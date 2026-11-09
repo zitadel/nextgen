@@ -4,6 +4,7 @@ import {
   e2eActionTimeouts,
   e2eTimeouts,
   e2eTrace,
+  reuseExistingServer,
   workspaceRoot,
 } from "../playwright.shared";
 
@@ -55,7 +56,7 @@ export default defineConfig({
     {
       command: "node .output/server/index.mjs",
       url: "http://localhost:3001/login",
-      reuseExistingServer: true,
+      reuseExistingServer,
       cwd: `${workspaceRoot}/apps/demo-nuxt`,
       stdout: "pipe",
       stderr: "pipe",

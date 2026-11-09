@@ -200,7 +200,10 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - The console and demo lanes and `@zitadel/testing#test:integration` are
   cached: they boot servers and browsers, but only on the repo's own builds,
   so a later push that leaves their inputs alone restores their pass instead
-  of rerunning them.
+  of rerunning them. Their key holds the switches that change what they test
+  (`env`: `ZITADEL_*`, `NEXTGEN_*`, the lanes' ports), and as a turbo task a
+  lane never uses a server already on its port (`e2e/playwright.shared.ts`),
+  so a stored pass is the hashed tree's.
 - Each journey depends on the builds of exactly what it installs
   (`journey-packages` plus its framework's SDK), and packs only those; so an
   SDK change selects only the journeys that install it.

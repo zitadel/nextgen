@@ -7,10 +7,13 @@
     // which no longer fit side by side). The lanes boot real servers and
     // browsers. The console and demo lanes test only the repo's own builds,
     // so they are cached by what they hash: a push that leaves those alone
-    // restores their pass. The deployment lanes and the journeys reach
-    // outside the repo (a deployment, scaffolders' latest releases) and are
-    // not. Each passes through the switches the Playwright configs and the
-    // journey runner read.
+    // restores their pass. Their key also holds the switches that change
+    // what they test (`env`: another server binary, a server setting, a
+    // lane's port), and as turbo tasks they never use a server already on
+    // their port (playwright.shared.ts), so a pass is only ever the hashed
+    // tree's. The deployment lanes and the journeys reach outside the repo (a
+    // deployment, scaffolders' latest releases) and are not cached: they pass
+    // the switches through.
     //
     // `test` is the journey harness's unit tests. There is no `all` lane: a
     // `turbo run` names the lanes it runs. Each lane hashes, through its base
@@ -21,8 +24,9 @@
     // mutex in package.json (both serve the demo on :3002).
     // The packed-CLI helpers and the journey's registry scripts import the
     // root release scripts; the harness's unit tests (`test`) also read the
-    // CLI's skill and the router skill, the mock OIDC provider's users and the
-    // built-in schemas.
+    // CLI's skill and the router skill, the mock OIDC provider's users, the
+    // built-in schemas and the manifests of the packages a journey installs
+    // (frameworks.test.mjs derives each journey's edges from them).
     "typecheck": {
       "dependsOn": ["@zitadel/testing#build"],
       "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/scripts/*.d.mts"]
@@ -34,7 +38,8 @@
         "$TURBO_ROOT$/apps/cli/skills/**",
         "$TURBO_ROOT$/skills/zitadel/**",
         "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/{apps,packages}/*/package.json"
       ]
     },
     // Each lane writes its reports into its own folder.
@@ -114,7 +119,8 @@
     "console-smoke": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "@zitadel/console#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The three real-instance console lanes. The ports (8093, 8095, 8097) and
     // the binary path are the Playwright configs' defaults; the scripts set
@@ -122,17 +128,20 @@
     "console-real": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "real-instance"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "console-embedded": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "real-instance"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "console-platform": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "real-instance"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The hosted cloud's console on a deployment, which CLOUD_URL names
     // (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection); the root's
@@ -189,7 +198,8 @@
     "demo-next-mock": {
       "inputs": ["package.json"],
       "dependsOn": ["demo-next-base", "@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The same journey against a real ephemeral instance seeded via
     // @zitadel/testing. The script keeps the server-hosted UIs and the platform
@@ -197,7 +207,8 @@
     "demo-next-real": {
       "inputs": ["package.json"],
       "dependsOn": ["demo-next-base", "real-instance"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "demo-nuxt-mock": {
       "inputs": [
@@ -218,7 +229,8 @@
       ],
       // It serves the demo's production build (`.output/`).
       "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/demo-nuxt#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The journey runner with caller-supplied flags (`turbo run journey
     // --filter=@zitadel/e2e -- <flags>`); the script defaults

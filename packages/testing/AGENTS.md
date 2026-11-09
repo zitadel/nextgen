@@ -102,3 +102,5 @@ Test credentials come from the kit's boot contract, never from the server
 - Run a lane with `turbo run <lane> --filter=@zitadel/e2e`.
 - Run one turbo invocation of the lanes at a time: two collide on their fixed
   ports. `pnpm run cli -- stop --all` sweeps the runtimes an aborted run left.
+- A mock lane turbo runs fails on a taken port; stop what holds it. Only a
+  direct `playwright test --config …` uses a server you started by hand.
