@@ -167,7 +167,9 @@ export default class Deploy extends EnvironmentCommand {
     // so a project with none fails before the IdP step writes part of a
     // change. A dry run never reaches the deploy, so it is exempt.
     const publisher = new Publisher(client, projectId);
-    const landing = this.dryRun ? [] : await this.primaryOrigins(publisher, projectId, environment);
+    if (!this.dryRun) {
+      await this.requirePrimaryOrigin(publisher, projectId, environment);
+    }
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -216,7 +218,6 @@ export default class Deploy extends EnvironmentCommand {
     const { release, publication } = await publisher.deploy({
       prepared,
       message,
-      landing,
     });
     switch (publication.outcome) {
       case "revoked":
@@ -282,18 +283,17 @@ export default class Deploy extends EnvironmentCommand {
   }
 
   /**
-   * The primary origins this deploy lands on, refusing a project with none and
-   * naming the step that gives it one.
+   * Refuses a project with no primary origin, naming the step that gives it
+   * one.
    */
-  private async primaryOrigins(
+  private async requirePrimaryOrigin(
     publisher: Publisher,
     projectId: string,
     environment: Connection["environment"],
-  ): Promise<readonly string[]> {
+  ): Promise<void> {
     const origins = await publisher.landing();
-    const landing = origins.primary;
-    if (landing.length > 0) {
-      return landing;
+    if (origins.primary.length > 0) {
+      return;
     }
     const setupProject = await readZitadelSecret(this.cwd).then(
       (secret) => {

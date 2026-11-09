@@ -66,8 +66,6 @@ export type ReleaseRequest = Readonly<{
 export type DeployRequest = Readonly<{
   prepared: PreparedRelease;
   message?: string;
-  /** The primary origins the deploy lands on, which decide the concurrency guard. */
-  landing: readonly string[];
 }>;
 
 /** The release a deploy created, and what deploying it came to. */
@@ -217,7 +215,6 @@ export class Publisher {
     const release = await this.createRelease(request);
     const publication = await this.deployments.deployToPrimary({
       releaseId: release.id,
-      landing: request.landing,
       message: request.message,
     });
     return {
