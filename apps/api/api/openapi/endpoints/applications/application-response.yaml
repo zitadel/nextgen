@@ -1,0 +1,47 @@
+type: object
+description: |
+  An application at its newest revision, with its document as `definition`.
+  It never carries a client secret.
+required:
+  - id
+  - revision_id
+  - slug
+  - definition
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    description: |
+      A unique ID, generated when the application is created and shared by
+      every revision.
+    example: app_01KWH3B72K7M7F0N9WD3P2E4YM
+  revision_id:
+    type: string
+    description: |
+      The ID of the revision this entry holds. `getApplicationById`
+      (`GET /applications/{id}`) returns the newest one.
+    example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
+  slug:
+    type: string
+    description: |
+      The identifier by which other documents reference the application.
+      Fixed for the life of the application.
+    example: shop
+  created_at:
+    type: string
+    format: date-time
+    description: When the application was created.
+    example: '2026-11-06T09:11:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: |
+      When this revision was created. On the newest revision, that is when
+      the application was last revised.
+    example: '2026-11-06T09:11:00Z'
+  definition:
+    $ref: ../schemas/application.yaml
+    description: |
+      The stored application document, with each client's `client_id`. It
+      never carries a secret.

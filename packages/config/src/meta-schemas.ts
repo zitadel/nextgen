@@ -15,6 +15,7 @@
  * reads that file, so its schema is written by hand here
  * (`project-config.schema.json`) and never reaches the server.
  */
+import applicationMetaSchema from "../meta-schemas/application.json" with { type: "json" };
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
@@ -79,6 +80,7 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "auth-method.json", body: authMethodMetaSchema as object },
     { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
+    { name: "application.json", body: applicationMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
     { name: "policy.json", body: policyMetaSchema as object },
     { name: "policy-test.json", body: policyTestMetaSchema as object },

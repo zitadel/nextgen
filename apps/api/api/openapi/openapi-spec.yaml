@@ -78,6 +78,12 @@ tags:
       its slug from user schemas and flow definitions. These operations create
       or revise a connection, query connections, read one by ID, and read its
       revisions. A slug resolves through the query.
+  - name: Applications
+    description: |
+      Applications authenticate their users via Zitadel, each through its
+      OAuth clients. A registered application is written through the API as
+      one revisioned document. These operations create or revise a registered
+      application and read one by ID.
   - name: Policies
     description: |
       A policy holds the settings an operation is checked against, such as a
@@ -261,6 +267,10 @@ paths:
     $ref: endpoints/idps/by_id/revisions/methods.yaml
   /idps/revisions/{revision_id}:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
+  /applications:
+    $ref: endpoints/applications/methods.yaml
+  /applications/{id}:
+    $ref: endpoints/applications/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
   /policies/evaluate:
