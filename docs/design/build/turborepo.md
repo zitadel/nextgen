@@ -232,7 +232,7 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
   are hashed (`CONSOLE_ADDON`, `GOFLAGS`, the cached e2e lanes' `ZITADEL_*`
-  and `NEXTGEN_*`); `passThroughEnv`
+  and `NEXTGEN_*`, the journeys' `JOURNEY_*` but `JOURNEY_WORK_DIR`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
   (`PLAYWRIGHT_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
@@ -314,9 +314,9 @@ cache key of every task in the run
 ([vercel/turborepo#14770](https://github.com/vercel/turborepo/issues/14770),
 by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
-environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
-for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
-runner (`e2e/journey/README.md`).
+environment: `RELEASE_SKIP_CONTAINER=1` for the release snapshot
+(`passThroughEnv`), `JOURNEY_RUNTIME`, `JOURNEY_MATRIX`, … for the journey
+runner (`e2e/journey/README.md`; `env` on the cached journeys).
 
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the

@@ -9,8 +9,8 @@
     // own builds (a journey runs the framework CLIs at the CLI's pins), so
     // they are cached by what they hash: a push that leaves those alone
     // restores their pass. The deployment lanes test a deployment and are
-    // not. Each passes through the switches the Playwright configs and the
-    // journey runner read.
+    // not. A cached lane hashes the switches the Playwright configs and the
+    // journey runner read; an uncached one passes them through.
     //
     // `test` is the journey harness's unit tests. There is no `all` lane: a
     // `turbo run` names the lanes it runs. Each lane hashes, through its base
@@ -260,6 +260,9 @@
     // build they depend on holds the framework CLI pins, and only the npm
     // ranges those releases write resolve at run time, as in a customer's
     // app; the nightly run (TURBO_FORCE, ci.yml) reruns them on that day's npm.
+    // Their key holds the switches, as the cached lanes' does, and the
+    // JOURNEY_* ones too (another runtime, image or tarball set), less
+    // JOURNEY_WORK_DIR, which moves where a journey writes and is CI's own.
     "journey-packages": {
       "inputs": ["package.json"],
       "dependsOn": ["@zitadel/api#build", "@zitadel/cli#build", "@zitadel/components#build", "@zitadel/config#build", "@zitadel/sdk-core#build", "@zitadel/server-darwin-arm64#build-binary", "@zitadel/server-darwin-x64#build-binary", "@zitadel/server-linux-arm64#build-binary", "@zitadel/server-linux-x64#build-binary", "@zitadel/server-win32-x64#build-binary"]
@@ -272,67 +275,80 @@
     "journey:next": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:nuxt": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:react": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-react#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:vue": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-vue#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:angular": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-angular#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:solid": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-solid#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:svelte": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-svelte#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:qwik": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-qwik#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:passkey": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:preexisting-next": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:preexisting-nuxt": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:testkit": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build", "@zitadel/testing#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:remote": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-react#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     }
   }
 }

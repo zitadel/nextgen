@@ -70,6 +70,8 @@ the repo root.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.
+- `JOURNEY_*` is in the cached journeys' key; exclude a variable that only
+  moves where a run writes, as `!JOURNEY_WORK_DIR` (`e2e/turbo.json`).
 - Keep each framework suite Playwright-serial with one worker. Suites run in
   parallel only with their own app directory, npm cache and tmp directories,
   app port, Zitadel port and runtime state.
