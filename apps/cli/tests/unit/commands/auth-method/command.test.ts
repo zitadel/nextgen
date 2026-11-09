@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
@@ -14,6 +14,7 @@ import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { ZitadelError } from "@/lib/errors";
 import { type Change, UserSchema } from "@/lib/zitadel";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
+import { it } from "@tests/helpers/fixtures";
 import {
   defaultSchema,
   makeProject,
@@ -51,10 +52,11 @@ const NEW_SCHEMA_FILE = ".zitadel/schemas/employees.json";
  * A Project whose only enabled method is passkey, with no flows to stop the
  * change.
  *
+ * @param dir - The directory to write the Project into.
  * @returns The Project's directory.
  */
-function aPasskeyOnlyProject(): Promise<string> {
-  return makeProject({
+function aPasskeyOnlyProject(dir: string): Promise<string> {
+  return makeProject(dir, {
     schemas: {
       "default-human-user": aSchema({ password: { enabled: false }, passkey: { enabled: true } }),
     },
@@ -64,10 +66,11 @@ function aPasskeyOnlyProject(): Promise<string> {
 /**
  * A Project whose only way to sign in is Google.
  *
+ * @param dir - The directory to write the Project into.
  * @returns The Project's directory.
  */
-function aGoogleOnlyProject(): Promise<string> {
-  return makeProject({
+function aGoogleOnlyProject(dir: string): Promise<string> {
+  return makeProject(dir, {
     schemas: {
       "default-human-user": aSchema({
         password: { enabled: false },
@@ -163,8 +166,8 @@ beforeEach(() => {
 
 describe("AuthMethodCommand", () => {
   describe("when disabling passkey would leave no way to sign in", () => {
-    it("asks once before going on", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("asks once before going on", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(false);
 
       await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
@@ -174,8 +177,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when disabling Google would leave no way to sign in", () => {
-    it("asks, naming the provider and the schema", async () => {
-      const cwd = await aGoogleOnlyProject();
+    it("asks, naming the provider and the schema", async ({ dir }) => {
+      const cwd = await aGoogleOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(false);
 
       await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
@@ -189,8 +192,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when the person declines to disable passkey", () => {
-    it("ends as skipped", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("ends as skipped", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(false);
 
       const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
@@ -198,8 +201,8 @@ describe("AuthMethodCommand", () => {
       expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
     });
 
-    it("leaves passkey enabled", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("leaves passkey enabled", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(false);
 
       await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
@@ -211,8 +214,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when the person confirms disabling passkey", () => {
-    it("ends ok, warning that nobody can sign in", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("ends ok, warning that nobody can sign in", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(true);
 
       const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
@@ -220,8 +223,8 @@ describe("AuthMethodCommand", () => {
       expect(envelope).toMatchObject({ status: "ok", warnings: [NO_WAY_TO_SIGN_IN] });
     });
 
-    it("disables passkey", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("disables passkey", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(true);
 
       await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
@@ -233,8 +236,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when the person declines to disable Google", () => {
-    it("ends as skipped", async () => {
-      const cwd = await aGoogleOnlyProject();
+    it("ends as skipped", async ({ dir }) => {
+      const cwd = await aGoogleOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(false);
 
       const envelope = await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
@@ -242,8 +245,8 @@ describe("AuthMethodCommand", () => {
       expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
     });
 
-    it("leaves Google enabled", async () => {
-      const cwd = await aGoogleOnlyProject();
+    it("leaves Google enabled", async ({ dir }) => {
+      const cwd = await aGoogleOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(false);
 
       await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
@@ -256,8 +259,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when the person confirms disabling Google", () => {
-    it("ends ok, warning that nobody can sign in", async () => {
-      const cwd = await aGoogleOnlyProject();
+    it("ends ok, warning that nobody can sign in", async ({ dir }) => {
+      const cwd = await aGoogleOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(true);
 
       const envelope = await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
@@ -265,8 +268,8 @@ describe("AuthMethodCommand", () => {
       expect(envelope).toMatchObject({ status: "ok", warnings: [NO_WAY_TO_SIGN_IN] });
     });
 
-    it("removes the provider", async () => {
-      const cwd = await aGoogleOnlyProject();
+    it("removes the provider", async ({ dir }) => {
+      const cwd = await aGoogleOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(true);
 
       await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
@@ -278,8 +281,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when the person cancels the question with Ctrl-C", () => {
-    it("fails with the exit code of every cancelled prompt", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("fails with the exit code of every cancelled prompt", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
@@ -291,8 +294,8 @@ describe("AuthMethodCommand", () => {
       expect(error).toMatchObject({ oclif: { exit: CANCELLED } });
     });
 
-    it("says it was cancelled", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("says it was cancelled", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
@@ -303,8 +306,8 @@ describe("AuthMethodCommand", () => {
       expect(cancel).toHaveBeenCalledWith("Cancelled.");
     });
 
-    it("leaves passkey enabled", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("leaves passkey enabled", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
@@ -319,16 +322,16 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("with --dry-run at a terminal", () => {
-    it("does not ask", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("does not ask", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
 
       await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
 
       expect(confirm).not.toHaveBeenCalled();
     });
 
-    it("previews the change and warns, rather than refusing", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("previews the change and warns, rather than refusing", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
 
       const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
 
@@ -339,8 +342,8 @@ describe("AuthMethodCommand", () => {
       });
     });
 
-    it("leaves passkey enabled", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("leaves passkey enabled", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
 
       await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
 
@@ -351,16 +354,16 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("with --force at a terminal", () => {
-    it("does not ask", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("does not ask", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
 
       await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
 
       expect(confirm).not.toHaveBeenCalled();
     });
 
-    it("ends ok", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("ends ok", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
 
       const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
 
@@ -369,8 +372,8 @@ describe("AuthMethodCommand", () => {
   });
 
   describe("when run from inside the Project", () => {
-    it("suggests a dry run and a deploy without --cwd", async () => {
-      const cwd = await aPasskeyOnlyProject();
+    it("suggests a dry run and a deploy without --cwd", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
       await writeJson(
         cwd,
         SCHEMA_FILE,
@@ -396,8 +399,8 @@ describe("AuthMethodCommand", () => {
 });
 
 describe("AuthMethodCommand.write", () => {
-  it("says it wrote a file the change creates", async () => {
-    const cwd = await aPasskeyOnlyProject();
+  it("says it wrote a file the change creates", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
     const success = vi.spyOn(consola, "success").mockImplementation(() => {
@@ -409,8 +412,8 @@ describe("AuthMethodCommand.write", () => {
     expect(success).toHaveBeenCalledWith(`Wrote ${NEW_SCHEMA_FILE}`);
   });
 
-  it("says it updated a file the change edits", async () => {
-    const cwd = await aPasskeyOnlyProject();
+  it("says it updated a file the change edits", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
     const success = vi.spyOn(consola, "success").mockImplementation(() => {
@@ -422,8 +425,8 @@ describe("AuthMethodCommand.write", () => {
     expect(success).toHaveBeenCalledWith(`Updated ${SCHEMA_FILE}`);
   });
 
-  it("writes the change to the Project", async () => {
-    const cwd = await aPasskeyOnlyProject();
+  it("writes the change to the Project", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
 
@@ -434,8 +437,8 @@ describe("AuthMethodCommand.write", () => {
     });
   });
 
-  it("returns the paths it wrote", async () => {
-    const cwd = await aPasskeyOnlyProject();
+  it("returns the paths it wrote", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
 
@@ -444,8 +447,8 @@ describe("AuthMethodCommand.write", () => {
     expect(written).toEqual([NEW_SCHEMA_FILE]);
   });
 
-  it("says nothing for a change that writes nothing", async () => {
-    const cwd = await aPasskeyOnlyProject();
+  it("says nothing for a change that writes nothing", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
     const success = vi.spyOn(consola, "success").mockImplementation(() => {
@@ -460,16 +463,16 @@ describe("AuthMethodCommand.write", () => {
 
 describe("readSchemaTarget", () => {
   describe("with one schema", () => {
-    it("finds it, with no --cwd for the follow-ups", async () => {
-      const cwd = await setUpProject();
+    it("finds it, with no --cwd for the follow-ups", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
 
       const read = await target(cwd);
 
       expect(read).toMatchObject({ schema: { name: "default-human-user" }, cwdArgs: [] });
     });
 
-    it("carries --cwd into the follow-ups when the run had one", async () => {
-      const cwd = await setUpProject();
+    it("carries --cwd into the follow-ups when the run had one", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
 
       const read = await target(cwd, { cwdGiven: true });
 
@@ -478,16 +481,18 @@ describe("readSchemaTarget", () => {
   });
 
   describe("with more than one schema", () => {
-    it("chooses the one --schema names", async () => {
-      const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
+    it("chooses the one --schema names", async ({ dir }) => {
+      const cwd = await setUpProject(dir, { customers: defaultSchema, employees: defaultSchema });
 
       const read = await target(cwd, { schema: "employees" });
 
       expect(read).toMatchObject({ schema: { name: "employees" } });
     });
 
-    it("chooses the one whose objectType --schema names, as a flow's user_schema does", async () => {
-      const cwd = await setUpProject({
+    it("chooses the one whose objectType --schema names, as a flow's user_schema does", async ({
+      dir,
+    }) => {
+      const cwd = await setUpProject(dir, {
         customers: { ...defaultSchema, objectType: "customer" },
         employees: { ...defaultSchema, objectType: "employee" },
       });
@@ -497,8 +502,8 @@ describe("readSchemaTarget", () => {
       expect(read).toMatchObject({ schema: { name: "employees" } });
     });
 
-    it("refuses a Project with none named", async () => {
-      const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
+    it("refuses a Project with none named", async ({ dir }) => {
+      const cwd = await setUpProject(dir, { customers: defaultSchema, employees: defaultSchema });
 
       const error = await rejectionOf(() => {
         return target(cwd);
@@ -522,8 +527,8 @@ describe("readSchemaTarget", () => {
       "human-user": { ...defaultSchema, objectType: "staff" },
     };
 
-    it("refuses that name, suggesting each schema by its file", async () => {
-      const cwd = await setUpProject(AMBIGUOUS);
+    it("refuses that name, suggesting each schema by its file", async ({ dir }) => {
+      const cwd = await setUpProject(dir, AMBIGUOUS);
 
       const error = await rejectionOf(() => {
         return target(cwd, { schema: "human-user" });
@@ -539,16 +544,16 @@ describe("readSchemaTarget", () => {
       });
     });
 
-    it("chooses the schema that name is the file of, given with .json", async () => {
-      const cwd = await setUpProject(AMBIGUOUS);
+    it("chooses the schema that name is the file of, given with .json", async ({ dir }) => {
+      const cwd = await setUpProject(dir, AMBIGUOUS);
 
       const read = await target(cwd, { schema: "human-user.json" });
 
       expect(read).toMatchObject({ schema: { name: "human-user" }, schemaFlag: "human-user.json" });
     });
 
-    it("names the other schema by its file alone, which is unambiguous", async () => {
-      const cwd = await setUpProject(AMBIGUOUS);
+    it("names the other schema by its file alone, which is unambiguous", async ({ dir }) => {
+      const cwd = await setUpProject(dir, AMBIGUOUS);
 
       const read = await target(cwd, { schema: "default-human-user" });
 
@@ -565,8 +570,8 @@ describe("readSchemaTarget", () => {
       employees: { ...defaultSchema, objectType: "employees" },
     };
 
-    it("lists each by file and objectType when none is named", async () => {
-      const cwd = await setUpProject(TYPED);
+    it("lists each by file and objectType when none is named", async ({ dir }) => {
+      const cwd = await setUpProject(dir, TYPED);
 
       const error = await rejectionOf(() => {
         return target(cwd);
@@ -580,8 +585,8 @@ describe("readSchemaTarget", () => {
       });
     });
 
-    it("lists each by file and objectType when the named one does not exist", async () => {
-      const cwd = await setUpProject(TYPED);
+    it("lists each by file and objectType when the named one does not exist", async ({ dir }) => {
+      const cwd = await setUpProject(dir, TYPED);
 
       const error = await rejectionOf(() => {
         return target(cwd, { schema: "staff" });
@@ -604,8 +609,8 @@ describe("readSchemaTarget", () => {
   });
 
   describe("with no schema", () => {
-    it("refuses the Project", async () => {
-      const cwd = await makeProject();
+    it("refuses the Project", async ({ dir }) => {
+      const cwd = await makeProject(dir);
 
       const error = await rejectionOf(() => {
         return target(cwd);
@@ -617,8 +622,8 @@ describe("readSchemaTarget", () => {
   });
 
   describe("with a schema that points at an external url", () => {
-    it("refuses it, naming the file and the url", async () => {
-      const cwd = await makeProject({
+    it("refuses it, naming the file and the url", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
         schemas: {
           remote: { kind: "schema-url", url: "https://schemas.test.invalid/remote.json" },
         },
@@ -641,8 +646,8 @@ describe("readSchemaTarget", () => {
   });
 
   describe("with a state file", () => {
-    it("finds the flows that name the schema by the id it was published as", async () => {
-      const cwd = await makeProject({
+    it("finds the flows that name the schema by the id it was published as", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
         schemas: { customers: { ...defaultSchema, $id: "https://a.test/customers.json" } },
         flows: { login: { name: "login", user_schema: "sch_PUBLISHED" } },
       });
@@ -657,8 +662,8 @@ describe("readSchemaTarget", () => {
       ]);
     });
 
-    it("refuses one it cannot read rather than guess the schema's flows", async () => {
-      const cwd = await makeProject({ schemas: { customers: defaultSchema } });
+    it("refuses one it cannot read rather than guess the schema's flows", async ({ dir }) => {
+      const cwd = await makeProject(dir, { schemas: { customers: defaultSchema } });
       await writeJson(cwd, ".zitadel/state.json", { resources: [] });
 
       const error = await rejectionOf(() => {

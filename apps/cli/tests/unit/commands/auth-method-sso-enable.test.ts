@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { describe, expect, vi } from "vitest";
 
+import type { JsonObject } from "@/lib/zitadel";
 import {
   authMethodJson,
   authMethodText,
@@ -12,8 +13,9 @@ import {
   SCHEMA_FILE,
   schemaIdOf,
 } from "@tests/helpers/auth-method";
-import { aGoogleConnection } from "@tests/helpers/config";
+import { aGoogleConnection, type DocumentsByName } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
+import { withStep } from "@tests/helpers/flows";
 import {
   defaultSchema,
   loginFlow,
@@ -97,25 +99,28 @@ const CHANGED = [SCHEMA_FILE, LOGIN_FLOW_FILE, CONNECTION_FILE];
  * A Project as `zitadel setup` leaves it, each schema carrying the `$id` its
  * login flow names it by.
  *
+ * @param dir - The directory to write the Project into.
  * @param schemas - The schemas, by file name without `.json`.
  * @returns The Project's directory.
  */
 function aProject(
-  schemas: Record<string, object> = { "default-human-user": defaultSchema },
+  dir: string,
+  schemas: DocumentsByName = { "default-human-user": defaultSchema },
 ): Promise<string> {
   const named = Object.entries(schemas).map(([name, body]) => {
     return [name, { $id: schemaIdOf(name), ...body }];
   });
-  return setUpProject(Object.fromEntries(named));
+  return setUpProject(dir, Object.fromEntries(named));
 }
 
 /**
  * A Project where Google was already enabled with {@link CLIENT_ID}.
  *
+ * @param dir - The directory to write the Project into.
  * @returns The Project's directory.
  */
-async function aProjectWithGoogle(): Promise<string> {
-  const cwd = await aProject();
+async function aProjectWithGoogle(dir: string): Promise<string> {
+  const cwd = await aProject(dir);
   await withStdin(SECRET, () => {
     return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
   });
@@ -133,35 +138,46 @@ const EDITED_PASSWORD_STEP = {
 };
 
 /**
- * A Project whose login flow has {@link EDITED_PASSWORD_STEP} before its last
- * step, reached from the identifier step so the flow validates.
+ * A Project whose login flow has {@link EDITED_PASSWORD_STEP} in place of its
+ * password step.
  *
+ * @param dir - The directory to write the Project into.
  * @returns The Project's directory.
  */
-async function aProjectWithAnEditedPasswordStep(): Promise<string> {
-  const cwd = await aProject();
-  const flow = loginFlow("default-human-user");
-  const steps = flow.steps.map((step) => {
-    if (step.name !== "identifier" || !("transitions" in step)) {
-      return step;
-    }
-    return { ...step, transitions: { ...step.transitions, submit: { target: "password" } } };
-  });
-  await writeJson(cwd, LOGIN_FLOW_FILE, {
-    ...flow,
-    steps: [...steps.slice(0, -1), EDITED_PASSWORD_STEP, ...steps.slice(-1)],
-  });
+async function aProjectWithAnEditedPasswordStep(dir: string): Promise<string> {
+  const cwd = await aProject(dir);
+  await writeJson(
+    cwd,
+    LOGIN_FLOW_FILE,
+    withStep(loginFlow("default-human-user"), "password", () => {
+      return EDITED_PASSWORD_STEP;
+    }),
+  );
   return cwd;
+}
+
+/**
+ * A step that collects the staff number in place of the email.
+ *
+ * @param step - The step.
+ * @returns The step, collecting `staffNumber` alone.
+ */
+function collectingStaffNumber(step: JsonObject): JsonObject {
+  return { ...step, fields: ["staffNumber"] };
 }
 
 /**
  * A Project holding a Google connection someone wrote by hand.
  *
+ * @param dir - The directory to write the Project into.
  * @param oidc - The `oidc` keys the hand-written connection holds.
  * @returns The Project's directory.
  */
-async function aProjectWithAHandWrittenConnection(oidc: Record<string, string>): Promise<string> {
-  const cwd = await aProject();
+async function aProjectWithAHandWrittenConnection(
+  dir: string,
+  oidc: Record<string, string>,
+): Promise<string> {
+  const cwd = await aProject(dir);
   await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
   await writeJson(cwd, CONNECTION_FILE, aGoogleConnection({ oidc }));
   return cwd;
@@ -188,8 +204,8 @@ function refusePublishes(): void {
 
 describe("auth-method sso enable", () => {
   describe("with a Project as setup leaves it", () => {
-    it("reports the connection it created", async () => {
-      const cwd = await aProject();
+    it("reports the connection it created", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -201,8 +217,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("reports the callback URI to register", async () => {
-      const cwd = await aProject();
+    it("reports the callback URI to register", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -211,8 +227,8 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ data: { callback_uri: CALLBACK_URI } });
     });
 
-    it("lists the files it changed", async () => {
-      const cwd = await aProject();
+    it("lists the files it changed", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -221,21 +237,24 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ data: { changed: CHANGED } });
     });
 
-    it.each([
+    it.for([
       ["client_id", "${{ GOOGLE_CLIENT_ID }}"],
       ["client_secret", "${{ GOOGLE_CLIENT_SECRET }}"],
-    ])("writes the %s as a reference to a project variable", async (key, reference) => {
-      const cwd = await aProject();
+    ] as const)(
+      "writes the %s as a reference to a project variable",
+      async ([key, reference], { dir }) => {
+        const cwd = await aProject(dir);
 
-      await withStdin(SECRET, () => {
-        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
-      });
+        await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+        });
 
-      expect(await readJson(cwd, CONNECTION_FILE)).toMatchObject({ oidc: { [key]: reference } });
-    });
+        expect(await readJson(cwd, CONNECTION_FILE)).toMatchObject({ oidc: { [key]: reference } });
+      },
+    );
 
-    it("maps only the claims the schema defines", async () => {
-      const cwd = await aProject();
+    it("maps only the claims the schema defines", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -244,8 +263,8 @@ describe("auth-method sso enable", () => {
       expect((await readJson(cwd, CONNECTION_FILE)).claim_mapping).toEqual({ email: "email" });
     });
 
-    it("writes the vendor's own issuer", async () => {
-      const cwd = await aProject();
+    it("writes the vendor's own issuer", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -256,10 +275,10 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it.each(["authorization_endpoint", "token_endpoint"])(
+    it.for(["authorization_endpoint", "token_endpoint"])(
       "writes no %s, leaving it to the vendor's discovery document",
-      async (endpoint) => {
-        const cwd = await aProject();
+      async (endpoint, { dir }) => {
+        const cwd = await aProject(dir);
 
         await withStdin(SECRET, () => {
           return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -269,8 +288,8 @@ describe("auth-method sso enable", () => {
       },
     );
 
-    it("stores the piped secret on the project", async () => {
-      const cwd = await aProject();
+    it("stores the piped secret on the project", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -281,8 +300,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("writes the secret to no file in the Project", async () => {
-      const cwd = await aProject();
+    it("writes the secret to no file in the Project", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -291,8 +310,8 @@ describe("auth-method sso enable", () => {
       expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain(SECRET);
     });
 
-    it.each(["stdout", "stderr"] as const)("keeps the secret out of %s", async (stream) => {
-      const cwd = await aProject();
+    it.for(["stdout", "stderr"] as const)("keeps the secret out of %s", async (stream, { dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -301,8 +320,8 @@ describe("auth-method sso enable", () => {
       expect(result[stream]).not.toContain(SECRET);
     });
 
-    it("suggests a dry run and a deploy, each with --cwd", async () => {
-      const cwd = await aProject();
+    it("suggests a dry run and a deploy, each with --cwd", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -318,13 +337,13 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it.each([
+    it.for([
       ["a run", []],
       ["a dry run", ["--dry-run"]],
-    ])(
+    ] as const)(
       "names the project it changes on %s, since --json prints no line naming it",
-      async (_, mode) => {
-        const cwd = await aProject();
+      async ([_, mode], { dir }) => {
+        const cwd = await aProject(dir);
 
         const result = await withStdin(SECRET, () => {
           return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, ...mode));
@@ -334,12 +353,12 @@ describe("auth-method sso enable", () => {
       },
     );
 
-    it.each([
+    it.for([
       "Google sign-in is configured locally. Provider credentials are stored on your Project.",
       "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
       `  $ ${expectedPublicCliCommand("deploy --dry-run")}`,
-    ])("says %s", async (line) => {
-      const cwd = await aProject();
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -350,8 +369,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when publishing the credentials fails", () => {
-    it("says the provider is configured locally", async () => {
-      const cwd = await aProject();
+    it("says the provider is configured locally", async ({ dir }) => {
+      const cwd = await aProject(dir);
       refusePublishes();
 
       const result = await withStdin(SECRET, () => {
@@ -361,8 +380,8 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).toContain("Google sign-in is configured locally.");
     });
 
-    it("does not say the credentials are stored", async () => {
-      const cwd = await aProject();
+    it("does not say the credentials are stored", async ({ dir }) => {
+      const cwd = await aProject(dir);
       refusePublishes();
 
       const result = await withStdin(SECRET, () => {
@@ -372,8 +391,8 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).not.toContain("stored on your Project");
     });
 
-    it("reports the secret the project never received", async () => {
-      const cwd = await aProject();
+    it("reports the secret the project never received", async ({ dir }) => {
+      const cwd = await aProject(dir);
       refusePublishes();
 
       const result = await withStdin(SECRET, () => {
@@ -386,8 +405,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("suggests the command that publishes the secret again", async () => {
-      const cwd = await aProject();
+    it("suggests the command that publishes the secret again", async ({ dir }) => {
+      const cwd = await aProject(dir);
       refusePublishes();
 
       const result = await withStdin(SECRET, () => {
@@ -403,8 +422,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("renders every follow-up as a command an agent can run", async () => {
-      const cwd = await aProject();
+    it("renders every follow-up as a command an agent can run", async ({ dir }) => {
+      const cwd = await aProject(dir);
       refusePublishes();
 
       const result = await withStdin(SECRET, () => {
@@ -416,8 +435,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("suggests publishing the client id again first, with --cwd", async () => {
-      const cwd = await aProject();
+    it("suggests publishing the client id again first, with --cwd", async ({ dir }) => {
+      const cwd = await aProject(dir);
       refusePublishes();
 
       const result = await withStdin(SECRET, () => {
@@ -432,10 +451,10 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the password step was edited by hand", () => {
-    it.each(["Add google to its sso_providers", "user_already_exists to sso-conflict"])(
+    it.for(["Add google to its sso_providers", "user_already_exists to sso-conflict"])(
       "says %s",
-      async (line) => {
-        const cwd = await aProjectWithAnEditedPasswordStep();
+      async (line, { dir }) => {
+        const cwd = await aProjectWithAnEditedPasswordStep(dir);
 
         const result = await withStdin(SECRET, () => {
           return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -445,8 +464,8 @@ describe("auth-method sso enable", () => {
       },
     );
 
-    it("leaves the step alone, and says so once, by step name", async () => {
-      const cwd = await aProjectWithAnEditedPasswordStep();
+    it("leaves the step alone, and says so once, by step name", async ({ dir }) => {
+      const cwd = await aProjectWithAnEditedPasswordStep(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -465,8 +484,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("names the step on a dry run too", async () => {
-      const cwd = await aProjectWithAnEditedPasswordStep();
+    it("names the step on a dry run too", async ({ dir }) => {
+      const cwd = await aProjectWithAnEditedPasswordStep(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
@@ -479,8 +498,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when a method was enabled after the conflict step was written", () => {
-    it("reports no step as edited by hand", async () => {
-      const cwd = await aProject({
+    it("reports no step as edited by hand", async ({ dir }) => {
+      const cwd = await aProject(dir, {
         "default-human-user": {
           ...defaultSchema,
           "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
@@ -501,8 +520,8 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).not.toContain(HAND_EDITED);
     });
 
-    it("offers the newly enabled method on the conflict step", async () => {
-      const cwd = await aProject({
+    it("offers the newly enabled method on the conflict step", async ({ dir }) => {
+      const cwd = await aProject(dir, {
         "default-human-user": {
           ...defaultSchema,
           "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
@@ -532,11 +551,11 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a custom provider", () => {
-    it.each([
+    it.for([
       "Acme SSO sign-in is configured locally.",
       "then reload your app and test Acme SSO sign-in.",
-    ])("says %s", async (line) => {
-      const cwd = await aProject();
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
@@ -547,20 +566,16 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the schema defines nothing the provider maps", () => {
-    it("warns that the connection has no claim mapping", async () => {
-      const cwd = await aProject({
+    it("warns that the connection has no claim mapping", async ({ dir }) => {
+      const cwd = await aProject(dir, {
         "default-human-user": { ...defaultSchema, properties: { staffNumber: { type: "string" } } },
       });
-      const flow = loginFlow("default-human-user");
-      await writeJson(cwd, LOGIN_FLOW_FILE, {
-        ...flow,
-        steps: flow.steps.map((step) => {
-          if ("fields" in step) {
-            return { ...step, fields: ["staffNumber"] };
-          }
-          return step;
-        }),
-      });
+      const flow = withStep(
+        withStep(loginFlow("default-human-user"), "identifier", collectingStaffNumber),
+        "register",
+        collectingStaffNumber,
+      );
+      await writeJson(cwd, LOGIN_FLOW_FILE, flow);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
@@ -574,8 +589,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when rerun on a configured Project", () => {
-    it("reuses the connection", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("reuses the connection", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE));
@@ -586,8 +601,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("leaves the connection file as it was", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("leaves the connection file as it was", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
       const before = await readFile(join(cwd, CONNECTION_FILE), "utf8");
 
       await withStdin(SECRET, () => {
@@ -597,8 +612,10 @@ describe("auth-method sso enable", () => {
       expect(await readFile(join(cwd, CONNECTION_FILE), "utf8")).toBe(before);
     });
 
-    it("reuses the connection given the same client id, which the file only references", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("reuses the connection given the same client id, which the file only references", async ({
+      dir,
+    }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -610,8 +627,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("publishes a different client id rather than ignoring it", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("publishes a different client id rather than ignoring it", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", OTHER_CLIENT_ID));
@@ -623,8 +640,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("says the provider is already configured", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("says the provider is already configured", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
@@ -633,8 +650,8 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).toContain("Google sign-in is already configured locally.");
     });
 
-    it("does not offer a deploy, since nothing changed", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("does not offer a deploy, since nothing changed", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
@@ -643,8 +660,8 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).not.toContain("Deploy the configuration");
     });
 
-    it("prints the callback URI to register, without --json", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("prints the callback URI to register, without --json", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
@@ -655,21 +672,24 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with more than one schema", () => {
-    it.each(["customers", "employees"])("names the %s schema when none is chosen", async (name) => {
-      const cwd = await aProject({ customers: defaultSchema, employees: defaultSchema });
+    it.for(["customers", "employees"])(
+      "names the %s schema when none is chosen",
+      async (name, { dir }) => {
+        const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
 
-      const result = await withStdin(SECRET, () => {
-        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
-      });
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+        });
 
-      expect(parseJson(result.stdout)).toMatchObject({
-        status: "error",
-        hint: expect.stringContaining(name),
-      });
-    });
+        expect(parseJson(result.stdout)).toMatchObject({
+          status: "error",
+          hint: expect.stringContaining(name),
+        });
+      },
+    );
 
-    it("changes the schema --schema names", async () => {
-      const cwd = await aProject({ customers: defaultSchema, employees: defaultSchema });
+    it("changes the schema --schema names", async ({ dir }) => {
+      const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(
@@ -682,10 +702,10 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when a second schema is configured with the connection already on disk", () => {
-    it.each(["customers", "employees"])(
+    it.for(["customers", "employees"])(
       "enables the provider on the %s schema rather than reporting a no-op",
-      async (name) => {
-        const cwd = await aProject({ customers: defaultSchema, employees: defaultSchema });
+      async (name, { dir }) => {
+        const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
         await withStdin(SECRET, () => {
           return runCliForTest(
             authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--schema", "customers"),
@@ -702,10 +722,10 @@ describe("auth-method sso enable", () => {
       },
     );
 
-    it.each(["customers", "employees"])(
+    it.for(["customers", "employees"])(
       "offers the provider on the %s login flow's entry step",
-      async (name) => {
-        const cwd = await aProject({ customers: defaultSchema, employees: defaultSchema });
+      async (name, { dir }) => {
+        const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
         await withStdin(SECRET, () => {
           return runCliForTest(
             authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--schema", "customers"),
@@ -726,8 +746,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run", () => {
-    it("reports the run as skipped", async () => {
-      const cwd = await aProject();
+    it("reports the run as skipped", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
@@ -736,8 +756,8 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ status: "skipped" });
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
@@ -746,8 +766,8 @@ describe("auth-method sso enable", () => {
       expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
     });
 
-    it("lists the files it would change", async () => {
-      const cwd = await aProject();
+    it("lists the files it would change", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
@@ -756,8 +776,8 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ data: { changed: CHANGED } });
     });
 
-    it("lists the credentials it would store", async () => {
-      const cwd = await aProject();
+    it("lists the credentials it would store", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
@@ -770,7 +790,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run and no credentials", () => {
-    it.each([
+    it.for([
       "Google needs an OAuth application.",
       `Callback URI   ${CALLBACK_URI}`,
       "Create it at   https://console.cloud.google.com/apis/credentials",
@@ -778,16 +798,16 @@ describe("auth-method sso enable", () => {
       `Would write ${SCHEMA_FILE}`,
       `Would write ${LOGIN_FLOW_FILE}`,
       "Would store GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the project",
-    ])("says %s", async (line) => {
-      const cwd = await aProject();
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
 
       expect(result.stdout).toContain(line);
     });
 
-    it("publishes nothing", async () => {
-      const cwd = await aProject();
+    it("publishes nothing", async ({ dir }) => {
+      const cwd = await aProject(dir);
       const publish = vi.fn(() => {
         return HttpResponse.json({});
       });
@@ -798,8 +818,8 @@ describe("auth-method sso enable", () => {
       expect(publish).not.toHaveBeenCalled();
     });
 
-    it("leaves the schema as it was", async () => {
-      const cwd = await aProject();
+    it("leaves the schema as it was", async ({ dir }) => {
+      const cwd = await aProject(dir);
       const before = await readFile(join(cwd, SCHEMA_FILE), "utf8");
 
       await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
@@ -807,8 +827,8 @@ describe("auth-method sso enable", () => {
       expect(await readFile(join(cwd, SCHEMA_FILE), "utf8")).toBe(before);
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
 
@@ -817,10 +837,10 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run on a configured Project", () => {
-    it.each([`Callback URI   ${CALLBACK_URI}`, "Would store GOOGLE_CLIENT_ID on the project"])(
+    it.for([`Callback URI   ${CALLBACK_URI}`, "Would store GOOGLE_CLIENT_ID on the project"])(
       "says %s",
-      async (line) => {
-        const cwd = await aProjectWithGoogle();
+      async (line, { dir }) => {
+        const cwd = await aProjectWithGoogle(dir);
 
         const result = await withStdin(SECRET, () => {
           return runCliForTest(
@@ -832,10 +852,10 @@ describe("auth-method sso enable", () => {
       },
     );
 
-    it.each(["needs an OAuth application", `Would write ${CONNECTION_FILE}`])(
+    it.for(["needs an OAuth application", `Would write ${CONNECTION_FILE}`])(
       "does not say %s",
-      async (line) => {
-        const cwd = await aProjectWithGoogle();
+      async (line, { dir }) => {
+        const cwd = await aProjectWithGoogle(dir);
 
         const result = await withStdin(SECRET, () => {
           return runCliForTest(
@@ -847,8 +867,8 @@ describe("auth-method sso enable", () => {
       },
     );
 
-    it("would store only the credential it was given", async () => {
-      const cwd = await aProjectWithGoogle();
+    it("would store only the credential it was given", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(
@@ -863,21 +883,21 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run for a custom provider", () => {
-    it.each([
+    it.for([
       "Callback URI   http://localhost:3000/__nextgen/idp/acme-sso/callback",
       "Register it as a client at https://sso.acme.example, with the callback URI above.",
       "Would write .zitadel/idps/acme-sso.json",
       "Would store ACME_SSO_CLIENT_ID and ACME_SSO_CLIENT_SECRET on the project",
-    ])("says %s", async (line) => {
-      const cwd = await aProject();
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await runCliForTest(authMethodText(cwd, ...ACME, "--dry-run"));
 
       expect(result.stdout).toContain(line);
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await runCliForTest(authMethodText(cwd, ...ACME, "--dry-run"));
 
@@ -886,8 +906,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with no client id to ask for", () => {
-    it("refuses, naming --client-id", async () => {
-      const cwd = await aProject();
+    it("refuses, naming --client-id", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE));
@@ -899,8 +919,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("keeps the run's server in the retry it suggests", async () => {
-      const cwd = await aProject();
+    it("keeps the run's server in the retry it suggests", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(
@@ -919,8 +939,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a blank --client-id", () => {
-    it("refuses it rather than taking it as one", async () => {
-      const cwd = await aProject();
+    it("refuses it rather than taking it as one", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", "   "));
@@ -932,8 +952,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", "   "));
@@ -944,8 +964,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with no provider", () => {
-    it("refuses, naming the next move", async () => {
-      const cwd = await aProject();
+    it("refuses, naming the next move", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin(undefined, () => {
         return runCliForTest(["auth-method", "sso", "enable", "--cwd", cwd, "--json"]);
@@ -959,8 +979,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with nothing piped in", () => {
-    it("refuses, naming stdin", async () => {
-      const cwd = await aProject();
+    it("refuses, naming stdin", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       const result = await withStdin("", () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -972,8 +992,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
       await withStdin("", () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -984,8 +1004,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a hand-written connection", () => {
-    it("refuses a client id other than the literal one it holds", async () => {
-      const cwd = await aProjectWithAHandWrittenConnection({ client_id: "literal-one" });
+    it("refuses a client id other than the literal one it holds", async ({ dir }) => {
+      const cwd = await aProjectWithAHandWrittenConnection(dir, { client_id: "literal-one" });
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", "a-different-one"));
@@ -994,8 +1014,8 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION" });
     });
 
-    it("publishes to the variables the connection names", async () => {
-      const cwd = await aProjectWithAHandWrittenConnection({
+    it("publishes to the variables the connection names", async ({ dir }) => {
+      const cwd = await aProjectWithAHandWrittenConnection(dir, {
         client_id: "${{ ACME_GOOGLE_ID }}",
         client_secret: "${{ ACME_GOOGLE_SECRET }}",
       });
@@ -1015,8 +1035,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when an earlier run was interrupted after writing the connection", () => {
-    it("enables the provider on the schema", async () => {
-      const cwd = await aProjectWithAHandWrittenConnection({ client_id: "abc" });
+    it("enables the provider on the schema", async ({ dir }) => {
+      const cwd = await aProjectWithAHandWrittenConnection(dir, { client_id: "abc" });
 
       await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE));
@@ -1029,8 +1049,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when no login flow runs against the schema", () => {
-    it("refuses, naming where flows live", async () => {
-      const cwd = await aProject();
+    it("refuses, naming where flows live", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await rm(join(cwd, LOGIN_FLOW_FILE));
 
       const result = await withStdin(SECRET, () => {
@@ -1043,8 +1063,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("refuses a dry run for the same reason", async () => {
-      const cwd = await aProject();
+    it("refuses a dry run for the same reason", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await rm(join(cwd, LOGIN_FLOW_FILE));
 
       const result = await withStdin(SECRET, () => {
@@ -1054,8 +1074,8 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ code: "E_NOT_FOUND" });
     });
 
-    it("leaves the schema as it was", async () => {
-      const cwd = await aProject();
+    it("leaves the schema as it was", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await rm(join(cwd, LOGIN_FLOW_FILE));
       const before = await readFile(join(cwd, SCHEMA_FILE), "utf8");
 
@@ -1066,8 +1086,8 @@ describe("auth-method sso enable", () => {
       expect(await readFile(join(cwd, SCHEMA_FILE), "utf8")).toBe(before);
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await rm(join(cwd, LOGIN_FLOW_FILE));
 
       await withStdin(SECRET, () => {
@@ -1079,8 +1099,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the schemas directory cannot be listed", () => {
-    it("refuses, without reporting it as holding no schemas", async () => {
-      const cwd = await aProject();
+    it("refuses, without reporting it as holding no schemas", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await rm(join(cwd, ".zitadel/schemas"), { recursive: true });
       await writeFile(join(cwd, ".zitadel/schemas"), "not a directory");
 
@@ -1096,8 +1116,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the flow names the schema by its objectType", () => {
-    it("offers the provider on that flow", async () => {
-      const cwd = await makeProject({
+    it("offers the provider on that flow", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
         schemas: {
           "default-human-user": {
             ...defaultSchema,
@@ -1127,8 +1147,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the only flow names a different schema with the same file name", () => {
-    it("refuses rather than wire the provider into the wrong sign-in", async () => {
-      const cwd = await makeProject({
+    it("refuses rather than wire the provider into the wrong sign-in", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
         schemas: {
           "default-human-user": {
             ...defaultSchema,
@@ -1153,8 +1173,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the flow cannot be checked against the changed schema", () => {
-    it("refuses, saying so", async () => {
-      const cwd = await aProject();
+    it("refuses, saying so", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         purposes: { login: "missing" },
@@ -1169,8 +1189,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         purposes: { login: "missing" },
@@ -1183,8 +1203,8 @@ describe("auth-method sso enable", () => {
       expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
     });
 
-    it("refuses a dry run too", async () => {
-      const cwd = await aProject();
+    it("refuses a dry run too", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         purposes: { login: "missing" },
@@ -1199,8 +1219,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the flow's steps are not a list", () => {
-    it("refuses, naming the steps", async () => {
-      const cwd = await aProject();
+    it("refuses, naming the steps", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         steps: "broken",
@@ -1216,8 +1236,8 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("leaves the flow's steps as they were rather than overwriting them", async () => {
-      const cwd = await aProject();
+    it("leaves the flow's steps as they were rather than overwriting them", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         steps: "broken",
@@ -1230,8 +1250,8 @@ describe("auth-method sso enable", () => {
       expect(await readJson(cwd, LOGIN_FLOW_FILE)).toMatchObject({ steps: "broken" });
     });
 
-    it("writes no connection", async () => {
-      const cwd = await aProject();
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         steps: "broken",
@@ -1246,8 +1266,8 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when no active flow offers a way to sign in", () => {
-    it("warns that nobody can sign in", async () => {
-      const cwd = await aProject();
+    it("warns that nobody can sign in", async ({ dir }) => {
+      const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
         status: "draft",
@@ -1267,8 +1287,7 @@ describe("auth-method sso enable", () => {
 
   describe("when the Project's path needs quoting", () => {
     it("leaves the follow-ups out of next_commands", async ({ dir }) => {
-      const cwd = join(dir, "my project");
-      await rename(await aProject(), cwd);
+      const cwd = await aProject(join(dir, "my project"));
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
@@ -1278,8 +1297,7 @@ describe("auth-method sso enable", () => {
     });
 
     it("still lists them as next_args", async ({ dir }) => {
-      const cwd = join(dir, "my project");
-      await rename(await aProject(), cwd);
+      const cwd = await aProject(join(dir, "my project"));
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));

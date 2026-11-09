@@ -1,10 +1,11 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 import { developmentIssuer } from "@/commands/auth-method/sso/enable/index";
 import { ZitadelError } from "@/lib/errors";
+import { it } from "@tests/helpers/fixtures";
 import { makeProject, setUpProject } from "@tests/helpers/local-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -18,8 +19,8 @@ beforeEach(() => {
 });
 
 describe("developmentIssuer", () => {
-  it("is the issuer the Project's environment file names", async () => {
-    const cwd = await setUpProject();
+  it("is the issuer the Project's environment file names", async ({ dir }) => {
+    const cwd = await setUpProject(dir);
     await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=${ISSUER}\n`);
 
     const issuer = await developmentIssuer(cwd, {});
@@ -27,8 +28,8 @@ describe("developmentIssuer", () => {
     expect(issuer).toBe(ISSUER);
   });
 
-  it("refuses a Project that was never set up, with the next move", async () => {
-    const cwd = await makeProject();
+  it("refuses a Project that was never set up, with the next move", async ({ dir }) => {
+    const cwd = await makeProject(dir);
 
     const error = await rejectionOf(() => {
       return developmentIssuer(cwd, {});

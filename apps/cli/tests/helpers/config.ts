@@ -200,6 +200,10 @@ export function aBranding(overrides: JsonObject = {}): JsonObject {
  */
 export type LoginFlowOptions = Readonly<{
   /**
+   * The flow's name.
+   */
+  name?: string;
+  /**
    * The schema the flow signs users of in, by object type or revision id.
    */
   userSchema?: string;
@@ -217,13 +221,19 @@ export type LoginFlowOptions = Readonly<{
  * The default login flow the CLI scaffolds: an identifier step collecting the
  * email, then a password.
  *
- * @param options - The schema, the identifier step's fields and the status to set.
+ * @param options - The name, the schema, the identifier step's fields and the status to set.
  * @returns The flow document.
  */
 export function aLoginFlow(options: LoginFlowOptions = {}): JsonObject {
-  const { userSchema = defaultLogin.user_schema, collects, status = defaultLogin.status } = options;
+  const {
+    name = defaultLogin.name,
+    userSchema = defaultLogin.user_schema,
+    collects,
+    status = defaultLogin.status,
+  } = options;
   return {
     ...defaultLogin,
+    name,
     user_schema: userSchema,
     status,
     steps: defaultLogin.steps.map((step) => {
