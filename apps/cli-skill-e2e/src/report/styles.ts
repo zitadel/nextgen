@@ -77,6 +77,17 @@ main{max-width:1000px;margin:0 auto;padding:24px clamp(16px,4vw,32px)}
 .cmd .o{background:var(--term-bg);color:var(--term-fg);padding:12px 14px;margin:0;font:11.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;border-top:1px solid #1f2937}
 /* Exit-status colour-coding: a non-zero command gets a red-tinted terminal and
    an "exit N" badge, so failures are spotted at a glance. */
+.took{flex:none;font:600 10.5px/1.6 ui-monospace,Menlo,monospace;color:#fcd34d;white-space:nowrap}
+.took.think{color:#94a3b8;font-weight:500}
+.timing{margin:0 0 20px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--card)}
+.timing-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px}
+.timing-h+.slow,.legend+.timing-h{margin-top:12px}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--border);margin:0 0 10px}
+.seg.run,.sw.run{background:#f59e0b}.seg.model,.sw.model{background:#6366f1}.seg.start,.sw.start{background:#94a3b8}.seg.wait,.sw.wait{background:#2dd4bf}
+.legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px}
+.legend .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.legend .muted{color:var(--muted)}
+.slow{margin:0;padding-left:20px;font-size:12.5px}.slow code{font:11.5px ui-monospace,Menlo,monospace;color:var(--muted)}
 .exit{flex:none;font:700 10.5px/1.6 ui-monospace,Menlo,monospace;padding:1px 8px;border-radius:999px;letter-spacing:.3px}
 .exit.ok{color:#6ee7b7;background:rgba(110,231,183,.14)}
 .exit.err{color:#fecaca;background:rgba(248,113,113,.2)}

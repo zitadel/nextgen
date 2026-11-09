@@ -66,9 +66,9 @@ describe("the vitest config", () => {
     expect(config.test?.globalSetup).toContain("./tests/helpers/stale-servers.ts");
   });
 
-  it("leaves three cores free and never outnumbers the port blocks", () => {
+  it("takes three quarters of the cores and never outnumbers the port blocks", () => {
     expect(config.test?.maxWorkers).toBe(
-      Math.min(Math.max(availableParallelism() - 3, 1), PORT_WORKERS),
+      Math.min(Math.max(Math.floor((availableParallelism() * 3) / 4), 1), PORT_WORKERS),
     );
   });
 });

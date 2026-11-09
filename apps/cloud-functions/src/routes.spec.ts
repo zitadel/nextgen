@@ -1,14 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { MOCK_TEAM, mockSystems } from "./mock";
+import type { Team } from "./ports";
 import { type Runtime, routes } from "./routes";
 
 const ORIGIN = "https://cloud.example";
 
-function call(method: string, path: string, init: { body?: unknown; headers?: HeadersInit } = {}) {
+/** The mock person's personal team, made by their first session a moment ago. */
+const JUST_JOINED: Team = { ...MOCK_TEAM, joined_at: new Date().toISOString() };
+
+function call(
+  method: string,
+  path: string,
+  init: { body?: unknown; headers?: HeadersInit; teams?: Team[] } = {},
+) {
   const route = routes[`${method} ${path}`];
   if (!route) throw new Error(`no route ${method} ${path}`);
   const runtime: Runtime = { systems: mockSystems(), provisionOnce: vi.fn(async () => true) };
+  if (init.teams)
+    vi.spyOn(runtime.systems.zitadel, "administeredTeams").mockResolvedValue(init.teams);
   const request = new Request(`${ORIGIN}${path}`, {
     method,
     headers: {
@@ -65,6 +75,7 @@ describe("the add-on's RPC", () => {
 
   it("hands provisioning the sign-up's source, as far as it holds up", async () => {
     const { response, runtime } = call("POST", "/cloud/api/account/ensure", {
+      teams: [JUST_JOINED],
       body: {
         attribution: {
           via: "console",
@@ -81,8 +92,17 @@ describe("the add-on's RPC", () => {
     });
   });
 
+  it("leaves out the source of someone who signed up before, whatever page they came back through", async () => {
+    const { response, runtime } = call("POST", "/cloud/api/account/ensure", {
+      body: { attribution: { via: "console", utm_source: "newsletter" } },
+    });
+    expect(await (await response).json()).toEqual({ state: "started" });
+    expect(vi.mocked(runtime.provisionOnce).mock.calls[0]?.[2]).toBeUndefined();
+  });
+
   it("still provisions when the source is not one it knows", async () => {
     const { response, runtime } = call("POST", "/cloud/api/account/ensure", {
+      teams: [JUST_JOINED],
       body: { attribution: { via: "fax", utm_source: "newsletter" } },
     });
     expect(await (await response).json()).toEqual({ state: "started" });

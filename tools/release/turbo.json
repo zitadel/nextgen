@@ -61,7 +61,7 @@
         "build-public-packages",
         "@zitadel/console#build-release"
       ],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER", "RELEASE_HOST_ONLY"]
     },
     "publish": {
       "cache": false,

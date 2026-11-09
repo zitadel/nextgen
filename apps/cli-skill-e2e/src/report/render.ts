@@ -1,8 +1,17 @@
 import type { CheckResult } from "../grading.ts";
 import type { Stage } from "../journey.ts";
-import type { TranscriptEntry } from "../transcript.ts";
+import type { ParsedStage, TranscriptEntry } from "../transcript.ts";
 import { clientScript } from "./client-script.ts";
-import { badge, bubble, commandBlock, duration, escapeHtml, fileBlock, timestamp } from "./html.ts";
+import {
+  badge,
+  bubble,
+  commandBlock,
+  duration,
+  escapeHtml,
+  fileBlock,
+  timestamp,
+  took,
+} from "./html.ts";
 import { markdownToHtml } from "./markdown.ts";
 import { type Group, metricsFor, percent } from "./metrics.ts";
 import { REPORT_CSS } from "./styles.ts";
@@ -52,6 +61,84 @@ const renderEntry = (entry: TranscriptEntry): string => {
 /** The whole stage as a conversation, in order: the prompt, then every message, command and answer. */
 const conversation = (prompt: string, transcript: ReadonlyArray<TranscriptEntry>): string =>
   [bubble("prompt", "Prompt", prompt), ...transcript.map(renderEntry)].join("\n");
+
+const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/** The stage's tally: questions, commands, failures, then the model's own round trips, which are not questions. */
+const tally = (parsed: ParsedStage, steps: number | "?"): string =>
+  [
+    plural(parsed.counts.questions, "question"),
+    `${plural(parsed.counts.commands, "command")}${parsed.counts.failed > 0 ? ` (${parsed.counts.failed} failed)` : ""}`,
+    `${steps} model ${steps === 1 ? "step" : "steps"}`,
+  ].join(" · ");
+
+interface Slice {
+  readonly key: string;
+  readonly label: string;
+  readonly ms: number;
+  readonly hint: string;
+}
+
+/** Where the stage's time went, as a bar and a legend, with the slowest commands under it. */
+function timingBlock(parsed: ParsedStage): string {
+  const { timing } = parsed;
+  if (!timing.measured) {
+    return "";
+  }
+  const slices: ReadonlyArray<Slice> = [
+    {
+      key: "run",
+      label: "Commands",
+      ms: timing.commandMs,
+      hint: "tools running; the skill cannot shrink this",
+    },
+    {
+      key: "model",
+      label: "Model",
+      ms: timing.modelMs,
+      hint: "the agent thinking between commands; fewer calls shrink this",
+    },
+    {
+      key: "start",
+      label: "Startup",
+      ms: timing.startupMs,
+      hint: "the agent starting and closing each turn",
+    },
+    {
+      key: "wait",
+      label: "Developer",
+      ms: timing.waitMs,
+      hint: "the simulated developer answering; not the agent's time",
+    },
+  ];
+  const total = slices.reduce((all, slice) => all + slice.ms, 0);
+  if (total <= 0) {
+    return "";
+  }
+  const bar = slices
+    .filter((slice) => slice.ms > 0)
+    .map(
+      (slice) =>
+        `<span class="seg ${slice.key}" style="flex:${slice.ms}" title="${escapeHtml(`${slice.label}: ${slice.hint}`)}"></span>`,
+    )
+    .join("");
+  const legend = slices
+    .map(
+      (slice) =>
+        `<li><span class="sw ${slice.key}"></span><span class="tl">${slice.label}</span> <b>${took(slice.ms) || "0s"}</b> <span class="muted">${Math.round((100 * slice.ms) / total)}%</span></li>`,
+    )
+    .join("");
+  const slowest = parsed.transcript
+    .flatMap((entry) => (entry.kind === "command" && (entry.ran ?? 0) > 0 ? [entry] : []))
+    .toSorted((a, b) => (b.ran ?? 0) - (a.ran ?? 0))
+    .slice(0, 3)
+    .map(
+      (entry) =>
+        `<li><b>${took(entry.ran)}</b> <code>${escapeHtml(entry.cmd.replace(/\s+/g, " ").trim().slice(0, 110))}</code></li>`,
+    )
+    .join("");
+  return `<div class="timing"><div class="timing-h">Where the time went</div><div class="bar" role="img" aria-label="Time split between commands, model, startup and developer">${bar}</div><ul class="legend">${legend}</ul>${slowest === "" ? "" : `<div class="timing-h">Slowest commands</div><ol class="slow">${slowest}</ol>`}</div>`;
+}
 
 /** What the harness asked the running instance and the app after the agent's turn, and whether reality matched. */
 function checksBlock(checks: ReadonlyArray<CheckResult> | undefined): string {
@@ -132,7 +219,7 @@ function stagePanel({ groups }: ReportData, stage: Stage, index: number): string
       }
       const time = row.ms > 0 ? ` · ${duration(row.ms)}` : "";
       const open = group.config === "with-skill" ? " open" : "";
-      return `<details class="cfg"${open}><summary>${badge(row.status)}<span class="cfg-name">${escapeHtml(scenarioLabel(group))}</span><span class="why">${escapeHtml(row.why)}</span><span class="stat">${row.turns} turns · ${row.tokens.toLocaleString()} tokens${time}</span></summary><div class="body">${checksBlock(row.asserts)}${conversation(stage.prompt, row.parsed.transcript)}</div></details>`;
+      return `<details class="cfg"${open}><summary>${badge(row.status)}<span class="cfg-name">${escapeHtml(scenarioLabel(group))}</span><span class="why">${escapeHtml(row.why)}</span><span class="stat">${tally(row.parsed, row.turns)} · ${row.tokens.toLocaleString()} tokens${time}</span></summary><div class="body">${checksBlock(row.asserts)}${timingBlock(row.parsed)}${conversation(stage.prompt, row.parsed.transcript)}</div></details>`;
     })
     .join("");
   return `<section class="stage-panel" role="tabpanel" id="stage-${stage.id}" aria-labelledby="tab-${stage.id}" tabindex="0"${index === 0 ? "" : " hidden"}><h2 class="stage-head">Stage ${stage.id}: ${escapeHtml(stage.title)}</h2>${details}</section>`;

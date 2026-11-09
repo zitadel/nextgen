@@ -4897,6 +4897,7 @@ const ssoSchemaContent string = `{
 			"employee_id": { "type": "integer", "x-unique": "project" },
 			"age":         { "type": ["string", "integer"] },
 			"locale":      { "type": "string", "enum": ["en", "de", "fr"] },
+			"homepage":    { "type": "string", "format": "uri" },
 			"account": {
 				"type": "object",
 				"properties": { "handle": { "type": "string", "x-unique": "project" } }
@@ -5512,6 +5513,12 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 		},
 		"verified unique claim": {
 			edit:     func(claims map[string]any, _ map[string]bool) { claims["username"] = long },
+			probes:   3,
+			wantStep: "credentials",
+			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		"verified unique claim failing its format": {
+			edit:     func(claims map[string]any, _ map[string]bool) { claims["email"] = "not-an-email" },
 			probes:   3,
 			wantStep: "credentials",
 			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
@@ -7000,6 +7007,13 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 			edit:      func(fields map[string]any) { delete(fields, "given_name") },
 			wantAttributes: map[string]any{
 				"email": "alice@example.com", "username": "alice", "given_name": "Typed", "family_name": "Liddell", "badge": "b-7",
+			},
+		},
+		"hidden claim failing its format": {
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "homepage": "no scheme"},
+			edit:   func(map[string]any) {},
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
 			},
 		},
 		// The typed leaf wins, and the hidden ones are stored beside it.

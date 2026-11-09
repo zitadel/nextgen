@@ -19,9 +19,12 @@ type CreateDeploymentInput struct {
 	ReleaseID  string
 	OriginKind domain.DeploymentOriginKind
 	Origins    []string
-	Reason     domain.DeploymentReason
-	Message    *string
-	RollbackTo *string
+	// CurrentPrimaryOrigins freezes the project's primary origins, read under
+	// the project lock, in place of Origins.
+	CurrentPrimaryOrigins bool
+	Reason                domain.DeploymentReason
+	Message               *string
+	RollbackTo            *string
 	// ExpectedDeploymentID makes the write conditional. Not persisted.
 	ExpectedDeploymentID *string
 	// PreviewTTL is the lifetime of the previews a preview deploy renews.
@@ -45,7 +48,6 @@ type DeployInput struct {
 	To                   domain.DeployTo
 	Reason               domain.DeploymentReason
 	Message              *string
-	RollbackTo           *string
 	ExpectedDeploymentID *string
 }
 
@@ -92,7 +94,8 @@ func NewDeploymentService(v2Pool *DB, variables VariableService) *DeploymentServ
 // the optimistic lock.
 const maxDeployAttempts = 3
 
-// Create deploys a release to its origins with optimistic locking: it reads
+// Create deploys a release to its origins. Primary deploys of one project run
+// one at a time under the project lock. A preview deploy is optimistic: it reads
 // what each origin serves and writes without holding a lock, and a concurrent
 // deploy to one of the origins makes the write fail. A guarded deploy then
 // answers a conflict with the winner; an unguarded one retries on top of it.
@@ -101,24 +104,21 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	defer end(&err)
 
 	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.OriginKind, input.Origins, domain.DeploymentMetadata{
+	metadata := domain.DeploymentMetadata{
 		Reason:         input.Reason,
 		Message:        input.Message,
 		RollbackTo:     input.RollbackTo,
 		DeployedBy:     actor.ActorID,
 		DeployedByType: actor.ActorType,
-	})
-	if err != nil {
-		return nil, err
 	}
-	if entity.OriginKind == domain.DeploymentOriginKindPreview {
+	if input.OriginKind == domain.DeploymentOriginKindPreview {
 		if _, err = domain.ResolvePreviewTTL(&input.PreviewTTL); err != nil {
 			return nil, err
 		}
 	}
 
 	for attempt := 1; ; attempt++ {
-		output, err := s.create(ctx, entity, input)
+		output, entity, err := s.create(ctx, input, metadata)
 		if _, lost := errors.AsType[*database.UniqueError](err); lost {
 			if input.ExpectedDeploymentID == nil && attempt < maxDeployAttempts {
 				continue
@@ -136,43 +136,43 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 }
 
 // Deploy resolves the targets against the project's origins, then creates
-// the deployment.
+// the deployment. A primary deploy reads its origins under the project lock.
 func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *CreateDeploymentOutput, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.Deploy")
 	defer end(&err)
 
+	create := CreateDeploymentInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            input.ReleaseID,
+		Reason:               input.Reason,
+		Message:              input.Message,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
+	}
+	if input.To.Primary() {
+		if input.TTL != nil {
+			return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
+		}
+		create.OriginKind = domain.DeploymentOriginKindPrimary
+		create.CurrentPrimaryOrigins = true
+		return s.Create(ctx, create)
+	}
 	origins, err := s.projectOrigins(ctx, input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.To)
+	create.OriginKind, create.Origins, err = domain.ResolveDeploymentTargets(origins, input.To)
 	if err != nil {
 		return nil, err
 	}
-	var ttl time.Duration
-	if kind == domain.DeploymentOriginKindPreview {
-		ttl, err = domain.ResolvePreviewTTL(input.TTL)
-		if err != nil {
-			return nil, err
-		}
-	} else if input.TTL != nil {
-		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
+	create.PreviewTTL, err = domain.ResolvePreviewTTL(input.TTL)
+	if err != nil {
+		return nil, err
 	}
-	return s.Create(ctx, CreateDeploymentInput{
-		ProjectID:            input.ProjectID,
-		ReleaseID:            input.ReleaseID,
-		OriginKind:           kind,
-		Origins:              resolved,
-		Reason:               input.Reason,
-		Message:              input.Message,
-		RollbackTo:           input.RollbackTo,
-		ExpectedDeploymentID: input.ExpectedDeploymentID,
-		PreviewTTL:           ttl,
-	})
+	return s.Create(ctx, create)
 }
 
-// Rollback re-deploys the release of a primary deployment to every current
-// primary origin.
+// Rollback re-deploys the release of a primary deployment to the origins it
+// froze.
 func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (_ *CreateDeploymentOutput, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.Rollback")
 	defer end(&err)
@@ -184,10 +184,11 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs cannot be rolled back")
 	}
-	return s.Deploy(ctx, DeployInput{
+	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
-		To:                   domain.DeployToPrimary(),
+		OriginKind:           domain.DeploymentOriginKindPrimary,
+		Origins:              previous.Origins(),
 		Reason:               domain.DeploymentReasonRollback,
 		Message:              input.Message,
 		RollbackTo:           &previous.ID,
@@ -219,7 +220,6 @@ func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deploym
 // servedBy reads what entity's origins hold, for the optimistic lock, and the
 // deployment entity replaces: the project's newest primary deployment, or the
 // newest deployment to its preview URLs. nil when there is none.
-// TODO(#1572): lock primary deploys per project.
 func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.OriginDeployment, *domain.Deployment, error) {
 	read, err := stmts.GetNewestPerOrigin(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {
@@ -237,12 +237,43 @@ func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deploymen
 	return read, current, err
 }
 
-// create is one attempt of Create, in one transaction.
-func (s *DeploymentService) create(ctx context.Context, entity *domain.Deployment, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
+// create is one attempt of Create, in one transaction. It returns the
+// deployment it tried to write, nil when it failed before building one.
+func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentInput, metadata domain.DeploymentMetadata) (*CreateDeploymentOutput, *domain.Deployment, error) {
 	var output *CreateDeploymentOutput
+	var entity *domain.Deployment
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		output = nil
+		output, entity = nil, nil
 		stmts := tx.Statements()
+		// Two primary deploys can name disjoint origins, so no origin row
+		// collides. They still replace one deployment. Origin writes take the
+		// lock too, so the primary origins read under it hold until commit.
+		if input.OriginKind == domain.DeploymentOriginKindPrimary {
+			if err := stmts.LockProject(ctx, input.ProjectID); err != nil {
+				if isNoRowFound(err) {
+					return domain.ErrProjectNotFound()
+				}
+				return err
+			}
+		}
+		origins := input.Origins
+		if input.CurrentPrimaryOrigins {
+			project, err := stmts.GetProjectByID(ctx, input.ProjectID)
+			if err != nil {
+				if isNoRowFound(err) {
+					return domain.ErrProjectNotFound()
+				}
+				return err
+			}
+			if origins, err = domain.PrimaryOrigins(project.Origins); err != nil {
+				return err
+			}
+		}
+		built, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.OriginKind, origins, metadata)
+		if err != nil {
+			return err
+		}
+		entity = built
 		release, err := stmts.GetReleaseByID(ctx, entity.ProjectID, entity.ReleaseID)
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -304,7 +335,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
 		return nil
 	})
-	return output, err
+	return output, entity, err
 }
 
 func emitDeploymentCreated(ctx context.Context, stmts EventStatements, entity *domain.Deployment) error {
