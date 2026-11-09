@@ -58,7 +58,19 @@ export class Narration {
       return;
     }
     this.previous = [...consola.options.reporters];
-    consola.setReporters([{ log: (entry) => this.draw(format(...entry.args), entry.type) }]);
+    consola.setReporters([
+      {
+        log: (entry) => {
+          // A box keeps its title apart from its message, so a line drawn from
+          // the message alone would lose what the box was for.
+          const said = format(...entry.args);
+          this.draw(
+            entry.type === "box" && entry.title ? `${entry.title}\n${said}` : said,
+            entry.type,
+          );
+        },
+      },
+    ]);
   }
 
   /** Gives consola its own reporters back, whatever happened to the command. */

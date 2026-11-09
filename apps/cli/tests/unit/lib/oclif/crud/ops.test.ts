@@ -356,6 +356,49 @@ describe("list filters", () => {
   });
 });
 
+describe("list nouns", () => {
+  const nothingListed = async (plural: string | undefined): Promise<string> => {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
+      body: z.object({}).passthrough(),
+      filters: [],
+      call: async () => ({ rows: [] }),
+      items: (page) => page.rows,
+      next: () => undefined,
+    };
+    const named: OperationDefinition<Ctx, ListSpec<Ctx>> = {
+      topic: "idps",
+      resource: {
+        singular: "identity provider",
+        ...(plural === undefined ? {} : { plural }),
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
+      spec,
+      options: { connect: async () => ({ token: "t" }), operations: ["equals"] },
+    };
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, named);
+    const written: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    await asTerminal(() =>
+      (command as unknown as { run(argv: string[]): Promise<unknown> }).run([]),
+    );
+    return written.join("");
+  };
+
+  it("says the descriptor's plural when nothing is found", async () => {
+    expect(await nothingListed("identity providers")).toContain("No identity providers found");
+  });
+
+  it("falls back to the topic when the descriptor names no plural", async () => {
+    expect(await nothingListed(undefined)).toContain("No idps found");
+  });
+});
+
 describe("write results", () => {
   it("carries data and no next command when the server answers without a body", async () => {
     // `grants create` by identifier answers 202 with no body.

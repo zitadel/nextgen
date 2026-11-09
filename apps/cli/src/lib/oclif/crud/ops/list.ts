@@ -263,12 +263,15 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
       throw error;
     });
     const { items } = collected;
+    // The noun the person reads: the descriptor's own plural when it has one,
+    // since the topic is the command's name (`idps`, `release`).
+    const plural = resource.plural ?? topic;
     const next = collected.next;
-    progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
+    progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : plural}`);
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);
-    const empty = nothingFound(topic);
+    const empty = nothingFound(plural);
     const footer: string[] = [];
     const page = {
       token: next,
@@ -285,7 +288,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
         rows,
         items,
         singular: resource.singular,
-        plural: topic,
+        plural,
         empty,
         footer,
         page,

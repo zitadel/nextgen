@@ -50,6 +50,17 @@ describe("Narration", () => {
     expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} Looking for a project`]);
   });
 
+  it("draws a consola box as its title and message, not as an object", () => {
+    const { chain } = bridged();
+
+    consola.box({ title: "Finish in your browser", message: "Sign in to claim the project." });
+
+    expect(chain.lines.join("\n")).toContain(
+      "Finish in your browser\nSign in to claim the project.",
+    );
+    expect(chain.lines.join("\n")).not.toContain("borderStyle");
+  });
+
   it("gives each consola level the mark that level deserves", () => {
     const { chain } = bridged();
 
