@@ -1,33 +1,37 @@
-
-import { schemaConfigSchema } from "@zitadel/config/schemas";
-
-import { CONFIG_DIRECTORIES, DiskStore } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**
- * Verifies local schema config files round-trip through the canonical
- * `schemaConfigSchema` from `@zitadel/config/schemas` — the same Zod the
- * release pipeline validates with, so doctor and `deploy` can never disagree
- * about a file. The union enforces the `kind` discriminator
- * (`user-schema` / `schema-url`) and the `metaSchema`/`x-auth-methods`/etc.
- * fields the platform requires.
+ * Verifies the project's configuration in `.zitadel/` against every rule
+ * `ZitadelConfig.validate` holds it to: each schema, flow, connection, policy
+ * and branding file's contract, the server's flow rules, and how the files
+ * agree. These are the rules `deploy` validates with, so doctor and `deploy`
+ * can never disagree about a file. An error fails the check; a warning, when
+ * nothing fails, makes it a warning.
  */
 export class SchemaCheck extends AbstractSanityCheck {
   readonly name = "schema";
   readonly path = CONFIG_DIRECTORIES.schemas;
-  protected readonly summary = "User schemas are valid Zitadel schema bodies";
+  protected readonly summary = "The configuration in .zitadel/ is valid";
 
   /**
-   * An empty `.zitadel/schemas/` is a warning, not a failure: projects
-   * created before editable config existed were seeded server-side and have
-   * no local schema files, and there is no safe auto-fix that could invent
-   * them. Only invalid files fail the check.
+   * Fails on what {@link verify} refuses. Otherwise an empty
+   * `.zitadel/schemas/` is a warning, not a failure: projects created before
+   * editable config existed were seeded server-side and have no local schema
+   * files, and there is no safe auto-fix that could invent them. A warning
+   * the rules raise is reported the same way.
+   *
+   * @param ctx - The project to check.
+   * @returns The outcome: a failure, a warning, or a pass.
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const schemas = (await new DiskStore(ctx.cwd).read("schemas")).map((file) => {
-      return file.body;
-    });
-    if (schemas.length === 0) {
+    const outcome = await super.run(ctx);
+    if (outcome.status === "fail") {
+      return outcome;
+    }
+    const store = new DiskStore(ctx.cwd);
+    const config = await ZitadelConfig.loadUnchecked(store);
+    if (config.schemas.length === 0) {
       return {
         name: this.name,
         status: "warn",
@@ -38,22 +42,44 @@ export class SchemaCheck extends AbstractSanityCheck {
         path: this.path,
       };
     }
-    return super.run(ctx);
+    const warnings = config.validate({ store }).filter((issue) => {
+      return issue.severity === "warning";
+    });
+    if (warnings.length > 0) {
+      return { name: this.name, status: "warn", message: described(warnings), path: this.path };
+    }
+    return outcome;
   }
 
+  /**
+   * Loads the configuration without its contract check and validates it.
+   *
+   * @param ctx - The project to check.
+   * @returns Nothing when no rule raises an error.
+   * @throws When a file cannot be read, or naming every error the rules raise.
+   */
   protected async verify(ctx: CheckContext): Promise<void> {
-    const schemas = (await new DiskStore(ctx.cwd).read("schemas")).map((file) => {
-      return file.body;
+    const store = new DiskStore(ctx.cwd);
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const errors = config.validate({ store }).filter((issue) => {
+      return issue.severity === "error";
     });
-    for (const schema of schemas) {
-      const result = schemaConfigSchema.safeParse(schema);
-      if (!result.success) {
-        throw new Error(
-          result.error.issues
-            .map((issue) => `${issue.path.join(".") || "/"} ${issue.message}`)
-            .join("; "),
-        );
-      }
+    if (errors.length > 0) {
+      throw new Error(described(errors));
     }
   }
+}
+
+/**
+ * Puts issues on one line, each prefixed with the file it is in.
+ *
+ * @param issues - The issues, in the order the rules raised them.
+ * @returns The issues, separated by semicolons.
+ */
+function described(issues: readonly Issue[]): string {
+  return issues
+    .map((issue) => {
+      return `${issue.file}: ${issue.message}`;
+    })
+    .join("; ");
 }

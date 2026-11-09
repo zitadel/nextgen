@@ -647,6 +647,62 @@ describe("SchemaCheck", () => {
     expect(outcome.status).toBe("fail");
     expect(outcome.message).toContain("x-auth-methods pasword is not");
   });
+
+  it("fails on a flow file that breaks the flow contract, naming it", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/flows/login.json"), JSON.stringify({ name: "bad" }));
+
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining(".zitadel/flows/login.json: "),
+    });
+  });
+
+  it("fails on a connection file that breaks the connection contract, naming it", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/idps/acme.json"),
+      JSON.stringify({ slug: "acme", protocol: "oidc" }),
+    );
+
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining(".zitadel/idps/acme.json: "),
+    });
+  });
+
+  it("warns on a warning the rules raise when nothing fails", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/idps/acme.json"),
+      JSON.stringify({
+        slug: "acme",
+        protocol: "oidc",
+        display_name: "Acme",
+        subject_claim: "email",
+        oidc: {
+          issuer: "https://sso.acme.example",
+          client_id: "client",
+          client_secret: "${{ ACME_CLIENT_SECRET }}",
+          scopes: ["openid"],
+        },
+      }),
+    );
+
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+
+    expect(outcome).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining(".zitadel/idps/acme.json: subject_claim"),
+    });
+  });
 });
 
 describe("DependencyCheck", () => {
