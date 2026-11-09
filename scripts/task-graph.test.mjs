@@ -342,6 +342,45 @@ describe.sequential("task graph cache and ordering contracts", () => {
     });
   });
 
+  // The cached e2e lanes and the kit's suite boot what a switch replaces
+  // (another server binary, a server setting, a lane's port), so their key
+  // holds the switches; the telemetry opt-outs change no result.
+  test("a cached lane's key holds the switches that change what it tests", () => {
+    const lanes = [...baseline.values()].filter(
+      ({ taskId, command, resolvedTaskDefinition }) =>
+        resolvedTaskDefinition.cache &&
+        // Their input-only bases run nothing.
+        command !== "<NONEXISTENT>" &&
+        /^@zitadel\/(e2e#(console|demo)-|testing#test:integration$)/.test(taskId),
+    );
+    expect(lanes.length).toBeGreaterThanOrEqual(8);
+    const switched = dry({ ZITADEL_SERVER_BINARY: "/elsewhere/nextgen" });
+    const optedOut = dry({ ZITADEL_TELEMETRY: "0", ZITADEL_TELEMETRY_ENV: "development" });
+    for (const { taskId, hash } of lanes) {
+      expect(switched.get(taskId).hash, taskId).not.toBe(hash);
+      expect(optedOut.get(taskId).hash, taskId).toBe(hash);
+    }
+  });
+
+  // Two suites read files outside their package that only their inputs can
+  // name: frameworks.test.mjs derives each journey's edges from the manifests
+  // of what it installs, and this file builds its fixture from every module's
+  // go.mod.
+  test("the graph's own tests rerun when a manifest or a go.mod they read changes", () => {
+    const manifest = "packages/sdk-svelte/package.json";
+    const described = {
+      ...JSON.parse(readFileSync(join(root, manifest), "utf8")),
+      description: "",
+    };
+    changed(manifest, JSON.stringify(described, null, 2), () => {
+      expect(dry().get("@zitadel/e2e#test").hash).not.toBe(baseline.get("@zitadel/e2e#test").hash);
+    });
+    const module = "tools/bench/go.mod";
+    changed(module, `${readFileSync(join(root, module), "utf8")}\n// changed\n`, () => {
+      expect(dry().get("//#test").hash).not.toBe(baseline.get("//#test").hash);
+    });
+  });
+
   test("a module the server requires reaches its builds through the module graph", () => {
     // No input list names these modules: turbo follows go.work and the
     // server module's requires (`^go-sources`).

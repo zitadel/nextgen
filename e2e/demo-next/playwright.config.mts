@@ -5,6 +5,7 @@ import {
   e2eActionTimeouts,
   e2eTimeouts,
   e2eTrace,
+  reuseExistingServer,
   workspaceRoot,
 } from "../playwright.shared";
 
@@ -35,8 +36,8 @@ export default defineConfig({
     trace: e2eTrace,
   },
   // The mock auth server first, then the Next dev server against it.
-  // `reuseExistingServer` lets developers run either server manually and
-  // have Playwright skip its own boot.
+  // Run directly, Playwright uses either server a developer started by hand
+  // (`reuseExistingServer`, ../playwright.shared.ts).
   //
   // Direct pnpm filter commands keep these long-running processes outside
   // turbo's task graph; Playwright owns their lifecycle for this e2e suite.
@@ -45,7 +46,7 @@ export default defineConfig({
     {
       command: "pnpm --filter @zitadel/demo-next dev",
       url: "http://localhost:3002/login",
-      reuseExistingServer: true,
+      reuseExistingServer,
       cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",

@@ -81,15 +81,24 @@ export function realLaneDefaults(
 type WebServer = Exclude<NonNullable<PlaywrightTestConfig["webServer"]>, unknown[]>;
 
 /**
+ * `webServer.reuseExistingServer` for the mock lanes. Run directly
+ * (`playwright test`), a lane uses a server a developer started by hand. As a
+ * turbo task (turbo sets TURBO_HASH) it never does, and fails on a taken
+ * port: turbo caches the lane's pass by the files it hashes, and a server
+ * already on the port was not built from them.
+ */
+export const reuseExistingServer = !process.env.TURBO_HASH;
+
+/**
  * The standalone `@zitadel/api-mock` server on `port`, for the mock lanes'
  * `webServer`, booted first so the demo can proxy to it on its very first
- * request. `reuseExistingServer` lets a developer run it by hand instead.
+ * request. A developer may run it by hand instead ({@link reuseExistingServer}).
  */
 export function apiMockServer(port: number): WebServer {
   return {
     command: "pnpm --filter @zitadel/api-mock start",
     url: `http://localhost:${port}/.well-known/jwks.json`,
-    reuseExistingServer: true,
+    reuseExistingServer,
     cwd: workspaceRoot,
     stdout: "pipe",
     stderr: "pipe",

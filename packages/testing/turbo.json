@@ -12,13 +12,16 @@
       "dependsOn": ["build"]
     },
     // Boots a real local server (binary runtime + SQLite by default) from the
-    // repo's own builds, so it is cached by what it hashes. The script sets ZITADEL_SERVER_BINARY to the server build and
-    // keeps the server-hosted UI surfaces off — these tests drive the API and
-    // the app-embedded login, not /ui/*.
+    // repo's own builds, so it is cached by what it hashes, the switches
+    // that change what it tests included (`env`). The script sets
+    // ZITADEL_SERVER_BINARY to the server build and keeps the server-hosted
+    // UI surfaces off — these tests drive the API and the app-embedded
+    // login, not /ui/*.
     "test:integration": {
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"],
       "dependsOn": ["install-browsers", "build", "@zitadel/cli#build", "@zitadel/server#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "PLAYWRIGHT_*", "DEBUG", "RUNNER_TEMP", "GITHUB_*"]
+      "env": ["ZITADEL_*", "NEXTGEN_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "PLAYWRIGHT_*", "DEBUG", "RUNNER_TEMP", "GITHUB_*"]
     }
   }
 }

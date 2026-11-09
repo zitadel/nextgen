@@ -4,6 +4,7 @@ import {
   e2eActionTimeouts,
   e2eTimeouts,
   e2eTrace,
+  reuseExistingServer,
   workspaceRoot,
 } from "../playwright.shared";
 
@@ -27,7 +28,7 @@ export default defineConfig({
     // racing those writers.
     command: "corepack pnpm --filter @zitadel/console run preview",
     url: "http://localhost:4173",
-    reuseExistingServer: true,
+    reuseExistingServer,
     cwd: workspaceRoot,
   },
   projects: chromiumProjects,

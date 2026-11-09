@@ -209,6 +209,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   (`journey-packages` plus its framework's SDK), and packs only those; so an
   SDK change selects only the journeys that install it.
   `@zitadel/release#pack` packs and checks the full release set.
+- A cached lane's pass is the hashed tree's: its key holds the switches that
+  change what it tests (`env`, below), and as a turbo task it never uses a
+  server already on its port (`e2e/playwright.shared.ts`).
 - Go tasks are cached. Turbo keys every task of a Go module, and every task
   that depends on a module's `go-sources`, on `go version` and the effective
   `go env` (GOOS, GOARCH, CGO_ENABLED, GOFLAGS, …), so a result never
@@ -228,9 +231,10 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
-  are hashed (`CONSOLE_ADDON`, `GOFLAGS`); `passThroughEnv`
+  are hashed (`CONSOLE_ADDON`, `GOFLAGS`, the cached e2e lanes' `ZITADEL_*`
+  and `NEXTGEN_*`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
-  (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
+  (`PLAYWRIGHT_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
 - A dev server or preview that reads a variable the task does not list never
   sees it and quietly runs with its default. The console's `dev`, `dev:real`,

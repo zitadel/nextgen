@@ -85,9 +85,11 @@
       ]
     },
     // It asks the npm advisory database, whose answer changes when an
-    // advisory is published, with no input changing.
+    // advisory is published, with no input changing. The scaffolders load
+    // @zitadel/api and @zitadel/config from source: the generated client and
+    // the meta-schemas copy.
     "check-advisories": {
-      "dependsOn": ["@zitadel/api#generate"],
+      "dependsOn": ["@zitadel/api#generate", "@zitadel/config#sync-schemas"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"]
     },
