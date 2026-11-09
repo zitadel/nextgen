@@ -116,11 +116,24 @@ const gaps = (line: string): number[] =>
  */
 const columnRows = (lines: readonly string[]): boolean[] => {
   const starts = lines.map((line) => gaps(line));
+  // The rule a table draws under its header is not a row, and it sits between
+  // the header and the first row. Read as a neighbour it breaks the alignment
+  // the two share, so a header went unrecognised and was folded, and so did
+  // the only row of a one-row table. A neighbour is the nearest line that is
+  // not a rule.
+  const isRule = (line: string): boolean => /^[\u2500\u2501-]{3,}$/.test(bare(line).trim());
+  const neighbour = (index: number, step: 1 | -1): number[] | undefined => {
+    let at = index + step;
+    while (lines[at] !== undefined && isRule(lines[at] ?? "")) {
+      at += step;
+    }
+    return starts[at];
+  };
   const shares = (a: number[], b: number[] | undefined): boolean =>
     b !== undefined && a.some((start) => b.includes(start));
   return starts.map(
     (own, index) =>
-      own.length > 0 && (shares(own, starts[index - 1]) || shares(own, starts[index + 1])),
+      own.length > 0 && (shares(own, neighbour(index, -1)) || shares(own, neighbour(index, 1))),
   );
 };
 

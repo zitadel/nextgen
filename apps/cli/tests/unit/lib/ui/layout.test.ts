@@ -76,6 +76,19 @@ describe("Prose", () => {
   // The whole bug: a label and three `key=value` pairs joined by two spaces is
   // not a table, and nothing was aligned to it, so it ran off the screen as
   // one unbroken line. A stray double space after a full stop did the same.
+  // A table draws a rule under its header, so the header and the first row are
+  // not adjacent. With one row neither had a neighbour that lined up with it,
+  // and a table wider than the width was folded into a ragged column.
+  it("leaves a table whole when its header is separated from its one row by a rule", () => {
+    const table = [
+      "  name          source                   server                  project_id          resolved",
+      "  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+      "  development   .env.development.local   http://localhost:8111   proj-000000000000   yes",
+    ].join("\n");
+
+    expect(new Prose(table, 80).render()).toBe(table);
+  });
+
   it("wraps a sentence that happens to hold a double space", () => {
     const sentence = "Project proj-1  lifecycle=configured  issuer=https://auth.example.com";
 
