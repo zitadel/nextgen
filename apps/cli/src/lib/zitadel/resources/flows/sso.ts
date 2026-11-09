@@ -22,8 +22,10 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 import { RefusedEditError } from "@/lib/zitadel/errors";
 import { type StepName, stepName } from "@/lib/zitadel/names";
 import type { Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
+import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import {
   COLLISION_OUTCOME,
+  type FlowValue,
   LEGACY_OUTCOMES,
   PASSWORD_STEP,
   PROVIDER_OUTCOMES,
@@ -40,7 +42,6 @@ import {
   isJsonValue,
   listAt,
   objectAt,
-  stringAt,
   stringsIn,
   withoutKey,
 } from "@/lib/zitadel/utils/json";
@@ -54,28 +55,6 @@ const DONE_STEP: StepName = stepName("done");
  * Where each provider outcome goes.
  */
 type ProviderRoutes = { readonly [O in ProviderOutcome]: StepName };
-
-/**
- * Whether a flow can be edited to offer a provider, and where a completed
- * sign-in ends when it can.
- */
-export type FlowEditability =
-  | {
-      readonly kind: "refused";
-
-      /**
-       * Why the flow cannot be edited.
-       */
-      readonly reason: string;
-    }
-  | {
-      readonly kind: "editable";
-
-      /**
-       * The step a completed sign-in ends at.
-       */
-      readonly terminal: StepName;
-    };
 
 /**
  * A step the edit adds, and the forms the generator wrote it in before.
@@ -96,26 +75,36 @@ type Staged = {
 
 /**
  * The edits that offer a provider on one login flow's body, and take it away
- * again, with the refusals that say when a body cannot be edited.
+ * again, with the refusal that says when a flow cannot be edited.
  *
  * @remarks
  * Only {@link Flow} uses it, for `withProvider`, `withoutProvider` and
  * `assertProviderEditable`; it is kept out of the class because it is as long
- * again as the class.
+ * again as the class. An edit rewrites the body as written, so it keeps every
+ * key the contract does not know and the order the author wrote; whatever is
+ * only read is read from the flow's typed value.
  */
 export class SsoGenerator {
   /**
-   * The flow's body, which no edit changes.
+   * The flow's body as written, which an edit rewrites into a new one and
+   * never changes.
    */
-  private readonly flow: JsonObject;
+  private readonly body: JsonObject;
 
   /**
-   * Hold the body of the flow to edit.
-   *
-   * @param flow - The flow's body.
+   * The flow as its contract took it, which every question that only reads is
+   * asked of.
    */
-  constructor(flow: JsonObject) {
-    this.flow = flow;
+  private readonly value: FlowValue;
+
+  /**
+   * Hold the flow to edit.
+   *
+   * @param flow - The flow.
+   */
+  constructor(flow: Flow) {
+    this.body = flow.body;
+    this.value = flow.value;
   }
 
   /**
@@ -131,17 +120,16 @@ export class SsoGenerator {
    *   drop a route the author wrote.
    */
   withProvider(slug: ConnectionSlug, enabled: EnabledMethods): Edit<JsonObject> {
-    const flow = this.flow;
+    const flow = this.body;
     // Before any rewrite, so a refused flow is never half edited.
-    SsoGenerator.refuseOutcomeActionCollision(flow);
+    SsoGenerator.refuseOutcomeActionCollision(this.value);
     // `editRefusal` has already refused a flow with no terminal to route to,
     // so the caller never reaches here without one.
-    const terminal = SsoGenerator.terminalStep(SsoGenerator.stepsOf(flow)) ?? DONE_STEP;
+    const terminal = SsoGenerator.terminalStep(this.value) ?? DONE_STEP;
     // First, so a step the previous CLI wrote matches today's template below.
     const migrated = SsoGenerator.migrateLegacyOutcomes(SsoGenerator.stepsOf(flow));
-    const purposes = objectAt(flow, "purposes");
-    const login = SsoGenerator.loginEntry(purposes, migrated);
-    const entries = SsoGenerator.providerSteps(purposes, migrated);
+    const login = SsoGenerator.loginEntry(this.value);
+    const entries = SsoGenerator.providerSteps(this.value);
 
     const offered = entries.reduce((steps: readonly JsonObject[], name) => {
       return SsoGenerator.replaceStep(steps, name, (step) => {
@@ -154,7 +142,8 @@ export class SsoGenerator {
     }, migrated);
     const password = SsoGenerator.offerOnPasswordStep(offered, entries, slug, terminal);
     const rerouted = SsoGenerator.routeRegisterPassword(password.steps);
-    const wanted = SsoGenerator.generatedSteps(purposes, rerouted, slug, enabled, login, terminal);
+    const fields = SsoGenerator.registrationFields(this.value);
+    const wanted = SsoGenerator.generatedSteps(fields, slug, enabled, login, terminal);
     const placed = wanted.reduce(
       (staged: Staged, generated) => {
         return SsoGenerator.placeGeneratedStep(staged, generated, slug, terminal);
@@ -182,9 +171,9 @@ export class SsoGenerator {
    *   when no step offers it.
    */
   withoutProvider(slug: string): Edit<JsonObject> {
-    const flow = this.flow;
-    const offered = SsoGenerator.stepsOf(flow).some((step) => {
-      return listAt(step, "sso_providers").includes(slug);
+    const flow = this.body;
+    const offered = this.value.steps.some((step) => {
+      return step.sso_providers.includes(slug);
     });
     if (!offered) {
       return { document: flow, changed: false, skipped: [] };
@@ -205,72 +194,20 @@ export class SsoGenerator {
   }
 
   /**
-   * Whether the flow can be edited to offer a provider, and where a completed
-   * sign-in ends when it can.
+   * Why a flow cannot be edited to offer a provider.
    *
    * @remarks
-   * The edits read a missing region as empty and write the generated one in its
-   * place. That is right for a document that has simply not got there yet, and
-   * wrong for one whose region holds something else: that value was put there by
-   * hand.
-   *
-   * @returns The reason it cannot, or the terminal step it routes to.
-   */
-  get editability(): FlowEditability {
-    const providers = this.providersRefusal;
-    if (providers !== undefined) {
-      return { kind: "refused", reason: providers };
-    }
-    const terminal = SsoGenerator.terminalStep(SsoGenerator.stepsOf(this.flow));
-    if (terminal === undefined) {
-      return { kind: "refused", reason: "no step marks where a completed sign-in ends" };
-    }
-    return { kind: "editable", terminal };
-  }
-
-  /**
-   * Why a flow cannot be edited to offer a provider.
+   * The generated routes send a completed sign-in to the flow's terminal step,
+   * so a flow without one has nowhere to send it. Every other region the edit
+   * writes is the shape it writes, because the contract took the flow.
    *
    * @returns The reason, or `undefined` when it can be.
    */
   get editRefusal(): string | undefined {
-    const editability = this.editability;
-    if (editability.kind === "refused") {
-      return editability.reason;
+    if (SsoGenerator.terminalStep(this.value) === undefined) {
+      return "no step marks where a completed sign-in ends";
     }
     return undefined;
-  }
-
-  /**
-   * Why a flow's steps cannot be read for their provider lists.
-   *
-   * @remarks
-   * This is all removing a provider needs: unlike enabling, it writes no route,
-   * so it does not care where a completed sign-in ends.
-   *
-   * @returns The reason, or `undefined` when they can be.
-   */
-  get providersRefusal(): string | undefined {
-    const flow = this.flow;
-    if (flow.steps !== undefined && !isJsonArray(flow.steps)) {
-      return "steps is not a list";
-    }
-    const reasons = listAt(flow, "steps").flatMap((step, index): readonly string[] => {
-      if (!isJsonObject(step)) {
-        return [`steps[${index}] is not a step`];
-      }
-      const name = stringAt(step, "name") ?? String(index);
-      if (step.transitions !== undefined && !isJsonObject(step.transitions)) {
-        return [`steps.${name}.transitions is not an object`];
-      }
-      // Owned like transitions are: a non-list would be read as empty and the
-      // generated list written over it, losing the provider it named.
-      if (step.sso_providers !== undefined && !isJsonArray(step.sso_providers)) {
-        return [`steps.${name}.sso_providers is not a list`];
-      }
-      return [];
-    });
-    return reasons[0];
   }
 
   /**
@@ -286,11 +223,15 @@ export class SsoGenerator {
   /**
    * The step with this name.
    *
+   * @typeParam Found - A step as written, or as the contract took it.
    * @param steps - The flow's steps.
    * @param name - The step's name.
    * @returns The first step by that name, or `undefined`.
    */
-  private static stepNamed(steps: readonly JsonObject[], name: string): JsonObject | undefined {
+  private static stepNamed<Found extends { readonly name?: unknown }>(
+    steps: readonly Found[],
+    name: string,
+  ): Found | undefined {
     return steps.find((step) => {
       return step.name === name;
     });
@@ -334,17 +275,13 @@ export class SsoGenerator {
    * reference flow shows. On passkey-first it also picks up the passkey entry
    * screen.
    *
-   * @param purposes - The flow's purposes.
-   * @param steps - The flow's steps.
+   * @param flow - The flow.
    * @returns The names of the steps that offer providers, each once.
    */
-  private static providerSteps(
-    purposes: JsonObject,
-    steps: readonly JsonObject[],
-  ): readonly StepName[] {
-    const names = [purposes.login, purposes.register, "identifier", "register"];
+  private static providerSteps(flow: FlowValue): readonly StepName[] {
+    const names = [flow.purposes.login, flow.purposes.register, "identifier", "register"];
     return names.flatMap((name, index): readonly StepName[] => {
-      if (typeof name !== "string" || SsoGenerator.stepNamed(steps, name) === undefined) {
+      if (name === undefined || SsoGenerator.stepNamed(flow.steps, name) === undefined) {
         return [];
       }
       if (names.indexOf(name) !== index) {
@@ -365,19 +302,18 @@ export class SsoGenerator {
    * does not serve the login purpose has nowhere to send someone who wants to
    * sign in instead, so it gets no such step.
    *
-   * @param purposes - The flow's purposes.
-   * @param steps - The flow's steps.
+   * @param flow - The flow.
    * @returns The step's name, or `undefined`.
    */
-  private static loginEntry(
-    purposes: JsonObject,
-    steps: readonly JsonObject[],
-  ): StepName | undefined {
-    const named = stringAt(purposes, "login");
-    if (named !== undefined && SsoGenerator.stepNamed(steps, named) !== undefined) {
+  private static loginEntry(flow: FlowValue): StepName | undefined {
+    const named = flow.purposes.login;
+    if (named === undefined) {
+      return undefined;
+    }
+    if (SsoGenerator.stepNamed(flow.steps, named) !== undefined) {
       return stepName(named);
     }
-    if (SsoGenerator.stepNamed(steps, "identifier") !== undefined && purposes.login !== undefined) {
+    if (SsoGenerator.stepNamed(flow.steps, "identifier") !== undefined) {
       return stepName("identifier");
     }
     return undefined;
@@ -406,22 +342,18 @@ export class SsoGenerator {
    * valid before this edit. Writing `done` into the generated routes would point
    * them at a step that does not exist.
    *
-   * @param steps - The flow's steps.
+   * @param flow - The flow.
    * @returns The terminal's name, or `undefined` when there is no single one.
    */
-  private static terminalStep(steps: readonly JsonObject[]): StepName | undefined {
-    const complete = steps.flatMap((step): readonly string[] => {
-      const name = stringAt(step, "name");
-      if (step.complete === undefined || name === undefined) {
-        return [];
-      }
-      return [name];
+  private static terminalStep(flow: FlowValue): StepName | undefined {
+    const complete = flow.steps.filter((step) => {
+      return step.complete !== undefined;
     });
     const only = complete[0];
     if (complete.length === 1 && only !== undefined) {
-      return stepName(only);
+      return stepName(only.name);
     }
-    if (SsoGenerator.stepNamed(steps, DONE_STEP) === undefined) {
+    if (SsoGenerator.stepNamed(flow.steps, DONE_STEP) === undefined) {
       return undefined;
     }
     return DONE_STEP;
@@ -542,8 +474,7 @@ export class SsoGenerator {
    * The conflict step follows the methods enabled, so one written when passkey
    * was off is still the generator's own output once passkey is on.
    *
-   * @param purposes - The flow's purposes.
-   * @param steps - The flow's steps.
+   * @param fields - What registration asks for, which `register-sso` asks for too.
    * @param slug - The provider.
    * @param enabled - The methods the schema enables.
    * @param login - Where signing in instead goes, if anywhere.
@@ -551,14 +482,12 @@ export class SsoGenerator {
    * @returns The generated steps, in the order they are placed.
    */
   private static generatedSteps(
-    purposes: JsonObject,
-    steps: readonly JsonObject[],
+    fields: readonly string[],
     slug: ConnectionSlug,
     enabled: EnabledMethods,
     login: StepName | undefined,
     terminal: StepName,
   ): readonly GeneratedStep[] {
-    const fields = SsoGenerator.registrationFields(purposes, steps);
     const earlierConflicts = [true, false].flatMap((usesPassword) => {
       return [true, false].map((usesPasskey) => {
         const methods: EnabledMethods = { password: usesPassword, passkey: usesPasskey };
@@ -664,17 +593,14 @@ export class SsoGenerator {
    * dropped, because the provider is the proof for an account it creates. Falls
    * back to the identifier-collecting step, and then to nothing.
    *
-   * @param purposes - The flow's purposes.
-   * @param steps - The flow's steps.
+   * @param flow - The flow.
    * @returns The fields to ask a provider's new user for.
    */
-  private static registrationFields(
-    purposes: JsonObject,
-    steps: readonly JsonObject[],
-  ): readonly string[] {
-    const named = stringAt(purposes, "register") ?? "register";
+  private static registrationFields(flow: FlowValue): readonly string[] {
+    const named = flow.purposes.register ?? "register";
     const candidates = [named, "register", "identifier"].map((name) => {
-      return stringsIn(SsoGenerator.stepNamed(steps, name)?.fields).filter((field) => {
+      const fields = SsoGenerator.stepNamed(flow.steps, name)?.fields ?? [];
+      return fields.filter((field) => {
         return !field.startsWith("x-auth-methods#");
       });
     });
@@ -1041,9 +967,8 @@ export class SsoGenerator {
    * @param flow - The flow.
    * @throws {@link RefusedEditError} When such an action exists.
    */
-  private static refuseOutcomeActionCollision(flow: JsonObject): void {
-    const steps = SsoGenerator.stepsOf(flow);
-    const providerSteps = SsoGenerator.providerSteps(objectAt(flow, "purposes"), steps);
+  private static refuseOutcomeActionCollision(flow: FlowValue): void {
+    const providerSteps = SsoGenerator.providerSteps(flow);
     const collisionOnly: readonly string[] = [COLLISION_OUTCOME];
     const entries = [
       ...providerSteps.map((name) => {
@@ -1069,10 +994,10 @@ export class SsoGenerator {
           return entry.keys;
         }),
       );
-      const step = SsoGenerator.stepNamed(steps, name) ?? {};
-      for (const action of listAt(step, "actions")) {
-        const actionName = isJsonObject(action) ? stringAt(action, "name") : undefined;
-        if (actionName !== undefined && keys.has(actionName)) {
+      const actions = SsoGenerator.stepNamed(flow.steps, name)?.actions ?? [];
+      for (const action of actions) {
+        const actionName = action.name;
+        if (keys.has(actionName)) {
           throw new RefusedEditError(
             `steps.${name}: action "${actionName}" uses a name auth-method sso enable writes as an outcome on this step`,
             {

@@ -20,6 +20,16 @@ import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 export type FlowValue = ContractValue<typeof flowConfigSchema>;
 
 /**
+ * One step of a login flow, as the flow contract took it.
+ */
+export type StepValue = FlowValue["steps"][number];
+
+/**
+ * Where one outcome of a step goes, as the flow contract took it.
+ */
+export type RouteValue = NonNullable<StepValue["transitions"]>[string];
+
+/**
  * The field a step collects a password with.
  */
 export const PASSWORD_FIELD = "x-auth-methods#password";
@@ -177,19 +187,10 @@ export type Transition =
     };
 
 /**
- * One action a step declares.
+ * One action a step declares, as the flow contract took it: its name, which
+ * the step's outcomes refer to it by, and what it does, such as `passkey`.
  */
-export type StepAction = {
-  /**
-   * The action's name, as the step's outcomes refer to it.
-   */
-  readonly name: string;
-
-  /**
-   * What the action does, such as `passkey`.
-   */
-  readonly kind: string;
-};
+export type StepAction = StepValue["actions"][number];
 
 /**
  * A transition of another step that leads to a step.

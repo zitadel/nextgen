@@ -1,86 +1,75 @@
 import { type PropertyPath, type StepName, stepName } from "@/lib/zitadel/names";
 import {
   COLLISION_OUTCOME,
+  type RouteValue,
   type StepAction,
+  type StepValue,
   type Transition,
 } from "@/lib/zitadel/resources/flows/types";
-import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
-import { isJsonObject, listAt, objectAt, stringAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
  * One step of a login flow, read-only: the questions the rules ask of it.
  *
  * @remarks
- * A view over the step's JSON, never written back; a flow is edited through
- * {@link Flow}.
+ * A view over the step as the flow contract took it, never written back; a
+ * flow is edited through {@link Flow}.
  */
 export class Step {
   /**
-   * The step's name; empty when it has none.
+   * The step's name.
    */
   readonly name: StepName;
 
   /**
-   * The step's JSON, exactly as the flow holds it.
+   * The step as the flow contract took it.
    */
-  private readonly body: JsonObject;
+  private readonly value: StepValue;
 
   /**
-   * Hold a step's JSON.
+   * Hold a step the flow contract took.
    *
-   * @param body - The step's JSON.
+   * @param value - The step.
    */
-  private constructor(body: JsonObject) {
-    this.body = body;
-    this.name = stepName(stringAt(body, "name") ?? "");
+  private constructor(value: StepValue) {
+    this.value = value;
+    this.name = stepName(value.name);
   }
 
   /**
    * Read a step of a flow.
    *
-   * @param body - The step's JSON.
+   * @param value - The step, as the flow contract took it.
    * @returns The step.
    */
-  static of(body: JsonObject): Step {
-    return new Step(body);
+  static of(value: StepValue): Step {
+    return new Step(value);
   }
 
   /**
-   * The providers `sso_providers` lists, as written.
+   * The providers `sso_providers` lists.
    *
-   * @returns The strings listed, in order; none when there is no list.
+   * @returns The slugs, in order; none when the step lists none.
    */
   get providers(): readonly string[] {
-    return stringsIn(this.body.sso_providers);
+    return this.value.sso_providers;
   }
 
   /**
-   * The fields the step asks for, as written.
+   * The fields the step asks for.
    *
-   * @returns The strings listed, in order; none when there is no list.
+   * @returns The fields, in order; none when the step asks for none.
    */
   get fields(): readonly string[] {
-    return stringsIn(this.body.fields);
+    return this.value.fields;
   }
 
   /**
    * The actions the step declares.
    *
-   * @remarks
-   * A name or kind that is not a string is spelled out, so a rule can still
-   * name it.
-   *
-   * @returns Each action that is an object, in order; none when there is no list.
+   * @returns Each action, in order; none when the step declares none.
    */
   get actions(): readonly StepAction[] {
-    return listAt(this.body, "actions")
-      .filter(isJsonObject)
-      .map((action) => {
-        return {
-          name: stringAt(action, "name") ?? String(action.name),
-          kind: stringAt(action, "kind") ?? String(action.kind),
-        };
-      });
+    return this.value.actions;
   }
 
   /**
@@ -89,7 +78,7 @@ export class Step {
    * @returns True when `gates` has at least one entry.
    */
   get hasGates(): boolean {
-    return Object.keys(objectAt(this.body, "gates")).length > 0;
+    return Object.keys(this.value.gates).length > 0;
   }
 
   /**
@@ -98,7 +87,7 @@ export class Step {
    * @returns True when `on_success` is `create_user_with_sso`.
    */
   get createsUserFromSso(): boolean {
-    return this.body.on_success === "create_user_with_sso";
+    return this.value.on_success === "create_user_with_sso";
   }
 
   /**
@@ -107,35 +96,9 @@ export class Step {
    * @returns One per outcome, in the order written; none when there are none.
    */
   get transitions(): readonly Transition[] {
-    return Object.entries(objectAt(this.body, "transitions")).map((entry) => {
+    return Object.entries(this.routesByOutcome).map((entry) => {
       return Step.transitionOf(entry[0], entry[1]);
     });
-  }
-
-  /**
-   * One transition, as the engine reads it.
-   *
-   * @param outcome - The outcome that fires it.
-   * @param route - Where it goes, as written.
-   * @returns The transition: an `action` leaves the flow, a target names a
-   *   step, a lone purpose names that purpose's entry step.
-   */
-  private static transitionOf(outcome: string, route: JsonValue | undefined): Transition {
-    const entry = isJsonObject(route) ? route : {};
-    const action = stringAt(entry, "action");
-    const target = stringAt(entry, "target");
-    const purpose = stringAt(entry, "purpose");
-    const named = target === undefined || target === "" ? undefined : stepName(target);
-    if (action !== undefined) {
-      return { kind: "cross-flow", outcome, action, target: named };
-    }
-    if (named !== undefined) {
-      return { kind: "step", outcome, target: named, purpose };
-    }
-    if (purpose !== undefined) {
-      return { kind: "purpose", outcome, purpose };
-    }
-    return { kind: "nowhere", outcome };
   }
 
   /**
@@ -149,14 +112,13 @@ export class Step {
    * @returns The outcomes the engine follows.
    */
   get routes(): ReadonlySet<string> {
-    const transitions = objectAt(this.body, "transitions");
+    const routes = this.routesByOutcome;
     return new Set(
-      Object.keys(transitions).filter((outcome) => {
+      Object.keys(routes).filter((outcome) => {
         if (outcome !== COLLISION_OUTCOME) {
           return true;
         }
-        const route = transitions[outcome];
-        return !isJsonObject(route) || route.action === undefined || route.action === null;
+        return Step.crossFlowAction(routes[outcome]) === undefined;
       }),
     );
   }
@@ -168,8 +130,7 @@ export class Step {
    * @returns True when the collision transition is written but not routed.
    */
   get collisionCarriesAction(): boolean {
-    const transitions = objectAt(this.body, "transitions");
-    return COLLISION_OUTCOME in transitions && !this.routes.has(COLLISION_OUTCOME);
+    return Step.crossFlowAction(this.routesByOutcome[COLLISION_OUTCOME]) !== undefined;
   }
 
   /**
@@ -183,5 +144,63 @@ export class Step {
     return this.fields.some((field) => {
       return field === path || field.startsWith(`${path}.`) || path.startsWith(`${field}.`);
     });
+  }
+
+  /**
+   * The step's transitions by outcome.
+   *
+   * @returns Each outcome and where it goes; none when the step routes none.
+   */
+  private get routesByOutcome(): Readonly<Record<string, RouteValue>> {
+    return this.value.transitions ?? {};
+  }
+
+  /**
+   * One transition, as the engine reads it.
+   *
+   * @param outcome - The outcome that fires it.
+   * @param route - Where it goes.
+   * @returns The transition: an `action` leaves the flow, a target names a
+   *   step, a lone purpose names that purpose's entry step.
+   */
+  private static transitionOf(outcome: string, route: RouteValue): Transition {
+    const action = Step.crossFlowAction(route);
+    const target = Step.targetOf(route);
+    const purpose = route.purpose ?? undefined;
+    if (action !== undefined) {
+      return { kind: "cross-flow", outcome, action, target };
+    }
+    if (target !== undefined) {
+      return { kind: "step", outcome, target, purpose };
+    }
+    if (purpose !== undefined) {
+      return { kind: "purpose", outcome, purpose };
+    }
+    return { kind: "nowhere", outcome };
+  }
+
+  /**
+   * The step a transition names.
+   *
+   * @param route - Where the transition goes.
+   * @returns The step, or `undefined` when the transition names none.
+   */
+  private static targetOf(route: RouteValue): StepName | undefined {
+    if (route.target === undefined) {
+      return undefined;
+    }
+    return stepName(route.target);
+  }
+
+  /**
+   * The action that sends a transition to another flow.
+   *
+   * @param route - Where the transition goes, or `undefined` when there is no
+   *   such transition.
+   * @returns `switch` or `pivot`, or `undefined` when it stays in this flow;
+   *   a `null` action stays too.
+   */
+  private static crossFlowAction(route: RouteValue | undefined): string | undefined {
+    return route?.action ?? undefined;
   }
 }
