@@ -1411,7 +1411,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // "required" error instead of an enum mismatch. Other fields keep the ""
       // default so required-checks and challenge dispatch still run.
       if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
-      fields[f.name] = value;
+      fields[f.name] = f.type === "date_time" ? localDateTimeToRfc3339(value) : value;
     }
     return fields;
   }
@@ -1886,6 +1886,28 @@ export class ZitadelLogin extends ZitadelSurface {
 }
 
 /**
+ * What a `date_time` field submits: `datetime-local` yields local time with no
+ * offset (`2026-11-03T12:00`), which the server's `date-time` format refuses.
+ * An empty or unparsable value goes as it is, for the server to judge.
+ */
+function localDateTimeToRfc3339(value: string): string {
+  const parsed = new Date(value);
+  return value === "" || Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+}
+
+/**
+ * What a `date_time` field shows for a value the server prefills: an RFC 3339
+ * timestamp is no valid `datetime-local` value, so the browser would blank it
+ * and the next submit would clear it. Anything else goes as it is.
+ */
+function rfc3339ToLocalDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) || Number.isNaN(parsed.getTime())) return value;
+  const shifted = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  return shifted.toISOString().slice(0, -1);
+}
+
+/**
  * Whether `value` is a member of a select field's closed `enum`. A select
  * with no explicit enum has no submittable value, so this returns `false`
  * and the caller omits the field. Because the enum never contains "" unless
@@ -2013,7 +2035,8 @@ function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const field of step.fields) {
-    values[field.name] = typeof field.value === "string" ? field.value : "";
+    const value = typeof field.value === "string" ? field.value : "";
+    values[field.name] = field.type === "date_time" ? rfc3339ToLocalDateTime(value) : value;
   }
   return values;
 }

@@ -64,6 +64,7 @@ export {
   type FlowQuery,
   type FlowRecord,
 } from "./services/flow";
+export { IdpService, type IdpSummary } from "./services/idp";
 export {
   Operation,
   OperationService,

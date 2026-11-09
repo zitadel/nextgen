@@ -3,6 +3,7 @@ import { format } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { run } from "@oclif/core";
+import { z } from "zod";
 
 export const cliPackageRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -57,14 +58,37 @@ async function assertCommandFilesReady(): Promise<void> {
   );
 }
 
+/** What `commands --json` prints, as far as the readiness check reads it. */
+const ListedCommands = z.array(
+  z.object({
+    id: z.unknown().optional(),
+  }),
+);
+
+/**
+ * Fails unless oclif, run against the built CLI, lists the `status` command.
+ *
+ * @returns Once `status` is listed.
+ */
 async function assertOclifDiscoversStatus(): Promise<void> {
   const { stdout, stderr } = await captureOclifOutput(["commands", "--json"]);
-  const commands = JSON.parse(stdout) as Array<{ id?: unknown }>;
-  if (!commands.some((command) => command.id === "status")) {
+  const commands = ListedCommands.parse(JSON.parse(stdout));
+  const discovered = commands.some((command) => {
+    return command.id === "status";
+  });
+  if (!discovered) {
     throw new Error(`oclif did not discover the status command. stderr: ${stderr.trim()}`);
   }
 }
 
+/**
+ * Runs oclif in this process and collects what it writes, through the streams
+ * or the console. A write takes only its chunk, which fits every overload of
+ * `write`, so no cast is needed to stand in for it.
+ *
+ * @param argv - The command line to run.
+ * @returns What it printed on each stream.
+ */
 async function captureOclifOutput(argv: string[]): Promise<{ stdout: string; stderr: string }> {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -73,14 +97,14 @@ async function captureOclifOutput(argv: string[]): Promise<{ stdout: string; std
   const originalLog = console.log;
   const originalConsoleError = console.error;
 
-  process.stdout.write = ((chunk: string | Uint8Array): boolean => {
+  process.stdout.write = (chunk: string | Uint8Array): boolean => {
     stdout.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: string | Uint8Array): boolean => {
+  };
+  process.stderr.write = (chunk: string | Uint8Array): boolean => {
     stderr.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
-  }) as typeof process.stderr.write;
+  };
   console.log = (...args: unknown[]): void => {
     stdout.push(`${format(...args)}\n`);
   };

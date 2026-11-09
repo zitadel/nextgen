@@ -108,3 +108,18 @@ func TestSetNested(t *testing.T) {
 		assert.Equal(t, "downtown", got)
 	})
 }
+
+func TestDeleteNested(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]any{"name": "dummy", "address": map[string]any{"city": "Bern", "zip": "3000"}}
+	maputil.DeleteNested(m, []string{"address", "zip"})
+	assert.Equal(t, map[string]any{"name": "dummy", "address": map[string]any{"city": "Bern"}}, m)
+
+	// A path that holds nothing, or that descends through a non-map, is a no-op.
+	maputil.DeleteNested(m, []string{"missing", "zip"})
+	maputil.DeleteNested(m, []string{"name", "first"})
+	maputil.DeleteNested(m, nil)
+	maputil.DeleteNested(nil, []string{"name"})
+	assert.Equal(t, map[string]any{"name": "dummy", "address": map[string]any{"city": "Bern"}}, m)
+}
