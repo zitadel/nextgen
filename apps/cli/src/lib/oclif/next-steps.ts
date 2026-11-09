@@ -1,4 +1,5 @@
 import { command, dim, strong } from "@/lib/style";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -28,14 +29,14 @@ export type EndingStep = { text: string; command?: string };
  * The next steps as the steps an ending is made of, so a command states them
  * once, as the result's `next`, and the envelope and the ending cannot say
  * different things. Prose is a step of its own; the commands follow under the
- * label every command uses for commands nothing else introduces.
+ * heading every command uses.
  */
 export function stepsOf(next: NextSteps | undefined): EndingStep[] {
   const actions = (next?.actions ?? []).map((text) => ({ text }));
   const commands = next?.commands ?? [];
   return [
     ...actions,
-    ...(commands.length === 0 ? [] : [{ text: "Run next:", command: commands.join("\n") }]),
+    ...(commands.length === 0 ? [] : [{ text: NEXT_LABEL, command: commands.join("\n") }]),
   ];
 }
 
@@ -83,7 +84,7 @@ export function renderNextSteps(next: NextSteps): string {
   // what the server answered — a cursor to page with, an id to act on — so it
   // is spelled out here.
   return [
-    strong("Next:"),
+    strong(NEXT_LABEL),
     ...actions.map((action) => {
       return `  ${escapeControlCharacters(action)}`;
     }),

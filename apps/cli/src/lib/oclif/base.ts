@@ -21,7 +21,7 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { processUserAgent, useUserAgent } from "@/lib/user-agent";
 import { claimSkills, eligibleForSkills } from "@/lib/skills-hint";
 import type { Presentation, Summary } from "@/lib/ui";
-import { textOf } from "@/lib/ui/summary";
+import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { takeReportedWarnings } from "@/lib/warnings";
@@ -653,12 +653,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (beside) {
       // `--plain` and a write's data are for something to read: nothing frames
       // them, whether or not a person is watching, and their next steps go
-      // beside them on stderr, set apart when both share a terminal.
+      // beside them on stderr, set apart by a blank line like everywhere else.
       if (rendered !== "") {
         this.log(stripColumnMarks(rendered));
       }
       if (next !== "") {
-        this.logAside(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
+        this.logAside(rendered !== "" ? `\n${next}` : next);
       }
       if (footer !== undefined) {
         this.log(`\n${stripColumnMarks(footer)}`);
@@ -1031,9 +1031,8 @@ function renderPretty(result: CommandResult, next: string): string {
   // one itself.
   const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
   // One blank line before the next steps, whatever newlines the rendering
-  // ends with; a skip's follow directly.
-  const gap = result.status === "ok" ? "\n" : "";
-  const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
+  // ends with and whether the run succeeded or was skipped.
+  const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`;
   return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
 }
 
@@ -1061,7 +1060,7 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
     lines: error.hint ? [escapeControlCharacters(error.hint)] : [],
     ...(commands.length === 0
       ? {}
-      : { next: [{ text: "Run next:", command: commands.join("\n") }], boxed: true }),
+      : { next: [{ text: NEXT_LABEL, command: commands.join("\n") }], boxed: true }),
     failed: true,
   };
 }

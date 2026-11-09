@@ -151,7 +151,7 @@ describe("setup dependency installation", () => {
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
     // A sentence, not a second label: it says why the step is there at all,
-    // which `Run next:` — the one label — cannot.
+    // which `Next:` — the one label — cannot.
     expect(result.boxActions[0]).toEqual({
       text: "Setup did not install the new dependencies, so install them first:",
       command: "npm install",

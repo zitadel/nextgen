@@ -97,7 +97,7 @@ describe("status command", () => {
     );
   });
 
-  it("leaves the command overview to the wizard, in the text and the envelope alike", async () => {
+  it("keeps the command overview out of what a script reads, in the text and the envelope alike", async () => {
     const cwd = await configuredProject();
 
     const text = await runCliForTest([

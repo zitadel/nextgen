@@ -9,6 +9,12 @@ import type { BoxAction } from "../box";
  * decided in one place and a command cannot forget to end.
  */
 
+/**
+ * The heading every list of next steps carries, so a person finds them in the
+ * same words under every command.
+ */
+export const NEXT_LABEL = "Next:";
+
 /** `label   value`, aligned with its neighbours in the same section. */
 export type Fact = readonly [label: string, value: string];
 
@@ -47,6 +53,11 @@ export type Summary = {
   readonly extras?: readonly string[];
   /** What to do next, each step a sentence and the commands it asks for. */
   readonly next?: readonly BoxAction[];
+  /**
+   * A block under the next steps of a normal command, such as where to find
+   * every command. `status` ends with it, as `setup` and every help page do.
+   */
+  readonly overview?: string;
   /** The headline is a failure, so it closes the chain in red. */
   readonly failed?: boolean;
   /** Draw the box even with no steps, for a command whose body is instructions. */

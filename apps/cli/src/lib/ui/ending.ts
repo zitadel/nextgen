@@ -1,8 +1,10 @@
 import pc from "picocolors";
 
+import { command, dim, strong } from "../style";
+import { escapeControlCharacters } from "../terminal-text";
 import { Facts, Frame, stripColumnMarks } from "./layout";
 import type { Presentation } from "./presentation";
-import type { Summary } from "./summary";
+import { NEXT_LABEL, type Summary } from "./summary";
 import type { Where } from "./where";
 
 /**
@@ -56,13 +58,19 @@ export class Ending {
    * what a run that failed against the wrong one is read for.
    */
   renderStandalone(): string {
-    const body = this.laidOutWithSteps(this.body(false, false));
+    const rendered = this.body(false, false);
+    const body = this.laidOutWithSteps(rendered);
     const place = this.where.known ? [this.where.plain] : [];
     if (this.summary.failed === true) {
       const stated = stripColumnMarks(this.summary.title)
         .split("\n")
         .map((line) => pc.red(line));
-      const under = body === "" ? [] : [body];
+      // The next steps are set off by a blank line from what precedes them,
+      // as they are under every other ending; the hint sits directly under
+      // the error it explains.
+      const hint = rendered.length === 0 ? "" : this.laidOut(rendered);
+      const after = this.after();
+      const under = [...(hint === "" ? [] : [hint]), ...(after === "" ? [] : ["", after])];
       const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
       return `${[...stated, ...under, ...footer].join("\n")}\n`;
     }
@@ -71,7 +79,11 @@ export class Ending {
       .map((part) => part.trim())
       .filter((part) => part !== "")
       .join(" · ");
+    // With no answer of its own the next steps follow whatever the command
+    // wrote above, so they open on the blank line that sets them off from it.
+    const setOff = rendered.length === 0 && this.after() !== "" ? [""] : [];
     return [
+      ...setOff,
       ...(body === "" ? [] : [body, ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
       "",
@@ -79,19 +91,51 @@ export class Ending {
   }
 
   /**
-   * The body as it is drawn, then the next steps under it. Nothing is folded: a
-   * command broken across lines can no longer be run, and a terminal that wraps
-   * a long line keeps it one command when it is copied.
+   * The body as it is drawn, then the next steps and the overview under it, a
+   * blank line apart. Nothing is folded: a command broken across lines can no
+   * longer be run, and a terminal that wraps a long line keeps it one command
+   * when it is copied.
    */
   private laidOutWithSteps(body: readonly string[]): string {
-    const steps = this.presentation === "plain" ? (this.summary.next ?? []) : [];
-    const sentences = steps.flatMap((step) => [
-      stripColumnMarks(step.text),
-      ...(step.command === undefined ? [] : step.command.split("\n").map((one) => `  $ ${one}`)),
-    ]);
-    return [body.length === 0 ? "" : this.laidOut(body), ...sentences]
+    return [body.length === 0 ? "" : this.laidOut(body), this.after()]
       .filter((part) => part !== "")
-      .join("\n");
+      .join("\n\n");
+  }
+
+  /** What follows the answer, set off from it by a blank line: the next steps, then the overview. */
+  private after(): string {
+    return [this.nextBlock(), this.overview()].filter((part) => part !== "").join("\n\n");
+  }
+
+  /**
+   * The next steps of a normal command: the heading in bold, a sentence per
+   * step, and each command on a `$` line the way a person copies it. The
+   * heading is written once however many steps there are, and a step that
+   * only repeats it is left out.
+   */
+  private nextBlock(): string {
+    const steps = this.presentation === "plain" ? (this.summary.next ?? []) : [];
+    if (steps.length === 0) {
+      return "";
+    }
+    return [
+      strong(NEXT_LABEL),
+      ...steps.flatMap((step) => [
+        ...(step.text === NEXT_LABEL
+          ? []
+          : stripColumnMarks(step.text)
+              .split("\n")
+              .map((line) => `  ${escapeControlCharacters(line)}`)),
+        ...(step.command === undefined
+          ? []
+          : step.command.split("\n").map((one) => `  ${dim("$")} ${command(one)}`)),
+      ]),
+    ].join("\n");
+  }
+
+  /** Where to find every command, when the command asks to end on it. */
+  private overview(): string {
+    return this.presentation === "plain" ? (this.summary.overview ?? "") : "";
   }
 
   /** The body as it is drawn: as written, with the marks a builder left on its rows taken off. */

@@ -166,7 +166,7 @@ describe("BaseCommand next steps", () => {
       expect(cmd.stdout.at(-1)).toMatch(/\n\nNext:\n {2}Publish it\.$/);
     });
 
-    it("follows a skip's own rendering on the next line", async () => {
+    it("follows a skip's own rendering after a blank line", async () => {
       const cmd = makeCommand();
 
       await cmd.finish({
@@ -177,10 +177,10 @@ describe("BaseCommand next steps", () => {
         next: { commands: [DEPLOY] },
       });
 
-      expect(cmd.stdout).toEqual([`Nothing was removed\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
+      expect(cmd.stdout).toEqual([`Nothing was removed\n\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
     });
 
-    it("follows a skip's own ending", async () => {
+    it("follows a skip's own ending after a blank line", async () => {
       const cmd = makeCommand();
 
       await cmd.finish({
@@ -190,7 +190,7 @@ describe("BaseCommand next steps", () => {
         next: { commands: [DEPLOY] },
       });
 
-      expect(cmd.stdout).toEqual([`Nothing to do\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
+      expect(cmd.stdout).toEqual([`Nothing to do\n\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
     });
 
     it("comes before the footer", async () => {
@@ -222,7 +222,7 @@ describe("BaseCommand next steps", () => {
       expect(cmd.stdout).toEqual(["row"]);
     });
 
-    it("goes to stderr beside output a script reads", async () => {
+    it("goes to stderr beside output a script reads, after a blank line", async () => {
       const cmd = makeCommand();
 
       await offTerminal(() =>
@@ -235,7 +235,7 @@ describe("BaseCommand next steps", () => {
         }),
       );
 
-      expect(cmd.stderr).toEqual([`Next:\n  $ ${PUBLIC_DEPLOY}`]);
+      expect(cmd.stderr).toEqual([`\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
     });
 
     it("is set apart from output a script reads when both share a terminal", async () => {

@@ -73,6 +73,7 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { AuthMethodCommand } from "@/commands/auth-method/command";
 import type { SchemaTarget } from "@/commands/auth-method/command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 import { DEPLOY_ARGS, inShell, type SuggestedCommand } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
 import { refuseUneditable } from "@/lib/auth-methods";
@@ -749,7 +750,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             : []),
           ...(followUps.commands.length === 0
             ? []
-            : [{ text: "Run next:", command: followUps.commands.join("\n") }]),
+            : [{ text: NEXT_LABEL, command: followUps.commands.join("\n") }]),
         ],
       },
     });

@@ -362,14 +362,14 @@ describe("Frame", () => {
   it("never widens for a command longer than it is", () => {
     const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
 
-    expect(widest(new Frame("Summary", [], [{ text: "Run next:", command }]).render())).toBe(WIDTH);
+    expect(widest(new Frame("Summary", [], [{ text: "Next:", command }]).render())).toBe(WIDTH);
   });
 
   // The one thing allowed to widen the box: a token with nowhere to break is
   // worth more whole and over the width than split and unusable.
   it("widens only for a command that is one unbreakable argument", () => {
     const url = `https://example.com/${"a".repeat(200)}`;
-    const box = new Frame("Next steps", [], [{ text: "Run next:", command: url }]).render();
+    const box = new Frame("Next steps", [], [{ text: "Next:", command: url }]).render();
 
     expect(widest(box)).toBeGreaterThan(WIDTH);
     expect(box).toContain(url);
@@ -377,22 +377,20 @@ describe("Frame", () => {
 
   it("writes a command too long to fit as the one command it is", () => {
     const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
-    const box = new Frame("Summary", [], [{ text: "Run next:", command }]).render();
+    const box = new Frame("Summary", [], [{ text: "Next:", command }]).render();
 
     expect(
       pasted(
-        inside(box).filter((line) => line.trim() !== "Run next:"),
+        inside(box).filter((line) => line.trim() !== "Next:"),
         "  ",
       ),
     ).toBe(command);
   });
 
   it("puts each command on its own line under the sentence that asks for it", () => {
-    const box = plain(
-      new Frame("Next steps", [], [{ text: "Run next:", command: "a\nb" }]).render(),
-    );
+    const box = plain(new Frame("Next steps", [], [{ text: "Next:", command: "a\nb" }]).render());
 
-    expect(box).toContain("Run next:");
+    expect(box).toContain("Next:");
     expect(box.indexOf("a")).toBeLessThan(box.indexOf("b"));
   });
 });

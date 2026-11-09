@@ -168,8 +168,7 @@ describe("BaseCommand endings for a skip", () => {
 
 /**
  * A run nothing can be drawn into used to fall through to a rendering that was
- * neither of the two shapes: `Next:` where a box says `Run next:`,
- * `(server: host)` at the top where the ending says where it ran at the end,
+ * neither of the two shapes: `(server: host)` at the top where the ending says where it ran at the end,
  * and, for a wizard, no box at all.
  */
 describe("the ending of a run nothing is drawn into", () => {
@@ -187,13 +186,7 @@ describe("the ending of a run nothing is drawn into", () => {
   it("introduces a wizard's command under the label its box uses", async () => {
     const shown = await written(STATUS);
 
-    expect(shown).toContain("Run next:");
-  });
-
-  it("does not fall back to the bare label a terminal never shows", async () => {
-    const shown = await written(STATUS);
-
-    expect(shown).not.toContain("Next:");
+    expect(shown).toContain("Next:");
   });
 
   it("closes a wizard on the line it would have closed the chain on", async () => {

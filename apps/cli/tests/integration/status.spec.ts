@@ -176,7 +176,17 @@ describe("status", () => {
           app.runWithoutServer(["status", "--server", "https://self.example"]),
         );
 
-        expect(result).toPrint("Run next:");
+        expect(result).toPrint("Next:");
+      });
+
+      it("ends on where to find every command", async () => {
+        const app = await aConfiguredApp();
+
+        const result = await asTerminal(() =>
+          app.runWithoutServer(["status", "--server", "https://self.example"]),
+        );
+
+        expect(result).toPrint("Explore all commands:");
       });
     });
   });

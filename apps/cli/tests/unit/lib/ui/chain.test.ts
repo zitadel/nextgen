@@ -332,7 +332,7 @@ describe("a normal command's chain, which is no chain at all", () => {
   });
 
   // A run nothing can be drawn into used to fall through to a third rendering
-  // that was neither shape: `Next:` for `Run next:`, `(server: host)` at the
+  // that was neither shape: `(server: host)` at the
   // top for the place at the end, and no box at all. The words are the
   // command's, so they are the same written as drawn.
   describe("the ending written out, for a run nothing is drawn into", () => {
@@ -340,7 +340,7 @@ describe("a normal command's chain, which is no chain at all", () => {
       title: "Checked the status of the project",
       sections: [],
       lines: ["Project proj-1, lifecycle configured"],
-      next: [{ text: "Run next:", command: "npx @zitadel/cli@0.1.0 start" }],
+      next: [{ text: "Next:", command: "npx @zitadel/cli@0.1.0 start" }],
       boxed: true,
     };
 
@@ -354,7 +354,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     it("introduces a command under the label every box uses", () => {
       const text = stripAnsi(scripted().written(summary));
 
-      expect(text).toContain("Run next:");
+      expect(text).toContain("Next:");
     });
 
     it("ends a wizard on where it ran, in the sentence the box ends on", () => {

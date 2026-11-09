@@ -227,7 +227,7 @@ describe("Ui", () => {
     const summary = {
       title: "Checked the status of the project",
       sections: [],
-      next: [{ text: "Run next:", command: "npx @zitadel/cli@0.1.0 start" }],
+      next: [{ text: "Next:", command: "npx @zitadel/cli@0.1.0 start" }],
       boxed: true,
     };
 

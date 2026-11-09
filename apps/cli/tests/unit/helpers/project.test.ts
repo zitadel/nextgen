@@ -17,7 +17,7 @@ const BROKEN = [
 describe("assertEndingIsWellFormed", () => {
   it("lets an ending that names the overview once, with its steps laid out, through", () => {
     const well = [
-      " \u2502  Run next:                     \u2502",
+      " \u2502  Next:                     \u2502",
       " \u2502    npx @zitadel/cli@0.5.0 start  \u2502",
       " \u2502  Explore all commands:         \u2502",
     ].join("\n");
@@ -57,7 +57,7 @@ describe("assertEndingIsWellFormed", () => {
 
   it("refuses a command that was folded across lines like prose", () => {
     const folded =
-      "Run next:\n  $ npx @zitadel/cli@0.5.0 deployment create --release rel_1\n    --server http://localhost:8111\n";
+      "Next:\n  $ npx @zitadel/cli@0.5.0 deployment create --release rel_1\n    --server http://localhost:8111\n";
 
     expect(() => assertEndingIsWellFormed(run(folded), "release create")).toThrow(
       /folds a command across lines/,
@@ -66,7 +66,7 @@ describe("assertEndingIsWellFormed", () => {
 
   it("allows a command continued with the shell's own backslash", () => {
     const continued =
-      "Run next:\n  $ npx @zitadel/cli@0.5.0 deployment create --release rel_1 \\\n    --server http://localhost:8111\n";
+      "Next:\n  $ npx @zitadel/cli@0.5.0 deployment create --release rel_1 \\\n    --server http://localhost:8111\n";
 
     expect(() => assertEndingIsWellFormed(run(continued), "release create")).not.toThrow();
   });

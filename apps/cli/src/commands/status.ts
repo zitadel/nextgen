@@ -9,7 +9,11 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "@/lib/claim-state";
-import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
+import {
+  customizeAndPublishActions,
+  exploreAllCommands,
+  verifyLoginAction,
+} from "@/lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
@@ -137,6 +141,7 @@ export default class Status extends EnvironmentCommand {
         title: "Checked the status of the project",
         sections: [],
         lines: [projectSentence(project)],
+        overview: exploreAllCommands(this.cliVersion),
       },
     });
   }

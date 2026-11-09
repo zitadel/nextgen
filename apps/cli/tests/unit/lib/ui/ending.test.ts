@@ -2,6 +2,7 @@ import { stripAnsi } from "consola/utils";
 import pc from "picocolors";
 import { describe, expect, it } from "vitest";
 
+import { command, dim, strong } from "../../../../src/lib/style";
 import { Ending } from "../../../../src/lib/ui/ending";
 import { section, type Summary } from "../../../../src/lib/ui/summary";
 import { Where } from "../../../../src/lib/ui/where";
@@ -116,6 +117,75 @@ describe("Ending", () => {
   });
 });
 
+describe("the next steps of a normal command", () => {
+  const START = "npx @zitadel/cli@0.5.0 start";
+  const OVERVIEW = "Explore all commands:\n  npx @zitadel/cli@0.5.0";
+  const normally = (summary: Partial<Summary>): Ending =>
+    new Ending({ title: "Done", sections: [], ...summary }, nowhere, "plain");
+  const written = (summary: Partial<Summary>): string =>
+    plain(normally(summary).renderStandalone()).trim();
+
+  it("sit under one bold Next: heading, however many steps there are", () => {
+    const shown = normally({
+      next: [{ text: "Open the app." }, { text: "Next:", command: START }],
+    }).renderStandalone();
+
+    expect(shown.split("\n").filter((line) => line.includes("Next:"))).toEqual([strong("Next:")]);
+  });
+
+  it("put a sentence before the commands, indented under the heading", () => {
+    expect(written({ next: [{ text: "Open the app." }, { text: "Next:", command: START }] })).toBe(
+      `Next:\n  Open the app.\n  $ ${START}`,
+    );
+  });
+
+  it("draw each command the way every other command is drawn, dim $ and bold cyan", () => {
+    const shown = normally({ next: [{ text: "Next:", command: START }] }).renderStandalone();
+
+    expect(shown).toContain(`  ${dim("$")} ${command(START)}`);
+  });
+
+  it("leave a blank line between the answer and the heading", () => {
+    expect(written({ lines: ["Project proj-1."], next: [{ text: "Next:", command: START }] })).toBe(
+      `Project proj-1.\n\nNext:\n  $ ${START}`,
+    );
+  });
+
+  it("end on the overview when the command asks for it, under the steps", () => {
+    expect(written({ next: [{ text: "Next:", command: START }], overview: OVERVIEW })).toBe(
+      `Next:\n  $ ${START}\n\n${OVERVIEW}`,
+    );
+  });
+
+  it("open on a blank line when the command has no answer to follow, after what it wrote", () => {
+    const shown = plain(normally({ next: [{ text: "Next:", command: START }] }).renderStandalone());
+
+    expect(shown.startsWith(`\nNext:\n  $ ${START}`)).toBe(true);
+  });
+
+  it("end on the overview even when there is nothing to do next", () => {
+    expect(written({ overview: OVERVIEW })).toBe(OVERVIEW);
+  });
+
+  it("add no overview the command did not ask for", () => {
+    expect(written({ next: [{ text: "Next:", command: START }] })).not.toContain(
+      "Explore all commands",
+    );
+  });
+
+  it("are not shown by a wizard's standalone ending, which draws them in its box", () => {
+    const shown = plain(
+      new Ending(
+        { title: "Done", sections: [], next: [{ text: "Next:", command: START }] },
+        nowhere,
+        "wizard",
+      ).renderStandalone(),
+    );
+
+    expect(shown).not.toContain(START);
+  });
+});
+
 describe("what a long failure looks like under its closing line", () => {
   // Outside a frame nothing is widened by a wide line, so a table the command
   // was asked for keeps its columns however wide they are.
@@ -208,7 +278,7 @@ describe("which shape an ending takes", () => {
     it("says a next step's sentence on one line", () => {
       const shown = plain(normally({ next: [{ text: long }] }).renderStandalone());
 
-      expect(shown).toContain(`${long}\n`);
+      expect(shown).toContain(`  ${long}\n`);
     });
   });
 
@@ -222,11 +292,11 @@ describe("which shape an ending takes", () => {
     const shown = plain(
       normally({
         title: "Created rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
-        next: [{ text: "Run next:", command }],
+        next: [{ text: "Next:", command }],
       }).renderStandalone(),
     );
 
-    expect(shown).toContain(`Run next:\n  $ ${command}\n`);
+    expect(shown).toContain(`Next:\n  $ ${command}\n`);
   });
 
   // A dim unmarked footer is right for an answer and wrong for an error: it
