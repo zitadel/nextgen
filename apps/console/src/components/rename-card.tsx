@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
+import { CARD_ACTION_BUTTON, DetailSection, FIELD_LABEL_RAIL } from "@/components/detail-page";
 import { cn } from "@/lib/utils";
 import { FormError } from "@/components/form-error";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,10 @@ import { useSubmit } from "@/hooks/use-submit";
  * The details card of a resource whose one editable field is its name.
  *
  * The field follows `value`: a save re-runs the loader, and the draft resets
- * when the saved name changes. `layout="inline"` puts the label on a 202px
- * rail beside the input, as the project's card draws it, and stacks them
- * below `sm` where the rail would leave the input no room; the default
- * stacks them always.
+ * when the saved name changes. `layout="inline"` puts the label on the detail
+ * cards' rail beside the input, so the input starts where a read-only value
+ * does, and stacks them below `sm` where the rail would leave the input no
+ * room; the default stacks them always.
  */
 export function RenameCard({
   id,
@@ -58,7 +58,10 @@ export function RenameCard({
             layout === "inline" && "flex-col items-stretch sm:flex-row sm:items-center",
           )}
         >
-          <FieldLabel htmlFor={id} className={cn(layout === "inline" && "flex-none! sm:w-[202px]")}>
+          <FieldLabel
+            htmlFor={id}
+            className={cn(layout === "inline" && `flex-none! ${FIELD_LABEL_RAIL}`)}
+          >
             {label}
           </FieldLabel>
           <Input

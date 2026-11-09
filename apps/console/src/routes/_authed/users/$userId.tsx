@@ -3,7 +3,13 @@ import { User } from "lucide-react";
 import { useState } from "react";
 import { DeleteUserDialog } from "@/features/users/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
+import {
+  DETAIL_BODY,
+  DETAIL_CARD,
+  DETAIL_STACK,
+  DetailHeader,
+  DetailSection,
+} from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -86,7 +92,7 @@ function UserDetail() {
         }
       />
 
-      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} gap-6`}>
+      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="User detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
@@ -98,7 +104,7 @@ function UserDetail() {
           value="overview"
           forceMount
           hidden={tab !== "overview"}
-          className="flex flex-col gap-6"
+          className={DETAIL_STACK}
         >
           <UserProfileCard
             // The route reuses this for the next user: a save's error stays with its own.

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import {
   AddAdminButton,
@@ -123,7 +123,7 @@ function ProjectDetail() {
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as Tab)}
-        className={`${DETAIL_BODY} gap-6`}
+        className={`${DETAIL_BODY} ${DETAIL_STACK}`}
       >
         {/* The active tab's action sits on the tab row, as the design draws it. */}
         <div className="flex items-center justify-between gap-6">
@@ -134,8 +134,7 @@ function ProjectDetail() {
           {tab === "admins" && <AddAdminButton projectId={project.id} onAdded={reload} />}
         </div>
 
-        {/* The page owns the 16px between its cards. */}
-        <TabsContent value="overview" className="flex flex-col gap-4">
+        <TabsContent value="overview" className={DETAIL_STACK}>
           <RenameCard
             id="project-name"
             layout="inline"

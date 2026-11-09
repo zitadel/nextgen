@@ -3,7 +3,7 @@ import { Box } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
 import { MetaRule, MetaValue } from "./detail-meta";
-import { DetailHeader } from "./detail-page";
+import { DetailHeader, DetailRow, DetailRows } from "./detail-page";
 import { Page } from "./layout";
 
 function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
@@ -55,5 +55,39 @@ describe("detail header", () => {
       <DetailHeader icon={Box} title="Engineering" meta={<MetaValue label="ID" value="x" />} />,
     );
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+describe("detail header action", () => {
+  it("renders the action after the header card", () => {
+    renderHeader({ action: <button type="button">Actions</button> });
+    const action = screen.getByRole("button", { name: "Actions" });
+    const copy = screen.getByRole("button", { name: "Copy Team ID" });
+    expect(copy.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("detail rows", () => {
+  it("rules between rows, never after the last", () => {
+    const { container } = render(
+      <DetailRows>
+        <DetailRow label="Message">a</DetailRow>
+        <DetailRow label="Git commit">b</DetailRow>
+        <DetailRow label="Created by">c</DetailRow>
+      </DetailRows>,
+    );
+    const list = container.firstElementChild;
+    expect(container.querySelectorAll("[data-slot=separator]")).toHaveLength(2);
+    expect(list?.lastElementChild).toHaveTextContent("Created by");
+  });
+
+  it("keeps a list a list: rules are presentational items", () => {
+    render(
+      <DetailRows as="ul">
+        <DetailRow label="Password">Not set</DetailRow>
+        <DetailRow label="Passkey">Not set up</DetailRow>
+      </DetailRows>,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 });

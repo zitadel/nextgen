@@ -1,15 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Shield } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
-import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, PanelTitle } from "@/components/detail-page";
+import { MetaRule, MetaValue } from "@/components/detail-meta";
+import {
+  DETAIL_BODY,
+  DETAIL_VALUE,
+  DETAIL_VALUE_EMPTY,
+  DetailHeader,
+  DetailRow,
+  DetailRows,
+  DetailSection,
+} from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SECTION_HEADING } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
-import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
 import { fetchAllFlows } from "@/features/flow-definitions/api";
 import { flowDisplayName } from "@/features/flow-definitions/model";
@@ -55,49 +62,55 @@ function IdpDetail() {
   const clientId = idpClientId(idp.definition);
 
   return (
-    <Page inset="panel">
-      <DetailPanel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <PanelTitle icon={Shield} title={idp.definition.display_name} />
-          <MetaCard bordered={false}>
+    <Page>
+      <DetailHeader
+        icon={Shield}
+        title={idp.definition.display_name}
+        meta={
+          <>
             <MetaValue label="Connection ID" value={idp.id} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(idp.created_at)} />
-          </MetaCard>
-        </div>
+          </>
+        }
+      />
 
-        <Separator />
-
+      <DetailSection title="Provider details" className={DETAIL_BODY}>
         {/* Two columns at `lg`, 40px apart as drawn; the document stacks
             under the details below it. */}
         <div className="flex flex-col gap-10 lg:flex-row lg:items-stretch">
-          <div className="flex min-w-0 flex-1 flex-col gap-10">
-            <Section title="Provider details">
-              <Row label="Slug">
-                <span className="truncate">{idp.slug}</span>
-              </Row>
-              <Row label="Client ID">
+          <div className="flex min-w-0 flex-1 flex-col gap-6">
+            <DetailRows>
+              <DetailRow label="Slug">
+                <span className={DETAIL_VALUE}>{idp.slug}</span>
+              </DetailRow>
+              <DetailRow align={clientId ? "control" : "start"} label="Client ID">
                 {clientId ? (
                   <span className="flex min-w-0 items-center gap-2">
                     {/* Shown as written: a `${{ VAR }}` reference stays a
                         reference — the value differs per environment. */}
-                    <span className="truncate">{clientId}</span>
+                    <span className={DETAIL_VALUE}>{clientId}</span>
                     <CopyButton value={clientId} label="Copy Client ID" className="shrink-0" />
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">—</span>
+                  <span className={DETAIL_VALUE_EMPTY}>—</span>
                 )}
-              </Row>
-            </Section>
+              </DetailRow>
+            </DetailRows>
 
-            <Section title="Used by">
-              <Row label="User schemas">
-                <References items={schemas} to="schema" />
-              </Row>
-              <Row label="Login flows">
-                <References items={flows} to="flow" />
-              </Row>
-            </Section>
+            <section aria-labelledby="idp-used-by" className="flex flex-col gap-2">
+              <h3 id="idp-used-by" className={SECTION_HEADING}>
+                Used by
+              </h3>
+              <DetailRows>
+                <DetailRow label="User schemas">
+                  <References items={schemas} to="schema" />
+                </DetailRow>
+                <DetailRow label="Login flows">
+                  <References items={flows} to="flow" />
+                </DetailRow>
+              </DetailRows>
+            </section>
           </div>
 
           {/* `client_secret` is always a `${{ VAR }}` reference (the document
@@ -105,41 +118,16 @@ function IdpDetail() {
               whole. */}
           <DocumentViewer document={idp.definition} noun="connection" />
         </div>
-      </DetailPanel>
+      </DetailSection>
     </Page>
-  );
-}
-
-/** An eyebrow over label/value rows, each row followed by a hairline. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-4">
-      <h2 className={SECTION_HEADING}>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-/** A 200px muted label and its value, then the rule beneath them. */
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <>
-      <div className="flex min-h-7 items-center gap-4 py-1 text-sm leading-5">
-        <span className="w-32 shrink-0 font-medium text-muted-foreground sm:w-[200px]">
-          {label}
-        </span>
-        <div className="flex min-w-0 flex-1 text-foreground">{children}</div>
-      </div>
-      <Separator />
-    </>
   );
 }
 
 /** Comma-separated links to what references the connection, or `Not used`. */
 function References({ items, to }: { items: IdpReference[]; to: "schema" | "flow" }) {
-  if (items.length === 0) return <span className="text-muted-foreground">Not used</span>;
+  if (items.length === 0) return <span className={DETAIL_VALUE_EMPTY}>Not used</span>;
   return (
-    <span className="flex min-w-0 flex-wrap">
+    <span className={`flex flex-wrap ${DETAIL_VALUE}`}>
       {items.map((item, index) => (
         <Fragment key={item.id}>
           {index > 0 && <span className="mr-1">,</span>}

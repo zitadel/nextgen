@@ -1,8 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
-import { DETAIL_BODY, DetailSection, DetailTitle } from "@/components/detail-page";
+import {
+  DETAIL_BODY,
+  DETAIL_STACK,
+  DetailRows,
+  DetailSection,
+  DetailTitle,
+} from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/features/schemas/components/schema-fields-panel";
@@ -15,7 +20,6 @@ import {
   RevisionValue,
 } from "@/features/schemas/components/revision-select";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { field } from "@/lib/record";
@@ -86,7 +90,7 @@ function SchemaDetail() {
           resource backs it, so the created date stands in. */}
       <DetailTitle title={name} idLabel="Schema ID" id={schemaId} createdAt={createdAt} />
 
-      <Tabs defaultValue="fields" className={`${DETAIL_BODY} gap-6`}>
+      <Tabs defaultValue="fields" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="Schema detail sections">
           <TabsTrigger value="fields">Fields</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
@@ -114,30 +118,27 @@ function SchemaDetail() {
                 This schema declares no sign-in methods.
               </p>
             ) : (
-              <div className="flex flex-col gap-2.5">
-                {methods.map((method, index) => (
-                  <Fragment key={method.key}>
-                    {index > 0 && <Separator className={RULE} />}
-                    <div className="flex items-center justify-between gap-4 py-1">
-                      <span className="text-sm leading-5 font-medium text-foreground">
-                        {method.label}
-                      </span>
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        {/* Raw slugs: resolving them to connection names needs
+              <DetailRows>
+                {methods.map((method) => (
+                  <div key={method.key} className="flex items-center justify-between gap-4 py-1">
+                    <span className="text-sm leading-5 font-medium text-foreground">
+                      {method.label}
+                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      {/* Raw slugs: resolving them to connection names needs
                             `idp.read`, which this screen does not assume. A
                             slug with no connection reads the same — the
                             Authentication screen is where that is flagged. */}
-                        {method.providers.map((slug) => (
-                          <InlineCode key={slug}>{slug}</InlineCode>
-                        ))}
-                        <Badge variant="secondary" className="h-5">
-                          {method.enabled ? "Enabled" : "Disabled"}
-                        </Badge>
-                      </div>
+                      {method.providers.map((slug) => (
+                        <InlineCode key={slug}>{slug}</InlineCode>
+                      ))}
+                      <Badge variant="secondary" className="h-5">
+                        {method.enabled ? "Enabled" : "Disabled"}
+                      </Badge>
                     </div>
-                  </Fragment>
+                  </div>
                 ))}
-              </div>
+              </DetailRows>
             )}
           </DetailSection>
         </TabsContent>
@@ -188,9 +189,3 @@ function RevisionSelect({
     </Select>
   );
 }
-
-// The rules between sign-in methods take no vertical space: the design draws
-// them as zero-height lines with the hairline outside the box, so the 10px
-// column gap sits either side of the rule rather than 10px + the rule's own
-// height. `Separator` is `h-px`, which is enough to drift the rows below it.
-const RULE = "h-0 border-t border-border bg-transparent";

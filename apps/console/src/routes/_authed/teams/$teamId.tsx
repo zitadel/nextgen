@@ -2,7 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -60,7 +60,7 @@ function TeamDetail() {
         }
       />
 
-      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
+      <Tabs defaultValue="overview" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="Team detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
@@ -70,6 +70,7 @@ function TeamDetail() {
           {/* The team's own `name`, the only field `PATCH /teams/{team_id}` accepts. */}
           <RenameCard
             id="team-detail-name"
+            layout="inline"
             label="Team name"
             value={team.name}
             onSave={async (name) => {
