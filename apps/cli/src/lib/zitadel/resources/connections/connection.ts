@@ -9,13 +9,21 @@ import {
   type IdpProvider,
   isVariableReference,
   missingEndpoints,
+  type Parsed,
   parseConnectionSlug,
+  parseDisplayName,
+  parseIssuer,
   referencedVariable,
 } from "@zitadel/config/idp";
 import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import { ConfigError, ConflictError } from "@/lib/zitadel/errors";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
 import { type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
@@ -68,6 +76,21 @@ export type CredentialNames = Readonly<{
    * The variable the client secret is read from.
    */
   clientSecret: ClientSecretVariable | undefined;
+}>;
+
+/**
+ * The settings that describe a connection of the developer's own beyond its
+ * slug, as a run gives them or a file holds them.
+ */
+export type StoredSettings = Readonly<{
+  /**
+   * The name shown on the sign-in button.
+   */
+  displayName?: string | undefined;
+  /**
+   * The provider's issuer.
+   */
+  issuer?: string | undefined;
 }>;
 
 /**
@@ -473,6 +496,102 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
       return row.property === property;
     });
   }
+
+  /**
+   * The settings this file holds that a run reusing the connection takes
+   * instead of asking for them, each held to the rules a typed answer is.
+   *
+   * @remarks
+   * A setting the run was given is not read at all, so a stored value it
+   * replaces is never refused. Scopes are left out: reusing a connection never
+   * applies them.
+   *
+   * @param given - The settings the run was given.
+   * @returns Each stored setting the run uses; `undefined` for one it was
+   *   given or the file does not hold.
+   * @throws {@link ConflictError} When the file has no issuer, so it is not an
+   *   OIDC connection to reuse at all, whatever issuer is given.
+   * @throws {@link ConfigError} When a stored setting the run would use cannot
+   *   be used, naming the file.
+   */
+  storedSettings(given: StoredSettings): StoredSettings {
+    const issuer = this.issuer;
+    if (issuer === undefined) {
+      throw new ConflictError(
+        `${this.path} is already named ${this.name} and is not an OIDC connection`,
+        {
+          hint: "Fix the file, or choose another slug, then run the command again.",
+          details: { file: this.path, slug: this.name },
+        },
+      );
+    }
+    return {
+      displayName: usableSetting(
+        this,
+        "a display name",
+        this.displayName,
+        given.displayName,
+        parseDisplayName,
+      ),
+      issuer: usableSetting(this, "an issuer", issuer, given.issuer, parseIssuer),
+    };
+  }
+
+  /**
+   * The connection pointing at other endpoints, such as a local stand-in for
+   * the provider that a development run answers with.
+   *
+   * @remarks
+   * Only the issuer is written: the engine takes a connection naming every
+   * endpoint or none, and a stand-in serves its own discovery document as the
+   * vendor does. A missing or blank issuer leaves the connection as it is.
+   *
+   * @param endpoints - Where the provider answers.
+   * @returns The connection, or the same one when nothing changes.
+   */
+  withEndpoints(endpoints: ConnectionEndpoints): Connection {
+    const issuer = endpoints.issuer;
+    if (issuer === undefined || issuer === "") {
+      return this;
+    }
+    const body = { ...this.body, oidc: { ...objectAt(this.body, "oidc"), issuer } };
+    return new Connection(this.path, body, this.editedStatus);
+  }
+}
+
+/**
+ * A setting a connection's file holds, when a run reusing it uses it.
+ *
+ * @param connection - The connection.
+ * @param what - How a refusal names the setting.
+ * @param stored - The setting as the file holds it.
+ * @param given - The setting as the run was given it, which replaces the file's.
+ * @param parse - The rules a typed answer is held to.
+ * @returns The stored setting, or `undefined` when the run was given one or
+ *   the file holds none.
+ * @throws {@link ConfigError} When the stored setting cannot be used.
+ */
+function usableSetting<T>(
+  connection: Connection,
+  what: string,
+  stored: string | undefined,
+  given: string | undefined,
+  parse: (value: string) => Parsed<T>,
+): string | undefined {
+  if (given !== undefined || stored === undefined) {
+    return undefined;
+  }
+  const parsed = parse(stored);
+  if (!parsed.ok) {
+    throw new ConfigError(
+      `${connection.path} holds ${what} that cannot be used: ${parsed.problem}`,
+      {
+        hint: "Fix it in that file, or choose another slug.",
+        details: { file: connection.path, slug: connection.name },
+      },
+    );
+  }
+  return stored;
 }
 
 /**

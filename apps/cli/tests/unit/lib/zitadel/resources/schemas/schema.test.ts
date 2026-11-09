@@ -71,6 +71,18 @@ describe("UserSchema.create", () => {
   });
 });
 
+describe("UserSchema.handle", () => {
+  it("is the objectType a release pins the schema by", () => {
+    expect(UserSchema.of({ path: PATH, body: { objectType: "human-user" } }).handle).toBe(
+      "human-user",
+    );
+  });
+
+  it("is undefined for a schema with no objectType", () => {
+    expect(UserSchema.of({ path: PATH, body: { objectType: "" } }).handle).toBeUndefined();
+  });
+});
+
 describe("UserSchema.asRead", () => {
   it("marks an edited schema as read", () => {
     const edited = shippedSchema().withProvider(slug("google"));

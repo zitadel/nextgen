@@ -359,6 +359,18 @@ describe("Flow.create", () => {
   });
 });
 
+describe("Flow.handle", () => {
+  it("is the name a release pins the flow by, not its file name", () => {
+    expect(
+      Flow.of({ path: ".zitadel/flows/login.json", body: { name: "default-login" } }).handle,
+    ).toBe("default-login");
+  });
+
+  it("is undefined for a flow with no name", () => {
+    expect(Flow.of({ path: PATH, body: {} }).handle).toBeUndefined();
+  });
+});
+
 describe("Flow.asRead", () => {
   it("marks an edited flow as read", () => {
     const edited = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);

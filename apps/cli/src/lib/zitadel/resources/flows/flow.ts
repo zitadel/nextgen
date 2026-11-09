@@ -5,7 +5,11 @@ import { basename } from "node:path";
 import { flowConfigSchema } from "@zitadel/config/schemas";
 import { PURPOSE_FLIP_TARGETS } from "@zitadel/config/validate";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
 import {
   addSsoToFlow,
   flowEditRefusal,
@@ -161,6 +165,20 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    */
   get name(): string {
     return basename(this.path, ".json");
+  }
+
+  /**
+   * The name a release pins the flow by: its `name`, which its file name
+   * need not match.
+   *
+   * @returns The name, or `undefined` when it is missing or empty.
+   */
+  override get handle(): string | undefined {
+    const name = this.body.name;
+    if (typeof name !== "string" || name === "") {
+      return undefined;
+    }
+    return name;
   }
 
   /**

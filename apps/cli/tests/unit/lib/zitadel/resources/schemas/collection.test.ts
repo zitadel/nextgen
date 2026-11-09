@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AmbiguousSchemaError,
   BrokenFlowsError,
+  MemoryStore,
   NoSignInLeftError,
   RefusedEditError,
+  SchemaNotFoundError,
   type UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
@@ -20,6 +23,31 @@ const SCHEMA_PATH = ".zitadel/schemas/customers.json";
  * The `$id` the flows name the schema by.
  */
 const SCHEMA_ID = "https://schemas.test.invalid/customers.json";
+
+/**
+ * A schema whose file name is another schema's objectType.
+ */
+const CUSTOMER_FILE = ".zitadel/schemas/customer.json";
+
+/**
+ * A schema whose objectType is another schema's file name.
+ */
+const CUSTOMERS_FILE = ".zitadel/schemas/customers.json";
+
+/**
+ * A schema no other schema's objectType shadows.
+ */
+const EMPLOYEES_FILE = ".zitadel/schemas/employees.json";
+
+/**
+ * Three schemas, where `customer` is one's file name and the other's
+ * objectType.
+ */
+const SEVERAL_SCHEMAS = [
+  { path: CUSTOMER_FILE, body: { objectType: "staff" } },
+  { path: CUSTOMERS_FILE, body: { objectType: "customer" } },
+  { path: EMPLOYEES_FILE, body: { objectType: "employee" } },
+];
 
 /**
  * Where the first flow in these tests sits.
@@ -364,7 +392,11 @@ describe("Schemas.disable", () => {
     });
 
     expect(error).toBeInstanceOf(NoSignInLeftError);
-    expect(error).toMatchObject({ disabling: "password", usable: ["password"], alternatives: ["passkey"] });
+    expect(error).toMatchObject({
+      disabling: "password",
+      usable: ["password"],
+      alternatives: ["passkey"],
+    });
   });
 
   it("refuses a flow that still uses the method before the last way to sign in", () => {
@@ -637,5 +669,153 @@ describe("Schemas.signInNotices", () => {
     expect(messagesOf(toggled(config, "password", false))).toEqual([
       "customers is left with no way to sign in. Its users can only be managed through the API.",
     ]);
+  });
+});
+
+describe("Schemas.named", () => {
+  describe("with one schema", () => {
+    it("picks it when no name is given", async () => {
+      const config = await ZitadelConfig.loadUnchecked(
+        new MemoryStore([{ path: CUSTOMERS_FILE, body: {} }]),
+      );
+
+      const schema = config.schemas.named();
+
+      expect(schema.path).toBe(CUSTOMERS_FILE);
+    });
+  });
+
+  describe("with several schemas", () => {
+    it.each([
+      ["its file name", "employees", EMPLOYEES_FILE],
+      ["its objectType, as a flow's user_schema names it", "employee", EMPLOYEES_FILE],
+      ["<file>.json, which never matches an objectType", "customer.json", CUSTOMER_FILE],
+    ])("picks the schema by %s", async (_how, requested, path) => {
+      const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+      const schema = config.schemas.named(requested);
+
+      expect(schema.path).toBe(path);
+    });
+
+    it("refuses a name more than one schema answers to, naming every one", async () => {
+      const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+      const error = thrownBy(() => {
+        return config.schemas.named("customer");
+      });
+
+      expect(error).toBeInstanceOf(AmbiguousSchemaError);
+      expect(error).toMatchObject({
+        requested: "customer",
+        details: { requested: "customer", candidates: ["customer", "customers"] },
+      });
+    });
+
+    it("refuses to guess when no name is given, naming every schema", async () => {
+      const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+      const error = thrownBy(() => {
+        return config.schemas.named();
+      });
+
+      expect(error).toBeInstanceOf(AmbiguousSchemaError);
+      expect(error).toMatchObject({
+        requested: undefined,
+        candidates: config.schemas.all,
+        details: { requested: null },
+      });
+    });
+
+    it("refuses a name no schema has, without its .json", async () => {
+      const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+      const error = thrownBy(() => {
+        return config.schemas.named("staff.json");
+      });
+
+      expect(error).toBeInstanceOf(SchemaNotFoundError);
+      expect(error).toMatchObject({
+        message: "No user schema is named staff",
+        requested: "staff",
+        details: { requested: "staff", known: ["customer", "customers", "employees"] },
+      });
+    });
+  });
+
+  describe("with no schema", () => {
+    it("refuses whatever is asked for", () => {
+      const config = ZitadelConfig.empty();
+
+      const error = thrownBy(() => {
+        return config.schemas.named("customers");
+      });
+
+      expect(error).toBeInstanceOf(SchemaNotFoundError);
+      expect(error).toMatchObject({
+        message: "There is no user schema under .zitadel/schemas",
+        known: [],
+      });
+    });
+  });
+});
+
+describe("Schemas.nameFor", () => {
+  it.each([
+    ["its file name", EMPLOYEES_FILE, "employees"],
+    [
+      "<file>.json, when its file name is another schema's objectType",
+      CUSTOMER_FILE,
+      "customer.json",
+    ],
+  ])("names a schema by %s", async (_how, path, name) => {
+    const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+    const named = config.schemas.all
+      .filter((schema) => {
+        return schema.path === path;
+      })
+      .map((schema) => {
+        return config.schemas.nameFor(schema);
+      });
+
+    expect(named).toEqual([name]);
+  });
+});
+
+describe("Schemas.pathFor", () => {
+  describe("when a file holds the handle", () => {
+    it("is that file", async () => {
+      const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+      const path = config.schemas.pathFor("customer");
+
+      expect(path).toBe(CUSTOMERS_FILE);
+    });
+  });
+
+  describe("when no file holds the handle", () => {
+    it("is <handle>.json", () => {
+      const config = ZitadelConfig.empty();
+
+      const path = config.schemas.pathFor("human-user");
+
+      expect(path).toBe(".zitadel/schemas/human-user.json");
+    });
+  });
+});
+
+describe("Schemas.revision", () => {
+  describe("when a file holds the handle", () => {
+    it("replaces that file rather than writing a second one", async () => {
+      const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
+
+      const change = config.schemas.revision("customer", {
+        objectType: "customer",
+        type: "object",
+      });
+
+      expect(change.changedPaths).toEqual([CUSTOMERS_FILE]);
+    });
   });
 });

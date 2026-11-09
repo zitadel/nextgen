@@ -4,7 +4,11 @@ import { basename } from "node:path";
 
 import { schemaConfigSchema } from "@zitadel/config/schemas";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
 import { RefusedEditError } from "@/lib/zitadel/errors";
 import { type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
@@ -120,6 +124,15 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
       return undefined;
     }
     return objectType;
+  }
+
+  /**
+   * The name a release pins the schema by: its `objectType`.
+   *
+   * @returns The object type, or `undefined` when it is missing or empty.
+   */
+  override get handle(): string | undefined {
+    return this.objectType;
   }
 
   /**
