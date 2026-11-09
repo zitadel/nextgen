@@ -1,5 +1,6 @@
 ---
 "@zitadel/cli": patch
+"@zitadel/config": patch
 ---
 
-`deploy` now reports an invalid `typography.font_url`, `typography.font_family` or `theme.*.logo_url` in `branding.json` once, in plain words that say what a valid value looks like, instead of a raw regex followed by the same finding again. The finding names the field, not `(root)`, and still appears when another field in the file is also wrong.
+`deploy` now says each refused branding value once, at its own field and in plain words (a font URL, a font stack, a logo URL or a palette colour), instead of a raw regex or a `(root)` finding, and still says so when another field in the file is also wrong.

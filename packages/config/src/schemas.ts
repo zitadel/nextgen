@@ -1,4 +1,9 @@
 import {
+  createBrandingBodyHeroUrlRegExp,
+  createBrandingBodyLogoUrlRegExp,
+  createBrandingBodyThemeDarkLogoUrlRegExp,
+  createBrandingBodyThemeLightLogoUrlRegExp,
+  createBrandingBodyTypographyFontUrlRegExp,
   CreateBrandingBody,
   CreateFlowDefinitionBody,
   CreateIdpBody,
@@ -149,110 +154,170 @@ export const brandingWireSchema = CreateBrandingBody;
  */
 export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1) });
 
+const BRANDING_THEME_SIDE = CreateBrandingBody.shape.theme.unwrap().shape.light.unwrap();
+const BRANDING_PALETTE = BRANDING_THEME_SIDE.shape.palette.unwrap();
+
+/**
+ * A string field the CLI holds to the server's asset URL gate itself, so the
+ * refusal sits at the field, in plain words, and the generated URL format and
+ * pattern checks, which would refuse the same value in regex wording beside
+ * it, do not run.
+ *
+ * @param pattern - The URL pattern the OpenAPI spec gives the field.
+ * @param options - `loopback: false` for a stylesheet, which has no carve-out.
+ * @returns The field's schema; an empty string passes, as it does the server.
+ */
+function brandingAssetUrl(
+  pattern: RegExp,
+  options: { loopback?: boolean } = {},
+): z.ZodOptional<z.ZodString> {
+  return z
+    .string()
+    .superRefine((value, ctx) => {
+      const problem = brandingAssetUrlProblem(value, pattern, options);
+      if (problem !== undefined) {
+        ctx.addIssue({ code: "custom", message: problem });
+      }
+    })
+    .optional();
+}
+
+/**
+ * A palette colour held to the server's colour gate at the colour itself, in
+ * place of the generated length and pattern checks.
+ */
+const brandingColour = z
+  .string()
+  .superRefine((value, ctx) => {
+    if (!isBrandingColor(value)) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch().",
+      });
+    }
+  })
+  .optional();
+
+/**
+ * One theme side with its logo and every palette colour held to the server's
+ * gates at the field that holds them.
+ */
+const brandingThemeSide = (sidePattern: RegExp) =>
+  BRANDING_THEME_SIDE.extend({
+    logo_url: brandingAssetUrl(sidePattern),
+    palette: z
+      .object(
+        Object.fromEntries(
+          Object.keys(BRANDING_PALETTE.shape).map((key) => [key, brandingColour]),
+        ) as { [Key in keyof typeof BRANDING_PALETTE.shape]: typeof brandingColour },
+      )
+      .optional(),
+  }).optional();
+
+/**
+ * The typeface, with its stylesheet and font stack held to the server's gates
+ * at the field, and the pair held to each other at the stylesheet.
+ *
+ * A stylesheet alone names no face to render in, so the server rejects the
+ * pair as a pair (validateBrandingFontURL in
+ * internal/domain/branding_validator.go). plan has to agree, or apply fails
+ * after schemas and flows have already been written.
+ */
+const brandingTypography = CreateBrandingBody.shape.typography
+  .unwrap()
+  .extend({
+    // The appearance values land in a CSS declaration, so the server stores
+    // only forms it recognises (ValidateBrandingColor / ValidateBrandingFontFamily
+    // in internal/domain/branding_css.go).
+    font_family: z
+      .string()
+      .superRefine((value, ctx) => {
+        if (!isBrandingFontFamily(value)) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
+          });
+        }
+      })
+      .optional(),
+    // A stylesheet is styling rather than an image, so it has no loopback
+    // carve-out.
+    font_url: brandingAssetUrl(createBrandingBodyTypographyFontUrlRegExp, { loopback: false }),
+  })
+  .superRefine((value, ctx) => {
+    if (value.font_url !== undefined && value.font_url !== "" && value.font_family === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["font_url"],
+        message:
+          "needs a typography.font_family to load; a stylesheet alone names no face to render in.",
+      });
+    }
+  })
+  .optional();
+
 /**
  * The local `.zitadel/branding/*.json` dialect: the wire shape, where
  * `liquid_template` may also be a `$file` reference to the sibling `.liquid`
  * template (the meta-schema `branding.json` mirrors this).
+ *
+ * Every value the server gates is checked at the field that holds it, so a
+ * refusal carries the field's path and is said once, in plain words, whatever
+ * else is wrong with the file. Mirror the server's asset URL gate
+ * (validateBrandingAssetURL in internal/domain/branding_validator.go) so plan
+ * rejects what apply would: apply mutates schemas and flows before branding,
+ * so a late 400 would leave a half-applied run.
  */
-export const brandingConfigSchema = z
-  .strictObject({
-    // Strict, unlike the generated wire schema: a typo like `hero_urll`
-    // must fail plan, not silently pass and get ignored by the server. The
-    // editor meta-schema already rejects unknown keys; the CLI gate has to
-    // agree.
-    ...CreateBrandingBody.shape,
-    // Raw strings instead of the generated uri fields: those trim and
-    // normalize before refinement runs, hiding exactly the forms the wire
-    // body still carries verbatim and Go's url.Parse rejects.
-    logo_url: z.string().optional(),
-    hero_url: z.string().optional(),
-    $schema: z.string().optional(),
-    liquid_template: z
-      .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
-      .optional(),
-  })
-  .superRefine((value, ctx) => {
-    // A stylesheet alone names no face to render in, so the server rejects the
-    // pair as a pair (validateBrandingFontURL in
-    // internal/domain/branding_validator.go). plan has to agree, or apply
-    // fails after schemas and flows have already been written.
-    validateBrandingAssetUrl(value.typography?.font_url, "typography.font_url", ctx, {
-      loopback: false,
-    });
-    if (value.typography?.font_url !== undefined && value.typography.font_family === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.",
-      });
-    }
-    // Mirror the server's asset URL gate (validateBrandingAssetURL in
-    // internal/domain/branding_validator.go) so plan rejects what apply would.
-    // Apply mutates schemas and flows before branding, so a late 400 here would
-    // leave a half-applied run.
-    validateBrandingAssetUrl(value.logo_url, "logo_url", ctx);
-    validateBrandingAssetUrl(value.hero_url, "hero_url", ctx);
-    validateBrandingAssetUrl(value.theme?.light?.logo_url, "theme.light.logo_url", ctx);
-    validateBrandingAssetUrl(value.theme?.dark?.logo_url, "theme.dark.logo_url", ctx);
-    // The appearance values land in a CSS declaration, so the server stores
-    // only forms it recognises (ValidateBrandingColor / ValidateBrandingFontFamily
-    // in internal/domain/branding_css.go).
-    validateBrandingPalette(value.theme?.light?.palette, "theme.light", ctx);
-    validateBrandingPalette(value.theme?.dark?.palette, "theme.dark", ctx);
-    if (
-      value.typography?.font_family !== undefined &&
-      !isBrandingFontFamily(value.typography.font_family)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          'typography.font_family must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
-      });
-    }
-  });
+export const brandingConfigSchema = z.strictObject({
+  // Strict, unlike the generated wire schema: a typo like `hero_urll`
+  // must fail plan, not silently pass and get ignored by the server. The
+  // editor meta-schema already rejects unknown keys; the CLI gate has to
+  // agree.
+  ...CreateBrandingBody.shape,
+  // Raw strings instead of the generated uri fields: those trim and
+  // normalize before refinement runs, hiding exactly the forms the wire
+  // body still carries verbatim and Go's url.Parse rejects.
+  logo_url: brandingAssetUrl(createBrandingBodyLogoUrlRegExp),
+  hero_url: brandingAssetUrl(createBrandingBodyHeroUrlRegExp),
+  theme: CreateBrandingBody.shape.theme
+    .unwrap()
+    .extend({
+      light: brandingThemeSide(createBrandingBodyThemeLightLogoUrlRegExp),
+      dark: brandingThemeSide(createBrandingBodyThemeDarkLogoUrlRegExp),
+    })
+    .optional(),
+  typography: brandingTypography,
+  $schema: z.string().optional(),
+  liquid_template: z
+    .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
+    .optional(),
+});
 
-function validateBrandingPalette(
-  palette: Record<string, unknown> | undefined,
-  side: string,
-  ctx: z.RefinementCtx,
-): void {
-  if (!palette) {
-    return;
-  }
-  for (const [key, colour] of Object.entries(palette)) {
-    // A non-string never reaches here: the generated object schema types every
-    // palette value as a string, and Zod skips refinements once the base parse
-    // has failed. The check is what narrows `unknown` for the call below.
-    if (typeof colour !== "string") {
-      continue;
-    }
-    if (isBrandingColor(colour)) {
-      continue;
-    }
-    ctx.addIssue({
-      code: "custom",
-      message: `${side}.palette.${key} must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch().`,
-    });
-  }
-}
-
-function validateBrandingAssetUrl(
-  value: string | undefined,
-  field: string,
-  ctx: z.RefinementCtx,
-  options: { loopback?: boolean } = {},
-): void {
-  if (value === undefined || value === "") {
-    return;
+/**
+ * Why an asset URL is refused, in the words the server uses.
+ *
+ * @param value - The URL as written.
+ * @param pattern - The URL pattern the OpenAPI spec gives the field, which the
+ *   API enforces too and which refuses forms the checks above it let through,
+ *   such as `https:///host`.
+ * @param options - `loopback: false` for a stylesheet.
+ * @returns What is wrong with it, to follow the field's path; `undefined` when
+ *   it passes. An empty string passes, as it does the server.
+ */
+function brandingAssetUrlProblem(
+  value: string,
+  pattern: RegExp,
+  options: { loopback?: boolean },
+): string | undefined {
+  if (value === "") {
+    return undefined;
   }
   // The server counts bytes (validateBrandingAssetURL), so a URL with
   // non-ASCII characters can be short in characters and still too long.
   if (new TextEncoder().encode(value).length > MAX_BRANDING_URL_BYTES) {
-    ctx.addIssue({
-      code: "custom",
-      message: `${field} must be at most ${MAX_BRANDING_URL_BYTES} bytes.`,
-    });
-    return;
+    return `must be at most ${MAX_BRANDING_URL_BYTES} bytes.`;
   }
   // Stricter-or-equal than the Go gate (validateBrandingAssetURL): the WHATWG
   // parser forgives what Go's url.Parse rejects — `https:example.com`,
@@ -260,50 +325,35 @@ function validateBrandingAssetUrl(
   // accept what apply would reject (the reverse is harmless), so reject the
   // raw forms before parsing.
   if (/[\s\\]/.test(value)) {
-    ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
-    return;
+    return "is not a valid URL.";
   }
   if (!/^https?:\/\//i.test(value)) {
-    ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
-    return;
+    return "must be an absolute https URL.";
   }
   let parsed: URL;
   try {
     parsed = new URL(value);
   } catch {
-    ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
-    return;
+    return "is not a valid URL.";
   }
   // Fetched by every visitor's browser, so userinfo in it is a credential in
   // every access log — the server refuses it and so must plan.
   if (parsed.username !== "" || parsed.password !== "") {
-    ctx.addIssue({
-      code: "custom",
-      message: `${field} must not carry credentials; the URL is fetched by every visitor's browser.`,
-    });
-    return;
+    return "must not carry credentials; the URL is fetched by every visitor's browser.";
   }
   // Loopback HTTP is the dev-posture carve-out (assets served from the app's
   // own dev server), and it covers images only: a stylesheet is styling rather
   // than an image, so it stays https everywhere. Check the raw URL so WHATWG
   // normalisation cannot make plan accept a host spelling that the Go save
   // gate rejects.
-  if (
-    options.loopback !== false &&
-    parsed.protocol === "http:" &&
-    isCanonicalLoopbackHttpUrl(value)
-  ) {
-    return;
-  }
-  if (parsed.protocol !== "https:" || parsed.host === "") {
+  const loopback =
+    options.loopback !== false && parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value);
+  if (!loopback && (parsed.protocol !== "https:" || parsed.host === "")) {
     // Worded as the server words it (validateBrandingFontURL,
     // validateBrandingAssetURL): only a field with the carve-out mentions it.
-    ctx.addIssue({
-      code: "custom",
-      message:
-        options.loopback === false
-          ? `${field} must be an absolute https URL.`
-          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
-    });
+    return options.loopback === false
+      ? "must be an absolute https URL."
+      : "must be an absolute https URL (http is allowed for canonical loopback development hosts only).";
   }
+  return pattern.test(value) ? undefined : "is not a valid URL.";
 }
