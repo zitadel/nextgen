@@ -11,7 +11,7 @@ import {
   writeScaffoldManifest,
 } from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
-import type { ScaffoldFileClass, ScaffoldManifest } from "@/lib/sync/types";
+import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
 import { loadPatchContext } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -237,7 +237,7 @@ export class ManagedFilesCheck implements SanityCheck {
     // the current plan does not write for this app (Nuxt's retired plugins),
     // so it is dropped the same way.
     const current = new Set(actions.markedFiles);
-    const files: ScaffoldManifest["files"] = {};
+    const files: Record<string, ScaffoldFileEntry> = {};
     for (const [path, entry] of Object.entries(manifest.files)) {
       const contents = await readIfReadable(join(ctx.cwd, path));
       if (contents === undefined && (!current.has(path) || conditional.has(path))) {

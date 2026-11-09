@@ -80,6 +80,26 @@ describe("runSteps", () => {
     expect(outcome.data).toEqual({ diff: { files: [] } });
   });
 
+  it("hands a later step what an earlier one learned", async () => {
+    const runs: string[] = [];
+    const seen: StepContext["learned"][] = [];
+    const learns = recordingStep("diff", runs, {
+      run: async () => {
+        return { learned: { schemasOrFlowsChanged: false } };
+      },
+    });
+    const reads = recordingStep("lockout", runs, {
+      run: async (context) => {
+        seen.push(context.learned);
+        return undefined;
+      },
+    });
+
+    await runSteps([learns, reads], ctx({ learned: {} }));
+
+    expect(seen).toEqual([{ schemasOrFlowsChanged: false }]);
+  });
+
   it("leaves out what a skipped step would have reported", async () => {
     const runs: string[] = [];
     const skipped = recordingStep("writes", runs, {

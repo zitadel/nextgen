@@ -22,54 +22,54 @@ function liveOn(releaseId: string) {
   };
 }
 
-describe("PublishedConfiguration.liveReleaseId", () => {
+describe("PublishedConfiguration.fetchLiveReleaseId", () => {
   it("answers the release the newest primary deployment serves", async () => {
     const live = configuration({
       listDeployments: { all: async () => [liveOn("rel_9")] },
     });
 
-    await expect(live.liveReleaseId()).resolves.toBe("rel_9");
+    await expect(live.fetchLiveReleaseId()).resolves.toBe("rel_9");
   });
 
   it("answers nothing when the project has nothing on a primary origin", async () => {
     const live = configuration({ listDeployments: { all: async () => [] } });
 
-    await expect(live.liveReleaseId()).resolves.toBeUndefined();
+    await expect(live.fetchLiveReleaseId()).resolves.toBeUndefined();
   });
 });
 
-describe("PublishedConfiguration.releaseIdOfDeployment", () => {
+describe("PublishedConfiguration.fetchReleaseIdOfDeployment", () => {
   it("answers the release one deployment made live", async () => {
     const live = configuration({
       getDeploymentById: async () => liveOn("rel_3"),
       getDeploymentVariables: async () => ({}),
     });
 
-    await expect(live.releaseIdOfDeployment("dep_1")).resolves.toBe("rel_3");
+    await expect(live.fetchReleaseIdOfDeployment("dep_1")).resolves.toBe("rel_3");
   });
 });
 
-describe("PublishedConfiguration.release", () => {
+describe("PublishedConfiguration.fetchRelease", () => {
   it("reads the release with the revisions it pins", async () => {
     const getReleaseById = vi.fn(async () => ({
       id: "rel_1",
       pointers: [{ kind: "schema" as const, revision_id: "sch_1" }],
     }));
 
-    await expect(configuration({ getReleaseById }).release("rel_1")).resolves.toMatchObject({
+    await expect(configuration({ getReleaseById }).fetchRelease("rel_1")).resolves.toMatchObject({
       pointers: [{ kind: "schema" }],
     });
     expect(getReleaseById).toHaveBeenCalledWith("rel_1", { project_id: "proj_1" });
   });
 });
 
-describe("PublishedConfiguration.revision", () => {
+describe("PublishedConfiguration.fetchRevision", () => {
   it("answers a schema's document", async () => {
     const live = configuration({
       getSchemaById: async () => ({ schema: { objectType: "human-user" } }),
     });
 
-    await expect(live.revision("schema", "sch_1")).resolves.toEqual({
+    await expect(live.fetchRevision("schema", "sch_1")).resolves.toEqual({
       objectType: "human-user",
     });
   });
@@ -79,7 +79,7 @@ describe("PublishedConfiguration.revision", () => {
       getFlowDefinition: async () => ({ flow_definition: { name: "default-login" } }),
     });
 
-    await expect(live.revision("flow_definition", "flowdef_1")).resolves.toEqual({
+    await expect(live.fetchRevision("flow_definition", "flowdef_1")).resolves.toEqual({
       name: "default-login",
     });
   });
@@ -87,7 +87,7 @@ describe("PublishedConfiguration.revision", () => {
   it.each(["branding", "idp", "policy"] as const)(
     "answers nothing for a %s, which has no file on disk yet",
     async (kind) => {
-      await expect(configuration({}).revision(kind, "rev_1")).resolves.toBeUndefined();
+      await expect(configuration({}).fetchRevision(kind, "rev_1")).resolves.toBeUndefined();
     },
   );
 });

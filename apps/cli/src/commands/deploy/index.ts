@@ -290,7 +290,7 @@ export default class Deploy extends EnvironmentCommand {
     projectId: string,
     environment: Connection["environment"],
   ): Promise<readonly string[]> {
-    const origins = await publisher.landing();
+    const origins = await publisher.fetchLanding();
     const landing = origins.primary;
     if (landing.length > 0) {
       return landing;

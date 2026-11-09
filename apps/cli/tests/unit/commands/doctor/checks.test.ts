@@ -39,7 +39,7 @@ import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { hashScaffoldFile } from "@/lib/scaffold-manifest";
-import type { ScaffoldManifest } from "@/lib/sync/types";
+import type { ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
 
 const signal = new AbortController().signal;
 
@@ -241,7 +241,7 @@ async function makeOlderNuxtProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
   await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
-  const files: ScaffoldManifest["files"] = {};
+  const files: Record<string, ScaffoldFileEntry> = {};
   for (const [path, cls] of [
     ["app/pages/login.vue", "presentation"],
     ["app/pages/register.vue", "presentation"],

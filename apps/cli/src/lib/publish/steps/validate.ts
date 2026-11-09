@@ -1,4 +1,5 @@
 import { ZitadelError } from "@/lib/errors";
+import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue } from "@/lib/zitadel";
 import { brandingAssetWarnings } from "./asset-probe";
@@ -20,11 +21,12 @@ export const validateStep: Step = {
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<StepResult> {
     const issues = ctx.config.validate({ store: ctx.store, environment: ctx.env });
-    refuseErrors(ctx, [...issues, ...(await unresolvedSchemas(ctx))]);
+    const unresolved = await unresolvedSchemas(ctx);
+    refuseErrors(ctx, [...issues, ...unresolved]);
     await validateConnections(ctx);
-    const assetWarnings = await brandingAssetWarnings(
-      ctx.bundle.branding === undefined ? [] : [ctx.bundle.branding],
-    );
+    const branding = ctx.bundle.branding;
+    const brandings = branding === undefined ? [] : [branding];
+    const assetWarnings = await brandingAssetWarnings(brandings);
     const warnings = issues
       .filter((issue) => {
         return issue.severity === "warning";
@@ -36,8 +38,38 @@ export const validateStep: Step = {
   },
 };
 
-/** A finding that only the server could make, about a flow's schema. */
-type ServerFinding = Readonly<{ file: string; rule: string; message: string }>;
+/**
+ * A finding that only the server could make, about a flow's schema.
+ */
+type ServerFinding = {
+  readonly file: string;
+  readonly rule: string;
+  readonly message: string;
+};
+
+/**
+ * A finding as `--json` lists it under `details.issues`.
+ */
+type ReportedFinding = {
+  readonly rule: string;
+  readonly path: string;
+  readonly steps?: Issue["steps"];
+  readonly message: string;
+};
+
+/**
+ * One finding as `--json` lists it.
+ *
+ * @param finding - A rule's issue or a server finding.
+ * @returns Its rule, file, steps when the rule named any, and message.
+ */
+function reported(finding: Issue | ServerFinding): ReportedFinding {
+  const base = { rule: finding.rule, path: finding.file };
+  if ("steps" in finding && finding.steps !== undefined) {
+    return { ...base, steps: finding.steps, message: finding.message };
+  }
+  return { ...base, message: finding.message };
+}
 
 /**
  * Stop the deploy on every error, named in one `E_VALIDATION`, before anything
@@ -45,7 +77,7 @@ type ServerFinding = Readonly<{ file: string; rule: string; message: string }>;
  *
  * @param ctx - The step's context, for the commands a hint suggests.
  * @param findings - Every finding.
- * @throws ZitadelError `E_VALIDATION` when any finding is an error.
+ * @throws {@link ZitadelError} `E_VALIDATION` when any finding is an error.
  */
 function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -58,27 +90,19 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   const literalSecret = errors.some((finding) => {
     return finding.rule === "connection/literal-secret";
   });
+  const lines = errors.map((finding) => {
+    return `  - ${finding.file}: ${finding.message}`;
+  });
+  const hint = literalSecret
+    ? `Publish a secret with \`${ctx.suggest("variable set NAME --secret")}\` and reference it as "\${{ NAME }}".`
+    : "These are the same rules the server enforces. Fix the files named above and re-run; no changes were made.";
   throw new ZitadelError(
     "E_VALIDATION",
-    `Configuration validation failed (${errors.length} ${noun}):\n` +
-      errors
-        .map((finding) => {
-          return `  - ${finding.file}: ${finding.message}`;
-        })
-        .join("\n"),
+    `Configuration validation failed (${errors.length} ${noun}):\n${lines.join("\n")}`,
     {
-      hint: literalSecret
-        ? `Publish a secret with \`${ctx.suggest("variable set NAME --secret")}\` and reference it as "\${{ NAME }}".`
-        : "These are the same rules the server enforces. Fix the files named above and re-run; no changes were made.",
+      hint,
       details: {
-        issues: errors.map((finding) => {
-          return {
-            rule: finding.rule,
-            path: finding.file,
-            ...("steps" in finding && finding.steps !== undefined ? { steps: finding.steps } : {}),
-            message: finding.message,
-          };
-        }),
+        issues: errors.map(reported),
       },
     },
   );
@@ -86,9 +110,12 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
 
 /**
  * Flows whose `user_schema` names a schema neither the configuration nor the
- * project holds. The server pins the project's latest revision of a schema the
- * release leaves out and refuses the release when there is none, so a dry run
- * asks the project the same thing.
+ * project holds.
+ *
+ * @remarks
+ * The server pins the project's latest revision of a schema the release leaves
+ * out and refuses the release when there is none, so a dry run asks the
+ * project the same thing.
  *
  * Only an `objectType` reference is checked. A schema id (`sch_…` or a `$id`
  * URL) resolves through the server's built-in bases, and a `schema-url` entry
@@ -97,44 +124,49 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
  * @param ctx - The step's context.
  * @returns One finding per such flow.
  */
-async function unresolvedSchemas(ctx: StepContext): Promise<ServerFinding[]> {
+async function unresolvedSchemas(ctx: StepContext): Promise<readonly ServerFinding[]> {
   const local = ctx.config.schemas.all.flatMap((schema) => {
-    return schema.objectType === undefined ? [] : [schema.objectType];
+    const objectType = schema.objectType;
+    if (objectType === undefined) {
+      return [];
+    }
+    return [objectType];
   });
   // A schema that learns its objectType only from the server could be the one.
   if (local.length !== ctx.config.schemas.all.length) {
     return [];
   }
-  const findings: ServerFinding[] = [];
-  for (const flow of ctx.config.flows.all) {
-    const ref = flow.userSchema;
-    if (
-      ref === undefined ||
-      ctx.config.flows.schemaOf(flow) !== undefined ||
-      flow.namesSchemaById
-    ) {
-      continue;
+  const asked = ctx.config.flows.all.filter((flow) => {
+    return (
+      flow.userSchema !== undefined &&
+      ctx.config.flows.schemaOf(flow) === undefined &&
+      !flow.namesSchemaById
+    );
+  });
+  const quoted = local.map((objectType) => {
+    return `"${objectType}"`;
+  });
+  const listed = quoted.length === 0 ? "none" : quoted.join(", ");
+  // One request at a time, so the step asks the project for one schema at once.
+  const findings = await mapBounded(asked, 1, async (flow): Promise<readonly ServerFinding[]> => {
+    const reference = flow.userSchema;
+    if (reference === undefined) {
+      return [];
     }
     // Through the schema service, which is bound to the project this run
     // addresses, so the step says which schema it is after and never which
     // endpoint answers.
-    const page = await ctx.schemas.page({ object_type: ref, revisions: "latest", limit: 1 });
+    const page = await ctx.schemas.page({ object_type: reference, revisions: "latest", limit: 1 });
     if (page.items.length > 0) {
-      continue;
+      return [];
     }
-    const listed =
-      local.length === 0
-        ? "none"
-        : local
-            .map((objectType) => {
-              return `"${objectType}"`;
-            })
-            .join(", ");
-    findings.push({
-      file: flow.path,
-      rule: "release/user-schema-resolves",
-      message: `user_schema "${ref}" is not the objectType of a schema in ${CONFIG_DIRECTORIES.schemas}/ (${listed}) or in the project.`,
-    });
-  }
-  return findings;
+    return [
+      {
+        file: flow.path,
+        rule: "release/user-schema-resolves",
+        message: `user_schema "${reference}" is not the objectType of a schema in ${CONFIG_DIRECTORIES.schemas}/ (${listed}) or in the project.`,
+      },
+    ];
+  });
+  return findings.flat();
 }

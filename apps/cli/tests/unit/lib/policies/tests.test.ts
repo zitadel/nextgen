@@ -8,7 +8,7 @@ import { PolicyTest } from "@/lib/zitadel";
 /**
  * The operation every test file in these tests is for.
  */
-const OPERATION = "auth.factor.password.set";
+const OPERATION = "auth.factor.password.set" as const;
 
 describe("caseHolds", () => {
   const refused = {

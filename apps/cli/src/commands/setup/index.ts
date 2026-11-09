@@ -1995,21 +1995,18 @@ export default class Setup extends Destructive(BaseCommand) {
         { directory: CONFIG_DIRECTORIES.schemas, text: schemasReadmeContent() },
         { directory: CONFIG_DIRECTORIES.flows, text: flowsReadmeContent() },
         { directory: CONFIG_DIRECTORIES.policies, text: policiesReadmeContent() },
-      ].map(async ({ directory, text }) => {
-        const path = `${directory}/${README}`;
-        return store
-          .writeText(path, normalizePublicCliProse(text, this.cliVersion), "create")
-          .then(
-            () => {
-              return [path];
-            },
-            (error: unknown) => {
-              if (error instanceof FileExistsError) {
-                return [];
-              }
-              throw error;
-            },
-          );
+      ].map(async (readme): Promise<readonly string[]> => {
+        const path = `${readme.directory}/${README}`;
+        const text = normalizePublicCliProse(readme.text, this.cliVersion);
+        try {
+          await store.writeText(path, text, "create");
+          return [path];
+        } catch (error) {
+          if (error instanceof FileExistsError) {
+            return [];
+          }
+          throw error;
+        }
       }),
     );
     return {
@@ -2386,8 +2383,8 @@ function setupRefusal(error: unknown, connections: readonly ScaffoldedConnection
   if (!(error instanceof FileExistsError)) {
     return error;
   }
-  const planned = connections.find(({ connection }) => {
-    return connection.path === error.path;
+  const planned = connections.find((scaffolded) => {
+    return scaffolded.connection.path === error.path;
   });
   if (planned !== undefined) {
     return connectionRefusal(error.path, planned.chosen.selection);

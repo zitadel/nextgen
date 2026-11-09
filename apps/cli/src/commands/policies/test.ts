@@ -55,22 +55,34 @@ The server evaluates every case, so the command needs a connection to it. By def
     }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
-    const operations = args.operation === undefined ? [] : [args.operation];
+  /**
+   * Evaluate the test cases and report each one.
+   *
+   * @param input - The operation to test, if only one, and `--release`.
+   * @returns The results.
+   * @throws {@link ZitadelError} With `E_VALIDATION` when a test or policy file
+   *   is not valid, or a case fails.
+   */
+  protected async execute(input: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
+    const operation = input.args.operation;
+    const release = input.flags.release;
+    const operations = operation === undefined ? [] : [operation];
     const config = await ZitadelConfig.loadUnchecked(new DiskStore(this.cwd));
-    const { documents: tests, issues } = config.policies.testsFor(operations);
-    if (issues.length > 0) {
+    const selected = config.policies.testsFor(operations);
+    const tests = selected.documents;
+    if (selected.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
-        details: { issues },
-        hint: issues.join("\n"),
+        details: { issues: selected.issues },
+        hint: selected.issues.join("\n"),
       });
     }
     if (tests.length === 0) {
+      const directory = CONFIG_DIRECTORIES.policies;
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",
         pretty: prose(
-          `No policy test files in ${CONFIG_DIRECTORIES.policies}/. Add <operation>.test.json beside a policy; ${CONFIG_DIRECTORIES.policies}/README.md shows one.`,
+          `No policy test files in ${directory}/. Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`,
         ),
       });
     }
@@ -78,32 +90,36 @@ The server evaluates every case, so the command needs a connection to it. By def
     const { client, projectId } = await this.connect();
     const policyService = new PolicyService(client, projectId);
     const releaseService = new ReleaseService(client, projectId);
-    const fromRelease =
-      flags.release === undefined
-        ? undefined
-        : await policiesFromRelease(releaseService, policyService, flags.release);
-    if (fromRelease?.revoked) {
-      reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
-    }
-    const policies = fromRelease?.policies ?? this.policiesFromFiles(config, operations);
+    const policies = await this.policiesUnderTest(
+      config,
+      operations,
+      release,
+      policyService,
+      releaseService,
+    );
 
     const results = await runPolicyTests(policyService, tests, policies);
-    const cases = results.flatMap((result) => result.cases);
-    const failed = cases.filter((testCase) => !testCase.passed).length;
+    const cases = results.flatMap((result) => {
+      return result.cases;
+    });
+    const failed = cases.filter((testCase) => {
+      return !testCase.passed;
+    }).length;
+    const source = release === undefined ? "files" : "release";
     this.recordTelemetry({
-      policy_source: flags.release === undefined ? "files" : "release",
+      policy_source: source,
       case_count: cases.length,
       failed_count: failed,
     });
 
     const data = {
-      source: flags.release === undefined ? "files" : "release",
-      ...(flags.release === undefined ? {} : { release_id: flags.release }),
+      source,
+      release_id: release,
       operations: results,
       passed: cases.length - failed,
       failed,
     };
-    const pretty = renderPolicyTestResults(results, flags.release);
+    const pretty = renderPolicyTestResults(results, release);
     if (failed > 0) {
       // The results are the explanation: the hint shows them on a terminal,
       // and under --json they travel in the error's details.
@@ -122,6 +138,36 @@ The server evaluates every case, so the command needs a connection to it. By def
   }
 
   /**
+   * The policies the cases run against: a release's, warning when it is
+   * revoked, or the project's files.
+   *
+   * @param config - The project's configuration.
+   * @param operations - The operations to read the policies of; every one when empty.
+   * @param release - The release `--release` named, if any.
+   * @param policyService - Where a release's revisions are read.
+   * @param releaseService - Where the release is read.
+   * @returns The rules of each operation's policy, by operation.
+   * @throws {@link ZitadelError} With `E_VALIDATION` when a policy file asked
+   *   for has a problem, naming each one.
+   */
+  private async policiesUnderTest(
+    config: ZitadelConfig,
+    operations: readonly string[],
+    release: string | undefined,
+    policyService: PolicyService,
+    releaseService: ReleaseService,
+  ): Promise<ReadonlyMap<string, PolicyUnderTest>> {
+    if (release === undefined) {
+      return this.policiesFromFiles(config, operations);
+    }
+    const fromRelease = await policiesFromRelease(releaseService, policyService, release);
+    if (fromRelease.revoked) {
+      reportWarning(`Release ${release} is revoked, so no origin serves its policies.`);
+    }
+    return fromRelease.policies;
+  }
+
+  /**
    * The project's policies of some operations, to test against.
    *
    * @param config - The project's configuration.
@@ -134,16 +180,20 @@ The server evaluates every case, so the command needs a connection to it. By def
     config: ZitadelConfig,
     operations: readonly string[],
   ): ReadonlyMap<string, PolicyUnderTest> {
-    const { documents, issues } = config.policies.for(operations);
-    if (issues.length > 0) {
+    const selected = config.policies.for(operations);
+    if (selected.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
-        details: { issues },
-        hint: issues.join("\n"),
+        details: { issues: selected.issues },
+        hint: selected.issues.join("\n"),
       });
     }
     return new Map(
-      documents.map((policy): [string, PolicyUnderTest] => {
-        return [policy.operation, { config: policy.config, source: { file: policy.path } }];
+      selected.documents.map((policy): readonly [string, PolicyUnderTest] => {
+        const underTest: PolicyUnderTest = {
+          config: policy.config,
+          source: { file: policy.path },
+        };
+        return [policy.operation, underTest];
       }),
     );
   }

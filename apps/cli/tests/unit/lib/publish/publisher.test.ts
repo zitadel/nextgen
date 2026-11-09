@@ -45,7 +45,7 @@ describe("Publisher.landing", () => {
       }),
     });
 
-    const origins = await live.landing();
+    const origins = await live.fetchLanding();
 
     expect(origins.primary).toEqual(["https://app.acme.com"]);
   });

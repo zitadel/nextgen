@@ -206,7 +206,7 @@ async function serveNewOrigin(
  * @returns Each connection's name, in path order; none when the
  *   configuration cannot be read.
  */
-async function connectionSlugs(cwd: string): Promise<string[]> {
+async function connectionSlugs(cwd: string): Promise<readonly string[]> {
   const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd)).catch(() => {
     return ZitadelConfig.empty();
   });

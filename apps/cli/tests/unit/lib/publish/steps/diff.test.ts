@@ -183,42 +183,33 @@ describe("diffStep", () => {
   it("records that a schema changed since the live commit", async ({ dir: cwd }) => {
     const sha = await liveCommit(cwd);
     await editSchema(cwd);
-    const learned: StepContext["learned"] = {};
 
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], false, {}, learned));
+    const result = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
-    expect(learned.schemasOrFlowsChanged).toBe(true);
+    expect(result?.learned?.schemasOrFlowsChanged).toBe(true);
   });
 
   it("records that no schema or flow changed when only branding did", async ({ dir: cwd }) => {
     const sha = await liveCommit(cwd);
     await mkdir(join(cwd, ".zitadel", "branding"), { recursive: true });
     await writeFile(join(cwd, ".zitadel", "branding", "brand.json"), "{}\n");
-    const learned: StepContext["learned"] = {};
 
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], false, {}, learned));
+    const result = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
-    expect(learned.schemasOrFlowsChanged).toBe(false);
+    expect(result?.learned?.schemasOrFlowsChanged).toBe(false);
   });
 
   it("records nothing when the primary origins serve different releases", async ({ dir: cwd }) => {
     const sha = await liveCommit(cwd);
-    const learned: StepContext["learned"] = {};
 
-    await diffStep.run(
-      ctx(
-        cwd,
-        [
-          { targets: [PRIMARY], sha, release: "rel_2" },
-          { targets: [SECOND_PRIMARY], sha, release: "rel_1" },
-        ],
-        false,
-        {},
-        learned,
-      ),
+    const result = await diffStep.run(
+      ctx(cwd, [
+        { targets: [PRIMARY], sha, release: "rel_2" },
+        { targets: [SECOND_PRIMARY], sha, release: "rel_1" },
+      ]),
     );
 
-    expect(learned.schemasOrFlowsChanged).toBeUndefined();
+    expect(result?.learned?.schemasOrFlowsChanged).toBeUndefined();
   });
 
   it("records nothing when there is no diff to read", async ({ dir: cwd }) => {
