@@ -6,7 +6,7 @@ import { CANCELLED, PromptCancelled, ZitadelError } from "../errors";
 import { asker, plainAsker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
-import { GUTTER, Prose, WIDTH } from "./layout";
+import { Prose, stripColumnMarks, WIDTH } from "./layout";
 import { GUIDE, MARK } from "./marks";
 import type { Narratable } from "./narration";
 import type { Presentation } from "./presentation";
@@ -113,7 +113,7 @@ export class Chain implements Drawing, Narratable {
     }
     // A bridged line is whatever the caller passed `consola`, so it obeys no
     // width of its own: wrapped here, or a long warning runs past the gutter.
-    const body = new Prose(text, WIDTH - GUTTER).render();
+    const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
       process.stdout.write(`${symbol === GUIDE ? " " : symbol}  ${body}\n`);
       return;

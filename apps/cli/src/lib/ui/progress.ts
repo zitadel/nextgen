@@ -1,7 +1,7 @@
 import { log } from "@clack/prompts";
 import { consola } from "consola";
 
-import { GUTTER, Prose, WIDTH } from "./layout";
+import { stripColumnMarks } from "./layout";
 import { GUIDE, MARK } from "./marks";
 import { DrawnSpinner } from "./spinner";
 
@@ -184,7 +184,7 @@ export class Progress {
   private draw(lines: readonly Line[]): void {
     const width = Math.max(0, ...lines.map((entry) => entry.verb.length));
     for (const { mark, verb, subject } of lines) {
-      this.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`, true);
+      this.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`);
     }
   }
 
@@ -194,12 +194,12 @@ export class Progress {
    * says so, since a row on its own has nothing to line up with; what a caller
    * reported through {@link Step.detail} is a sentence and folds like one.
    */
-  private detail(text: string, columns = false): void {
+  private detail(text: string): void {
     if (!this.drawing.chained) {
-      consola.log(new Prose(`  ${text}`, WIDTH, columns).render());
+      consola.log(stripColumnMarks(`  ${text}`));
       return;
     }
-    this.line(GUIDE, text, columns);
+    this.line(GUIDE, text);
   }
 
   /**
@@ -212,11 +212,11 @@ export class Progress {
    * A normal command has no gutter and no marks: its step is a plain line,
    * like the answer it is working towards.
    */
-  private line(symbol: string, text: string, columns = false): void {
+  private line(symbol: string, text: string): void {
     if (!this.drawing.chained) {
-      consola.log(new Prose(text, WIDTH, columns).render());
+      consola.log(stripColumnMarks(text));
       return;
     }
-    log.message(new Prose(text, WIDTH - GUTTER, columns).render(), { symbol, spacing: 0 });
+    log.message(stripColumnMarks(text), { symbol, spacing: 0 });
   }
 }

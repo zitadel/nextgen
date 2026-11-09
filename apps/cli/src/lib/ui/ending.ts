@@ -1,6 +1,6 @@
 import pc from "picocolors";
 
-import { Facts, Frame, GUTTER, Prose, WIDTH } from "./layout";
+import { Facts, Frame, stripColumnMarks } from "./layout";
 import type { Presentation } from "./presentation";
 import type { Summary } from "./summary";
 import type { Where } from "./where";
@@ -59,8 +59,7 @@ export class Ending {
     const body = this.laidOutWithSteps(this.body(false, false));
     const place = this.where.known ? [this.where.plain] : [];
     if (this.summary.failed === true) {
-      const stated = new Prose(this.summary.title, WIDTH, false)
-        .render()
+      const stated = stripColumnMarks(this.summary.title)
         .split("\n")
         .map((line) => pc.red(line));
       const under = body === "" ? [] : [body];
@@ -80,15 +79,14 @@ export class Ending {
   }
 
   /**
-   * The body as it is drawn, then the next steps under it. A step's sentence is
-   * folded like the rest of the body, but a command is never folded: broken
-   * across lines it can no longer be run, and a terminal that wraps a long line
-   * keeps it one command when it is copied.
+   * The body as it is drawn, then the next steps under it. Nothing is folded: a
+   * command broken across lines can no longer be run, and a terminal that wraps
+   * a long line keeps it one command when it is copied.
    */
   private laidOutWithSteps(body: readonly string[]): string {
     const steps = this.presentation === "plain" ? (this.summary.next ?? []) : [];
     const sentences = steps.flatMap((step) => [
-      new Prose(step.text, WIDTH, false).render(),
+      stripColumnMarks(step.text),
       ...(step.command === undefined ? [] : step.command.split("\n").map((one) => `  $ ${one}`)),
     ]);
     return [body.length === 0 ? "" : this.laidOut(body), ...sentences]
@@ -96,29 +94,21 @@ export class Ending {
       .join("\n");
   }
 
-  /** The body as it is drawn: folded to the width, unless it is not the CLI's to lay out. */
+  /** The body as it is drawn: as written, with the marks a builder left on its rows taken off. */
   private laidOut(body: readonly string[]): string {
-    return this.summary.verbatim === true
-      ? body.join("\n")
-      : new Prose(body.join("\n"), WIDTH).render();
+    return stripColumnMarks(body.join("\n"));
   }
 
   /**
    * The line that closes the chain, red when the headline is a failure.
    *
-   * A success's headline is a short label and is one line by construction. A
-   * failure's is the whole sentence, and a URL or a server message can make it
-   * longer than the terminal: it is folded to what the chain's gutter leaves,
-   * and the folded lines are indented to sit under the first, so the sentence
-   * is said once, in one place, and still fits.
+   * Nothing is folded to a width here: the terminal wraps a long line to its
+   * own, and a line it wraps is still one line when it is copied. Only the box
+   * has a width of its own, because its border has to line up.
    */
   get line(): string {
-    return new Prose(this.summary.title, WIDTH - GUTTER, false)
-      .render()
-      .split("\n")
-      .map((part, index) => (index === 0 ? part : " ".repeat(GUTTER) + part))
-      .map((part) => (this.summary.failed === true ? pc.red(part) : part))
-      .join("\n");
+    const title = stripColumnMarks(this.summary.title);
+    return this.summary.failed === true ? pc.red(title) : title;
   }
 
   /**
@@ -132,11 +122,7 @@ export class Ending {
       // A listing is what the command was asked for, printed as it is. Where it
       // ran is part of a summary, so a command that has no summary does not
       // say it: the table is the answer, and nothing else belongs under it.
-      // Wrapped like everything else, which leaves a table's rows alone and
-      // folds a long error message instead of running it off the screen.
-      return body.length === 0
-        ? undefined
-        : `${indent(new Prose(body.join("\n"), WIDTH - INDENT).render())}\n`;
+      return body.length === 0 ? undefined : `${indent(stripColumnMarks(body.join("\n")))}\n`;
     }
     // The report and the steps share one frame: what the command produced and
     // what to do about it belong together.

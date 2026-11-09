@@ -214,25 +214,6 @@ describe("Chain", () => {
     expect(stripAnsi(String(vi.mocked(outro).mock.calls[0]?.[0]))).toBe("Cancelled");
   });
 
-  // Read off `log.message`, not stdout: the clack double writes nothing, so
-  // asserting on what was written passes however wide the line is.
-  it("wraps a bridged line, which obeys no width of its own", () => {
-    const chain = watching();
-    chain.describe("Listing variables");
-
-    chain.narrate("!", `a warning ${"that keeps going ".repeat(12)}`);
-
-    expect(log.message).toHaveBeenCalledOnce();
-    const [drawn] = vi.mocked(log.message).mock.calls[0] ?? [""];
-    expect(
-      Math.max(
-        ...String(drawn)
-          .split("\n")
-          .map((line) => line.length),
-      ),
-    ).toBeLessThanOrEqual(80 - 3);
-  });
-
   it("leaves a bridged line that already fits on one line", () => {
     const chain = watching();
     chain.describe("Listing variables");

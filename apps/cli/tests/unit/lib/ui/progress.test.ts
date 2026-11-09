@@ -148,6 +148,15 @@ describe("Progress", () => {
       expect(drawn()).toEqual(["✔ Detecting framework"]);
     });
 
+    it("draws a detail too wide for the chain on one line, as the terminal wraps it", () => {
+      const step = new Progress(chain(true)).begin("Patching project files");
+      const wide = `Wrote the editable default human user schema (${"x".repeat(100)}.json)`;
+      step.detail(wide);
+      step.done("Patched 1 file");
+
+      expect(drawn().slice(1)).toEqual([`│ ${wide}`]);
+    });
+
     it("lists the detail it collected under its result", () => {
       const step = new Progress(chain(true)).begin("Patching project files");
       step.detail("src/app/page.tsx");
@@ -162,32 +171,6 @@ describe("Progress", () => {
       step.detail("src/app/page.tsx");
 
       expect(drawn()).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
-    });
-
-    // A step names what it did, which for `setup` is a sentence and a path:
-    // unwrapped, the longest of those runs past the chain it is drawn in.
-    it("folds a detail line too wide for the chain", () => {
-      const step = new Progress(chain(true)).begin("Patching project files");
-      step.detail(
-        "Wrote the editable default human user schema (.zitadel/schemas/default-human-user.json)",
-      );
-      step.done("Patched 1 file");
-
-      expect(drawn().slice(1)).toEqual([
-        "│ Wrote the editable default human user schema\n(.zitadel/schemas/default-human-user.json)",
-      ]);
-    });
-
-    it("folds a result line too wide for the chain", () => {
-      new Progress(chain(true))
-        .begin("Moving the app")
-        .done(
-          "Moved the app from http://localhost:3000 to http://localhost:4000, and told the project about it",
-        );
-
-      expect(drawn()).toEqual([
-        "✔ Moved the app from http://localhost:3000 to http://localhost:4000, and told\nthe project about it",
-      ]);
     });
 
     it("ends once, however many times it is ended", () => {

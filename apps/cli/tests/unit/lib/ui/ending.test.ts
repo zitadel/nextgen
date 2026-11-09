@@ -21,33 +21,6 @@ describe("Ending", () => {
     it("is red when the headline is a failure", () => {
       expect(ending({ title: "Stopped", failed: true }).line).toBe(pc.red("Stopped"));
     });
-
-    // The sentence is said once, in one place, so a long one is folded here
-    // rather than swapped for its code and repeated underneath.
-    describe("a failure whose sentence does not fit on one line", () => {
-      const long = `Error E_NETWORK: GET http://localhost:9/deployments?project_id=${"x".repeat(20)}&live=true got no response`;
-      const folded = () => plain(ending({ title: long, failed: true }).line).split("\n");
-
-      // The first line is drawn after the chain's own `└  `, and the rest are
-      // indented to start in the same column, so the screen is 80 either way.
-      it("folds it to what the chain's gutter leaves", () => {
-        const onScreen = folded().map((line, index) => (index === 0 ? 3 : 0) + line.length);
-
-        expect(Math.max(...onScreen)).toBeLessThanOrEqual(80);
-      });
-
-      it("indents what it folded, so it sits under the first line", () => {
-        expect(
-          folded()
-            .slice(1)
-            .map((line) => /^ {3}\S/.test(line)),
-        ).toEqual([true, true]);
-      });
-
-      it("says the whole sentence, with nothing dropped", () => {
-        expect(folded().join(" ").replace(/\s+/g, " ").trim()).toBe(long);
-      });
-    });
   });
 
   describe("what goes under it", () => {
@@ -144,16 +117,6 @@ describe("Ending", () => {
 });
 
 describe("what a long failure looks like under its closing line", () => {
-  // A server pastes a URL into its message; the message must still fold
-  // rather than run off the right of the screen.
-  it("wraps the body of an unboxed ending", () => {
-    const long = `GET http://host/deployments?project_id=x returned 404 ${"and then some more words ".repeat(6)}`;
-
-    const below = plain(ending({ lines: [long], failed: true }).render());
-
-    expect(Math.max(...below.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
-  });
-
   // Outside a frame nothing is widened by a wide line, so a table the command
   // was asked for keeps its columns however wide they are.
   it("still leaves a table's rows whole, past the width prose obeys", () => {
@@ -167,14 +130,6 @@ describe("what a long failure looks like under its closing line", () => {
     for (const row of rows) {
       expect(below).toContain(row);
     }
-  });
-
-  it("folds a sentence that holds a double space, which no table is aligned to", () => {
-    const sentence = `Project proj-1  lifecycle=configured  issuer=https://${"sub.".repeat(10)}example.com`;
-
-    const below = plain(ending({ lines: [sentence] }).render());
-
-    expect(Math.max(...below.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
   });
 });
 
@@ -227,6 +182,36 @@ describe("which shape an ending takes", () => {
     expect(shown).toContain("Create an app:\n  $ zitadel setup --server local");
   });
 
+  // The terminal wraps a long line to its own width, and a line it wraps is
+  // still one line when it is copied. Only the box has a width of its own.
+  describe("a line longer than the terminal", () => {
+    const long = `Error E_NETWORK: GET http://localhost:9/deployments?project_id=${"x".repeat(60)}&live=true got no response, and ${"then some ".repeat(8)}`;
+
+    it("closes a chain on its whole sentence, on one line", () => {
+      expect(plain(ending({ title: long, failed: true }).line)).toBe(long);
+    });
+
+    it("says a normal command's failure on one line, and what it has to say under it", () => {
+      const shown = plain(
+        normally({ title: long, lines: [long], failed: true }).renderStandalone(),
+      );
+
+      expect(shown.split("\n").filter((line) => line === long)).toHaveLength(2);
+    });
+
+    it("says a normal command's answer as it is", () => {
+      const shown = plain(normally({ lines: [long] }).renderStandalone());
+
+      expect(shown).toContain(`${long}\n`);
+    });
+
+    it("says a next step's sentence on one line", () => {
+      const shown = plain(normally({ next: [{ text: long }] }).renderStandalone());
+
+      expect(shown).toContain(`${long}\n`);
+    });
+  });
+
   // A command broken across lines can no longer be run, and the box breaks a
   // long one with the shell's own continuation. A normal command's step is not
   // in a box, so its command is left whole, however long.
@@ -242,32 +227,6 @@ describe("which shape an ending takes", () => {
     );
 
     expect(shown).toContain(`Run next:\n  $ ${command}\n`);
-  });
-
-  it("still folds a next step's sentence to the width", () => {
-    const text = `Check it in the browser ${"and then again ".repeat(8)}`.trim();
-
-    const shown = plain(normally({ next: [{ text }] }).renderStandalone());
-
-    expect(shown.split("\n").some((line) => line.length > 80)).toBe(false);
-  });
-
-  // A server's log lines are not the CLI's to lay out: folded to 80 columns they
-  // stop being lines a person can search for.
-  it("writes verbatim output exactly as given, however wide", () => {
-    const line = `time=now level=INFO source=server.go:530 msg="${"x".repeat(120)}"`;
-
-    const shown = plain(normally({ lines: [line], verbatim: true }).renderStandalone());
-
-    expect(shown).toContain(`${line}\n`);
-  });
-
-  it("folds ordinary output to the width, which verbatim output is spared", () => {
-    const line = `time=now level=INFO source=server.go:530 msg="${"x ".repeat(60)}"`;
-
-    const shown = plain(normally({ lines: [line] }).renderStandalone());
-
-    expect(shown).not.toContain(`${line}\n`);
   });
 
   // A dim unmarked footer is right for an answer and wrong for an error: it
@@ -295,49 +254,11 @@ describe("which shape an ending takes", () => {
 
     expect(shown).toContain("project proj-1 on api.zitadel.cloud");
   });
-
-  // The one width every other line obeys. Without it a failure was the only
-  // thing the CLI printed that ran off the right of the screen.
-  describe("a normal command's failure that does not fit on one line", () => {
-    const hint = `Check your connection and the server URL ${"and on ".repeat(12)}`.trimEnd();
-    const shown = () =>
-      plain(
-        normally({
-          title: `Error E_NETWORK: POST http://localhost:9/teams/query?project_id=${"x".repeat(12)} got no response`,
-          lines: [hint],
-          failed: true,
-        }).renderStandalone(),
-      );
-
-    it("folds the sentence to the same width as everything else", () => {
-      expect(
-        Math.max(
-          ...shown()
-            .split("\n")
-            .map((line) => line.length),
-        ),
-      ).toBeLessThanOrEqual(80);
-    });
-
-    it("folds what it has to say under it too", () => {
-      expect(shown()).not.toContain(hint);
-    });
-  });
 });
 
 describe("the answer of a normal command, which draws no chain", () => {
   const answering = (summary: Partial<Summary>) =>
     new Ending({ title: "Done", sections: [], ...summary }, nowhere, "plain");
-
-  // `release create -m x` drew a 98-column headline: the standalone answer was
-  // the one body the layout never folded.
-  it("folds a long answer instead of running it off the screen", () => {
-    const long = `Created a release ${"that keeps going ".repeat(8)}`;
-
-    const shown = plain(answering({ lines: [long] }).renderStandalone());
-
-    expect(Math.max(...shown.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
-  });
 
   it("still leaves a table's rows whole, however wide they are", () => {
     const rows = [

@@ -51,12 +51,6 @@ export type Summary = {
   readonly failed?: boolean;
   /** Draw the box even with no steps, for a command whose body is instructions. */
   readonly boxed?: boolean;
-  /**
-   * The body is output that is not the CLI's to lay out, such as a server's log
-   * lines: it is written exactly as given, without being folded to the width
-   * of the terminal.
-   */
-  readonly verbatim?: boolean;
   /** The box's own title. Defaults to "Summary". */
   readonly boxTitle?: string;
   /**

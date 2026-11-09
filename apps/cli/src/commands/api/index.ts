@@ -357,7 +357,6 @@ export default class Api extends Destructive(BaseCommand) {
           title: `Would call ${operation.id}`,
           sections: [],
           lines: curl.text.split("\n"),
-          verbatim: true,
         },
         pretty: curl,
       });
@@ -456,7 +455,6 @@ export default class Api extends Destructive(BaseCommand) {
         title: `Called ${operationId}`,
         sections: [],
         lines: pretty.text.split("\n"),
-        verbatim: true,
       },
       pretty,
     };
