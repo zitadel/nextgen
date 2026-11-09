@@ -24,6 +24,17 @@ const (
 	grantTypeRefreshToken      = "refresh_token"
 )
 
+const (
+	ApplicationFieldUnspecified ApplicationField = iota
+	ApplicationFieldProjectID
+	ApplicationFieldID
+	ApplicationFieldSlug
+	ApplicationFieldRevisionID
+	ApplicationFieldCreatedAt
+	ApplicationFieldUpdatedAt
+	ApplicationFieldDocument
+)
+
 // refreshTokenIssuingGrants are the grants that issue a refresh token, which
 // a refresh_token grant then renews.
 var refreshTokenIssuingGrants = []string{grantTypeAuthorizationCode}
@@ -32,6 +43,51 @@ var refreshTokenIssuingGrants = []string{grantTypeAuthorizationCode}
 // and, later, those of dynamic client registration. A supplied id may not
 // take one, so a generated id never collides with a supplied one.
 var reservedClientIDPrefixes = []string{PrefixApplicationClient.IDPrefix(""), "dcr_"}
+
+type ApplicationField uint8
+
+// ApplicationDocument holds the document fields the server reads. The
+// stored document stays the raw JSON the contract defines.
+type ApplicationDocument struct {
+	Slug    string                      `json:"slug"`
+	Name    string                      `json:"name"`
+	Clients []ApplicationClientDocument `json:"clients"`
+}
+
+type ApplicationClientDocument struct {
+	Slug         string   `json:"slug"`
+	ClientID     *string  `json:"client_id"`
+	GrantTypes   []string `json:"grant_types"`
+	RedirectURIs []string `json:"redirect_uris"`
+}
+
+// Application is one application at one revision. The application row holds
+// identity, and every write appends a revision holding the document (ADR 063).
+// RevisionID and Document are the newest revision's.
+type Application struct {
+	ProjectID  string
+	ID         string
+	Slug       string
+	RevisionID string
+	Document   []byte
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// ApplicationClient is the stored credential of one client, matched to the
+// document's client by Slug. ID is the row's primary key and stays inside
+// storage; the API and the OAuth endpoints identify a client by ClientID.
+// SecretHash is [HashSecret] of the secret, which the server returns once,
+// when it creates the client.
+type ApplicationClient struct {
+	ProjectID     string
+	ApplicationID string
+	ID            string
+	Slug          string
+	ClientID      string
+	SecretHash    string
+	CreatedAt     time.Time
+}
 
 // The codes are literal: the ID prefix is "app", the error resource is
 // "application".
@@ -49,21 +105,6 @@ func ErrApplicationFieldImmutable(details any) Error {
 // a rule of the authorization server. details maps each location to why.
 func ErrApplicationInvalid(details any, parent error) Error {
 	return newError("application.invalid", "application: invalid", details, parent)
-}
-
-// ApplicationDocument holds the document fields the server reads. The
-// stored document stays the raw JSON the contract defines.
-type ApplicationDocument struct {
-	Slug    string                      `json:"slug"`
-	Name    string                      `json:"name"`
-	Clients []ApplicationClientDocument `json:"clients"`
-}
-
-type ApplicationClientDocument struct {
-	Slug         string   `json:"slug"`
-	ClientID     *string  `json:"client_id"`
-	GrantTypes   []string `json:"grant_types"`
-	RedirectURIs []string `json:"redirect_uris"`
 }
 
 func ParseApplicationDocument(document []byte) (ApplicationDocument, error) {
@@ -108,31 +149,6 @@ func ValidateApplicationDocument(doc ApplicationDocument) error {
 	return nil
 }
 
-func isRefreshTokenIssuingGrant(grant string) bool {
-	return slices.Contains(refreshTokenIssuingGrants, grant)
-}
-
-// validateRedirectURI returns why uri is not a redirect URI the authorization
-// server accepts. Matching is exact, so only the canonical form passes: a URI
-// that re-serializes differently, or has an uppercase host, would never match
-// the one the client sends.
-func validateRedirectURI(uri string) error {
-	if strings.Contains(uri, "#") {
-		return errors.New("a redirect URI may not have a fragment")
-	}
-	u, err := httputil.ParseRedirectTarget(uri)
-	if err != nil {
-		return err
-	}
-	if u.Scheme == "http" && !IsLoopbackOrigin(u.Scheme+"://"+u.Host) {
-		return errors.New("an http redirect URI must be on a loopback host")
-	}
-	if u.String() != uri || u.Host != strings.ToLower(u.Host) {
-		return errors.New("the redirect URI is not in its canonical form")
-	}
-	return nil
-}
-
 // ApplicationRevisionNewClients returns the slugs of the clients in next that
 // stored does not have; on create, stored is the zero document. Each stored
 // client keeps its slug and client_id: next may leave the id out, but may not
@@ -169,62 +185,33 @@ func ApplicationRevisionNewClients(stored, next ApplicationDocument) ([]string, 
 	return added, nil
 }
 
+func isRefreshTokenIssuingGrant(grant string) bool {
+	return slices.Contains(refreshTokenIssuingGrants, grant)
+}
+
+// validateRedirectURI returns why uri is not a redirect URI the authorization
+// server accepts. Matching is exact, so only the canonical form passes: a URI
+// that re-serializes differently, or has an uppercase host, would never match
+// the one the client sends.
+func validateRedirectURI(uri string) error {
+	if strings.Contains(uri, "#") {
+		return errors.New("a redirect URI may not have a fragment")
+	}
+	u, err := httputil.ParseRedirectTarget(uri)
+	if err != nil {
+		return err
+	}
+	if u.Scheme == "http" && !IsLoopbackOrigin(u.Scheme+"://"+u.Host) {
+		return errors.New("an http redirect URI must be on a loopback host")
+	}
+	if u.String() != uri || u.Host != strings.ToLower(u.Host) {
+		return errors.New("the redirect URI is not in its canonical form")
+	}
+	return nil
+}
+
 func hasReservedClientIDPrefix(clientID string) bool {
 	return slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
 		return strings.HasPrefix(clientID, prefix)
 	})
 }
-
-// Application is one application at one revision. The application row holds
-// identity, and every write appends a revision holding the document (ADR 063).
-// RevisionID and Document are the newest revision's.
-type Application struct {
-	ProjectID  string
-	ID         string
-	Slug       string
-	RevisionID string
-	Document   []byte
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-}
-
-type ApplicationField uint8
-
-const (
-	ApplicationFieldUnspecified ApplicationField = iota
-	ApplicationFieldProjectID
-	ApplicationFieldID
-	ApplicationFieldSlug
-	ApplicationFieldRevisionID
-	ApplicationFieldCreatedAt
-	ApplicationFieldUpdatedAt
-	ApplicationFieldDocument
-)
-
-// ApplicationClient is the stored credential of one client, matched to the
-// document's client by Slug. ID is the row's primary key and stays inside
-// storage; the API and the OAuth endpoints identify a client by ClientID.
-// SecretHash is [HashSecret] of the secret, which the server returns once,
-// when it creates the client.
-type ApplicationClient struct {
-	ProjectID     string
-	ApplicationID string
-	ID            string
-	Slug          string
-	ClientID      string
-	SecretHash    string
-	CreatedAt     time.Time
-}
-
-type ApplicationClientField uint8
-
-const (
-	ApplicationClientFieldUnspecified ApplicationClientField = iota
-	ApplicationClientFieldProjectID
-	ApplicationClientFieldApplicationID
-	ApplicationClientFieldID
-	ApplicationClientFieldSlug
-	ApplicationClientFieldClientID
-	ApplicationClientFieldSecretHash
-	ApplicationClientFieldCreatedAt
-)
