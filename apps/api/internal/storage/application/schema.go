@@ -1,5 +1,6 @@
-// Package application holds the read plumbing every dialect shares for
-// applications joined to their revisions.
+// Package application holds what every dialect shares for applications: the
+// read plumbing for applications joined to their revisions, and the client_id
+// fill of the stored document.
 package application
 
 import (

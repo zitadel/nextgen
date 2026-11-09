@@ -54,14 +54,18 @@ func newApplicationStatements(client queryExecutor) applicationStatements {
 }
 
 // CreateApplication implements [service.ApplicationStatements].
-func (s applicationStatements) CreateApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error {
-	if err := ensureManagedID(&application.ID, domain.PrefixApplication); err != nil {
+func (s applicationStatements) CreateApplication(ctx context.Context, entity *domain.Application, clients []*domain.ApplicationClient) error {
+	if err := ensureManagedID(&entity.ID, domain.PrefixApplication); err != nil {
 		return err
 	}
-	if err := ensureManagedID(&application.RevisionID, domain.PrefixApplicationRevision); err != nil {
+	if err := ensureManagedID(&entity.RevisionID, domain.PrefixApplicationRevision); err != nil {
 		return err
 	}
-	if err := ensureClientIDs(application, clients); err != nil {
+	if err := ensureClientIDs(entity, clients); err != nil {
+		return err
+	}
+	document, err := application.FillClientIDs(entity.Document, clients...)
+	if err != nil {
 		return err
 	}
 	// One stamp for every row, so an application nobody revised reports
@@ -69,18 +73,18 @@ func (s applicationStatements) CreateApplication(ctx context.Context, applicatio
 	now := nowUnixNano()
 	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, createApplicationStmt,
-			application.ProjectID,
-			application.ID,
-			application.Slug,
+			entity.ProjectID,
+			entity.ID,
+			entity.Slug,
 			now,
 		); err != nil {
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createApplicationRevisionStmt,
-			application.ProjectID,
-			application.RevisionID,
-			application.ID,
-			string(application.Document),
+			entity.ProjectID,
+			entity.RevisionID,
+			entity.ID,
+			string(document),
 			now,
 		); err != nil {
 			return wrapError(err)
@@ -88,32 +92,41 @@ func (s applicationStatements) CreateApplication(ctx context.Context, applicatio
 		if err := insertApplicationClients(ctx, tx, clients, now); err != nil {
 			return err
 		}
-		application.CreatedAt, application.UpdatedAt = timeFromUnixNano(now), timeFromUnixNano(now)
+		entity.CreatedAt, entity.UpdatedAt = timeFromUnixNano(now), timeFromUnixNano(now)
+		entity.Document = document
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindApplication, application.ProjectID, application.ID))
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindApplication, entity.ProjectID, entity.ID))
 	})
 }
 
 // ReviseApplication implements [service.ApplicationStatements].
-func (s applicationStatements) ReviseApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error {
+func (s applicationStatements) ReviseApplication(ctx context.Context, entity *domain.Application, clients []*domain.ApplicationClient) error {
 	// A new id every time, not ensureManagedID: the entity usually arrives from
 	// a get, and keeping its revision id would rewrite that revision.
 	revisionID, err := managedIDs.New(string(domain.PrefixApplicationRevision))
 	if err != nil {
 		return err
 	}
-	if err := ensureClientIDs(application, clients); err != nil {
+	if err := ensureClientIDs(entity, clients); err != nil {
 		return err
 	}
 	// Stamped inside a transaction BEGIN IMMEDIATE already serialized, so
 	// revision order follows transaction order.
 	now := nowUnixNano()
 	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		stored, err := newApplicationStatements(tx).ListApplicationClients(ctx, entity.ProjectID, entity.ID)
+		if err != nil {
+			return err
+		}
+		document, err := application.FillClientIDs(entity.Document, append(stored, clients...)...)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, createApplicationRevisionStmt,
-			application.ProjectID,
+			entity.ProjectID,
 			revisionID,
-			application.ID,
-			string(application.Document),
+			entity.ID,
+			string(document),
 			now,
 		); err != nil {
 			return idpconnection.ReviseNotFound(wrapError(err))
@@ -122,7 +135,7 @@ func (s applicationStatements) ReviseApplication(ctx context.Context, applicatio
 			return err
 		}
 		// Set last; see the postgres dialect.
-		application.RevisionID, application.UpdatedAt = revisionID, timeFromUnixNano(now)
+		entity.RevisionID, entity.UpdatedAt, entity.Document = revisionID, timeFromUnixNano(now), document
 		return nil
 	})
 }

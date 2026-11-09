@@ -64,17 +64,21 @@ func newApplicationStatements(db queryExecutor) applicationStatements {
 }
 
 // CreateApplication implements [service.ApplicationStatements].
-func (s applicationStatements) CreateApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error {
-	if err := ensureManagedID(&application.ID, domain.PrefixApplication); err != nil {
+func (s applicationStatements) CreateApplication(ctx context.Context, entity *domain.Application, clients []*domain.ApplicationClient) error {
+	if err := ensureManagedID(&entity.ID, domain.PrefixApplication); err != nil {
 		return err
 	}
-	if err := ensureManagedID(&application.RevisionID, domain.PrefixApplicationRevision); err != nil {
+	if err := ensureManagedID(&entity.RevisionID, domain.PrefixApplicationRevision); err != nil {
 		return err
 	}
-	if err := ensureClientIDs(application, clients); err != nil {
+	if err := ensureClientIDs(entity, clients); err != nil {
 		return err
 	}
-	document, err := encodeNullJSON(application.Document)
+	filled, err := application.FillClientIDs(entity.Document, clients...)
+	if err != nil {
+		return err
+	}
+	document, err := encodeNullJSON(filled)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -82,17 +86,17 @@ func (s applicationStatements) CreateApplication(ctx context.Context, applicatio
 		// A retry replays this callback, so the stamp stays local.
 		var createdAt time.Time
 		stmt := buildStatement(createApplicationStmt,
-			application.ProjectID,
-			application.ID,
-			application.Slug,
+			entity.ProjectID,
+			entity.ID,
+			entity.Slug,
 		).statement()
 		if err := tx.Write(ctx, stmt, scanReturnedTimestamp(&createdAt)); err != nil {
 			return err
 		}
 		revision := buildStatement(createFirstApplicationRevisionStmt,
-			application.ProjectID,
-			application.RevisionID,
-			application.ID,
+			entity.ProjectID,
+			entity.RevisionID,
+			entity.ID,
 			document,
 			createdAt,
 		).statement()
@@ -102,33 +106,41 @@ func (s applicationStatements) CreateApplication(ctx context.Context, applicatio
 		if err := insertApplicationClients(ctx, tx, clients, createdAt); err != nil {
 			return err
 		}
-		application.CreatedAt, application.UpdatedAt = createdAt, createdAt
+		entity.CreatedAt, entity.UpdatedAt, entity.Document = createdAt, createdAt, filled
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindApplication, application.ProjectID, application.ID))
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindApplication, entity.ProjectID, entity.ID))
 	})
 }
 
 // ReviseApplication implements [service.ApplicationStatements].
-func (s applicationStatements) ReviseApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error {
+func (s applicationStatements) ReviseApplication(ctx context.Context, entity *domain.Application, clients []*domain.ApplicationClient) error {
 	// A new id every time, not ensureManagedID: the entity usually arrives from
 	// a get, and keeping its revision id would rewrite that revision.
 	revisionID, err := managedIDs.New(string(domain.PrefixApplicationRevision))
 	if err != nil {
 		return err
 	}
-	if err := ensureClientIDs(application, clients); err != nil {
+	if err := ensureClientIDs(entity, clients); err != nil {
 		return err
 	}
-	document, err := encodeNullJSON(application.Document)
-	if err != nil {
-		return wrapError(err)
-	}
 	return withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
+		stored, err := newApplicationStatements(tx).ListApplicationClients(ctx, entity.ProjectID, entity.ID)
+		if err != nil {
+			return err
+		}
+		filled, err := application.FillClientIDs(entity.Document, append(stored, clients...)...)
+		if err != nil {
+			return err
+		}
+		document, err := encodeNullJSON(filled)
+		if err != nil {
+			return wrapError(err)
+		}
 		var updatedAt time.Time
 		revision := buildStatement(createApplicationRevisionStmt,
-			application.ProjectID,
+			entity.ProjectID,
 			revisionID,
-			application.ID,
+			entity.ID,
 			document,
 		).statement()
 		if err := tx.Write(ctx, revision, scanReturnedTimestamp(&updatedAt)); err != nil {
@@ -137,7 +149,7 @@ func (s applicationStatements) ReviseApplication(ctx context.Context, applicatio
 		if err := insertApplicationClients(ctx, tx, clients, updatedAt); err != nil {
 			return err
 		}
-		application.UpdatedAt, application.RevisionID = updatedAt, revisionID
+		entity.UpdatedAt, entity.RevisionID, entity.Document = updatedAt, revisionID, filled
 		return nil
 	})
 }

@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -44,6 +45,7 @@ func TestApplicationStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, slug, byID.Slug)
 		assert.Equal(t, application.RevisionID, byID.RevisionID)
 		assert.JSONEq(t, string(application.Document), string(byID.Document))
+		assert.JSONEq(t, string(applicationDocument(slug, generated, supplied)), string(byID.Document), "the stored document holds the generated client_id")
 		assert.True(t, byID.UpdatedAt.Equal(application.UpdatedAt), "create must report the timestamp a read serves")
 
 		bySlug, err := d.stmts.GetApplication(t.Context(), applicationBySlug(projectID, slug))
@@ -99,12 +101,14 @@ func TestApplicationStatements_ClientIDUniquePerProject(t *testing.T) {
 func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
+		slug := "shop-" + uniqueSuffix(t)
 		web := &domain.ApplicationClient{Slug: "web", SecretHash: domain.HashSecret("one")}
-		application := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), web)
+		application := createApplication(t, d.stmts, projectID, slug, web)
 		firstRevisionID := application.RevisionID
 
-		application.Document = []byte(`{"slug":"shop","name":"Shop 2","clients":[]}`)
+		// The revision leaves web's client_id out, which the contract allows.
 		api := &domain.ApplicationClient{Slug: "api", SecretHash: domain.HashSecret("two")}
+		application.Document = applicationDocument(slug, &domain.ApplicationClient{Slug: "web"}, api)
 		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{api}))
 		assert.NotEqual(t, firstRevisionID, application.RevisionID)
 		assert.True(t, domain.PrefixApplicationRevision.Matches(application.RevisionID))
@@ -115,6 +119,7 @@ func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, application.RevisionID, got.RevisionID)
 		assert.JSONEq(t, string(application.Document), string(got.Document))
+		assert.JSONEq(t, string(applicationDocument(slug, web, api)), string(got.Document), "the stored document holds the stored and the generated client_id")
 
 		clients, err := d.stmts.ListApplicationClients(t.Context(), projectID, application.ID)
 		require.NoError(t, err)
@@ -171,8 +176,19 @@ func TestApplicationStatements_ProjectDeleteCascades(t *testing.T) {
 	})
 }
 
-func applicationDocument(slug string) []byte {
-	return []byte(`{"slug":"` + slug + `","name":"Shop","clients":[]}`)
+// applicationDocument lists clients by slug, each with the client_id it has.
+// The type field stands for the fields storage does not model.
+func applicationDocument(slug string, clients ...*domain.ApplicationClient) []byte {
+	docClients := make([]map[string]any, 0, len(clients))
+	for _, client := range clients {
+		docClient := map[string]any{"slug": client.Slug, "type": "web"}
+		if client.ClientID != "" {
+			docClient["client_id"] = client.ClientID
+		}
+		docClients = append(docClients, docClient)
+	}
+	document, _ := json.Marshal(map[string]any{"slug": slug, "name": "Shop", "clients": docClients})
+	return document
 }
 
 func applicationByID(projectID, id string) database.Filter[domain.ApplicationField] {
@@ -191,7 +207,7 @@ func applicationBySlug(projectID, slug string) database.Filter[domain.Applicatio
 
 func createApplication(t *testing.T, stmts service.ApplicationStatements, projectID, slug string, clients ...*domain.ApplicationClient) *domain.Application {
 	t.Helper()
-	application := &domain.Application{ProjectID: projectID, Slug: slug, Document: applicationDocument(slug)}
+	application := &domain.Application{ProjectID: projectID, Slug: slug, Document: applicationDocument(slug, clients...)}
 	require.NoError(t, stmts.CreateApplication(t.Context(), application, clients))
 	return application
 }

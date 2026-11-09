@@ -305,13 +305,15 @@ type ApplicationStatements interface {
 	Statements
 	// CreateApplication writes the application, its first revision, the
 	// clients and the resource-scope row in one transaction, and sets the ids
-	// and timestamps on application and each client. A slug or client_id
+	// and timestamps on application and each client. The stored document, and
+	// application.Document, hold each client's client_id. A slug or client_id
 	// already used in the project returns *database.UniqueError.
 	CreateApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error
 	// ReviseApplication appends a revision holding application.Document and
-	// inserts clients, the ones the revision adds, in one transaction. It sets
-	// RevisionID and UpdatedAt on application; CreatedAt stays as the caller
-	// had it.
+	// inserts clients, the ones the revision adds, in one transaction. The
+	// revision holds the client_id of every client, stored or added, even one
+	// the document leaves out. It sets RevisionID, UpdatedAt and the filled
+	// Document on application; CreatedAt stays as the caller had it.
 	//
 	// An unknown application returns *database.NoRowFoundError. A revision
 	// created in the same instant as another, or a client_id already used in
