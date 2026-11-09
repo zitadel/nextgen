@@ -57,7 +57,25 @@ export {
   type Transition,
 } from "@/lib/zitadel/resources/flows";
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
-export { Policies, Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/resources/policies";
+export {
+  PASSWORD_POLICY_OPERATION,
+  PASSWORD_POLICY_PATH,
+  Policies,
+  Policy,
+  POLICY_FILE_SUFFIX,
+  POLICY_TEST_SUFFIX,
+  PolicyTest,
+  parsePasswordMinLength,
+  passwordPolicy,
+  type PasswordMinLength,
+  type PolicyBody,
+  type PolicyCase,
+  type PolicyConfig,
+  type PolicyExpectation,
+  type PolicyOperation,
+  type PolicySelection,
+  type PolicyTestBody,
+} from "@/lib/zitadel/resources/policies";
 export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
 export {
@@ -82,4 +100,5 @@ export {
   type ConfigKind,
   type EditResult,
   type JsonObject,
+  RELEASE_POLICY_GLOBS,
 } from "@/lib/zitadel/types";
