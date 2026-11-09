@@ -20,6 +20,7 @@ const PREPARED: PreparedRelease = {
   report: {},
   warnings: [],
   notices: [],
+  lockouts: [],
   gitSha: "abc1234",
   gitDirty: false,
 };

@@ -311,20 +311,22 @@ Each invocation prints one JSON object:
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the
   collision names the user.
-- `deploy` and `deploy --dry-run` read the project's users and add a warning
-  to `warnings` when the config would lock existing users out: users of a
+- `deploy` and `deploy --dry-run` read the project's users and refuse when the
+  config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
   collects it (it cannot tell who signs in with a password, so it counts them
   all), users of a schema no flow uses any more, who cannot sign in at all
   (the warning counts those with an SSO link on top), or users whose only
   credential is a method the release disables on their schema, such as a
-  passkey once passkeys are off. It runs only when the
-  diff finds schemas or flows changed, or cannot tell, and it only warns and
-  never fails the deploy. When it could not finish (a request failed, the
+  passkey once passkeys are off. Each lockout is listed in `warnings`, and a
+  non-interactive run fails with `E_CONFIRMATION_REQUIRED`; `--force` deploys
+  anyway. Ask the user before re-running with `--force`: it is for users they
+  will migrate, or a lockout they mean. It runs only when the diff finds
+  schemas or flows changed, or cannot tell. When it could not finish (a request failed, the
   unserved-schema part was skipped,
   or the read limit was reached), `warnings` carries a note saying so, such as
   "Could not finish checking existing users"; that note means the check was
-  incomplete, not that users are locked out.
+  incomplete, not that users are locked out, and it never stops the deploy.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`

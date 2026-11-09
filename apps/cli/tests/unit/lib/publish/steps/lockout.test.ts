@@ -13,6 +13,7 @@ import { aConfig, aLoginFlow, aUserSchema } from "@tests/helpers/config";
 import { type ClientStubs, pagesOf } from "@tests/helpers/fake-client";
 import { aDeployment } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
+import type { StepContext } from "@/lib/publish/pipeline";
 
 /**
  * The revision id the project lists for `human-user`.
@@ -329,9 +330,73 @@ beforeEach(() => {
   takeReportedWarnings();
 });
 
+/**
+ * Run the step and say everything it found: the lockouts it hands back, then
+ * the notes it warned with.
+ *
+ * @param context - The step's context.
+ * @returns The lockouts, then the warnings.
+ */
+async function everythingSaid(context: StepContext): Promise<readonly string[]> {
+  const result = await lockoutStep.run(context);
+  return [...(result?.lockouts ?? []), ...takeReportedWarnings()];
+}
+
 describe("lockoutStep", () => {
   it("runs for deploy only", () => {
     expect(lockoutStep.runsFor).toEqual(["deploy"]);
+  });
+
+  describe("when it finds users it would lock out", () => {
+    const context = () => {
+      return aStepContext({
+        config: aConfig({
+          schemas: { "1.json": signingInWith("human-user", "username") },
+          flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
+        }),
+        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
+      });
+    };
+
+    it("hands them back as lockouts", async () => {
+      const result = await lockoutStep.run(context());
+
+      expect(result?.lockouts).toEqual([
+        expect.stringContaining('1 of 1 existing user of "human-user" has no "username"'),
+      ]);
+    });
+
+    it("does not only warn about them", async () => {
+      await lockoutStep.run(context());
+
+      expect(takeReportedWarnings()).toEqual([]);
+    });
+  });
+
+  describe("when it cannot finish the check", () => {
+    const context = () => {
+      return aStepContext({
+        config: aConfig({
+          schemas: { "1.json": signingInWith("human-user", "username") },
+          flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
+        }),
+        client: { ...aPlatform(), queryUsers: { pages: refused } },
+      });
+    };
+
+    it("hands back no lockouts", async () => {
+      const result = await lockoutStep.run(context());
+
+      expect(result?.lockouts).toBeUndefined();
+    });
+
+    it("warns that the check did not finish", async () => {
+      await lockoutStep.run(context());
+
+      expect(takeReportedWarnings()).toEqual([
+        expect.stringContaining("Could not finish checking"),
+      ]);
+    });
   });
 
   describe("with users lacking the identifier their schema signs in with", () => {
@@ -349,9 +414,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('1 of 2 existing users of "human-user" has no "username"'),
       ]);
     });
@@ -365,9 +430,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           "users update <user_id> --schema <revision_id> --set attributes.username=<value>",
         ),
@@ -383,9 +448,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining("--set attributes.username=<value> --env staging"),
       ]);
     });
@@ -399,11 +464,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("--set attributes.account.handle=<value>"),
-      ]);
+      expect(said).toEqual([expect.stringContaining("--set attributes.account.handle=<value>")]);
     });
 
     it("does not read an inherited property as the identifier", async () => {
@@ -415,9 +478,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toHaveLength(1);
+      expect(said).toHaveLength(1);
     });
 
     it("counts only active users", async () => {
@@ -432,11 +495,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [...someUsers("a", "human-user", 3), ...deactivated] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining('3 of 3 existing users of "human-user"'),
-      ]);
+      expect(said).toEqual([expect.stringContaining('3 of 3 existing users of "human-user"')]);
     });
 
     it("stays quiet when every user carries the identifier", async () => {
@@ -448,9 +509,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
   });
 
@@ -464,9 +525,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("checks only the designated identifier among the fields a login step collects", async () => {
@@ -478,9 +539,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("finds the identifier on a later step of the login path", async () => {
@@ -492,9 +553,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "email"')]);
+      expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
     it.each([
@@ -538,9 +599,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "email"')]);
+      expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
     it.each([
@@ -584,9 +645,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
   });
 
@@ -600,9 +661,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "email"')]);
+      expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
     it("checks a flow whose schema exists only on the server, named by object type", async () => {
@@ -614,9 +675,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "email"')]);
+      expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
     it("uses the newest revision of a server-only schema for its identifier", async () => {
@@ -639,9 +700,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("takes the identifier from the newest revision when a flow names an older one by id", async () => {
@@ -666,9 +727,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "username"')]);
+      expect(said).toEqual([expect.stringContaining('has no "username"')]);
     });
 
     it("takes the first listed revision as the newest, whatever the timestamps' fractional digits", async () => {
@@ -693,9 +754,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "username"')]);
+      expect(said).toEqual([expect.stringContaining('has no "username"')]);
     });
 
     it("lets the bundle's schema drop the designation even if a listed revision still has one", async () => {
@@ -716,9 +777,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("does not list the schemas when every flow names an object type, nobody is linked and nothing is deployed", async () => {
@@ -760,9 +821,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -783,9 +844,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           '2 existing users of "human-user" are on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -801,11 +862,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining('keep or restore a flow on "human-user"'),
-      ]);
+      expect(said).toEqual([expect.stringContaining('keep or restore a flow on "human-user"')]);
     });
 
     it("counts the revisions of one schema together", async () => {
@@ -820,9 +879,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           '2 existing users of "human-user" are on a schema no flow in this release uses (2 of them have an SSO link)',
         ),
@@ -838,9 +897,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           '1 existing user of "human-user" is on a schema no flow in this release uses, so they cannot sign in',
         ),
@@ -856,9 +915,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.not.stringContaining("SSO link")]);
+      expect(said).toEqual([expect.not.stringContaining("SSO link")]);
     });
 
     it("resolves a flow's schema given by its $id before checking either case", async () => {
@@ -879,9 +938,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('of "employee"'),
         expect.stringContaining('of "human-user"'),
       ]);
@@ -902,9 +961,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -920,9 +979,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -935,9 +994,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           '1 existing user of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -956,9 +1015,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining("Skipped the check for users of schemas no flow serves"),
       ]);
     });
@@ -976,9 +1035,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           'of "" is on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -998,9 +1057,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           '2 existing users of "human-user" are on a schema no flow in this release uses (1 of them has an SSO link)',
         ),
@@ -1016,9 +1075,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-249"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('250 existing users of "human-user" are on a schema'),
       ]);
     });
@@ -1032,9 +1091,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-249"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.not.stringContaining("SSO link")]);
+      expect(said).toEqual([expect.not.stringContaining("SSO link")]);
     });
 
     it("counts linked users among the first ones", async () => {
@@ -1046,11 +1105,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-0"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("(at least 1 of them has an SSO link)"),
-      ]);
+      expect(said).toEqual([expect.stringContaining("(at least 1 of them has an SSO link)")]);
     });
 
     it("qualifies the SSO count when the user read was cut short", async () => {
@@ -1062,11 +1119,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: someUsers("s", "human-user", 1200), linked: ["s-0"] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("(at least 1 of them has an SSO link)"),
-      ]);
+      expect(said).toEqual([expect.stringContaining("(at least 1 of them has an SSO link)")]);
     });
   });
 
@@ -1113,9 +1168,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('3 of 3 existing users of "employee" have no "email"'),
         expect.stringContaining('Checked only some of the users of "human-user"'),
       ]);
@@ -1130,11 +1185,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: someUsers("u", "human-user", 500) }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining('500 of 500 existing users of "human-user"'),
-      ]);
+      expect(said).toEqual([expect.stringContaining('500 of 500 existing users of "human-user"')]);
     });
 
     it("stops asking when a page is empty but still offers another", async () => {
@@ -1153,11 +1206,9 @@ describe("lockoutStep", () => {
         },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("Checked only some of the users of"),
-      ]);
+      expect(said).toEqual([expect.stringContaining("Checked only some of the users of")]);
     });
   });
 
@@ -1188,9 +1239,9 @@ describe("lockoutStep", () => {
         learned: { schemasOrFlowsChanged: false },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("checks the users when a schema or flow changed", async () => {
@@ -1203,9 +1254,9 @@ describe("lockoutStep", () => {
         learned: { schemasOrFlowsChanged: true },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toHaveLength(1);
+      expect(said).toHaveLength(1);
     });
 
     it("still checks when a clean diff leaves a flow's schema to the server", async () => {
@@ -1215,9 +1266,9 @@ describe("lockoutStep", () => {
         learned: { schemasOrFlowsChanged: false },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toHaveLength(1);
+      expect(said).toHaveLength(1);
     });
   });
 
@@ -1245,9 +1296,9 @@ describe("lockoutStep", () => {
         client: { ...aPlatform(), queryUsers: { pages: refused } },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining(UNFINISHED)]);
+      expect(said).toEqual([expect.stringContaining(UNFINISHED)]);
     });
 
     it("keeps the identifier warning when a link read fails", async () => {
@@ -1262,9 +1313,9 @@ describe("lockoutStep", () => {
         },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('has no "username"'),
         expect.stringContaining('1 existing user of "human-user" is on a schema'),
         expect.stringContaining(UNFINISHED),
@@ -1283,9 +1334,9 @@ describe("lockoutStep", () => {
         },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('1 existing user of "human-user" is on a schema'),
         expect.stringContaining(UNFINISHED),
       ]);
@@ -1307,9 +1358,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('has no "email"'),
         expect.stringContaining(UNFINISHED),
       ]);
@@ -1334,9 +1385,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining('of "human-user"'),
         expect.stringContaining(UNFINISHED),
       ]);
@@ -1354,9 +1405,9 @@ describe("lockoutStep", () => {
         },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "username"')]);
+      expect(said).toEqual([expect.stringContaining('has no "username"')]);
     });
 
     it("says the schemas could not be read, not that a flow's schema is undefined", async () => {
@@ -1368,11 +1419,9 @@ describe("lockoutStep", () => {
         client: { ...aPlatform(), listSchemas: { all: refused } },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("the project's schemas could not be read"),
-      ]);
+      expect(said).toEqual([expect.stringContaining("the project's schemas could not be read")]);
     });
 
     it("counts users together when their schemas cannot be named", async () => {
@@ -1390,9 +1439,9 @@ describe("lockoutStep", () => {
         },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining("2 existing users of schemas whose names could not be read"),
       ]);
     });
@@ -1412,9 +1461,9 @@ describe("lockoutStep", () => {
         },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.not.stringContaining(HUMAN)]);
+      expect(said).toEqual([expect.not.stringContaining(HUMAN)]);
     });
 
     it("says so when resolving the flows throws before the scans start", async () => {
@@ -1427,9 +1476,9 @@ describe("lockoutStep", () => {
       });
       vi.spyOn(context.config.flows, "findSchemaOf").mockImplementation(refused);
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining(UNFINISHED)]);
+      expect(said).toEqual([expect.stringContaining(UNFINISHED)]);
     });
   });
 
@@ -1473,9 +1522,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
       ]);
     });
@@ -1498,9 +1547,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
       ]);
     });
@@ -1548,9 +1597,7 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
-
-      return takeReportedWarnings();
+      return everythingSaid(context);
     };
 
     it("counts SSO on a refused live revision that lists a provider", async () => {
@@ -1621,9 +1668,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "email"')]);
+      expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
     it.each([["   "], [""], [5]])(
@@ -1639,9 +1686,9 @@ describe("lockoutStep", () => {
           }),
         });
 
-        await lockoutStep.run(context);
+        const said = await everythingSaid(context);
 
-        expect(takeReportedWarnings()).toEqual([]);
+        expect(said).toEqual([]);
       },
     );
 
@@ -1669,9 +1716,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: users.slice(0, 1), listing: liveListing, pinned: [HUMAN] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("reads no credentials when the release keeps every method", async () => {
@@ -1713,9 +1760,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users, listing: liveListing, pinned: [HUMAN] }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("warns about nothing when nothing is deployed", async () => {
@@ -1727,9 +1774,9 @@ describe("lockoutStep", () => {
         client: aPlatform({ users, listing: liveListing }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("compares with the revision the live release pins, not the newest one", async () => {
@@ -1749,11 +1796,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("can only sign in with passkey"),
-      ]);
+      expect(said).toEqual([expect.stringContaining("can only sign in with passkey")]);
     });
 
     it("compares a schema the release does not carry with the newest revision the server pins for it", async () => {
@@ -1770,9 +1815,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           '1 of 3 existing users of "human-user" can only sign in with passkey',
         ),
@@ -1797,9 +1842,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(said).toEqual([]);
     });
 
     it("asks to keep both methods when two are disabled", async () => {
@@ -1813,9 +1858,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         expect.stringContaining(
           "can only sign in with passkey or password, which this release disables, so they cannot sign in after it. Keep them enabled",
         ),
@@ -1836,9 +1881,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
       ]);
     });
@@ -1858,9 +1903,9 @@ describe("lockoutStep", () => {
         }),
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(said).toEqual([
         'at least 1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
         "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
       ]);
@@ -1887,9 +1932,9 @@ describe("lockoutStep", () => {
         client: { ...aPlatform({ users, ...platform }), ...failing },
       });
 
-      await lockoutStep.run(context);
+      const said = await everythingSaid(context);
 
-      expect(takeReportedWarnings()).toContain(CREDENTIALS_SKIPPED);
+      expect(said).toContain(CREDENTIALS_SKIPPED);
     });
 
     it("reads no credentials when a live revision is not in the listing", async () => {
