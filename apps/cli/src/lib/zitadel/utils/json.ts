@@ -183,3 +183,35 @@ export function withoutKey(body: JsonObject, key: string): JsonObject {
     }),
   );
 }
+
+/**
+ * An object without the member at a path, however deep it sits.
+ *
+ * @remarks
+ * For raw bodies only: setting aside a member a contract refused to hold the
+ * rest to it. Only object members are followed; a path that runs into
+ * anything else, or into a member that is not there, leaves the body as it is.
+ *
+ * @param body - The object.
+ * @param path - The keys from the object down to the member, at least one.
+ * @returns A new object without the member and with every other key, in the
+ *   same order; the object itself when there is nothing at the path.
+ */
+export function withoutPath(body: JsonObject, path: readonly PropertyKey[]): JsonObject {
+  if (path.length === 0) {
+    return body;
+  }
+  const head = String(path[0]);
+  if (path.length === 1) {
+    return withoutKey(body, head);
+  }
+  const child = body[head];
+  if (child === undefined || !isJsonObject(child)) {
+    return body;
+  }
+  const rest = withoutPath(child, path.slice(1));
+  if (rest === child) {
+    return body;
+  }
+  return { ...body, [head]: rest };
+}

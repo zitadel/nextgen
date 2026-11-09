@@ -1,5 +1,6 @@
 import { brandingConfigSchema } from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
+import type { z } from "zod";
 
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
@@ -18,7 +19,7 @@ import { ConfigError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { withoutKey } from "@/lib/zitadel/utils/json";
+import { withoutKey, withoutPath } from "@/lib/zitadel/utils/json";
 
 /**
  * A branding descriptor under `.zitadel/branding/`: the login's layout, its
@@ -30,17 +31,17 @@ export class Branding extends ConfigDocument<BrandingValue> {
    * The contract a branding descriptor is held to.
    *
    * @remarks
-   * A file it refuses is broken by the `contract/branding` refusals, or, for a
-   * descriptor that still names its template the old way, by how to migrate
-   * it in place of the bare unknown-key refusal, as {@link explainRefusals}
-   * words it.
+   * A file it refuses is broken by the `contract/branding` refusals, each
+   * mistake said once, or, for a descriptor that still names its template the
+   * old way, by how to migrate it in place of the bare unknown-key refusal, as
+   * {@link explainRefusals} words it.
    */
   static readonly CONTRACT: DocumentContract<typeof brandingConfigSchema> = {
     kind: "branding",
     rule: "contract/branding",
     schema: brandingConfigSchema,
-    explain: (file, refusals) => {
-      return Branding.explainRefusals(file, refusals);
+    explain: (file) => {
+      return Branding.explainRefusals(file);
     },
   };
 
@@ -150,7 +151,8 @@ export class Branding extends ConfigDocument<BrandingValue> {
 
   /**
    * Word what the branding contract refused of a descriptor: how to migrate a
-   * template named the old way, beside every other refusal the body has.
+   * template named the old way, beside every other refusal the body has, each
+   * said once and in plain words.
    *
    * @remarks
    * The contract reports every unknown key in one refusal, so the retired key
@@ -159,13 +161,12 @@ export class Branding extends ConfigDocument<BrandingValue> {
    * the body as written: a refused file has no typed value.
    *
    * @param file - The descriptor the contract refused.
-   * @param refusals - The `contract/branding` refusals.
-   * @returns The `branding/legacy-template-key` finding first, then the
-   *   refusals the rest of the body has; the refusals as they are when the body
-   *   has no retired key.
+   * @returns The `branding/legacy-template-key` finding first when the body
+   *   has a retired key, then the refusals the rest of the body has.
    */
-  private static explainRefusals(file: DocumentFile, refusals: readonly Issue[]): readonly Issue[] {
+  private static explainRefusals(file: DocumentFile): readonly Issue[] {
     const legacy = file.body[LEGACY_TEMPLATE_FILE_KEY];
+    const refusals = Branding.wordRefusals(file, withoutKey(file.body, LEGACY_TEMPLATE_FILE_KEY));
     if (legacy === undefined) {
       return refusals;
     }
@@ -177,31 +178,105 @@ export class Branding extends ConfigDocument<BrandingValue> {
         "branding/legacy-template-key",
         `${LEGACY_TEMPLATE_FILE_KEY} is no longer supported. Replace it with "liquid_template": { "$file": ${reference} }.`,
       ),
-      ...Branding.refusalsWithoutLegacyKey(file),
+      ...refusals,
     ];
   }
 
   /**
-   * The branding contract's refusals of a descriptor's body with the retired
-   * key taken out, worded as {@link ConfigDocument.readFile} words them.
+   * The branding contract's refusals of a body, one finding per mistake.
    *
-   * @param file - The descriptor the contract refused.
-   * @returns The refusals the rest of the body has; none when it passes.
+   * @remarks
+   * Some fields are held to a generated pattern or format as well as to a
+   * check of the contract's own that says what a valid value looks like, so
+   * one mistake is refused twice: once by a raw regex and once in plain words.
+   * The contract's own refusal names its field as the first word of its
+   * message and has no path, so the generic refusals at that field are
+   * dropped and the plain one is reported as it is, without a `(root)`
+   * location.
+   *
+   * The contract's own checks only run once every field has the right type
+   * and one of its values, so a body with such a mistake elsewhere would show
+   * the raw regex and nothing else. The fields with such a mistake are set
+   * aside and the rest of the body is held to the contract again, so its own
+   * checks speak too.
+   *
+   * @param file - The file the body is from, which findings are filed under.
+   * @param body - The body to hold to the contract.
+   * @returns The findings; none when the body passes.
    */
-  private static refusalsWithoutLegacyKey(file: DocumentFile): readonly Issue[] {
-    const body = withoutKey(file.body, LEGACY_TEMPLATE_FILE_KEY);
-    const result = Branding.CONTRACT.schema.safeParse(body);
-    if (result.success) {
+  private static wordRefusals(file: DocumentFile, body: JsonObject): readonly Issue[] {
+    const first = Branding.CONTRACT.schema.safeParse(body);
+    if (first.success) {
       return [];
     }
-    return result.error.issues.map((refusal) => {
-      const where = refusal.path.join(".") || "(root)";
-      return Branding.makeFileIssue(
-        file.path,
-        Branding.CONTRACT.rule,
-        `${where} ${refusal.message}`,
-      );
+    const setAside = first.error.issues.filter((refusal) => {
+      return refusal.code !== "custom" && refusal.code !== "invalid_format";
     });
+    let refusals = first.error.issues;
+    if (setAside.length > 0) {
+      const rest = Branding.CONTRACT.schema.safeParse(Branding.withoutRefused(body, setAside));
+      refusals = [...setAside, ...(rest.success ? [] : rest.error.issues)];
+    }
+    const named = new Set<string>();
+    for (const refusal of refusals) {
+      if (refusal.code === "custom" && refusal.path.length === 0) {
+        named.add(Branding.fieldNamedBy(refusal.message));
+      }
+    }
+    return refusals
+      .filter((refusal) => {
+        return refusal.code === "custom" || !named.has(refusal.path.join("."));
+      })
+      .map((refusal) => {
+        if (
+          refusal.code === "custom" &&
+          refusal.path.length === 0 &&
+          named.has(Branding.fieldNamedBy(refusal.message))
+        ) {
+          return Branding.makeFileIssue(file.path, Branding.CONTRACT.rule, refusal.message);
+        }
+        const where = refusal.path.join(".") || "(root)";
+        return Branding.makeFileIssue(
+          file.path,
+          Branding.CONTRACT.rule,
+          `${where} ${refusal.message}`,
+        );
+      });
+  }
+
+  /**
+   * The field a message of the contract's own checks is about.
+   *
+   * @param message - A message that starts with the field's dotted name.
+   * @returns The first word of the message.
+   */
+  private static fieldNamedBy(message: string): string {
+    return message.split(" ")[0] ?? "";
+  }
+
+  /**
+   * A body without the members the contract refused for their type or value.
+   *
+   * @param body - The body as written.
+   * @param refusals - The refusals whose members are set aside; an unknown key
+   *   is refused at the object that holds it.
+   * @returns The body without those members.
+   */
+  private static withoutRefused(
+    body: JsonObject,
+    refusals: readonly z.core.$ZodIssue[],
+  ): JsonObject {
+    let rest = body;
+    for (const refusal of refusals) {
+      if (refusal.code === "unrecognized_keys") {
+        for (const key of refusal.keys) {
+          rest = withoutPath(rest, [...refusal.path, key]);
+        }
+      } else {
+        rest = withoutPath(rest, refusal.path);
+      }
+    }
+    return rest;
   }
 
   /**

@@ -10,6 +10,7 @@ import {
   stringsIn,
   toJsonObject,
   withoutKey,
+  withoutPath,
 } from "@/lib/zitadel/utils/json";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -128,5 +129,31 @@ describe("listAt", () => {
 describe("withoutKey", () => {
   it("leaves out one key and keeps the rest in order", () => {
     expect(Object.keys(withoutKey({ a: 1, $schema: "x", b: 2 }, "$schema"))).toEqual(["a", "b"]);
+  });
+});
+
+describe("withoutPath", () => {
+  it("leaves out a member at the top and keeps the rest", () => {
+    expect(withoutPath({ a: 1, b: 2 }, ["a"])).toEqual({ b: 2 });
+  });
+
+  it("leaves out a nested member and keeps its siblings", () => {
+    expect(withoutPath({ a: { b: 1, c: 2 }, d: 3 }, ["a", "b"])).toEqual({ a: { c: 2 }, d: 3 });
+  });
+
+  it("leaves the body as it is when nothing sits at the path", () => {
+    const body = { a: { b: 1 }, c: "text" };
+
+    expect(withoutPath(body, ["a", "x", "y"])).toBe(body);
+    expect(withoutPath(body, ["c", "x"])).toBe(body);
+    expect(withoutPath(body, [])).toBe(body);
+  });
+
+  it("does not change the body it is given", () => {
+    const body = { a: { b: 1 } };
+
+    withoutPath(body, ["a", "b"]);
+
+    expect(body).toEqual({ a: { b: 1 } });
   });
 });
