@@ -1,5 +1,80 @@
 # @zitadel/server
 
+## 0.5.0
+
+### Minor Changes
+
+- [#2570](https://github.com/zitadel/nextgen/pull/2570) [`6dc824b`](https://github.com/zitadel/nextgen/commit/6dc824bdd5e8745322fe95a6aadc6c7408a18c90) - In the console, the Users list's revision filter picks one schema revision, or `Older revisions` for every user not yet on the newest. Its `Latest only` choice is gone: pick the newest revision instead, and a link carrying `revision=latest` opens the schema's whole list. The revision menu there and on a schema's detail page shows each revision the same way: a shortened id, its creation time, and `Latest` and `In use` badges. An older revision no longer carries a note and migration-guide link under Field definitions; its badges say where it stands. Ids that do not fit their slot are cut in the middle, keeping their start and the end that tells them apart (`user_0…PQFJA0`, `https://part…/v2/profile.schema.json`): in id columns, the revision pickers, a schema's id under its title, and a user's revision box.
+
+- [#2731](https://github.com/zitadel/nextgen/pull/2731) [`c2c8454`](https://github.com/zitadel/nextgen/commit/c2c84543ae6e3f3e53dd1eeb9b30daeb80f32c72) - The console's user page now says when a newer schema revision is available, and lets you move that user to any revision of their schema, asking only for the values the move needs. See [Migrate users between schema revisions](https://preview.zitadel.com/docs/guides/migrate-user-schema).
+
+- [#2686](https://github.com/zitadel/nextgen/pull/2686) [`bb83d04`](https://github.com/zitadel/nextgen/commit/bb83d04fe20ba045e49350b4adbcc128b80bbbff) - The console's Add user and user edit forms now build their controls from the whole user schema, including nested objects, arrays, nullable types and enums. Rules show as help and errors on the affected field. A property no control can write points to the CLI or API. The identifier is marked, labels name their API property on hover, and objects can be collapsed.
+
+- [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a) - **Breaking:** `targets` on `POST /deployments` is `"primary"` or a list of preview URLs. `["primary"]`, which CLIs and test kits released before this send, still deploys to every primary origin until 1.0.0, and its answer carries a `Deprecation` header.
+  
+  **Breaking:** a `--dry-run --json` from `zitadel deploy` and `zitadel deployment create` prints `data.targets` as the request sends it: `"primary"`, not `["primary"]`.
+
+- [#2679](https://github.com/zitadel/nextgen/pull/2679) [`c2b79af`](https://github.com/zitadel/nextgen/commit/c2b79aff3172dab6158fe1ebe701a02e9932fa65) - A project secret can no longer read a granted platform user's profile through the grants API, and a project that has not been claimed can no longer grant platform users or teams.
+  
+  **Breaking:** `expand=principal` on `GET /grants/{id}` and `POST /grants/query` now answers 403 `user.permission_denied` unless the caller can read the platform project. `POST /grants` on a project that has not been claimed answers 403 `grant.project_unclaimed`; claim the project first.
+
+- [#2534](https://github.com/zitadel/nextgen/pull/2534) [`ec3c199`](https://github.com/zitadel/nextgen/commit/ec3c199bad6d467e3f36712ab440ed42f8c740fb) - The server writes an `api error` log line for every error it answers. That includes a sign-in step it refuses (for example a wrong password, a rejected passkey or a failed external sign-in), a refusal with its own response body, a path or method no operation serves, and the external sign-in callback. Each line carries the error's cause and the place it was raised, and shares the `request_id` of the request's `request served` line, which holds the status. Values a user submitted, such as an email or a pasted client secret, are left out of these lines.
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+- [#2554](https://github.com/zitadel/nextgen/pull/2554) [`6b49566`](https://github.com/zitadel/nextgen/commit/6b4956600d7a3fe03ae3bbf27082eccd15985f47) - A request is served only what its release pins: a flow, user schema, identity provider, branding, or policy the release leaves out is not served, and a request with no release answers `rel.not_deployed`. `setUserPassword` applies the password policy of the release that serves the caller's `Origin`, so a frontend on a preview URL gets that preview's policy; the console's own origin and a caller with no `Origin` get the project's newest primary deployment. `createAuthAttempt` always follows the newest primary deployment. With no primary deployment both answer `409` with `rel.no_default`. A release that pins no flow answers `flowdef.not_found` saying so, `zitadel deploy` warns that such a release strands every existing user, and the console's project page shows the password policy the primary origins' release pins rather than the newest published one.
+  
+  **Breaking:** publishing a flow, schema, identity provider, branding, or policy no longer changes sign-in or `setUserPassword` until a release that pins it is deployed. That includes a project the test kit starts: what a test publishes after `startZitadel` applies once a release that pins it is deployed.
+
+- [#2552](https://github.com/zitadel/nextgen/pull/2552) [`a79bc7e`](https://github.com/zitadel/nextgen/commit/a79bc7eed1b624e90fc865a833380ab9398d8ff0) - **Breaking:** `POST /flow` is served the project's newest primary deployment, not the newest revisions, when there is one and the request has no `Origin`. The same holds for a request from an origin the project does not list but the server lets in anyway, such as a loopback origin like `http://localhost:3000` or a console origin like `https://console.example.com`, when nothing is deployed to that origin. That deployment stays live whatever the project lists, so its release cannot be revoked.
+
+- [#2553](https://github.com/zitadel/nextgen/pull/2553) [`e7799e9`](https://github.com/zitadel/nextgen/commit/e7799e933cd71dfea188724944d3f8369d952121) - A sign-in runs only what is deployed. `zitadel origin rm` warns that a project with no origins admits no origin except a loopback origin, and the test kit deploys the bootstrapped release to its primary origins, which default to a loopback origin. `zitadel setup --dev-port` deploys the release the old port ran to the new one, and `zitadel doctor --fix` does the same for the issuer it makes primary, or says to deploy. `<zitadel-login>` says to deploy when it cannot start a flow because nothing is deployed.
+  
+  **Breaking:** a project with no origins no longer serves a flow to an arbitrary host. A flow with no `Origin`, or from a console origin the project does not list, needs a primary deployment and otherwise answers `rel.no_default`. A listed origin or a live preview with nothing deployed answers `rel.not_deployed`, and so does a primary origin added since the last deploy. A loopback origin the project does not list is no longer served the newest primary deployment: it answers `rel.not_deployed` until it is added as a primary origin and deployed to. The test kit registers `appOrigins` as primary origins, so each must be an exact URL; a wildcard pattern is refused.
+
+- [#2689](https://github.com/zitadel/nextgen/pull/2689) [`0aff39f`](https://github.com/zitadel/nextgen/commit/0aff39f917f89d85e0f500147a3a6072ccbde400) - Serve the OpenAPI document this binary was built from at `GET /api/v1/openapi.json`, with no authentication, so clients and agents can read the contract of a specific deployment.
+
+- [#2821](https://github.com/zitadel/nextgen/pull/2821) [`6885a0e`](https://github.com/zitadel/nextgen/commit/6885a0eea2a4296f9d957c519a5feecbc9622a69) - `PATCH /users/{user_id}` takes `dry_run` in its body to check an update or schema migration without changing anything, and `zitadel users update --dry-run` asks the server the same question. See [Migrate users between schema revisions](https://preview.zitadel.com/docs/guides/migrate-user-schema).
+  
+  **Breaking:** `zitadel users update --dry-run` now calls the server, so it needs a server and a credential. A failure inside an array item now names the item in `details.details.fields`, such as `attributes.phones.0.fax` instead of `attributes.phones`, so match those names by prefix.
+
+### Patch Changes
+
+- [#2454](https://github.com/zitadel/nextgen/pull/2454) [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b) - The API reference explains each operation for developers new to Zitadel: where
+  each required ID comes from, what else a call changes, and how to recover from
+  a refusal, in short sentences with consistent terms. An operation it names
+  carries its method and path, such as `createRelease` (`POST /releases`). The `@zitadel/api` JSDoc
+  and the `zitadel` CLI's flag help, which come from the same descriptions,
+  follow.
+
+- [#2614](https://github.com/zitadel/nextgen/pull/2614) [`e562907`](https://github.com/zitadel/nextgen/commit/e5629070aabf1df50ed541736f8e7ce53e850766) - The console shows a failed action's whole error message instead of cutting it off after one line, so the reason and the next step stay readable, for example when deleting a project's last owner is refused.
+
+- [#2820](https://github.com/zitadel/nextgen/pull/2820) [`c5eb07b`](https://github.com/zitadel/nextgen/commit/c5eb07b33b2239ab4cca0b1903e0b3316b409358) - The console now shows the Zitadel favicon on self-hosted servers, which used to serve none: it linked files only the hosted cloud provides.
+
+- [#2845](https://github.com/zitadel/nextgen/pull/2845) [`43d2a8d`](https://github.com/zitadel/nextgen/commit/43d2a8d6c5533872a5dbb0c3d8eb774bd8db2106) - The console's project page no longer shows a warning when the password policy's minimum length is under 15 characters: it states the rules the policy sets without grading them.
+
+- [#2814](https://github.com/zitadel/nextgen/pull/2814) [`f417309`](https://github.com/zitadel/nextgen/commit/f4173093cc23e33be1084b87f964d18ab330b00c) - The console's team details label the team's name "Team name", matching the rest of the console.
+
+- [#2675](https://github.com/zitadel/nextgen/pull/2675) [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560) - `<zitadel-login>`'s error for an unknown `flow-name`, the `@zitadel/components` and `@zitadel/config` READMEs and the branding API reference now name `zitadel deploy` instead of the removed `zitadel apply` and `zitadel plan`.
+
+- [#2597](https://github.com/zitadel/nextgen/pull/2597) [`9b687fe`](https://github.com/zitadel/nextgen/commit/9b687fe88342b80349bea5fecfdce94044fa1799) - `zitadel deploy` now prints which schema or flow the server rejected and why, instead of only `release: invalid`. A schema that fails the meta-schema names the failing property path and keyword. The `warn/password-without-identifier` warning no longer fires for a password step reached through an SSO email collision, so the scaffolded flow deploys without a false `sso-conflict` warning.
+
+- [#2693](https://github.com/zitadel/nextgen/pull/2693) [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede) - Update dependencies that have published security advisories. `@zitadel/cli` now
+  requires `undici` 7.30.1 or later, which fixes TLS certificate validation being
+  skipped, cache poisoning across redirects and several denial-of-service bugs.
+  `@zitadel/cli`, `@zitadel/api` and `@zitadel/config` require `zod` 4.6.6 or
+  later, which stops oversized collections from exhausting memory during
+  validation. The console embedded in the server picks up the `seroval` and `zod`
+  fixes.
+
+- [#2272](https://github.com/zitadel/nextgen/pull/2272) [`45c5abe`](https://github.com/zitadel/nextgen/commit/45c5abe88704a97550628122135d6db0980bfd1e) - The session exchange's `sess.invalid_ttl` error reports `ttl` and `max_ttl` with their fractional seconds, instead of rounding them down to the second or writing an empty `P` below one second.
+
+- [#2716](https://github.com/zitadel/nextgen/pull/2716) [`8feb3ec`](https://github.com/zitadel/nextgen/commit/8feb3ec225889edccb33b812c5e32bd85573bb93) - When an identity provider refuses the code exchange, the server log now includes the provider's `error_description`, for example `invalid client_id / client_secret` for a wrong client secret.
+
+- [#2598](https://github.com/zitadel/nextgen/pull/2598) [`503e27b`](https://github.com/zitadel/nextgen/commit/503e27b9017ac0bbf93e785f94b36c32ba361bfd) - An SSO sign-in whose provider account is linked to a user of a schema the flow does not serve now ends with `flow.sso_user_schema_mismatch` instead of `flow.restart_required`. `<zitadel-login>` shows "This account can't sign in with this provider. Please try another way to sign in, or contact your administrator." in English, Italian and German, rather than asking the visitor to start again, which could never succeed.
+
 ## 0.4.0
 
 ### Minor Changes

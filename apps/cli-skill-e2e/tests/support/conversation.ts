@@ -26,14 +26,19 @@ export async function converse(
   const maxTurns = scenario.skill ? settings.maxTurns : settings.baselineMaxTurns;
   const record = (turn: Turn): Turn => {
     if (turn.lines.length > 0) {
-      appendFileSync(stageFile, `${turn.lines.join("\n")}\n`);
+      // The turn's start anchors the first model step: without it the time
+      // before the agent's first message could not be told from startup.
+      appendFileSync(
+        stageFile,
+        `${JSON.stringify({ type: "turn_start", _t: turn.startedAt })}\n${turn.lines.join("\n")}\n`,
+      );
     }
     // A turn that was killed prints no result of its own; without one, an
     // earlier turn's clean result would stand for the whole stage.
     if (turn.isError) {
       appendFileSync(
         stageFile,
-        `${JSON.stringify({ type: "result", is_error: true, subtype: "turn_failed", num_turns: 0, duration_ms: 0 })}\n`,
+        `${JSON.stringify({ type: "result", is_error: true, subtype: "turn_failed", num_turns: 0, duration_ms: 0, _t: Date.now() })}\n`,
       );
     }
     return turn;
@@ -44,15 +49,24 @@ export async function converse(
     if (remaining === 0 || turn.isError || stage.user === undefined) {
       return;
     }
+    const asked = Date.now();
     const answer = await agent.simulatedUser({
       persona: stage.user,
       agentText: turn.lastText,
       model: settings.simModel,
     });
+    // `_ms` is how long the simulated developer took to answer, so the report
+    // can show it apart from the agent's own time. The closing "done" probe is
+    // timed too, but it is not a question and never reaches the transcript.
+    const waited = Date.now() - asked;
     if (isDone(answer)) {
+      appendFileSync(stageFile, `${JSON.stringify({ type: "sim_done", _ms: waited })}\n`);
       return;
     }
-    appendFileSync(stageFile, `${JSON.stringify({ type: "sim_user", text: answer })}\n`);
+    appendFileSync(
+      stageFile,
+      `${JSON.stringify({ type: "sim_user", text: answer, _ms: waited })}\n`,
+    );
     const next = record(
       await agent.turn({
         prompt: answer,

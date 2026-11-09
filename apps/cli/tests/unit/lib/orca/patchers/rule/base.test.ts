@@ -1,13 +1,58 @@
-import { posix } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join, posix } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
+import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
 import type { PatchContext } from "@/lib/orca/patchers/types";
+import { it } from "@tests/helpers/fixtures";
+import { write } from "@tests/helpers/git-repo";
 
-function ctx(overrides: Partial<PatchContext> = {}): PatchContext {
+/**
+ * The CLI version the patcher scaffolds for.
+ */
+const CLI_VERSION = "0.1.0-alpha.0";
+
+/**
+ * The project file the base ops write.
+ */
+const ZITADEL_JSON = "zitadel.json";
+
+/**
+ * The branding meta-schema's path.
+ */
+const BRANDING = ".zitadel/meta/branding.json";
+
+/**
+ * A meta-schema from an older dialect than this CLI's.
+ */
+const OUTDATED_BRANDING = '{"title": "an older dialect"}\n';
+
+/**
+ * The React app setup scaffolds into before patching.
+ */
+const REACT_APP: Record<string, string> = {
+  "package.json": JSON.stringify({ name: "demo", dependencies: { vite: "^7.0.0" } }),
+  "vite.config.ts": "export default {}\n",
+  "index.html":
+    '<!doctype html>\n<html>\n  <body>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n',
+  "src/main.tsx":
+    "import { StrictMode } from 'react'\nimport { createRoot } from 'react-dom/client'\n" +
+    "import App from './App.tsx'\n\n" +
+    "createRoot(document.getElementById('root')!).render(\n  <StrictMode>\n    <App />\n  </StrictMode>,\n)\n",
+};
+
+/**
+ * What the integration is applied with: a React app on a local issuer, for a
+ * project with one preview origin.
+ *
+ * @param overrides - What the test is about.
+ * @returns The context.
+ */
+function aContext(overrides: Partial<PatchContext> = {}): PatchContext {
   return {
     framework: { id: "react", appDir: "src", devPort: 3000, url: "http://localhost:3000" },
     rendererId: "react",
@@ -20,31 +65,131 @@ function ctx(overrides: Partial<PatchContext> = {}): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "http://localhost:8080",
-    cliVersion: "0.1.0-alpha.0",
+    cliVersion: CLI_VERSION,
     ...overrides,
   };
 }
 
-function written(plan: ScaffoldPlan, path: string): Record<string, unknown> {
-  const op = plan.ops.find(
-    (candidate): candidate is Extract<FileOp, { kind: "write" }> =>
-      candidate.kind === "write" && candidate.path === path,
-  );
-  expect(op, `${path} is written`).toBeDefined();
-  return JSON.parse(op?.contents ?? "") as Record<string, unknown>;
+/**
+ * A rule patcher. The base ops are shared by every rule patcher, so React
+ * stands in for them all.
+ *
+ * @returns The patcher.
+ */
+function aRulePatcher(): ReactPatcher {
+  return new ReactPatcher();
 }
 
-// The base ops are shared by every rule patcher; React stands in for them.
-describe("zitadel.json", () => {
-  it("points $schema at a copy setup writes, which accepts the file", () => {
-    const plan = new ReactPatcher().plan(ctx({ preset: "passkey-first", useCase: "consumer" }));
-    const config = written(plan, "zitadel.json");
+/**
+ * The JSON a plan writes at `path`.
+ *
+ * @param plan - The plan.
+ * @param path - The file, from the project root.
+ * @returns The parsed contents, or undefined when the plan does not write it.
+ */
+function writtenJson(plan: ScaffoldPlan, path: string): unknown {
+  for (const op of plan.ops) {
+    if (op.kind === "write" && op.path === path) {
+      return JSON.parse(op.contents);
+    }
+  }
+  return undefined;
+}
 
-    const ref = config.$schema as string;
-    expect(ref).not.toMatch(/^https?:/);
-    const schema = written(plan, posix.normalize(ref));
+/**
+ * The meta-schema a document's `$schema` names, among those setup writes.
+ *
+ * @param document - The document.
+ * @returns The meta-schema, or undefined when it names none of them.
+ */
+function metaSchemaNamedBy(document: unknown): ProjectMetaSchema | undefined {
+  if (typeof document !== "object" || document === null || !("$schema" in document)) {
+    return undefined;
+  }
+  const ref = document.$schema;
+  if (typeof ref !== "string") {
+    return undefined;
+  }
+  return projectMetaSchemas(CLI_VERSION).find((file) => {
+    return file.path === posix.normalize(ref);
+  });
+}
 
-    const validate = new Ajv2020({ strict: false, validateFormats: false }).compile(schema);
-    expect(validate(config), JSON.stringify(validate.errors)).toBe(true);
+/**
+ * What the meta-schema a document names says is wrong with it.
+ *
+ * @param document - The document.
+ * @returns Each validation error; none when the meta-schema accepts it.
+ */
+function metaSchemaErrors(document: unknown): unknown[] {
+  const validate = new Ajv2020({ strict: false, validateFormats: false }).compile(
+    metaSchemaNamedBy(document)?.body ?? {},
+  );
+  validate(document);
+  return validate.errors ?? [];
+}
+
+/**
+ * This CLI's contents for one meta-schema.
+ *
+ * @param path - The meta-schema's path.
+ * @returns Its contents, or undefined when this CLI ships none there.
+ */
+function metaSchemaContents(path: string): string | undefined {
+  return projectMetaSchemas(CLI_VERSION).find((file) => {
+    return file.path === path;
+  })?.contents;
+}
+
+describe("AbstractRulePatcher.plan", () => {
+  describe("with a preset and a use case", () => {
+    const context = aContext({ preset: "passkey-first", useCase: "consumer" });
+
+    it("points zitadel.json's $schema at a path rather than a URL", () => {
+      const plan = aRulePatcher().plan(context);
+
+      expect(writtenJson(plan, ZITADEL_JSON)).toMatchObject({
+        $schema: expect.stringMatching(/^(?!https?:)/),
+      });
+    });
+
+    it("points zitadel.json's $schema at a meta-schema setup writes", () => {
+      const plan = aRulePatcher().plan(context);
+
+      expect(metaSchemaNamedBy(writtenJson(plan, ZITADEL_JSON))).toBeDefined();
+    });
+
+    it("writes a zitadel.json the meta-schema it names accepts", () => {
+      const plan = aRulePatcher().plan(context);
+
+      expect(metaSchemaErrors(writtenJson(plan, ZITADEL_JSON))).toEqual([]);
+    });
+  });
+});
+
+describe("AbstractRulePatcher.patch", () => {
+  it("writes this CLI's meta-schemas and reports each one", async ({ dir }) => {
+    await write(dir, REACT_APP);
+    const expected = projectMetaSchemas(CLI_VERSION).map((file) => {
+      return join(dir, file.path);
+    });
+
+    const result = await aRulePatcher().patch(aContext(), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+
+    expect(result.filesWritten).toEqual(expect.arrayContaining(expected));
+  });
+
+  describe("with an outdated meta-schema", () => {
+    it("replaces it without --force", async ({ dir }) => {
+      await write(dir, { ...REACT_APP, [BRANDING]: OUTDATED_BRANDING });
+
+      await aRulePatcher().patch(aContext(), { cwd: dir, dryRun: false, force: false });
+
+      expect(await readFile(join(dir, BRANDING), "utf8")).toBe(metaSchemaContents(BRANDING));
+    });
   });
 });

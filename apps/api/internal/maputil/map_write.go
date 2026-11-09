@@ -29,3 +29,20 @@ func SetNested(m map[string]any, path []string, value any) error {
 	m[path[0]] = value
 	return nil
 }
+
+// DeleteNested removes the value at path, leaving the maps it descends through.
+// A path that holds nothing, or descends through a value that is not a map, is
+// a no-op.
+func DeleteNested(m map[string]any, path []string) {
+	if len(path) == 0 {
+		return
+	}
+	for len(path) > 1 {
+		sub, ok := Get[map[string]any](m, path[0])
+		if !ok {
+			return
+		}
+		m, path = sub, path[1:]
+	}
+	delete(m, path[0])
+}

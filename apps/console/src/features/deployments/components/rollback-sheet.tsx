@@ -23,8 +23,10 @@ import { formatDateTime } from "@/lib/date";
 import {
   type Deployment,
   KIND_LABEL,
+  droppedOrigins,
   type RollbackTargets,
   listRollbackTargets,
+  returningOrigins,
   rollbackDeployment,
 } from "@/features/deployments/deployment";
 import { useRequiredProjectScope } from "@/features/projects/project-scope";
@@ -110,6 +112,11 @@ function RollbackForm({
     };
   }, [projectId, deploymentId]);
 
+  const restored = targets?.options.find((option) => option.id === selected);
+  const dropped = restored && targets ? droppedOrigins(restored, targets.primaryOrigins) : [];
+  const returning =
+    restored && targets ? returningOrigins(restored, targets.current, targets.primaryOrigins) : [];
+
   const rollback = useSubmit(async () => {
     await rollbackDeployment(projectId, selected, {
       message: message.trim() || undefined,
@@ -162,6 +169,16 @@ function RollbackForm({
                 <RollbackOption key={option.id} deployment={option} />
               ))}
             </RadioGroup>
+          )}
+          {dropped.length > 0 && (
+            <p className="text-xs leading-4 text-muted-foreground">
+              {dropped.join(", ")} will refuse sign-in until the next deploy.
+            </p>
+          )}
+          {returning.length > 0 && (
+            <p className="text-xs leading-4 text-muted-foreground">
+              {returning.join(", ")} will serve this release again.
+            </p>
           )}
         </FieldSet>
 

@@ -361,6 +361,28 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
+  test("ignored files a build writes change no task's hash", () => {
+    // A fresh checkout, as in CI, has none of them, so the run after a local
+    // build would miss the cache and never share CI's entries.
+    const generated = {
+      // The Workflow routes cloud-functions' build writes, under a
+      // `.gitignore` of their own that ignores itself.
+      "apps/cloud-functions/app/.well-known/workflow/v1/.gitignore": "*",
+      "apps/cloud-functions/app/.well-known/workflow/v1/flow/route.js": "export {};\n",
+      "apps/demo-next/next-env.d.ts": '/// <reference types="next" />\n',
+    };
+    try {
+      for (const [file, content] of Object.entries(generated)) write(file, content);
+      const next = dry();
+      const rehashed = [...baseline]
+        .filter(([id, task]) => task.command !== "<NONEXISTENT>" && next.get(id).hash !== task.hash)
+        .map(([id]) => id);
+      expect(rehashed).toEqual([]);
+    } finally {
+      for (const file of Object.keys(generated)) rmSync(join(root, file), { force: true });
+    }
+  });
+
   for (const app of ["docs", "website"]) {
     test(`${app} dotenv changes invalidate Turbo and Moon builds`, () => {
       changed(`apps/${app}/.env.local`, "SAMPLE_RATE=one\n", () => {

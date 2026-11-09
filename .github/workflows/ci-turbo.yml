@@ -392,6 +392,12 @@ jobs:
     runs-on: *runner
     timeout-minutes: 120
     permissions: *permissions
+    # The lane installs only this runner's server package, so the snapshot
+    # builds and packs only its platform and the lane's tarball check
+    # expects only that one (`--host-only`, see the top). The nightly run
+    # cross-compiles all five, as a release does.
+    env:
+      RELEASE_HOST_ONLY: ${{ github.event_name != 'schedule' && '1' || '' }}
     steps:
       - *checkout
       - *setup-go
@@ -444,7 +450,7 @@ jobs:
       # role ran them first, but the server's Go tests are never cached, so
       # this role runs them again. No `env -u CI`: turbo has no runInCI, so
       # nothing hides these tasks. RELEASE_SKIP_CONTAINER=1 is
-      # `--skip-container` (see the top).
+      # `--skip-container` and RELEASE_HOST_ONLY=1 `--host-only` (see the top).
       - name: Build release snapshot without container
         if: ${{ steps.affected.outputs.run == 'true' }}
         env:
