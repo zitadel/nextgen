@@ -350,6 +350,31 @@ function withPasswordRoute(outcome: string, route: JsonObject): JsonObject {
 }
 
 /**
+ * The enabled flow with its sign-in routed through an `mfa` step on the entry
+ * steps, as a developer who wants a second factor after every provider return
+ * would write it.
+ *
+ * @returns The flow.
+ */
+function withMfaAfterSso(): JsonObject {
+  const mfa = {
+    name: "mfa",
+    fields: [],
+    actions: [{ name: "submit", kind: "submit", primary: true, text_key: "mfa.action.submit" }],
+    transitions: { submit: { target: "done" } },
+  };
+  const routed = ["identifier", "register"].reduce((flow, name) => {
+    return withStep(flow, name, (step) => {
+      return {
+        ...step,
+        transitions: { ...objectAt(step, "transitions"), sso_authenticated: { target: "mfa" } },
+      };
+    });
+  }, ENABLED);
+  return { ...routed, steps: [...listAt(routed, "steps"), mfa] };
+}
+
+/**
  * The enabled flow as it was before the password step offered providers: the
  * password step as shipped.
  *
@@ -1026,6 +1051,69 @@ describe("SsoGenerator.withProvider", () => {
     });
   });
 
+  describe("when the developer routed a provider return through an mfa step", () => {
+    const flow = withMfaAfterSso();
+
+    it.each(["identifier", "register"])("keeps the sso_authenticated route on %s", (step) => {
+      const { document } = new SsoGenerator(aFlow(flow)).withProvider(ACME, BOTH_METHODS);
+
+      expect(stepsIn(document)[step]?.transitions).toMatchObject({
+        sso_authenticated: { target: "mfa" },
+      });
+    });
+
+    it.each(["identifier", "register"])("names the %s step it left alone", (step) => {
+      const { skipped } = new SsoGenerator(aFlow(flow)).withProvider(ACME, BOTH_METHODS);
+
+      expect(skipped).toContainEqual({ step, region: `steps.${step}`, reason: "hand-edited" });
+    });
+
+    it("still offers the provider on the step", () => {
+      const { document } = new SsoGenerator(aFlow(flow)).withProvider(ACME, BOTH_METHODS);
+
+      expect(stepsIn(document).identifier?.sso_providers).toEqual(["google", "acme-sso"]);
+    });
+
+    it("keeps the other routes the generator writes", () => {
+      const { document } = new SsoGenerator(aFlow(flow)).withProvider(ACME, BOTH_METHODS);
+
+      expect(stepsIn(document).identifier?.transitions).toMatchObject({
+        sso_user_not_found: { target: "register-sso" },
+        user_already_exists: { target: "sso-conflict" },
+      });
+    });
+
+    it("keeps a sso_user_not_found route of its own", () => {
+      const routed = withStep(flow, "identifier", (step) => {
+        return {
+          ...step,
+          transitions: { ...objectAt(step, "transitions"), sso_user_not_found: { target: "mfa" } },
+        };
+      });
+
+      const { document } = new SsoGenerator(aFlow(routed)).withProvider(ACME, BOTH_METHODS);
+
+      expect(stepsIn(document).identifier?.transitions).toMatchObject({
+        sso_user_not_found: { target: "mfa" },
+      });
+    });
+
+    it("still retargets a user_already_exists route", () => {
+      const routed = withStep(flow, "identifier", (step) => {
+        return {
+          ...step,
+          transitions: { ...objectAt(step, "transitions"), user_already_exists: { target: "mfa" } },
+        };
+      });
+
+      const { document } = new SsoGenerator(aFlow(routed)).withProvider(ACME, BOTH_METHODS);
+
+      expect(stepsIn(document).identifier?.transitions).toMatchObject({
+        user_already_exists: { target: "sso-conflict" },
+      });
+    });
+  });
+
   describe("when the provider was enabled before the password step offered providers", () => {
     it("says it changed the flow", () => {
       const flow = beforePasswordOffered();
@@ -1236,6 +1324,24 @@ describe("SsoGenerator.withoutProvider", () => {
     const edit = new SsoGenerator(aFlow(flow)).withoutProvider("google");
 
     expect(edit).toEqual({ document: flow, changed: false, skipped: [] });
+  });
+
+  describe("when the developer routed a provider return through an mfa step", () => {
+    const flow = withMfaAfterSso();
+
+    it("keeps the route", () => {
+      const { document } = new SsoGenerator(aFlow(flow)).withoutProvider("google");
+
+      expect(stepsIn(document).identifier?.transitions).toMatchObject({
+        sso_authenticated: { target: "mfa" },
+      });
+    });
+
+    it("reports nothing as hand-edited", () => {
+      const { skipped } = new SsoGenerator(aFlow(flow)).withoutProvider("google");
+
+      expect(skipped).toEqual([]);
+    });
   });
 
   describe("when the provider is enabled again", () => {

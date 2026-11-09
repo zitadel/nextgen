@@ -131,16 +131,27 @@ export class SsoGenerator {
     const login = SsoGenerator.loginEntry(this.value);
     const entries = SsoGenerator.providerSteps(this.value);
 
-    const offered = entries.reduce((steps: readonly JsonObject[], name) => {
-      return SsoGenerator.replaceStep(steps, name, (step) => {
-        return {
-          ...step,
-          sso_providers: SsoGenerator.mergedProviders(step, slug),
-          transitions: SsoGenerator.withProviderRoutes(objectAt(step, "transitions"), terminal),
-        };
-      });
-    }, migrated);
-    const password = SsoGenerator.offerOnPasswordStep(offered, entries, slug, terminal);
+    const offered = entries.reduce(
+      (staged: Staged, name) => {
+        const routed = SsoGenerator.withProviderRoutes(
+          objectAt(SsoGenerator.stepNamed(staged.steps, name) ?? {}, "transitions"),
+          terminal,
+        );
+        const steps = SsoGenerator.replaceStep(staged.steps, name, (step) => {
+          return {
+            ...step,
+            sso_providers: SsoGenerator.mergedProviders(step, slug),
+            transitions: routed.transitions,
+          };
+        });
+        if (!routed.handEdited) {
+          return { steps, skipped: staged.skipped };
+        }
+        return { steps, skipped: [...staged.skipped, SsoGenerator.handEdited(name)] };
+      },
+      { steps: migrated, skipped: [] },
+    );
+    const password = SsoGenerator.offerOnPasswordStep(offered.steps, entries, slug, terminal);
     const rerouted = SsoGenerator.routeRegisterPassword(password.steps);
     const fields = SsoGenerator.registrationFields(this.value);
     const wanted = SsoGenerator.generatedSteps(fields, slug, enabled, login, terminal);
@@ -148,7 +159,7 @@ export class SsoGenerator {
       (staged: Staged, generated) => {
         return SsoGenerator.placeGeneratedStep(staged, generated, slug, terminal);
       },
-      { steps: rerouted, skipped: password.skipped },
+      { steps: rerouted, skipped: [...offered.skipped, ...password.skipped] },
     );
     const document: JsonObject = { ...flow, steps: placed.steps };
 
@@ -363,15 +374,23 @@ export class SsoGenerator {
    * A step's transitions with the routes a provider return needs.
    *
    * @remarks
-   * A route that already goes where it should is kept as it is; one that goes
-   * anywhere else is replaced in place, and a missing one is added at the end.
+   * A route that already goes where it should is kept as it is, and a missing
+   * one is added at the end. The collision outcome is the generator's: one that
+   * goes anywhere else is replaced in place. Any other outcome that already goes
+   * somewhere else is the developer's, such as a sign-in routed through an extra
+   * step, so it stays and the step is reported as hand-edited.
    *
    * @param transitions - The step's transitions.
    * @param terminal - The step a completed sign-in ends at.
-   * @returns The transitions with the provider routes.
+   * @returns The transitions with the provider routes, and whether a route the
+   *   developer wrote was kept.
    */
-  private static withProviderRoutes(transitions: JsonObject, terminal: StepName): JsonObject {
+  private static withProviderRoutes(
+    transitions: JsonObject,
+    terminal: StepName,
+  ): { readonly transitions: JsonObject; readonly handEdited: boolean } {
     const routes = SsoGenerator.providerRoutes(terminal);
+    const kept: string[] = [];
     const added = PROVIDER_OUTCOMES.flatMap(
       (outcome): readonly (readonly [string, JsonObject])[] => {
         const target = routes[outcome];
@@ -379,10 +398,27 @@ export class SsoGenerator {
         if (isJsonObject(current) && current.target === target) {
           return [];
         }
+        if (current !== undefined && outcome !== COLLISION_OUTCOME) {
+          kept.push(outcome);
+          return [];
+        }
         return [[outcome, { target }]];
       },
     );
-    return { ...transitions, ...Object.fromEntries(added) };
+    return {
+      transitions: { ...transitions, ...Object.fromEntries(added) },
+      handEdited: kept.length > 0,
+    };
+  }
+
+  /**
+   * A step named as left alone because it was edited by hand.
+   *
+   * @param name - The step.
+   * @returns The skipped region.
+   */
+  private static handEdited(name: StepName): SkippedRegion {
+    return { step: name, region: `steps.${name}`, reason: "hand-edited" };
   }
 
   /**
@@ -416,12 +452,7 @@ export class SsoGenerator {
       return { steps, skipped: [] };
     }
     if (!SsoGenerator.isShippedPasswordStep(password, terminal)) {
-      const skipped: SkippedRegion = {
-        step: PASSWORD_STEP,
-        region: `steps.${PASSWORD_STEP}`,
-        reason: "hand-edited",
-      };
-      return { steps, skipped: [skipped] };
+      return { steps, skipped: [SsoGenerator.handEdited(PASSWORD_STEP)] };
     }
     // Every provider the entry steps carry, not only the one named: a project
     // enabled before the password step offered providers has several to catch up.
@@ -436,7 +467,8 @@ export class SsoGenerator {
       return {
         ...step,
         sso_providers: [...current, ...added],
-        transitions: SsoGenerator.withProviderRoutes(objectAt(step, "transitions"), terminal),
+        transitions: SsoGenerator.withProviderRoutes(objectAt(step, "transitions"), terminal)
+          .transitions,
       };
     });
     return { steps: edited, skipped: [] };
@@ -580,8 +612,7 @@ export class SsoGenerator {
    * @returns The same steps, and the regions left alone with this one.
    */
   private static leftAlone(staged: Staged, name: StepName): Staged {
-    const skipped: SkippedRegion = { step: name, region: `steps.${name}`, reason: "hand-edited" };
-    return { steps: staged.steps, skipped: [...staged.skipped, skipped] };
+    return { steps: staged.steps, skipped: [...staged.skipped, SsoGenerator.handEdited(name)] };
   }
 
   /**
