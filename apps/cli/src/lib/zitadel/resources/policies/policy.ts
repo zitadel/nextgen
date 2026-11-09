@@ -1,16 +1,23 @@
 import { basename } from "node:path";
 
-import { policyConfigSchema, policyTestFileSchema } from "@zitadel/config/schemas";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import { BrokenFilesError } from "@/lib/zitadel/errors";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
+import {
+  type PasswordMinLength,
+  POLICY_FILE_SUFFIX,
+  type PolicyBody,
+  type PolicyConfig,
+  type PolicyOperation,
+} from "@/lib/zitadel/resources/policies/types";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
-
-/**
- * The suffix that marks a policy's test file, which sits beside the policies.
- */
-export const POLICY_TEST_SUFFIX = ".test.json";
 
 /**
  * An operation policy under `.zitadel/policies/` (ADR 066): the rules one
@@ -55,12 +62,73 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
   }
 
   /**
+   * The name a policy file must have, so one file holds one operation's
+   * policy.
+   *
+   * @param operation - The operation the policy guards.
+   * @returns The operation followed by `.json`.
+   */
+  static fileName(operation: string): string {
+    return `${operation}${POLICY_FILE_SUFFIX}`;
+  }
+
+  /**
+   * The operation the policy guards.
+   *
+   * @returns The operation, as the policy contract types it.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the
+   *   body; a policy with no {@link problems} never throws.
+   */
+  get operation(): PolicyOperation {
+    return this.contract.operation;
+  }
+
+  /**
+   * The rules the policy holds its operation to.
+   *
+   * @returns The rules, as the policy contract types them.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the
+   *   body; a policy with no {@link problems} never throws.
+   */
+  get config(): PolicyConfig {
+    return this.contract.config;
+  }
+
+  /**
    * The policy as saved: what it holds is now what the file holds.
    *
    * @returns The same policy, marked as read.
    */
   asRead(): Policy<Body> {
     return new Policy(this.path, this.body, "read");
+  }
+
+  /**
+   * The policy with the minimum password length `setup` was given.
+   *
+   * @remarks
+   * Its other settings stay as the project chose them.
+   *
+   * @param minLength - The minimum: a length, `null` for an explicit "none",
+   *   or `undefined` when none was given.
+   * @returns The same policy when none was given or the minimum is already
+   *   that one; otherwise the policy without `min_length` for "none", or with
+   *   the new length.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the body.
+   */
+  withMinLength(minLength: PasswordMinLength | undefined): Policy {
+    if (minLength === undefined || (minLength ?? undefined) === this.config.min_length) {
+      return this;
+    }
+    const { min_length: _replaced, ...kept } = this.config;
+    if (minLength === null) {
+      return new Policy(this.path, { ...this.body, config: kept }, this.editedStatus);
+    }
+    return new Policy(
+      this.path,
+      { ...this.body, config: { ...kept, min_length: minLength } },
+      this.editedStatus,
+    );
   }
 
   /**
@@ -75,13 +143,12 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
     if (refusals.length > 0) {
       return refusals;
     }
-    const { operation } = policyConfigSchema.parse(this.contractBody);
-    const expected = `${operation}.json`;
+    const expected = Policy.fileName(this.operation);
     if (basename(this.path) !== expected) {
       return [
         this.issue(
           "contract/policy",
-          `holds the ${operation} policy, so it must be named ${expected}`,
+          `holds the ${this.operation} policy, so it must be named ${expected}`,
         ),
       ];
     }
@@ -91,101 +158,33 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
   /**
    * The body the server receives: the operation and its rules.
    *
+   * @remarks
+   * Loose like every document's, since a deploy builds its bundle before its
+   * checks run; {@link operation} and {@link config} are the typed parts.
+   *
    * @param _store - Unused: a policy holds no `$file` references.
    * @returns The body without the editor-only `$schema` pointer.
    */
   wireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
-}
-
-/**
- * A policy's tests under `.zitadel/policies/`: cases `zitadel policies test`
- * runs, which a release never carries.
- */
-export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
-  /**
-   * What kind of document this is: a policy's test file.
-   */
-  readonly kind = "policy-test";
 
   /**
-   * Hold a test file's body at its path.
+   * The body as the policy contract takes it.
    *
-   * @param path - The project-relative path.
-   * @param body - The body as written.
-   * @param status - Where it stands against the file on disk.
+   * @returns The parsed body.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the
+   *   body, naming each refusal.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
-    super(path, body, status);
-  }
-
-  /**
-   * Take a policy test file as read.
-   *
-   * @param file - The file.
-   * @returns The test file, marked as read.
-   */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): PolicyTest<Body> {
-    return new PolicyTest(file.path, file.body, "read");
-  }
-
-  /**
-   * A new policy test file, not yet written: saving it never replaces a file
-   * already there.
-   *
-   * @param file - Where it goes, and what it holds.
-   * @returns The test file, marked as created.
-   */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): PolicyTest<Body> {
-    return new PolicyTest(file.path, file.body, "created");
-  }
-
-  /**
-   * The test file as saved: what it holds is now what the file holds.
-   *
-   * @returns The same test file, marked as read.
-   */
-  asRead(): PolicyTest<Body> {
-    return new PolicyTest(this.path, this.body, "read");
-  }
-
-  /**
-   * Everything wrong with the test file on its own: what the policy test
-   * contract refuses, or a file name that is not its operation's.
-   *
-   * @param _context - Unused: the test contract needs nothing beyond the file.
-   * @returns The `contract/policy` findings; none when the file is sound.
-   */
-  problems(_context: ValidationContext): readonly Issue[] {
-    const refusals = this.contractIssues("contract/policy", policyTestFileSchema);
-    if (refusals.length > 0) {
-      return refusals;
+  private get contract(): PolicyBody {
+    const result = policyConfigSchema.safeParse(this.contractBody);
+    if (!result.success) {
+      throw new BrokenFilesError(
+        this.problems({}).map((issue) => {
+          return { path: this.path, problem: issue.message };
+        }),
+      );
     }
-    const { operation } = policyTestFileSchema.parse(this.contractBody);
-    const expected = `${operation}${POLICY_TEST_SUFFIX}`;
-    if (basename(this.path) !== expected) {
-      return [
-        this.issue(
-          "contract/policy",
-          `tests the ${operation} policy, so it must be named ${expected}`,
-        ),
-      ];
-    }
-    return [];
-  }
-
-  /**
-   * The body as `zitadel policies test` reads it.
-   *
-   * @remarks
-   * A release never carries a test file; this is the body without what an
-   * editor added, for the standard every document follows.
-   *
-   * @param _store - Unused: a test file holds no `$file` references.
-   * @returns The body without the editor-only `$schema` pointer.
-   */
-  wireBody(_store: ConfigStore): JsonObject {
-    return this.contractBody;
+    return result.data;
   }
 }

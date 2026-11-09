@@ -16,7 +16,7 @@ import type { Detector } from "@/lib/orca/detectors/types";
 import { readPackageJson } from "@/lib/npm";
 import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
 import { arrow, dim, mark } from "@/lib/style";
-import type { PasswordMinLength } from "@/lib/policies";
+import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Policy, PolicyTest } from "@/lib/zitadel";
+import { BrokenFilesError, Policy } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
 
@@ -15,20 +15,6 @@ const OPERATION = "auth.factor.password.set";
 const POLICY = { operation: OPERATION, config: { min_length: 12 } };
 
 /**
- * A test file the policy test contract takes.
- */
-const TEST_FILE = {
-  operation: OPERATION,
-  cases: [
-    {
-      name: "too short",
-      input: { password: "short1" },
-      expect: { allowed: false, violations: ["min_length"] },
-    },
-  ],
-};
-
-/**
  * A policy read from `.zitadel/policies/`.
  *
  * @param name - The file's name.
@@ -37,17 +23,6 @@ const TEST_FILE = {
  */
 function policyAt(name: string, body: JsonObject): Policy {
   return Policy.of({ path: `.zitadel/policies/${name}`, body });
-}
-
-/**
- * A policy test file read from `.zitadel/policies/`.
- *
- * @param name - The file's name.
- * @param body - What it holds.
- * @returns The test file, as read.
- */
-function testAt(name: string, body: JsonObject): PolicyTest {
-  return PolicyTest.of({ path: `.zitadel/policies/${name}`, body });
 }
 
 describe("Policy.of", () => {
@@ -64,11 +39,84 @@ describe("Policy.create", () => {
   });
 });
 
+describe("Policy.fileName", () => {
+  it("names the file after its operation", () => {
+    expect(Policy.fileName(OPERATION)).toBe(`${OPERATION}.json`);
+  });
+});
+
+describe("Policy.operation", () => {
+  it("reads the operation the policy guards", () => {
+    expect(policyAt(`${OPERATION}.json`, POLICY).operation).toBe(OPERATION);
+  });
+
+  it("refuses a body the policy contract refuses", () => {
+    const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION });
+
+    expect(() => {
+      return policy.operation;
+    }).toThrow(BrokenFilesError);
+  });
+});
+
+describe("Policy.config", () => {
+  it("reads the rules without the $schema pointer", () => {
+    const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
+
+    expect(policy.config).toEqual({ min_length: 12 });
+  });
+
+  it("names the file and what the contract refuses in it", () => {
+    const policy = policyAt(`${OPERATION}.json`, { ...POLICY, config: { min_length: 0 } });
+
+    expect(() => {
+      return policy.config;
+    }).toThrow(/\.zitadel\/policies\/auth\.factor\.password\.set\.json: config\.min_length/);
+  });
+});
+
 describe("Policy.asRead", () => {
   it("marks a new policy as read", () => {
     const policy = Policy.create({ path: `.zitadel/policies/${OPERATION}.json`, body: POLICY });
 
     expect(policy.asRead().status).toBe("read");
+  });
+});
+
+describe("Policy.withMinLength", () => {
+  const kept = policyAt(`${OPERATION}.json`, {
+    $schema: "../meta/policy.json",
+    operation: OPERATION,
+    config: { min_length: 12, max_length: 40 },
+  });
+
+  it.each([
+    ["none was given", undefined],
+    ["the minimum is already that one", 12],
+  ])("keeps the same policy when %s", (_case, minLength) => {
+    expect(kept.withMinLength(minLength)).toBe(kept);
+  });
+
+  it("keeps the same policy when none is asked of a policy without a minimum", () => {
+    const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION, config: {} });
+
+    expect(policy.withMinLength(null)).toBe(policy);
+  });
+
+  it("drops the minimum for an explicit none, keeping the other settings", () => {
+    expect(kept.withMinLength(null).body).toEqual({
+      $schema: "../meta/policy.json",
+      operation: OPERATION,
+      config: { max_length: 40 },
+    });
+  });
+
+  it("sets a new minimum, keeping the other settings", () => {
+    expect(kept.withMinLength(20).config).toEqual({ min_length: 20, max_length: 40 });
+  });
+
+  it("marks a read policy as edited", () => {
+    expect(kept.withMinLength(20).status).toBe("edited");
   });
 });
 
@@ -111,69 +159,10 @@ describe("Policy.wireBody", () => {
 
     expect(policy.wireBody(new MemoryStore())).toEqual(POLICY);
   });
-});
 
-describe("PolicyTest.of", () => {
-  it("takes the file as read", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).status).toBe("read");
-  });
-});
+  it("sends a body the contract refuses as it is, for the deploy's checks to name", () => {
+    const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION });
 
-describe("PolicyTest.create", () => {
-  it("takes the file as new", () => {
-    const test = PolicyTest.create({
-      path: `.zitadel/policies/${OPERATION}.test.json`,
-      body: TEST_FILE,
-    });
-
-    expect(test.status).toBe("created");
-  });
-});
-
-describe("PolicyTest.asRead", () => {
-  it("marks a new test file as read", () => {
-    const test = PolicyTest.create({
-      path: `.zitadel/policies/${OPERATION}.test.json`,
-      body: TEST_FILE,
-    });
-
-    expect(test.asRead().status).toBe("read");
-  });
-});
-
-describe("PolicyTest.problems", () => {
-  it("finds nothing wrong with a test file named after its operation", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).problems({})).toEqual([]);
-  });
-
-  it("names the file a test file must have when it has another", () => {
-    expect(
-      testAt("password.test.json", TEST_FILE)
-        .problems({})
-        .map((issue) => {
-          return issue.message;
-        }),
-    ).toEqual([`tests the ${OPERATION} policy, so it must be named ${OPERATION}.test.json`]);
-  });
-
-  it("reports what the test contract refuses, under contract/policy", () => {
-    const test = testAt(`${OPERATION}.test.json`, { operation: OPERATION });
-
-    expect(
-      test.problems({}).map((issue) => {
-        return issue.rule;
-      }),
-    ).toEqual(["contract/policy"]);
-  });
-});
-
-describe("PolicyTest.wireBody", () => {
-  it("gives the cases without the $schema pointer", () => {
-    const test = testAt(`${OPERATION}.test.json`, {
-      $schema: "../meta/policy-test.json",
-      ...TEST_FILE,
-    });
-
-    expect(test.wireBody(new MemoryStore())).toEqual(TEST_FILE);
+    expect(policy.wireBody(new MemoryStore())).toEqual({ operation: OPERATION });
   });
 });

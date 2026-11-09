@@ -141,6 +141,21 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   }
 
   /**
+   * Whether `user_schema` names the schema by an id rather than by its
+   * `objectType`.
+   *
+   * @remarks
+   * Told apart as the server's `isUserSchemaID` does: a platform id
+   * (`sch_…`) or a URL, which is a schema's `$id`.
+   *
+   * @returns True for an id; false for an `objectType` or no reference at all.
+   */
+  get namesSchemaById(): boolean {
+    const reference = this.userSchema ?? "";
+    return /^sch_./.test(reference) || /^[a-z][a-z0-9+.-]*:/i.test(reference);
+  }
+
+  /**
    * The steps that are objects.
    *
    * @returns Each step, in order; none when `steps` is not a list.
@@ -213,6 +228,30 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
         return visited.name === step.name;
       });
     });
+  }
+
+  /**
+   * The fields collected on the way to signing in: every field a step of the
+   * {@link loginJourney} asks for.
+   *
+   * @remarks
+   * The journey follows the engine (`flow_state_machine.go`), not the wire
+   * alone. A transition with an `action` is a cross-flow `switch` or `pivot`,
+   * which leaves this flow; a declared `purpose` other than `login` re-purposes
+   * the attempt; and `user_not_found` or `sso_user_not_found` switch a login to
+   * registration on their own (`applyOutcomeFlip`), so the step they lead to is
+   * a sign-up step even when the transition names no purpose. A transition
+   * that declares `purpose: "login"` stays in the login, but the server holds
+   * its target to the login entry, which is already on the way.
+   *
+   * @returns Each field once, in the order of the steps that ask for it.
+   */
+  get loginFields(): ReadonlySet<string> {
+    return new Set(
+      this.loginJourney.flatMap((step) => {
+        return step.fields;
+      }),
+    );
   }
 
   /**

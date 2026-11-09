@@ -120,6 +120,24 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
+   * The property that identifies a user, which `x-identifier` designates.
+   *
+   * @remarks
+   * The login looks a user up by it once a step collects it, and a password
+   * is checked against the user it finds.
+   *
+   * @returns The property's dotted path, or `undefined` when `x-identifier`
+   *   is missing, not a string, or blank.
+   */
+  get identifier(): string | undefined {
+    const identifier = this.body["x-identifier"];
+    if (typeof identifier !== "string" || identifier.trim() === "") {
+      return undefined;
+    }
+    return identifier;
+  }
+
+  /**
    * Whether the schema points at an external schema, which holds its sign-in
    * methods there.
    *

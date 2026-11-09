@@ -1,28 +1,33 @@
 import { type DiffedFile, Repository } from "@/lib/git";
-import { POLICY_FILES_GLOB, POLICY_TEST_FILES_GLOB } from "@/lib/policies";
+import { CONFIG_DIRECTORIES, RELEASE_POLICY_GLOBS } from "@/lib/zitadel";
 
 /**
- * The directories a release is built from, the only paths a deploy diffs. Not
- * the whole of `.zitadel/`: `state.json` and `meta/` are not published, and
- * `.zitadel/secret` or `.zitadel/local/`, left untracked but not ignored, would
- * otherwise be marked for the diff and their contents printed.
+ * The directories a release is built from, the only paths a deploy diffs.
+ *
+ * @remarks
+ * Not the whole of `.zitadel/`: `state.json` and `meta/` are not published,
+ * and `.zitadel/secret` or `.zitadel/local/`, left untracked but not ignored,
+ * would otherwise be marked for the diff and their contents printed. The
+ * policies are diffed by {@link CONFIG_GLOBS} instead of by directory.
  */
-const CONFIG_PATHS = [
-  ".zitadel/schemas/",
-  ".zitadel/flows/",
-  ".zitadel/branding/",
-  ".zitadel/idps/",
-];
+const CONFIG_PATHS: readonly string[] = [
+  CONFIG_DIRECTORIES.schemas,
+  CONFIG_DIRECTORIES.flows,
+  CONFIG_DIRECTORIES.branding,
+  CONFIG_DIRECTORIES.connections,
+].map((directory) => {
+  return `${directory}/`;
+});
 
 /**
  * The policy files, as the bundle reads them rather than the whole directory,
  * so its `README.md` and anything in a subdirectory, which no release carries,
  * do not show as changes.
  */
-const CONFIG_GLOBS = [POLICY_FILES_GLOB];
+const CONFIG_GLOBS = [RELEASE_POLICY_GLOBS.included];
 
 /** Policy test files sit beside the policies, but `policies test` runs them and no release carries them. */
-const EXCLUDED = [POLICY_TEST_FILES_GLOB];
+const EXCLUDED = [RELEASE_POLICY_GLOBS.excluded];
 
 /** The current commit, or null when there is no repo or no commit yet. */
 export async function headSha(cwd: string): Promise<string | null> {

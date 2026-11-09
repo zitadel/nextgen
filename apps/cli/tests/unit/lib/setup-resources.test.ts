@@ -16,7 +16,7 @@ import {
 
 import { assertNoSetupResourceConflicts, materializeSetupResources } from "@/lib/setup-resources";
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
-import { PASSWORD_POLICY_PATH } from "@/lib/policies";
+import { PASSWORD_POLICY_PATH } from "@/lib/zitadel";
 import { CONFIG_DIRECTORIES, ConflictError } from "@/lib/zitadel";
 import { stableStringify } from "@/lib/json";
 import { hashForState } from "@/lib/sync";

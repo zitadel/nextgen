@@ -103,6 +103,20 @@ describe("UserSchema.wireBody", () => {
   });
 });
 
+describe("UserSchema.identifier", () => {
+  it("is the property x-identifier designates, as written", () => {
+    expect(schemaOf({ "x-identifier": "profile.email" }).identifier).toBe("profile.email");
+  });
+
+  it.each([
+    ["missing", {}],
+    ["not a string", { "x-identifier": 7 }],
+    ["blank", { "x-identifier": "  " }],
+  ])("is undefined when x-identifier is %s", (_case, body) => {
+    expect(schemaOf(body).identifier).toBeUndefined();
+  });
+});
+
 describe("UserSchema.providers", () => {
   it("returns malformed entries as written and leaves out what is not a string", () => {
     const schema = schemaOf({
