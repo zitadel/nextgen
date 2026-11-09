@@ -35,6 +35,7 @@ type AllStatements interface {
 	JSONSchemaStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	ApplicationStatements
 	PolicyStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
@@ -292,6 +293,43 @@ type IDPConnectionStatements interface {
 	// the cursor. An unknown connection returns an empty page, so a handler
 	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// ApplicationStatements persists registered applications, their revisions and
+// the credentials of their clients. Like an IdP connection, the newest revision
+// is the one with the greatest created_at (ADR 063 §7).
+//
+// Clients are rows of their own, never removed by a revision. Each gets a
+// minted client_* id; an empty ClientID takes a copy of it (ADR 047 §5).
+type ApplicationStatements interface {
+	Statements
+	// CreateApplication writes the application, its first revision, the
+	// clients and the resource-scope row in one transaction, and sets the ids
+	// and timestamps on application and each client. A slug or client_id
+	// already used in the project returns *database.UniqueError.
+	CreateApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error
+	// ReviseApplication appends a revision holding application.Document and
+	// inserts clients, the ones the revision adds, in one transaction. It sets
+	// RevisionID and UpdatedAt on application; CreatedAt stays as the caller
+	// had it.
+	//
+	// An unknown application returns *database.NoRowFoundError. A revision
+	// created in the same instant as another, or a client_id already used in
+	// the project, returns *database.UniqueError.
+	ReviseApplication(ctx context.Context, application *domain.Application, clients []*domain.ApplicationClient) error
+	// LockApplication takes the application row's write lock for the rest of
+	// the transaction, so concurrent revisions serialize. It must be called
+	// inside a transaction. An unknown id returns *database.NoRowFoundError.
+	LockApplication(ctx context.Context, projectID, id string) error
+	// GetApplication returns the application matching filter at its newest
+	// revision. No match returns *database.NoRowFoundError.
+	GetApplication(ctx context.Context, filter database.Filter[domain.ApplicationField]) (*domain.Application, error)
+	// ListApplicationClients returns the application's clients ordered by
+	// slug. An unknown application returns none.
+	ListApplicationClients(ctx context.Context, projectID, applicationID string) ([]*domain.ApplicationClient, error)
+	// GetApplicationClientByClientID returns the client holding clientID in
+	// the project. No match returns *database.NoRowFoundError.
+	GetApplicationClientByClientID(ctx context.Context, projectID, clientID string) (*domain.ApplicationClient, error)
 }
 
 // IDPIdentityLinkStatements stores which user a provider subject resolves to.
