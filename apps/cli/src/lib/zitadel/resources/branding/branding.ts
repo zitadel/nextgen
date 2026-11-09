@@ -158,7 +158,8 @@ export class Branding extends ConfigDocument<BrandingValue> {
    * The contract reports every unknown key in one refusal, so the retired key
    * cannot be filtered out of the refusals it came with: the body is held to
    * the contract again without that key, and what that refuses is kept. Reads
-   * the body as written: a refused file has no typed value.
+   * the body as written, without the editor-only `$schema` pointer the
+   * contract is never held to: a refused file has no typed value.
    *
    * @param file - The descriptor the contract refused.
    * @returns The `branding/legacy-template-key` finding first when the body
@@ -166,7 +167,10 @@ export class Branding extends ConfigDocument<BrandingValue> {
    */
   private static explainRefusals(file: DocumentFile): readonly Issue[] {
     const legacy = file.body[LEGACY_TEMPLATE_FILE_KEY];
-    const refusals = Branding.wordRefusals(file, withoutKey(file.body, LEGACY_TEMPLATE_FILE_KEY));
+    const refusals = Branding.wordRefusals(
+      file,
+      withoutKey(withoutKey(file.body, LEGACY_TEMPLATE_FILE_KEY), "$schema"),
+    );
     if (legacy === undefined) {
       return refusals;
     }
@@ -198,7 +202,9 @@ export class Branding extends ConfigDocument<BrandingValue> {
    * and one of its values, so a body with such a mistake elsewhere would show
    * the raw regex and nothing else. The fields with such a mistake are set
    * aside and the rest of the body is held to the contract again, so its own
-   * checks speak too.
+   * checks speak too. A check of the contract's own that fails only because a
+   * field it names was set aside, such as a font URL left without the family
+   * that was refused, is not reported: the refusal of the field says it.
    *
    * @param file - The file the body is from, which findings are filed under.
    * @param body - The body to hold to the contract.
@@ -215,7 +221,14 @@ export class Branding extends ConfigDocument<BrandingValue> {
     let refusals = first.error.issues;
     if (setAside.length > 0) {
       const rest = Branding.CONTRACT.schema.safeParse(Branding.withoutRefused(body, setAside));
-      refusals = [...setAside, ...(rest.success ? [] : rest.error.issues)];
+      const aside = Branding.fieldsRefused(setAside);
+      const later = rest.success ? [] : rest.error.issues;
+      refusals = [
+        ...setAside,
+        ...later.filter((refusal) => {
+          return !Branding.isCausedByPruning(refusal, aside);
+        }),
+      ];
     }
     const named = new Set<string>();
     for (const refusal of refusals) {
@@ -242,6 +255,54 @@ export class Branding extends ConfigDocument<BrandingValue> {
           `${where} ${refusal.message}`,
         );
       });
+  }
+
+  /**
+   * The dotted names of the fields the contract refused.
+   *
+   * @param refusals - The refusals; an unknown key is refused at the object
+   *   that holds it.
+   * @returns One name per field, an unknown key's included.
+   */
+  private static fieldsRefused(refusals: readonly z.core.$ZodIssue[]): readonly string[] {
+    const fields: string[] = [];
+    for (const refusal of refusals) {
+      if (refusal.code === "unrecognized_keys") {
+        for (const key of refusal.keys) {
+          fields.push([...refusal.path, key].join("."));
+        }
+      } else {
+        fields.push(refusal.path.join("."));
+      }
+    }
+    return fields;
+  }
+
+  /**
+   * Whether a refusal of the contract's own checks is only there because a
+   * field was set aside.
+   *
+   * @remarks
+   * Such a check names the field it is about first and any field it depends
+   * on after, as `typography.font_url needs a typography.font_family`, so it
+   * is caused by pruning when it names a field that was set aside, other than
+   * the one it is about.
+   *
+   * @param refusal - A refusal of the body without the fields set aside.
+   * @param aside - The fields that were set aside.
+   * @returns True when the refusal would not exist had the field been kept.
+   */
+  private static isCausedByPruning(refusal: z.core.$ZodIssue, aside: readonly string[]): boolean {
+    if (refusal.code !== "custom" || refusal.path.length > 0) {
+      return false;
+    }
+    const about = Branding.fieldNamedBy(refusal.message);
+    const named = refusal.message.split(" ").map((word) => {
+      return word.replace(/[.,;]$/, "");
+    });
+    return aside.some((field) => {
+      return field !== about && named.includes(field);
+    });
   }
 
   /**

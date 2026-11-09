@@ -204,6 +204,28 @@ describe("Branding.read", () => {
     });
   });
 
+  it("does not report a font URL as missing the family that was refused for its type", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({ typography: { font_family: 42, font_url: "https://fonts.example.com/css2" } }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [{ message: expect.stringMatching(/^typography\.font_family /) }],
+    });
+  });
+
+  it("holds the rest of the body to the contract without the editor-only $schema pointer", () => {
+    const reading = Branding.read(
+      aFile("branding", NAME, aBranding({ $schema: 42, layout: "sideways" })),
+    );
+
+    expect(reading).toMatchObject({ issues: [{ message: expect.stringMatching(/^layout /) }] });
+  });
+
   it("points a retired key that names no path at login.liquid", () => {
     const reading = Branding.read(
       aFile("branding", NAME, { layout: "centered", liquid_template_file: true }),
