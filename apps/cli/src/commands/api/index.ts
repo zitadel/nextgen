@@ -11,7 +11,7 @@ import {
   OperationService,
   type Target,
 } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { unscopedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 import {
@@ -33,6 +33,7 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Destructive } from "@/lib/oclif/destructive";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
+import type { Summary } from "@/lib/ui";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -300,6 +301,12 @@ export default class Api extends Destructive(BaseCommand) {
       status: "ok",
       data: {},
       next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      // The help was already written by the help command, so there is no
+      // ending to add to it.
+      summary: {
+        title: "Done",
+        sections: [],
+      },
       pretty: prose(""),
     });
   }
@@ -330,6 +337,7 @@ export default class Api extends Destructive(BaseCommand) {
 
     const url = operation.urlOn(this.meta.source, request);
     if (this.dryRun) {
+      const curl = prose(this.curlFor(request));
       return this.emit({
         status: "ok",
         data: {
@@ -342,7 +350,16 @@ export default class Api extends Destructive(BaseCommand) {
                 body: request.body,
               }),
         },
-        pretty: prose(this.curlFor(request)),
+        // A script reads the command on its own; a person at a terminal is
+        // told it is not sent, with the command under it exactly as written
+        // because it is copied, not read.
+        summary: {
+          title: `Would call ${operation.id}`,
+          sections: [],
+          lines: curl.text.split("\n"),
+          verbatim: true,
+        },
+        pretty: curl,
       });
     }
 
@@ -373,6 +390,11 @@ export default class Api extends Destructive(BaseCommand) {
       return this.emit({
         status: "skipped",
         reason: "call-cancelled",
+        summary: {
+          title: CANCELLED,
+          sections: [],
+          lines: [`${operation.id} was not called.`],
+        },
       });
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
@@ -389,33 +411,55 @@ export default class Api extends Destructive(BaseCommand) {
       ? await operationService.callAll(request)
       : await operationService.call(request);
 
+    const answer = this.answered(operation.id, response);
     return this.emit({
       status: "ok",
       data: response.body ?? null,
-      pretty: this.answered(response),
+      summary: answer.summary,
+      ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
     });
   }
 
   /**
-   * What the call answered, in the spelling its shape takes.
+   * What the call answered: the ending a person at a terminal sees, and the
+   * rendering a pipe is given when that differs from it.
    *
    * A JSON body is spelled the way JSON spells a control character, because
    * this is the command a script pipes into `jq`: the terminal spelling would
    * write `\x9b` for a C1 character, which is not an escape JSON has, and the
    * body would not parse. A text body and the note about an empty one are a
-   * person's to read, so they take the spelling a person reads.
+   * person's to read, so they take the spelling a person reads. The body is
+   * the server's, not the CLI's, so the ending writes it as it came instead of
+   * folding it to the width of the terminal.
    *
+   * @param operationId - The operation that was called.
    * @param response - The answer the call got.
-   * @returns The rendering.
+   * @returns The ending, and the rendering when a script is given something else.
    */
-  private answered(response: ApiResponse): Rendering {
+  private answered(
+    operationId: string,
+    response: ApiResponse,
+  ): { summary: Summary; pretty?: Rendering } {
     if (response.body === undefined) {
-      return prose(this.isOnScreen ? `No content (${response.status}).` : "");
+      return {
+        summary: {
+          title: `No content (${response.status})`,
+          sections: [],
+        },
+        // Nothing is written for a script, which reads an empty answer.
+        ...(this.isOnScreen ? {} : { pretty: prose("") }),
+      };
     }
-    if (typeof response.body === "string") {
-      return prose(response.body);
-    }
-    return json(response.body);
+    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
+    return {
+      summary: {
+        title: `Called ${operationId}`,
+        sections: [],
+        lines: pretty.text.split("\n"),
+        verbatim: true,
+      },
+      pretty,
+    };
   }
 
   /** Choose an operation the CLI can call: its part of the API, then the operation. */

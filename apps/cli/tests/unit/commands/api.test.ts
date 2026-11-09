@@ -169,6 +169,8 @@ describe("zitadel api, rendered for a terminal", () => {
     // Asserting on the box's wording here would pass however it is drawn.
     const shown = stripAnsi(drawn.join(""));
     expect(shown).not.toContain("╭");
+    expect(shown).toContain("curl -X GET 'http://localhost:8080/api/v1/livez'");
+    expect(shown).toContain("Would call getLive");
     expect(shown).toContain("project proj_01TEST");
   });
 });
