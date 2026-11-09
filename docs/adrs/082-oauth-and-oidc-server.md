@@ -271,9 +271,9 @@ are in the release (§3), and the flow it opens seals that deployment.
   (its canonical URI), the scopes it defines with the text keys their consent
   lines use (§8), its access token lifetime, its claim rules and its claims
   hook (§6), whether third-party clients may request it, and the clients
-  that may introspect its tokens (§2). A declared application lists the APIs
-  it calls; a registered application may request
-  only APIs open to third parties, and consent covers the rest.
+  that may introspect its tokens (§2). A first-party client calls the APIs
+  its application lists; a third-party client may request only APIs open to
+  third parties, and consent covers the rest.
 - Since a declared application's APIs and scopes are config, the flow checks
   them against the deployment it seals (ADR 081 §10), and an unknown one ends
   it with `invalid_scope` or `invalid_target`.
