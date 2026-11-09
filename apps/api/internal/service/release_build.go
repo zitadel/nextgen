@@ -48,6 +48,7 @@ type BuildReleaseInput struct {
 	IDPs            []BuildIDP
 	Policies        []BuildPolicy
 	Branding        *CreateBrandingInput
+	OAuth           *CreateOAuthSettingsInput
 	Message         *string
 	GitSHA          *string
 	GitDirty        bool
@@ -100,6 +101,14 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 		preparedBranding, err = prepareBranding(*input.Branding)
 		if err != nil {
 			failures.add(domain.ReleasePointerKindBranding, 0, domain.ReleaseBrandingHandle, err)
+		}
+	}
+	var preparedOAuth *domain.OAuthSettings
+	if input.OAuth != nil {
+		var err error
+		preparedOAuth, err = prepareOAuthSettings(*input.OAuth)
+		if err != nil {
+			failures.add(domain.ReleasePointerKindOauth, 0, domain.ReleaseOAuthHandle, err)
 		}
 	}
 	// In-tx checks (flows, schema-URL resolve, IDP immutables) can still add
@@ -180,6 +189,13 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 			}
 			content.Branding = brandingEntity
 		}
+		if preparedOAuth != nil {
+			settings, err := s.oauth.resolveOrCreateOAuthSettings(ctx, stmts, input.ProjectID, preparedOAuth)
+			if err != nil {
+				return err
+			}
+			content.OAuth = settings
+		}
 
 		if err := s.autoPinReferences(ctx, stmts, input.ProjectID, &content); err != nil {
 			return err
@@ -250,6 +266,7 @@ func bundleShapeInput(input BuildReleaseInput) domain.BundleShapeInput {
 		IDPs:        idps,
 		Policies:    policies,
 		HasBranding: input.Branding != nil,
+		HasOAuth:    input.OAuth != nil,
 	}
 }
 
