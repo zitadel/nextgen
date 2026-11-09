@@ -362,6 +362,47 @@ those, and SPAs wait for #560 (ADR 081's question 7).
 The console is no OAuth client while it shares the server's origin: it keeps
 its session cookie.
 
+### How an MCP client's consent runs
+
+Consent is not a round trip of its own. It is a step inside the one flow
+that answers the one authorization request (ADR 081 §11, ADR 082 §8):
+
+1. The MCP client sends one authorization request: its client id,
+   `resource`, the scopes, PKCE and a redirect URI. The server checks it,
+   seals it into a handle and sends the browser to the login page with
+   `?auth_request=<handle>` and a binding cookie.
+2. The widget starts the login flow with that handle, and the user signs in
+   as on any other day.
+3. The engine inserts the `consent` step after sign-in when the client is
+   third party and the user has not consented to those scopes for that API,
+   when the request says `prompt=consent`, or when the application's
+   document asks for it on every request. A first-party client gets no step
+   unless the request asks.
+4. The step shows the client's name beside the redirect host the server
+   checked, the API, and one line per scope from the API's text keys. Allow
+   records a consent per user, client, API and scopes; Deny records nothing.
+5. The flow ends in the one redirect to the client: with a code after Allow,
+   with `error=access_denied` after Deny. `prompt=none` without a stored
+   consent answers `consent_required` and shows nothing.
+
+A later request for the same scopes skips the step while the consent lives;
+one for more scopes gets a step for the difference, and the consent becomes
+the union. The user revokes a consent through the me endpoints and the
+connected-apps element, which ends the client's refresh tokens; the access
+token runs out on its own, since there is no introspection (challenge 9).
+
+**Consent is all or nothing so far.** #2451's step has Allow and Deny and no
+fields, so a user takes every requested scope or none. Stripe's MCP server
+shows the other design: its consent page is a permission builder where the
+user picks read, write or none per resource, and the token carries the
+selection, not the request. OAuth allows that, since a server may grant
+fewer scopes than asked and returns the granted `scope`. For Zitadel it
+would take scopes with structure in the API's entry (which resource, which
+level, and an order so that write implies read), a consent step with fields
+whose Allow submits the selection, a consent stored for the chosen subset,
+and a template block that renders the matrix. It changes nothing about
+tokens. Whether a user may choose a subset is open question 12.
+
 ## Scope: which apps become the issuer
 
 One rule decides it: an app can be the issuer when it has a server runtime
@@ -628,7 +669,7 @@ version bump and never a re-scaffold.
 | --- | --- | --- |
 | `@zitadel/server` | AGPL | The protocol under `/oauth/{project_id}/`: authorize, token, JWKS, and later revocation, registration and consents |
 | `@zitadel/sdk-*` | MIT | The reserved paths and the browser endpoints under `/__nextgen`; later, bearer verification with RFC 9728 metadata and `WWW-Authenticate`, the claims hook and relying-party mode |
-| `@zitadel/components` | MIT | The authorization request's handle in `<zitadel-login>`; later, consent, account choice and a connected-apps element |
+| `@zitadel/components` | MIT | The authorization request's handle in `<zitadel-login>`; later, consent (with fields if open question 12 says so), account choice and a connected-apps element |
 | `@zitadel/config` | MIT | Schemas and presets for applications, with their `apis` entries (ADR 082 §5: no files or commands of their own), and the OAuth settings |
 | `@zitadel/cli` | MIT | The commands that write those files, `doctor` checks, and the skill an agent reads |
 | `@zitadel/testing`, the API mock | MIT | An authorization server to test against without a running Zitadel |
@@ -785,3 +826,6 @@ answered; the rest have no answer yet.
 11. When does OpenID Connect return (#2801)? Until it does, an off-the-shelf
     application or an OIDC library cannot connect, and the application
     reads the user from its access token. *Not raised; belongs on #1425.*
+12. Can a user allow part of a request, per scope or per resource and level
+    as Stripe's MCP consent does, or is consent all or nothing as #2451 has
+    it? *Not raised; belongs in ADR 082 §8.*
