@@ -721,6 +721,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * that knows no project can still say where it ran.
    */
   private serverRanOn(): string | undefined {
+    // A dry run spoke to no server, so it did not run on one.
+    if (this.meta.dryRun) {
+      return undefined;
+    }
     try {
       const { host } = new URL(this.meta.source);
       return host === new URL(DEFAULT_SERVER).host ? undefined : host;
