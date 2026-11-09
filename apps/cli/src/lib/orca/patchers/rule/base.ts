@@ -7,6 +7,7 @@ import { Origins } from "@/lib/backend";
 import { stableStringify } from "@/lib/json";
 import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { DEFAULT_SERVER } from "@/lib/server";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { FileWriter } from "./file-writer";
@@ -319,8 +320,8 @@ export abstract class AbstractRulePatcher implements Patcher {
   private baseOps(ctx: PatchContext): ReadonlyArray<FileOp> {
     return [
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
-      { kind: "mkdir", path: ".zitadel/flows" },
-      { kind: "mkdir", path: ".zitadel/schemas" },
+      { kind: "mkdir", path: CONFIG_DIRECTORIES.flows },
+      { kind: "mkdir", path: CONFIG_DIRECTORIES.schemas },
       { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
       {
         kind: "write",
@@ -383,7 +384,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "write",
         path: ".zitadel/state.json",
-        contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
+        contents: `${stableStringify({ framework: ctx.framework.id })}\n`,
       },
       ...guidanceOps(ctx),
     ];

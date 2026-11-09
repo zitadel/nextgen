@@ -1,3 +1,5 @@
+import type { ProviderSelection } from "@zitadel/config/idp";
+
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
@@ -342,6 +344,50 @@ export class FileExistsError extends ConflictError {
       details: { file: path },
     });
     this.path = path;
+  }
+}
+
+/**
+ * A provider a new project was to offer that already has a connection, which
+ * a scaffold never replaces.
+ *
+ * @remarks
+ * A connection may hold a client id someone registered with the vendor and a
+ * slug the schemas and flows already name, so the file is the developer's,
+ * with or without `force`. The provider is kept, so the caller can say how to
+ * enable it with the connection that is there.
+ */
+export class ConnectionExistsError extends ConflictError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "ConnectionExistsError";
+
+  /**
+   * The project-relative path of the connection already there.
+   */
+  readonly path: string;
+
+  /**
+   * The provider, as it was chosen.
+   */
+  readonly selection: ProviderSelection;
+
+  /**
+   * Make the failure for this connection.
+   *
+   * @param path - The project-relative path of the connection already there.
+   * @param selection - The provider, as it was chosen.
+   */
+  constructor(path: string, selection: ProviderSelection) {
+    super(`${path} already exists`, {
+      hint:
+        "A connection file is yours to keep, so it is never replaced or removed. " +
+        "Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
+      details: { file: path },
+    });
+    this.path = path;
+    this.selection = selection;
   }
 }
 

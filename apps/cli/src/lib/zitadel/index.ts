@@ -35,6 +35,7 @@ export {
   BrokenFlowsError,
   ConfigError,
   ConflictError,
+  ConnectionExistsError,
   FileExistsError,
   NoSignInLeftError,
   NotFoundError,
@@ -81,6 +82,12 @@ export {
   type PolicyTestBody,
 } from "@/lib/zitadel/resources/policies";
 export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
+export type {
+  Scaffold,
+  ScaffoldedConnection,
+  ScaffoldedProvider,
+  ScaffoldOptions,
+} from "@/lib/zitadel/scaffold";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
 export {
   RULE_IDS,

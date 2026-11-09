@@ -26,9 +26,6 @@ export interface Captured<T> {
  * HTTP it takes to arrange that stays in here.
  */
 export interface PlatformMock {
-  /** Makes storing a schema fail, so a command fails partway through. */
-  rejectsSchemaUploads(): void;
-
   /** Holds a user of the login flow's schema that carries no email, the identifier the scaffold signs in with. */
   holdsAUserWithoutAnEmail(): void;
 
@@ -303,14 +300,6 @@ export function usePlatformMock(): PlatformMock {
     cannotQueryUsers() {
       server.use(
         http.post("*/users/query", () =>
-          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-        ),
-      );
-    },
-
-    rejectsSchemaUploads() {
-      server.use(
-        http.post("*/schemas", () =>
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
         ),
       );
