@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import type { ConfigOptions, Issue, JsonObject } from "@/lib/zitadel";
+import { isJsonObject, listAt } from "@/lib/zitadel/utils/json";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
-import { aConfig, anOidcConnection } from "@tests/helpers/config";
+import {
+  aConfig,
+  anOidcConnection,
+  aUserSchema,
+  type ConfigDocuments,
+} from "@tests/helpers/config";
 import { aFlowOffering, aSchemaListing, HUMAN_USER } from "@tests/helpers/schemas";
 
 /**
@@ -227,6 +234,406 @@ describe("SSO_RULES", () => {
         return rule.check(config, {});
       }).filter((issue) => {
         return issue.rule === "sso/unmapped-verification-key";
+      });
+
+      expect(issues).toEqual([]);
+    });
+  });
+
+  describe("when a rule reads the files together", () => {
+    /**
+     * A second connection, `other`, that nobody lists or offers.
+     */
+    const OTHER_PATH = ".zitadel/idps/other.json";
+
+    /**
+     * The schema listing `acme`, with a property whose type is a number.
+     */
+    const NUMERIC_EMAIL_SCHEMA = aSchemaListing(["acme"], {
+      properties: { email: { "x-unique": "project", type: "integer" } },
+    });
+
+    /**
+     * A schema listing `acme`, which a user must have an email in.
+     */
+    const REQUIRING_SCHEMA = aSchemaListing(["acme"], { required: ["email"] });
+
+    /**
+     * Every project below lists `acme` in its schema, offers it in its flow
+     * and keeps the connection `acme.json`: the documents of a project whose
+     * files agree, but for what a row changes.
+     *
+     * @param connection - The connection file `acme.json` holds.
+     * @param overrides - Documents to set in place of the agreeing ones.
+     * @returns The documents.
+     */
+    function agreeing(connection: JsonObject, overrides: ConfigDocuments = {}): ConfigDocuments {
+      return {
+        schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) },
+        flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+        connections: { [CONNECTION_FILE]: connection },
+        ...overrides,
+      };
+    }
+
+    /**
+     * A flow whose entry step offers `acme` and whose other steps are as given.
+     *
+     * @param step - Keys to set on the entry step in place of the routed ones.
+     * @param extra - Further steps.
+     * @returns The flow document.
+     */
+    function aFlowStepping(step: JsonObject, extra: readonly JsonObject[] = []): JsonObject {
+      const offering = aFlowOffering(["acme"]);
+      const entry = listAt(offering, "steps")[0];
+      return { ...offering, steps: [{ ...(isJsonObject(entry) ? entry : {}), ...step }, ...extra] };
+    }
+
+    /**
+     * Find the issues of one rule.
+     *
+     * @param rule - The rule's id.
+     * @param documents - The project's documents.
+     * @param options - What is known beyond the files.
+     * @returns The rule's issues.
+     */
+    function issuesOf(
+      rule: string,
+      documents: ConfigDocuments,
+      options: ConfigOptions = {},
+    ): readonly Issue[] {
+      return SSO_RULES.flatMap((candidate) => {
+        return candidate.check(aConfig(documents, options), {});
+      }).filter((issue) => {
+        return issue.rule === rule;
+      });
+    }
+
+    it.each([
+      {
+        rule: "sso/shared-variable",
+        severity: "error",
+        documents: {
+          connections: {
+            [CONNECTION_FILE]: ACME,
+            "other.json": anOidcConnection({ slug: "other" }),
+          },
+        },
+        file: OTHER_PATH,
+        message: "client_secret names the variable ACME_CLIENT_SECRET",
+      },
+      {
+        rule: "sso/flow-enables-sso",
+        severity: "error",
+        documents: agreeing(ACME, { schemas: { [SCHEMA_FILE]: aUserSchema() } }),
+        file: FLOW_PATH,
+        message: `offers sso_providers but "sso" is not an enabled authentication method in ${SCHEMA_PATH}`,
+      },
+      {
+        rule: "sso/outcome-routing",
+        severity: "error",
+        documents: agreeing(ACME, {
+          flows: {
+            [FLOW_FILE]: aFlowStepping({ transitions: { sso_authenticated: { target: "done" } } }),
+          },
+        }),
+        file: FLOW_PATH,
+        message:
+          "does not route sso_user_not_found, user_already_exists. Add a transition for each.",
+      },
+      {
+        rule: "sso/outcome-routing",
+        severity: "error",
+        documents: agreeing(ACME, {
+          flows: {
+            [FLOW_FILE]: aFlowStepping({
+              transitions: {
+                sso_authenticated: { target: "done" },
+                sso_user_not_found: { target: "register-sso" },
+                user_already_exists: { action: "switch", target: "sso-conflict" },
+              },
+            }),
+          },
+        }),
+        file: FLOW_PATH,
+        message: "does not route user_already_exists. A collision is followed only through",
+      },
+      {
+        rule: "sso/collection-conflict-routing",
+        severity: "error",
+        documents: agreeing(ACME, {
+          flows: {
+            [FLOW_FILE]: aFlowStepping({
+              on_success: "create_user_with_sso",
+              transitions: {
+                sso_authenticated: { target: "done" },
+                sso_user_not_found: { target: "register-sso" },
+              },
+            }),
+          },
+        }),
+        file: FLOW_PATH,
+        message:
+          "on_success create_user_with_sso must route user_already_exists. Add that transition.",
+      },
+      {
+        rule: "sso/empty-claim-mapping",
+        severity: "error",
+        documents: agreeing(anOidcConnection({ claim_mapping: {} })),
+        file: FLOW_PATH,
+        message: `claim_mapping of "acme" (${CONNECTION_PATH}) is empty, so no sign-in can fill the user`,
+      },
+      {
+        rule: "sso/collection-misses-required",
+        severity: "error",
+        documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
+          schemas: { [SCHEMA_FILE]: REQUIRING_SCHEMA },
+          flows: {
+            [FLOW_FILE]: aFlowStepping(
+              {
+                transitions: {
+                  sso_authenticated: { target: "done" },
+                  sso_user_not_found: { target: "register-sso" },
+                  user_already_exists: { target: "sso-conflict" },
+                },
+              },
+              [{ name: "register-sso", on_success: "create_user_with_sso" }],
+            ),
+          },
+        }),
+        file: FLOW_PATH,
+        message: `can create a user without "email", which ${SCHEMA_PATH} requires`,
+      },
+      {
+        rule: "sso/claim-needs-scope",
+        severity: "warning",
+        documents: agreeing(anOidcConnection({ claim_mapping: { email: "email" } })),
+        file: CONNECTION_PATH,
+        message: 'claim_mapping reads "email", which a provider only returns for the "email" scope',
+      },
+      {
+        rule: "sso/verification-source-not-boolean",
+        severity: "warning",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email" },
+            verified_claims: { email: "email" },
+            oidc: { scopes: ["openid", "email"] },
+          }),
+        ),
+        file: CONNECTION_PATH,
+        message: 'verified_claims reads "email" to verify "email", but that is a string claim',
+      },
+      {
+        rule: "sso/claim-name-whitespace",
+        severity: "error",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: " email" },
+            oidc: { scopes: ["openid", "email"] },
+          }),
+        ),
+        file: CONNECTION_PATH,
+        message: 'claim_mapping names " email", which has a space at its start or end',
+      },
+      {
+        rule: "sso/claim-name-whitespace",
+        severity: "error",
+        documents: agreeing(anOidcConnection({ subject_claim: "oid " })),
+        file: CONNECTION_PATH,
+        message: 'subject_claim names "oid "',
+      },
+      {
+        rule: "sso/subject-claim-unstable",
+        severity: "warning",
+        documents: agreeing(anOidcConnection({ subject_claim: "email" })),
+        file: CONNECTION_PATH,
+        message: 'subject_claim is "email", a profile claim the user can change',
+      },
+      {
+        rule: "sso/subject-claim-unstable",
+        severity: "warning",
+        documents: agreeing(anOidcConnection({ subject_claim: "username" })),
+        file: CONNECTION_PATH,
+        message: 'subject_claim is "username"',
+      },
+      {
+        rule: "sso/claim-type-mismatch",
+        severity: "warning",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email" },
+            oidc: { scopes: ["openid", "email"] },
+          }),
+          { schemas: { [SCHEMA_FILE]: NUMERIC_EMAIL_SCHEMA } },
+        ),
+        file: CONNECTION_PATH,
+        message: 'reads "email", a string claim, into "email", which the schema types as integer',
+      },
+      {
+        rule: "sso/orphaned-mapping-target",
+        severity: "error",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { emial: "email" },
+            oidc: { scopes: ["openid", "email"] },
+          }),
+        ),
+        file: CONNECTION_PATH,
+        message:
+          'claim_mapping target "emial" is not a property of any schema that lists "acme" in sso.providers. Did you mean',
+      },
+      {
+        rule: "sso/orphaned-verification-key",
+        severity: "error",
+        documents: agreeing(anOidcConnection({ verified_claims: { emial: true } })),
+        file: CONNECTION_PATH,
+        message:
+          'verified_claims key "emial" is not a property of any schema that lists "acme" in sso.providers, so it can never verify.',
+      },
+    ] satisfies readonly {
+      readonly rule: string;
+      readonly severity: string;
+      readonly documents: ConfigDocuments;
+      readonly file: string;
+      readonly message: string;
+    }[])("$rule fires: $message", (row) => {
+      const issues = issuesOf(row.rule, row.documents);
+
+      expect(issues).toMatchObject([
+        {
+          severity: row.severity,
+          rule: row.rule,
+          file: row.file,
+          message: expect.stringContaining(row.message),
+        },
+      ]);
+    });
+
+    it.each([
+      {
+        rule: "sso/shared-variable",
+        documents: {
+          connections: {
+            [CONNECTION_FILE]: ACME,
+            "other.json": anOidcConnection({
+              slug: "other",
+              oidc: { client_secret: "${{ OTHER_SECRET }}" },
+            }),
+          },
+        },
+      },
+      { rule: "sso/flow-enables-sso", documents: agreeing(ACME) },
+      { rule: "sso/outcome-routing", documents: agreeing(ACME) },
+      {
+        rule: "sso/outcome-routing",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email" },
+            provisioning: { creation: "disabled" },
+          }),
+          {
+            flows: {
+              [FLOW_FILE]: aFlowStepping({
+                transitions: { sso_authenticated: { target: "done" } },
+              }),
+            },
+          },
+        ),
+      },
+      { rule: "sso/collection-conflict-routing", documents: agreeing(ACME) },
+      { rule: "sso/empty-claim-mapping", documents: agreeing(ACME) },
+      {
+        rule: "sso/empty-claim-mapping",
+        documents: agreeing(anOidcConnection({ claim_mapping: { nickname: "name" } })),
+      },
+      {
+        rule: "sso/empty-claim-mapping",
+        documents: agreeing(
+          anOidcConnection({ claim_mapping: {}, provisioning: { creation: "disabled" } }),
+        ),
+      },
+      {
+        rule: "sso/collection-misses-required",
+        documents: agreeing(ACME, { schemas: { [SCHEMA_FILE]: REQUIRING_SCHEMA } }),
+      },
+      { rule: "sso/claim-needs-scope", documents: agreeing(ACME) },
+      {
+        rule: "sso/claim-needs-scope",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email" },
+            oidc: { scopes: ["openid", "custom"] },
+          }),
+        ),
+      },
+      {
+        rule: "sso/verification-source-not-boolean",
+        documents: agreeing(
+          anOidcConnection({
+            claim_mapping: { email: "email" },
+            verified_claims: { email: "email_verified" },
+            oidc: { scopes: ["openid", "email"] },
+          }),
+        ),
+      },
+      { rule: "sso/claim-name-whitespace", documents: agreeing(ACME) },
+      {
+        rule: "sso/subject-claim-unstable",
+        documents: agreeing(anOidcConnection({ subject_claim: "sub" })),
+      },
+      {
+        rule: "sso/subject-claim-unstable",
+        documents: agreeing(anOidcConnection({ subject_claim: "oid" })),
+      },
+      { rule: "sso/claim-type-mismatch", documents: agreeing(ACME) },
+      {
+        rule: "sso/claim-type-mismatch",
+        documents: agreeing(ACME, {
+          schemas: {
+            [SCHEMA_FILE]: aSchemaListing(["acme"], {
+              properties: { email: { "x-unique": "project", type: "string" } },
+            }),
+          },
+        }),
+      },
+      { rule: "sso/orphaned-mapping-target", documents: agreeing(ACME) },
+      {
+        rule: "sso/orphaned-mapping-target",
+        documents: {
+          connections: {
+            [CONNECTION_FILE]: anOidcConnection({ claim_mapping: { emial: "email" } }),
+          },
+        },
+      },
+      {
+        rule: "sso/orphaned-verification-key",
+        documents: agreeing(
+          anOidcConnection({ claim_mapping: { email: "email" }, verified_claims: { email: true } }),
+        ),
+      },
+      {
+        rule: "sso/orphaned-verification-key",
+        documents: {
+          connections: {
+            [CONNECTION_FILE]: anOidcConnection({ verified_claims: { emial: true } }),
+          },
+        },
+      },
+    ] satisfies readonly { readonly rule: string; readonly documents: ConfigDocuments }[])(
+      "$rule stays silent on a project that does not break it",
+      (row) => {
+        const issues = issuesOf(row.rule, row.documents);
+
+        expect(issues).toEqual([]);
+      },
+    );
+
+    it("does not warn about an unstable subject once the connection is deployed", () => {
+      const documents = agreeing(anOidcConnection({ subject_claim: "email" }));
+
+      const issues = issuesOf("sso/subject-claim-unstable", documents, {
+        deployed: new Set(["acme"]),
       });
 
       expect(issues).toEqual([]);
