@@ -1,28 +1,23 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { type Issue, UserSchema, ZitadelConfig } from "@/lib/zitadel";
+import { type Issue, UserSchema } from "@/lib/zitadel";
 import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
+import { aConfig } from "@tests/helpers/config";
 
+/**
+ * Where the first of the two schemas sits.
+ */
 const FIRST = ".zitadel/schemas/first.json";
+
+/**
+ * Where the second of the two schemas sits.
+ */
 const SECOND = ".zitadel/schemas/second.json";
 
 /**
- * A configuration holding two user schemas, whose findings a test decides.
- *
- * @returns The configuration.
+ * Two user schemas, whose findings a test decides.
  */
-function twoSchemas(): ZitadelConfig {
-  return ZitadelConfig.of({
-    schemas: [
-      { path: FIRST, body: {} },
-      { path: SECOND, body: {} },
-    ],
-    flows: [],
-    connections: [],
-    policies: [],
-    branding: [],
-  });
-}
+const TWO_SCHEMAS = { schemas: { "first.json": {}, "second.json": {} } };
 
 /**
  * An error-level finding about a file.
@@ -35,37 +30,31 @@ function finding(rule: Issue["rule"], file: string): Issue {
   return { severity: "error", rule, file, message: `${rule} in ${file}` };
 }
 
-/**
- * Every finding the contract rules report about a configuration.
- *
- * @param config - The configuration.
- * @returns The findings, in the order reported.
- */
-function reported(config: ZitadelConfig): readonly Issue[] {
-  return CONTRACT_RULES.flatMap((rule) => {
-    return rule.check(config, {});
-  });
-}
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe("CONTRACT_RULES", () => {
   it("keeps a finding under a rule no list names for the document's kind", () => {
+    const config = aConfig(TWO_SCHEMAS);
     vi.spyOn(UserSchema.prototype, "check").mockReturnValue([
       finding("sso/duplicate-provider", FIRST),
     ]);
 
-    expect(reported(twoSchemas())).toContainEqual(finding("sso/duplicate-provider", FIRST));
+    const issues = CONTRACT_RULES.flatMap((rule) => {
+      return rule.check(config, {});
+    });
+
+    expect(issues).toContainEqual(finding("sso/duplicate-provider", FIRST));
   });
 
   it("reports one mistake made in several files as one run of lines", () => {
+    const config = aConfig(TWO_SCHEMAS);
     vi.spyOn(UserSchema.prototype, "check").mockImplementation(function (this: UserSchema) {
       return [finding("contract/schema", this.path), finding("sso/duplicate-provider", this.path)];
     });
 
-    expect(reported(twoSchemas())).toEqual([
+    const issues = CONTRACT_RULES.flatMap((rule) => {
+      return rule.check(config, {});
+    });
+
+    expect(issues).toEqual([
       finding("contract/schema", FIRST),
       finding("contract/schema", SECOND),
       finding("sso/duplicate-provider", FIRST),

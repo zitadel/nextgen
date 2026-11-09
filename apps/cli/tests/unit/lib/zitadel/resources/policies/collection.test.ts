@@ -1,194 +1,183 @@
 import { describe, expect, it } from "vitest";
 
-import { type JsonObject, ZitadelConfig } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { aConfig, aPasswordPolicy, PASSWORD_POLICY } from "@tests/helpers/config";
+import {
+  aPolicyTest,
+  PASSWORD_POLICY_FILE,
+  PASSWORD_POLICY_TEST_FILE,
+  TOO_SHORT_CASE,
+} from "@tests/helpers/policies";
 
 /**
- * The operation every policy in these tests is for.
+ * Where the password policy sits.
  */
-const OPERATION = "auth.factor.password.set";
+const POLICY_PATH = `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_FILE}`;
 
 /**
- * A case the policy test contract takes.
+ * Where the password policy's test file sits.
  */
-const CASE = {
-  name: "too short",
-  input: { password: "short1" },
-  expect: { allowed: false, violations: ["min_length"] },
-};
+const TEST_PATH = `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_TEST_FILE}`;
 
 /**
- * A test file the policy test contract takes.
+ * An operation no policy file in these tests is for.
  */
-const TEST_FILE = { operation: OPERATION, cases: [CASE] };
-
-/**
- * The configuration holding these files under `.zitadel/policies/`.
- *
- * @param files - Each file's body, by its name.
- * @returns The configuration.
- */
-function project(files: Record<string, JsonObject>): ZitadelConfig {
-  return ZitadelConfig.of({
-    schemas: [],
-    flows: [],
-    connections: [],
-    policies: Object.entries(files).map(([name, body]) => {
-      return { path: `.zitadel/policies/${name}`, body };
-    }),
-    branding: [],
-  });
-}
+const UNKNOWN = "auth.unknown";
 
 describe("Policies.password", () => {
   it("is the policy at the password policy's file", () => {
-    const config = project({ [`${OPERATION}.json`]: { operation: OPERATION, config: {} } });
+    const config = aConfig({ policies: { [PASSWORD_POLICY_FILE]: aPasswordPolicy({}) } });
 
-    expect(config.policies.password?.path).toBe(`.zitadel/policies/${OPERATION}.json`);
+    const policy = config.policies.password;
+
+    expect(policy?.path).toBe(POLICY_PATH);
   });
 
   it("is undefined when the project has none", () => {
-    const config = project({ "other.json": { operation: OPERATION, config: {} } });
+    const config = aConfig({ policies: { "other.json": aPasswordPolicy({}) } });
 
-    expect(config.policies.password).toBeUndefined();
+    const policy = config.policies.password;
+
+    expect(policy).toBeUndefined();
   });
 });
 
 describe("Policies.selectPolicies", () => {
   it("holds each sound policy file, without the test files", () => {
-    const config = project({
-      [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
-      [`${OPERATION}.test.json`]: TEST_FILE,
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_FILE]: aPasswordPolicy(),
+        [PASSWORD_POLICY_TEST_FILE]: aPolicyTest(),
+      },
     });
 
     const { documents, issues } = config.policies.selectPolicies();
 
-    expect([
-      issues,
+    expect(issues).toEqual([]);
+    expect(
       documents.map((policy) => {
         return [policy.path, policy.readOperation(), policy.readConfig()];
       }),
-    ]).toEqual([[], [[`.zitadel/policies/${OPERATION}.json`, OPERATION, { min_length: 12 }]]]);
+    ).toEqual([[POLICY_PATH, PASSWORD_POLICY, { min_length: 12 }]]);
   });
 
   it("reports an invalid policy file rather than leaving it out", () => {
-    const config = project({
-      [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 0 } },
+    const config = aConfig({
+      policies: { [PASSWORD_POLICY_FILE]: aPasswordPolicy({ min_length: 0 }) },
     });
 
     const { documents, issues } = config.policies.selectPolicies();
 
-    expect([documents, issues]).toEqual([
-      [],
-      [
-        expect.stringMatching(
-          /^\.zitadel\/policies\/auth\.factor\.password\.set\.json: config\.min_length/,
-        ),
-      ],
-    ]);
+    expect(documents).toEqual([]);
+    expect(issues).toEqual([expect.stringContaining(`${POLICY_PATH}: config.min_length`)]);
   });
 
   it("reports a policy file not named after its operation", () => {
-    const config = project({ "password.json": { operation: OPERATION, config: {} } });
+    const config = aConfig({ policies: { "password.json": aPasswordPolicy({}) } });
 
     const { issues } = config.policies.selectPolicies();
 
     expect(issues).toEqual([
-      `.zitadel/policies/password.json: holds the ${OPERATION} policy, so it must be named ${OPERATION}.json`,
+      `${CONFIG_DIRECTORIES.policies}/password.json: holds the ${PASSWORD_POLICY} policy, so it must be named ${PASSWORD_POLICY_FILE}`,
     ]);
   });
 
   it("never reads another operation's policy file when one is asked for", () => {
-    const config = project({
-      [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
-      "scratch.json": { operation: "auth.unknown", config: { nope: true } },
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_FILE]: aPasswordPolicy(),
+        "scratch.json": { operation: UNKNOWN, config: { nope: true } },
+      },
     });
 
-    const { documents, issues } = config.policies.selectPolicies([OPERATION]);
+    const { documents, issues } = config.policies.selectPolicies([PASSWORD_POLICY]);
 
-    expect([
-      issues,
+    expect(issues).toEqual([]);
+    expect(
       documents.map((policy) => {
         return policy.readOperation();
       }),
-    ]).toEqual([[], [OPERATION]]);
+    ).toEqual([PASSWORD_POLICY]);
   });
 
   it("holds nothing for an operation without a policy file", () => {
-    const config = project({});
+    const config = aConfig();
 
-    expect(config.policies.selectPolicies([OPERATION])).toEqual({ documents: [], issues: [] });
+    const policies = config.policies.selectPolicies([PASSWORD_POLICY]);
+
+    expect(policies).toEqual({ documents: [], issues: [] });
   });
 });
 
 describe("Policies.selectTests", () => {
   it("holds only the test files", () => {
-    const config = project({
-      [`${OPERATION}.json`]: { operation: OPERATION, config: {} },
-      [`${OPERATION}.test.json`]: TEST_FILE,
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_FILE]: aPasswordPolicy({}),
+        [PASSWORD_POLICY_TEST_FILE]: aPolicyTest(),
+      },
     });
 
     const { documents, issues } = config.policies.selectTests();
 
-    expect([
-      issues,
+    expect(issues).toEqual([]);
+    expect(
       documents.map((test) => {
         return [test.path, test.readOperation(), test.readCases()];
       }),
-    ]).toEqual([[], [[`.zitadel/policies/${OPERATION}.test.json`, OPERATION, [CASE]]]]);
+    ).toEqual([[TEST_PATH, PASSWORD_POLICY, [TOO_SHORT_CASE]]]);
   });
 
   it("names an operation asked for that has no test file", () => {
-    const config = project({ [`${OPERATION}.test.json`]: TEST_FILE });
+    const config = aConfig({ policies: { [PASSWORD_POLICY_TEST_FILE]: aPolicyTest() } });
 
-    const { documents, issues } = config.policies.selectTests(["auth.unknown"]);
+    const { documents, issues } = config.policies.selectTests([UNKNOWN]);
 
-    expect([documents, issues]).toEqual([
-      [],
-      [".zitadel/policies/auth.unknown.test.json does not exist"],
-    ]);
+    expect(documents).toEqual([]);
+    expect(issues).toEqual([`${CONFIG_DIRECTORIES.policies}/${UNKNOWN}.test.json does not exist`]);
   });
 
   it("never reads another operation's test file when one is asked for", () => {
-    const config = project({
-      [`${OPERATION}.test.json`]: TEST_FILE,
-      "scratch.test.json": { cases: "not a test" },
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_TEST_FILE]: aPolicyTest(),
+        "scratch.test.json": { cases: "not a test" },
+      },
     });
 
-    const { documents, issues } = config.policies.selectTests([OPERATION]);
+    const { documents, issues } = config.policies.selectTests([PASSWORD_POLICY]);
 
-    expect([
-      issues,
+    expect(issues).toEqual([]);
+    expect(
       documents.map((test) => {
         return test.readOperation();
       }),
-    ]).toEqual([[], [OPERATION]]);
+    ).toEqual([PASSWORD_POLICY]);
   });
 
   it("names a test file not named after its operation", () => {
-    const config = project({ "password.test.json": TEST_FILE });
+    const config = aConfig({ policies: { "password.test.json": aPolicyTest() } });
 
     const { documents, issues } = config.policies.selectTests();
 
-    expect([documents, issues]).toEqual([
-      [],
-      [
-        `.zitadel/policies/password.test.json: tests the ${OPERATION} policy, so it must be named ${OPERATION}.test.json`,
-      ],
+    expect(documents).toEqual([]);
+    expect(issues).toEqual([
+      `${CONFIG_DIRECTORIES.policies}/password.test.json: tests the ${PASSWORD_POLICY} policy, so it must be named ${PASSWORD_POLICY_TEST_FILE}`,
     ]);
   });
 
   it("names the file and the path of what the schema refuses", () => {
-    const config = project({
-      [`${OPERATION}.test.json`]: { ...TEST_FILE, cases: [{ ...CASE, input: { passwd: "x" } }] },
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_TEST_FILE]: aPolicyTest([{ ...TOO_SHORT_CASE, input: { passwd: "x" } }]),
+      },
     });
 
     const { issues } = config.policies.selectTests();
 
-    expect(issues.length).toBeGreaterThan(0);
-    for (const issue of issues) {
-      expect(issue).toMatch(
-        /^\.zitadel\/policies\/auth\.factor\.password\.set\.test\.json: cases\.0\.input/,
-      );
-    }
+    expect(issues).toEqual([
+      expect.stringContaining(`${TEST_PATH}: cases.0.input.password `),
+      expect.stringContaining(`${TEST_PATH}: cases.0.input `),
+    ]);
   });
 });

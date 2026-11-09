@@ -1,1250 +1,1635 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { type AddressInfo, createServer, type Server } from "node:net";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
-import { http, HttpResponse } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => {
+  return (await import("@tests/helpers/clack")).clackDouble();
+});
 
-vi.mock("@/commands/setup/prompts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  askCustomSettings: vi.fn(),
-}));
+vi.mock("@/commands/setup/prompts", async (importOriginal) => {
+  return { ...(await importOriginal<object>()), askCustomSettings: vi.fn() };
+});
 
-import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
+import { confirm, intro, isCancel, multiselect, select } from "@clack/prompts";
 
-import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
-import { localServerHostsPlatform, portInUseWarning, ssoFromFlags } from "@/commands/setup";
-import { retryOptionsFromFlags, setupRetryFlags } from "@/commands/setup";
+import Setup, {
+  localServerHostsPlatform,
+  portInUseWarning,
+  retryOptionsFromFlags,
+  setupRetryFlags,
+  ssoFromFlags,
+} from "@/commands/setup";
+import { moveDevPort } from "@/commands/setup/move-dev-port";
 import { askCustomSettings } from "@/commands/setup/prompts";
-import type { Asker } from "@/lib/input";
+import { createZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { type Asker, input } from "@/lib/input";
 import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
+import { createOrca } from "@/lib/orca";
+import { readZitadelSecret } from "@/lib/project";
 import { unscopedCommand } from "@/lib/suggestion";
-import Setup from "@/commands/setup";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
+import { it, type Serve } from "@tests/helpers/fixtures";
+import { write } from "@tests/helpers/git-repo";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { aDockerRecord } from "@tests/helpers/runtime-record";
+import { aNextApp, suggestedCommands } from "@tests/helpers/setup";
 import { asTerminal } from "@tests/helpers/terminal";
-import { moveDevPort } from "@/commands/setup/move-dev-port";
-import { createOrca } from "@/lib/orca";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const signal = new AbortController().signal;
-
-const { server, dirs: tempDirs } = usePlatformServer();
-const held: Server[] = [];
-
-function setup(cwd: string, extra: string[] = []) {
-  return runCliForTest([
-    "setup",
-    "--cwd",
-    cwd,
-    "--json",
-    "--server",
-    "https://api.zitadel.cloud",
-    ...extra,
-  ]);
-}
-
-/** Holds a port the system picks until the test ends, and says which. */
-async function aHeldPort(): Promise<number> {
-  const holder = createServer();
-  held.push(holder);
-  await new Promise<void>((resolve) => holder.listen({ port: 0 }, () => resolve()));
-  return (holder.address() as AddressInfo).port;
-}
+const { server } = usePlatformServer();
 
 /**
- * `--dev-port` for a run that checks every warning: setup warns when the app's
- * detected port is taken, and whatever holds 3000 on the machine running the
- * tests must not decide what it reports.
+ * The cloud platform the mock answers for.
+ */
+const CLOUD = "https://api.zitadel.cloud";
+
+/**
+ * A local server the mock answers for, as `zitadel start` would run one.
+ */
+const LOCAL_SERVER = "http://localhost:9941";
+
+/**
+ * A preview of setting up a Next.js app, which contacts no platform.
+ */
+const DRY_RUN_NEXT = ["--dry-run", "--framework", "next"];
+
+/**
+ * A scripted setup of a Next.js app, skipping the install.
+ */
+const SCRIPTED_NEXT = ["--non-interactive", "--skip-install", "--framework", "next"];
+
+/**
+ * `--dev-port` for a run that checks every warning: setup warns when the
+ * app's detected port is taken, and whatever holds 3000 on the machine
+ * running the tests must not decide what it reports.
  */
 const PINNED_DEV_PORT = ["--dev-port", "3000"];
 
-/** What `zitadel start` records beside the local admin: which server it started. */
-async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
-  await writeRuntimeMetadata(dir, {
-    schema_version: 1,
-    backend: "docker",
-    container_name: "zitadel-server-test",
-    container_id: "container-1",
-    image: "ghcr.io/zitadel/nextgen:test",
-    port: Number(new URL(serverUrl).port),
-    server_url: serverUrl,
-    data_dir: join(dir, ".zitadel/local/nextgen-data"),
-    created_at: "2026-06-09T00:00:00.000Z",
-    cli_version: "0.0.0-test",
-  });
-}
+/**
+ * A scripted move of an app already set up to port 3101.
+ */
+const MOVE_TO_3101 = ["--non-interactive", "--dev-port", "3101"];
 
-/** An empty directory named as npm requires a package to be, which a new app's must be. */
-async function makeNewAppDirectory(): Promise<string> {
-  const parent = await mkdtemp(join(tmpdir(), "zitadel-setup-new-"));
-  tempDirs.push(parent);
-  const cwd = join(parent, "my-app");
-  await mkdir(cwd);
-  return cwd;
-}
+/**
+ * A Google client id of the shape Google issues.
+ */
+const GOOGLE_CLIENT_ID = "1234-abc.apps.googleusercontent.com";
 
-/** What a prompt answers when the person cancels it; the clack double's `isCancel` knows it. */
+/**
+ * A custom provider described in full, short of its client id.
+ */
+const ACME = [
+  "--sso",
+  "custom",
+  "--sso-slug",
+  "acme-sso",
+  "--sso-display-name",
+  "Acme SSO",
+  "--sso-issuer",
+  "https://sso.acme.example",
+];
+
+/**
+ * The claim nudge setup ends a new project's suggestions with.
+ */
+const CLAIM_COMMAND =
+  /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/;
+
+/**
+ * The runtime document of a local server that hosts its own platform project
+ * and claim page.
+ */
+const PLATFORM_RUNTIME = {
+  mode: "standalone",
+  console_project_id: "proj_platform",
+  publishable_key: "pk_platform",
+};
+
+/**
+ * What a prompt answers when the person cancels it; the clack double's
+ * `isCancel` is told to know it.
+ */
 const CANCELLED = Symbol("cancelled");
 
-/** A minimal detectable Next.js App Router project (no Zitadel files yet). */
-async function makeNextProject(devPort?: number): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-"));
-  tempDirs.push(cwd);
-  await mkdir(join(cwd, "app"), { recursive: true });
-  await writeFile(
-    join(cwd, "package.json"),
-    JSON.stringify({
-      name: "demo",
-      dependencies: { next: "^15" },
-      ...(devPort === undefined ? {} : { scripts: { dev: `next dev -p ${devPort}` } }),
-    }),
-  );
-  await writeFile(join(cwd, "app/layout.tsx"), "export default function L() {}\n");
-  return cwd;
-}
+/**
+ * Asks as a person at a terminal would be asked.
+ *
+ * @param question - The question.
+ * @returns The answer.
+ */
+const ask: Asker = (question) => {
+  return input(question, { interactive: true, force: false });
+};
 
-const FRAMEWORK_FIXTURES = [
+/**
+ * A Vite React app.
+ */
+const REACT_APP = {
+  "package.json": JSON.stringify({
+    name: "demo",
+    dependencies: { react: "^19.0.0", vite: "^8.0.0" },
+  }),
+  "vite.config.ts": "export default {}\n",
+  "src/.keep": "",
+};
+
+/**
+ * An app of each framework setup supports, and the file setup writes into it.
+ */
+const FRAMEWORK_APPS: ReadonlyArray<{
+  framework: string;
+  expectedFile: string;
+  files: Record<string, string>;
+}> = [
   {
     framework: "next",
     expectedFile: "app/login/page.tsx",
-    async create() {
-      return makeNextProject();
+    files: {
+      "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+      "app/layout.tsx": "export default function L() {}\n",
     },
   },
   {
     framework: "nuxt",
     expectedFile: "app/pages/login.vue",
-    async create() {
-      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-nuxt-"));
-      tempDirs.push(cwd);
-      await mkdir(join(cwd, "app"), { recursive: true });
-      await writeFile(
-        join(cwd, "package.json"),
-        JSON.stringify({ name: "demo", dependencies: { nuxt: "^4.0.0" } }),
-      );
-      await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({})\n");
-      return cwd;
+    files: {
+      "package.json": JSON.stringify({ name: "demo", dependencies: { nuxt: "^4.0.0" } }),
+      "nuxt.config.ts": "export default defineNuxtConfig({})\n",
+      "app/.keep": "",
     },
   },
   {
     framework: "react",
     expectedFile: "src/App.tsx",
-    async create() {
-      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-react-"));
-      tempDirs.push(cwd);
-      await mkdir(join(cwd, "src"), { recursive: true });
-      await writeFile(
-        join(cwd, "package.json"),
-        JSON.stringify({ name: "demo", dependencies: { react: "^19.0.0", vite: "^8.0.0" } }),
-      );
-      await writeFile(join(cwd, "vite.config.ts"), "export default {}\n");
-      return cwd;
-    },
+    files: REACT_APP,
   },
   {
     framework: "vue",
     expectedFile: "src/App.vue",
-    async create() {
-      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-vue-"));
-      tempDirs.push(cwd);
-      await mkdir(join(cwd, "src"), { recursive: true });
-      await writeFile(
-        join(cwd, "package.json"),
-        JSON.stringify({ name: "demo", dependencies: { vue: "^3.0.0", vite: "^8.0.0" } }),
-      );
-      await writeFile(join(cwd, "vite.config.ts"), "export default {}\n");
-      return cwd;
+    files: {
+      "package.json": JSON.stringify({
+        name: "demo",
+        dependencies: { vue: "^3.0.0", vite: "^8.0.0" },
+      }),
+      "vite.config.ts": "export default {}\n",
+      "src/.keep": "",
     },
   },
   {
     framework: "angular",
     expectedFile: "src/app/app.ts",
-    async create() {
-      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-angular-"));
-      tempDirs.push(cwd);
-      await mkdir(join(cwd, "src/app"), { recursive: true });
-      await writeFile(
-        join(cwd, "package.json"),
-        JSON.stringify({ name: "demo", dependencies: { "@angular/core": "^20.0.0" } }),
-      );
-      await writeFile(
-        join(cwd, "angular.json"),
-        JSON.stringify({
-          defaultProject: "demo",
-          projects: { demo: { architect: { serve: { options: {} } } } },
-        }),
-      );
-      await writeFile(
-        join(cwd, "src/app/app.routes.ts"),
+    files: {
+      "package.json": JSON.stringify({
+        name: "demo",
+        dependencies: { "@angular/core": "^20.0.0" },
+      }),
+      "angular.json": JSON.stringify({
+        defaultProject: "demo",
+        projects: { demo: { architect: { serve: { options: {} } } } },
+      }),
+      "src/app/app.routes.ts":
         "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];\n",
-      );
-      return cwd;
     },
   },
-] as const;
+];
 
-afterEach(async () => {
-  for (const holder of held.splice(0)) {
-    await new Promise<void>((resolve) => holder.close(() => resolve()));
-  }
-});
+/**
+ * `setup` in `cwd` against the cloud, with one JSON envelope on stdout.
+ *
+ * @param cwd - The directory to set up.
+ * @param flags - Further flags to pass.
+ * @returns The command line.
+ */
+function onTheCloud(cwd: string, ...flags: string[]): string[] {
+  return ["setup", "--cwd", cwd, "--json", "--server", CLOUD, ...flags];
+}
 
-describe("setup command", () => {
-  it("skips when the project is already initialized", async () => {
-    const cwd = await makeNextProject();
-    await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "existing" }));
+/**
+ * `setup` in `cwd` against `server`, with one JSON envelope on stdout.
+ *
+ * @param cwd - The directory to set up.
+ * @param server - The server to set it up against.
+ * @param flags - Further flags to pass.
+ * @returns The command line.
+ */
+function against(cwd: string, server: string, ...flags: string[]): string[] {
+  return ["setup", "--cwd", cwd, "--json", "--server", server, ...flags];
+}
 
-    const res = await setup(cwd);
+/**
+ * The environment that ends the search for local state at `cwd`, which keeps
+ * the developer's own `~/.zitadel/local` out of the test.
+ *
+ * @param cwd - The directory to treat as home.
+ * @returns The environment to run with.
+ */
+function homeAt(cwd: string): NodeJS.ProcessEnv {
+  return { HOME: cwd, USERPROFILE: cwd };
+}
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; reason: string };
-    expect(json.status).toBe("skipped");
-    expect(json.reason).toBe("already-initialized");
+/**
+ * Holds a port the system picks until the test ends.
+ *
+ * @param serve - The fixture that holds it.
+ * @returns The port.
+ */
+async function aHeldPort(serve: Serve): Promise<number> {
+  const url = await serve((_req, res) => {
+    res.end();
   });
+  return Number(new URL(url).port);
+}
 
-  it("errors with E_CONFLICT when a secret exists without zitadel.json", async () => {
-    const cwd = await makeNextProject();
-    await mkdir(join(cwd, ".zitadel"), { recursive: true });
-    await writeFile(join(cwd, ".zitadel/secret"), "{}");
+/**
+ * Records in `cwd` what `zitadel start` records beside the local admin: which
+ * server it started.
+ *
+ * @param cwd - The directory `start` ran in.
+ * @param serverUrl - The server it started.
+ * @returns Once the record is written.
+ */
+async function recordStartedServer(cwd: string, serverUrl: string): Promise<void> {
+  await writeRuntimeMetadata(
+    cwd,
+    aDockerRecord({
+      port: Number(new URL(serverUrl).port),
+      server_url: serverUrl,
+      data_dir: join(cwd, ".zitadel/local/nextgen-data"),
+    }),
+  );
+}
 
-    const res = await setup(cwd);
-
-    expect(res.exitCode).toBe(5);
-    const json = parseJson(res.stdout) as { status: string; code: string };
-    expect(json.status).toBe("error");
-    expect(json.code).toBe("E_CONFLICT");
+/**
+ * Writes the local admin `zitadel start` creates into `cwd`.
+ *
+ * @param cwd - The directory `start` ran in.
+ * @returns Once the admin is written.
+ */
+async function aLocalAdmin(cwd: string): Promise<void> {
+  await write(cwd, {
+    ".zitadel/local/admin.json": JSON.stringify({
+      email: "admin@zitadel.localhost",
+      password: "local-admin-password",
+      user_id: "user_localadmin",
+      team_id: "team_localadmin",
+    }),
   });
+}
 
-  it("dry-run returns ok with a stub project and contacts no platform", async () => {
-    const cwd = await makeNextProject();
+/**
+ * An empty directory named as npm requires a package to be, which a new app's
+ * must be.
+ *
+ * @param parent - The directory to make it in.
+ * @returns Its path.
+ */
+async function aNewAppDirectory(parent: string): Promise<string> {
+  const cwd = join(parent, "my-app");
+  await mkdir(cwd);
+  return cwd;
+}
 
-    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+/**
+ * Answers `server`'s runtime document as a local server hosting its own
+ * platform project does.
+ *
+ * @param serverUrl - The server.
+ * @returns The handler.
+ */
+function hostingThePlatform(serverUrl: string) {
+  return http.get(`${serverUrl}/console/runtime.json`, () => {
+    return HttpResponse.json(PLATFORM_RUNTIME);
+  });
+}
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as {
-      status: string;
-      data: {
-        install: { status: string; reason: string; command: string };
-        next_commands: string[];
-        project: { project_id: string };
-      };
-    };
-    expect(json.status).toBe("ok");
-    expect(json.data.project.project_id).toBe("dry-run-0000");
-    expect(json.data.install).toMatchObject({
-      status: "skipped",
-      reason: "dry-run",
-      command: "npm install",
+/**
+ * Answers the local admin's sign-in and the claim it makes on `serverUrl`.
+ * Completing the claim is a cookie-authenticated write, so it is refused
+ * without the session's CSRF token, as the server does (ADR 053 §5).
+ *
+ * @param serverUrl - The local server.
+ * @returns The handlers.
+ */
+function signingInTheAdmin(serverUrl: string) {
+  return [
+    http.post(`${serverUrl}/api/v1/auth_attempts`, () => {
+      return HttpResponse.json({ attempt_id: "att_1" }, { status: 201 });
+    }),
+    http.post(`${serverUrl}/api/v1/auth_attempts/:attempt/challenges`, () => {
+      return HttpResponse.json({ challenge_id: "ch_1" }, { status: 201 });
+    }),
+    http.post(`${serverUrl}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () => {
+      return HttpResponse.json({ attempt_id: "att_1" });
+    }),
+    http.post(`${serverUrl}/api/v1/auth_attempts/:attempt/handoff`, () => {
+      return HttpResponse.json({ handoff_token: "handoff_1" });
+    }),
+    http.post(`${serverUrl}/api/v1/sessions/exchange`, () => {
+      return new HttpResponse(null, {
+        headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
+      });
+    }),
+    http.post(`${serverUrl}/api/v1/projects/:projectId/claim/init`, () => {
+      return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
+    }),
+    http.get(`${serverUrl}/api/v1/sessions/me/csrf`, () => {
+      return HttpResponse.json({ csrf_token: "csrf_admin" });
+    }),
+    http.post(`${serverUrl}/api/v1/projects/:projectId/claim/complete`, ({ request }) => {
+      if (request.headers.get("x-zitadel-csrf") === "csrf_admin") {
+        return HttpResponse.json({
+          team_id: "team_localadmin",
+          claimed_at: "2027-01-01T00:00:00Z",
+        });
+      }
+      return HttpResponse.json({ code: "auth.csrf_invalid", message: "no" }, { status: 403 });
+    }),
+  ];
+}
+
+/**
+ * Makes the platform refuse to create a project.
+ *
+ * @returns The handler.
+ */
+function refusingProjects() {
+  return http.post("*/projects", () => {
+    return HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 });
+  });
+}
+
+/**
+ * Reads a JSON file of an app.
+ *
+ * @param cwd - The app's directory.
+ * @param path - The file, from the app's directory.
+ * @returns The parsed file.
+ */
+async function readJsonAt(cwd: string, path: string): Promise<unknown> {
+  return JSON.parse(await readFile(join(cwd, path), "utf8"));
+}
+
+/**
+ * A client of the cloud, acting as the project `cwd` is bound to.
+ *
+ * @param cwd - The app's directory.
+ * @returns The client and the project's id.
+ */
+async function aClientOf(cwd: string) {
+  const secret = await readZitadelSecret(cwd);
+  const client = createZitadelClient({
+    signal: new AbortController().signal,
+    baseUrl: CLOUD,
+    token: secret.project_secret,
+  });
+  return { client, projectId: secret.project_id };
+}
+
+/**
+ * The origins the platform holds for the project `cwd` is bound to.
+ *
+ * @param cwd - The app's directory.
+ * @returns Its origins.
+ */
+async function projectOrigins(cwd: string) {
+  const { client, projectId } = await aClientOf(cwd);
+  return (await client.getProject(projectId)).origins;
+}
+
+/**
+ * What the project `cwd` is bound to serves now, as `deployment list --live`
+ * reads it.
+ *
+ * @param cwd - The app's directory.
+ * @returns Its live deployments.
+ */
+async function liveDeployments(cwd: string) {
+  const { client, projectId } = await aClientOf(cwd);
+  return client.listDeployments.all({ project_id: projectId, live: true });
+}
+
+describe("setup", () => {
+  describe("with zitadel.json already present", () => {
+    it("reports itself skipped, as already initialized", async ({ dir }) => {
+      await aNextApp(dir);
+      await write(dir, { "zitadel.json": JSON.stringify({ project: "existing" }) });
+
+      const res = await runCliForTest(onTheCloud(dir));
+
+      expect(res).toBeSkipped();
+      expect(parseJson(res.stdout)).toMatchObject({ reason: "already-initialized" });
     });
-    expect(json.data.next_commands.slice(0, 2)).toEqual([
-      `npm --prefix ${cwd} install`,
-      `npm --prefix ${cwd} run dev`,
-    ]);
-    expect(json.data.next_commands[2]).toBe(
-      expectedPublicCliCommand(
-        `deploy --dry-run --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
-      ),
-    );
   });
 
-  it("warns, with the command that picks a free port, when the detected one is taken", async () => {
-    // The wizard asks for another port then. A run that asks nothing says so.
-    const port = await aHeldPort();
-    const cwd = await makeNextProject(port);
+  describe("with .zitadel/secret but no zitadel.json", () => {
+    it("refuses with E_CONFLICT", async ({ dir }) => {
+      await aNextApp(dir);
+      await write(dir, { ".zitadel/secret": "{}" });
 
-    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+      const res = await runCliForTest(onTheCloud(dir));
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { warnings: string[] };
-    expect(json.warnings).toEqual([
-      expect.stringContaining(
-        `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@`,
-      ),
-    ]);
-    expect(json.warnings[0]).toMatch(/ setup --dev-port \d+ --cwd \S+$/);
-  });
-
-  it("names only the flag for a taken port when the ports after it are taken too", () => {
-    // A placeholder in a suggested command would be run as a shell redirection.
-    expect(portInUseWarning(3000, undefined, (args) => unscopedCommand(args, "1.2.3"))).toBe(
-      "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
-    );
-  });
-
-  it("does not warn about a taken port that --dev-port chose", async () => {
-    const port = await aHeldPort();
-    const cwd = await makeNextProject();
-
-    const res = await setup(cwd, ["--dry-run", "--framework", "next", "--dev-port", String(port)]);
-
-    expect(res.exitCode).toBe(0);
-    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toEqual([]);
-  });
-
-  // `data.sso` is a list, one entry per provider, because setup can enable
-  // several. An agent that kept parsing the old object would read nothing, so
-  // the shape is pinned here rather than left to the summary box.
-  it("reports the enabled providers as a list in the json envelope", async () => {
-    const cwd = await makeNextProject();
-
-    const res = await setup(cwd, [
-      "--dry-run",
-      "--framework",
-      "next",
-      "--sso",
-      "google",
-      "--sso-client-id",
-      "1234-abc.apps.googleusercontent.com",
-    ]);
-
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as {
-      data: {
-        sso: Array<{
-          provider: string;
-          client_id: string;
-          connection: string;
-          callback_uri: string;
-        }>;
-      };
-    };
-    expect(Array.isArray(json.data.sso)).toBe(true);
-    expect(json.data.sso).toHaveLength(1);
-    expect(json.data.sso[0]).toMatchObject({
-      provider: "google",
-      client_id: "1234-abc.apps.googleusercontent.com",
-      connection: ".zitadel/idps/google.json",
+      expect(res).toFailWith("E_CONFLICT");
     });
-    // The connection's own route: an agent registering the OAuth application
-    // reads it from here, since a JSON run shows no prompt.
-    expect(json.data.sso[0]?.callback_uri).toMatch(
-      /^http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback$/,
-    );
   });
 
-  // A scripted `--sso` run without `--json` shows no prompt, so the summary
-  // box is the only place the developer reads the URI to register.
-  it("names the connection's redirect URI in the summary of a scripted --sso run", async () => {
-    const cwd = await makeNextProject();
+  describe("as a dry run", () => {
+    it("reports a stub project", async ({ dir }) => {
+      await aNextApp(dir);
 
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--server",
-      "https://api.zitadel.cloud",
-      "--non-interactive",
-      "--dry-run",
-      "--skip-install",
-      "--framework",
-      "next",
-      "--sso",
-      "google",
-      "--sso-client-id",
-      "1234-abc.apps.googleusercontent.com",
-    ]);
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
 
-    expect(res.exitCode).toBe(0);
-    const output = `${res.stdout}${res.stderr}`;
-    expect(output).toContain("Redirect URI");
-    expect(output).toMatch(/http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/);
-  });
-
-  it("ends its summary with where to find every command", async () => {
-    const cwd = await makeNextProject();
-
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--server",
-      "https://api.zitadel.cloud",
-      "--non-interactive",
-      "--dry-run",
-      "--skip-install",
-      "--framework",
-      "next",
-    ]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain(`Explore all commands:\n  ${expectedPublicCliCommand("")}`);
-  });
-
-  describe("a custom provider", () => {
-    const ACME = [
-      "--sso",
-      "custom",
-      "--sso-slug",
-      "acme-sso",
-      "--sso-display-name",
-      "Acme SSO",
-      "--sso-issuer",
-      "https://sso.acme.example",
-    ];
-
-    it("is reported under the slug the developer gave it", async () => {
-      const cwd = await makeNextProject();
-
-      const res = await setup(cwd, [
-        "--dry-run",
-        "--framework",
-        "next",
-        ...ACME,
-        "--sso-client-id",
-        "acme-client-id",
-      ]);
-
-      expect(res.exitCode).toBe(0);
-      const json = parseJson(res.stdout) as {
-        data: { sso: Array<Record<string, unknown>> };
-      };
-      expect(json.data.sso).toHaveLength(1);
-      expect(json.data.sso[0]).toMatchObject({
-        provider: "custom",
-        slug: "acme-sso",
-        client_id: "acme-client-id",
-        connection: ".zitadel/idps/acme-sso.json",
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+        data: { project: { project_id: "dry-run-0000" } },
       });
     });
 
-    it("must be described completely, before anything is created", async () => {
-      const cwd = await makeNextProject();
+    it.for(FRAMEWORK_APPS)("sets up a $framework app", async ({ framework, files }, { dir }) => {
+      await write(dir, files);
 
-      const res = await setup(cwd, [
-        "--framework",
-        "next",
-        "--sso",
-        "custom",
-        "--sso-slug",
-        "acme-sso",
-        "--sso-client-id",
-        "acme-client-id",
-      ]);
-
-      expect(res.exitCode).not.toBe(0);
-      const json = parseJson(res.stdout) as { code: string; message: string };
-      expect(json.code).toBe("E_VALIDATION");
-      expect(json.message).toBe("A custom connection needs --sso-display-name, --sso-issuer");
-    });
-
-    it("refuses a name belonging to a built-in provider", async () => {
-      const cwd = await makeNextProject();
-
-      const res = await setup(cwd, [
-        "--dry-run",
-        "--framework",
-        "next",
-        "--sso",
-        "custom",
-        "--sso-slug",
-        "google",
-        "--sso-display-name",
-        "Mine",
-        "--sso-issuer",
-        "https://sso.acme.example",
-        "--sso-client-id",
-        "id",
-      ]);
-
-      expect(res.exitCode).not.toBe(0);
-      expect((parseJson(res.stdout) as { message: string }).message).toContain("built-in provider");
-    });
-
-    it("refuses the --sso-* description for a provider the catalog describes", async () => {
-      const cwd = await makeNextProject();
-
-      const res = await setup(cwd, [
-        "--dry-run",
-        "--framework",
-        "next",
-        "--sso",
-        "google",
-        "--sso-issuer",
-        "https://sso.acme.example",
-        "--sso-client-id",
-        "id",
-      ]);
-
-      expect(res.exitCode).not.toBe(0);
-      expect((parseJson(res.stdout) as { message: string }).message).toBe(
-        "--sso-issuer only applies to a custom connection",
+      const res = await runCliForTest(
+        onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
       );
+
+      expect(parseJson(res.stdout)).toMatchObject({ status: "ok", data: { framework } });
     });
 
-    it("refuses a description with no --sso to attach it to", async () => {
-      const cwd = await makeNextProject();
+    it.for(FRAMEWORK_APPS)(
+      "writes $expectedFile into a $framework app",
+      async ({ framework, files, expectedFile }, { dir }) => {
+        await write(dir, files);
 
-      const res = await setup(cwd, ["--dry-run", "--framework", "next", "--sso-slug", "acme-sso"]);
+        const res = await runCliForTest(
+          onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
+        );
 
-      expect(res.exitCode).not.toBe(0);
-      expect((parseJson(res.stdout) as { message: string }).message).toBe(
-        "--sso-slug needs --sso custom",
-      );
+        expect(parseJson(res.stdout)).toMatchObject({
+          data: { files_written: expect.arrayContaining([expectedFile]) },
+        });
+      },
+    );
+
+    it.for(FRAMEWORK_APPS)(
+      "skips the install of a $framework app as a dry run",
+      async ({ framework, files }, { dir }) => {
+        await write(dir, files);
+
+        const res = await runCliForTest(
+          onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
+        );
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          data: { install: { status: "skipped", reason: "dry-run", command: "npm install" } },
+        });
+      },
+    );
+
+    it.for(FRAMEWORK_APPS)(
+      "suggests installing and running a $framework app first",
+      async ({ framework, files }, { dir }) => {
+        await write(dir, files);
+
+        const res = await runCliForTest(
+          onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
+        );
+
+        expect(suggestedCommands(res.stdout).slice(0, 2)).toEqual([
+          `npm --prefix ${dir} install`,
+          `npm --prefix ${dir} run dev`,
+        ]);
+      },
+    );
+
+    it.for(FRAMEWORK_APPS)(
+      "suggests a deploy dry run next for a $framework app",
+      async ({ framework, files }, { dir }) => {
+        await write(dir, files);
+
+        const res = await runCliForTest(
+          onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
+        );
+
+        expect(suggestedCommands(res.stdout)[2]).toBe(
+          expectedPublicCliCommand(
+            `deploy --dry-run --env-file ${dir}/.env.development.local --cwd ${dir}`,
+          ),
+        );
+      },
+    );
+
+    it("names the SDK package it installs in the summary, not the Next.js one", async ({ dir }) => {
+      await write(dir, REACT_APP);
+
+      const res = await runCliForTest([
+        "setup",
+        "--cwd",
+        dir,
+        "--server",
+        CLOUD,
+        "--dry-run",
+        "--skip-install",
+        "--framework",
+        "react",
+      ]);
+
+      expect(res).toSay("@zitadel/sdk-react");
     });
-  });
 
-  // No provider is an empty list, not a missing key or null: a consumer can
-  // iterate the field without checking which of three shapes it holds.
-  it("reports an empty list when no provider was enabled", async () => {
-    const cwd = await makeNextProject();
+    it("does not name the Next.js SDK in the summary of another framework", async ({ dir }) => {
+      await write(dir, REACT_APP);
 
-    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+      const res = await runCliForTest([
+        "setup",
+        "--cwd",
+        dir,
+        "--server",
+        CLOUD,
+        "--dry-run",
+        "--skip-install",
+        "--framework",
+        "react",
+      ]);
 
-    const json = parseJson(res.stdout) as { data: { sso: unknown[] } };
-    expect(json.data.sso).toEqual([]);
-  });
+      expect(res).not.toSay("@zitadel/sdk-next");
+    });
 
-  // Every project starts unattached, so setup is where the developer first
-  // learns the project is temporary and that `zitadel claim` exists.
-  //
-  // Asserted through `--dry-run`, which previews the real output verbatim:
-  // the install, start, and verify actions all name a project dry run never
-  // created, so the claim nudge appearing alongside them is the consistent
-  // behaviour, not a leak. Suppressing only this one would make dry run a
-  // dishonest preview of the surface under test.
-  it("tells a new cloud project it is temporary until claimed", async () => {
-    const cwd = await makeNextProject();
+    it("ends its summary with where to find every command", async ({ dir }) => {
+      await aNextApp(dir);
 
-    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+      const res = await runCliForTest([
+        "setup",
+        "--cwd",
+        dir,
+        "--server",
+        CLOUD,
+        "--non-interactive",
+        "--dry-run",
+        "--skip-install",
+        "--framework",
+        "next",
+      ]);
 
-    const json = parseJson(res.stdout) as {
-      data: { next_actions: string[]; next_commands: string[] };
-    };
-    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/,
-    );
-  });
+      expect(res).toPrint(`Explore all commands:\n  ${expectedPublicCliCommand("")}`);
+    });
 
-  // A bootstrapped local server hosts its own platform project and claim
-  // page. A real run probes the server's runtime document before nudging
-  // (localServerHostsPlatform, covered below); dry run contacts no platform,
-  // so its preview shows the nudge optimistically.
-  it("nudges claim when setting up against the local server (dry run previews it)", async () => {
-    const cwd = await makeNextProject();
+    it.for([
+      { against: "a new cloud project", server: CLOUD },
+      {
+        against: "the local server, whose probe a dry run previews optimistically",
+        server: "http://localhost:8080",
+      },
+    ])("tells $against it is temporary until claimed", async ({ server: url }, { dir }) => {
+      await aNextApp(dir);
 
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      "http://localhost:8080",
-      "--dry-run",
-      "--framework",
-      "next",
-    ]);
+      const res = await runCliForTest(against(dir, url, ...DRY_RUN_NEXT));
 
-    const json = parseJson(res.stdout) as {
-      data: { next_actions: string[]; next_commands: string[] };
-    };
-    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/,
-    );
-  });
-
-  // The probe behind the real-run local nudge: only a runtime document
-  // naming the well-known platform project counts, and every failure mode
-  // (wrong project, missing document, dead server) fails closed so setup
-  // never nudges into a claim that would 401 at complete.
-  it("detects the platform plane from the local runtime document, failing closed", async () => {
-    server.use(
-      http.get("http://localhost:9931/console/runtime.json", () =>
-        HttpResponse.json({
-          mode: "standalone",
-          console_project_id: "proj_platform",
-          publishable_key: "pk_platform",
-        }),
-      ),
-      http.get("http://localhost:9932/console/runtime.json", () =>
-        HttpResponse.json({ mode: "standalone", console_project_id: "proj_someone" }),
-      ),
-      http.get("http://localhost:9933/console/runtime.json", () =>
-        HttpResponse.json({ error: "nope" }, { status: 404 }),
-      ),
-      http.get("http://localhost:9934/console/runtime.json", () => HttpResponse.error()),
-    );
-
-    await expect(localServerHostsPlatform("http://localhost:9931")).resolves.toBe(true);
-    await expect(localServerHostsPlatform("http://localhost:9932")).resolves.toBe(false);
-    await expect(localServerHostsPlatform("http://localhost:9933")).resolves.toBe(false);
-    await expect(localServerHostsPlatform("http://localhost:9934")).resolves.toBe(false);
-  });
-
-  it("says nothing about teams when setting up against a self-hosted server", async () => {
-    const cwd = await makeNextProject();
-
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      "https://zitadel.example.com",
-      "--dry-run",
-      "--framework",
-      "next",
-    ]);
-
-    const json = parseJson(res.stdout) as {
-      data: { next_actions: string[]; next_commands: string[] };
-    };
-    expect(json.data.next_actions.join("\n")).not.toContain("Claim your Project");
-    expect(json.data.next_commands.join("\n")).not.toMatch(/claim/);
-  });
-
-  it.each(FRAMEWORK_FIXTURES)(
-    "dry-run setup supports $framework projects",
-    async ({ create, expectedFile, framework }) => {
-      const cwd = await create();
-
-      const res = await setup(cwd, ["--dry-run", "--skip-install", "--framework", framework]);
-
-      expect(res.exitCode).toBe(0);
-      const json = parseJson(res.stdout) as {
-        status: string;
+      expect(parseJson(res.stdout)).toMatchObject({
         data: {
-          install: { status: string; reason: string };
-          framework: string;
-          files_written: string[];
-          next_commands: string[];
-        };
-      };
-      expect(json.status).toBe("ok");
-      expect(json.data.framework).toBe(framework);
-      expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
-      expect(json.data.files_written).toContain(expectedFile);
-      expect(json.data.next_commands.slice(0, 2)).toEqual([
-        `npm --prefix ${cwd} install`,
-        `npm --prefix ${cwd} run dev`,
-      ]);
-      expect(json.data.next_commands[2]).toBe(
-        expectedPublicCliCommand(
-          `deploy --dry-run --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
+          next_actions: expect.arrayContaining([
+            expect.stringContaining("temporary and its data may be lost"),
+          ]),
+        },
+      });
+    });
+
+    it.for([
+      { against: "a new cloud project", server: CLOUD },
+      { against: "the local server", server: "http://localhost:8080" },
+    ])("ends the suggestions for $against with claim", async ({ server: url }, { dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(against(dir, url, ...DRY_RUN_NEXT));
+
+      expect(suggestedCommands(res.stdout).at(-1)).toMatch(CLAIM_COMMAND);
+    });
+
+    it("says nothing about claiming against a self-hosted server", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(against(dir, "https://zitadel.example.com", ...DRY_RUN_NEXT));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        data: {
+          next_actions: expect.not.arrayContaining([expect.stringContaining("Claim your Project")]),
+        },
+      });
+    });
+
+    it("suggests no claim against a self-hosted server", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(against(dir, "https://zitadel.example.com", ...DRY_RUN_NEXT));
+
+      expect(suggestedCommands(res.stdout)).not.toContainEqual(expect.stringMatching(/claim/));
+    });
+  });
+
+  describe("when the detected dev port is taken", () => {
+    it("still succeeds", async ({ dir, serve }) => {
+      await aNextApp(dir, { scripts: { dev: `next dev -p ${await aHeldPort(serve)}` } });
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
+
+      expect(res).toSucceed();
+    });
+
+    it("warns that the port is in use", async ({ dir, serve }) => {
+      const port = await aHeldPort(serve);
+      await aNextApp(dir, { scripts: { dev: `next dev -p ${port}` } });
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        warnings: [
+          expect.stringContaining(
+            `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@`,
+          ),
+        ],
+      });
+    });
+
+    it("ends the warning with the setup that picks a free port", async ({ dir, serve }) => {
+      await aNextApp(dir, { scripts: { dev: `next dev -p ${await aHeldPort(serve)}` } });
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        warnings: [expect.stringMatching(/ setup --dev-port \d+ --cwd \S+$/)],
+      });
+    });
+  });
+
+  describe("with --dev-port naming a taken port", () => {
+    it("succeeds without a warning, since the port was chosen", async ({ dir, serve }) => {
+      const port = await aHeldPort(serve);
+      await aNextApp(dir);
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT, "--dev-port", String(port)));
+
+      expect(parseJson(res.stdout)).toMatchObject({ status: "ok", warnings: [] });
+    });
+  });
+
+  describe("with --sso google", () => {
+    it("reports the enabled providers as a list, which an agent can rely on", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(dir, ...DRY_RUN_NEXT, "--sso", "google", "--sso-client-id", GOOGLE_CLIENT_ID),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+        data: {
+          sso: [
+            {
+              provider: "google",
+              client_id: GOOGLE_CLIENT_ID,
+              connection: ".zitadel/idps/google.json",
+            },
+          ],
+        },
+      });
+    });
+
+    it("reports the connection's callback URI, which a JSON run shows no prompt for", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(dir, ...DRY_RUN_NEXT, "--sso", "google", "--sso-client-id", GOOGLE_CLIENT_ID),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        data: {
+          sso: [
+            {
+              callback_uri: expect.stringMatching(
+                /^http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback$/,
+              ),
+            },
+          ],
+        },
+      });
+    });
+
+    describe("run without --json", () => {
+      it("names the redirect URI in its summary, the only place a scripted run shows it", async ({
+        dir,
+      }) => {
+        await aNextApp(dir);
+
+        const res = await runCliForTest([
+          "setup",
+          "--cwd",
+          dir,
+          "--server",
+          CLOUD,
+          "--non-interactive",
+          "--skip-install",
+          ...DRY_RUN_NEXT,
+          "--sso",
+          "google",
+          "--sso-client-id",
+          GOOGLE_CLIENT_ID,
+        ]);
+
+        expect(res).toSay("Redirect URI");
+      });
+
+      it("prints the redirect URI to register", async ({ dir }) => {
+        await aNextApp(dir);
+
+        const res = await runCliForTest([
+          "setup",
+          "--cwd",
+          dir,
+          "--server",
+          CLOUD,
+          "--non-interactive",
+          "--skip-install",
+          ...DRY_RUN_NEXT,
+          "--sso",
+          "google",
+          "--sso-client-id",
+          GOOGLE_CLIENT_ID,
+        ]);
+
+        expect(`${res.stdout}${res.stderr}`).toMatch(
+          /http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/,
+        );
+      });
+    });
+  });
+
+  describe("with no provider", () => {
+    it("reports an empty list, so a consumer never checks which shape it holds", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
+
+      expect(parseJson(res.stdout)).toMatchObject({ data: { sso: [] } });
+    });
+  });
+
+  describe("with a custom provider", () => {
+    it("reports it under the slug the developer gave it", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(dir, ...DRY_RUN_NEXT, ...ACME, "--sso-client-id", "acme-client-id"),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+        data: {
+          sso: [
+            {
+              provider: "custom",
+              slug: "acme-sso",
+              client_id: "acme-client-id",
+              connection: ".zitadel/idps/acme-sso.json",
+            },
+          ],
+        },
+      });
+    });
+
+    it("refuses one described in part before anything is created, naming what it lacks", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(
+          dir,
+          "--framework",
+          "next",
+          "--sso",
+          "custom",
+          "--sso-slug",
+          "acme-sso",
+          "--sso-client-id",
+          "acme-client-id",
         ),
       );
-    },
-  );
 
-  // The INSTALLED section reports the dependency the patcher actually added;
-  // it used to hardcode @zitadel/sdk-next from the Next-only era, which lied
-  // for every other framework.
-  it("names the actually installed SDK package in the summary box", async () => {
-    const react = FRAMEWORK_FIXTURES.find((fixture) => fixture.framework === "react");
-    if (!react) throw new Error("react fixture missing");
-    const cwd = await react.create();
-
-    // No `--json`: the summary box is human-facing consola narration.
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--server",
-      "https://api.zitadel.cloud",
-      "--dry-run",
-      "--skip-install",
-      "--framework",
-      "react",
-    ]);
-
-    expect(res.exitCode).toBe(0);
-    const output = `${res.stdout}${res.stderr}`;
-    expect(output).toContain("@zitadel/sdk-react");
-    expect(output).not.toContain("@zitadel/sdk-next");
-  });
-
-  it("creates CLI-managed projects with a name and without server default seeding", async () => {
-    const cwd = await makeNextProject();
-    const createProjectBodies: unknown[] = [];
-
-    server.use(
-      http.post("*/projects", async ({ request }) => {
-        createProjectBodies.push(await request.json());
-        return HttpResponse.json(
-          {
-            id: "proj-test",
-            name: "demo",
-            project_secret: "sk_proj_test_full",
-            preview_secret: "sk_proj_test_preview",
-            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
-            created_at: "2026-04-21T14:03:11.000Z",
-          },
-          { status: 201 },
-        );
-      }),
-    );
-
-    const res = await setup(cwd, ["--non-interactive", "--skip-install", "--framework", "next"]);
-
-    expect(res.exitCode).toBe(0);
-    const [createProjectBody] = createProjectBodies;
-    expect(createProjectBody).toMatchObject({
-      name: expect.any(String),
-      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
-      seed_defaults: false,
+      expect(res).toFailWith("E_VALIDATION");
+      expect(parseJson(res.stdout)).toMatchObject({
+        message: "A custom connection needs --sso-display-name, --sso-issuer",
+      });
     });
-    const projectName = (createProjectBody as { name?: unknown }).name;
-    expect(typeof projectName).toBe("string");
-    if (typeof projectName !== "string") {
-      throw new Error("expected create-project payload name to be a string");
-    }
-    expect(projectName.trim().length).toBeGreaterThan(0);
+
+    it("refuses a slug belonging to a built-in provider", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(
+          dir,
+          ...DRY_RUN_NEXT,
+          "--sso",
+          "custom",
+          "--sso-slug",
+          "google",
+          "--sso-display-name",
+          "Mine",
+          "--sso-issuer",
+          "https://sso.acme.example",
+          "--sso-client-id",
+          "id",
+        ),
+      );
+
+      expect(res).toFail();
+      expect(res).toExplain("built-in provider");
+    });
+
+    it("refuses the --sso-* description for a provider the catalog describes", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(
+          dir,
+          ...DRY_RUN_NEXT,
+          "--sso",
+          "google",
+          "--sso-issuer",
+          "https://sso.acme.example",
+          "--sso-client-id",
+          "id",
+        ),
+      );
+
+      expect(res).toFail();
+      expect(parseJson(res.stdout)).toMatchObject({
+        message: "--sso-issuer only applies to a custom connection",
+      });
+    });
+
+    it("refuses a description with no --sso to attach it to", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT, "--sso-slug", "acme-sso"));
+
+      expect(res).toFail();
+      expect(parseJson(res.stdout)).toMatchObject({ message: "--sso-slug needs --sso custom" });
+    });
   });
 
-  // A runtime document naming the platform project does not guarantee a claim
-  // can complete, so attaching the project to the local admin must not fail a
-  // setup that has already written the app files.
-  it("keeps the project unclaimed when attaching it to the local admin fails", async () => {
-    const cwd = await makeNextProject();
-    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
-    await writeFile(
-      join(cwd, ".zitadel/local/admin.json"),
-      JSON.stringify({
-        email: "admin@zitadel.localhost",
-        password: "local-admin-password",
-        user_id: "user_localadmin",
-        team_id: "team_localadmin",
-      }),
-    );
-    await recordStartedServer(cwd, "http://localhost:9941");
-    server.use(
-      http.get("http://localhost:9941/console/runtime.json", () =>
-        HttpResponse.json({
-          mode: "standalone",
-          console_project_id: "proj_platform",
-          publishable_key: "pk_platform",
+  describe("with a custom provider described in part", () => {
+    it("refuses with E_VALIDATION when the run cannot ask, whatever the server is doing", async ({
+      dir,
+    }) => {
+      const res = await runCliForTest(onTheCloud(dir, "--sso", "custom", "--sso-slug", "acme-sso"));
+
+      expect(res).toFailWith("E_VALIDATION");
+    });
+
+    it("refuses with E_VALIDATION before it looks for the local server", async ({ dir }) => {
+      const res = await runCliForTest(
+        against(dir, "local", "--sso", "custom", "--sso-slug", "acme-sso"),
+      );
+
+      expect(res).toFailWith("E_VALIDATION");
+    });
+
+    it("shows the example with setup's own flags", async ({ dir }) => {
+      const res = await runCliForTest(onTheCloud(dir, "--sso", "custom", "--sso-slug", "acme-sso"));
+
+      expect(res).toHintAt(customExample(SETUP_FLAG_NAMES));
+    });
+
+    it("refuses a setting that is wrong before anything else", async ({ dir }) => {
+      const res = await runCliForTest(onTheCloud(dir, "--sso", "custom", "--sso-slug", "Acme"));
+
+      expect(res).toExplain("--sso-slug");
+    });
+  });
+
+  describe("against a platform that creates the project", () => {
+    it("creates it with a name, the primary origin and no server default seeding", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+      const createBodies: unknown[] = [];
+      server.use(
+        http.post("*/projects", async ({ request }) => {
+          createBodies.push(await request.json());
+          return HttpResponse.json(
+            {
+              id: "proj-test",
+              name: "demo",
+              project_secret: "sk_proj_test_full",
+              preview_secret: "sk_proj_test_preview",
+              origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+              created_at: "2026-04-21T14:03:11.000Z",
+            },
+            { status: 201 },
+          );
         }),
-      ),
-      http.post("http://localhost:9941/api/v1/projects/:projectId/claim/init", () =>
-        HttpResponse.json({ code: "internal", message: "claim unavailable" }, { status: 500 }),
-      ),
-    );
+      );
 
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      "http://localhost:9941",
-      "--non-interactive",
-      "--skip-install",
-      "--framework",
-      "next",
-    ]);
+      await runCliForTest(onTheCloud(dir, ...SCRIPTED_NEXT));
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { next_commands: string[] } };
-    expect(json.status).toBe("ok");
-    const secret = JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as {
-      team_id?: string;
-    };
-    expect(secret.team_id).toBeUndefined();
-    expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/,
+      expect(createBodies).toMatchObject([
+        {
+          name: expect.stringMatching(/\S/),
+          origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
+          seed_defaults: false,
+        },
+      ]);
+    });
+  });
+
+  describe("when the platform cannot create the project", () => {
+    it("refuses", async ({ dir }) => {
+      await aNextApp(dir);
+      server.use(refusingProjects());
+
+      const res = await runCliForTest(onTheCloud(dir, ...SCRIPTED_NEXT));
+
+      expect(res).toFail();
+      expect(parseJson(res.stdout)).toMatchObject({ status: "error" });
+    });
+
+    it.for([
+      ["--use-case", "business"],
+      ["--password-min-length", "12"],
+    ])(
+      "carries %s %s into the retry it suggests, which agents follow literally",
+      async (flag, { dir }) => {
+        await aNextApp(dir);
+        server.use(refusingProjects());
+
+        const res = await runCliForTest(onTheCloud(dir, ...SCRIPTED_NEXT, ...flag));
+
+        expect(res).toPrint(flag.join(" "));
+      },
     );
   });
 
-  it("says the project went unattached when a local platform server has no local admin here", async () => {
-    const cwd = await makeNextProject();
-    server.use(
-      http.get("http://localhost:9942/console/runtime.json", () =>
-        HttpResponse.json({
-          mode: "standalone",
-          console_project_id: "proj_platform",
-          publishable_key: "pk_platform",
-        }),
-      ),
-    );
+  describe("against a local server hosting the platform", () => {
+    describe("with a local admin in a parent directory", () => {
+      it("attaches the project to the admin's team", async ({ dir }) => {
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, LOCAL_SERVER);
+        const cwd = join(dir, "my-app");
+        await aNextApp(cwd);
+        server.use(hostingThePlatform(LOCAL_SERVER), ...signingInTheAdmin(LOCAL_SERVER));
 
-    const res = await runCliForTest(
-      [
-        "setup",
-        "--cwd",
-        cwd,
-        "--json",
-        "--server",
-        "http://localhost:9942",
-        "--non-interactive",
-        "--skip-install",
-        "--no-git",
-        "--framework",
-        "next",
-        ...PINNED_DEV_PORT,
-      ],
-      // The search for local state ends at the home directory; pinning it
-      // keeps the developer's own `~/.zitadel/local` out of the test.
-      { HOME: cwd, USERPROFILE: cwd },
-    );
+        await runCliForTest(against(cwd, LOCAL_SERVER, ...SCRIPTED_NEXT));
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as {
-      warnings: string[];
-      data: { next_actions: string[]; next_commands: string[] };
-    };
-    expect(json.warnings).toHaveLength(1);
-    expect(json.warnings[0]).toContain(
-      `No local admin for http://localhost:9942 in ${cwd} or its parents`,
-    );
-    expect(json.warnings[0]).toContain("If `zitadel start` started this server");
-    expect(json.data.next_actions.join("\n")).not.toContain("No local admin");
-    // No project to manage there, so the console is not suggested.
-    expect(json.data.next_commands.join("\n")).not.toMatch(/ console$/m);
-  });
+        expect(await readZitadelSecret(cwd)).toMatchObject({ team_id: "team_localadmin" });
+      });
 
-  it("passes over a local admin that belongs to another server", async () => {
-    const cwd = await makeNextProject();
-    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
-    await writeFile(
-      join(cwd, ".zitadel/local/admin.json"),
-      JSON.stringify({
-        email: "admin@zitadel.localhost",
-        password: "another-servers-password",
-        user_id: "user_localadmin",
-        team_id: "team_localadmin",
-      }),
-    );
-    await recordStartedServer(cwd, "http://localhost:9999");
-    // No sign-in or claim handlers: a request made with that admin would fail
-    // the test as an unhandled request.
-    server.use(
-      http.get("http://localhost:9944/console/runtime.json", () =>
-        HttpResponse.json({
-          mode: "standalone",
-          console_project_id: "proj_platform",
-          publishable_key: "pk_platform",
-        }),
-      ),
-    );
+      it.for([
+        {
+          suggestion: "the console",
+          command: (cwd: string) => {
+            return `console --cwd ${cwd}`;
+          },
+        },
+        {
+          suggestion: "enabling Google sign-in",
+          command: (cwd: string) => {
+            return `auth-method sso enable --provider google --env-file ${cwd}/.env.development.local --cwd ${cwd}`;
+          },
+        },
+      ])("suggests $suggestion", async ({ command }, { dir }) => {
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, LOCAL_SERVER);
+        const cwd = join(dir, "my-app");
+        await aNextApp(cwd);
+        server.use(hostingThePlatform(LOCAL_SERVER), ...signingInTheAdmin(LOCAL_SERVER));
 
-    const res = await runCliForTest(
-      [
-        "setup",
-        "--cwd",
-        cwd,
-        "--json",
-        "--server",
-        "http://localhost:9944",
-        "--non-interactive",
-        "--skip-install",
-        "--no-git",
-        "--framework",
-        "next",
-        ...PINNED_DEV_PORT,
-      ],
-      { HOME: cwd, USERPROFILE: cwd },
-    );
+        const res = await runCliForTest(against(cwd, LOCAL_SERVER, ...SCRIPTED_NEXT));
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { warnings: string[] };
-    expect(json.warnings[0]).toContain("No local admin for http://localhost:9944");
-  });
+        expect(suggestedCommands(res.stdout)).toContain(expectedPublicCliCommand(command(cwd)));
+      });
 
-  it("attaches the project to a local admin created in a parent directory and offers the console", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel-setup-parent-"));
-    tempDirs.push(parent);
-    await mkdir(join(parent, ".zitadel/local"), { recursive: true });
-    await writeFile(
-      join(parent, ".zitadel/local/admin.json"),
-      JSON.stringify({
-        email: "admin@zitadel.localhost",
-        password: "local-admin-password",
-        user_id: "user_localadmin",
-        team_id: "team_localadmin",
-      }),
-    );
-    await recordStartedServer(parent, "http://localhost:9943");
-    const cwd = join(parent, "my-app");
-    await mkdir(join(cwd, "app"), { recursive: true });
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
-    );
-    await writeFile(join(cwd, "app/layout.tsx"), "export default function L() {}\n");
-    const local = "http://localhost:9943";
-    server.use(
-      http.get(`${local}/console/runtime.json`, () =>
-        HttpResponse.json({
-          mode: "standalone",
-          console_project_id: "proj_platform",
-          publishable_key: "pk_platform",
-        }),
-      ),
-      http.post(`${local}/api/v1/auth_attempts`, () =>
-        HttpResponse.json({ attempt_id: "att_1" }, { status: 201 }),
-      ),
-      http.post(`${local}/api/v1/auth_attempts/:attempt/challenges`, () =>
-        HttpResponse.json({ challenge_id: "ch_1" }, { status: 201 }),
-      ),
-      http.post(`${local}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
-        HttpResponse.json({ attempt_id: "att_1" }),
-      ),
-      http.post(`${local}/api/v1/auth_attempts/:attempt/handoff`, () =>
-        HttpResponse.json({ handoff_token: "handoff_1" }),
-      ),
-      http.post(
-        `${local}/api/v1/sessions/exchange`,
-        () =>
-          new HttpResponse(null, {
-            headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
+      it("says to manage the project in the local console as the admin", async ({ dir }) => {
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, LOCAL_SERVER);
+        const cwd = join(dir, "my-app");
+        await aNextApp(cwd);
+        server.use(hostingThePlatform(LOCAL_SERVER), ...signingInTheAdmin(LOCAL_SERVER));
+
+        const res = await runCliForTest(against(cwd, LOCAL_SERVER, ...SCRIPTED_NEXT));
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          data: {
+            next_actions: expect.arrayContaining([
+              expect.stringContaining(
+                "Manage the project in the local console as admin@zitadel.localhost",
+              ),
+            ]),
+          },
+        });
+      });
+    });
+
+    describe("when attaching the project to the local admin fails", () => {
+      it("still succeeds, since a claim that can complete is not guaranteed", async ({ dir }) => {
+        await aNextApp(dir);
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, LOCAL_SERVER);
+        server.use(
+          hostingThePlatform(LOCAL_SERVER),
+          http.post(`${LOCAL_SERVER}/api/v1/projects/:projectId/claim/init`, () => {
+            return HttpResponse.json(
+              { code: "internal", message: "claim unavailable" },
+              { status: 500 },
+            );
           }),
-      ),
-      http.post(`${local}/api/v1/projects/:projectId/claim/init`, () =>
-        HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 }),
-      ),
-      http.get(`${local}/api/v1/sessions/me/csrf`, () =>
-        HttpResponse.json({ csrf_token: "csrf_admin" }),
-      ),
-      // A cookie-authenticated write: refused without the session's CSRF
-      // token, as the server does (ADR 053 §5).
-      http.post(`${local}/api/v1/projects/:projectId/claim/complete`, ({ request }) =>
-        request.headers.get("x-zitadel-csrf") === "csrf_admin"
-          ? HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" })
-          : HttpResponse.json({ code: "auth.csrf_invalid", message: "no" }, { status: 403 }),
-      ),
-    );
+        );
 
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      local,
-      "--non-interactive",
-      "--skip-install",
-      "--framework",
-      "next",
-    ]);
+        const res = await runCliForTest(against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT));
 
-    expect(res.exitCode).toBe(0);
-    const secret = JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as {
-      team_id?: string;
-    };
-    expect(secret.team_id).toBe("team_localadmin");
-    const json = parseJson(res.stdout) as {
-      data: { next_actions: string[]; next_commands: string[] };
-    };
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand(`console --cwd ${cwd}`));
-    expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(
-        `auth-method sso enable --provider google --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
-      ),
-    );
-    expect(json.data.next_actions.join("\n")).toContain(
-      "Manage the project in the local console as admin@zitadel.localhost",
-    );
+        expect(res).toSucceed();
+      });
+
+      it("keeps the project unclaimed", async ({ dir }) => {
+        await aNextApp(dir);
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, LOCAL_SERVER);
+        server.use(
+          hostingThePlatform(LOCAL_SERVER),
+          http.post(`${LOCAL_SERVER}/api/v1/projects/:projectId/claim/init`, () => {
+            return HttpResponse.json(
+              { code: "internal", message: "claim unavailable" },
+              { status: 500 },
+            );
+          }),
+        );
+
+        await runCliForTest(against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT));
+
+        expect(await readZitadelSecret(dir)).not.toHaveProperty("team_id");
+      });
+
+      it("ends its suggestions with claim", async ({ dir }) => {
+        await aNextApp(dir);
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, LOCAL_SERVER);
+        server.use(
+          hostingThePlatform(LOCAL_SERVER),
+          http.post(`${LOCAL_SERVER}/api/v1/projects/:projectId/claim/init`, () => {
+            return HttpResponse.json(
+              { code: "internal", message: "claim unavailable" },
+              { status: 500 },
+            );
+          }),
+        );
+
+        const res = await runCliForTest(against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT));
+
+        expect(suggestedCommands(res.stdout).at(-1)).toMatch(CLAIM_COMMAND);
+      });
+    });
+
+    describe("with no local admin here", () => {
+      it("still succeeds", async ({ dir }) => {
+        await aNextApp(dir);
+        server.use(hostingThePlatform(LOCAL_SERVER));
+
+        const res = await runCliForTest(
+          against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+          homeAt(dir),
+        );
+
+        expect(res).toSucceed();
+      });
+
+      it.for([
+        {
+          saying: "no local admin was found here or above",
+          said: (cwd: string) => {
+            return `No local admin for ${LOCAL_SERVER} in ${cwd} or its parents`;
+          },
+        },
+        {
+          saying: "what to do if zitadel start started the server",
+          said: () => {
+            return "If `zitadel start` started this server";
+          },
+        },
+      ])("warns once, saying $saying", async ({ said }, { dir }) => {
+        await aNextApp(dir);
+        server.use(hostingThePlatform(LOCAL_SERVER));
+
+        const res = await runCliForTest(
+          against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+          homeAt(dir),
+        );
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          warnings: [expect.stringContaining(said(dir))],
+        });
+      });
+
+      it("keeps the missing admin out of the next actions", async ({ dir }) => {
+        await aNextApp(dir);
+        server.use(hostingThePlatform(LOCAL_SERVER));
+
+        const res = await runCliForTest(
+          against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+          homeAt(dir),
+        );
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          data: {
+            next_actions: expect.not.arrayContaining([expect.stringContaining("No local admin")]),
+          },
+        });
+      });
+
+      it("does not suggest the console, which has no project to manage", async ({ dir }) => {
+        await aNextApp(dir);
+        server.use(hostingThePlatform(LOCAL_SERVER));
+
+        const res = await runCliForTest(
+          against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+          homeAt(dir),
+        );
+
+        expect(suggestedCommands(res.stdout)).not.toContainEqual(
+          expect.stringMatching(/ console$/),
+        );
+      });
+    });
+
+    describe("with a local admin that belongs to another server", () => {
+      it("passes over it, asking that server nothing", async ({ dir }) => {
+        await aNextApp(dir);
+        await aLocalAdmin(dir);
+        await recordStartedServer(dir, "http://localhost:9999");
+        server.use(hostingThePlatform(LOCAL_SERVER));
+
+        const res = await runCliForTest(
+          against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+          homeAt(dir),
+        );
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          warnings: [expect.stringContaining(`No local admin for ${LOCAL_SERVER}`)],
+        });
+      });
+    });
   });
 
-  it("errors in a non-interactive empty directory without --framework", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-empty-"));
-    tempDirs.push(cwd);
+  describe("in an empty directory, run non-interactively without --framework", () => {
+    it("refuses with E_FRAMEWORK_NOT_DETECTED, listing the frameworks in the details", async ({
+      dir,
+    }) => {
+      const res = await runCliForTest(onTheCloud(dir));
 
-    const res = await setup(cwd);
+      expect(res).toFailWith("E_FRAMEWORK_NOT_DETECTED");
+      expect(parseJson(res.stdout)).toMatchObject({
+        details: { frameworks: expect.arrayContaining(["next"]) },
+      });
+    });
 
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as {
-      status: string;
-      code: string;
-      hint: string;
-      next_commands?: string[];
-      details?: { frameworks?: string[] };
-    };
-    expect(json.status).toBe("error");
-    expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    // Every choice, not a prompt the caller cannot see. And no rerun: the
-    // suggested command pins `--server local`, which this run did not ask for.
-    expect(json.hint).toContain("only in a terminal");
-    expect(json.hint).toContain("next, nuxt");
-    expect(json.details?.frameworks).toContain("next");
-    expect(json.next_commands ?? []).toEqual([]);
-  });
+    it.for(["only in a terminal", "next, nuxt"])(
+      "hints %s, rather than prompting a caller who cannot see it",
+      async (hinted, { dir }) => {
+        const res = await runCliForTest(onTheCloud(dir));
 
-  it("reproduces a non-default --use-case in the retry guidance when project creation fails", async () => {
-    const cwd = await makeNextProject();
-
-    // Force the project-create call to fail so the command surfaces its retry
-    // guidance — the retry must reproduce the chosen use case verbatim, since
-    // agents follow the suggested `setup ...` command literally.
-    server.use(
-      http.post("*/projects", () =>
-        HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 }),
-      ),
+        expect(res).toHintAt(hinted);
+      },
     );
 
-    const res = await setup(cwd, [
-      "--non-interactive",
-      "--skip-install",
-      "--framework",
-      "next",
-      "--use-case",
-      "business",
-    ]);
+    it("suggests no rerun, since it would pin a --server local this run did not ask for", async ({
+      dir,
+    }) => {
+      const res = await runCliForTest(onTheCloud(dir));
 
-    expect(res.exitCode).not.toBe(0);
-    const json = parseJson(res.stdout) as { status: string };
-    expect(json.status).toBe("error");
-    // `--use-case business` only appears in the reconstructed retry flags, so
-    // its presence proves the non-default use case survived into the guidance.
-    expect(res.stdout).toContain("--use-case business");
-  });
-
-  it("reproduces --password-min-length in the retry guidance when project creation fails", async () => {
-    const cwd = await makeNextProject();
-    server.use(
-      http.post("*/projects", () =>
-        HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 }),
-      ),
-    );
-
-    const res = await setup(cwd, [
-      "--non-interactive",
-      "--skip-install",
-      "--framework",
-      "next",
-      "--password-min-length",
-      "12",
-    ]);
-
-    expect(res.exitCode).not.toBe(0);
-    // Without it, following the suggested retry would publish an empty policy.
-    expect(res.stdout).toContain("--password-min-length 12");
+      expect(suggestedCommands(res.stdout)).toEqual([]);
+    });
   });
 
   describe("when the default configuration of a new app cannot be written", () => {
-    const failingWrite = async () => {
-      const cwd = await makeNewAppDirectory();
+    it("says the new app is gone again", async ({ dir }) => {
+      const cwd = await aNewAppDirectory(dir);
       server.use(
         http.post("*/projects", async () => {
-          await mkdir(join(cwd, ".zitadel"), { recursive: true });
-          await writeFile(join(cwd, ".zitadel/policies"), "");
+          await write(cwd, { ".zitadel/policies": "" });
         }),
       );
-      const res = await runCliForTest(
-        [
-          ...["setup", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
-          ...["--framework", "next", "--non-interactive", "--skip-install"],
-        ],
-        { PATH: await aFakeAppGeneratorPath() },
+
+      const res = await runCliForTest(onTheCloud(cwd, ...SCRIPTED_NEXT), {
+        PATH: await aFakeAppGeneratorPath(),
+      });
+
+      expect(res).toHintAt("so setup removed the new app again");
+    });
+
+    it("does not suggest --force, which the emptied directory does not need", async ({ dir }) => {
+      const cwd = await aNewAppDirectory(dir);
+      server.use(
+        http.post("*/projects", async () => {
+          await write(cwd, { ".zitadel/policies": "" });
+        }),
       );
-      return parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
-    };
 
-    it("says the new app is gone again", async () => {
-      const json = await failingWrite();
+      const res = await runCliForTest(onTheCloud(cwd, ...SCRIPTED_NEXT), {
+        PATH: await aFakeAppGeneratorPath(),
+      });
 
-      expect(json.hint).toContain("so setup removed the new app again");
+      expect(suggestedCommands(res.stdout)).toEqual([]);
+    });
+  });
+
+  describe("with a flag it cannot use", () => {
+    it.for(["0", "65536", "many"])(
+      "refuses a --dev-port of %s, saying it is not a TCP port",
+      async (port, { dir }) => {
+        await aNextApp(dir);
+
+        const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT, "--dev-port", port));
+
+        expect(res).toFailWith("E_VALIDATION");
+        expect(res).toExplain(`${port} is not a TCP port`);
+      },
+    );
+
+    it("refuses a --password-min-length the policy would not accept, with the reason", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        onTheCloud(dir, ...DRY_RUN_NEXT, "--password-min-length", "many"),
+      );
+
+      expect(res).toFailWith("E_VALIDATION");
+      expect(res).toExplain("Must be a whole number from 1 to");
     });
 
-    it("does not suggest --force, which the emptied directory does not need", async () => {
-      const json = await failingWrite();
+    it("refuses --design, which setup no longer applies", async ({ dir }) => {
+      await aNextApp(dir);
 
-      expect(json.next_commands ?? []).toEqual([]);
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT, "--design", "centered"));
+
+      expect(res).toFail();
+      expect(parseJson(res.stdout)).toMatchObject({
+        message: "setup no longer applies a login template, so --design was removed",
+      });
+    });
+
+    it("refuses a --sso-client-id with no --sso to attach it to, saying how to name one", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT, "--sso-client-id", "abc"));
+
+      expect(res).toFail();
+      expect(parseJson(res.stdout)).toMatchObject({
+        message: "--sso-client-id needs --sso",
+        hint: "Name the provider with --sso, e.g. --sso google.",
+      });
+    });
+  });
+
+  describe("on an app already set up, with a --dev-port to move it to", () => {
+    it("reports the move from the previous issuer to the new one", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+        data: {
+          moved: true,
+          previous_issuer: "http://localhost:3000",
+          issuer: "http://localhost:3101",
+        },
+      });
+    });
+
+    it.for([
+      {
+        file: "the dev script",
+        path: "package.json",
+        moved: { scripts: { dev: "next dev --port 3101" } },
+      },
+      {
+        file: "the development issuer in zitadel.json",
+        path: "zitadel.json",
+        moved: { environments: { development: { issuer: "http://localhost:3101" } } },
+      },
+      {
+        file: "the primary origin .zitadel/secret records",
+        path: ".zitadel/secret",
+        moved: { primary_origins: ["http://localhost:3101"] },
+      },
+    ])("moves $file", async ({ path, moved }, { dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+      expect(await readJsonAt(dir, path)).toMatchObject(moved);
+    });
+
+    it.for([
+      {
+        file: "the issuer in .env.local",
+        path: ".env.local",
+        moved: "ZITADEL_ISSUER=http://localhost:3101\n",
+      },
+      {
+        file: "the README's register link",
+        path: "README.md",
+        moved: "http://localhost:3101/register",
+      },
+    ])("moves $file", async ({ path, moved }, { dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+      expect(await readFile(join(dir, path), "utf8")).toContain(moved);
+    });
+
+    it("moves the project's allowed origin", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+      expect(await projectOrigins(dir)).toEqual([
+        { pattern: "http://localhost:3101", kind: "primary" },
+      ]);
+    });
+
+    it("serves the new port the release the previous port ran", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+      const [before] = await liveDeployments(dir);
+
+      await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+      expect(await liveDeployments(dir)).toContainEqual(
+        expect.objectContaining({
+          release_id: before?.release_id,
+          targets: expect.arrayContaining([
+            expect.objectContaining({ origin: "http://localhost:3101" }),
+          ]),
+        }),
+      );
+    });
+
+    it("names the deployment that serves the new port", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        data: {
+          deployment_id: expect.toBeOneOf(
+            (await liveDeployments(dir)).map((deployment) => {
+              return deployment.id;
+            }),
+          ),
+        },
+      });
+    });
+
+    it("reports nothing moved for the port the app is already on", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      const res = await runCliForTest(onTheCloud(dir, "--non-interactive", "--dev-port", "3000"));
+
+      expect(parseJson(res.stdout)).toMatchObject({ status: "ok", data: { moved: false } });
+    });
+
+    it("keeps the project's origin for the port the app is already on", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--dev-port", "3000"));
+
+      expect(await projectOrigins(dir)).toEqual([
+        { pattern: "http://localhost:3000", kind: "primary" },
+      ]);
+    });
+
+    it("refuses a port outside 1..65535", async ({ dir }) => {
+      await aNextApp(dir, { scripts: { dev: "next dev" } });
+      await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+      const res = await runCliForTest(onTheCloud(dir, "--non-interactive", "--dev-port", "70000"));
+
+      expect(res).toFailWith("E_VALIDATION");
+    });
+
+    describe("when nothing is deployed for the new port to serve", () => {
+      it("warns that the new port serves nothing until the next deploy", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        server.use(
+          http.get("*/deployments", () => {
+            return HttpResponse.json({ deployments: [] });
+          }),
+        );
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          warnings: expect.arrayContaining([
+            expect.stringMatching(
+              /^http:\/\/localhost:3101 serves nothing until the next deploy: nothing is deployed to the project yet\. Run `\S+ \S+ deploy .+`\.$/,
+            ),
+          ]),
+        });
+      });
+
+      it("suggests the deploy", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        server.use(
+          http.get("*/deployments", () => {
+            return HttpResponse.json({ deployments: [] });
+          }),
+        );
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
+
+        expect(suggestedCommands(res.stdout)).toEqual([expect.stringContaining(" deploy -m ")]);
+      });
+    });
+
+    describe("without --force, since nobody can be asked", () => {
+      it("keeps the previous origin", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101));
+
+        expect(await projectOrigins(dir)).toContainEqual({
+          pattern: "http://localhost:3000",
+          kind: "primary",
+        });
+      });
+
+      it("warns that the previous origin was kept, with the command that removes it", async ({
+        dir,
+      }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101));
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          warnings: expect.arrayContaining([
+            expect.stringMatching(
+              /^http:\/\/localhost:3000 is still among the project's origins; it admits a port nothing serves any more\. Remove it with `\S+ \S+ origin rm http:\/\/localhost:3000 --force .+`\.$/,
+            ),
+          ]),
+        });
+      });
+
+      it.for([
+        {
+          situation: "with --force",
+          suggested: () => {
+            return "origin rm http://localhost:3000 --force";
+          },
+        },
+        {
+          situation: "from the project it moved",
+          suggested: (cwd: string) => {
+            return `--env-file ${cwd}/.env.development.local`;
+          },
+        },
+      ])("suggests removing the previous origin $situation", async ({ suggested }, { dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101));
+
+        expect(suggestedCommands(res.stdout)).toEqual([expect.stringContaining(suggested(dir))]);
+      });
+
+      it("pins the removal to the server it moved on, for a project with no env file", async ({
+        dir,
+      }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        await rm(join(dir, ".env.development.local"), { force: true });
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101));
+
+        expect(suggestedCommands(res.stdout)).toEqual([
+          expect.stringContaining("origin rm http://localhost:3000 --force --server "),
+        ]);
+      });
+    });
+
+    describe("when the server refuses the new origin", () => {
+      it("fails", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        server.use(
+          http.post("*/projects/:project_id/origins", () => {
+            return HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 });
+          }),
+        );
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101));
+
+        expect(res).toFail();
+      });
+
+      it.for(["package.json", ".env.local"])("leaves %s as it was", async (path, { dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        const before = await readFile(join(dir, path), "utf8");
+        server.use(
+          http.post("*/projects/:project_id/origins", () => {
+            return HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 });
+          }),
+        );
+
+        await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101));
+
+        expect(await readFile(join(dir, path), "utf8")).toBe(before);
+      });
     });
   });
 });
 
-describe("a retry after a failure before the wizard", () => {
-  it("keeps the custom settings that were typed, though they do not make a connection yet", () => {
-    const retry = retryOptionsFromFlags({ sso: "custom", ssoSlug: "acme-sso" });
-
-    expect(setupRetryFlags(retry)).toContain("--sso custom --sso-slug acme-sso");
-  });
-
-  it("quotes what was typed for a shell", () => {
-    const retry = retryOptionsFromFlags({
-      sso: "custom",
-      ssoSlug: "acme-sso",
-      ssoDisplayName: "Acme's SSO",
-    });
-
-    expect(setupRetryFlags(retry)).toContain("--sso-display-name 'Acme'\\''s SSO'");
-  });
-
-  it("restates a whole connection as before", () => {
-    const retry = retryOptionsFromFlags({
-      sso: "custom",
-      ssoSlug: "acme-sso",
-      ssoDisplayName: "Acme",
-      ssoIssuer: "https://sso.acme.example",
-    });
-
-    expect(setupRetryFlags(retry)).toContain("--sso-issuer https://sso.acme.example");
-  });
-
-  it("drops --non-interactive while a provider is being configured, typed in part or not", () => {
-    const retry = retryOptionsFromFlags({
-      sso: "custom",
-      ssoSlug: "acme-sso",
-      nonInteractive: true,
-    });
-
-    expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
-  });
-
-  it("carries the minimum password length, and an explicit none as 0", () => {
-    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: 12 }))).toContain(
-      "--password-min-length 12",
-    );
-    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: null }))).toContain(
-      "--password-min-length 0",
-    );
-    // The recommended one too: without the flag, a policy file --force keeps
-    // keeps its own minimum.
-    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: 15 }))).toContain(
-      "--password-min-length 15",
-    );
-  });
-
-  it("does not carry a provider this CLI does not offer", () => {
-    const retry = retryOptionsFromFlags({ sso: "nonesuch", ssoSlug: "acme-sso" });
-
-    expect(setupRetryFlags(retry)).not.toContain("--sso");
-  });
-});
-
-describe("a custom provider named with --sso", () => {
-  const partial = { sso: "custom", ssoSlug: "acme-sso" };
-  const ask = vi.fn() as unknown as Asker;
-
-  it("has the settings it was not given asked for when a person is there", async () => {
-    vi.mocked(askCustomSettings).mockResolvedValueOnce({
-      slug: "acme-sso",
-      displayName: "Acme",
-      issuer: "https://sso.acme.example",
-      scopes: "openid",
-    });
-
-    const draft = await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
-
-    expect(draft?.selection).toMatchObject({ kind: "custom", connection: { displayName: "Acme" } });
-  });
-
-  it("is asked about with what was already typed", async () => {
-    vi.mocked(askCustomSettings).mockClear();
-    vi.mocked(askCustomSettings).mockResolvedValueOnce({
-      slug: "acme-sso",
-      displayName: "Acme",
-      issuer: "https://sso.acme.example",
-      scopes: "openid",
-    });
-
-    await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
-
-    expect(askCustomSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: "acme-sso" }),
-      ask,
-    );
-  });
-
-  it("is not asked about when nobody is there to answer", async () => {
-    vi.mocked(askCustomSettings).mockClear();
-
-    await expect(ssoFromFlags(partial, true, false, ask, "0.0.0-test")).rejects.toMatchObject({
-      code: "E_VALIDATION",
-    });
-    expect(askCustomSettings).not.toHaveBeenCalled();
-  });
-});
-
-describe("setup with a custom provider described in part", () => {
-  it("names what is missing when the run cannot ask, whatever the server is doing", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
-    tempDirs.push(cwd);
-
-    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
-
-    expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
-  });
-
-  it("names what is missing before it looks for the local server", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
-    tempDirs.push(cwd);
-
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      "local",
-      "--sso",
-      "custom",
-      "--sso-slug",
-      "acme-sso",
-    ]);
-
-    expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
-  });
-
-  it("shows the example with setup's own flags", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
-    tempDirs.push(cwd);
-
-    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
-
-    expect(parseJson(res.stdout)).toMatchObject({
-      hint: expect.stringContaining(customExample(SETUP_FLAG_NAMES)),
-    });
-  });
-
-  it("refuses a setting that is wrong before anything else", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
-    tempDirs.push(cwd);
-
-    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "Acme"]);
-
-    expect(parseJson(res.stdout)).toMatchObject({ message: expect.stringContaining("--sso-slug") });
-  });
-});
-
-describe("setup asked on a terminal", () => {
-  // The built CLI bundles its own prompts, so a prompt can only be answered
-  // by running the command from source, where `input` is the one module asked.
-  const settingUp = (cwd: string, ...extra: string[]) =>
-    asTerminal(() => Setup.run(["--cwd", cwd, "--server", "https://api.zitadel.cloud", ...extra]));
-
-  // The port question is asked only when the app's port is taken; whether 3000
-  // is free on the machine running the tests must not decide what is asked.
+describe("Setup.run", () => {
   beforeEach(() => {
     vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
   });
 
-  it("still asks whether to proceed with the detected framework when --force is given", async () => {
-    // --force permits overwriting files here. It must never answer a question.
-    const cwd = await makeNextProject();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+  it("still asks whether to proceed with the detected framework when --force is given", async ({
+    dir,
+  }) => {
+    await aNextApp(dir);
+    vi.mocked(confirm).mockResolvedValueOnce(false);
 
-    await settingUp(cwd, "--force").catch(() => undefined);
+    await rejectionOf(() => {
+      return asTerminal(() => {
+        return Setup.run(["--cwd", dir, "--server", CLOUD, "--force"]);
+      });
+    });
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: "Would you like to set up Zitadel in this Next.js app?",
-      }),
+      expect.objectContaining({ message: "Would you like to set up Zitadel in this Next.js app?" }),
     );
   });
 
-  it("stops without writing anything when the framework is declined", async () => {
-    const cwd = await makeNextProject();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+  describe("when the framework is declined", () => {
+    it("stops", async ({ dir }) => {
+      await aNextApp(dir);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
 
-    await expect(settingUp(cwd)).rejects.toThrow();
+      const error = await rejectionOf(() => {
+        return asTerminal(() => {
+          return Setup.run(["--cwd", dir, "--server", CLOUD]);
+        });
+      });
 
-    await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it("writes no zitadel.json", async ({ dir }) => {
+      await aNextApp(dir);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
+
+      await rejectionOf(() => {
+        return asTerminal(() => {
+          return Setup.run(["--cwd", dir, "--server", CLOUD]);
+        });
+      });
+
+      expect(existsSync(join(dir, "zitadel.json"))).toBe(false);
+    });
   });
 
   describe("in a directory without an app", () => {
     beforeEach(async () => {
       vi.stubEnv("PATH", await aFakeAppGeneratorPath());
-      vi.mocked(isCancel).mockImplementation((value) => value === CANCELLED);
-      vi.mocked(text).mockClear();
+      vi.mocked(isCancel).mockImplementation((value) => {
+        return value === CANCELLED;
+      });
       vi.mocked(intro).mockClear();
     });
 
@@ -1255,323 +1640,291 @@ describe("setup asked on a terminal", () => {
      */
     function answeringEveryQuestion(): void {
       vi.mocked(select)
-        .mockResolvedValueOnce("next" as never)
-        .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
-        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
-        .mockResolvedValueOnce(15 as never);
-      vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+        .mockResolvedValueOnce("next")
+        .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE)
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET)
+        .mockResolvedValueOnce(15);
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
     }
 
-    it("creates no app when a question after the framework is cancelled", async () => {
-      const cwd = await makeNewAppDirectory();
-      vi.mocked(select)
-        .mockResolvedValueOnce("next" as never)
-        .mockResolvedValueOnce(CANCELLED as never);
+    /**
+     * Picks Next.js to scaffold, then cancels the question after it.
+     */
+    function cancellingAfterTheFramework(): void {
+      vi.mocked(select).mockResolvedValueOnce("next").mockResolvedValueOnce(CANCELLED);
+    }
 
-      // Exits 130, as Ctrl-C does anywhere.
-      await expect(settingUp(cwd)).rejects.toMatchObject({ oclif: { exit: 130 } });
+    describe("when a question after the framework is cancelled", () => {
+      it("exits 130, as Ctrl-C does anywhere", async ({ dir }) => {
+        const cwd = await aNewAppDirectory(dir);
+        cancellingAfterTheFramework();
 
-      expect(select).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining("Which fields should registration collect?"),
-        }),
+        const error = await rejectionOf(() => {
+          return asTerminal(() => {
+            return Setup.run(["--cwd", cwd, "--server", CLOUD]);
+          });
+        });
+
+        expect(error).toBeInstanceOf(Error);
+        expect(error).toMatchObject({ oclif: { exit: 130 } });
+      });
+
+      it("asks nothing after the cancelled question", async ({ dir }) => {
+        const cwd = await aNewAppDirectory(dir);
+        cancellingAfterTheFramework();
+
+        await rejectionOf(() => {
+          return asTerminal(() => {
+            return Setup.run(["--cwd", cwd, "--server", CLOUD]);
+          });
+        });
+
+        expect(select).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining("Which fields should registration collect?"),
+          }),
+        );
+      });
+
+      it("creates no app", async ({ dir }) => {
+        const cwd = await aNewAppDirectory(dir);
+        cancellingAfterTheFramework();
+
+        await rejectionOf(() => {
+          return asTerminal(() => {
+            return Setup.run(["--cwd", cwd, "--server", CLOUD]);
+          });
+        });
+
+        expect(await readdir(cwd)).toEqual([]);
+      });
+    });
+
+    describe("when every question is answered", () => {
+      it("creates the app", async ({ dir }) => {
+        const cwd = await aNewAppDirectory(dir);
+        answeringEveryQuestion();
+
+        await asTerminal(() => {
+          return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"]);
+        });
+
+        expect(await readdir(cwd)).toEqual(expect.arrayContaining(["app", "zitadel.json"]));
+      });
+
+      it("asks every question under the heading the framework question opened", async ({ dir }) => {
+        const cwd = await aNewAppDirectory(dir);
+        answeringEveryQuestion();
+
+        await asTerminal(() => {
+          return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"]);
+        });
+
+        expect(intro).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+});
+
+describe("portInUseWarning", () => {
+  it("names only the flag when the ports after the taken one are taken too, since a placeholder would run as a shell redirection", () => {
+    const warning = portInUseWarning(3000, undefined, (args) => {
+      return unscopedCommand(args, "1.2.3");
+    });
+
+    expect(warning).toBe(
+      "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
+    );
+  });
+});
+
+describe("localServerHostsPlatform", () => {
+  it.each([
+    {
+      situation: "a runtime document naming the platform project",
+      answer: () => {
+        return HttpResponse.json(PLATFORM_RUNTIME);
+      },
+      hosts: true,
+    },
+    {
+      situation: "a runtime document naming another project",
+      answer: () => {
+        return HttpResponse.json({ mode: "standalone", console_project_id: "proj_someone" });
+      },
+      hosts: false,
+    },
+    {
+      situation: "no runtime document",
+      answer: () => {
+        return HttpResponse.json({ error: "nope" }, { status: 404 });
+      },
+      hosts: false,
+    },
+    {
+      situation: "a server that does not answer",
+      answer: () => {
+        return HttpResponse.error();
+      },
+      hosts: false,
+    },
+  ])(
+    "is $hosts for $situation, failing closed so setup never nudges into a claim that would fail",
+    async ({ answer, hosts }) => {
+      server.use(http.get(`${LOCAL_SERVER}/console/runtime.json`, answer));
+
+      const hosting = await localServerHostsPlatform(LOCAL_SERVER);
+
+      expect(hosting).toBe(hosts);
+    },
+  );
+});
+
+describe("setupRetryFlags", () => {
+  it.each([
+    {
+      situation: "the custom settings typed, though they do not make a connection yet",
+      flags: { sso: "custom", ssoSlug: "acme-sso" },
+      carried: "--sso custom --sso-slug acme-sso",
+    },
+    {
+      situation: "what was typed, quoted for a shell",
+      flags: { sso: "custom", ssoSlug: "acme-sso", ssoDisplayName: "Acme's SSO" },
+      carried: "--sso-display-name 'Acme'\\''s SSO'",
+    },
+    {
+      situation: "a whole connection as before",
+      flags: {
+        sso: "custom",
+        ssoSlug: "acme-sso",
+        ssoDisplayName: "Acme",
+        ssoIssuer: "https://sso.acme.example",
+      },
+      carried: "--sso-issuer https://sso.acme.example",
+    },
+    {
+      situation: "the minimum password length",
+      flags: { passwordMinLength: 12 },
+      carried: "--password-min-length 12",
+    },
+    {
+      situation: "an explicit no minimum as 0",
+      flags: { passwordMinLength: null },
+      carried: "--password-min-length 0",
+    },
+    {
+      situation: "the recommended minimum, which a policy file --force keeps would not hold",
+      flags: { passwordMinLength: 15 },
+      carried: "--password-min-length 15",
+    },
+  ])("carries $situation", ({ flags, carried }) => {
+    const retry = setupRetryFlags(retryOptionsFromFlags(flags));
+
+    expect(retry).toContain(carried);
+  });
+
+  it.each([
+    {
+      situation: "--non-interactive while a provider is being configured, typed in part or not",
+      flags: { sso: "custom", ssoSlug: "acme-sso", nonInteractive: true },
+      dropped: "--non-interactive",
+    },
+    {
+      situation: "a provider this CLI does not offer",
+      flags: { sso: "nonesuch", ssoSlug: "acme-sso" },
+      dropped: "--sso",
+    },
+  ])("drops $situation", ({ flags, dropped }) => {
+    const retry = setupRetryFlags(retryOptionsFromFlags(flags));
+
+    expect(retry).not.toContain(dropped);
+  });
+});
+
+describe("ssoFromFlags", () => {
+  describe("with a custom provider described in part", () => {
+    const partial = { sso: "custom", ssoSlug: "acme-sso" };
+
+    beforeEach(() => {
+      vi.mocked(askCustomSettings).mockReset();
+    });
+
+    it("has the settings it was not given asked for when a person is there", async () => {
+      vi.mocked(askCustomSettings).mockResolvedValueOnce({
+        slug: "acme-sso",
+        displayName: "Acme",
+        issuer: "https://sso.acme.example",
+        scopes: "openid",
+      });
+
+      const draft = await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
+
+      expect(draft?.selection).toMatchObject({
+        kind: "custom",
+        connection: { displayName: "Acme" },
+      });
+    });
+
+    it("asks with what was already typed", async () => {
+      vi.mocked(askCustomSettings).mockResolvedValueOnce({
+        slug: "acme-sso",
+        displayName: "Acme",
+        issuer: "https://sso.acme.example",
+        scopes: "openid",
+      });
+
+      await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
+
+      expect(askCustomSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ slug: "acme-sso" }),
+        ask,
       );
-      expect(await readdir(cwd)).toEqual([]);
     });
 
-    it("creates the app once every question is answered", async () => {
-      const cwd = await makeNewAppDirectory();
-      answeringEveryQuestion();
+    describe("when nobody is there to answer", () => {
+      it("refuses with E_VALIDATION", async () => {
+        const error = await rejectionOf(() => {
+          return ssoFromFlags(partial, true, false, ask, "0.0.0-test");
+        });
 
-      await settingUp(cwd, "--skip-install");
+        expect(error).toBeInstanceOf(ZitadelError);
+        expect(error).toMatchObject({ code: "E_VALIDATION" });
+      });
 
-      expect(await readdir(cwd)).toEqual(expect.arrayContaining(["app", "zitadel.json"]));
-    });
+      it("does not ask", async () => {
+        await rejectionOf(() => {
+          return ssoFromFlags(partial, true, false, ask, "0.0.0-test");
+        });
 
-    it("asks every question under the heading the framework question opened", async () => {
-      const cwd = await makeNewAppDirectory();
-      answeringEveryQuestion();
-
-      await settingUp(cwd, "--skip-install");
-
-      expect(intro).toHaveBeenCalledTimes(1);
+        expect(askCustomSettings).not.toHaveBeenCalled();
+      });
     });
   });
 });
 
-describe("setup refuses a flag before it touches anything", () => {
-  async function refused(extra: string[]) {
-    const cwd = await makeNextProject();
-    const res = await setup(cwd, ["--dry-run", "--framework", "next", ...extra]);
-    expect(res.exitCode).not.toBe(0);
-    return parseJson(res.stdout) as { code: string; message: string; hint?: string };
-  }
+describe("moveDevPort", () => {
+  it("stops when asking to remove the previous origin fails for a reason other than a refusal", async ({
+    dir,
+  }) => {
+    await aNextApp(dir, { scripts: { dev: "next dev" } });
+    await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
 
-  it.each(["0", "65536", "many"])("a --dev-port of %s that is not a TCP port", async (port) => {
-    const json = await refused(["--dev-port", port]);
-
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain(`${port} is not a TCP port`);
-  });
-
-  it("a --password-min-length the policy would not accept, with the reason", async () => {
-    const json = await refused(["--password-min-length", "many"]);
-
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("Must be a whole number from 1 to");
-  });
-
-  it("a --design, which setup no longer applies", async () => {
-    const json = await refused(["--design", "centered"]);
-
-    expect(json.message).toBe("setup no longer applies a login template, so --design was removed");
-  });
-
-  it("a --sso-client-id with no --sso to attach it to", async () => {
-    const json = await refused(["--sso-client-id", "abc"]);
-
-    expect(json.message).toBe("--sso-client-id needs --sso");
-    expect(json.hint).toBe("Name the provider with --sso, e.g. --sso google.");
-  });
-});
-
-describe("setup --dev-port on an app already set up", () => {
-  /** A Next app with a `dev` script, through setup on the detected port, 3000. */
-  async function aSetUpNextApp(): Promise<string> {
-    const cwd = await makeNextProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", scripts: { dev: "next dev" }, dependencies: { next: "^15" } }),
-    );
-    const res = await setup(cwd, ["--non-interactive", "--skip-install"]);
-    expect(res.exitCode, res.stdout).toBe(0);
-    return cwd;
-  }
-
-  function moveTo(cwd: string, port: number, extra: string[] = []) {
-    return setup(cwd, ["--non-interactive", "--dev-port", String(port), ...extra]);
-  }
-
-  /** The fields of `package.json`, `zitadel.json` and `.zitadel/secret` these tests read. */
-  type MovedFile = {
-    scripts?: { dev?: string };
-    environments?: unknown;
-    primary_origins?: unknown;
-    preview_origins?: unknown;
-    project_id?: string;
-  };
-
-  async function readJsonFile(cwd: string, path: string): Promise<MovedFile> {
-    return JSON.parse(await readFile(join(cwd, path), "utf8")) as MovedFile;
-  }
-
-  async function projectOrigins(cwd: string): Promise<unknown> {
-    const { project_id } = await readJsonFile(cwd, ".zitadel/secret");
-    const res = await fetch(`https://api.zitadel.cloud/projects/${project_id}`);
-    return ((await res.json()) as { origins: unknown }).origins;
-  }
-
-  /** What the project serves now, as `deployment list --live` reads it. */
-  async function liveDeployments(
-    cwd: string,
-  ): Promise<{ id: string; release_id: string; targets: { origin: string }[] }[]> {
-    const { project_id } = await readJsonFile(cwd, ".zitadel/secret");
-    const res = await fetch(
-      `https://api.zitadel.cloud/deployments?project_id=${project_id}&live=true`,
-    );
-    return ((await res.json()) as { deployments: Awaited<ReturnType<typeof liveDeployments>> })
-      .deployments;
-  }
-
-  it("moves the dev script, the issuer and the allowed origin to the new port", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 3101, ["--force"]);
-
-    expect(res.exitCode, res.stdout).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
-    expect(json.status).toBe("ok");
-    expect(json.data).toMatchObject({
-      moved: true,
-      previous_issuer: "http://localhost:3000",
-      issuer: "http://localhost:3101",
-    });
-    expect((await readJsonFile(cwd, "package.json")).scripts?.dev).toBe("next dev --port 3101");
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).toContain(
-      "ZITADEL_ISSUER=http://localhost:3101\n",
-    );
-    expect((await readJsonFile(cwd, "zitadel.json")).environments).toEqual({
-      development: { issuer: "http://localhost:3101" },
-    });
-    expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
-      "http://localhost:3101",
-    ]);
-    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain(
-      "http://localhost:3101/register",
-    );
-    expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3101", kind: "primary" },
-    ]);
-  });
-
-  it("serves the new port the release the previous port ran", async () => {
-    const cwd = await aSetUpNextApp();
-    const [before] = await liveDeployments(cwd);
-
-    await moveTo(cwd, 3101, ["--force"]);
-
-    expect(await liveDeployments(cwd)).toContainEqual(
-      expect.objectContaining({
-        release_id: before?.release_id,
-        targets: expect.arrayContaining([
-          expect.objectContaining({ origin: "http://localhost:3101" }),
-        ]),
-      }),
-    );
-  });
-
-  it("names the deployment that serves the new port", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 3101, ["--force"]);
-
-    const json = parseJson(res.stdout) as { data: { deployment_id: string | null } };
-    expect((await liveDeployments(cwd)).map((deployment) => deployment.id)).toContain(
-      json.data.deployment_id,
-    );
-  });
-
-  it("says to deploy when nothing is deployed for the new port to serve", async () => {
-    const cwd = await aSetUpNextApp();
-    server.use(http.get("*/deployments", () => HttpResponse.json({ deployments: [] })));
-
-    const res = await moveTo(cwd, 3101, ["--force"]);
-
-    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContainEqual(
-      expect.stringMatching(
-        /^http:\/\/localhost:3101 serves nothing until the next deploy: nothing is deployed to the project yet\. Run `\S+ \S+ deploy .+`\.$/,
-      ),
-    );
-  });
-
-  it("suggests the deploy when nothing is deployed for the new port to serve", async () => {
-    const cwd = await aSetUpNextApp();
-    server.use(http.get("*/deployments", () => HttpResponse.json({ deployments: [] })));
-
-    const res = await moveTo(cwd, 3101, ["--force"]);
-
-    expect(
-      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
-    ).toEqual([expect.stringContaining(" deploy -m ")]);
-  });
-
-  it("stops when asking to remove the previous origin fails for another reason", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const move = moveDevPort({
-      cwd,
-      devPort: 3101,
-      source: "https://api.zitadel.cloud",
-      orca: createOrca(),
-      cliVersion: "0.0.0",
-      dryRun: false,
-      signal,
-      consent: () => Promise.reject(new Error("a bug in the caller")),
+    const error = await rejectionOf(() => {
+      return moveDevPort({
+        cwd: dir,
+        devPort: 3101,
+        source: CLOUD,
+        orca: createOrca(),
+        cliVersion: "0.0.0",
+        dryRun: false,
+        signal: new AbortController().signal,
+        consent: () => {
+          return Promise.reject(new Error("a bug in the caller"));
+        },
+      });
     });
 
-    await expect(move).rejects.toThrow("a bug in the caller");
-  });
-
-  it("keeps the previous origin without --force, since nobody can be asked", async () => {
-    const cwd = await aSetUpNextApp();
-
-    await moveTo(cwd, 3101);
-
-    expect(await projectOrigins(cwd)).toContainEqual({
-      pattern: "http://localhost:3000",
-      kind: "primary",
-    });
-  });
-
-  it("says the previous origin was kept", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 3101);
-
-    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContainEqual(
-      expect.stringMatching(
-        /^http:\/\/localhost:3000 is still among the project's origins; it admits a port nothing serves any more\. Remove it with `\S+ \S+ origin rm http:\/\/localhost:3000 --force .+`\.$/,
-      ),
-    );
-  });
-
-  it("pins the removal to the server it moved on, for a project with no env file", async () => {
-    const cwd = await aSetUpNextApp();
-    await rm(join(cwd, ".env.development.local"), { force: true });
-
-    const res = await moveTo(cwd, 3101);
-
-    expect(
-      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
-    ).toEqual([expect.stringContaining("origin rm http://localhost:3000 --force --server ")]);
-  });
-
-  it("suggests removing the previous origin from the project it moved", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 3101);
-
-    expect(
-      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
-    ).toEqual([expect.stringContaining(`--env-file ${join(cwd, ".env.development.local")}`)]);
-  });
-
-  it("suggests removing the previous origin with --force", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 3101);
-
-    expect(
-      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
-    ).toEqual([expect.stringContaining("origin rm http://localhost:3000 --force")]);
-  });
-
-  it("changes nothing when the server refuses the new origin", async () => {
-    const cwd = await aSetUpNextApp();
-    const before = await readFile(join(cwd, "package.json"), "utf8");
-    const env = await readFile(join(cwd, ".env.local"), "utf8");
-    server.use(
-      http.post("*/projects/:project_id/origins", () =>
-        HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
-      ),
-    );
-
-    const res = await moveTo(cwd, 3101);
-
-    expect(res.exitCode).not.toBe(0);
-    expect(await readFile(join(cwd, "package.json"), "utf8")).toBe(before);
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(env);
-  });
-
-  it("reports nothing moved for the port the app is already on", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 3000);
-
-    expect(res.exitCode, res.stdout).toBe(0);
-    const json = parseJson(res.stdout) as { data: { moved: boolean; files_written: string[] } };
-    expect(json.data.moved).toBe(false);
-    expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3000", kind: "primary" },
-    ]);
-  });
-
-  it("refuses a port outside 1..65535", async () => {
-    const cwd = await aSetUpNextApp();
-
-    const res = await moveTo(cwd, 70000);
-
-    const json = parseJson(res.stdout) as { code: string };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: "a bug in the caller" });
   });
 });

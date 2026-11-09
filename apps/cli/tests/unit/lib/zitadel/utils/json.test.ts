@@ -19,7 +19,9 @@ describe("isJsonObject", () => {
     { value: null, expected: false },
     { value: "text", expected: false },
   ])("says $expected for $value", ({ value, expected }) => {
-    expect(isJsonObject(value)).toBe(expected);
+    const isObject = isJsonObject(value);
+
+    expect(isObject).toBe(expected);
   });
 });
 
@@ -55,11 +57,15 @@ describe("toJsonObject", () => {
 
 describe("stringsIn", () => {
   it("keeps the strings of a list in order", () => {
-    expect(stringsIn(["a", 1, "b", null])).toEqual(["a", "b"]);
+    const strings = stringsIn(["a", 1, "b", null]);
+
+    expect(strings).toEqual(["a", "b"]);
   });
 
   it("reads anything but a list as none", () => {
-    expect(stringsIn("a")).toEqual([]);
+    const strings = stringsIn("a");
+
+    expect(strings).toEqual([]);
   });
 });
 
@@ -75,11 +81,15 @@ describe("stringAt", () => {
 
 describe("objectAt", () => {
   it("returns the object at the key", () => {
-    expect(objectAt({ key: { a: 1 } }, "key")).toEqual({ a: 1 });
+    const object = objectAt({ key: { a: 1 } }, "key");
+
+    expect(object).toEqual({ a: 1 });
   });
 
   it("reads anything but an object as an empty one", () => {
-    expect(objectAt({ key: ["a"] }, "key")).toEqual({});
+    const object = objectAt({ key: ["a"] }, "key");
+
+    expect(object).toEqual({});
   });
 });
 
@@ -87,11 +97,15 @@ describe("listAt", () => {
   it("returns the very list at the key", () => {
     const list = ["a", 1];
 
-    expect(listAt({ key: list }, "key")).toBe(list);
+    const found = listAt({ key: list }, "key");
+
+    expect(found).toBe(list);
   });
 
   it("reads anything but a list as an empty one", () => {
-    expect(listAt({ key: { a: 1 } }, "key")).toEqual([]);
+    const list = listAt({ key: { a: 1 } }, "key");
+
+    expect(list).toEqual([]);
   });
 });
 

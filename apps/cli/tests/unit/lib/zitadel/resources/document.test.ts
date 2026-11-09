@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { RefusedEditError } from "@/lib/zitadel/errors";
 import {
   ConfigDocument,
   type DocumentFile,
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
-import { RefusedEditError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
@@ -17,6 +17,16 @@ import { thrownBy } from "@tests/helpers/thrown-value";
  * Where the document in these tests sits.
  */
 const PATH = ".zitadel/samples/sample.json";
+
+/**
+ * The editor's pointer at the sample meta-schema.
+ */
+const POINTER = "../meta/sample.json";
+
+/**
+ * A sample whose name is a string.
+ */
+const NAMED = { path: PATH, body: { name: "a" } };
 
 /**
  * The contract a sample is held to: a string `name`, and nothing else.
@@ -107,63 +117,91 @@ class Sample extends ConfigDocument {
 
 describe("ConfigDocument.isUnsaved", () => {
   it("is false for a document as read", () => {
-    expect(Sample.of({ path: PATH, body: { name: "a" } }).isUnsaved).toBe(false);
+    const sample = Sample.of(NAMED);
+
+    const changed = sample.isUnsaved;
+
+    expect(changed).toBe(false);
   });
 
   it("is true once a document is edited", () => {
-    expect(Sample.of({ path: PATH, body: { name: "a" } }).withName("b").isUnsaved).toBe(true);
+    const sample = Sample.of(NAMED);
+
+    const changed = sample.withName("b").isUnsaved;
+
+    expect(changed).toBe(true);
   });
 
   it("is true for a new document", () => {
-    expect(Sample.create({ path: PATH, body: { name: "a" } }).isUnsaved).toBe(true);
+    const sample = Sample.create(NAMED);
+
+    const changed = sample.isUnsaved;
+
+    expect(changed).toBe(true);
   });
 });
 
 describe("ConfigDocument.writeMode", () => {
   it("replaces the file of a document that was read", () => {
-    expect(Sample.of({ path: PATH, body: { name: "a" } }).writeMode).toBe("replace");
+    const sample = Sample.of(NAMED);
+
+    const mode = sample.writeMode;
+
+    expect(mode).toBe("replace");
   });
 
   it("creates the file of a new document", () => {
-    expect(Sample.create({ path: PATH, body: { name: "a" } }).writeMode).toBe("create");
+    const sample = Sample.create(NAMED);
+
+    const mode = sample.writeMode;
+
+    expect(mode).toBe("create");
   });
 
   it("still creates the file of a new document after an edit", () => {
-    expect(Sample.create({ path: PATH, body: { name: "a" } }).withName("b").writeMode).toBe(
-      "create",
-    );
+    const sample = Sample.create(NAMED);
+
+    const mode = sample.withName("b").writeMode;
+
+    expect(mode).toBe("create");
   });
 });
 
-describe("ConfigDocument.toFile", () => {
+describe("ConfigDocument.file", () => {
   it("gives the path and the body exactly as written", () => {
-    const body = { $schema: "../meta/sample.json", name: "a" };
+    const body = { $schema: POINTER, name: "a" };
 
-    expect(Sample.of({ path: PATH, body }).file).toEqual({ path: PATH, body });
+    const file = Sample.of({ path: PATH, body }).file;
+
+    expect(file).toEqual({ path: PATH, body });
   });
 });
 
-describe("ConfigDocument.asRead", () => {
+describe("ConfigDocument.markRead", () => {
   it("marks an edited document as read", () => {
-    expect(
-      Sample.of({ path: PATH, body: { name: "a" } })
-        .withName("b")
-        .markRead().status,
-    ).toBe("read");
+    const edited = Sample.of(NAMED).withName("b");
+
+    const read = edited.markRead();
+
+    expect(read.status).toBe("read");
   });
 });
 
-describe("ConfigDocument.problems", () => {
+describe("ConfigDocument.check", () => {
   it("finds nothing wrong once the editor's pointer is set aside", () => {
-    const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
+    const sample = Sample.of({ path: PATH, body: { $schema: POINTER, name: "a" } });
 
-    expect(sample.check({})).toEqual([]);
+    const problems = sample.check({});
+
+    expect(problems).toEqual([]);
   });
 
   it("reports each refusal with its path, as an error in the file", () => {
     const sample = Sample.of({ path: PATH, body: { name: 7 } });
 
-    expect(sample.check({})).toEqual([
+    const problems = sample.check({});
+
+    expect(problems).toEqual([
       {
         severity: "error",
         rule: "contract/schema",
@@ -176,27 +214,29 @@ describe("ConfigDocument.problems", () => {
   it("names the root for a refusal of the body itself", () => {
     const sample = Sample.of({ path: PATH, body: { name: "a", extra: true } });
 
-    expect(
-      sample.check({}).map((issue) => {
-        return issue.message.startsWith("(root) ");
-      }),
-    ).toEqual([true]);
+    const problems = sample.check({});
+
+    expect(problems).toMatchObject([{ message: expect.stringMatching(/^\(root\) /) }]);
   });
 });
 
-describe("ConfigDocument.wireBody", () => {
+describe("ConfigDocument.toWireBody", () => {
   it("leaves out the editor's $schema pointer", () => {
-    const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
+    const sample = Sample.of({ path: PATH, body: { $schema: POINTER, name: "a" } });
 
-    expect(sample.toWireBody(new MemoryStore())).toEqual({ name: "a" });
+    const body = sample.toWireBody(new MemoryStore());
+
+    expect(body).toEqual({ name: "a" });
   });
 });
 
 describe("ConfigDocument.contractBody", () => {
   it("is the body without the editor's $schema pointer, which every rule judges", () => {
-    const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
+    const sample = Sample.of({ path: PATH, body: { $schema: POINTER, name: "a" } });
 
-    expect(sample.contractBody).toEqual({ name: "a" });
+    const body = sample.contractBody;
+
+    expect(body).toEqual({ name: "a" });
   });
 });
 
@@ -208,17 +248,15 @@ describe("ConfigDocument edits", () => {
       return sample.withName("b");
     });
 
-    expect(error).toEqual(
-      expect.objectContaining({
-        constructor: RefusedEditError,
-        message: `${PATH}: name is not a string`,
-        details: { file: PATH, region: "name is not a string" },
-      }),
-    );
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({
+      message: `${PATH}: name is not a string`,
+      details: { file: PATH, region: "name is not a string" },
+    });
   });
 
   it("leave the document they were given as it was", () => {
-    const sample = Sample.of({ path: PATH, body: { name: "a" } });
+    const sample = Sample.of(NAMED);
 
     sample.withName("b");
 

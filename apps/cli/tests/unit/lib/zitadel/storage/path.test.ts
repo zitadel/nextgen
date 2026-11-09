@@ -3,133 +3,151 @@ import { join, resolve, sep } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
 import { Path } from "@/lib/zitadel/storage/path";
+import { it } from "@tests/helpers/fixtures";
 
-describe("Path", () => {
-  describe("of", () => {
-    it("resolves segments against the working directory", () => {
-      expect(Path.of("a", "b").toString()).toBe(resolve("a", "b"));
-    });
+describe("Path.of", () => {
+  it("resolves segments against the working directory", () => {
+    const path = Path.of("a", "b");
 
-    it("normalises dot segments away", () => {
-      expect(Path.of(sep, "a", ".", "b", "..", "c").toString()).toBe(resolve(sep, "a", "c"));
-    });
+    expect(path.toString()).toBe(resolve("a", "b"));
   });
 
-  describe("parent", () => {
-    it("is the directory the path is in", () => {
-      expect(Path.of(sep, "a", "b").parent).toEqual(Path.of(sep, "a"));
-    });
+  it("normalises dot segments away", () => {
+    const path = Path.of(sep, "a", ".", "b", "..", "c");
 
-    it("is the filesystem root itself for the filesystem root", () => {
-      expect(Path.of(sep).parent).toEqual(Path.of(sep));
-    });
+    expect(path.toString()).toBe(resolve(sep, "a", "c"));
+  });
+});
+
+describe("Path.parent", () => {
+  it("is the directory the path is in", () => {
+    const parent = Path.of(sep, "a", "b").parent;
+
+    expect(parent).toEqual(Path.of(sep, "a"));
   });
 
-  describe("ancestors", () => {
-    it("lists every directory above, nearest first", () => {
-      expect(Path.of(sep, "a", "b", "c").ancestors).toEqual([
-        Path.of(sep, "a", "b"),
-        Path.of(sep, "a"),
-        Path.of(sep),
-      ]);
-    });
+  it("is the filesystem root itself for the filesystem root", () => {
+    const parent = Path.of(sep).parent;
 
-    it("is empty for the filesystem root", () => {
-      expect(Path.of(sep).ancestors).toEqual([]);
-    });
+    expect(parent).toEqual(Path.of(sep));
+  });
+});
+
+describe("Path.ancestors", () => {
+  it("lists every directory above, nearest first", () => {
+    const ancestors = Path.of(sep, "a", "b", "c").ancestors;
+
+    expect(ancestors).toEqual([Path.of(sep, "a", "b"), Path.of(sep, "a"), Path.of(sep)]);
   });
 
-  describe("resolve", () => {
-    it("lands a relative segment beneath the path", () => {
-      expect(Path.of(sep, "a").resolve("b/c").toString()).toBe(resolve(sep, "a", "b", "c"));
-    });
+  it("is empty for the filesystem root", () => {
+    const ancestors = Path.of(sep).ancestors;
 
-    it("climbs out of the path on ..", () => {
-      expect(Path.of(sep, "a", "b").resolve("../c").toString()).toBe(resolve(sep, "a", "c"));
-    });
+    expect(ancestors).toEqual([]);
+  });
+});
 
-    it("starts over at an absolute segment", () => {
-      expect(Path.of(sep, "a").resolve(resolve(sep, "z")).toString()).toBe(resolve(sep, "z"));
-    });
+describe("Path.resolve", () => {
+  it("lands a relative segment beneath the path", () => {
+    const resolved = Path.of(sep, "a").resolve("b/c");
+
+    expect(resolved.toString()).toBe(resolve(sep, "a", "b", "c"));
   });
 
-  describe("contains", () => {
-    it("holds for the path itself", () => {
-      expect(Path.of(sep, "a").contains(Path.of(sep, "a"))).toBe(true);
-    });
+  it("climbs out of the path on ..", () => {
+    const resolved = Path.of(sep, "a", "b").resolve("../c");
 
-    it("holds for a path beneath it", () => {
-      expect(Path.of(sep, "a").contains(Path.of(sep, "a", "b", "c"))).toBe(true);
-    });
-
-    it("does not hold for its parent", () => {
-      expect(Path.of(sep, "a", "b").contains(Path.of(sep, "a"))).toBe(false);
-    });
-
-    it("does not hold for a sibling whose name it prefixes", () => {
-      expect(Path.of(sep, "a", "b").contains(Path.of(sep, "a", "bc"))).toBe(false);
-    });
-
-    it("holds for a child whose name starts with ..", () => {
-      expect(Path.of(sep, "a").contains(Path.of(sep, "a", "..b"))).toBe(true);
-    });
+    expect(resolved.toString()).toBe(resolve(sep, "a", "c"));
   });
 
-  describe("equals", () => {
-    it("holds for two paths spelled alike once resolved", () => {
-      expect(Path.of(sep, "a", "b").equals(Path.of(sep, "a", "x", "..", "b"))).toBe(true);
-    });
+  it("starts over at an absolute segment", () => {
+    const resolved = Path.of(sep, "a").resolve(resolve(sep, "z"));
 
-    it("does not hold for different paths", () => {
-      expect(Path.of(sep, "a").equals(Path.of(sep, "b"))).toBe(false);
-    });
+    expect(resolved.toString()).toBe(resolve(sep, "z"));
+  });
+});
+
+describe("Path.contains", () => {
+  it.each([
+    ["holds for the path itself", [sep, "a"], [sep, "a"], true],
+    ["holds for a path beneath it", [sep, "a"], [sep, "a", "b", "c"], true],
+    ["does not hold for its parent", [sep, "a", "b"], [sep, "a"], false],
+    [
+      "does not hold for a sibling whose name it prefixes",
+      [sep, "a", "b"],
+      [sep, "a", "bc"],
+      false,
+    ],
+    ["holds for a child whose name starts with ..", [sep, "a"], [sep, "a", "..b"], true],
+  ])("%s", (_claim, outer, inner, holds) => {
+    const contains = Path.of(...outer).contains(Path.of(...inner));
+
+    expect(contains).toBe(holds);
+  });
+});
+
+describe("Path.equals", () => {
+  it.each([
+    ["holds for two paths spelled alike once resolved", [sep, "a", "x", "..", "b"], true],
+    ["does not hold for different paths", [sep, "b"], false],
+  ])("%s", (_claim, other, holds) => {
+    const equals = Path.of(sep, "a", "b").equals(Path.of(...other));
+
+    expect(equals).toBe(holds);
+  });
+});
+
+describe("Path.relativeTo", () => {
+  it.each([
+    ["spells a path beneath the base with /", [sep, "a", "b", "c"], [sep, "a"], "b/c"],
+    ["climbs with .. for a path outside the base", [sep, "a", "c"], [sep, "a", "b"], "../c"],
+    ["is empty for the base itself", [sep, "a"], [sep, "a"], ""],
+  ])("%s", (_claim, path, base, relative) => {
+    const spelled = Path.of(...path).relativeTo(Path.of(...base));
+
+    expect(spelled).toBe(relative);
+  });
+});
+
+describe("Path.resolveReal", () => {
+  it("resolves a symlinked directory on the way", async ({ dir, other }) => {
+    await writeFile(join(other, "x.txt"), "x");
+    await symlink(other, join(dir, "link"));
+
+    const real = Path.of(dir, "link", "x.txt").resolveReal();
+
+    expect(real).toEqual(Path.of(await realpath(other), "x.txt"));
   });
 
-  describe("relativeTo", () => {
-    it("spells a path beneath the base with /", () => {
-      expect(Path.of(sep, "a", "b", "c").relativeTo(Path.of(sep, "a"))).toBe("b/c");
-    });
+  it("keeps the segments that do not exist yet", async ({ dir }) => {
+    const real = Path.of(dir, "not", "yet.txt").resolveReal();
 
-    it("climbs with .. for a path outside the base", () => {
-      expect(Path.of(sep, "a", "c").relativeTo(Path.of(sep, "a", "b"))).toBe("../c");
-    });
-
-    it("is empty for the base itself", () => {
-      expect(Path.of(sep, "a").relativeTo(Path.of(sep, "a"))).toBe("");
-    });
+    expect(real).toEqual(Path.of(await realpath(dir), "not", "yet.txt"));
   });
 
-  describe("resolveReal", () => {
-    it("resolves a symlinked directory on the way", async ({ dir, other }) => {
-      await writeFile(join(other, "x.txt"), "x");
-      await symlink(other, join(dir, "link"));
+  it("is undefined through a symlink that resolves nowhere", async ({ dir }) => {
+    await symlink(join(dir, "gone"), join(dir, "dangling"));
 
-      expect(Path.of(dir, "link", "x.txt").resolveReal()).toEqual(Path.of(await realpath(other), "x.txt"));
-    });
+    const real = Path.of(dir, "dangling", "x.txt").resolveReal();
 
-    it("keeps the segments that do not exist yet", async ({ dir }) => {
-      expect(Path.of(dir, "not", "yet.txt").resolveReal()).toEqual(Path.of(await realpath(dir), "not", "yet.txt"));
-    });
+    expect(real).toBeUndefined();
+  });
 
-    it("is undefined through a symlink that resolves nowhere", async ({ dir }) => {
-      await symlink(join(dir, "gone"), join(dir, "dangling"));
+  it("is undefined for a symlink that resolves nowhere itself", async ({ dir }) => {
+    await symlink(join(dir, "gone"), join(dir, "dangling"));
 
-      expect(Path.of(dir, "dangling", "x.txt").resolveReal()).toBeUndefined();
-    });
+    const real = Path.of(dir, "dangling").resolveReal();
 
-    it("is undefined for a symlink that resolves nowhere itself", async ({ dir }) => {
-      await symlink(join(dir, "gone"), join(dir, "dangling"));
+    expect(real).toBeUndefined();
+  });
 
-      expect(Path.of(dir, "dangling").resolveReal()).toBeUndefined();
-    });
+  it("keeps the segments under a regular file", async ({ dir }) => {
+    await mkdir(join(dir, "a"));
+    await writeFile(join(dir, "a", "file.txt"), "x");
 
-    it("keeps the segments under a regular file", async ({ dir }) => {
-      await mkdir(join(dir, "a"));
-      await writeFile(join(dir, "a", "file.txt"), "x");
+    const real = Path.of(dir, "a", "file.txt", "x").resolveReal();
 
-      expect(Path.of(dir, "a", "file.txt", "x").resolveReal()).toEqual(Path.of(await realpath(dir), "a", "file.txt", "x"));
-    });
+    expect(real).toEqual(Path.of(await realpath(dir), "a", "file.txt", "x"));
   });
 });

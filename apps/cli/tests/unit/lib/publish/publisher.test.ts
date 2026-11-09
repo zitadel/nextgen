@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ConflictError } from "@/lib/backend/errors";
 import { type PreparedRelease, Publisher } from "@/lib/publish/publisher";
-import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
+import { fakeClient } from "@tests/helpers/fake-client";
+import { aDeployment, PROJECT_ID } from "@tests/helpers/records";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-/** A bundle already built and checked, as `prepare` hands one over. */
+/**
+ * A bundle already built and checked, as `prepare` hands one over.
+ */
 const PREPARED: PreparedRelease = {
   bundle: { schemas: [], flow_definitions: [], idps: [] },
   resourceCount: 0,
@@ -15,37 +19,33 @@ const PREPARED: PreparedRelease = {
   gitDirty: false,
 };
 
-/** A publisher answering `stubs`, bound to one project. */
-function publisher(stubs: ClientStubs): Publisher {
-  return new Publisher(fakeClient(stubs), "proj_1");
-}
+/**
+ * The origin a preview deploys to.
+ */
+const PREVIEW_URL = "https://pr-7.preview.acme.com";
 
-/** A deployment record as the API answers one. */
-function deployment(id: string) {
-  return {
-    id,
-    project_id: "proj_1",
-    release_id: "rel_1",
-    kind: "primary" as const,
-    status: "live" as const,
-    deployed_at: "2026-01-01T00:00:00Z",
-    targets: [{ origin: "https://app.acme.com" }],
-    metadata: { reason: "deploy" as const },
-  };
-}
+/**
+ * Where every call of the publisher is scoped.
+ */
+const SCOPE = { project_id: PROJECT_ID };
 
 describe("Publisher.landing", () => {
-  it("answers the project's origins, so a command asks them what it needs", async () => {
-    const live = publisher({
-      getProject: async () => ({
-        origins: [
-          { pattern: "https://app.acme.com", kind: "primary" },
-          { pattern: "https://*.preview.acme.com", kind: "preview" },
-        ],
+  it("answers the project's primary origins", async () => {
+    const publisher = new Publisher(
+      fakeClient({
+        getProject: async () => {
+          return {
+            origins: [
+              { pattern: "https://app.acme.com", kind: "primary" },
+              { pattern: "https://*.preview.acme.com", kind: "preview" },
+            ],
+          };
+        },
       }),
-    });
+      PROJECT_ID,
+    );
 
-    const origins = await live.fetchLanding();
+    const origins = await publisher.fetchLanding();
 
     expect(origins.primary).toEqual(["https://app.acme.com"]);
   });
@@ -53,135 +53,237 @@ describe("Publisher.landing", () => {
 
 describe("Publisher.createRelease", () => {
   it("sends the bundle with the git provenance the build recorded", async () => {
-    const buildRelease = vi.fn(async () => ({ id: "rel_1" }));
-
-    await publisher({ buildRelease }).createRelease({
-      prepared: PREPARED,
-      message: "ship it",
+    const buildRelease = vi.fn(async () => {
+      return { id: "rel_1" };
     });
+    const publisher = new Publisher(fakeClient({ buildRelease }), PROJECT_ID);
+
+    await publisher.createRelease({ prepared: PREPARED, message: "ship it" });
 
     expect(buildRelease).toHaveBeenCalledWith(
-      {
-        bundle: PREPARED.bundle,
-        message: "ship it",
-        git_sha: "abc1234",
-        git_dirty: false,
-      },
-      { project_id: "proj_1" },
+      { bundle: PREPARED.bundle, message: "ship it", git_sha: "abc1234", git_dirty: false },
+      SCOPE,
     );
   });
 });
 
 describe("Publisher.deploy", () => {
-  it("answers the release it built and the deployment that made it live", async () => {
-    const live = publisher({
-      buildRelease: async () => ({ id: "rel_1" }),
-      listDeployments: { all: async () => [] },
-      createDeployment: async () => deployment("dep_1"),
+  describe("when the deployment lands", () => {
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        listDeployments: {
+          all: async () => {
+            return [];
+          },
+        },
+        createDeployment: async () => {
+          return aDeployment();
+        },
+      }),
+      PROJECT_ID,
+    );
+
+    it("answers the release it built", async () => {
+      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
+
+      expect(outcome.release).toMatchObject({ id: "rel_1" });
     });
 
-    const outcome = await live.deploy({ prepared: PREPARED, landing: [] });
+    it("answers the deployment that made it live", async () => {
+      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
 
-    expect(outcome.release).toMatchObject({ id: "rel_1" });
-    expect(outcome.publication).toMatchObject({
-      outcome: "deployed",
-      deployment: { id: "dep_1" },
+      expect(outcome.publication).toMatchObject({
+        outcome: "deployed",
+        deployment: { id: "dep_1" },
+      });
     });
   });
 
-  it("answers the race it lost, with the release it had built", async () => {
-    const live = publisher({
-      buildRelease: async () => ({ id: "rel_1" }),
-      listDeployments: { all: async () => [] },
-      createDeployment: async () => {
-        throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
-      },
+  describe("when another deploy wins the race", () => {
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        listDeployments: {
+          all: async () => {
+            return [];
+          },
+        },
+        createDeployment: async () => {
+          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+        },
+      }),
+      PROJECT_ID,
+    );
+
+    it("answers the release it had built", async () => {
+      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
+
+      expect(outcome.release).toMatchObject({ id: "rel_1" });
     });
 
-    const outcome = await live.deploy({ prepared: PREPARED, landing: [] });
+    it("answers the race it lost", async () => {
+      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
 
-    expect(outcome.release).toMatchObject({ id: "rel_1" });
-    expect(outcome.publication).toMatchObject({ outcome: "raced" });
+      expect(outcome.publication).toMatchObject({ outcome: "raced" });
+    });
   });
 
-  it("refuses content that builds back to a revoked release, before any deploy", async () => {
-    const createDeployment = vi.fn(async () => deployment("dep_1"));
-    const live = publisher({
-      buildRelease: async () => ({ id: "rel_1", revoked_at: "2026-01-01T00:00:00Z" }),
-      createDeployment,
+  describe("when the content builds back to a revoked release", () => {
+    it("refuses with a conflict", async () => {
+      const publisher = new Publisher(
+        fakeClient({
+          buildRelease: async () => {
+            return { id: "rel_1", revoked_at: "2026-01-01T00:00:00Z" };
+          },
+        }),
+        PROJECT_ID,
+      );
+
+      const error = await rejectionOf(() => {
+        return publisher.deploy({ prepared: PREPARED, landing: [] });
+      });
+
+      expect(error).toBeInstanceOf(ConflictError);
     });
 
-    await expect(live.deploy({ prepared: PREPARED, landing: [] })).rejects.toMatchObject({
-      name: "ConflictError",
+    it("deploys nothing", async () => {
+      const createDeployment = vi.fn(async () => {
+        return aDeployment();
+      });
+      const publisher = new Publisher(
+        fakeClient({
+          buildRelease: async () => {
+            return { id: "rel_1", revoked_at: "2026-01-01T00:00:00Z" };
+          },
+          createDeployment,
+        }),
+        PROJECT_ID,
+      );
+
+      await rejectionOf(() => {
+        return publisher.deploy({ prepared: PREPARED, landing: [] });
+      });
+
+      expect(createDeployment).not.toHaveBeenCalled();
     });
-    expect(createDeployment).not.toHaveBeenCalled();
   });
 });
 
 describe("Publisher.preview", () => {
   it("deploys to the URLs the build registered, with their time to live", async () => {
-    const createDeployment = vi.fn(async () => deployment("dep_1"));
+    const createDeployment = vi.fn(async () => {
+      return aDeployment();
+    });
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        createDeployment,
+      }),
+      PROJECT_ID,
+    );
 
-    await publisher({
-      buildRelease: async () => ({ id: "rel_1" }),
-      createDeployment,
-    }).preview({
+    await publisher.preview({
       prepared: PREPARED,
-      urls: ["https://pr-7.preview.acme.com"],
+      urls: [PREVIEW_URL],
       ttl: "PT2H",
       message: "pr 7",
     });
 
     expect(createDeployment).toHaveBeenCalledWith(
-      {
-        release_id: "rel_1",
-        targets: ["https://pr-7.preview.acme.com"],
-        message: "pr 7",
-        ttl: "PT2H",
-      },
-      { project_id: "proj_1" },
+      { release_id: "rel_1", targets: [PREVIEW_URL], message: "pr 7", ttl: "PT2H" },
+      SCOPE,
     );
   });
 
   it("sends no time to live when the run named none", async () => {
-    const createDeployment = vi.fn(async () => deployment("dep_1"));
+    const createDeployment = vi.fn(async () => {
+      return aDeployment();
+    });
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        createDeployment,
+      }),
+      PROJECT_ID,
+    );
 
-    await publisher({
-      buildRelease: async () => ({ id: "rel_1" }),
-      createDeployment,
-    }).preview({ prepared: PREPARED, urls: ["https://pr-7.preview.acme.com"] });
+    await publisher.preview({ prepared: PREPARED, urls: [PREVIEW_URL] });
 
     expect(createDeployment).toHaveBeenCalledWith(
       expect.not.objectContaining({ ttl: expect.anything() }),
-      { project_id: "proj_1" },
+      SCOPE,
     );
   });
 });
 
 describe("Publisher.deployInitial", () => {
-  it("deploys to every primary origin with no guard, there being nothing to race", async () => {
-    const createDeployment = vi.fn(async () => deployment("dep_1"));
+  it("deploys to every primary origin with no guard", async () => {
+    const createDeployment = vi.fn(async () => {
+      return aDeployment();
+    });
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        createDeployment,
+      }),
+      PROJECT_ID,
+    );
 
-    const outcome = await publisher({
-      buildRelease: async () => ({ id: "rel_1" }),
-      createDeployment,
-    }).deployInitial({ prepared: PREPARED, message: "first" });
+    await publisher.deployInitial({ prepared: PREPARED, message: "first" });
 
     expect(createDeployment).toHaveBeenCalledWith(
       { release_id: "rel_1", targets: "primary", message: "first" },
-      { project_id: "proj_1" },
+      SCOPE,
     );
+  });
+
+  it("answers the deployment it made", async () => {
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        createDeployment: async () => {
+          return aDeployment();
+        },
+      }),
+      PROJECT_ID,
+    );
+
+    const outcome = await publisher.deployInitial({ prepared: PREPARED, message: "first" });
+
     expect(outcome.deployment.id).toBe("dep_1");
   });
 
-  it("reads nothing before it writes, unlike a guarded deploy", async () => {
-    const all = vi.fn(async () => []);
+  it("reads nothing before it writes, there being nothing to race", async () => {
+    const all = vi.fn(async () => {
+      return [];
+    });
+    const publisher = new Publisher(
+      fakeClient({
+        buildRelease: async () => {
+          return { id: "rel_1" };
+        },
+        createDeployment: async () => {
+          return aDeployment();
+        },
+        listDeployments: { all },
+      }),
+      PROJECT_ID,
+    );
 
-    await publisher({
-      buildRelease: async () => ({ id: "rel_1" }),
-      createDeployment: async () => deployment("dep_1"),
-      listDeployments: { all },
-    }).deployInitial({ prepared: PREPARED });
+    await publisher.deployInitial({ prepared: PREPARED });
 
     expect(all).not.toHaveBeenCalled();
   });

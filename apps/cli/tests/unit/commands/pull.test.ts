@@ -1,7 +1,8 @@
-import { http } from "msw";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
 import Pull from "@/commands/pull";
+import { ZitadelError } from "@/lib/errors";
 import { parseArg } from "@tests/helpers/inputs";
 import {
   aProjectWithTwoDeploys,
@@ -10,56 +11,105 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-describe("pull latest", () => {
-  const { server, dirs } = usePlatformServer();
+/**
+ * The release the live primary deployment serves, found only past the first
+ * page of live deployments.
+ */
+const LIVE_RELEASE = "rel_live";
 
-  it("pulls the release of the primary that is live, past the first page", async () => {
-    const project = await aProjectWithTwoDeploys("zitadel-pull-");
-    dirs.push(project.cwd);
-    server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
-    const read: string[] = [];
-    server.use(
-      http.get(`${PLATFORM_URL}/api/v1/releases/:id`, ({ params }) => {
-        read.push(params.id as string);
-        return undefined;
-      }),
-    );
+/**
+ * The live primary deployment.
+ */
+const LIVE_PRIMARY = { id: "dep_live_primary", release_id: LIVE_RELEASE };
 
-    await runCliForTest([
-      "pull",
-      "latest",
-      "--cwd",
-      project.cwd,
-      "--server",
-      PLATFORM_URL,
-      "--json",
-    ]);
+/**
+ * A release id as the platform mints it.
+ */
+const RELEASE_ID = "rel_01KX3RG8A7F0N9WD3P2E4YM5C1";
 
-    expect(read).toEqual(["rel_live"]);
+/**
+ * A deployment id as the platform mints it.
+ */
+const DEPLOYMENT_ID = "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6";
+
+const { server, dirs } = usePlatformServer();
+
+/**
+ * Answers a read of {@link LIVE_RELEASE} with a release that pins nothing, so
+ * a pull of it succeeds and reports which release it read.
+ *
+ * @returns The handler.
+ */
+function answersTheLiveRelease() {
+  return http.get(`${PLATFORM_URL}/api/v1/releases/${LIVE_RELEASE}`, ({ request }) => {
+    return HttpResponse.json({
+      id: LIVE_RELEASE,
+      project_id: new URL(request.url).searchParams.get("project_id"),
+      content_hash: `sha256:${"0".repeat(64)}`,
+      metadata: {
+        message: null,
+        git_sha: null,
+        git_dirty: null,
+        created_at: "2026-01-01T00:00:00.000Z",
+        created_by: null,
+        created_by_type: "service",
+      },
+      revoked_at: null,
+      pointers: [],
+    });
+  });
+}
+
+describe("pull", () => {
+  describe("with latest as the target", () => {
+    it("pulls the release of the primary that is live, past the first page", async () => {
+      const project = await aProjectWithTwoDeploys("zitadel-pull-");
+      dirs.push(project.cwd);
+      server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
+
+      const result = await runCliForTest([
+        "pull",
+        "latest",
+        "--cwd",
+        project.cwd,
+        "--server",
+        PLATFORM_URL,
+        "--json",
+      ]);
+
+      expect(JSON.parse(result.stdout)).toMatchObject({ data: { release_id: LIVE_RELEASE } });
+    });
   });
 });
 
-describe("the pull target argument", () => {
+describe("Pull.args.target", () => {
   it.each([
     ["latest", { kind: "latest" }],
-    ["rel_01KX3RG8A7F0N9WD3P2E4YM5C1", { kind: "release", id: "rel_01KX3RG8A7F0N9WD3P2E4YM5C1" }],
-    [
-      "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
-      { kind: "deployment", id: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6" },
-    ],
-  ])("classifies %j", async (value, target) => {
-    await expect(parseArg(Pull.args.target, value, "target")).resolves.toEqual(target);
+    [RELEASE_ID, { kind: "release", id: RELEASE_ID }],
+    [DEPLOYMENT_ID, { kind: "deployment", id: DEPLOYMENT_ID }],
+  ])("classifies %j", async (value, expected) => {
+    const target = await parseArg(Pull.args.target, value, "target");
+
+    expect(target).toEqual(expected);
   });
 
   it("pulls the live release when no target is given", () => {
-    expect(Pull.args.target.default).toEqual({ kind: "latest" });
+    const fallback = Pull.args.target.default;
+
+    expect(fallback).toEqual({ kind: "latest" });
   });
 
   it.each(["newest", "rel", "01KX3RG8A7F0N9WD3P2E4YM5C1"])(
     "refuses %j, saying what it takes",
     async (value) => {
-      await expect(parseArg(Pull.args.target, value, "target")).rejects.toMatchObject({
+      const error = await rejectionOf(() => {
+        return parseArg(Pull.args.target, value, "target");
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: `Don't know how to pull "${value}".`,
         hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",

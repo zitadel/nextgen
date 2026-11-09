@@ -111,6 +111,26 @@ export async function stagedFiles(cwd: string): Promise<string[]> {
   return lines(await git(cwd, "diff", "--cached", "-z", "--name-only"), "\0");
 }
 
+/**
+ * The paths the repository has under version control, relative to `cwd`.
+ *
+ * @param cwd - A directory in the repository.
+ * @returns The tracked paths under it.
+ */
+export async function trackedFiles(cwd: string): Promise<string[]> {
+  return lines(await git(cwd, "ls-files", "-z"), "\0");
+}
+
+/**
+ * The subject of every commit on the branch checked out in `cwd`, newest first.
+ *
+ * @param cwd - A directory in the repository.
+ * @returns The subjects.
+ */
+export async function commitSubjects(cwd: string): Promise<string[]> {
+  return lines(await git(cwd, "log", "--format=%s"), "\n");
+}
+
 function lines(stdout: string, separator: string): string[] {
   return stdout.split(separator).filter((line) => line.trim() !== "");
 }

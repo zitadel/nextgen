@@ -1,52 +1,81 @@
 import { describe, expect, it } from "vitest";
 
-import { MemoryStore, Policy, ZitadelConfig } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, Policy, ZitadelConfig } from "@/lib/zitadel";
+import { aConfig, aFile, type ConfigDocuments } from "@tests/helpers/config";
 
-const PASSWORD = ".zitadel/policies/password.json";
-const LOCKOUT = ".zitadel/policies/lockout.json";
+/**
+ * The password policy's file.
+ */
+const PASSWORD = `${CONFIG_DIRECTORIES.policies}/password.json`;
 
-/** Where setup writes the human-user schema, whose objectType is not its file name. */
-const HUMAN_USER = ".zitadel/schemas/default-human-user.json";
+/**
+ * The lockout policy's file.
+ */
+const LOCKOUT = `${CONFIG_DIRECTORIES.policies}/lockout.json`;
 
-/** Where the flow in these tests sits, whose name is not its file name. */
-const LOGIN = ".zitadel/flows/login.json";
+/**
+ * Where setup writes the human-user schema, whose objectType is not its file name.
+ */
+const HUMAN_USER = `${CONFIG_DIRECTORIES.schemas}/default-human-user.json`;
 
-/** A configuration holding the password policy. */
-function withPasswordPolicy(): ZitadelConfig {
-  return ZitadelConfig.of({
-    schemas: [],
-    flows: [],
-    connections: [],
-    policies: [{ path: PASSWORD, body: { operation: "password" } }],
-    branding: [],
-  });
-}
+/**
+ * Where the flow in these tests sits, whose name is not its file name.
+ */
+const LOGIN = `${CONFIG_DIRECTORIES.flows}/login.json`;
+
+/**
+ * The editor's pointer at the user schema meta-schema.
+ */
+const POINTER = "../meta/schema.json";
+
+/**
+ * A configuration holding the password policy.
+ */
+const HOLDING_PASSWORD: ConfigDocuments = {
+  policies: { "password.json": { operation: "password" } },
+};
+
+/**
+ * A configuration holding the human-user schema, with the editor's pointer.
+ */
+const HOLDING_HUMAN_USER: ConfigDocuments = {
+  schemas: { "default-human-user.json": { $schema: POINTER, objectType: "human-user" } },
+};
+
+/**
+ * A new lockout policy, not yet written.
+ */
+const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", { operation: "lockout" }));
 
 describe("Collection.get", () => {
   it("is the document at a path", () => {
-    expect(withPasswordPolicy().policies.get(PASSWORD)?.path).toBe(PASSWORD);
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const document = config.policies.get(PASSWORD);
+
+    expect(document?.path).toBe(PASSWORD);
   });
 
   it("is undefined for a path no document of the kind is at", () => {
-    expect(withPasswordPolicy().schemas.get(PASSWORD)).toBeUndefined();
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const document = config.schemas.get(PASSWORD);
+
+    expect(document).toBeUndefined();
   });
 });
 
-describe("Collection.holding", () => {
-  it("finds the schema whose objectType is the handle, whatever its file is called", async () => {
-    const config = await ZitadelConfig.loadUnchecked(
-      new MemoryStore([{ path: HUMAN_USER, body: { objectType: "human-user" } }]),
-    );
+describe("Collection.findByHandle", () => {
+  it("finds the schema whose objectType is the handle, whatever its file is called", () => {
+    const config = aConfig(HOLDING_HUMAN_USER);
 
     const document = config.schemas.findByHandle("human-user");
 
     expect(document?.path).toBe(HUMAN_USER);
   });
 
-  it("finds the flow whose name is the handle, whatever its file is called", async () => {
-    const config = await ZitadelConfig.loadUnchecked(
-      new MemoryStore([{ path: LOGIN, body: { name: "default-login" } }]),
-    );
+  it("finds the flow whose name is the handle, whatever its file is called", () => {
+    const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
 
     const document = config.flows.findByHandle("default-login");
 
@@ -54,20 +83,18 @@ describe("Collection.holding", () => {
   });
 
   describe("when no document of the kind holds the handle", () => {
-    it("finds nothing", async () => {
-      const config = await ZitadelConfig.loadUnchecked(
-        new MemoryStore([{ path: HUMAN_USER, body: { objectType: "human-user" } }]),
-      );
+    it("finds nothing", () => {
+      const config = aConfig(HOLDING_HUMAN_USER);
 
       const document = config.schemas.findByHandle("machine-user");
 
       expect(document).toBeUndefined();
     });
 
-    it("never takes a document of another kind that carries the handle", async () => {
-      const config = await ZitadelConfig.loadUnchecked(
-        new MemoryStore([{ path: HUMAN_USER, body: { name: "default-login" } }]),
-      );
+    it("never takes a document of another kind that carries the handle", () => {
+      const config = aConfig({
+        schemas: { "default-human-user.json": { name: "default-login" } },
+      });
 
       const document = config.flows.findByHandle("default-login");
 
@@ -77,7 +104,7 @@ describe("Collection.holding", () => {
 
   describe("with a kind a release does not pin by name", () => {
     it("finds nothing", () => {
-      const config = withPasswordPolicy();
+      const config = aConfig(HOLDING_PASSWORD);
 
       const document = config.policies.findByHandle("password");
 
@@ -93,17 +120,13 @@ describe("Collection.placeRevision", () => {
 
       const change = config.schemas.placeRevision("human-user", { objectType: "human-user" });
 
-      expect(change.createdPaths).toEqual([".zitadel/schemas/human-user.json"]);
+      expect(change.createdPaths).toEqual([`${CONFIG_DIRECTORIES.schemas}/human-user.json`]);
     });
   });
 
   describe("when a file holds the handle", () => {
-    it("carries the editor's $schema pointer over from it", async () => {
-      const config = await ZitadelConfig.loadUnchecked(
-        new MemoryStore([
-          { path: HUMAN_USER, body: { $schema: "../meta/schema.json", objectType: "human-user" } },
-        ]),
-      );
+    it("carries the editor's $schema pointer over from it", () => {
+      const config = aConfig(HOLDING_HUMAN_USER);
 
       const change = config.schemas.placeRevision("human-user", {
         objectType: "human-user",
@@ -113,16 +136,12 @@ describe("Collection.placeRevision", () => {
       expect(change.after.schemas.get(HUMAN_USER)?.body).toEqual({
         objectType: "human-user",
         type: "object",
-        $schema: "../meta/schema.json",
+        $schema: POINTER,
       });
     });
 
-    it("keeps a $schema pointer the revision has of its own", async () => {
-      const config = await ZitadelConfig.loadUnchecked(
-        new MemoryStore([
-          { path: HUMAN_USER, body: { $schema: "../meta/schema.json", objectType: "human-user" } },
-        ]),
-      );
+    it("keeps a $schema pointer the revision has of its own", () => {
+      const config = aConfig(HOLDING_HUMAN_USER);
 
       const change = config.schemas.placeRevision("human-user", {
         $schema: "https://example.test/schema.json",
@@ -134,12 +153,8 @@ describe("Collection.placeRevision", () => {
       );
     });
 
-    it("writes nothing when the file already holds exactly the revision", async () => {
-      const config = await ZitadelConfig.loadUnchecked(
-        new MemoryStore([
-          { path: HUMAN_USER, body: { $schema: "../meta/schema.json", objectType: "human-user" } },
-        ]),
-      );
+    it("writes nothing when the file already holds exactly the revision", () => {
+      const config = aConfig(HOLDING_HUMAN_USER);
 
       const change = config.schemas.placeRevision("human-user", { objectType: "human-user" });
 
@@ -150,15 +165,17 @@ describe("Collection.placeRevision", () => {
 
 describe("Collection.put", () => {
   it("adds a document the configuration does not have", () => {
-    const change = withPasswordPolicy().policies.put(
-      Policy.create({ path: LOCKOUT, body: { operation: "lockout" } }),
-    );
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.put(NEW_LOCKOUT);
 
     expect(change.createdPaths).toEqual([LOCKOUT]);
   });
 
   it("replaces the document at the same path", () => {
-    const change = withPasswordPolicy().policies.put(
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.put(
       Policy.create({ path: PASSWORD, body: { operation: "password", min_length: 12 } }),
     );
 
@@ -172,39 +189,47 @@ describe("Collection.put", () => {
 
 describe("Collection.remove", () => {
   it("removes the document from the configuration", () => {
-    const change = withPasswordPolicy().policies.remove(PASSWORD);
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.remove(PASSWORD);
 
     expect(change.after.policies.all).toEqual([]);
   });
 
   it("deletes the document's file", () => {
-    const change = withPasswordPolicy().policies.remove(PASSWORD);
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.remove(PASSWORD);
 
     expect(change.removedPaths).toEqual([PASSWORD]);
   });
 
   it("writes nothing else", () => {
-    const change = withPasswordPolicy().policies.remove(PASSWORD);
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.remove(PASSWORD);
 
     expect(change.changedPaths).toEqual([]);
   });
 
   it("changes nothing for a path no document is at", () => {
-    const change = withPasswordPolicy().policies.remove(LOCKOUT);
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.remove(LOCKOUT);
 
     expect(change.changed).toBe(false);
   });
 
   it("leaves a document of another kind at the path alone", () => {
-    const change = withPasswordPolicy().schemas.remove(PASSWORD);
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.schemas.remove(PASSWORD);
 
     expect(change.after.policies.get(PASSWORD)?.path).toBe(PASSWORD);
   });
 
   it("deletes nothing for a document that was never written", () => {
-    const added = withPasswordPolicy().policies.put(
-      Policy.create({ path: LOCKOUT, body: { operation: "lockout" } }),
-    );
+    const added = aConfig(HOLDING_PASSWORD).policies.put(NEW_LOCKOUT);
 
     const change = added.after.policies.remove(LOCKOUT);
 
@@ -212,7 +237,7 @@ describe("Collection.remove", () => {
   });
 
   it("writes a document put back where one was removed, rather than deleting it", () => {
-    const removed = withPasswordPolicy().policies.remove(PASSWORD);
+    const removed = aConfig(HOLDING_PASSWORD).policies.remove(PASSWORD);
 
     const change = removed.after.policies.put(
       Policy.create({ path: PASSWORD, body: { operation: "password" } }),

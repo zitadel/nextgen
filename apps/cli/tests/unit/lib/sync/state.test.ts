@@ -3,120 +3,143 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
-
+import { ZitadelError } from "@/lib/errors";
 import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
+import { it } from "@tests/helpers/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const CUSTOMERS = ".zitadel/schemas/customers.json";
+/**
+ * The directory the state file lives in.
+ */
+const ZITADEL_DIR = ".zitadel";
 
-/** Write a state file holding exactly this text. */
-async function writeStateText(cwd: string, text: string): Promise<void> {
-  await mkdir(join(cwd, ".zitadel"), { recursive: true });
-  await writeFile(join(cwd, ".zitadel/state.json"), text);
-}
+/**
+ * The state file, from the project root.
+ */
+const STATE_FILE = `${ZITADEL_DIR}/state.json`;
 
-async function writeStateFile(cwd: string, state: ZitadelState): Promise<void> {
-  await mkdir(join(cwd, ".zitadel"), { recursive: true });
-  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(state));
+/**
+ * A synced schema file, as the state file keys it.
+ */
+const CUSTOMERS = `${ZITADEL_DIR}/schemas/customers.json`;
+
+/**
+ * A synced flow file, which no test asks about.
+ */
+const LOGIN_FLOW = `${ZITADEL_DIR}/flows/login.json`;
+
+/**
+ * Writes the state file holding exactly this text.
+ *
+ * @param cwd - The project root.
+ * @param text - The file's contents.
+ */
+async function writeState(cwd: string, text: string): Promise<void> {
+  await mkdir(join(cwd, ZITADEL_DIR), { recursive: true });
+  await writeFile(join(cwd, STATE_FILE), text);
 }
 
 describe("readState", () => {
-  it("returns the parsed contents of .zitadel/state.json", async ({ dir: cwd }) => {
-    const state: ZitadelState = {
-      framework: "next",
-      scaffold: { files: {}, dev_port: 3000 },
-    };
-    await writeStateFile(cwd, state);
+  it("returns the parsed contents of the state file", async ({ dir }) => {
+    const state: ZitadelState = { framework: "next", scaffold: { files: {}, dev_port: 3000 } };
+    await writeState(dir, JSON.stringify(state));
 
-    const result = await readState(cwd);
+    const result = await readState(dir);
 
     expect(result).toEqual(state);
   });
 
-  it("throws when the state file is missing", async ({ dir: cwd }) => {
-    await expect(readState(cwd)).rejects.toThrow();
+  describe("when the state file is missing", () => {
+    it("refuses with the file system's error", async ({ dir }) => {
+      const error = await rejectionOf(() => {
+        return readState(dir);
+      });
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toMatchObject({ code: "ENOENT" });
+    });
   });
 
-  it("throws when the state file is malformed JSON", async ({ dir: cwd }) => {
-    await mkdir(join(cwd, ".zitadel"), { recursive: true });
-    await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
+  describe("when the state file is not JSON", () => {
+    it("refuses with the parser's error", async ({ dir }) => {
+      await writeState(dir, "{ not json");
 
-    await expect(readState(cwd)).rejects.toThrow();
+      const error = await rejectionOf(() => {
+        return readState(dir);
+      });
+
+      expect(error).toBeInstanceOf(SyntaxError);
+    });
   });
 });
 
 describe("updateScaffold", () => {
-  it("records the manifest", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, { framework: "next" });
+  it("records the manifest", async ({ dir }) => {
+    await writeState(dir, JSON.stringify({ framework: "next" }));
 
-    await updateScaffold(cwd, { files: {} });
+    await updateScaffold(dir, { files: {} });
 
-    expect(await readState(cwd)).toEqual({ framework: "next", scaffold: { files: {} } });
+    expect(await readState(dir)).toEqual({ framework: "next", scaffold: { files: {} } });
   });
 
-  it("keeps the rest of the file", async ({ dir: cwd }) => {
-    await writeStateText(
-      cwd,
+  it("keeps the rest of the file", async ({ dir }) => {
+    await writeState(
+      dir,
       JSON.stringify({ framework: "next", resources: { [CUSTOMERS]: { id: "sch_1" } } }),
     );
 
-    await updateScaffold(cwd, { files: {} });
+    await updateScaffold(dir, { files: {} });
 
-    expect(await publishedIds(cwd, [CUSTOMERS])).toEqual(new Map([[CUSTOMERS, ["sch_1"]]]));
+    expect(await publishedIds(dir, [CUSTOMERS])).toEqual(new Map([[CUSTOMERS, ["sch_1"]]]));
   });
 });
 
 describe("publishedIds", () => {
-  it("is the id a file was synced as", async ({ dir: cwd }) => {
-    await writeStateText(cwd, JSON.stringify({ resources: { [CUSTOMERS]: { id: "sch_1" } } }));
+  it("is the id a file was synced as", async ({ dir }) => {
+    await writeState(dir, JSON.stringify({ resources: { [CUSTOMERS]: { id: "sch_1" } } }));
 
-    const ids = await publishedIds(cwd, [CUSTOMERS]);
+    const ids = await publishedIds(dir, [CUSTOMERS]);
 
     expect(ids.get(CUSTOMERS)).toEqual(["sch_1"]);
   });
 
-  it("keeps the id a file was synced as before, which a flow may still name", async ({
-    dir: cwd,
-  }) => {
-    await writeStateText(
-      cwd,
+  it("keeps the id a file was synced as before, which a flow may still name", async ({ dir }) => {
+    await writeState(
+      dir,
       JSON.stringify({ resources: { [CUSTOMERS]: { id: "sch_NEW", previousId: "sch_OLD" } } }),
     );
 
-    const ids = await publishedIds(cwd, [CUSTOMERS]);
+    const ids = await publishedIds(dir, [CUSTOMERS]);
 
     expect(ids.get(CUSTOMERS)).toEqual(["sch_NEW", "sch_OLD"]);
   });
 
-  it("leaves out a file that was never synced", async ({ dir: cwd }) => {
-    await writeStateText(cwd, JSON.stringify({ resources: {} }));
+  it("leaves out a file that was never synced", async ({ dir }) => {
+    await writeState(dir, JSON.stringify({ resources: {} }));
 
-    const ids = await publishedIds(cwd, [CUSTOMERS]);
+    const ids = await publishedIds(dir, [CUSTOMERS]);
 
     expect(ids.has(CUSTOMERS)).toBe(false);
   });
 
-  it("is empty for a project that was never synced", async ({ dir: cwd }) => {
-    const ids = await publishedIds(cwd, [CUSTOMERS]);
+  it("is empty for a project that was never synced", async ({ dir }) => {
+    const ids = await publishedIds(dir, [CUSTOMERS]);
 
     expect(ids.size).toBe(0);
   });
 
-  it("is empty for a state file with no resources section", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, { framework: "next" });
+  it("is empty for a state file with no resources section", async ({ dir }) => {
+    await writeState(dir, JSON.stringify({ framework: "next" }));
 
-    const ids = await publishedIds(cwd, [CUSTOMERS]);
+    const ids = await publishedIds(dir, [CUSTOMERS]);
 
     expect(ids.size).toBe(0);
   });
 
-  it("does not judge an entry it was not asked about", async ({ dir: cwd }) => {
-    await writeStateText(
-      cwd,
-      JSON.stringify({ resources: { ".zitadel/flows/login.json": { id: 7 } } }),
-    );
+  it("does not judge an entry it was not asked about", async ({ dir }) => {
+    await writeState(dir, JSON.stringify({ resources: { [LOGIN_FLOW]: { id: 7 } } }));
 
-    const ids = await publishedIds(cwd, [CUSTOMERS]);
+    const ids = await publishedIds(dir, [CUSTOMERS]);
 
     expect(ids.size).toBe(0);
   });
@@ -134,11 +157,17 @@ describe("publishedIds", () => {
     },
     { problem: "an empty id", text: JSON.stringify({ resources: { [CUSTOMERS]: { id: "" } } }) },
     { problem: "text that is not JSON", text: "{not json" },
-  ])("refuses a state file with $problem rather than treat it as never synced", async ({
-    text,
-  }, { dir: cwd }) => {
-    await writeStateText(cwd, text);
+  ])(
+    "refuses a state file with $problem rather than treat it as never synced",
+    async ({ text }, { dir }) => {
+      await writeState(dir, text);
 
-    await expect(publishedIds(cwd, [CUSTOMERS])).rejects.toMatchObject({ code: "E_VALIDATION" });
-  });
+      const error = await rejectionOf(() => {
+        return publishedIds(dir, [CUSTOMERS]);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+    },
+  );
 });

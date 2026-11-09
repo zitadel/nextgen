@@ -1,7 +1,17 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -1327,6 +1337,190 @@ export class ScaffoldedApp {
     return flow_definition.steps.filter((step) => (step.sso_providers ?? []).length > 0);
   }
 
+  /**
+   * The auth methods the published user schema names, as `schemas list`
+   * reports them.
+   *
+   * @returns The schema's `x-auth-methods`, empty when it names none.
+   */
+  async publishedAuthMethods(): Promise<NonNullable<UserSchemaDocument["x-auth-methods"]>> {
+    const { schema } = await this.publishedSchema();
+    return schema["x-auth-methods"] ?? {};
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then reads the auth methods the published user schema names.
+   *
+   * @returns The published schema's `x-auth-methods`.
+   */
+  async authMethodsOnceDeployed(): Promise<NonNullable<UserSchemaDocument["x-auth-methods"]>> {
+    await this.publishData();
+    return this.publishedAuthMethods();
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then reads the published steps that offer a provider.
+   *
+   * @returns The steps, as {@link stepsOfferingSso} reads them.
+   */
+  async stepsOfferingSsoOnceDeployed(): Promise<FlowStep[]> {
+    await this.publishData();
+    return this.stepsOfferingSso();
+  }
+
+  /**
+   * Deploys the project's files, then reads each distinct list of providers a
+   * published step offers: one list when every step offers the same ones.
+   *
+   * @returns The distinct `sso_providers` lists, in step order.
+   */
+  async providerListsOfferedOnceDeployed(): Promise<string[][]> {
+    const lists = new Map<string, string[]>();
+    for (const step of await this.stepsOfferingSsoOnceDeployed()) {
+      const providers = step.sso_providers ?? [];
+      lists.set(JSON.stringify(providers), providers);
+    }
+    return [...lists.values()];
+  }
+
+  /**
+   * Deploys the project's files, then names the published steps that offer a
+   * provider but give `outcome` no transition.
+   *
+   * @param outcome - The transition every offering step should name.
+   * @returns The names of the steps that lack it.
+   */
+  async stepsOfferingSsoWithoutOnceDeployed(outcome: string): Promise<string[]> {
+    const steps = await this.stepsOfferingSsoOnceDeployed();
+    return steps
+      .filter((step) => {
+        return !Object.hasOwn(step.transitions ?? {}, outcome);
+      })
+      .map((step) => {
+        return step.name;
+      });
+  }
+
+  /**
+   * Deploys the project's files, then reads the slugs of the providers the
+   * platform has registered, sorted.
+   *
+   * @returns The registered slugs.
+   */
+  async registeredIdpSlugsOnceDeployed(): Promise<string[]> {
+    await this.publishData();
+    const registered = await this.registeredIdps();
+    return registered
+      .map((idp) => {
+        return idp.slug;
+      })
+      .sort();
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then runs `deploy --dry-run`, which refuses when the platform
+   * and the files still differ.
+   *
+   * @returns The dry run.
+   */
+  async deployDryRunOnceDeployed(): Promise<CliResult> {
+    await this.publishData();
+    return this.deployDryRun();
+  }
+
+  /**
+   * Deploys the project's files twice in a row, failing the arrange if either
+   * deploy does not succeed.
+   *
+   * @returns The release each deploy made live, first then again.
+   */
+  async releasesOfTwoDeploys(): Promise<Array<string | undefined>> {
+    const first = await this.publishData();
+    const again = await this.deployData();
+    return [first.release_id, again.release_id];
+  }
+
+  /**
+   * Runs `auth-method password|passkey disable`, failing the arrange if it
+   * does not succeed.
+   *
+   * @param method - The method to turn off.
+   */
+  async hasDisabledMethod(method: "password" | "passkey"): Promise<void> {
+    const result = await this.disableMethod(method);
+    expect(result, `arranging auth-method ${method} disable should have succeeded`).toSucceed();
+  }
+
+  /**
+   * Turns `method` off in the committed user schema, as the developer owning it
+   * would, without a command.
+   *
+   * @param method - The method to turn off.
+   */
+  hasTurnedOffByHand(method: "password" | "passkey"): Promise<void> {
+    return this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = { ...schema["x-auth-methods"], [method]: { enabled: false } };
+    });
+  }
+
+  /**
+   * Removes the committed user schema's `x-identifier`, so nothing names what
+   * a password is checked against.
+   */
+  lacksAnIdentifier(): Promise<void> {
+    return this.editDocument<Record<string, unknown>>(SCHEMA_FILE, (schema) => {
+      delete schema["x-identifier"];
+    });
+  }
+
+  /**
+   * Runs `auth-method sso enable` with exactly these flags and this secret
+   * piped, failing the arrange if it does not succeed.
+   *
+   * @param args - The flags naming the provider and its client id.
+   * @param secret - The client secret, piped as a script would.
+   */
+  async hasEnabledSsoWith(args: string[], secret: string): Promise<void> {
+    const result = await this.enableSsoWith(args, secret);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Enables a catalog provider, failing the arrange if it does not succeed.
+   *
+   * @param provider - The catalog provider.
+   * @param credentials - Its client id and secret.
+   */
+  async hasEnabledSso(provider: string, credentials: Credentials): Promise<void> {
+    const result = await this.enableSso(provider, credentials);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Enables a connection the developer describes, failing the arrange if it
+   * does not succeed.
+   *
+   * @param connection - The connection.
+   * @param credentials - Its client id and secret.
+   */
+  async hasEnabledCustomSso(connection: CustomConnection, credentials: Credentials): Promise<void> {
+    const result = await this.enableCustomSso(connection, credentials);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Runs `auth-method sso disable`, failing the arrange if it does not succeed.
+   *
+   * @param provider - The provider to remove.
+   */
+  async hasDisabledSso(provider: string): Promise<void> {
+    const result = await this.disableSso(provider);
+    expect(result, "arranging auth-method sso disable should have succeeded").toSucceed();
+  }
+
   /** What the fake npm was asked to do, for the install leg of setup. */
   async installInvocation(): Promise<{ cwd: string; args: string[] }> {
     if (this.installLogPath === undefined) {
@@ -1336,6 +1530,27 @@ export class ScaffoldedApp {
       cwd: string;
       args: string[];
     };
+  }
+
+  /**
+   * The app's directory with every symlink resolved, as a process the CLI
+   * starts in it sees its working directory.
+   *
+   * @returns The resolved directory.
+   */
+  realPath(): Promise<string> {
+    return realpath(this.path);
+  }
+
+  /**
+   * `command` as setup suggests it: aimed at the project setup created by the
+   * env file it wrote, and run from `--cwd`.
+   *
+   * @param command - The command, after the runner.
+   * @returns The whole suggestion.
+   */
+  asSetupSuggests(command: string): string {
+    return `${command} --env-file ${this.path}/.env.development.local --cwd ${this.path}`;
   }
 
   envelopeOf<T = Record<string, unknown>>(result: CliResult): Envelope<T> {
@@ -2046,6 +2261,24 @@ export async function anUndeployedEnvironment(): Promise<ScaffoldedApp> {
   ]);
   expect(added, "arranging env add should have succeeded").toSucceed();
   return app;
+}
+
+/**
+ * A second working copy of the same project: a fresh app directory carrying
+ * the project's `.zitadel/secret` but none of its resource files, the way a
+ * developer who cloned the repo reaches a project someone else deployed.
+ *
+ * @param project - The project to check out again.
+ * @returns The checkout.
+ */
+export async function aFreshCheckoutOf(project: ScaffoldedApp): Promise<ScaffoldedApp> {
+  const checkout = await anApp();
+  await mkdir(join(checkout.path, ".zitadel"), { recursive: true });
+  await checkout.writeProjectFile(
+    ".zitadel/secret",
+    await project.readProjectFile(".zitadel/secret"),
+  );
+  return checkout;
 }
 
 /**

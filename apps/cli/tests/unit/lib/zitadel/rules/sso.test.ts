@@ -1,122 +1,123 @@
 import { describe, expect, it } from "vitest";
 
-import { type Issue, type JsonObject, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
-import { toJsonObject } from "@/lib/zitadel/utils/json";
-
-const SCHEMA = ".zitadel/schemas/staff.json";
-const FLOW = ".zitadel/flows/login.json";
-const CONNECTION = ".zitadel/idps/acme.json";
-
-type Entry = Readonly<{ path: string; body: Record<string, unknown> }>;
+import { aConfig, anOidcConnection } from "@tests/helpers/config";
+import { aFlowOffering, aSchemaListing, HUMAN_USER } from "@tests/helpers/schemas";
 
 /**
- * Fixture entries as the configuration takes its files: each body written and
- * read back as JSON, so a key set to `undefined` is left out, as a file leaves
- * it out.
- *
- * @param entries - The fixture entries.
- * @returns Each entry with its body as read.
+ * The file name of the schema in these tests.
  */
-function filesOf(entries: readonly Entry[]): readonly { path: string; body: JsonObject }[] {
-  return entries.map((entry) => {
-    const body = toJsonObject(JSON.parse(JSON.stringify(entry.body)), entry.path);
-    return { path: entry.path, body };
-  });
-}
+const SCHEMA_FILE = "staff.json";
 
-function schema(providers: string[], over: Record<string, unknown> = {}): Entry {
-  return {
-    path: SCHEMA,
-    body: {
-      objectType: "staff",
-      properties: { email: {} },
-      "x-auth-methods": { sso: { enabled: true, providers } },
-      ...over,
-    },
-  };
-}
+/**
+ * Where the schema in these tests sits.
+ */
+const SCHEMA_PATH = `.zitadel/schemas/${SCHEMA_FILE}`;
 
-function flow(userSchema: string, providers: string[]): Entry {
-  return {
-    path: FLOW,
-    body: {
-      user_schema: userSchema,
-      steps: [
-        {
-          name: "identifier",
-          sso_providers: providers,
-          transitions: {
-            sso_authenticated: { target: "done" },
-            sso_user_not_found: { target: "register-sso" },
-            user_already_exists: { target: "sso-conflict" },
-          },
-        },
-      ],
-    },
-  };
-}
+/**
+ * The file name of the flow in these tests.
+ */
+const FLOW_FILE = "login.json";
 
-function connection(slug: string, path = CONNECTION): Entry {
-  return { path, body: { slug, claim_mapping: { email: "email" } } };
-}
+/**
+ * Where the flow in these tests sits.
+ */
+const FLOW_PATH = `.zitadel/flows/${FLOW_FILE}`;
 
-function issuesOf(input: {
-  schemas?: readonly Entry[];
-  flows?: readonly Entry[];
-  connections?: readonly Entry[];
-}): readonly Issue[] {
-  const config = ZitadelConfig.of({
-    schemas: filesOf(input.schemas ?? []),
-    flows: filesOf(input.flows ?? []),
-    connections: filesOf(input.connections ?? []),
-    policies: [],
-    branding: [],
-  });
-  return SSO_RULES.flatMap((rule) => {
-    return rule.check(config, {});
-  });
-}
+/**
+ * The file name of the connection in these tests.
+ */
+const CONNECTION_FILE = "acme.json";
+
+/**
+ * Where the connection in these tests sits.
+ */
+const CONNECTION_PATH = `.zitadel/idps/${CONNECTION_FILE}`;
+
+/**
+ * The file name of a second connection claiming the same slug.
+ */
+const COPY_FILE = "copy.json";
+
+/**
+ * The `$id` a schema and the flow pinning it may both name.
+ */
+const SCHEMA_ID = "https://schemas.example.test/staff.json";
+
+/**
+ * The connection the schema and flow name, mapping the email claim it asks
+ * for.
+ */
+const ACME = anOidcConnection({
+  claim_mapping: { email: "email" },
+  oidc: { scopes: ["openid", "email"] },
+});
+
+/**
+ * A second connection claiming {@link ACME}'s slug, with a secret of its own.
+ */
+const ACME_COPY = anOidcConnection({
+  claim_mapping: { email: "email" },
+  oidc: { scopes: ["openid", "email"], client_secret: "${{ COPY_CLIENT_SECRET }}" },
+});
 
 describe("SSO_RULES", () => {
   it("find nothing in a project whose files agree", () => {
-    const issues = issuesOf({
-      schemas: [schema(["acme"])],
-      flows: [flow("staff", ["acme"])],
-      connections: [connection("acme")],
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) },
+      flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+      connections: { [CONNECTION_FILE]: ACME },
+    });
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
     });
 
     expect(issues).toEqual([]);
   });
 
   it("find nothing in a project with no SSO files at all", () => {
-    expect(issuesOf({})).toEqual([]);
+    const config = aConfig();
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
+    });
+
+    expect(issues).toEqual([]);
   });
 
   it("refuse a provider the pinned schema does not list, naming the flow file and its step", () => {
-    const issues = issuesOf({
-      schemas: [schema(["other"])],
-      flows: [flow("staff", ["acme"])],
-      connections: [connection("acme")],
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
+      flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+      connections: { [CONNECTION_FILE]: ACME },
+    });
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
     });
 
     expect(issues).toContainEqual({
       severity: "error",
       rule: "sso/provider-id",
-      file: FLOW,
+      file: FLOW_PATH,
       steps: ["identifier"],
-      message: `step "identifier": sso provider "acme" is not listed in sso.providers of ${SCHEMA}. Add it there, or remove it from the flow.`,
+      message: `step "identifier": sso provider "acme" is not listed in sso.providers of ${SCHEMA_PATH}. Add it there, or remove it from the flow.`,
     });
   });
 
   it("refuse a schema that lists a provider with no connection file, naming the schema", () => {
-    const issues = issuesOf({ schemas: [schema(["acme"])] });
+    const config = aConfig({ schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) } });
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
+    });
 
     expect(issues).toEqual([
       {
         severity: "error",
         rule: "sso/connection-resolves",
-        file: SCHEMA,
+        file: SCHEMA_PATH,
         slug: "acme",
         message:
           'sso.providers lists "acme" but there is no connection file with that slug under .zitadel/idps/. Add the file, or remove "acme" from sso.providers.',
@@ -125,64 +126,58 @@ describe("SSO_RULES", () => {
   });
 
   it("refuse a second connection file that claims a slug, naming the first", () => {
-    const issues = issuesOf({
-      connections: [connection("acme"), connection("acme", ".zitadel/idps/copy.json")],
+    const config = aConfig({ connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY } });
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
     });
 
     expect(issues).toEqual([
       {
         severity: "error",
         rule: "sso/duplicate-slug",
-        file: ".zitadel/idps/copy.json",
-        message: `connection slug "acme" is also used by ${CONNECTION}. A slug names one connection: change the slug here, or delete one of the two files.`,
+        file: `.zitadel/idps/${COPY_FILE}`,
+        message: `connection slug "acme" is also used by ${CONNECTION_PATH}. A slug names one connection: change the slug here, or delete one of the two files.`,
       },
     ]);
   });
 
   it("report every problem, one issue each", () => {
-    const issues = issuesOf({ schemas: [schema(["acme", "ghost"])] });
+    const config = aConfig({ schemas: { [SCHEMA_FILE]: aSchemaListing(["acme", "ghost"]) } });
 
-    expect(
-      issues.map((issue) => {
-        return issue.slug;
-      }),
-    ).toEqual(["acme", "ghost"]);
-  });
-
-  describe("finding the schema a flow pins", () => {
-    it("matches a flow's user_schema to a schema's objectType", () => {
-      const issues = issuesOf({
-        schemas: [schema(["other"])],
-        flows: [flow("staff", ["acme"])],
-        connections: [connection("acme")],
-      });
-
-      expect(
-        issues.map((issue) => {
-          return issue.rule;
-        }),
-      ).toContain("sso/provider-id");
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
     });
 
-    it("matches a flow's user_schema to a schema's $id", () => {
-      const id = "https://schemas.example.test/staff.json";
-      const issues = issuesOf({
-        schemas: [schema(["other"], { $id: id })],
-        flows: [flow(id, ["acme"])],
-        connections: [connection("acme")],
+    expect(issues).toMatchObject([{ slug: "acme" }, { slug: "ghost" }]);
+  });
+
+  describe("when finding the schema a flow pins", () => {
+    it.each([
+      ["objectType", aSchemaListing(["other"]), HUMAN_USER],
+      ["$id", aSchemaListing(["other"], { $id: SCHEMA_ID }), SCHEMA_ID],
+    ])("matches a flow's user_schema to a schema's %s", (_key, schema, userSchema) => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: schema },
+        flows: { [FLOW_FILE]: aFlowOffering(["acme"], userSchema) },
+        connections: { [CONNECTION_FILE]: ACME },
       });
 
-      expect(
-        issues.map((issue) => {
-          return issue.rule;
-        }),
-      ).toContain("sso/provider-id");
+      const issues = SSO_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(issues).toContainEqual(expect.objectContaining({ rule: "sso/provider-id" }));
     });
 
     it("does not hold a flow to a schema the project does not keep locally", () => {
-      const issues = issuesOf({
-        flows: [flow("not-kept-here", ["acme"])],
-        connections: [connection("acme")],
+      const config = aConfig({
+        flows: { [FLOW_FILE]: aFlowOffering(["acme"], "not-kept-here") },
+        connections: { [CONNECTION_FILE]: ACME },
+      });
+
+      const issues = SSO_RULES.flatMap((rule) => {
+        return rule.check(config, {});
       });
 
       expect(issues).toEqual([]);
