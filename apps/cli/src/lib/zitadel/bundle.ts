@@ -3,45 +3,62 @@ import { ConfigError } from "@/lib/zitadel/errors";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
 
-/** The most resources a release may pin: the cap `POST /releases/build` enforces. */
+/**
+ * The most resources a release may pin: the cap `POST /releases/build` enforces.
+ */
 const MAX_BUNDLE_RESOURCES = 50;
 
 /**
- * The configuration as `POST /releases/build` takes it, grouped by kind. Loose
- * on purpose: the files are untyped JSON until the deploy's checks have run,
- * and the publisher narrows them to the API's bundle before they are sent.
+ * The configuration as `POST /releases/build` takes it, grouped by kind.
+ *
+ * @remarks
+ * Loose on purpose: the files are untyped JSON until the deploy's checks have
+ * run, and the publisher narrows them to the API's bundle before they are sent.
  */
 export type ConfigurationBundle = Readonly<{
+  /**
+   * Every user schema's wire body.
+   */
   schemas: readonly JsonObject[];
+  /**
+   * Every login flow's wire body.
+   */
   flow_definitions: readonly JsonObject[];
+  /**
+   * Every connection's wire body.
+   */
   idps: readonly JsonObject[];
+  /**
+   * Every policy's wire body; absent when there are none.
+   */
   policies?: readonly JsonObject[];
+  /**
+   * The branding descriptor's wire body; absent when there is none.
+   */
   branding?: JsonObject;
 }>;
 
-/** A built bundle, and the number of resources it carries across every kind. */
+/**
+ * A built bundle, and the number of resources it carries across every kind.
+ */
 export type BuiltBundle = Readonly<{
+  /**
+   * The bundle to send.
+   */
   bundle: ConfigurationBundle;
+  /**
+   * How many resources it carries across every kind.
+   */
   resourceCount: number;
 }>;
 
 /**
- * A body without the editor-only `$schema` pointer, which the server never
- * echoes.
+ * Assemble the bundle a deploy sends: each document's wire body, grouped by
+ * kind.
  *
- * @param body - A file's body.
- * @returns The body to send.
- */
-function withoutEditorPointer(body: JsonObject): JsonObject {
-  const { $schema: _editorOnly, ...rest } = body;
-  return rest;
-}
-
-/**
- * Assemble the bundle a deploy sends. Schemas, flows and connections are sent
- * as authored, without their `$schema` pointer; the branding descriptor has its
- * `$file` references inlined. An empty configuration and one over the cap both
- * fail before any server call, with the messages the server would answer.
+ * @remarks
+ * An empty configuration and one over the cap both fail before any server
+ * call, with the messages the server would answer.
  *
  * @param config - The configuration.
  * @param store - Where branding's referenced files are read from.
@@ -62,19 +79,19 @@ export function toBundle(config: ZitadelConfig, store: ConfigStore): BuiltBundle
   const branding = config.branding.all[0]?.wireBody(store);
   const bundle: ConfigurationBundle = {
     schemas: config.schemas.all.map((schema) => {
-      return withoutEditorPointer(schema.body);
+      return schema.wireBody(store);
     }),
     flow_definitions: config.flows.all.map((flow) => {
-      return withoutEditorPointer(flow.body);
+      return flow.wireBody(store);
     }),
     idps: config.connections.all.map((connection) => {
-      return withoutEditorPointer(connection.body);
+      return connection.wireBody(store);
     }),
     ...(config.policies.all.length === 0
       ? {}
       : {
           policies: config.policies.all.map((policy) => {
-            return policy.wireBody;
+            return policy.wireBody(store);
           }),
         }),
     ...(branding === undefined ? {} : { branding }),

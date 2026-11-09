@@ -24,33 +24,55 @@ import type {
 } from "@/lib/backend";
 import type { ZitadelConfig } from "@/lib/zitadel";
 import { mapBounded } from "@/lib/map-bounded";
-import {
-  POLICY_TEST_SUFFIX,
-  policyFileName,
-} from "./index";
+import { POLICY_TEST_SUFFIX, policyFileName } from "./index";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 
-/** A policy test file as `policyTestFileSchema` accepts it. */
+/**
+ * A policy test file as `policyTestFileSchema` accepts it.
+ */
 export type PolicyTestFile = z.infer<typeof policyTestFileSchema>;
 
-/** One case's expected decision. */
+/**
+ * One case's expected decision.
+ */
 export type PolicyTestExpect = PolicyTestFile["cases"][number]["expect"];
 
-/** A test file read from `.zitadel/policies/`, with its file name. */
-export type PolicyTestSuite = { file: string; test: PolicyTestFile };
+/**
+ * A test file read from `.zitadel/policies/`, with its file name.
+ */
+export type PolicyTestSuite = {
+  /**
+   * The project-relative path of the test file.
+   */
+  file: string;
+  /**
+   * The cases it holds, as the test contract parsed them.
+   */
+  test: PolicyTestFile;
+};
 
-/** The name a test file must have: its operation, beside the operation's policy file. */
+/**
+ * The name a test file must have: its operation, beside the operation's policy file.
+ *
+ * @param operation - The operation.
+ * @returns The file name.
+ */
 export function policyTestFileName(operation: string): string {
   return `${operation}${POLICY_TEST_SUFFIX}`;
 }
 
-
 /**
  * The test files in `.zitadel/policies/`, checked, and the problems found.
+ *
+ * @remarks
  * `operations` narrows them to those operations' files, by name and before
  * anything is parsed, so a broken test file of another operation never
  * blocks the ones asked for. One without a test file is a problem, so a typo
  * in the filter never passes silently.
+ *
+ * @param config - The configuration whose test files are read.
+ * @param operations - The operations to read the test files of; every one when empty.
+ * @returns The suites that are sound, and a line per problem found.
  */
 export function readPolicyTests(
   config: ZitadelConfig,
@@ -59,7 +81,13 @@ export function readPolicyTests(
   const wanted = new Set(operations.map(policyTestFileName));
   const entries = config.policies.tests
     .map((document) => {
-      return { name: basename(document.path), body: document.body, problems: document.problems };
+      return {
+        name: basename(document.path),
+        body: document.body,
+        problems: document.problems({}).map((issue) => {
+          return issue.message;
+        }),
+      };
     })
     .filter((entry) => {
       return wanted.size === 0 || wanted.has(entry.name);
@@ -87,18 +115,28 @@ export function readPolicyTests(
   return { suites, issues };
 }
 
-/** Where a tested config came from: a policy file, a release's revision, or nowhere. */
+/**
+ * Where a tested config came from: a policy file, a release's revision, or nowhere.
+ */
 export type PolicySource = { file: string } | { revision_id: string } | null;
 
-/** The policy a suite is evaluated against, by operation. */
+/**
+ * The policy a suite is evaluated against, by operation.
+ */
 export type PolicyUnderTest = { config: PolicyEvaluation["config"]; source: PolicySource };
 
 /**
  * The policies in `.zitadel/policies/`, by operation, and the problems found.
+ *
+ * @remarks
  * A policy file that fails its own check is a problem rather than "no
  * policy": testing `{}` in its place would report on a policy nobody wrote.
  * `operations` narrows them to those operations' files, by name and before
  * anything is parsed, as {@link readPolicyTests} does.
+ *
+ * @param config - The configuration whose policies are read.
+ * @param operations - The operations to read the policies of; every one when empty.
+ * @returns The sound policies by operation, and a line per problem found.
  */
 export function policiesFromFiles(
   config: ZitadelConfig,
@@ -107,7 +145,13 @@ export function policiesFromFiles(
   const wanted = new Set(operations.map(policyFileName));
   const entries = config.policies.all
     .map((document) => {
-      return { name: basename(document.path), body: document.body, problems: document.problems };
+      return {
+        name: basename(document.path),
+        body: document.body,
+        problems: document.problems({}).map((issue) => {
+          return issue.message;
+        }),
+      };
     })
     .filter((entry) => {
       return wanted.size === 0 || wanted.has(entry.name);
@@ -134,16 +178,31 @@ export function policiesFromFiles(
   return { policies, issues };
 }
 
-/** A release's policies, and whether anything can still serve them. */
+/**
+ * A release's policies, and whether anything can still serve them.
+ */
 export type ReleasePolicies = {
+  /**
+   * The policies the release pins, by operation.
+   */
   policies: Map<string, PolicyUnderTest>;
+  /**
+   * Whether the release is revoked, so its policies serve no origin.
+   */
   revoked: boolean;
 };
 
 /**
  * The policies a release pins, by operation, read as the revisions it pins.
+ *
+ * @remarks
  * Whether it is revoked comes along: that does not stop the test, but its
  * policies then serve no origin.
+ *
+ * @param releases - Where the release is read from.
+ * @param service - Where each pinned revision is read from.
+ * @param releaseId - The release.
+ * @returns The release's policies, and whether it is revoked.
  */
 export async function policiesFromRelease(
   releases: ReleaseService,
@@ -168,26 +227,60 @@ export async function policiesFromRelease(
   };
 }
 
-/** One case's outcome: what it expected and what the server decided. */
+/**
+ * One case's outcome: what it expected and what the server decided.
+ */
 export type PolicyCaseResult = {
+  /**
+   * The case's name.
+   */
   name: string;
+  /**
+   * Whether the decision is what the case expects.
+   */
   passed: boolean;
+  /**
+   * The decision the case expects.
+   */
   expected: PolicyTestExpect;
+  /**
+   * The decision the server made.
+   */
   actual: PolicyDecision;
 };
 
-/** One test file's outcome. */
+/**
+ * One test file's outcome.
+ */
 export type PolicySuiteResult = {
+  /**
+   * The operation the file tests.
+   */
   operation: string;
+  /**
+   * The project-relative path of the test file.
+   */
   file: string;
+  /**
+   * Where the policy the cases ran against came from.
+   */
   policy: PolicySource;
+  /**
+   * Each case's outcome, in the file's order.
+   */
   cases: PolicyCaseResult[];
 };
 
 /**
- * Whether a decision is what a case expects: `allowed` always, `code` when
- * given, and `violations` when given as exactly that set of rule names, so a
- * rule that fails unexpectedly fails the case too.
+ * Whether a decision is what a case expects.
+ *
+ * @remarks
+ * `allowed` always, `code` when given, and `violations` when given as exactly
+ * that set of rule names, so a rule that fails unexpectedly fails the case too.
+ *
+ * @param expected - The decision the case expects.
+ * @param actual - The decision the server made.
+ * @returns Whether they agree.
  */
 export function caseHolds(expected: PolicyTestExpect, actual: PolicyDecision): boolean {
   if (expected.allowed !== actual.allowed) {
@@ -204,13 +297,22 @@ export function caseHolds(expected: PolicyTestExpect, actual: PolicyDecision): b
   return true;
 }
 
-/** How many evaluate requests a run keeps in flight at once. */
+/**
+ * How many evaluate requests a run keeps in flight at once.
+ */
 const EVALUATE_CONCURRENCY = 8;
 
 /**
  * Evaluates every case of every suite against its operation's policy, or `{}`
- * when there is none: one request per case, a few in flight at once, the
- * results in file and case order.
+ * when there is none.
+ *
+ * @remarks
+ * One request per case, a few in flight at once.
+ *
+ * @param service - Where each case is evaluated.
+ * @param suites - The test files.
+ * @param policies - The policy each operation is evaluated against.
+ * @returns Each suite's outcome, in file and case order.
  */
 export async function runPolicyTests(
   service: PolicyService,
@@ -248,8 +350,11 @@ export async function runPolicyTests(
 }
 
 /**
- * A decision in words: `allowed`, or refused with its code and its rules,
- * each when known, so a mismatch in either shows on the line.
+ * A decision in words.
+ *
+ * @param decision - The decision, expected or made.
+ * @returns `allowed`, or refused with its code and its rules, each when known,
+ *   so a mismatch in either shows on the line.
  */
 function describeDecision(decision: {
   allowed: boolean;
@@ -264,7 +369,13 @@ function describeDecision(decision: {
   return reason === "" ? "refused" : `refused (${reason})`;
 }
 
-/** Where a suite's policy came from, as its heading names it. */
+/**
+ * Where a suite's policy came from, as its heading names it.
+ *
+ * @param policy - Where the policy came from.
+ * @param release - The release the run was told to test against, if any.
+ * @returns The words for the heading.
+ */
 function describePolicy(policy: PolicySource, release: string | undefined): string {
   if (policy === null) {
     return release === undefined
@@ -278,9 +389,13 @@ function describePolicy(policy: PolicySource, release: string | undefined): stri
 }
 
 /**
- * The results for a terminal: each test file under a heading naming the
- * policy it ran against, a line per case, and on a failed case what was
- * expected and what the server decided; then the totals.
+ * The results for a terminal.
+ *
+ * @param results - Each suite's outcome.
+ * @param release - The release the run was told to test against, if any.
+ * @returns Each test file under a heading naming the policy it ran against, a
+ *   line per case, and on a failed case what was expected and what the server
+ *   decided; then the totals.
  */
 export function renderPolicyTestResults(
   results: readonly PolicySuiteResult[],

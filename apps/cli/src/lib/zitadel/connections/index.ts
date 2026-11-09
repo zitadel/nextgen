@@ -8,7 +8,6 @@ export {
   Connection,
   type ClaimRow,
   type CredentialNames,
-  type UnknownField,
   type VariableUse,
 } from "@/lib/zitadel/connections/connection";
 export type { ConnectionSetting, LookupOptions } from "@/lib/zitadel/connections/lookup";

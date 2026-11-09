@@ -3,18 +3,163 @@ import { describe, expect, it } from "vitest";
 import { CustomOidcProvider, idpProvider } from "@zitadel/config/idp";
 
 import { Connection, UserSchema } from "@/lib/zitadel";
+import type { Issue } from "@/lib/zitadel/rules/types";
+import { MemoryStore } from "@/lib/zitadel/storage";
 import { displayName, issuer, slug } from "@tests/helpers/idp-values";
 
+/**
+ * The directory connections sit in.
+ */
 const IDPS = ".zitadel/idps";
 
+/**
+ * The schema new connections fill.
+ */
 const schema = UserSchema.of({
   path: ".zitadel/schemas/customers.json",
   body: { objectType: "customers", properties: { email: { type: "string" } } },
 });
 
+/**
+ * A connection the server would accept: its secret is a `${{ NAME }}` reference.
+ */
+const SOUND = {
+  slug: "acme",
+  protocol: "oidc",
+  display_name: "Acme",
+  oidc: {
+    issuer: "https://sso.acme.example",
+    client_id: "client",
+    client_secret: "${{ ACME_CLIENT_SECRET }}",
+    scopes: ["openid"],
+  },
+};
+
+/**
+ * A connection read from `.zitadel/idps/`.
+ *
+ * @param name - The file's name.
+ * @param body - What it holds.
+ * @returns The connection, as read.
+ */
 function connection(name: string, body: Record<string, unknown>): Connection {
   return Connection.of({ path: `${IDPS}/${name}`, body });
 }
+
+/**
+ * The rules some findings break, in order.
+ *
+ * @param issues - The findings.
+ * @returns Each finding's rule.
+ */
+function rulesOf(issues: readonly Issue[]): readonly string[] {
+  return issues.map((issue) => {
+    return issue.rule;
+  });
+}
+
+describe("Connection.of", () => {
+  it("takes the file as read", () => {
+    expect(connection("acme.json", SOUND).status).toBe("read");
+  });
+});
+
+describe("Connection.create", () => {
+  it("takes the file as new", () => {
+    expect(Connection.create({ path: `${IDPS}/acme.json`, body: SOUND }).status).toBe("created");
+  });
+});
+
+describe("Connection.asRead", () => {
+  it("marks a new connection as read", () => {
+    expect(Connection.create({ path: `${IDPS}/acme.json`, body: SOUND }).asRead().status).toBe(
+      "read",
+    );
+  });
+});
+
+describe("Connection.problems", () => {
+  it("finds nothing wrong with a connection the server would accept", () => {
+    expect(connection("acme.json", SOUND).problems({})).toEqual([]);
+  });
+
+  it("reports a secret held as a value once, as a literal secret", () => {
+    const literal = connection("acme.json", {
+      ...SOUND,
+      oidc: { ...SOUND.oidc, client_secret: "a-literal-secret" },
+    });
+
+    expect(rulesOf(literal.problems({}))).toEqual(["connection/literal-secret"]);
+  });
+
+  it("tells a literal secret what to write instead", () => {
+    const literal = connection("acme.json", {
+      ...SOUND,
+      oidc: { ...SOUND.oidc, client_secret: "a-literal-secret" },
+    });
+
+    expect(literal.problems({})).toEqual([
+      {
+        severity: "error",
+        rule: "connection/literal-secret",
+        file: `${IDPS}/acme.json`,
+        message:
+          'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
+      },
+    ]);
+  });
+
+  it("names the endpoints an oidc block that names some of them leaves out", () => {
+    const partial = connection("acme.json", {
+      ...SOUND,
+      oidc: { ...SOUND.oidc, authorization_endpoint: "https://sso.acme.example/authorize" },
+    });
+
+    expect(
+      partial.problems({}).map((issue) => {
+        return [issue.rule, issue.message.split(".")[0]];
+      }),
+    ).toEqual([
+      [
+        "connection/endpoints",
+        "oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint",
+      ],
+    ]);
+  });
+
+  it("names a field the contract does not have, with what it most likely meant", () => {
+    const typo = connection("acme.json", { ...SOUND, display_nam: "Acme" });
+
+    expect(
+      typo.problems({}).filter((issue) => {
+        return issue.rule === "sso/unknown-connection-field";
+      }),
+    ).toEqual([
+      {
+        severity: "error",
+        rule: "sso/unknown-connection-field",
+        file: `${IDPS}/acme.json`,
+        message: expect.stringMatching(
+          /^"display_nam" is not a field of a connection, so it is ignored or refused\. Did you mean "display_name"\?/,
+        ),
+      },
+    ]);
+  });
+
+  it("reports what the connection contract refuses, under contract/connection", () => {
+    const broken = connection("acme.json", { ...SOUND, protocol: "saml" });
+
+    expect(rulesOf(broken.problems({}))).toEqual(["contract/connection"]);
+  });
+});
+
+describe("Connection.wireBody", () => {
+  it("sends the connection without its $schema pointer", () => {
+    const acme = connection("acme.json", { $schema: "../meta/idp-connection.json", ...SOUND });
+
+    expect(acme.wireBody(new MemoryStore())).toEqual(SOUND);
+  });
+});
 
 describe("Connection.credentialNames", () => {
   it("names no variable for a connection with no usable slug and no references", () => {

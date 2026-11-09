@@ -194,18 +194,15 @@ export class Connections extends Collection<Connection> {
       });
     }
     const edited = schema.withProvider(slug);
-    const edits = flows.map((flow) => {
-      return flow.withProvider(slug, schema.enabledMethods);
-    });
     const start = existing === undefined ? this.config.with(candidate) : this.config;
-    const after = edits.reduce((current, edit) => {
-      return current.with(edit.flow);
+    const after = flows.reduce((current, flow) => {
+      return current.with(flow.withProvider(slug, schema.enabledMethods));
     }, start.with(edited));
     const edit = { before: this.config, after, original: schema, edited };
     assertFlowsIntact(edit);
-    const skipped = edits.flatMap((flowEdit) => {
-      return flowEdit.skipped.map((region) => {
-        return untouchedNotice(flowEdit.flow, region, slug);
+    const skipped = flows.flatMap((flow) => {
+      return flow.regionsLeftAlone(slug, schema.enabledMethods).map((region) => {
+        return untouchedNotice(flow, region, slug);
       });
     });
     return new Change({

@@ -602,18 +602,18 @@ export const SSO_RULES: readonly Rule[] = [
   defineRule({
     id: "sso/unknown-connection-field",
     severity: "error",
-    each: (config) => {
+    each: (config, context) => {
       return standing(config).flatMap((entry) => {
-        return entry.connection.unknownFields.map((field) => {
-          return { connection: entry.connection, ...field };
+        return entry.connection.problems(context).filter((issue) => {
+          return issue.rule === "sso/unknown-connection-field";
         });
       });
     },
-    file: (fact) => {
-      return fact.connection.path;
+    file: (issue) => {
+      return issue.file;
     },
-    says: (fact) => {
-      return `${quote(fact.key)} is not a field of ${fact.where}, so it is ignored or refused.${didYouMean(fact.key, fact.allowed)} Fix the name, or remove it.`;
+    says: (issue) => {
+      return issue.message;
     },
   }),
 

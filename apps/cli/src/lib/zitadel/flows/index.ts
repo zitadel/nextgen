@@ -7,7 +7,6 @@ export { Flows } from "@/lib/zitadel/flows/collection";
 export {
   Flow,
   PASSWORD_FIELD,
-  type FlowEdit,
   type IncomingTransition,
   type MethodUse,
 } from "@/lib/zitadel/flows/flow";

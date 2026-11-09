@@ -151,7 +151,7 @@ export class Flows extends Collection<Flow> {
    *   failing the server's rules, or one already fails them.
    */
   forSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
-    schema.refuseUneditable(schema.editRefusal());
+    schema.assertProviderEditable();
     const flows = this.for(schema);
     if (flows.length === 0) {
       throw new NotFoundError(`No login flow runs against ${schema.name}`, {
@@ -162,12 +162,12 @@ export class Flows extends Collection<Flow> {
       });
     }
     for (const flow of flows) {
-      flow.refuseUneditable(flow.editRefusal());
+      flow.assertProviderEditable();
     }
     if (slug !== undefined) {
       const edited = schema.withProvider(slug);
       const after = flows.reduce((current, flow) => {
-        return current.with(flow.withProvider(slug, schema.enabledMethods).flow);
+        return current.with(flow.withProvider(slug, schema.enabledMethods));
       }, this.config.with(edited));
       assertFlowsIntact({ before: this.config, after, original: schema, edited });
     }

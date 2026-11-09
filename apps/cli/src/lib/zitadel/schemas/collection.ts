@@ -33,7 +33,7 @@ export class Schemas extends Collection<UserSchema> {
    * @throws {@link BrokenFlowsError} When a flow would stop validating.
    */
   enable(schema: UserSchema, method: ToggleableMethod): Change {
-    const edited = schema.withMethod(method, true);
+    const edited = schema.withMethod(method);
     const edit = { before: this.config, after: this.config.with(edited), original: schema, edited };
     assertFlowsIntact(edit);
     return new Change({
@@ -57,7 +57,7 @@ export class Schemas extends Collection<UserSchema> {
    *   `force` is not set.
    */
   disable(schema: UserSchema, method: ToggleableMethod, options: ForceOptions = {}): Change {
-    const edited = schema.withMethod(method, false);
+    const edited = schema.withoutMethod(method);
     const edit = { before: this.config, after: this.config.with(edited), original: schema, edited };
     assertMethodUnused(edit, method);
     this.assertSignInLeft(edit, method, options.force === true);
