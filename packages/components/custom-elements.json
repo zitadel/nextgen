@@ -7313,7 +7313,7 @@
               "text": "(html: string) => string"
             }
           },
-          "description": "Returns a sanitiser bound to the current manifest registry. Callers should\ncache the result; rebuilding is cheap but allocates a fresh DOMPurify config."
+          "description": "Returns a sanitiser bound to the current manifest registry. Callers should\ncache the result; rebuilding is cheap but allocates a fresh DOMPurify config.\nThe output is meant for the `<zitadel-login>` shadow root and DOM clobbering\nprotection (`SANITIZE_DOM`) is off, so callers must not inject it into the\ndocument itself."
         }
       ],
       "exports": [
