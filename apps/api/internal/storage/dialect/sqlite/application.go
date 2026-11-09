@@ -110,10 +110,10 @@ func (s applicationStatements) ReviseApplication(ctx context.Context, entity *do
 	if err := application.EnsureClientIDs(entity, clients, ensureManagedID); err != nil {
 		return err
 	}
-	// Stamped inside a transaction BEGIN IMMEDIATE already serialized, so
-	// revision order follows transaction order.
-	now := nowUnixNano()
 	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		// Stamped inside BEGIN IMMEDIATE, so revision order follows transaction
+		// order.
+		now := nowUnixNano()
 		stored, err := newApplicationStatements(tx).ListApplicationClients(ctx, entity.ProjectID, entity.ID)
 		if err != nil {
 			return err
