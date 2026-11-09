@@ -45,6 +45,12 @@ describe("assertEndingIsWellFormed", () => {
     expect(() => assertEndingIsWellFormed(run(doubled), "setup")).toThrow(/colour code as text/);
   });
 
+  it("allows a lone spelled-out colour from a hostile payload, which is not the CLI's pair", () => {
+    expect(() =>
+      assertEndingIsWellFormed(run("https://app.acme.com\\x1b[31m"), "origin add"),
+    ).not.toThrow();
+  });
+
   it("allows a hostile payload's spelled-out clear-screen, which is not a colour", () => {
     expect(() => assertEndingIsWellFormed(run("proj-\\x1b[2Jwiped"), "env add")).not.toThrow();
   });

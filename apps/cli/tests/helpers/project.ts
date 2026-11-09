@@ -1864,12 +1864,18 @@ export function assertEndingIsWellFormed(
     ).toBeLessThan(2);
     const raw$ = text.split("\n").filter((line) => /^\s*│\s+\$ /.test(line));
     expect(raw$, `${where}: ${stream} has a raw $ command line inside its box`).toEqual([]);
-    // A colour code written out as text (`\x1b[36m`) is a fragment that was
-    // spelled out for a second time: the CLI's own colour went through a palette
-    // function that spells out what it is given. A hostile payload spells out
-    // a clear-screen or a title, never a colour, so this cannot be one.
+    // The CLI's own colour spelled out a second time is a pair: the code that
+    // starts it and the reset that ends it (`\x1b[36m` ... `\x1b[39m`). A
+    // hostile payload that carries a colour sequence spells out the one it was
+    // given, which is not followed by a reset the CLI added, so a lone code is
+    // allowed and only the pair is refused.
     const spelled = text.match(/\\x1b\[[0-9;]*m/g) ?? [];
-    expect(spelled, `${where}: ${stream} prints a colour code as text`).toEqual([]);
+    const closes = spelled.some((code) => /^\\x1b\[(?:0|22|39|49)m$/.test(code));
+    const opens = spelled.some((code) => !/^\\x1b\[(?:0|22|39|49)m$/.test(code));
+    expect(
+      opens && closes ? spelled : [],
+      `${where}: ${stream} prints a colour code as text`,
+    ).toEqual([]);
   }
 }
 
