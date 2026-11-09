@@ -20,7 +20,14 @@ export {
   type BrandingDesignInfo,
 } from "@/lib/zitadel/resources/branding";
 export { BrokenFile, type BrokenFileFields } from "@/lib/zitadel/resources/broken";
-export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
+export {
+  Change,
+  DocumentChange,
+  type ChangeInput,
+  type Notice,
+  type SaveOptions,
+  type WrittenFile,
+} from "@/lib/zitadel/change";
 export { Collection, PinnedCollection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
 export {
@@ -29,6 +36,7 @@ export {
   Connections,
   type ClaimRow,
   type ConnectionCredentials,
+  type ConnectionPath,
   type ConnectionSetting,
   type Credential,
   type LookupOptions,
@@ -36,11 +44,11 @@ export {
   type UnusedConnection,
 } from "@/lib/zitadel/resources/connections";
 export type {
-  ContractValue,
-  DocumentContract,
+  DocumentFile,
   DocumentKind,
   DocumentStatus,
   Edit,
+  ReadableFile,
   SkippedRegion,
 } from "@/lib/zitadel/resources/document";
 export {
@@ -75,15 +83,23 @@ export {
   type Step,
   type Transition,
 } from "@/lib/zitadel/resources/flows";
-export type {
-  ClaimName,
-  EnvironmentVariable,
-  FlowName,
-  ObjectType,
-  PropertyName,
-  PropertyPath,
-  SchemaReference,
-  StepName,
+export {
+  claimName,
+  environmentVariable,
+  flowName,
+  objectType,
+  propertyName,
+  propertyPath,
+  schemaReference,
+  stepName,
+  type ClaimName,
+  type EnvironmentVariable,
+  type FlowName,
+  type ObjectType,
+  type PropertyName,
+  type PropertyPath,
+  type SchemaReference,
+  type StepName,
 } from "@/lib/zitadel/names";
 export {
   PASSWORD_POLICY_OPERATION,
@@ -102,7 +118,15 @@ export {
   type PolicySelection,
   type PolicyVerdict,
 } from "@/lib/zitadel/resources/policies";
-export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
+export {
+  Schemas,
+  TOGGLEABLE_METHODS,
+  UserSchema,
+  type EnabledMethods,
+  type ForceOptions,
+  type SchemaEdit,
+  type ToggleableMethod,
+} from "@/lib/zitadel/resources/schemas";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
 export {
   RULE_IDS,
@@ -114,12 +138,6 @@ export {
   type Severity,
   type ValidationContext,
 } from "@/lib/zitadel/rules/types";
-export {
-  TOGGLEABLE_METHODS,
-  type EnabledMethods,
-  type SchemaEdit,
-  type ToggleableMethod,
-} from "@/lib/zitadel/resources/schemas/types";
 export type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 export { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
 export {
