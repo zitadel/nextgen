@@ -1,6 +1,17 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import {
+  BRANDING_DESIGN_INFO,
+  Branding,
+  CONFIG_DIRECTORIES,
+  DiskStore,
+  FileExistsError,
+  PAGE_LAYOUT_HINT,
+  RETIRED_BRANDING_DESIGNS,
+  ZitadelConfig,
+} from "@/lib/zitadel";
+
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
@@ -15,19 +26,12 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import { BRANDING_DIR } from "@/lib/branding";
-import {
-  BRANDING_DESIGN_INFO,
-  PAGE_LAYOUT_HINT,
-  RETIRED_BRANDING_DESIGNS,
-} from "@/lib/branding/designs";
 import { isErrno, ZitadelError } from "@/lib/errors";
-import { stableStringify } from "@/lib/json";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { hasZitadelConfig } from "@/lib/project";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { filled, reads, suggesterOf } from "@/lib/oclif/flags";
-import { metaSchemaState, projectMetaSchemas } from "@/lib/meta-schemas";
+import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { normalizePublicCliProse } from "@/lib/public-cli";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
@@ -149,6 +153,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     const { branding, template } = getDefaultBrandingConfig(design);
 
     const filesWritten: string[] = [];
+    // The README and the editor's meta-schema are not configuration.
     const write = async (relPath: string, content: string, overwrite: boolean): Promise<void> => {
       const dest = join(this.cwd, relPath);
       await mkdir(dirname(dest), { recursive: true });
@@ -165,16 +170,29 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       }
     };
 
-    await write(
-      DEFAULT_BRANDING_CONFIG_PATH,
-      `${stableStringify({ $schema: BRANDING_FILE_SCHEMA_REF, ...branding })}\n`,
-      this.force,
-    );
-    await write(DEFAULT_BRANDING_TEMPLATE_PATH, template, this.force);
+    // The descriptor and its template are configuration, written through it.
+    const descriptor = Branding.create({
+      path: DEFAULT_BRANDING_CONFIG_PATH,
+      body: { $schema: BRANDING_FILE_SCHEMA_REF, ...branding },
+    });
+    const change = ZitadelConfig.empty()
+      .branding.put(descriptor)
+      .withText(DEFAULT_BRANDING_TEMPLATE_PATH, template);
+    try {
+      filesWritten.push(...(await change.save(new DiskStore(this.cwd), { overwrite: this.force })));
+    } catch (error) {
+      if (error instanceof FileExistsError) {
+        throw new ZitadelError("E_CONFLICT", error.message, {
+          hint: "Rerun with --force to replace it, or edit the existing file directly.",
+          details: error.details,
+        });
+      }
+      throw error;
+    }
 
     // Never overwrite a hand-edited README.
     await write(
-      join(BRANDING_DIR, "README.md"),
+      join(CONFIG_DIRECTORIES.branding, "README.md"),
       normalizePublicCliProse(brandingReadmeContent(), this.cliVersion),
       false,
     ).catch(swallowConflict);
@@ -182,13 +200,13 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     // in, so the CLI-owned meta-schema is written when missing or outdated,
     // as `doctor --fix` does; one that cannot be read, or sits behind a
     // symlink, is doctor's to report.
-    const brandingMeta = projectMetaSchemas(this.cliVersion).find(
-      (file) => file.path === `${META_SCHEMA_DIR}/branding.json`,
-    );
-    if (brandingMeta) {
-      const state = await metaSchemaState(this.cwd, brandingMeta).catch(() => "current" as const);
-      if (state === "missing" || state === "outdated") {
-        await write(brandingMeta.path, brandingMeta.contents, true);
+    const brandingMeta = projectMetaSchemas(this.cliVersion).filter((file) => {
+      return file.path === `${META_SCHEMA_DIR}/branding.json`;
+    });
+    const metaWrites = await writeMetaSchemas(this.cwd, brandingMeta, { dryRun: false });
+    for (const artifact of metaWrites.written) {
+      if (artifact.kind === "file") {
+        filesWritten.push(artifact.path);
       }
     }
 
@@ -196,7 +214,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       consola.info(`Wrote ${file}`);
     }
     // Said once, by the line the command ends on.
-    const ejected = `Ejected the ${BRANDING_DESIGN_INFO[design].label} design into ${BRANDING_DIR}/`;
+    const ejected = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;
 
     return this.emit({
       status: "ok",

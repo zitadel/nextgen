@@ -13,6 +13,7 @@ export type Verb =
   | "call"
   | "deactivate"
   | "delete"
+  | "deploy"
   | "disable"
   | "eject"
   | "remove"

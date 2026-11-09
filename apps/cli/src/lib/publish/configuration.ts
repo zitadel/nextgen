@@ -9,6 +9,14 @@ import {
 } from "@/lib/backend";
 
 /**
+ * A pinned revision's body, as the server stores it, for a kind `.zitadel/`
+ * has a file for.
+ */
+export type RevisionBody =
+  | Awaited<ReturnType<SchemaService["get"]>>["schema"]
+  | Awaited<ReturnType<FlowService["get"]>>["flow_definition"];
+
+/**
  * The configuration a project has published: which release is live, what it
  * pins, and the body of each resource it pins.
  *
@@ -39,46 +47,52 @@ export class PublishedConfiguration {
   }
 
   /**
-   * The release the newest deployment to a primary origin serves. A preview
-   * deployment never serves a primary origin, so this is the project's live
-   * configuration rather than a pull-request preview.
+   * Fetch the release the newest deployment to a primary origin serves.
+   *
+   * @remarks
+   * A preview deployment never serves a primary origin, so this is the
+   * project's live configuration rather than a pull-request preview.
    *
    * @returns The release's id, or undefined when nothing is deployed to a primary origin.
    */
-  async liveReleaseId(): Promise<string | undefined> {
+  async fetchLiveReleaseId(): Promise<string | undefined> {
     const deployment = await this.deployments.newestPrimary();
     return deployment?.release_id;
   }
 
   /**
-   * The release one deployment made live.
+   * Fetch the release one deployment made live.
    *
    * @param deploymentId - The deployment to read.
    * @returns The release's id.
    */
-  async releaseIdOfDeployment(deploymentId: string): Promise<string> {
+  async fetchReleaseIdOfDeployment(deploymentId: string): Promise<string> {
     const deployment = await this.deployments.get(deploymentId);
     return deployment.release_id;
   }
 
   /**
-   * One release, with the resource revisions it pins.
+   * Fetch one release, with the resource revisions it pins.
    *
    * @param releaseId - The release to read.
    * @returns The release.
    */
-  async release(releaseId: string): Promise<ReleaseRecord> {
+  async fetchRelease(releaseId: string): Promise<ReleaseRecord> {
     return this.releases.get(releaseId);
   }
 
   /**
-   * The body of one resource revision a release pins, as the server stores it.
+   * Fetch the body of one resource revision a release pins, as the server
+   * stores it.
    *
    * @param kind - The kind of resource the release pinned.
    * @param revisionId - The revision the release pinned.
    * @returns The body, or undefined for a kind that cannot be rebuilt on disk yet.
    */
-  async revision(kind: ReleasePointerKind, revisionId: string): Promise<object | undefined> {
+  async fetchRevision(
+    kind: ReleasePointerKind,
+    revisionId: string,
+  ): Promise<RevisionBody | undefined> {
     switch (kind) {
       case "schema": {
         const response = await this.schemas.get(revisionId);

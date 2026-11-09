@@ -10,6 +10,11 @@ import {
 import { stripAnsi } from "consola/utils";
 import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
+import {
+  ConfigError,
+  ConflictError as ConfigConflictError,
+  NotFoundError as ConfigNotFoundError,
+} from "./zitadel";
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -151,6 +156,31 @@ const NETWORK_HINTS: Record<UnavailableReason, string> = {
 };
 
 /**
+ * The error code a configuration error is reported with.
+ *
+ * @remarks
+ * A file or directory the OS refused to read carries its errno in
+ * `details.code`; a permission failure is `E_AUTH`, as it is for any other
+ * file the CLI reads.
+ *
+ * @param error - The error.
+ * @returns The code it is reported with.
+ */
+function configErrorCode(error: ConfigError): ZitadelErrorCode {
+  const errno = error.details?.code;
+  if (errno === "EACCES" || errno === "EPERM") {
+    return "E_AUTH";
+  }
+  if (error instanceof ConfigConflictError) {
+    return "E_CONFLICT";
+  }
+  if (error instanceof ConfigNotFoundError) {
+    return "E_NOT_FOUND";
+  }
+  return "E_VALIDATION";
+}
+
+/**
  * oclif's footer under a command line it refused. It is oclif's own name for
  * what this CLI calls `Next:`, and finding it is the only way to tell one of
  * its parse errors from an ordinary failure: they arrive as plain `Error`s
@@ -238,6 +268,15 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof BackendError) {
     return fromBackendError(error);
+  }
+
+  // Configuration that cannot be read or edited as asked is the developer's
+  // to fix, with the hint and details the configuration library gave.
+  if (error instanceof ConfigError) {
+    return new ZitadelError(configErrorCode(error), error.message, {
+      ...(error.hint === undefined ? {} : { hint: error.hint }),
+      ...(error.details === undefined ? {} : { details: error.details }),
+    });
   }
 
   if (isErrnoException(error)) {

@@ -24,9 +24,17 @@ export default class AuthMethodPasswordDisable extends AuthMethodCommand {
     }),
   };
 
-  protected async execute({
-    flags,
-  }: Admitted<typeof AuthMethodPasswordDisable>): Promise<JsonEnvelope> {
-    return this.toggle(await this.schemaTarget(flags), "password", false);
+  /**
+   * Turn the method on or off for the schema `--schema` names.
+   *
+   * @param input - The run's `--schema` and `--cwd`.
+   * @returns The result.
+   * @throws {@link ZitadelError} When the schema cannot be chosen, or the change
+   *   would leave no way to sign in and nobody agreed to it.
+   */
+  protected async execute(
+    input: Admitted<typeof AuthMethodPasswordDisable>,
+  ): Promise<JsonEnvelope> {
+    return this.toggle(input.flags, "password", false);
   }
 }

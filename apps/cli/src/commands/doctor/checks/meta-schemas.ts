@@ -1,8 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
-import semver from "semver";
-
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import {
@@ -10,8 +5,8 @@ import {
   metaSchemaState,
   projectMetaSchemas,
   type ProjectMetaSchema,
+  writeMetaSchemas,
 } from "@/lib/meta-schemas";
-import { exactZitadelPins } from "./dependency-version";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
@@ -25,9 +20,6 @@ type MetaSchemaDrift = {
   links: string[];
   unreadable: { path: string; reason: string }[];
 };
-
-/** A `@zitadel/*` package the project pins to a version newer than this CLI. */
-type NewerPin = { name: string; version: string };
 
 /**
  * Verifies the editor meta-schemas in `.zitadel/meta/` match this CLI. Only
@@ -69,7 +61,10 @@ export class MetaSchemasCheck implements SanityCheck {
         message: "Editor schemas in .zitadel/meta/ match this CLI",
       };
     }
-    const newer = missing.length > 0 || outdated.length > 0 ? await newerPin(ctx) : undefined;
+    const newer =
+      missing.length > 0 || outdated.length > 0
+        ? (await writeMetaSchemas(ctx.cwd, [...missing, ...outdated], { dryRun: true })).newerPin
+        : undefined;
     const parts = [
       missing.length > 0 ? `${missing.length} missing` : undefined,
       outdated.length > 0 ? `${outdated.length} differ from this CLI's` : undefined,
@@ -97,16 +92,19 @@ export class MetaSchemasCheck implements SanityCheck {
     };
   }
 
+  /**
+   * Writes this CLI's version of every missing or outdated meta-schema through
+   * {@link writeMetaSchemas}, which leaves a linked or unreadable file alone.
+   * Writes nothing in a dry run, or when {@link writeMetaSchemas} refuses
+   * because the project pins a newer `@zitadel/*` package than this CLI.
+   *
+   * @param ctx - The project and how to treat it.
+   * @returns Nothing; what differs is read again by the next {@link run}.
+   * @throws When a directory cannot be created or a file cannot be written.
+   */
   async fix(ctx: CheckContext): Promise<void> {
     const { missing, outdated } = await drift(ctx);
-    if (ctx.dryRun || (await newerPin(ctx)) !== undefined) {
-      return;
-    }
-    for (const file of [...missing, ...outdated]) {
-      const dest = join(ctx.cwd, file.path);
-      await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, file.contents);
-    }
+    await writeMetaSchemas(ctx.cwd, [...missing, ...outdated], { dryRun: ctx.dryRun });
   }
 }
 
@@ -136,15 +134,4 @@ async function drift(ctx: CheckContext): Promise<MetaSchemaDrift> {
     }
   }
   return result;
-}
-
-/** The first exact `@zitadel/*` pin newer than this CLI, when both are releases. */
-async function newerPin(ctx: CheckContext): Promise<NewerPin | undefined> {
-  if (semver.valid(ctx.cliVersion) === null) {
-    return undefined;
-  }
-  const pin = (await exactZitadelPins(ctx.cwd).catch(() => undefined))?.find(([, version]) =>
-    semver.gt(version, ctx.cliVersion),
-  );
-  return pin === undefined ? undefined : { name: pin[0], version: pin[1] };
 }

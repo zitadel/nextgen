@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
@@ -6,6 +6,7 @@ import { select } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
 import Api from "@/commands/api/index";
+import { it } from "@tests/helpers/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { stripAnsi } from "@tests/helpers/run-cli";
@@ -42,11 +43,11 @@ afterEach(() => {
 });
 
 /**
- * Run `zitadel api` from source with a person typing `answers` at the plain
- * questions it asks, and give back what it wrote.
+ * Run `zitadel api` from source in a project written to `dir`, with a person typing
+ * `answers` at the plain questions it asks, and give back what it wrote.
  */
-async function asking(answers: Answer[], ...argv: string[]) {
-  const cwd = await makeProject({ linked: true });
+async function asking(dir: string, answers: Answer[], ...argv: string[]) {
+  const cwd = await makeProject(dir, { linked: true });
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   const config = await Config.load({ root: cliPackageRoot });
@@ -63,9 +64,12 @@ const picking =
     return /^\s*(\d+)\)/.exec(line ?? "")?.[1] ?? "";
   };
 
-/** Run `zitadel api` from source with its output kept out of the test log. */
-async function api(...argv: string[]) {
-  return apiIn(await makeProject({ linked: true }), ...argv);
+/**
+ * Run `zitadel api` from source in a linked project written to `dir`, with its
+ * output kept out of the test log.
+ */
+async function api(dir: string, ...argv: string[]) {
+  return apiIn(await makeProject(dir, { linked: true }), ...argv);
 }
 
 /** Run `zitadel api` from source in `cwd`. */
@@ -81,16 +85,16 @@ async function apiIn(cwd: string, ...argv: string[]) {
 }
 
 describe("zitadel api help", () => {
-  it("is no operation, in any case and whatever follows", async () => {
-    const envelope = await api("Help", "getVariable");
+  it("is no operation, in any case and whatever follows", async ({ dir }) => {
+    const envelope = await api(dir, "Help", "getVariable");
 
     expect(envelope).toMatchObject({ status: "ok", data: {} });
   });
 
-  it("opens no telemetry and resolves no server", async () => {
+  it("opens no telemetry and resolves no server", async ({ dir }) => {
     const toMeta = vi.spyOn(Api.prototype as unknown as { toMeta: () => unknown }, "toMeta");
 
-    await api("help");
+    await api(dir, "help");
 
     expect(toMeta).not.toHaveBeenCalled();
   });
@@ -103,8 +107,8 @@ describe("zitadel api without an operation, at a terminal", () => {
     "sess_1",
   ];
 
-  it("asks for the part of the API, the operation and its path parameters", async () => {
-    const { result } = await asking(choosingRevokeSession, "--dry-run");
+  it("asks for the part of the API, the operation and its path parameters", async ({ dir }) => {
+    const { result } = await asking(dir, choosingRevokeSession, "--dry-run");
 
     expect(result).toMatchObject({
       status: "ok",
@@ -112,8 +116,8 @@ describe("zitadel api without an operation, at a terminal", () => {
     });
   });
 
-  it("words each of its three questions as a question", async () => {
-    const { shown } = await asking(choosingRevokeSession, "--dry-run");
+  it("words each of its three questions as a question", async ({ dir }) => {
+    const { shown } = await asking(dir, choosingRevokeSession, "--dry-run");
 
     expect(stripAnsi(shown)).toContain("Which part of the API would you like to use?");
     expect(stripAnsi(shown)).toContain("Which operation would you like to run?");
@@ -122,15 +126,15 @@ describe("zitadel api without an operation, at a terminal", () => {
 
   // `api` is a normal command, so it asks plainly: numbered choices, with no
   // chain drawn around them.
-  it("numbers its choices rather than drawing a prompt", async () => {
-    const { shown } = await asking(choosingRevokeSession, "--dry-run");
+  it("numbers its choices rather than drawing a prompt", async ({ dir }) => {
+    const { shown } = await asking(dir, choosingRevokeSession, "--dry-run");
 
     expect(select).not.toHaveBeenCalled();
     expect(stripAnsi(shown)).toMatch(/^ {2}\d+\) {2}Sessions$/m);
   });
 
-  it("offers only what the CLI can call", async () => {
-    const { shown } = await asking(choosingRevokeSession, "--dry-run");
+  it("offers only what the CLI can call", async ({ dir }) => {
+    const { shown } = await asking(dir, choosingRevokeSession, "--dry-run");
 
     expect(stripAnsi(shown)).toContain("GET /sessions/{session_id}");
     expect(stripAnsi(shown)).not.toContain("GET /sessions/me");
@@ -138,8 +142,8 @@ describe("zitadel api without an operation, at a terminal", () => {
 });
 
 describe("zitadel api for an operation that needs no credential", () => {
-  it("runs where no project was set up", async () => {
-    const envelope = await apiIn(await makeProject(), "getLive", "--dry-run");
+  it("runs where no project was set up", async ({ dir }) => {
+    const envelope = await apiIn(await makeProject(dir), "getLive", "--dry-run");
 
     expect(envelope).toMatchObject({
       status: "ok",
@@ -149,8 +153,8 @@ describe("zitadel api for an operation that needs no credential", () => {
 });
 
 describe("zitadel api, rendered for a terminal", () => {
-  it("answers with the response and one footer, drawing no box", async () => {
-    const cwd = await makeProject({ linked: true });
+  it("answers with the response and one footer, drawing no box", async ({ dir }) => {
+    const cwd = await makeProject(dir, { linked: true });
     const drawn: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
       drawn.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());

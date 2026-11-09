@@ -8,8 +8,9 @@ import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "@/commands/branding/eject";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asTerminalTyping } from "@tests/helpers/terminal";
+import { asTerminal, asTerminalTyping } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 
@@ -190,6 +191,16 @@ describe("branding eject", () => {
     expect(res.stdout + res.stderr).toContain("E_CONFLICT");
   });
 
+  it("writes no descriptor when the template is already there", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/branding"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/branding/login.liquid"), "mine");
+
+    await eject(cwd);
+
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
+  });
+
   it("--force replaces the scaffolded files with the chosen design", async () => {
     const cwd = await makeProject();
     await eject(cwd);
@@ -245,6 +256,23 @@ describe("branding eject asked on a terminal", () => {
     expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
       getDefaultBrandingConfig("centered").template,
     );
+  });
+
+  it("refuses a file that is already there, naming --force", async () => {
+    const cwd = await makeProject();
+    const args = ["--cwd", cwd, "--design", "minimal", "--json"];
+    await asTerminal(() => BrandingEject.run(args, cliPackageRoot));
+    const printed: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+      printed.push(String(line));
+    });
+
+    await asTerminal(() => BrandingEject.run(args, cliPackageRoot)).catch(() => undefined);
+
+    expect(parseJson(printed.join("\n"))).toMatchObject({
+      code: "E_CONFLICT",
+      hint: "Rerun with --force to replace it, or edit the existing file directly.",
+    });
   });
 
   it("fails, scaffolding nothing, when the person walks away", async () => {

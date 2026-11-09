@@ -52,6 +52,9 @@ export async function readPlatformRuntime(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
+      // Read to the end rather than left unread: an unread body keeps the abort timer
+      // tied to a live stream, and its abort then lands where nothing handles it.
+      await res.arrayBuffer();
       return undefined;
     }
     const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
@@ -383,6 +386,9 @@ export async function checkLocalServerHealth(
       headers: { "user-agent": userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
+    // Only the status is wanted; the body is read to the end so the abort timer has
+    // no stream left to abort.
+    await response.arrayBuffer();
     return response.ok;
   } catch {
     return false;

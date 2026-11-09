@@ -1,17 +1,30 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
+import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { parseJsonOrUndefined } from "@/lib/json";
+import type { JsonObject } from "@/lib/zitadel/types";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 
@@ -199,6 +212,119 @@ interface PackageJson {
   dependencies: Record<string, string>;
 }
 
+/** The checks behind {@link UserSchemaDocument}, run before a spec edits one. */
+const UserSchemaDocumentSchema: z.ZodType<UserSchemaDocument> = z.object({
+  properties: z.record(z.string(), z.unknown()),
+  "x-auth-methods": z
+    .record(
+      z.string(),
+      z.object({
+        enabled: z.boolean(),
+        providers: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
+});
+
+/** The checks behind {@link ConnectionDocument}, run before a spec edits one. */
+const ConnectionDocumentSchema: z.ZodType<ConnectionDocument> = z.object({
+  slug: z.string(),
+  protocol: z.string().optional(),
+  display_name: z.string().optional(),
+  subject_claim: z.string().optional(),
+  oidc: z.object({
+    issuer: z.string(),
+    client_id: z.string().optional(),
+    client_secret: z.string().optional(),
+  }),
+  claim_mapping: z.record(z.string(), z.string()).optional(),
+  verified_claims: z.record(z.string(), z.string()).optional(),
+});
+
+/** The checks behind {@link FlowDocument}, run before a spec edits one. */
+const FlowDocumentSchema: z.ZodType<FlowDocument> = z.object({
+  purposes: z.record(z.string(), z.string()),
+  steps: z.array(
+    z.object({
+      name: z.string(),
+      fields: z.array(z.string()).optional(),
+      actions: z
+        .array(
+          z.object({
+            name: z.string(),
+            text_key: z.string().optional(),
+          }),
+        )
+        .optional(),
+      transitions: z.record(z.string(), z.unknown()).optional(),
+      sso_providers: z.array(z.string()).optional(),
+    }),
+  ),
+});
+
+/** The checks behind {@link PackageJson}, run before a spec edits one. */
+const PackageJsonSchema: z.ZodType<PackageJson> = z.object({
+  dependencies: z.record(z.string(), z.string()),
+});
+
+/** The origins `.zitadel/secret` records, which a spec rewrites. */
+const SecretOriginsSchema = z.object({
+  primary_origins: z.array(z.string()).optional(),
+  preview_origins: z.array(z.string()).optional(),
+});
+
+/** Any JSON object, for an edit that only adds or removes a key. */
+const AnyObjectSchema = z.record(z.string(), z.unknown());
+
+/** A committed connection's credentials, as a spec reads them back. */
+const CommittedIdpConnection = z.looseObject({
+  oidc: z.looseObject({
+    client_id: z.string(),
+    client_secret: z.string(),
+  }),
+});
+
+/** What the fake `npx` records of how `upgrade` ran it. */
+const RefreshLog = z.looseObject({
+  args: z.array(z.string()),
+});
+
+/** What the fake npm records of how setup ran it. */
+const InstallLog = z.looseObject({
+  cwd: z.string(),
+  args: z.array(z.string()),
+});
+
+/** The project values `.zitadel/secret` holds, as far as an environment binding reads them. */
+const ProjectSecret = z.looseObject({
+  project_id: z.string(),
+  project_secret: z.string(),
+  preview_secret: z.string(),
+});
+
+/** The recovery a failed `doctor` run offers, at the envelope's root. */
+const DoctorRecovery = z.looseObject({
+  details: z
+    .looseObject({
+      suggested_args: z.array(z.array(z.string())).optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Whether a value passes `schema`'s checks, as a guard over the value itself
+ * rather than the copy `parse` makes, so an edit lands on the document as read
+ * and its keys keep their order. Sound only for a schema with no transforms or
+ * defaults, which none of the schemas here has.
+ *
+ * @param schema - The checks the value must pass.
+ * @param value - The value read.
+ * @returns Whether it is a `T`.
+ */
+function conforms<T>(schema: z.ZodType<T>, value: unknown): value is T {
+  return schema.safeParse(value).success;
+}
+
 /**
  * Files the developer commits and hand-edits.
  *
@@ -213,10 +339,16 @@ class CommittedFiles {
     this.root = root;
   }
 
-  idpConnection(slug: string): Promise<{ oidc: { client_id: string; client_secret: string } }> {
-    return this.read(`.zitadel/idps/${slug}.json`) as Promise<{
-      oidc: { client_id: string; client_secret: string };
-    }>;
+  /**
+   * A committed connection's credentials, as the file spells them.
+   *
+   * @param slug - The connection's slug, which names its file.
+   * @returns The connection, its `oidc` credentials checked to be strings.
+   */
+  async idpConnection(
+    slug: string,
+  ): Promise<{ oidc: { client_id: string; client_secret: string } }> {
+    return CommittedIdpConnection.parse(await this.read(`.zitadel/idps/${slug}.json`));
   }
 
   /** The ejected branding descriptor. */
@@ -234,11 +366,17 @@ class CommittedFiles {
     return JSON.stringify(documents);
   }
 
-  private async read(relativePath: string): Promise<Record<string, unknown>> {
-    return JSON.parse(await readFile(join(this.root, relativePath), "utf8")) as Record<
-      string,
-      unknown
-    >;
+  /**
+   * A committed JSON document.
+   *
+   * @param relativePath - The file, from the project's root.
+   * @returns Its contents, checked to be a JSON object.
+   */
+  private async read(relativePath: string): Promise<JsonObject> {
+    return toJsonObject(
+      JSON.parse(await readFile(join(this.root, relativePath), "utf8")),
+      relativePath,
+    );
   }
 }
 
@@ -610,8 +748,7 @@ export class ScaffoldedApp {
     if (this.refreshLogPath === undefined) {
       throw new Error("upgrade was not run");
     }
-    return (JSON.parse((await readFile(this.refreshLogPath, "utf8")).trim()) as { args: string[] })
-      .args;
+    return RefreshLog.parse(JSON.parse((await readFile(this.refreshLogPath, "utf8")).trim())).args;
   }
 
   /** Whether the fake npm was asked for anything. */
@@ -664,11 +801,15 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ port: number }>(result).data.port;
   }
 
-  /** The argument lists a failed `doctor` run offered as recovery, for an agent to run as they are. */
+  /**
+   * The argument lists a failed `doctor` run offered as recovery, for an agent
+   * to run as they are.
+   *
+   * @param result - The `doctor --json` run.
+   * @returns Each suggested argument list, or none.
+   */
   suggestedArgsOf(result: CliResult): string[][] {
-    const { details } = this.envelopeOf<Record<string, unknown>>(result) as unknown as {
-      details?: { suggested_args?: string[][] };
-    };
+    const { details } = DoctorRecovery.parse(this.envelopeOf(result));
     return details?.suggested_args ?? [];
   }
 
@@ -1225,13 +1366,10 @@ export class ScaffoldedApp {
   async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
     expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
     expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
-    await this.editDocument<{ primary_origins: string[]; preview_origins: string[] }>(
-      ".zitadel/secret",
-      (secret) => {
-        secret.primary_origins = [];
-        secret.preview_origins = [SETUP_ORIGIN.pattern];
-      },
-    );
+    await this.editDocument(".zitadel/secret", SecretOriginsSchema, (secret) => {
+      secret.primary_origins = [];
+      secret.preview_origins = [SETUP_ORIGIN.pattern];
+    });
   }
 
   /** The origin patterns the project admits, read back through `origin list`. */
@@ -1327,17 +1465,230 @@ export class ScaffoldedApp {
     return flow_definition.steps.filter((step) => (step.sso_providers ?? []).length > 0);
   }
 
+  /**
+   * The auth methods the published user schema names, as `schemas list`
+   * reports them.
+   *
+   * @returns The schema's `x-auth-methods`, empty when it names none.
+   */
+  async publishedAuthMethods(): Promise<NonNullable<UserSchemaDocument["x-auth-methods"]>> {
+    const { schema } = await this.publishedSchema();
+    return schema["x-auth-methods"] ?? {};
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then reads the auth methods the published user schema names.
+   *
+   * @returns The published schema's `x-auth-methods`.
+   */
+  async authMethodsOnceDeployed(): Promise<NonNullable<UserSchemaDocument["x-auth-methods"]>> {
+    await this.publishData();
+    return this.publishedAuthMethods();
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then reads the published steps that offer a provider.
+   *
+   * @returns The steps, as {@link stepsOfferingSso} reads them.
+   */
+  async stepsOfferingSsoOnceDeployed(): Promise<FlowStep[]> {
+    await this.publishData();
+    return this.stepsOfferingSso();
+  }
+
+  /**
+   * Deploys the project's files, then reads each distinct list of providers a
+   * published step offers: one list when every step offers the same ones.
+   *
+   * @returns The distinct `sso_providers` lists, in step order.
+   */
+  async providerListsOfferedOnceDeployed(): Promise<string[][]> {
+    const lists = new Map<string, string[]>();
+    for (const step of await this.stepsOfferingSsoOnceDeployed()) {
+      const providers = step.sso_providers ?? [];
+      lists.set(JSON.stringify(providers), providers);
+    }
+    return [...lists.values()];
+  }
+
+  /**
+   * Deploys the project's files, then names the published steps that offer a
+   * provider but give `outcome` no transition.
+   *
+   * @param outcome - The transition every offering step should name.
+   * @returns The names of the steps that lack it.
+   */
+  async stepsOfferingSsoWithoutOnceDeployed(outcome: string): Promise<string[]> {
+    const steps = await this.stepsOfferingSsoOnceDeployed();
+    return steps
+      .filter((step) => {
+        return !Object.hasOwn(step.transitions ?? {}, outcome);
+      })
+      .map((step) => {
+        return step.name;
+      });
+  }
+
+  /**
+   * Deploys the project's files, then reads the slugs of the providers the
+   * platform has registered, sorted.
+   *
+   * @returns The registered slugs.
+   */
+  async registeredIdpSlugsOnceDeployed(): Promise<string[]> {
+    await this.publishData();
+    const registered = await this.registeredIdps();
+    return registered
+      .map((idp) => {
+        return idp.slug;
+      })
+      .sort();
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then runs `deploy --dry-run`, which refuses when the platform
+   * and the files still differ.
+   *
+   * @returns The dry run.
+   */
+  async deployDryRunOnceDeployed(): Promise<CliResult> {
+    await this.publishData();
+    return this.deployDryRun();
+  }
+
+  /**
+   * Deploys the project's files twice in a row, failing the arrange if either
+   * deploy does not succeed.
+   *
+   * @returns The release each deploy made live, first then again.
+   */
+  async releasesOfTwoDeploys(): Promise<Array<string | undefined>> {
+    const first = await this.publishData();
+    const again = await this.deployData();
+    return [first.release_id, again.release_id];
+  }
+
+  /**
+   * Runs `auth-method password|passkey disable`, failing the arrange if it
+   * does not succeed.
+   *
+   * @param method - The method to turn off.
+   */
+  async hasDisabledMethod(method: "password" | "passkey"): Promise<void> {
+    const result = await this.disableMethod(method);
+    expect(result, `arranging auth-method ${method} disable should have succeeded`).toSucceed();
+  }
+
+  /**
+   * Turns `method` off in the committed user schema, as the developer owning it
+   * would, without a command.
+   *
+   * @param method - The method to turn off.
+   */
+  hasTurnedOffByHand(method: "password" | "passkey"): Promise<void> {
+    return this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = { ...schema["x-auth-methods"], [method]: { enabled: false } };
+    });
+  }
+
+  /**
+   * Removes the committed user schema's `x-identifier`, so nothing names what
+   * a password is checked against.
+   */
+  lacksAnIdentifier(): Promise<void> {
+    return this.editDocument(SCHEMA_FILE, AnyObjectSchema, (schema) => {
+      delete schema["x-identifier"];
+    });
+  }
+
+  /**
+   * Runs `auth-method sso enable` with exactly these flags and this secret
+   * piped, failing the arrange if it does not succeed.
+   *
+   * @param args - The flags naming the provider and its client id.
+   * @param secret - The client secret, piped as a script would.
+   */
+  async hasEnabledSsoWith(args: string[], secret: string): Promise<void> {
+    const result = await this.enableSsoWith(args, secret);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Enables a catalog provider, failing the arrange if it does not succeed.
+   *
+   * @param provider - The catalog provider.
+   * @param credentials - Its client id and secret.
+   */
+  async hasEnabledSso(provider: string, credentials: Credentials): Promise<void> {
+    const result = await this.enableSso(provider, credentials);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Enables a connection the developer describes, failing the arrange if it
+   * does not succeed.
+   *
+   * @param connection - The connection.
+   * @param credentials - Its client id and secret.
+   */
+  async hasEnabledCustomSso(connection: CustomConnection, credentials: Credentials): Promise<void> {
+    const result = await this.enableCustomSso(connection, credentials);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Runs `auth-method sso disable`, failing the arrange if it does not succeed.
+   *
+   * @param provider - The provider to remove.
+   */
+  async hasDisabledSso(provider: string): Promise<void> {
+    const result = await this.disableSso(provider);
+    expect(result, "arranging auth-method sso disable should have succeeded").toSucceed();
+  }
+
   /** What the fake npm was asked to do, for the install leg of setup. */
   async installInvocation(): Promise<{ cwd: string; args: string[] }> {
     if (this.installLogPath === undefined) {
       throw new Error("setup was not run with { install: true }");
     }
-    return JSON.parse((await readFile(this.installLogPath, "utf8")).trim()) as {
-      cwd: string;
-      args: string[];
-    };
+    return InstallLog.parse(JSON.parse((await readFile(this.installLogPath, "utf8")).trim()));
   }
 
+  /**
+   * The app's directory with every symlink resolved, as a process the CLI
+   * starts in it sees its working directory.
+   *
+   * @returns The resolved directory.
+   */
+  realPath(): Promise<string> {
+    return realpath(this.path);
+  }
+
+  /**
+   * `command` as setup suggests it: aimed at the project setup created by the
+   * env file it wrote, and run from `--cwd`.
+   *
+   * @param command - The command, after the runner.
+   * @returns The whole suggestion.
+   */
+  asSetupSuggests(command: string): string {
+    return `${command} --env-file ${this.path}/.env.development.local --cwd ${this.path}`;
+  }
+
+  /**
+   * The envelope a `--json` run printed, its `data` read as `T`.
+   *
+   * The cast stays: the spec names the shape of `data`, which differs for
+   * every command and is spelled at each of its many callers across the specs,
+   * so this signature is theirs. The envelope's own fields are not taken on
+   * trust: {@link assertEnvelope} checks them on every `--json` run.
+   *
+   * @param result - The finished run.
+   * @returns Its envelope.
+   */
   envelopeOf<T = Record<string, unknown>>(result: CliResult): Envelope<T> {
     try {
       return parseJson(result.stdout) as Envelope<T>;
@@ -1404,7 +1755,7 @@ export class ScaffoldedApp {
 
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
-    return this.editDocument(SCHEMA_FILE, edit);
+    return this.editDocument(SCHEMA_FILE, UserSchemaDocumentSchema, edit);
   }
 
   /**
@@ -1446,7 +1797,7 @@ export class ScaffoldedApp {
 
   /** Edits a committed connection file, as the developer owning it would. */
   editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
-    return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
+    return this.editDocument(`.zitadel/idps/${slug}.json`, ConnectionDocumentSchema, edit);
   }
 
   /** Adds a second connection file that claims the same slug as an existing one. */
@@ -1535,7 +1886,7 @@ export class ScaffoldedApp {
 
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
-    return this.editDocument(FLOW_FILE, edit);
+    return this.editDocument(FLOW_FILE, FlowDocumentSchema, edit);
   }
 
   /** Edits the step a visitor lands on to log in, as the developer owning the flow would. */
@@ -1550,7 +1901,7 @@ export class ScaffoldedApp {
   }
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
-    return this.editDocument("package.json", edit);
+    return this.editDocument("package.json", PackageJsonSchema, edit);
   }
 
   /** Adds a second flow definition, for a spec whose input is the flow itself. */
@@ -1594,11 +1945,9 @@ export class ScaffoldedApp {
    */
   async developmentValues(): Promise<Record<string, string>> {
     const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
-    const secret = JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")) as {
-      project_id: string;
-      project_secret: string;
-      preview_secret: string;
-    };
+    const secret = ProjectSecret.parse(
+      JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")),
+    );
     return {
       ZITADEL_PROJECT_ID: secret.project_id,
       ZITADEL_PROJECT_SECRET: secret.project_secret,
@@ -1620,9 +1969,24 @@ export class ScaffoldedApp {
     return join(this.path, fileName);
   }
 
-  private async editDocument<T>(relativePath: string, edit: (document: T) => void): Promise<void> {
+  /**
+   * Edits a committed JSON document in place, as the developer owning it
+   * would, once it passes `schema`'s checks.
+   *
+   * @param relativePath - The file, from the project's root.
+   * @param schema - The shape the edit expects the document to have.
+   * @param edit - Changes the document as read.
+   */
+  private async editDocument<T>(
+    relativePath: string,
+    schema: z.ZodType<T>,
+    edit: (document: T) => void,
+  ): Promise<void> {
     const contents = await readFile(join(this.path, relativePath), "utf8");
-    const document = JSON.parse(contents) as T;
+    const document: unknown = JSON.parse(contents);
+    if (!conforms(schema, document)) {
+      throw new Error(`${relativePath} is not the document this edit expects: ${contents}`);
+    }
     edit(document);
     await writeFile(join(this.path, relativePath), `${JSON.stringify(document, null, 2)}\n`);
   }
@@ -1759,11 +2123,19 @@ function dotenv(values: Record<string, string>): string {
     .join("\n")}\n`;
 }
 
+/**
+ * The one item a list holds.
+ *
+ * @param items - The list.
+ * @param what - What the items are, for the failure.
+ * @returns The item, when there is exactly one.
+ */
 function only<T>(items: T[], what: string): T {
-  if (items.length !== 1) {
+  const [item] = items;
+  if (items.length !== 1 || item === undefined) {
     throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
   }
-  return items[0] as T;
+  return item;
 }
 
 /** ESC, spelled out, so this file holds no control character of its own. */
@@ -1943,7 +2315,8 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
         `stdout: ${result.stdout || "(empty)"}\nstderr: ${result.stderr || "(empty)"}`,
     );
   }
-  const envelope = parsed as Envelope;
+  const fields = EnvelopeFields.safeParse(parsed);
+  const envelope: z.infer<typeof EnvelopeFields> = fields.success ? fields.data : {};
   expect(envelope.cli_version, `${where}: cli_version missing`).toBeTypeOf("string");
   expect(envelope.command, `${where}: command missing`).toBeTypeOf("string");
   expect(envelope.source, `${where}: source missing`).toBeTypeOf("string");
@@ -1951,9 +2324,38 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
-  assertRunnableSuggestions(where, envelope);
-  assertDataShape(where, envelope);
+  const contract = ContractEnvelope.parse(parsed);
+  assertRunnableSuggestions(where, contract);
+  assertDataShape(where, contract);
 }
+
+/**
+ * The fields of an envelope the contract asserts, each read as it is so the
+ * assertion, not the parse, reports one that is missing or of the wrong kind.
+ */
+const EnvelopeFields = z.looseObject({
+  cli_version: z.unknown().optional(),
+  command: z.unknown().optional(),
+  source: z.unknown().optional(),
+  status: z.unknown().optional(),
+  code: z.unknown().optional(),
+});
+
+/**
+ * An envelope that has passed the asserted half of the contract, read for the
+ * checks that follow: its suggestions and the shape of its `data`.
+ */
+const ContractEnvelope = z.looseObject({
+  status: z.enum(["ok", "skipped", "error"]),
+  command: z.string(),
+  message: z.string().optional(),
+  hint: z.string().optional(),
+  next_commands: z.array(z.string()).optional(),
+  data: z.unknown().optional(),
+});
+
+/** An envelope as {@link assertDataShape} reads it. */
+type ContractEnvelope = z.infer<typeof ContractEnvelope>;
 
 /**
  * The `data`-shape half of the contract, enforced on every command so an agent
@@ -1970,31 +2372,33 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
  * shape fails in that command's own spec, not a central list someone forgot to
  * update.
  */
-function assertDataShape(where: string, envelope: Envelope): void {
+function assertDataShape(where: string, envelope: ContractEnvelope): void {
   if (envelope.status !== "ok") {
     return;
   }
-  const data = envelope.data as Record<string, unknown> | undefined;
-  if (!data || typeof data !== "object") {
+  const { data } = envelope;
+  if (typeof data !== "object" || data === null) {
     return;
   }
   // A dry run previews what a write would do; it carries `dry_run: true` and
   // not the real result shape, so the shape contract does not apply to it.
-  if (data.dry_run === true) {
+  if ("dry_run" in data && data.dry_run === true) {
     return;
   }
-  const command = envelope.command ?? "";
+  const { command } = envelope;
   const verb = command.split(/[:\s]/).filter(Boolean).pop() ?? "";
+  const items = "items" in data ? data.items : undefined;
 
   if (verb === "list" || command === "resources") {
     expect(
-      Array.isArray(data.items),
+      Array.isArray(items),
       `${where}: a list command must emit its rows under \`items\` (use listData())`,
     ).toBe(true);
   }
-  if (Array.isArray(data.items)) {
-    expect(typeof data.count, `${where}: a list envelope needs a numeric \`count\``).toBe("number");
-    const token = data.next_page_token;
+  if (Array.isArray(items)) {
+    const count = "count" in data ? data.count : undefined;
+    expect(typeof count, `${where}: a list envelope needs a numeric \`count\``).toBe("number");
+    const token = "next_page_token" in data ? data.next_page_token : undefined;
     expect(
       token === null || typeof token === "string",
       `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
@@ -2002,7 +2406,7 @@ function assertDataShape(where: string, envelope: Envelope): void {
   }
   if (verb === "rm" || verb === "delete" || verb === "remove") {
     expect(
-      data.deleted === true,
+      "deleted" in data && data.deleted === true,
       `${where}: a \`${verb}\` command must confirm with \`deleted: true\` (use deletedData())`,
     ).toBe(true);
   }
@@ -2099,6 +2503,42 @@ export async function anUndeployedEnvironment(): Promise<ScaffoldedApp> {
   ]);
   expect(added, "arranging env add should have succeeded").toSucceed();
   return app;
+}
+
+/**
+ * A second working copy of the same project: a fresh app directory carrying
+ * the project's `.zitadel/secret` but none of its resource files, the way a
+ * developer who cloned the repo reaches a project someone else deployed.
+ *
+ * @param project - The project to check out again.
+ * @returns The checkout.
+ */
+export async function aFreshCheckoutOf(project: ScaffoldedApp): Promise<ScaffoldedApp> {
+  const checkout = await anApp();
+  await mkdir(join(checkout.path, ".zitadel"), { recursive: true });
+  await checkout.writeProjectFile(
+    ".zitadel/secret",
+    await project.readProjectFile(".zitadel/secret"),
+  );
+  return checkout;
+}
+
+/**
+ * A {@link aFreshCheckoutOf} that already holds a local human-user schema its
+ * contract refuses: only the object type the project's own schema has, so a
+ * pull has to replace it rather than write a second schema beside it.
+ *
+ * @param project - The project to check out again.
+ * @returns The checkout, holding the refused schema.
+ */
+export async function aFreshCheckoutHoldingARefusedSchemaOf(
+  project: ScaffoldedApp,
+): Promise<ScaffoldedApp> {
+  const checkout = await aFreshCheckoutOf(project);
+  const schema = JSON.parse(await project.readProjectFile(SCHEMA_FILE));
+  await mkdir(join(checkout.path, ".zitadel/schemas"), { recursive: true });
+  await checkout.writeProjectFile(SCHEMA_FILE, JSON.stringify({ objectType: schema.objectType }));
+  return checkout;
 }
 
 /**

@@ -99,6 +99,8 @@ export {
   credentialVariable,
   credentialVariables,
   isVariableReference,
+  referencedClientIdVariable,
+  referencedClientSecretVariable,
   referencedVariable,
   variableReference,
   type CallbackGuidance,

@@ -11,13 +11,19 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import {
   BRANDING_DESIGNS,
+  DEFAULT_FLOW_CONFIG_PATH,
+  DEFAULT_SCHEMA_CONFIG_PATH,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
+  flowsReadmeContent,
+  policiesReadmeContent,
+  schemasReadmeContent,
   SETUP_PRESETS,
   SETUP_USE_CASES,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
+import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 import {
   type ClientId,
   type ConnectionSlug,
@@ -104,18 +110,20 @@ import {
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import {
-  parsePasswordMinLength,
-  PASSWORD_POLICY_PATH,
-  type PasswordMinLength,
-} from "@/lib/policies";
+import { Connection, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
+import { normalizePublicCliProse } from "@/lib/public-cli";
 import {
-  assertNoSetupResourceConflicts,
-  materializeSetupResources,
-  type MaterializeSetupResourcesResult,
-} from "@/lib/setup-resources";
+  CONFIG_DIRECTORIES,
+  ConnectionExistsError,
+  DiskStore,
+  FileExistsError,
+  PAGE_LAYOUT_HINT,
+  type Scaffold,
+  type ScaffoldedConnection,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
 import { installDependenciesForSetup } from "./install";
@@ -165,7 +173,6 @@ import semver from "semver";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { DEFAULT_SERVER, type ResolvedServer, resolveServer } from "@/lib/server";
-import { PAGE_LAYOUT_HINT } from "@/lib/branding/designs";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { userAgent } from "@/lib/user-agent";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -612,7 +619,7 @@ function refuseWorktree(state: WorktreeState): void {
  * Refuses a local server another CLI release started. `start` restarts such a
  * server, but one left running stays that release's until `start` runs again,
  * and its API is that release's: setup would create the project, then fail
- * uploading the default schema and flow, and `--force` would not help.
+ * deploying the default schema and flow, and `--force` would not help.
  *
  * Only a binary runtime records the version it runs, and only release versions
  * are compared: an override records `override`, which says nothing about its
@@ -963,8 +970,8 @@ function recoverySelector(cwd: string | undefined): EnvironmentSelector {
  * scaffold), runs the wizard prompts to fill in any answers not pre-supplied
  * by flags, scaffolds the new app only then (never on a dry run), creates the
  * remote project without server fallback defaults, patches the local files via
- * `Orca`'s framework patcher, then scaffolds and uploads editable schema/flow
- * config from `.zitadel/**`.
+ * `Orca`'s framework patcher, then scaffolds the editable `.zitadel/**`
+ * configuration through the configuration library and deploys it.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -1062,7 +1069,7 @@ export default class Setup extends Destructive(BaseCommand) {
     "password-min-length": Flags.custom<PasswordMinLength>({
       parse: readsFilled(
         {
-          schema: made(parsePasswordMinLength),
+          schema: made(PasswordPolicy.parseMinLength),
           refusal: {
             message: "{problem}",
             hint: "Pass a whole number for {input}, or 0 for none.",
@@ -1309,7 +1316,7 @@ export default class Setup extends Destructive(BaseCommand) {
               : "none"
             : "multiple",
       // Whether a minimum goes into the password policy, never the value. None
-      // given is the recommended one (`passwordPolicyFile`), unless `--force`
+      // given is the recommended one (`PasswordPolicy.initial`), unless `--force`
       // keeps a policy file: `files_patched` records what was published.
       password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
@@ -1333,17 +1340,12 @@ export default class Setup extends Destructive(BaseCommand) {
       useCase: answers.useCase,
     });
     const patcher = orca.patcherFor(app.framework);
-    // The schema, flow and connection files setup writes only once the project
-    // exists: a conflict on one of those left the project behind, and the
-    // rerun's `.env.local` kept pointing at it. Checked before anything is
-    // written, a new app included. Read-only, so a dry run reports them too.
-    await assertNoSetupResourceConflicts({
-      cwd: this.cwd,
-      force: this.force,
-      preset: answers.preset,
-      useCase: answers.useCase,
-      sso: answers.sso,
-    });
+    // The schema, flow, connection and policy files setup writes only once the
+    // project exists: a conflict on one of those left the project behind, and
+    // the rerun's `.env.local` kept pointing at it. Planned, and so refused,
+    // before anything is written, a new app included. Read-only, so a dry run
+    // reports them too.
+    const planned = await scaffoldOf(this.cwd, this.force, answers);
 
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
@@ -1378,7 +1380,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // taking a half-set-up one for an app the developer brought.
     let project: CreatedProject;
     let result: Awaited<ReturnType<typeof patcher.patch>>;
-    let resourceResult: MaterializeSetupResourcesResult;
+    let scaffolded: ScaffoldedConfiguration;
     try {
       if (framework !== undefined && !this.dryRun) {
         // Patch as a dry run first, against a placeholder project: a file setup
@@ -1394,8 +1396,8 @@ export default class Setup extends Destructive(BaseCommand) {
       }
 
       // `POST /projects` is unauthenticated. CLI-managed projects opt out of
-      // server fallback defaults, then setup uploads the local default schema and
-      // flow files through the typed resource APIs and records the returned IDs.
+      // server fallback defaults; setup writes the default configuration files
+      // and the first deploy publishes them.
       current = this.ui.begin(
         `Creating project on ${answers.server}${this.dryRun ? " (dry run)" : ""}`,
       );
@@ -1458,7 +1460,7 @@ export default class Setup extends Destructive(BaseCommand) {
         } catch (error) {
           // The dry run above already ruled out conflicts, so this is an I/O
           // failure partway through. Remove the setup markers and put
-          // `.env.local` back, as a failed resource upload does below, so a
+          // `.env.local` back, as a failed configuration write does below, so a
           // rerun starts over.
           if (!this.dryRun) {
             await removeSetupMarkers(this.cwd);
@@ -1479,54 +1481,25 @@ export default class Setup extends Destructive(BaseCommand) {
         );
       }
       try {
-        resourceResult = this.dryRun
+        scaffolded = this.dryRun
           ? { filesWritten: [], passwordMinLength: signInOf(answers).password_min_length }
-          : await materializeSetupResources({
-              cwd: this.cwd,
-              client: createZitadelClient({
-                userAgent: userAgent(),
-                baseUrl: answers.server,
-                token: project.project_secret,
-                signal: this.signal,
-              }),
-              projectId: project.id,
-              force: this.force,
-              preset: answers.preset,
-              useCase: answers.useCase,
-              sso: answers.sso,
-              passwordMinLength: answers.passwordMinLength,
-              cliVersion: this.cliVersion,
-            });
+          : await this.writeConfiguration(answers);
       } catch (error) {
         // Setup is not atomic: the patcher already wrote `zitadel.json` (the
         // marker the already-initialized guard skips on) and `.zitadel/secret`.
         // Remove both so a rerun starts a fresh setup instead of being skipped
-        // forever with no default schema or login flow anywhere. The
-        // half-provisioned project has no usable resources, so its credentials
-        // are not worth keeping, and `.env.local`, where the patch merged them,
-        // goes back to what it held before.
+        // forever with no default schema or login flow anywhere. The project
+        // has nothing deployed, so its credentials are not worth keeping, and
+        // `.env.local`, where the patch merged them, goes back to what it held
+        // before.
         // Only these, and never a connection file: those are tenant-owned, and
         // setup neither writes over nor removes one -- unless it is part of a
         // new app, which goes as a whole.
         await removeSetupMarkers(this.cwd);
         await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
         const cause = toZitadelError(error);
-        throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
-          // The cause knows its own remedy when it has one -- a file setup
-          // declined to touch is fixed by deciding what to do with that file,
-          // not by rerunning with --force.
-          hint:
-            cause.hint ??
-            (newApp === undefined
-              ? "The project was created but its default resources (schema, login flow, " +
-                `password policy) did not all upload. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
-                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
-                "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
-                "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload, so setup removed the new app again. " +
-                "Rerun setup as before to start over."),
+        throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
+          hint: this.configurationFailureHint(cause, newApp !== undefined),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -1548,13 +1521,13 @@ export default class Setup extends Destructive(BaseCommand) {
         `Could not delete what the new app replaced, kept beside ${this.cwd}: ${toZitadelError(error).message}`,
       );
     }
-    for (const file of resourceResult.filesWritten) {
+    for (const file of scaffolded.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
       if (sentence) {
         current?.detail(sentence);
       }
     }
-    const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
+    const allFilesWritten = [...result.filesWritten, ...scaffolded.filesWritten];
     if (framework !== undefined) {
       current?.done(
         `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
@@ -1569,25 +1542,26 @@ export default class Setup extends Destructive(BaseCommand) {
     // `--force` kept decides it as much as the answers do.
     const signIn: SignIn = {
       ...signInOf(answers),
-      password_min_length: resourceResult.passwordMinLength,
+      password_min_length: scaffolded.passwordMinLength,
     };
     if (!this.dryRun) {
       // What was published, which a policy file `--force` keeps decides as much
       // as the answers recorded before. A dry run publishes nothing and keeps
       // those.
       this.recordTelemetry({
-        password_policy: resourceResult.passwordMinLength === null ? "empty" : "set",
+        password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
       });
     }
 
-    // After the connection exists, not before: a credential published under a
-    // name nothing references yet is an orphan in the project's variables, and
-    // a setup that fails in between would leave one behind. Neither credential
-    // reaches the filesystem — both go to the project's variables, which is
-    // where the engine resolves the connection's `${{ NAME }}` from, against
-    // Zitadel Cloud as much as against a local server. A refusal is reported
-    // rather than failing setup: everything else is already provisioned, and
-    // `variable set` publishes it later.
+    // After the connection file is written, not before: a credential published
+    // under a name nothing references yet is an orphan in the project's
+    // variables, and a setup that fails in between would leave one behind. And
+    // before the first deploy, which carries the connection and resolves its
+    // `${{ NAME }}` from the variables the project holds by then. Neither
+    // credential reaches the filesystem — both go to the project's variables,
+    // against Zitadel Cloud as much as against a local server. A refusal is
+    // reported rather than failing setup: everything else is already written,
+    // and `variable set` publishes it later.
     // One outcome per provider, keyed by slug: the summary reports each
     // separately, because one provider's publish can land while another's does
     // not, and telling the developer "the secret did not reach the project"
@@ -1863,7 +1837,7 @@ export default class Setup extends Destructive(BaseCommand) {
         issuer,
         scaffoldedFramework,
         scaffoldedBesideFiles,
-        sso: answers.sso,
+        connections: planned.connections,
         signIn,
       });
       const nextActions = [
@@ -1908,8 +1882,8 @@ export default class Setup extends Destructive(BaseCommand) {
         framework: app.framework,
         server: answers.server,
         files_written: allFilesWritten.map((file) => relativeDisplay(this.cwd, file)),
-        // Typed per-artifact rows for the scaffolded app files (the sync
-        // resources continue to report through files_written): one row per
+        // Typed per-artifact rows for the scaffolded app files (the
+        // configuration files continue to report through files_written): one row per
         // touched path with kind (file/dir) and action (create/update), so
         // agents can verify what setup did without parsing narration.
         files: result.files.map((file) => ({
@@ -1926,14 +1900,14 @@ export default class Setup extends Destructive(BaseCommand) {
         // A list, one entry per provider enabled during scaffolding, empty
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
-        sso: answers.sso.map((answer) => {
-          const slug = providerOf(answer.selection).slug;
+        sso: planned.connections.map((entry) => {
+          const slug = providerOf(entry.chosen.selection).slug;
           const outcome = ssoOutcomes.get(slug);
           return {
-            provider: selectionName(answer.selection),
+            provider: selectionName(entry.chosen.selection),
             slug,
-            client_id: answer.credentials.clientId ?? null,
-            connection: `.zitadel/idps/${slug}.json`,
+            client_id: entry.chosen.credentials.clientId ?? null,
+            connection: entry.connection.path,
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
@@ -1999,6 +1973,100 @@ export default class Setup extends Destructive(BaseCommand) {
       },
       nextShown,
     });
+  }
+
+  /**
+   * The hint for a default configuration that was not all written.
+   *
+   * @remarks
+   * The cause knows its own remedy when it has one: a file setup declined to
+   * touch is fixed by deciding what to do with that file, not by rerunning
+   * with --force. When setup removed the new app it made, that is said first
+   * either way, since the developer would otherwise look for an app that is
+   * gone.
+   *
+   * @param cause - What stopped the write.
+   * @param removedNewApp - Whether setup removed the new app it made.
+   * @returns The hint to show.
+   */
+  private configurationFailureHint(cause: ZitadelError, removedNewApp: boolean): string {
+    if (removedNewApp) {
+      const removed =
+        "The project was created but its default configuration (schema, login flow, " +
+        "password policy) was not all written, so setup removed the new app again.";
+      if (cause.hint !== undefined) {
+        return `${removed} ${cause.hint}`;
+      }
+      return `${removed} Re-run setup as before to start over.`;
+    }
+    if (cause.hint !== undefined) {
+      return cause.hint;
+    }
+    return (
+      "The project was created but its default configuration (schema, login flow, " +
+      `password policy) was not all written. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
+      "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+      "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+      "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
+      "one, or keep it and enable the provider after setup to reuse it."
+    );
+  }
+
+  /**
+   * Write the project's default configuration under `.zitadel/`, and a README
+   * into each of its directories, all through the configuration library.
+   *
+   * @remarks
+   * Only files: the first deploy publishes them. The configuration is planned
+   * again against what is on disk now, so it refuses what the plan before the
+   * project was created would. A README already there is the developer's, and
+   * is kept even under `--force`.
+   *
+   * @param answers - What to scaffold.
+   * @returns The absolute paths written, and the minimum password length the
+   *   policy holds.
+   * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
+   *   replace is there, or `E_VALIDATION` when a policy `--force` keeps is not
+   *   valid.
+   */
+  private async writeConfiguration(answers: SetupAnswers): Promise<ScaffoldedConfiguration> {
+    const scaffold = await scaffoldOf(this.cwd, this.force, answers);
+    const store = new DiskStore(this.cwd);
+    const saved = await scaffold.change
+      .save(store, {
+        overwrite: this.force,
+        createOnly: (document) => {
+          return document instanceof Connection;
+        },
+      })
+      .catch((error: unknown) => {
+        throw setupRefusal(error, scaffold.connections);
+      });
+    const readmes = await Promise.all(
+      [
+        { directory: CONFIG_DIRECTORIES.schemas, text: schemasReadmeContent() },
+        { directory: CONFIG_DIRECTORIES.flows, text: flowsReadmeContent() },
+        { directory: CONFIG_DIRECTORIES.policies, text: policiesReadmeContent() },
+      ].map(async (readme): Promise<readonly string[]> => {
+        const path = `${readme.directory}/${README}`;
+        const text = normalizePublicCliProse(readme.text, this.cliVersion);
+        try {
+          await store.writeText(path, text, "create");
+          return [path];
+        } catch (error) {
+          if (error instanceof FileExistsError) {
+            return [];
+          }
+          throw error;
+        }
+      }),
+    );
+    return {
+      filesWritten: [...saved, ...readmes.flat()].map((path) => {
+        return join(this.cwd, path);
+      }),
+      passwordMinLength: scaffold.policy.minLength ?? null,
+    };
   }
 
   /**
@@ -2310,6 +2378,142 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
   await rm(join(cwd, ".zitadel/secret"), { force: true });
 }
 
+/**
+ * The name of the README setup writes into each configuration directory.
+ */
+const README = "README.md";
+
+/**
+ * What setup's default configuration left behind.
+ */
+type ScaffoldedConfiguration = {
+  /**
+   * The absolute paths of the files written.
+   */
+  filesWritten: string[];
+
+  /**
+   * The minimum password length the password policy holds. A kept policy file
+   * decides that as much as the answers do: one without `min_length` keeps
+   * none when none was given. `null` when it has none.
+   */
+  passwordMinLength: number | null;
+};
+
+/**
+ * The default configuration setup scaffolds into a project, planned against
+ * the files the project already has.
+ *
+ * @remarks
+ * Every file it would refuse is refused here, so setup calls it before it
+ * creates the project: those files are written only once the project exists,
+ * and a conflict found then would leave the project behind. The files are
+ * read without being held to their contracts: a default schema, flow or
+ * password policy that is broken stands in the way like a valid one, so it is
+ * replaced with `force` and refused without it, and a broken file setup does
+ * not write is left for the deploy to refuse.
+ *
+ * @param cwd - The project root.
+ * @param force - Whether the default schema and flow may be replaced, and an
+ *   existing password policy kept.
+ * @param answers - What to scaffold.
+ * @returns The configuration, and the change that writes it.
+ * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
+ *   would refuse to write, or `E_VALIDATION` for a kept password policy that
+ *   is not valid.
+ */
+async function scaffoldOf(
+  cwd: string,
+  force: boolean,
+  answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
+): Promise<Scaffold<SsoDraft>> {
+  try {
+    // Read without refusing a broken file: the scaffold knows which paths it
+    // would write, so it alone decides whether a broken default is replaced
+    // (`force`) or refused, and any other broken file is left to the deploy.
+    // Only the kinds it scaffolds or plans around: branding is never written,
+    // so an unreadable branding file does not stand in setup's way.
+    const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), [
+      "schemas",
+      "flows",
+      "connections",
+      "policies",
+    ]);
+    return config.scaffold({
+      preset: answers.preset,
+      useCase: answers.useCase,
+      sso: answers.sso,
+      passwordMinLength: answers.passwordMinLength,
+      force,
+    });
+  } catch (error) {
+    throw setupRefusal(error, []);
+  }
+}
+
+/**
+ * The refusal setup words for a file it will not write, with what to do about
+ * that file; any other error as it is.
+ *
+ * @remarks
+ * A connection is never replaced, so its refusal names the command that
+ * enables the provider with the connection that is there. Setup stopped
+ * before it created a project, so there is no environment to carry: the
+ * command is for after the developer reruns setup.
+ *
+ * @param error - What the configuration library threw.
+ * @param connections - The connections setup planned, for a connection file
+ *   a write found taken.
+ * @returns The error to throw.
+ */
+function setupRefusal(error: unknown, connections: readonly ScaffoldedConnection[]): unknown {
+  if (error instanceof ConnectionExistsError) {
+    return connectionRefusal(error.path, error.selection);
+  }
+  if (!(error instanceof FileExistsError)) {
+    return error;
+  }
+  const planned = connections.find((scaffolded) => {
+    return scaffolded.connection.path === error.path;
+  });
+  if (planned !== undefined) {
+    return connectionRefusal(error.path, planned.chosen.selection);
+  }
+  if (error.path === PasswordPolicy.PATH) {
+    return new ZitadelError("E_CONFLICT", error.message, {
+      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+      details: error.details,
+    });
+  }
+  return new ZitadelError("E_CONFLICT", error.message, {
+    hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+    details: error.details,
+  });
+}
+
+/**
+ * The refusal for a provider whose connection file is already there.
+ *
+ * @remarks
+ * Setup neither replaces nor removes one, with or without `--force`: the
+ * developer decides what happens to the file.
+ *
+ * @param path - The project-relative path of the connection.
+ * @param selection - The provider, as it was chosen.
+ * @returns The `E_CONFLICT` error, with the command that enables the provider
+ *   afterwards.
+ */
+function connectionRefusal(path: string, selection: ProviderSelection): ZitadelError {
+  return new ZitadelError("E_CONFLICT", `${path} already exists`, {
+    hint:
+      "A connection file is yours to keep, so setup never replaces or removes one. " +
+      "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
+      "provider afterwards to reuse it.",
+    nextCommands: [unscopedCommand(ssoEnableArgs(selection))],
+    details: { file: path },
+  });
+}
+
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(issuer: string): CreatedProject {
   return {
@@ -2619,21 +2823,21 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
   ".env.development.local": { subject: "the environment variables the CLI reads" },
-  ".zitadel/state.json": { subject: "the sync state file" },
-  ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
-  ".zitadel/flows/README.md": { subject: "the flows folder README" },
-  ".zitadel/schemas/default-human-user.json": {
-    subject: "the editable default human user schema",
+  ".zitadel/state.json": { subject: "the scaffold state file" },
+  [DEFAULT_FLOW_CONFIG_PATH]: { subject: "the editable default login flow" },
+  [`${CONFIG_DIRECTORIES.flows}/${README}`]: { subject: "the flows folder README" },
+  [DEFAULT_SCHEMA_CONFIG_PATH]: { subject: "the editable default human user schema" },
+  [`${CONFIG_DIRECTORIES.schemas}/${README}`]: { subject: "the schemas folder README" },
+  [PasswordPolicy.PATH]: { subject: "the editable password policy" },
+  [`${CONFIG_DIRECTORIES.policies}/${README}`]: { subject: "the policies folder README" },
+  [`${META_SCHEMA_DIR}/policy.json`]: { subject: "the policy dialect spec (editor $schema)" },
+  [`${META_SCHEMA_DIR}/flow-definition.json`]: {
+    subject: "the flow dialect spec (editor $schema)",
   },
-  ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
-  ".zitadel/policies/auth.factor.password.set.json": { subject: "the editable password policy" },
-  ".zitadel/policies/README.md": { subject: "the policies folder README" },
-  ".zitadel/meta/policy.json": { subject: "the policy dialect spec (editor $schema)" },
-  ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
-  ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
-  ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
-  ".zitadel/meta/branding.json": { subject: "the branding dialect spec" },
-  ".zitadel/meta/project.json": { subject: "the zitadel.json spec (editor $schema)" },
+  [`${META_SCHEMA_DIR}/user-schema.json`]: { subject: "the user-schema dialect spec" },
+  [`${META_SCHEMA_DIR}/user-property.json`]: { subject: "the user-property dialect spec" },
+  [`${META_SCHEMA_DIR}/branding.json`]: { subject: "the branding dialect spec" },
+  [`${META_SCHEMA_DIR}/project.json`]: { subject: "the zitadel.json spec (editor $schema)" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },
@@ -2659,11 +2863,19 @@ export function buildSummary(opts: {
   issuer: string;
   scaffoldedFramework: boolean;
   scaffoldedBesideFiles: boolean;
-  sso: readonly SsoDraft[];
+  connections: readonly ScaffoldedConnection[];
   signIn: SignIn;
 }): Section[] {
-  const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
-    opts;
+  const {
+    projectFacts,
+    writtenRel,
+    depsAdded,
+    project,
+    server,
+    issuer,
+    scaffoldedFramework,
+    connections,
+  } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
@@ -2727,29 +2939,30 @@ export function buildSummary(opts: {
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
-    ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
-    ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
-    ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
+    ["User schema", DEFAULT_SCHEMA_CONFIG_PATH, CONFIG_DIRECTORIES.schemas],
+    ["Login flow", DEFAULT_FLOW_CONFIG_PATH, CONFIG_DIRECTORIES.flows],
+    ["Password policy", PasswordPolicy.PATH, CONFIG_DIRECTORIES.policies],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) {
-      customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+      customizeRows.push({ label, value: stylePath(`${dir}/`), secondary: "see its README.md" });
     }
   }
   // One row per provider: each has its own connection file, and a developer
   // scanning the summary for where to edit needs the path that belongs to the
   // provider they are looking at.
-  for (const answer of sso) {
+  for (const entry of connections) {
+    const provider = providerOf(entry.chosen.selection);
     customizeRows.push({
       label: "Social sign-in",
-      value: providerOf(answer.selection).displayName,
-      secondary: stylePath(`.zitadel/idps/${providerOf(answer.selection).slug}.json`),
+      value: provider.displayName,
+      secondary: stylePath(entry.connection.path),
     });
     // A scripted `--sso` run asks nothing, so the prompt that announces the
     // URI never shows; the summary is where it reaches the developer then.
     customizeRows.push({
       label: "Redirect URI",
-      value: styleUrl(callbackUriFor(issuer, providerOf(answer.selection).slug)),
+      value: styleUrl(callbackUriFor(issuer, provider.slug)),
     });
   }
 

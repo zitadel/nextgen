@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import ReleaseCreate from "@/commands/release/create";
 import { parseFlag } from "@tests/helpers/inputs";
@@ -56,10 +60,16 @@ describe("release create at a terminal", () => {
 
   beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
   afterAll(() => server.close());
-  afterEach(() => server.resetHandlers());
+  const dirs: string[] = [];
+  afterEach(async () => {
+    server.resetHandlers();
+    await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  });
 
   const created = async (): Promise<string> => {
-    const cwd = await makeProject({ linked: true, schemas: { "human-user": SCHEMA } });
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-release-create-"));
+    dirs.push(dir);
+    const cwd = await makeProject(dir, { linked: true, schemas: { "human-user": SCHEMA } });
     server.use(
       http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({

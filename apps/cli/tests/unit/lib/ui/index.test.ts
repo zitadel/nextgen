@@ -21,7 +21,6 @@ const asWritten = (file: string): string => relative(SRC, file).split(sep).join(
  */
 const STILL_DRAWING_THEMSELVES = [
   "commands/api/index.ts: imports consola",
-  "commands/auth-method/sso/disable/index.ts: imports consola",
   "commands/auth-method/sso/enable/index.ts: imports consola",
   "commands/branding/eject.ts: imports consola",
   "commands/claim/index.ts: imports consola",
@@ -38,7 +37,6 @@ const STILL_DRAWING_THEMSELVES = [
   "lib/oclif/base.ts: writes to process.stderr",
   "lib/publish/steps/asset-probe.ts: imports consola",
   "lib/skills-hint.ts: imports consola",
-  "lib/sync/writeback.ts: imports consola",
   "lib/telemetry/sink.ts: writes to process.stderr",
   "lib/warnings.ts: imports consola",
 ].sort();

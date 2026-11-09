@@ -327,20 +327,22 @@ Each invocation prints one JSON object:
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the
   collision names the user.
-- `deploy` and `deploy --dry-run` read the project's users and add a warning
-  to `warnings` when the config would lock existing users out: users of a
+- `deploy` and `deploy --dry-run` read the project's users and refuse when the
+  config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
   collects it (it cannot tell who signs in with a password, so it counts them
   all), users of a schema no flow uses any more, who cannot sign in at all
   (the warning counts those with an SSO link on top), or users whose only
   credential is a method the release disables on their schema, such as a
-  passkey once passkeys are off. It runs only when the
-  diff finds schemas or flows changed, or cannot tell, and it only warns and
-  never fails the deploy. When it could not finish (a request failed, the
+  passkey once passkeys are off. Each lockout is listed in `warnings`, and a
+  non-interactive run fails with `E_CONFIRMATION_REQUIRED`; `--force` deploys
+  anyway. Ask the user before re-running with `--force`: it is for users they
+  will migrate, or a lockout they mean. It runs only when the diff finds
+  schemas or flows changed, or cannot tell. When it could not finish (a request failed, the
   unserved-schema part was skipped,
   or the read limit was reached), `warnings` carries a note saying so, such as
   "Could not finish checking existing users"; that note means the check was
-  incomplete, not that users are locked out.
+  incomplete, not that users are locked out, and it never stops the deploy.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
@@ -651,14 +653,16 @@ terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
 no app: where it would scaffold one, it previews the project, and
 `data.files_written` is empty, because those files depend on the generated app.
-`setup` also writes and publishes the password policy
-(`.zitadel/policies/auth.factor.password.set.json`) with a minimum length of
+`setup` also writes the password policy, which its first deploy publishes
+(`.zitadel/policies/auth.factor.password.set.json`), with a minimum length of
 15, NIST's minimum for password-only sign-in and the wizard's default. Pass
 `--password-min-length <n>` only when the user asks for another value (`0` sets
 none), and give test users passwords at least that long.
 When setup fails after scaffolding a new app, before its default schema and
-flow are uploaded, it removes the app again and puts back what the directory
-held, so rerunning the same `setup` starts over.
+flow files are written, it removes the app again and puts back what the
+directory held, so rerunning the same `setup` starts over. Setup writes
+`.zitadel/` and publishes it only through its first deploy, so a failed deploy
+leaves every file in place: run the suggested `deploy`, not `setup` again.
 
 `start` reuses a server already running in the directory only when it is the
 release this CLI ships; one an earlier release started is restarted, and its
@@ -743,8 +747,10 @@ asks first: non-interactive, pass
 holds the `origin rm … --force` that removes it. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that
 port. A social sign-in provider still redirects to the old port: `warnings`
-names the redirect URI to add at each provider. Restart the dev server
-afterwards.
+names the redirect URI to add at each provider, listing each by its
+connection slug (by file name for a connection file that is broken). The move
+reads `.zitadel/idps/` before it changes anything and stops when that
+directory cannot be read. Restart the dev server afterwards.
 
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
@@ -760,15 +766,20 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   `--scopes` (default `openid profile email`).
   `--dry-run` asks for and reads no credentials: it prints the callback URI and
   where to register the client. `data.connection`, `data.changed` and
-  `data.would_store` name the connection file, the schema and flow files and
-  the project variables the real run would write.
+  `data.would_store` name the connection file, the files the run would write
+  (a new connection's `.zitadel/idps/<slug>.json` first, then the schema and
+  flow files) and the project variables it would store. The text output lists
+  them as `Would write <file>` and `Would store <variables> on the project`,
+  and a notice about a region left alone says it "would be" left alone. A
+  provider route you wrote yourself in a flow is kept, not reset, and
+  `data.notices` says so.
   In a terminal, a custom provider's settings you leave out are asked for, after
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
   run must pass all three and gets an error naming the missing ones. After
-  writing a new connection the text output prints the claim mappings and names
-  the file to edit them in; `--json` does not carry them, so read the
-  connection file.
+  writing a new custom connection that maps claims, the text output prints the
+  claim mappings and names the file to edit them in; `--json` carries the same
+  summary as an `info` entry in `data.notices`.
   An issuer on `http://localhost:<port>` (a test provider on this machine)
   works against a server `zitadel start` runs as a process: `start` sets
   `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless
@@ -781,9 +792,14 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   listing the offered providers and connections, unless the catalog lists it or
   a `.zitadel/idps/` connection names it; then the run is an `ok` no-op.
   It keeps the connection file, its variables and the `register-sso` /
-  `sso-conflict` steps, and lists them in `data.kept`. When nothing else offers
+  `sso-conflict` steps, and says so in `data.notices`. When nothing else offers
   the provider, `data.next_actions` says to delete the file before deploying
   and to `variable rm` its variables once that deploy is live, in that order.
+
+Every `auth-method` result carries `data.notices`, a list of `{severity,
+message}` (`severity` is `warning` or `info`): what the change left alone, kept
+or still needs doing, such as the files `sso disable` keeps. The text output
+prints the same notices.
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
@@ -792,7 +808,18 @@ project. A provider added by `sso enable` is configured locally, not live: its
 holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
 application exists. `data.title` claims the credentials are stored on the project
 only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
-They refuse to disable a method a login flow still asks for, to change a method
+They refuse to run while any file under `.zitadel/` does not parse, fails its
+contract or fails the per-file checks `deploy` makes (a literal `client_secret`,
+a branding template or `$file` that cannot be read or breaks the template
+rules, a connection field its contract does not know, a problem with its
+endpoints), even a file the command
+does not change (`E_VALIDATION`, with each file and finding in
+`details.problems`), changing nothing; fix the files named, then run the command
+again. A schema whose `x-auth-methods` is not the shape the contract expects is
+such a file. They refuse to write or remove a file under `.zitadel/` whose path,
+through a symlink, resolves outside `.zitadel/`; reading still follows
+symlinks. They refuse
+to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
 and to edit a schema that points at an external URL. When they refuse to disable a
@@ -825,13 +852,46 @@ generated by the CLI, not config: never edit them. `doctor` warns when one is
 missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
-the path; `deploy --dry-run` validates without them either way.
-`deploy`, `preview` and `release create`, `--dry-run` included, check the
-shape of `.zitadel/` locally before anything is written, and fail with
-`E_VALIDATION` listing each problem by field and by the schema's or flow's
-handle (a policy by its file). The server still applies its own release rules
-when the build is submitted, such as handles being unique, so a passing dry run
-does not promise the release is accepted.
+the path. `setup` and `branding eject` write a missing one and replace an
+outdated one the same way, and never replace one when the project pins a newer
+`@zitadel/*` package. `deploy --dry-run` validates without them either way.
+`doctor`'s `schema` check holds every file under `.zitadel/` to the rules
+`deploy` validates with: it fails on an error and warns on a warning. It holds
+no environment, so `environment/missing-variable` is checked only by `deploy`.
+When `sso/subject-claim-unstable` could apply, `doctor` (like `deploy`) lists
+the project's connections on the server, using `zitadel.json` and
+`.zitadel/secret`; when the listing cannot be read, both leave that one warning
+out rather than give it for connections already deployed.
+`deploy`, `preview` and `release create`, `--dry-run` included, check
+`.zitadel/` locally before anything is written, and refuse with one
+`E_VALIDATION`, `Configuration validation failed (N issues)`. `details.issues`
+lists every error as `{rule, path, steps?, message}`: the rule's id, the file,
+the flow steps when the rule names any, and what is wrong. There is no
+`handle` or `step` field. Every failure a file can have is an issue of that one
+error: a file that does not parse or fails its contract, a flow the server's
+flow rules refuse, a connection that disagrees with a schema or flow, and a
+variable the environment lacks (`environment/missing-variable`, one issue per
+file that references it). The hint says to fix the files and re-run, and for a
+literal `client_secret` (`connection/literal-secret`) to publish it with
+`variable set NAME --secret` and reference it as `"${{ NAME }}"`. Warnings in
+`warnings` start with the file's path. The server still applies its own
+release rules when the build is submitted, such as handles being unique, so a
+passing dry run does not promise the release is accepted.
+
+A flow is matched to a local schema by the schema's `objectType`, its `$id`, an
+id `.zitadel/state.json` records for it, or, for a schema with no `$id`, the
+file name at the end of the flow's `user_schema` URL (a schema file that only
+points at an external schema is matched by name alone). The flow and sign-in
+rules apply to every flow a schema matches this way.
+
+`pull` writes `.zitadel/` from the schema and flow revisions a release pins. It
+fetches every revision before it writes a file, and refuses, writing nothing,
+when a pinned handle cannot be a file name (`E_VALIDATION`), when two broken
+files in `.zitadel/` hold the same handle (`E_CONFLICT`), or when two pinned
+handles would be written to one file (`E_CONFLICT`).
+`policies test` reads every file under `.zitadel/policies/`; a file that is not
+valid JSON is listed, as text, in `details.issues` of its `E_VALIDATION`
+(naming one operation limits that to its own files).
 
 An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
 app's session in a cookie of its own project, `zitadel_session_<project id>`

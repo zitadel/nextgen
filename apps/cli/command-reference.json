@@ -1923,6 +1923,12 @@
       "args": [],
       "flags": [
         {
+          "name": "force",
+          "char": "f",
+          "description": "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "message",
           "char": "m",
           "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
@@ -1946,6 +1952,9 @@
         },
         {
           "command": "deploy --dry-run"
+        },
+        {
+          "command": "deploy -m 'move users to the new schema' --force"
         }
       ]
     },
