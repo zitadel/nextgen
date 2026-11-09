@@ -77,6 +77,7 @@ export default class Console extends BaseCommand {
           signed_in_as: admin.email,
           dry_run: true,
         },
+        summary: { title: "Local console sign-in link", sections: [] },
       });
     }
 
@@ -87,9 +88,6 @@ export default class Console extends BaseCommand {
     consola.log(signInUrl);
     const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
-    if (!opened) {
-      consola.info("Open the link above. It works once; run this command again for a new one.");
-    }
 
     return this.emit({
       status: "ok",
@@ -99,6 +97,8 @@ export default class Console extends BaseCommand {
         sign_in_url: signInUrl,
         browser_opened: opened,
       },
+      summary: { title: "Local console sign-in link", sections: [] },
+      // The one place it says the link works once, as the link is above it.
       next: {
         actions: [
           `The link signs you in once. Run ${this.suggestUnscoped("console")} again for a fresh one.`,

@@ -14,7 +14,9 @@ import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/p
 import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { normalizePublicCliCommand } from "@/lib/public-cli";
 import { isLoopbackUrl } from "@/lib/server";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 
@@ -222,17 +224,20 @@ export default class Claim extends EnvironmentCommand {
           : "Wait for the link to be used to claim this project";
       this.recordTelemetry({ claim_outcome: "dry_run" });
 
+      const would =
+        localRecord && !flags.noWait
+          ? `${action}, then record the owning team in .zitadel/secret.`
+          : `${action}.`;
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data: {
           title: "Zitadel claim was not started.",
           project_id: projectId,
-          would:
-            localRecord && !flags.noWait
-              ? `${action}, then record the owning team in .zitadel/secret.`
-              : `${action}.`,
+          would,
         },
+        summary: { title: "Dry run, nothing was claimed", sections: [], lines: [would] },
         next: {
           commands: [
             flags.challengeId === undefined
@@ -359,6 +364,17 @@ export default class Claim extends EnvironmentCommand {
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
       },
+      // The link sits under the sentence that introduces it, as one step.
+      summary: {
+        title: "Your project is now permanent",
+        sections: [],
+        next: [
+          {
+            text: "Manage your project and collaborate in the Console:",
+            command: escapeControlCharacters(completed.dashboard_url),
+          },
+        ],
+      },
       next: {
         actions: ["Manage your project and collaborate in the Console:", completed.dashboard_url],
       },
@@ -448,6 +464,7 @@ export default class Claim extends EnvironmentCommand {
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
+    const wait = this.suggest(`claim --challenge-id ${challenge.challenge_id}`);
 
     return this.emit({
       status: "ok",
@@ -458,9 +475,20 @@ export default class Claim extends EnvironmentCommand {
         challenge_id: challenge.challenge_id,
         expires_at: challenge.expires_at,
       },
+      // The command sits under the sentence that introduces it, as one step.
+      summary: {
+        title: "Open the link in a browser to make your project permanent",
+        sections: [],
+        next: [
+          {
+            text: "Wait for the browser step to finish with:",
+            command: normalizePublicCliCommand(wait, this.cliVersion),
+          },
+        ],
+      },
       next: {
         actions: ["Wait for the browser step to finish with:"],
-        commands: [this.suggest(`claim --challenge-id ${challenge.challenge_id}`)],
+        commands: [wait],
       },
     });
   }
@@ -483,6 +511,7 @@ export default class Claim extends EnvironmentCommand {
       status: "skipped",
       reason: "already-claimed",
       data: { title: "Zitadel project already belongs to a team.", ...data },
+      summary: { title: "This project already belongs to a team", sections: [] },
     });
   }
 }
