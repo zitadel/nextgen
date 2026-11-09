@@ -3,8 +3,6 @@
  * each kind of file lives.
  */
 
-import type { SkippedRegion } from "@/lib/zitadel/resources/flows/types";
-
 /**
  * A parsed JSON object, as a configuration file holds at its root.
  */
@@ -49,21 +47,3 @@ export type ConfigFile = Readonly<{
  * Every file of the configuration, by kind.
  */
 export type ConfigFiles = Readonly<Record<ConfigKind, readonly ConfigFile[]>>;
-
-/**
- * What an edit made of a document.
- */
-export type EditResult = Readonly<{
-  /**
-   * The document's body after the edit.
-   */
-  body: JsonObject;
-  /**
-   * False when the edit changed nothing, which makes a rerun a no-op.
-   */
-  changed: boolean;
-  /**
-   * The regions the edit left alone because they were changed by hand.
-   */
-  skipped: readonly SkippedRegion[];
-}>;

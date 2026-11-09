@@ -1,7 +1,7 @@
 import { Change, type Notice } from "@/lib/zitadel/change";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import { NoSignInLeftError } from "@/lib/zitadel/errors";
-import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/resources/flows/checks";
+import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import {
   type ForceOptions,
@@ -33,7 +33,7 @@ export class Schemas extends Collection<UserSchema> {
    * @throws {@link BrokenFlowsError} When a flow would stop validating.
    */
   enable(schema: UserSchema, method: ToggleableMethod): Change {
-    const edited = schema.withMethod(method);
+    const edited = schema.withMethod(method).document;
     const edit = { before: this.config, after: this.config.with(edited), original: schema, edited };
     assertFlowsIntact(edit);
     return new Change({
@@ -57,7 +57,7 @@ export class Schemas extends Collection<UserSchema> {
    *   `force` is not set.
    */
   disable(schema: UserSchema, method: ToggleableMethod, options: ForceOptions = {}): Change {
-    const edited = schema.withoutMethod(method);
+    const edited = schema.withoutMethod(method).document;
     const edit = { before: this.config, after: this.config.with(edited), original: schema, edited };
     assertMethodUnused(edit, method);
     this.assertSignInLeft(edit, method, options.force === true);

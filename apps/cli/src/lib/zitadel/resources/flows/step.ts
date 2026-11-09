@@ -1,48 +1,11 @@
 import { type StepName, stepName } from "@/lib/zitadel/names";
+import {
+  COLLISION_OUTCOME,
+  type StepAction,
+  type Transition,
+} from "@/lib/zitadel/resources/flows/types";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
-
-/**
- * One transition out of a step: what fires it, and where it goes.
- */
-export type Transition = Readonly<{
-  /**
-   * The outcome that fires it, such as `sso_authenticated`.
-   */
-  outcome: string;
-  /**
-   * The step it goes to; empty when it names none.
-   */
-  target: string;
-  /**
-   * `switch` or `pivot` for a transition to another flow; `null` within this one.
-   */
-  action: string | null;
-  /**
-   * The purpose it re-purposes to, or `null`.
-   */
-  purpose: string | null;
-}>;
-
-/**
- * One action a step declares.
- */
-export type StepAction = Readonly<{
-  /**
-   * The action's name, as the step's outcomes refer to it.
-   */
-  name: string;
-  /**
-   * What the action does, such as `passkey`.
-   */
-  kind: string;
-}>;
-
-/**
- * The outcome the engine raises when a provider's sign-in collides with an
- * existing account.
- */
-const COLLISION_OUTCOME = "user_already_exists";
+import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
  * One step of a login flow, read-only: the questions the rules ask of it.
@@ -92,22 +55,6 @@ export class Step {
   }
 
   /**
-   * The providers listed more than once, which offers their button twice.
-   *
-   * @returns Each repeated provider once, in the order first repeated.
-   */
-  get repeatedProviders(): readonly string[] {
-    const providers = this.providers;
-    return [
-      ...new Set(
-        providers.filter((provider, index) => {
-          return providers.indexOf(provider) !== index;
-        }),
-      ),
-    ];
-  }
-
-  /**
    * The fields the step asks for, as written.
    *
    * @returns The strings listed, in order; none when there is no list.
@@ -126,13 +73,14 @@ export class Step {
    * @returns Each action that is an object, in order; none when there is no list.
    */
   get actions(): readonly StepAction[] {
-    const actions: readonly unknown[] = Array.isArray(this.body.actions) ? this.body.actions : [];
-    return actions.filter(isJsonObject).map((action) => {
+    return listAt(this.body, "actions")
+      .filter(isJsonObject)
+      .map((action) => {
       return {
         name: typeof action.name === "string" ? action.name : String(action.name),
         kind: typeof action.kind === "string" ? action.kind : String(action.kind),
       };
-    });
+      });
   }
 
   /**

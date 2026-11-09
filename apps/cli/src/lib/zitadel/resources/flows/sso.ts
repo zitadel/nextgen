@@ -9,9 +9,12 @@
  * because silently rewriting it would discard deliberate work.
  *
  * @remarks
- * The flow edit works on a private copy that it changes step by step, because
- * that is how it decides what is hand-edited; the copy never escapes before it
- * is finished.
+ * Only {@link Flow} uses this module: its `withProvider` and `withoutProvider`
+ * are the edits, and its `assertProviderEditable` the refusal. It is kept out
+ * of the class because it is the generator, as long again as the class. The
+ * flow edit works on a private copy that it changes step by step, because that
+ * is how it decides what is hand-edited; the copy never escapes before it is
+ * finished.
  */
 
 import { isDeepStrictEqual } from "node:util";
@@ -20,9 +23,10 @@ import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { RefusedEditError } from "@/lib/zitadel/errors";
-import type { EditResult, JsonObject } from "@/lib/zitadel/types";
+import type { Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
+import { REGISTER_SSO_STEP, SSO_CONFLICT_STEP } from "@/lib/zitadel/resources/flows/types";
 import type { EnabledMethods } from "@/lib/zitadel/resources/schemas/types";
-import type { SkippedRegion } from "@/lib/zitadel/resources/flows/types";
+import type { JsonObject } from "@/lib/zitadel/types";
 import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
@@ -32,16 +36,6 @@ import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/j
  * Never handed out before it is done.
  */
 type Draft = Record<string, unknown>;
-
-/**
- * The step the engine sends a new external identity to.
- */
-const REGISTER_SSO = "register-sso";
-
-/**
- * The step shown when the provider's email already has an account.
- */
-const SSO_CONFLICT = "sso-conflict";
 
 /**
  * The step that asks the identified user for a password.
@@ -148,8 +142,8 @@ function loginEntry(flow: JsonObject): string | undefined {
 function providerOutcomes(terminal: string): Readonly<Record<string, string>> {
   return {
     sso_authenticated: terminal,
-    sso_user_not_found: REGISTER_SSO,
-    user_already_exists: SSO_CONFLICT,
+    sso_user_not_found: REGISTER_SSO_STEP,
+    user_already_exists: SSO_CONFLICT_STEP,
   };
 }
 
@@ -246,13 +240,17 @@ export function flowEditRefusal(flow: JsonObject): string | undefined {
  *
  * @param flow - The flow.
  * @param slug - The provider to remove.
- * @returns The flow without the provider.
+ * @returns The edit: the flow without the provider, or the flow it was given
+ *   when no step offers it.
  */
-export function removeSsoFromFlow(flow: JsonObject, slug: string): EditResult {
-  if (!offersProvider(flow, slug)) {
-    return { body: flow, changed: false, skipped: [] };
+export function removeSsoFromFlow(flow: JsonObject, slug: string): Edit<JsonObject> {
+  const offered = stepsOf(flow).some((step) => {
+    return listAt(step, "sso_providers").includes(slug);
+  });
+  if (!offered) {
+    return { document: flow, changed: false, skipped: [] };
   }
-  const body = structuredClone({
+  const document = structuredClone({
     ...flow,
     steps: listAt(flow, "steps").map((step) => {
       if (
@@ -272,42 +270,7 @@ export function removeSsoFromFlow(flow: JsonObject, slug: string): EditResult {
       return { ...step, sso_providers: providers };
     }),
   });
-  return { body, changed: true, skipped: [] };
-}
-
-/**
- * Whether any step of a flow offers a provider.
- *
- * @param flow - The flow.
- * @param slug - The provider, or none for any provider at all.
- * @returns Whether a step offers it.
- */
-export function offersProvider(flow: JsonObject, slug?: string): boolean {
-  return stepsOf(flow).some((step) => {
-    if (!Array.isArray(step.sso_providers)) {
-      return false;
-    }
-    if (slug === undefined) {
-      return step.sso_providers.length > 0;
-    }
-    return step.sso_providers.includes(slug);
-  });
-}
-
-/**
- * The steps enabling a provider adds that a flow carries, by name.
- *
- * @remarks
- * They cannot be told apart from a developer's own, so disabling keeps them
- * and names them.
- *
- * @param flow - The flow.
- * @returns The names of the generated steps it has.
- */
-export function generatedSsoSteps(flow: JsonObject): string[] {
-  return [REGISTER_SSO, SSO_CONFLICT].filter((name) => {
-    return stepNamed(flow, name) !== undefined;
-  });
+  return { document, changed: true, skipped: [] };
 }
 
 /**
@@ -317,7 +280,8 @@ export function generatedSsoSteps(flow: JsonObject): string[] {
  * @param slug - The provider to offer.
  * @param enabled - The methods the target schema enables, which decide what
  *   the conflict step may offer.
- * @returns The flow offering the provider, and what was left alone.
+ * @returns The edit: the flow offering the provider, or the flow it was given
+ *   when it already does, and what was left alone.
  * @throws {@link RefusedEditError} When a step the edit writes has an action
  *   named like an outcome it writes there, or renaming a legacy outcome would
  *   drop a route the author wrote.
@@ -326,7 +290,7 @@ export function addSsoToFlow(
   flow: JsonObject,
   slug: ConnectionSlug,
   enabled: EnabledMethods,
-): EditResult {
+): Edit<JsonObject> {
   const document: Draft = structuredClone({ ...flow });
   // Before any rewrite, so a refused flow is never half edited.
   refuseOutcomeActionCollision(document);
@@ -388,10 +352,10 @@ export function addSsoToFlow(
   if (registerPassword !== undefined) {
     const transitions = objectAt(registerPassword, "transitions");
     const current = transitions.user_already_exists;
-    if (!isJsonObject(current) || current.target !== SSO_CONFLICT) {
+    if (!isJsonObject(current) || current.target !== SSO_CONFLICT_STEP) {
       registerPassword.transitions = {
         ...transitions,
-        user_already_exists: { target: SSO_CONFLICT },
+        user_already_exists: { target: SSO_CONFLICT_STEP },
       };
     }
   }
@@ -402,12 +366,12 @@ export function addSsoToFlow(
   // off is still the generator's own output once passkey is on.
   const wanted = [
     {
-      name: REGISTER_SSO,
+      name: REGISTER_SSO_STEP,
       step: registerSsoStep(registrationFields(document), terminal),
       earlier: [],
     },
     {
-      name: SSO_CONFLICT,
+      name: SSO_CONFLICT_STEP,
       step: ssoConflictStep(slug, enabled, login, terminal),
       earlier: [true, false].flatMap((usesPassword) => {
         return [true, false].map((usesPasskey) => {
@@ -458,11 +422,10 @@ export function addSsoToFlow(
   }
   document.steps = list;
 
-  const changed = !isDeepStrictEqual(document, flow);
-  if (!changed && skipped.length === 0) {
-    return { body: flow, changed: false, skipped };
+  if (isDeepStrictEqual(document, flow)) {
+    return { document: flow, changed: false, skipped };
   }
-  return { body: document, changed, skipped };
+  return { document, changed: true, skipped };
 }
 
 /**
@@ -525,15 +488,15 @@ function registrationFields(flow: JsonObject): string[] {
  */
 function registerSsoStep(fields: readonly string[], terminal: string): Draft {
   return {
-    name: REGISTER_SSO,
+    name: REGISTER_SSO_STEP,
     fields: [...fields],
     actions: [
-      { name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO}.action.submit` },
+      { name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO_STEP}.action.submit` },
     ],
     on_success: "create_user_with_sso",
     transitions: {
       submit: { target: terminal },
-      user_already_exists: { target: SSO_CONFLICT },
+      user_already_exists: { target: SSO_CONFLICT_STEP },
     },
   };
 }
@@ -564,7 +527,7 @@ function ssoConflictStep(
             name: "submit",
             kind: "submit",
             primary: true,
-            text_key: `${SSO_CONFLICT}.action.submit`,
+            text_key: `${SSO_CONFLICT_STEP}.action.submit`,
           },
         ]
       : []),
@@ -574,7 +537,7 @@ function ssoConflictStep(
             name: "passkey",
             kind: "passkey",
             primary: false,
-            text_key: `${SSO_CONFLICT}.action.passkey`,
+            text_key: `${SSO_CONFLICT_STEP}.action.passkey`,
           },
         ]
       : []),
@@ -585,7 +548,7 @@ function ssoConflictStep(
             name: "sign_in",
             kind: "navigate",
             primary: false,
-            text_key: `${SSO_CONFLICT}.action.sign_in`,
+            text_key: `${SSO_CONFLICT_STEP}.action.sign_in`,
           },
         ]),
   ];
@@ -593,12 +556,12 @@ function ssoConflictStep(
     ...(methods.password ? { submit: { target: terminal } } : {}),
     ...(methods.passkey ? { passkey: { target: terminal } } : {}),
     sso_authenticated: { target: terminal },
-    user_already_exists: { target: SSO_CONFLICT },
+    user_already_exists: { target: SSO_CONFLICT_STEP },
     ...(loginStep === undefined ? {} : { sign_in: { target: loginStep, purpose: "login" } }),
-    sso_user_not_found: { target: REGISTER_SSO },
+    sso_user_not_found: { target: REGISTER_SSO_STEP },
   };
   return {
-    name: SSO_CONFLICT,
+    name: SSO_CONFLICT_STEP,
     fields: methods.password ? ["x-auth-methods#password"] : [],
     actions,
     sso_providers: [slug],
@@ -816,8 +779,8 @@ function refuseOutcomeActionCollision(document: JsonObject): void {
     ...providerSteps(document).map((name) => {
       return { name, keys: outcomes };
     }),
-    { name: SSO_CONFLICT, keys: outcomes },
-    { name: REGISTER_SSO, keys: ["user_already_exists"] },
+    { name: SSO_CONFLICT_STEP, keys: outcomes },
+    { name: REGISTER_SSO_STEP, keys: ["user_already_exists"] },
     { name: REGISTER_PASSWORD_STEP, keys: ["user_already_exists"] },
   ];
   // A step can be listed twice (a provider step named `register-password`), so

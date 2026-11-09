@@ -1,6 +1,7 @@
 import { brandingConfigSchema } from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
 
+import { DEFAULT_TEMPLATE_PATH, LEGACY_TEMPLATE_FILE_KEY } from "@/lib/zitadel/resources/branding/types";
 import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
 import { ConfigError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
@@ -8,26 +9,16 @@ import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
- * The key descriptors used before `$file` references.
- *
- * @remarks
- * Still recognised, so the finding can say how to migrate instead of
- * reporting an unknown key.
- */
-const LEGACY_TEMPLATE_FILE_KEY = "liquid_template_file";
-
-/**
- * Where a legacy descriptor's template is taken to be when its key does not
- * name a path.
- */
-const DEFAULT_TEMPLATE_PATH = "./login.liquid";
-
-/**
  * A branding descriptor under `.zitadel/branding/`: the login's layout, its
  * asset URLs, and its template, inline or behind a `$file` reference to a file
  * beside it.
  */
 export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+  /**
+   * What kind of document this is: a branding descriptor.
+   */
+  readonly kind = "branding";
+
   /**
    * Hold a descriptor's body at its path.
    *

@@ -36,6 +36,22 @@ export type EnabledMethods = Readonly<{
 }>;
 
 /**
+ * The longest provider slug a schema can name.
+ */
+export const MAX_SLUG_LENGTH = 64;
+
+/**
+ * The shape of a provider slug a schema can name.
+ */
+export const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+
+/**
+ * A method `x-auth-methods` holds an entry for that an edit writes: one
+ * switched by a flag alone, or SSO, which a provider edit switches.
+ */
+export type EditedMethod = ToggleableMethod | "sso";
+
+/**
  * An edit to one user schema, and the configuration before and after it.
  */
 export type SchemaEdit = Readonly<{

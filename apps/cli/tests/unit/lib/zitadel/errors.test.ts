@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BrokenFlowsError, NoSignInLeftError } from "@/lib/zitadel";
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
+import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
 const FLOW_PATH = ".zitadel/flows/login.json";

@@ -107,7 +107,7 @@ function editOf(config: ZitadelConfig, change: (schema: UserSchema) => UserSchem
  */
 function toggled(config: ZitadelConfig, method: ToggleableMethod, enabled: boolean): SchemaEdit {
   return editOf(config, (schema) => {
-    return enabled ? schema.withMethod(method) : schema.withoutMethod(method);
+    return enabled ? schema.withMethod(method).document : schema.withoutMethod(method).document;
   });
 }
 
@@ -524,7 +524,7 @@ describe("Schemas.assertSignInLeft", () => {
   it("names the provider being removed", () => {
     const config = configOf(schemaBody({ sso: { enabled: true, providers: ["google"] } }));
     const edit = editOf(config, (schema) => {
-      return schema.withoutProvider("google");
+      return schema.withoutProvider("google").document;
     });
 
     expect(refusalOf(edit, "google").disabling).toBe("google");

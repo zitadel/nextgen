@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BrokenFlowsError, ZitadelConfig } from "@/lib/zitadel";
-import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/resources/flows/checks";
+import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
 import type { JsonObject } from "@/lib/zitadel/types";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -67,7 +67,9 @@ function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolea
   if (original === undefined) {
     throw new Error("the configuration has no schema");
   }
-  const edited = enabled ? original.withMethod(method) : original.withoutMethod(method);
+  const edited = enabled
+    ? original.withMethod(method).document
+    : original.withoutMethod(method).document;
   return { before: config, after: config.with(edited), original, edited };
 }
 

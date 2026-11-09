@@ -2,37 +2,17 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { Collection } from "@/lib/zitadel/resources/collection";
 import { NotFoundError } from "@/lib/zitadel/errors";
-import { assertFlowsIntact } from "@/lib/zitadel/resources/flows/checks";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
-import type { Offer, SignUpGap } from "@/lib/zitadel/resources/flows/types";
+import {
+  type Offer,
+  type SignUpGap,
+  SSO_OUTCOMES,
+  type Visit,
+} from "@/lib/zitadel/resources/flows/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
-
-/**
- * The outcomes a provider sign-in can end in, which carry the provider to the
- * next step.
- */
-const SSO_OUTCOMES: ReadonlySet<string> = new Set([
-  "sso_authenticated",
-  "sso_user_not_found",
-  "user_already_exists",
-]);
-
-/**
- * A step reached while walking a flow, and the provider chosen on the way
- * there.
- */
-type Visit = Readonly<{
-  /**
-   * The step reached.
-   */
-  step: Step;
-
-  /**
-   * The provider chosen on the way, or an empty string when none was.
-   */
-  provider: string;
-}>;
+import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
+import { walk } from "@/lib/zitadel/utils/graph";
 
 /**
  * The login flows under `.zitadel/flows/`, the user schema each runs against,
@@ -165,9 +145,9 @@ export class Flows extends Collection<Flow> {
       flow.assertProviderEditable();
     }
     if (slug !== undefined) {
-      const edited = schema.withProvider(slug);
+      const edited = schema.withProvider(slug).document;
       const after = flows.reduce((current, flow) => {
-        return current.with(flow.withProvider(slug, schema.enabledMethods));
+        return current.with(flow.withProvider(slug, schema.enabledMethods).document);
       }, this.config.with(edited));
       assertFlowsIntact({ before: this.config, after, original: schema, edited });
     }
@@ -195,26 +175,16 @@ export class Flows extends Collection<Flow> {
       }
       return step;
     };
-    const queue: Visit[] = flow.entrySteps.flatMap((name) => {
-      const step = unasked(name);
-      if (step === undefined) {
-        return [];
-      }
-      return [{ step, provider: "" }];
-    });
-    const seen = new Map<string, Visit>();
-    while (queue.length > 0) {
-      const from = queue.shift();
-      if (from === undefined) {
-        break;
-      }
-      const key = JSON.stringify([from.step.name, from.provider]);
-      if (seen.has(key)) {
-        continue;
-      }
-      seen.set(key, from);
-      queue.push(
-        ...from.step.transitions.flatMap((transition): Visit[] => {
+    const visits = walk(
+      flow.entrySteps.flatMap((name): Visit[] => {
+        const step = unasked(name);
+        if (step === undefined) {
+          return [];
+        }
+        return [{ step, provider: "" }];
+      }),
+      (from) => {
+        return from.step.transitions.flatMap((transition): Visit[] => {
           const next = unasked(transition.target);
           if (next === undefined) {
             return [];
@@ -225,11 +195,14 @@ export class Flows extends Collection<Flow> {
             });
           }
           return [{ step: next, provider: from.provider }];
-        }),
-      );
-    }
+        });
+      },
+      (visit) => {
+        return JSON.stringify([visit.step.name, visit.provider]);
+      },
+    );
     const top = path.split(".")[0] ?? path;
-    return [...seen.values()].flatMap((visit) => {
+    return visits.flatMap((visit) => {
       const connection = this.config.connections.find(visit.provider);
       if (
         !visit.step.createsUserFromSso ||

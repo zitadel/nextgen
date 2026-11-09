@@ -186,7 +186,7 @@ const reference = objectOf(
 
 describe("applySsoToFlow", () => {
   it("produces the flow the design documents", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
 
     // The reference carries a $schema pointer the shipped flow does not,
     // which is not this generator's doing.
@@ -196,7 +196,7 @@ describe("applySsoToFlow", () => {
   });
 
   it("offers the provider on the steps that can start a sign-in", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
     const byName = new Map(
       stepsOf(document).map((step) => {
         return [step.name, step];
@@ -211,7 +211,7 @@ describe("applySsoToFlow", () => {
   });
 
   it("routes the three outcomes a provider return can produce", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
     const targets = targetsOf(document, "identifier");
 
     expect(targets.sso_authenticated).toBe("done");
@@ -225,7 +225,7 @@ describe("applySsoToFlow", () => {
   it("retargets the shared outcome on both registration steps", () => {
     // The colliding account may be SSO-only, so the password step would
     // dead-end it; the conflict step offers every way back in.
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
     for (const name of ["register", "register-password"]) {
       expect(targetsOf(document, name).user_already_exists).toBe("sso-conflict");
     }
@@ -234,7 +234,7 @@ describe("applySsoToFlow", () => {
   });
 
   it("offers only the methods the schema enables on the conflict step", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), {
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), {
       password: false,
       passkey: true,
     });
@@ -252,7 +252,7 @@ describe("applySsoToFlow", () => {
     const passkeyFirst = getDefaultLoginFlow({ useCase: "minimal", preset: "passkey-first" });
     const entry = objectAt(objectOf(passkeyFirst), "purposes").login;
 
-    const { body: document } = addSsoToFlow(passkeyFirst, slug("google"), bothMethods);
+    const { document } = addSsoToFlow(passkeyFirst, slug("google"), bothMethods);
 
     expect(entry).not.toBe("identifier");
     expect(targetsOf(document, "sso-conflict").sign_in).toBe(entry);
@@ -261,18 +261,18 @@ describe("applySsoToFlow", () => {
   it("offers a second provider on every step that already had the first", () => {
     const first = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
 
-    const second = addSsoToFlow(first.body, slug("github"), bothMethods);
+    const second = addSsoToFlow(first.document, slug("github"), bothMethods);
 
     expect(second.changed).toBe(true);
     // Nothing was hand-edited — the generator wrote every one of these.
     expect(second.skipped).toEqual([]);
     for (const step of ["identifier", "register", "sso-conflict"]) {
-      expect(stepNamed(second.body, step).sso_providers, step).toEqual(["google", "github"]);
+      expect(stepNamed(second.document, step).sso_providers, step).toEqual(["google", "github"]);
     }
   });
 
   it("does not offer providers on the step that collects what the provider missed", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
 
     expect(stepNamed(document, "register-sso").sso_providers).toBeUndefined();
   });
@@ -297,7 +297,7 @@ describe("applySsoToFlow", () => {
           }),
       );
     };
-    const reserialised = objectOf(sortDeep(first.body));
+    const reserialised = objectOf(sortDeep(first.document));
 
     expect(addSsoToFlow(reserialised, slug("google"), bothMethods).skipped).toEqual([]);
   });
@@ -315,7 +315,7 @@ describe("applySsoToFlow", () => {
       ],
     };
 
-    const { body: document } = addSsoToFlow(registerOnly, slug("google"), bothMethods);
+    const { document } = addSsoToFlow(registerOnly, slug("google"), bothMethods);
     const conflict = stepNamed(document, "sso-conflict");
 
     expect(conflict.transitions).not.toHaveProperty("sign_in");
@@ -324,11 +324,11 @@ describe("applySsoToFlow", () => {
 
   it("is a no-op the second time", () => {
     const first = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
-    const second = addSsoToFlow(first.body, slug("google"), bothMethods);
+    const second = addSsoToFlow(first.document, slug("google"), bothMethods);
 
     expect(second.changed).toBe(false);
     expect(second.skipped).toEqual([]);
-    expect(second.body).toEqual(first.body);
+    expect(second.document).toEqual(first.document);
   });
 
   it.each([
@@ -341,13 +341,13 @@ describe("applySsoToFlow", () => {
     ({ from, to }) => {
       const first = addSsoToFlow(shippedFlow(), slug("google"), from);
 
-      const second = addSsoToFlow(first.body, slug("google"), to);
+      const second = addSsoToFlow(first.document, slug("google"), to);
       const fresh = addSsoToFlow(shippedFlow(), slug("google"), to);
 
       expect(second.skipped).toEqual([]);
       expect(second.changed).toBe(true);
-      expect(stepNamed(second.body, "sso-conflict")).toEqual(
-        stepNamed(fresh.body, "sso-conflict"),
+      expect(stepNamed(second.document, "sso-conflict")).toEqual(
+        stepNamed(fresh.document, "sso-conflict"),
       );
     },
   );
@@ -363,10 +363,10 @@ describe("applySsoToFlow", () => {
       });
     };
 
-    const second = addSsoToFlow(first.body, slug("github"), bothMethods);
+    const second = addSsoToFlow(first.document, slug("github"), bothMethods);
 
-    expect(names(second.body)).toEqual(names(first.body));
-    expect(stepNamed(second.body, "sso-conflict").sso_providers).toEqual(["google", "github"]);
+    expect(names(second.document)).toEqual(names(first.document));
+    expect(stepNamed(second.document, "sso-conflict").sso_providers).toEqual(["google", "github"]);
   });
 
   it("still leaves a step that matches no combination of methods alone", () => {
@@ -374,7 +374,7 @@ describe("applySsoToFlow", () => {
       password: true,
       passkey: false,
     });
-    const edited = objectOf(structuredClone(first.body));
+    const edited = objectOf(structuredClone(first.document));
     stepNamed(edited, "sso-conflict").fields = ["email"];
 
     const second = addSsoToFlow(edited, slug("google"), bothMethods);
@@ -387,7 +387,7 @@ describe("applySsoToFlow", () => {
 
   it("leaves a hand-edited step alone and reports it", () => {
     const first = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
-    const edited = objectOf(structuredClone(first.body));
+    const edited = objectOf(structuredClone(first.document));
     stepNamed(edited, "sso-conflict").fields = ["email"];
 
     const second = addSsoToFlow(edited, slug("google"), bothMethods);
@@ -395,7 +395,7 @@ describe("applySsoToFlow", () => {
     expect(second.skipped).toEqual([
       { step: "sso-conflict", region: "steps.sso-conflict", reason: "hand-edited" },
     ]);
-    expect(stepNamed(second.body, "sso-conflict").fields).toEqual(["email"]);
+    expect(stepNamed(second.document, "sso-conflict").fields).toEqual(["email"]);
   });
 
   /**
@@ -405,7 +405,7 @@ describe("applySsoToFlow", () => {
    */
   function previousCliFlow(): Record<string, unknown> {
     const legacy = objectOf(
-      structuredClone(addSsoToFlow(shippedFlow(), slug("google"), bothMethods).body),
+      structuredClone(addSsoToFlow(shippedFlow(), slug("google"), bothMethods).document),
     );
     for (const step of stepsOf(legacy)) {
       const transitions = step.transitions;
@@ -446,13 +446,13 @@ describe("applySsoToFlow", () => {
 
     const second = addSsoToFlow(legacy, slug("github"), bothMethods);
 
-    expect(oldKeysIn(second.body)).toEqual([]);
+    expect(oldKeysIn(second.document)).toEqual([]);
     // After the rename the generated steps match the template again.
     expect(second.skipped).toEqual([]);
     for (const step of ["identifier", "register", "sso-conflict"]) {
-      expect(stepNamed(second.body, step).sso_providers, step).toEqual(["google", "github"]);
-      expect(targetsOf(second.body, step).sso_authenticated, step).toBe("done");
-      expect(targetsOf(second.body, step).sso_user_not_found, step).toBe("register-sso");
+      expect(stepNamed(second.document, step).sso_providers, step).toEqual(["google", "github"]);
+      expect(targetsOf(second.document, step).sso_authenticated, step).toBe("done");
+      expect(targetsOf(second.document, step).sso_user_not_found, step).toBe("register-sso");
     }
   });
 
@@ -465,9 +465,9 @@ describe("applySsoToFlow", () => {
     expect(second.skipped).toEqual([
       { step: "sso-conflict", region: "steps.sso-conflict", reason: "hand-edited" },
     ]);
-    expect(stepNamed(second.body, "sso-conflict").fields).toEqual(["email"]);
-    expect(oldKeysIn(second.body)).toEqual([]);
-    expect(targetsOf(second.body, "sso-conflict").sso_authenticated).toBe("done");
+    expect(stepNamed(second.document, "sso-conflict").fields).toEqual(["email"]);
+    expect(oldKeysIn(second.document)).toEqual([]);
+    expect(targetsOf(second.document, "sso-conflict").sso_authenticated).toBe("done");
   });
 
   it("keeps an action transition named like a legacy outcome", () => {
@@ -478,7 +478,7 @@ describe("applySsoToFlow", () => {
     register.actions = [...listAt(register, "actions"), { name: "callback", kind: "submit" }];
     const ownTarget = transitionsOf(register).callback;
 
-    const { body: document } = addSsoToFlow(legacy, slug("google"), bothMethods);
+    const { document } = addSsoToFlow(legacy, slug("google"), bothMethods);
 
     expect(transitionsOf(stepNamed(document, "register")).callback).toEqual(ownTarget);
     expect(targetsOf(document, "identifier").callback).toBeUndefined();
@@ -618,13 +618,13 @@ describe("applySsoToFlow", () => {
     const legacy = previousCliFlow();
     transitionsOf(stepNamed(legacy, "identifier")).sso_authenticated = { target: "register" };
 
-    const { body: document } = addSsoToFlow(legacy, slug("google"), bothMethods);
+    const { document } = addSsoToFlow(legacy, slug("google"), bothMethods);
 
     expect(targetsOf(document, "identifier").callback).toBeUndefined();
   });
 
   it("adds the new steps before the terminal step", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
     const names = stepsOf(document).map((step) => {
       return step.name;
     });
@@ -643,7 +643,7 @@ describe("register-sso collects what registration collects", () => {
    */
   function ssoFields(useCase: SetupUseCase): readonly unknown[] {
     const flow = objectOf(getDefaultLoginFlow({ useCase }));
-    const { body: document } = addSsoToFlow(flow, slug("google"), bothMethods);
+    const { document } = addSsoToFlow(flow, slug("google"), bothMethods);
     return listAt(stepNamed(document, "register-sso"), "fields");
   }
 
@@ -682,7 +682,7 @@ describe("register-sso collects what registration collects", () => {
     const register = stepNamed(flow, "register");
     register.fields = ["email", "givenName"];
 
-    const { body: document } = addSsoToFlow(flow, slug("google"), bothMethods);
+    const { document } = addSsoToFlow(flow, slug("google"), bothMethods);
 
     expect(stepNamed(document, "register-sso").fields).toEqual(["email", "givenName"]);
   });
@@ -724,7 +724,7 @@ describe("the terminal the generated routes point at", () => {
     // A flow calling its terminal `complete` was valid before this edit.
     // Writing `done` would point every generated route at a step that does
     // not exist, and `validateFlowDefinition` rejects that on the next plan.
-    const { body: document } = addSsoToFlow(flowEndingAt("complete"), slug("google"), {
+    const { document } = addSsoToFlow(flowEndingAt("complete"), slug("google"), {
       password: true,
       passkey: false,
     });
@@ -735,7 +735,7 @@ describe("the terminal the generated routes point at", () => {
   });
 
   it("points every generated transition at a step the flow actually has", () => {
-    const { body: document } = addSsoToFlow(flowEndingAt("finished"), slug("google"), {
+    const { document } = addSsoToFlow(flowEndingAt("finished"), slug("google"), {
       password: false,
       passkey: true,
     });
@@ -754,7 +754,7 @@ describe("the terminal the generated routes point at", () => {
   });
 
   it("still uses `done` when that is what the flow calls its terminal", () => {
-    const { body: document } = addSsoToFlow(flowEndingAt("done"), slug("google"), {
+    const { document } = addSsoToFlow(flowEndingAt("done"), slug("google"), {
       password: true,
       passkey: false,
     });
@@ -793,7 +793,7 @@ describe("a hand-edited owned step", () => {
   it("is reported and left exactly as it was, provider list included", () => {
     // Adding the provider and then reporting the step as untouched was the
     // report contradicting itself: it says the step was left alone.
-    const { body: document, skipped } = addSsoToFlow(flowWithEditedConflict(), slug("google"), {
+    const { document, skipped } = addSsoToFlow(flowWithEditedConflict(), slug("google"), {
       password: true,
       passkey: true,
     });
@@ -808,7 +808,7 @@ describe("a hand-edited owned step", () => {
   it("still gains the provider when the step is the generator's own output", () => {
     // The merge exists for this case: a step holding only an earlier provider
     // must not read as hand-edited.
-    const { body: document, skipped } = addSsoToFlow(
+    const { document, skipped } = addSsoToFlow(
       {
         name: "custom",
         status: "active",
@@ -880,7 +880,7 @@ describe("refusing a document the editors would overwrite", () => {
     // no longer say `primary: false`. Without this the step read as hand-edited
     // and a second connection never reached it.
     const first = addSsoToFlow(shippedFlow(), slug("google"), { password: true, passkey: true });
-    const written = objectOf(JSON.parse(JSON.stringify(first.body)));
+    const written = objectOf(JSON.parse(JSON.stringify(first.document)));
     for (const step of stepsOf(written)) {
       for (const action of actionsOf(step)) {
         if (action.primary === false) {
@@ -893,7 +893,7 @@ describe("refusing a document the editors would overwrite", () => {
     });
     expect(stillDefaulted).toBe(false);
 
-    const { body: document, skipped } = addSsoToFlow(written, slug("acme-sso"), {
+    const { document, skipped } = addSsoToFlow(written, slug("acme-sso"), {
       password: true,
       passkey: true,
     });
@@ -904,7 +904,7 @@ describe("refusing a document the editors would overwrite", () => {
 
   it("still reports a step whose actions really were edited", () => {
     const first = addSsoToFlow(shippedFlow(), slug("google"), { password: true, passkey: true });
-    const written = objectOf(JSON.parse(JSON.stringify(first.body)));
+    const written = objectOf(JSON.parse(JSON.stringify(first.document)));
     // `primary: true` is not the default, so removing the generator's `false`
     // elsewhere must not make this one invisible.
     const passkey = actionsOf(stepNamed(written, "sso-conflict")).find((action) => {
@@ -935,7 +935,7 @@ describe("removeSsoFromFlow", () => {
    */
   function enabled(...slugs: string[]): Record<string, unknown> {
     return slugs.reduce((flow, name) => {
-      return objectOf(addSsoToFlow(flow, slug(name), bothMethods).body);
+      return objectOf(addSsoToFlow(flow, slug(name), bothMethods).document);
     }, shippedFlow());
   }
 
@@ -949,7 +949,7 @@ describe("removeSsoFromFlow", () => {
   });
 
   it("takes the provider off every step that offered it", () => {
-    const { body: document, changed } = removeSsoFromFlow(enabled("google"), "google");
+    const { document, changed } = removeSsoFromFlow(enabled("google"), "google");
 
     expect(changed).toBe(true);
     const offering = stepsOf(document).filter((step) => {
@@ -961,26 +961,26 @@ describe("removeSsoFromFlow", () => {
   it.each(PRESETS)(
     "takes the provider off the password step of the %s flow, which enabling also offers it on",
     (preset) => {
-      const flow = addSsoToFlow(getDefaultLoginFlow({ preset }), slug("google"), bothMethods).body;
+      const flow = addSsoToFlow(getDefaultLoginFlow({ preset }), slug("google"), bothMethods).document;
       expect(stepNamed(flow, "password").sso_providers).toEqual(["google"]);
 
-      const { body: document } = removeSsoFromFlow(flow, "google");
+      const { document } = removeSsoFromFlow(flow, "google");
 
       expect(stepNamed(document, "password").sso_providers).toBeUndefined();
     },
   );
 
   it("leaves the password step as enabling reads the shipped one, so enabling again edits it", () => {
-    const { body: document } = removeSsoFromFlow(enabled("google"), "google");
+    const { document } = removeSsoFromFlow(enabled("google"), "google");
 
     const again = addSsoToFlow(document, slug("google"), bothMethods);
 
     expect(again.skipped).toEqual([]);
-    expect(stepNamed(again.body, "password").sso_providers).toEqual(["google"]);
+    expect(stepNamed(again.document, "password").sso_providers).toEqual(["google"]);
   });
 
   it("keeps the other providers on each step", () => {
-    const { body: document } = removeSsoFromFlow(enabled("google", "github"), "google");
+    const { document } = removeSsoFromFlow(enabled("google", "github"), "google");
 
     expect(stepNamed(document, "identifier").sso_providers).toEqual(["github"]);
   });
@@ -988,7 +988,7 @@ describe("removeSsoFromFlow", () => {
   it("keeps the routes and steps sso enable added", () => {
     const before = enabled("google");
 
-    const { body: document } = removeSsoFromFlow(before, "google");
+    const { document } = removeSsoFromFlow(before, "google");
 
     expect(targetsOf(document, "identifier")).toEqual(targetsOf(before, "identifier"));
     expect(stepNamed(document, "sso-conflict")).toBeDefined();
@@ -998,7 +998,7 @@ describe("removeSsoFromFlow", () => {
     const flow = enabled("github");
 
     expect(removeSsoFromFlow(flow, "google")).toEqual({
-      body: flow,
+      document: flow,
       changed: false,
       skipped: [],
     });
@@ -1019,7 +1019,7 @@ describe.each([
    */
   function rewritten(): Record<string, unknown> {
     return serverCanonicalFlow(
-      objectOf(addSsoToFlow(shippedFlow(), slug("google"), methods).body),
+      objectOf(addSsoToFlow(shippedFlow(), slug("google"), methods).document),
     );
   }
 
@@ -1030,13 +1030,13 @@ describe.each([
   });
 
   it("adds the provider to the conflict step", () => {
-    const { body: document } = addSsoToFlow(rewritten(), slug("acme-sso"), methods);
+    const { document } = addSsoToFlow(rewritten(), slug("acme-sso"), methods);
 
     expect(stepNamed(document, "sso-conflict").sso_providers).toEqual(["google", "acme-sso"]);
   });
 
   it("adds the provider to the entry steps", () => {
-    const { body: document } = addSsoToFlow(rewritten(), slug("acme-sso"), methods);
+    const { document } = addSsoToFlow(rewritten(), slug("acme-sso"), methods);
 
     expect(stepNamed(document, "identifier").sso_providers).toEqual(["google", "acme-sso"]);
   });
@@ -1065,7 +1065,7 @@ describe("the password step", () => {
    * @returns The flow offering Google.
    */
   function enabled(flow: Record<string, unknown> = shippedFlow()): Record<string, unknown> {
-    return objectOf(addSsoToFlow(flow, slug("google"), bothMethods).body);
+    return objectOf(addSsoToFlow(flow, slug("google"), bothMethods).document);
   }
 
   /**
@@ -1097,14 +1097,14 @@ describe("the password step", () => {
   }
 
   it("offers the provider, so a user without a password has a way in", () => {
-    const { body: document, skipped } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document, skipped } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
 
     expect(stepNamed(document, "password").sso_providers).toEqual(["google"]);
     expect(skipped).toEqual([]);
   });
 
   it("routes what comes back from the provider like the entry steps do", () => {
-    const { body: document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
+    const { document } = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
 
     expect(targetsOf(document, "password")).toEqual({
       submit: "done",
@@ -1123,7 +1123,7 @@ describe("the password step", () => {
   });
 
   it("is recognised on the passkey-first preset too, and keeps its passkey action", () => {
-    const { body: document, skipped } = addSsoToFlow(
+    const { document, skipped } = addSsoToFlow(
       presetFlow("passkey-first"),
       slug("google"),
       bothMethods,
@@ -1135,18 +1135,18 @@ describe("the password step", () => {
 
   it("gains every provider the entry steps carry", () => {
     const first = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
-    const second = addSsoToFlow(first.body, slug("acme-sso"), bothMethods);
+    const second = addSsoToFlow(first.document, slug("acme-sso"), bothMethods);
 
-    expect(stepNamed(second.body, "password").sso_providers).toEqual(["google", "acme-sso"]);
+    expect(stepNamed(second.document, "password").sso_providers).toEqual(["google", "acme-sso"]);
     expect(second.skipped).toEqual([]);
   });
 
   it("changes nothing when the same provider is enabled again", () => {
     const first = addSsoToFlow(shippedFlow(), slug("google"), bothMethods);
-    const again = addSsoToFlow(first.body, slug("google"), bothMethods);
+    const again = addSsoToFlow(first.document, slug("google"), bothMethods);
 
     expect(again.changed).toBe(false);
-    expect(again.body).toEqual(first.body);
+    expect(again.document).toEqual(first.document);
   });
 
   describe("in a project enabled before the step offered providers", () => {
@@ -1164,14 +1164,14 @@ describe("the password step", () => {
     }
 
     it("is caught up with the provider already on the entry steps", () => {
-      const { body: document, changed } = addSsoToFlow(older(), slug("google"), bothMethods);
+      const { document, changed } = addSsoToFlow(older(), slug("google"), bothMethods);
 
       expect(changed).toBe(true);
       expect(stepNamed(document, "password").sso_providers).toEqual(["google"]);
     });
 
     it("is caught up with every provider the entry steps carry", () => {
-      const { body: document } = addSsoToFlow(older(), slug("acme-sso"), bothMethods);
+      const { document } = addSsoToFlow(older(), slug("acme-sso"), bothMethods);
 
       expect(stepNamed(document, "password").sso_providers).toEqual(["google", "acme-sso"]);
     });
@@ -1194,13 +1194,13 @@ describe("the password step", () => {
     });
 
     it("adds the next provider to the password step", () => {
-      const { body: document } = addSsoToFlow(rewritten(), slug("acme-sso"), bothMethods);
+      const { document } = addSsoToFlow(rewritten(), slug("acme-sso"), bothMethods);
 
       expect(stepNamed(document, "password").sso_providers).toEqual(["google", "acme-sso"]);
     });
 
     it("adds the next provider to the conflict step", () => {
-      const { body: document } = addSsoToFlow(rewritten(), slug("acme-sso"), bothMethods);
+      const { document } = addSsoToFlow(rewritten(), slug("acme-sso"), bothMethods);
 
       expect(stepNamed(document, "sso-conflict").sso_providers).toEqual(["google", "acme-sso"]);
     });
@@ -1222,7 +1222,7 @@ describe("the password step", () => {
       const flow = editedFlow();
       const before = structuredClone(stepNamed(flow, "password"));
 
-      const { body: document } = addSsoToFlow(flow, slug("google"), bothMethods);
+      const { document } = addSsoToFlow(flow, slug("google"), bothMethods);
 
       expect(stepNamed(document, "password")).toEqual(before);
     });
@@ -1236,7 +1236,7 @@ describe("the password step", () => {
     });
 
     it("still offers the provider where the generator owns the step", () => {
-      const { body: document } = addSsoToFlow(editedFlow(), slug("google"), bothMethods);
+      const { document } = addSsoToFlow(editedFlow(), slug("google"), bothMethods);
 
       expect(stepNamed(document, "identifier").sso_providers).toEqual(["google"]);
       expect(stepNamed(document, "register").sso_providers).toEqual(["google"]);
@@ -1258,7 +1258,7 @@ describe("the password step", () => {
       ["sso_user_not_found", { target: "register" }],
       ["sso_authenticated", { target: "done", purpose: "login" }],
     ])("does not take over a %s route the developer wrote as %j", (outcome, route) => {
-      const { body: document, skipped } = addSsoToFlow(
+      const { document, skipped } = addSsoToFlow(
         withPasswordRoute(outcome, route),
         slug("acme-sso"),
         bothMethods,

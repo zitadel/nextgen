@@ -183,7 +183,7 @@ export function signInOf(answers: {
   const slugs = answers.sso.map((draft) => providerOf(draft.selection).slug);
   const schema = slugs.reduce<Record<string, unknown>>(
     (document, slug) => {
-      return UserSchema.of({ path: "", body: document }).withProvider(slug).body;
+      return UserSchema.of({ path: "", body: document }).withProvider(slug).document.body;
     },
     getDefaultHumanUserSchemaBody({ preset: answers.preset, useCase: answers.useCase }) as Record<
       string,

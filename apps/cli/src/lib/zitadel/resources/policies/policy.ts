@@ -18,6 +18,11 @@ export const POLICY_TEST_SUFFIX = ".test.json";
  */
 export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
   /**
+   * What kind of document this is: an operation policy.
+   */
+  readonly kind = "policy";
+
+  /**
    * Hold a policy's body at its path.
    *
    * @param path - The project-relative path.
@@ -99,6 +104,11 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
  * runs, which a release never carries.
  */
 export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+  /**
+   * What kind of document this is: a policy's test file.
+   */
+  readonly kind = "policy-test";
+
   /**
    * Hold a test file's body at its path.
    *

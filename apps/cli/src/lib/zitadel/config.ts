@@ -21,7 +21,7 @@ import type { ConfigFiles } from "@/lib/zitadel/types";
  * Any document of the configuration that a collection holds and a change
  * writes.
  */
-export type AnyDocument = UserSchema | Flow | Connection | Policy | Branding;
+export type AnyDocument = UserSchema | Flow | Connection | Policy | PolicyTest | Branding;
 
 /**
  * What a configuration knows beyond its files, which the caller keeps
@@ -63,6 +63,14 @@ type Parts = Readonly<{
   removed: readonly AnyDocument[];
   options: ConfigOptions;
 }>;
+
+/**
+ * An edit to the documents of one kind: a list, and the document it places or
+ * leaves out.
+ *
+ * @typeParam T - The kind of document.
+ */
+type ListEdit = <T extends AnyDocument>(documents: readonly T[], document: T) => readonly T[];
 
 /**
  * A project's whole configuration under `.zitadel/`: its user schemas, login
@@ -256,26 +264,13 @@ export class ZitadelConfig {
    * @returns The new configuration.
    */
   with(document: AnyDocument): ZitadelConfig {
-    // A document put back where one was removed is written, not deleted.
-    const parts = {
-      ...this.parts,
+    return new ZitadelConfig({
+      ...edited(this.parts, document, placed),
+      // A document put back where one was removed is written, not deleted.
       removed: this.removed.filter((gone) => {
         return gone.path !== document.path;
       }),
-    };
-    if (document instanceof UserSchema) {
-      return new ZitadelConfig({ ...parts, schemas: placed(this.schemas.all, document) });
-    }
-    if (document instanceof Flow) {
-      return new ZitadelConfig({ ...parts, flows: placed(this.flows.all, document) });
-    }
-    if (document instanceof Connection) {
-      return new ZitadelConfig({ ...parts, connections: placed(this.connections.all, document) });
-    }
-    if (document instanceof Policy) {
-      return new ZitadelConfig({ ...parts, policies: placed(this.policies.all, document) });
-    }
-    return new ZitadelConfig({ ...parts, brandings: placed(this.branding.all, document) });
+    });
   }
 
   /**
@@ -291,26 +286,15 @@ export class ZitadelConfig {
    * @returns The new configuration.
    */
   without(document: AnyDocument): ZitadelConfig {
-    const removed = document.status === "created" ? this.removed : [...this.removed, document];
-    const parts = { ...this.parts, removed };
-    if (document instanceof UserSchema) {
-      return new ZitadelConfig({ ...parts, schemas: kept(this.schemas.all, document) });
-    }
-    if (document instanceof Flow) {
-      return new ZitadelConfig({ ...parts, flows: kept(this.flows.all, document) });
-    }
-    if (document instanceof Connection) {
-      return new ZitadelConfig({ ...parts, connections: kept(this.connections.all, document) });
-    }
-    if (document instanceof Policy) {
-      return new ZitadelConfig({ ...parts, policies: kept(this.policies.all, document) });
-    }
-    return new ZitadelConfig({ ...parts, brandings: kept(this.branding.all, document) });
+    return new ZitadelConfig({
+      ...edited(this.parts, document, kept),
+      removed: document.status === "created" ? this.removed : [...this.removed, document],
+    });
   }
 
   /**
    * The documents an edit has changed or created since the configuration
-   * was read.
+   * was read, of every kind, policy test files included.
    *
    * @returns The documents, by kind.
    */
@@ -320,6 +304,7 @@ export class ZitadelConfig {
       ...this.flows.all,
       ...this.connections.all,
       ...this.policies.all,
+      ...this.policies.tests,
       ...this.branding.all,
     ];
     return documents.filter((document) => {
@@ -358,24 +343,57 @@ export class ZitadelConfig {
 }
 
 /**
+ * The parts of a configuration with one list edited: the list the document's
+ * kind is held in.
+ *
+ * @param parts - The parts.
+ * @param document - The document the edit places or leaves out.
+ * @param edit - The edit to its list.
+ * @returns The new parts.
+ */
+function edited(parts: Parts, document: AnyDocument, edit: ListEdit): Parts {
+  switch (document.kind) {
+    case "schema": {
+      return { ...parts, schemas: edit(parts.schemas, document) };
+    }
+    case "flow": {
+      return { ...parts, flows: edit(parts.flows, document) };
+    }
+    case "connection": {
+      return { ...parts, connections: edit(parts.connections, document) };
+    }
+    case "policy": {
+      return { ...parts, policies: edit(parts.policies, document) };
+    }
+    case "policy-test": {
+      return { ...parts, policyTests: edit(parts.policyTests, document) };
+    }
+    case "branding": {
+      return { ...parts, brandings: edit(parts.brandings, document) };
+    }
+  }
+}
+
+/**
  * A list of documents with one in place: replacing the document at the same
  * path, where it was, or appended when there is none.
  *
+ * @typeParam T - The kind of document.
  * @param documents - The documents.
- * @param edited - The document to place.
+ * @param document - The document to place.
  * @returns The new list.
  */
-function placed<T extends AnyDocument>(documents: readonly T[], edited: T): T[] {
+function placed<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
   if (
     !documents.some((current) => {
-      return current.path === edited.path;
+      return current.path === document.path;
     })
   ) {
-    return [...documents, edited];
+    return [...documents, document];
   }
   return documents.map((current) => {
-    if (current.path === edited.path) {
-      return edited;
+    if (current.path === document.path) {
+      return document;
     }
     return current;
   });
@@ -384,12 +402,13 @@ function placed<T extends AnyDocument>(documents: readonly T[], edited: T): T[] 
 /**
  * A list of documents without the one at a document's path.
  *
+ * @typeParam T - The kind of document.
  * @param documents - The documents.
- * @param removed - The document to leave out.
+ * @param document - The document to leave out.
  * @returns The new list.
  */
-function kept<T extends AnyDocument>(documents: readonly T[], removed: AnyDocument): T[] {
+function kept<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
   return documents.filter((current) => {
-    return current.path !== removed.path;
+    return current.path !== document.path;
   });
 }

@@ -1039,3 +1039,36 @@ describe("Connections.named", () => {
     });
   });
 });
+
+describe("Connections.sameIssuer", () => {
+  describe("with a connection of the developer's own to the candidate's issuer", () => {
+    it("names it", () => {
+      const work = connection(
+        "google-work.json",
+        googleBody({
+          slug: "google-work",
+          template: undefined,
+          oidc: {
+            issuer: "https://accounts.google.com",
+            client_id: "${{ WORK_CLIENT_ID }}",
+            client_secret: "${{ WORK_CLIENT_SECRET }}",
+          },
+        }),
+      );
+
+      const paths = connectionsOf([work]).sameIssuer(google);
+
+      expect(paths).toEqual([`${IDPS}/google-work.json`]);
+    });
+  });
+
+  describe("with a connection that names no issuer", () => {
+    it("names nothing", () => {
+      const connections = connectionsOf([connection("okta.json", { slug: "okta" })]);
+
+      const paths = connections.sameIssuer(google);
+
+      expect(paths).toEqual([]);
+    });
+  });
+});

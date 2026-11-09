@@ -173,22 +173,19 @@ function unroutedOutcomes(config: ZitadelConfig, step: Step): string[] {
 }
 
 /**
- * The providers a schema lists without a connection file, as the connections
- * they most likely meant. A flow offering the meant provider is then not
- * reported again for the schema's typo.
+ * The providers a list names more than once, which offers their button twice.
  *
- * @param config - The configuration.
- * @param schema - The schema.
- * @returns The slugs the schema's typos meant.
+ * @param providers - The providers, as listed.
+ * @returns Each repeated provider once, in the order first repeated.
  */
-function meantBySchemaTypos(config: ZitadelConfig, schema: UserSchema): Array<string | undefined> {
-  return schema.providers
-    .filter((slug) => {
-      return config.connections.find(slug) === undefined;
-    })
-    .map((slug) => {
-      return closest(slug, knownSlugs(config));
-    });
+function repeatedProviders(providers: readonly string[]): readonly string[] {
+  return [
+    ...new Set(
+      providers.filter((provider, index) => {
+        return providers.indexOf(provider) !== index;
+      }),
+    ),
+  ];
 }
 
 /**
@@ -290,7 +287,7 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       return config.schemas.all.flatMap((schema) => {
-        return schema.repeatedProviders.map((slug) => {
+        return repeatedProviders(schema.providers).map((slug) => {
           return { schema, slug };
         });
       });
@@ -312,7 +309,7 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       return config.flows.all.flatMap((flow) => {
         return flow.steps.flatMap((step) => {
-          return step.repeatedProviders.map((slug) => {
+          return repeatedProviders(step.providers).map((slug) => {
             return { flow, step, slug };
           });
         });
@@ -428,9 +425,19 @@ export const SSO_RULES: readonly Rule[] = [
   defineRule({
     id: "sso/provider-id",
     severity: "error",
+    // The providers the schema lists without a connection file, as the
+    // connections they most likely meant.
     each: (config) => {
+      const known = knownSlugs(config);
       return pinnedOffers(config).map((offer) => {
-        return { ...offer, meant: meantBySchemaTypos(config, offer.schema) };
+        const meant = offer.schema.providers
+          .filter((slug) => {
+            return config.connections.find(slug) === undefined;
+          })
+          .map((slug) => {
+            return closest(slug, known);
+          });
+        return { ...offer, meant };
       });
     },
     // A slug the schema lists without a connection file is most likely a typo

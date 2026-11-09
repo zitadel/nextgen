@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CustomOidcProvider, idpProvider } from "@zitadel/config/idp";
 
-import { Connection, UserSchema } from "@/lib/zitadel";
+import { ConfigError, Connection, UserSchema } from "@/lib/zitadel";
 import type { Issue } from "@/lib/zitadel/rules/types";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import { displayName, issuer, slug } from "@tests/helpers/idp-values";
@@ -300,5 +300,92 @@ describe("Connection.forProvider", () => {
     });
 
     expect(google.issuer).toBe("http://localhost:9100");
+  });
+});
+
+describe("Connection.unappliedSettings", () => {
+  const existing = connection("acme-sso.json", {
+    slug: "acme-sso",
+    display_name: "Acme SSO",
+    oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
+  });
+
+  describe("when the candidate differs in scopes", () => {
+    const candidate = connection("acme-sso.json", {
+      slug: "acme-sso",
+      display_name: "Acme SSO",
+      oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "groups"] },
+    });
+
+    it.each([
+      ["names them when they were given", ["scopes"], ["scopes"]],
+      ["says nothing when they were not given", [], []],
+    ] as const)("%s", (_claim, given, unapplied) => {
+      expect(existing.unappliedSettings(candidate, given)).toEqual(unapplied);
+    });
+  });
+
+  describe("when the candidate differs in display name", () => {
+    it("names the display name", () => {
+      const candidate = connection("acme-sso.json", {
+        slug: "acme-sso",
+        display_name: "New name",
+        oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
+      });
+
+      const unapplied = existing.unappliedSettings(candidate, ["display name", "scopes"]);
+
+      expect(unapplied).toEqual(["display name"]);
+    });
+  });
+
+  describe("when the candidate has what the file already has", () => {
+    it("names nothing", () => {
+      const unapplied = existing.unappliedSettings(existing, ["display name", "scopes"]);
+
+      expect(unapplied).toEqual([]);
+    });
+  });
+});
+
+describe("Connection.refuseDifferentClientId", () => {
+  describe("when the file holds another client id as a value", () => {
+    it("refuses with the stored and the given id", () => {
+      const acme = connection("acme.json", SOUND);
+
+      const refusal = (): void => {
+        acme.refuseDifferentClientId("other");
+      };
+
+      expect(refusal).toThrow(ConfigError);
+      expect(refusal).toThrow(`${IDPS}/acme.json already uses client id client, not other`);
+    });
+  });
+
+  describe("when the file references a variable", () => {
+    it("accepts any client id", () => {
+      const acme = connection("acme.json", {
+        ...SOUND,
+        oidc: { ...SOUND.oidc, client_id: "${{ ACME_CLIENT_ID }}" },
+      });
+
+      expect(() => {
+        acme.refuseDifferentClientId("other");
+      }).not.toThrow();
+    });
+  });
+});
+
+describe("Connection.mappingSummary", () => {
+  describe("with nothing verified", () => {
+    it("says so after the mappings", () => {
+      const acme = connection("acme.json", { ...SOUND, claim_mapping: { email: "email" } });
+
+      expect(acme.mappingSummary.split("\n").slice(1)).toEqual([
+        "  email ← email",
+        "Nothing is treated as verified.",
+        "Edit the mappings in that file if your provider returns other claims.",
+      ]);
+    });
   });
 });

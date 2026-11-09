@@ -24,6 +24,11 @@ const SAMPLE_CONTRACT = z.strictObject({ name: z.string() });
  */
 class Sample extends ConfigDocument {
   /**
+   * What kind of document this is: a sample.
+   */
+  readonly kind = "sample";
+
+  /**
    * Hold a sample's body at its path.
    *
    * @param path - The project-relative path.
@@ -180,6 +185,14 @@ describe("ConfigDocument.wireBody", () => {
     const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
 
     expect(sample.wireBody(new MemoryStore())).toEqual({ name: "a" });
+  });
+});
+
+describe("ConfigDocument.contractBody", () => {
+  it("is the body without the editor's $schema pointer, which every rule judges", () => {
+    const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
+
+    expect(sample.contractBody).toEqual({ name: "a" });
   });
 });
 

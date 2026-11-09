@@ -2,8 +2,9 @@
  * What the rules find, and what they need beyond the files.
  */
 
-import type { FlowRuleId } from "@zitadel/config/validate";
+import type { FlowRuleId, FlowValidationIssue } from "@zitadel/config/validate";
 
+import type { MethodUse } from "@/lib/zitadel/resources/flows/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 
 /**
@@ -103,4 +104,50 @@ export type Issue = Readonly<{
    * What is wrong, and what to change.
    */
   message: string;
+}>;
+
+/**
+ * A flow rule's finding, and the flow file it is in.
+ */
+export type FlowIssue = Readonly<{
+  /**
+   * The flow file's project-relative path.
+   */
+  path: string;
+  /**
+   * The finding, as the server's flow rules word it.
+   */
+  issue: FlowValidationIssue;
+}>;
+
+/**
+ * A step that uses a method being disabled, the flow file it is in, and the
+ * transitions into it that outlive the edit: those from a step that is itself
+ * left with nothing go with that step.
+ */
+export type FlowMethodUse = MethodUse &
+  Readonly<{
+    /**
+     * The flow file's project-relative path.
+     */
+    path: string;
+    /**
+     * The transitions into the step that outlive the edit.
+     */
+    staying: MethodUse["targetedBy"];
+  }>;
+
+/**
+ * What a change does to the flows that run against its schema.
+ */
+export type FlowCheck = Readonly<{
+  /**
+   * Errors a flow already has that stop the server's rules short of the ones
+   * that read the schema, so whether the change breaks it cannot be told.
+   */
+  unchecked: readonly FlowIssue[];
+  /**
+   * The errors the change brings. One a flow already had is not the change's.
+   */
+  introduced: readonly FlowIssue[];
 }>;

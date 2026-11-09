@@ -26,7 +26,7 @@ export {
   type SsoOptions,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections";
-export type { DocumentStatus } from "@/lib/zitadel/resources/document";
+export type { DocumentStatus, Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
 export {
   BrokenFilesError,
   BrokenFlowsError,
@@ -45,14 +45,10 @@ export {
   Flow,
   Flows,
   PASSWORD_FIELD,
-  type FlowCheck,
-  type FlowIssue,
-  type FlowMethodUse,
   type IncomingTransition,
   type MethodUse,
   type Offer,
   type SignUpGap,
-  type SkippedRegion,
   type Step,
   type Transition,
 } from "@/lib/zitadel/resources/flows";
@@ -62,6 +58,9 @@ export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
 export {
   RULE_IDS,
+  type FlowCheck,
+  type FlowIssue,
+  type FlowMethodUse,
   type Issue,
   type RuleId,
   type Severity,
@@ -80,6 +79,5 @@ export {
   type ConfigFile,
   type ConfigFiles,
   type ConfigKind,
-  type EditResult,
   type JsonObject,
 } from "@/lib/zitadel/types";

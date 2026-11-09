@@ -209,7 +209,7 @@ export async function materializeSetupResources(opts: {
   // builds one schema that names every chosen provider.
   const schemaDocument = slugs.reduce(
     (document, slug) => {
-      return document.withProvider(slug);
+      return document.withProvider(slug).document;
     },
     UserSchema.create({ path: DEFAULT_SCHEMA_CONFIG_PATH, body: schemaTemplate }),
   );
@@ -237,7 +237,7 @@ export async function materializeSetupResources(opts: {
   // rather than inferred from the preset.
   const flowDocument = slugs.reduce(
     (document, slug) => {
-      return document.withProvider(slug, schemaDocument.enabledMethods);
+      return document.withProvider(slug, schemaDocument.enabledMethods).document;
     },
     Flow.create({ path: DEFAULT_FLOW_CONFIG_PATH, body: flowTemplate }),
   );

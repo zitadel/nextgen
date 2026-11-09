@@ -4,40 +4,37 @@ import { basename } from "node:path";
 
 import { schemaConfigSchema } from "@zitadel/config/schemas";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+  type Edit,
+} from "@/lib/zitadel/resources/document";
 import { RefusedEditError } from "@/lib/zitadel/errors";
 import { type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import {
+  type EditedMethod,
   type EnabledMethods,
+  MAX_SLUG_LENGTH,
+  SLUG_PATTERN,
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
-
-/**
- * The longest provider slug a schema can name.
- */
-const MAX_SLUG_LENGTH = 64;
-
-/**
- * The shape of a provider slug a schema can name.
- */
-const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
-
-/**
- * A method `x-auth-methods` holds an entry for that an edit writes: one
- * switched by a flag alone, or SSO, which a provider edit switches.
- */
-type EditedMethod = ToggleableMethod | "sso";
+import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
  * A user schema under `.zitadel/schemas/`: the properties a user has, and how
  * a user signs in.
  */
 export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+  /**
+   * What kind of document this is: a user schema.
+   */
+  readonly kind = "schema";
+
   /**
    * Hold a schema's body at its path.
    *
@@ -215,22 +212,6 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
-   * The providers listed more than once.
-   *
-   * @returns Each repeated provider once, in the order first repeated.
-   */
-  get repeatedProviders(): readonly string[] {
-    const providers = this.providers;
-    return [
-      ...new Set(
-        providers.filter((provider, index) => {
-          return providers.indexOf(provider) !== index;
-        }),
-      ),
-    ];
-  }
-
-  /**
    * The ways to sign in besides SSO that the schema enables.
    *
    * @returns Whether password and passkey are each enabled.
@@ -355,16 +336,17 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * whoever put it there.
    *
    * @param method - The method.
-   * @returns The edited schema, or this one when the method is already on.
+   * @returns The edit: the edited schema, or this one when the method is
+   *   already on.
    * @throws {@link RefusedEditError} When the method's region is not the shape
    *   the edit writes, or password is switched on in a schema with no
    *   identifier.
    */
-  withMethod(method: ToggleableMethod): UserSchema<Body> {
+  withMethod(method: ToggleableMethod): Edit<UserSchema<Body>> {
     this.refuseUneditable(this.methodRefusal(method));
     const entry = this.method(method);
     if (entry.enabled === true) {
-      return this;
+      return { document: this, changed: false, skipped: [] };
     }
     if (method === "password" && !this.hasIdentifier) {
       throw new RefusedEditError(`${this.path} has no x-identifier for password`, {
@@ -375,7 +357,11 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
       });
     }
     const next = { ...entry, enabled: true };
-    return new UserSchema(this.path, this.bodyWithMethod(method, next), this.editedStatus);
+    return {
+      document: new UserSchema(this.path, this.bodyWithMethod(method, next), this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
   }
 
   /**
@@ -386,18 +372,23 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * whoever put it there.
    *
    * @param method - The method.
-   * @returns The edited schema, or this one when the method is already off.
+   * @returns The edit: the edited schema, or this one when the method is
+   *   already off.
    * @throws {@link RefusedEditError} When the method's region is not the shape
    *   the edit writes.
    */
-  withoutMethod(method: ToggleableMethod): UserSchema<Body> {
+  withoutMethod(method: ToggleableMethod): Edit<UserSchema<Body>> {
     this.refuseUneditable(this.methodRefusal(method));
     const entry = this.method(method);
     if (entry.enabled !== true) {
-      return this;
+      return { document: this, changed: false, skipped: [] };
     }
     const next = { ...entry, enabled: false };
-    return new UserSchema(this.path, this.bodyWithMethod(method, next), this.editedStatus);
+    return {
+      document: new UserSchema(this.path, this.bodyWithMethod(method, next), this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
   }
 
   /**
@@ -409,20 +400,25 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * first.
    *
    * @param slug - The provider.
-   * @returns The edited schema, or this one when SSO is on and lists it.
+   * @returns The edit: the edited schema, or this one when SSO is on and lists
+   *   it.
    * @throws {@link RefusedEditError} When `x-auth-methods.sso` is not the shape
    *   the edit writes.
    */
-  withProvider(slug: ConnectionSlug): UserSchema<Body> {
+  withProvider(slug: ConnectionSlug): Edit<UserSchema<Body>> {
     this.assertProviderEditable();
     const entry = this.method("sso");
-    const listed: readonly unknown[] = Array.isArray(entry.providers) ? entry.providers : [];
+    const listed = listAt(entry, "providers");
     if (entry.enabled === true && listed.includes(slug)) {
-      return this;
+      return { document: this, changed: false, skipped: [] };
     }
     const providers = listed.includes(slug) ? listed : [...listed, slug];
     const next = { ...entry, enabled: true, providers };
-    return new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus);
+    return {
+      document: new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
   }
 
   /**
@@ -434,22 +430,27 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * one provider whenever the list is there.
    *
    * @param slug - The provider.
-   * @returns The edited schema, or this one when it does not list the provider.
+   * @returns The edit: the edited schema, or this one when it does not list
+   *   the provider.
    * @throws {@link RefusedEditError} When `x-auth-methods.sso` is not the shape
    *   the edit writes.
    */
-  withoutProvider(slug: string): UserSchema<Body> {
+  withoutProvider(slug: string): Edit<UserSchema<Body>> {
     this.assertProviderEditable();
     const entry = this.method("sso");
-    const listed: readonly unknown[] = Array.isArray(entry.providers) ? entry.providers : [];
+    const listed = listAt(entry, "providers");
     if (!listed.includes(slug)) {
-      return this;
+      return { document: this, changed: false, skipped: [] };
     }
     const providers = listed.filter((provider) => {
       return provider !== slug;
     });
     const next = providers.length === 0 ? { enabled: false } : { ...entry, providers };
-    return new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus);
+    return {
+      document: new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
   }
 
   /**
