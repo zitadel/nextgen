@@ -1,7 +1,7 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
-import type { ReleasePointerKind } from "@/lib/backend";
+import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
 import { PublishedConfiguration } from "@/lib/publish";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
@@ -142,6 +142,18 @@ type PulledResource = PinnedResource & {
 };
 
 /**
+ * How many revisions are fetched at once.
+ */
+const FETCH_CONCURRENCY = 8;
+
+/**
+ * One pinned resource's attempt: what became of it, or what stopped it.
+ */
+type Attempt =
+  | { readonly kind: "done"; readonly outcome: PullOutcome }
+  | { readonly kind: "failed"; readonly error: unknown };
+
+/**
  * What became of one pinned resource: the file it goes in and the change that
  * writes it, or why nothing is written.
  */
@@ -204,30 +216,26 @@ export default class Pull extends EnvironmentCommand {
     const releaseId = await this.resolveReleaseId(configuration, input.args.target);
     const release = await configuration.fetchRelease(releaseId);
 
-    // One resource at a time, so the files land in the order the release pins them.
-    const outcomes = await mapBounded(
+    // Fetched together, but kept in the order the release pins them, so the
+    // files land in that order and the first failure in it is the one raised.
+    const attempts = await mapBounded(
       release.pointers,
-      1,
-      async (pointer): Promise<PullOutcome> => {
-        const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
-        if (!isPullable(pointer.kind)) {
-          return { kind: "skipped", resource };
+      FETCH_CONCURRENCY,
+      async (pointer): Promise<Attempt> => {
+        try {
+          return { kind: "done", outcome: await this.fetchOne(configuration, config, pointer) };
+        } catch (error) {
+          return { kind: "failed", error };
         }
-        const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
-        if (!isJsonValue(body) || !isJsonObject(body)) {
-          return { kind: "skipped", resource };
-        }
-        const collection = PULLABLE[pointer.kind](config);
-        // Located here, before anything is written: a handle that has no
-        // single file refuses the pull while the working copy is untouched.
-        const change = collection.placeRevision(pointer.handle, body);
-        return {
-          kind: "pulled",
-          resource: { ...resource, path: collection.locate(pointer.handle) },
-          change,
-        };
       },
     );
+    const outcomes: PullOutcome[] = [];
+    for (const attempt of attempts) {
+      if (attempt.kind === "failed") {
+        throw attempt.error;
+      }
+      outcomes.push(attempt.outcome);
+    }
     if (!this.dryRun) {
       for (const outcome of outcomes) {
         if (outcome.kind === "pulled") {
@@ -276,6 +284,42 @@ export default class Pull extends EnvironmentCommand {
       next: { commands: next },
       pretty: prose(`${headline}\n${summary}`),
     });
+  }
+
+  /**
+   * Fetch one pinned revision and work out the change that writes it, without
+   * writing anything.
+   *
+   * @remarks
+   * The file is located here, before anything is written: a handle that has no
+   * single file refuses the pull while the working copy is untouched.
+   *
+   * @param configuration - The project's published configuration.
+   * @param config - The configuration on disk, as far as `pull` reads it.
+   * @param pointer - The resource the release pins.
+   * @returns What became of the resource.
+   * @throws When the revision cannot be fetched, or its handle has no single file.
+   */
+  private async fetchOne(
+    configuration: PublishedConfiguration,
+    config: ZitadelConfig,
+    pointer: ReleasePointer,
+  ): Promise<PullOutcome> {
+    const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
+    if (!isPullable(pointer.kind)) {
+      return { kind: "skipped", resource };
+    }
+    const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
+    if (!isJsonValue(body) || !isJsonObject(body)) {
+      return { kind: "skipped", resource };
+    }
+    const collection = PULLABLE[pointer.kind](config);
+    const change = collection.placeRevision(pointer.handle, body);
+    return {
+      kind: "pulled",
+      resource: { ...resource, path: collection.locate(pointer.handle) },
+      change,
+    };
   }
 
   /**

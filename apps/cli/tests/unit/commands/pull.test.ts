@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import Pull from "@/commands/pull";
 import { ZitadelError } from "@/lib/errors";
@@ -147,7 +147,7 @@ describe("pull of a release pinning a handle that has no file", () => {
     dirs.push(project.cwd);
     server.use(...pinningAGoodSchemaThenABadHandle());
 
-    const result = await runCliForTest([
+    await runCliForTest([
       "pull",
       RELEASE_ID,
       "--cwd",
@@ -158,8 +158,61 @@ describe("pull of a release pinning a handle that has no file", () => {
       ...flags,
     ]);
 
-    console.log("PROBE", result.exitCode, result.stdout, result.stderr);
     expect(existsSync(join(project.cwd, ".zitadel/schemas/good.json"))).toBe(false);
+  });
+});
+
+describe("pull of a release whose revisions cannot be fetched", () => {
+  it("raises the first failure in the order the release pins them", async () => {
+    const project = await aProjectWithTwoDeploys("zitadel-pull-");
+    dirs.push(project.cwd);
+    server.use(
+      http.get(`${PLATFORM_URL}/api/v1/releases/${RELEASE_ID}`, ({ request }) => {
+        return HttpResponse.json({
+          id: RELEASE_ID,
+          project_id: new URL(request.url).searchParams.get("project_id"),
+          content_hash: `sha256:${"0".repeat(64)}`,
+          metadata: {
+            message: null,
+            git_sha: null,
+            git_dirty: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            created_by: null,
+            created_by_type: "service",
+          },
+          revoked_at: null,
+          pointers: [
+            { kind: "schema", handle: "first", revision_id: "sch_first" },
+            { kind: "schema", handle: "second", revision_id: "sch_second" },
+          ],
+        });
+      }),
+      http.get(`${PLATFORM_URL}/api/v1/schemas/:id`, async ({ params }) => {
+        if (params.id === "sch_first") {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 100);
+          });
+        }
+        return HttpResponse.json(
+          { code: "internal", message: `${String(params.id)} failed` },
+          { status: 400 },
+        );
+      }),
+    );
+
+    const printed = vi.spyOn(console, "log").mockImplementation(() => {
+      return undefined;
+    });
+    await rejectionOf(() => {
+      return Pull.run([RELEASE_ID, "--cwd", project.cwd, "--server", PLATFORM_URL, "--json"]);
+    });
+    const said = printed.mock.calls.flat().join("\n");
+    printed.mockRestore();
+
+    expect(JSON.parse(said)).toMatchObject({
+      status: "error",
+      message: "sch_first failed",
+    });
   });
 });
 
