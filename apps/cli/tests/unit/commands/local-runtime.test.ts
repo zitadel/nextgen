@@ -565,7 +565,7 @@ describe("local runtime commands", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Local Zitadel server is ready.");
+    expect(result.stdout).toContain("Local Zitadel server is ready");
     expect(result.stdout).toContain(
       "  Create an app with authentication. Run setup in this directory",
     );

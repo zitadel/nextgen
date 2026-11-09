@@ -85,6 +85,7 @@ describe("BaseCommand envelope", () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {
         deployment: Deployment.of(RECORD as never),
@@ -104,6 +105,7 @@ describe("BaseCommand envelope", () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {
         items: [Deployment.of(RECORD as never)],
@@ -120,6 +122,7 @@ describe("BaseCommand envelope", () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {
         deployment: Deployment.of({
@@ -143,6 +146,7 @@ describe("BaseCommand rendering", () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       pretty: prose("Deployed \u001b[2Jwiped"),
@@ -152,37 +156,11 @@ describe("BaseCommand rendering", () => {
     expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
   });
 
-  // The generic rendering carries the colour the CLI puts on the next steps
-  // and the warnings, so it spells out what the data says itself rather than
-  // being spelled out whole. These hold that boundary where it is.
-  it("spells out the title the data carries, which a command took from the server", async () => {
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "ok",
-      data: { title: "Bound dev to proj\u001b[2Jwiped." },
-    });
-
-    expect(cmd.logged.join("\n")).toContain("Bound dev to proj\\x1b[2Jwiped.");
-    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
-  });
-
-  it("spells out a section the data carries, which the server answered", async () => {
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "ok",
-      data: { project: { project_id: "proj_1", issuer: "https://a.example\u001b[2Jwiped" } },
-    });
-
-    expect(cmd.logged.join("\n")).toContain("https://a.example\\x1b[2Jwiped");
-    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
-  });
-
   it("spells out a warning beside the generic rendering, which names what was read", async () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       warnings: ["schema \u001b[2Jwiped has no identifier"],
@@ -196,24 +174,13 @@ describe("BaseCommand rendering", () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       pretty: painted("\u001b[32mok\u001b[39m"),
     });
 
     expect(cmd.logged.join("\n")).toContain("\u001b[32mok\u001b[39m");
-  });
-
-  it("spells out the reason a skip gives, which is a server value as often as not", async () => {
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "skipped",
-      reason: "\u001b[2Jwiped",
-    });
-
-    expect(cmd.logged.join("\n")).toContain("\\x1b[2Jwiped");
-    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
   });
 });
 

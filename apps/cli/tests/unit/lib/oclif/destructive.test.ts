@@ -14,7 +14,11 @@ const GATE: Omit<DestructiveChange, "apply"> = {
   verb: "remove",
   name: "remove API_URL from the project",
   message: "Remove API_URL from the project?",
-  preview: () => ({ status: "ok", data: { dry_run: true } }),
+  preview: () => ({
+    status: "ok",
+    data: { dry_run: true },
+    summary: { title: "Done", sections: [] },
+  }),
 };
 
 /** How a run was invoked: its arguments, and who can answer. */
@@ -75,7 +79,7 @@ class Removing extends Destructive(BaseCommand) {
       apply: async (consent, ready) => {
         this.acted.push(consent);
         this.ready.push(ready);
-        return { status: "ok", data: { acted: true } };
+        return { status: "ok", data: { acted: true }, summary: { title: "Done", sections: [] } };
       },
     });
   }
@@ -96,7 +100,7 @@ describe("Destructive", () => {
     it("answers a dry run with the preview", async () => {
       const command = new Removing({ dryRun: true });
 
-      expect(await command.remove()).toEqual({ status: "ok", data: { dry_run: true } });
+      expect(await command.remove()).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
     it("never acts on a dry run, even with --force", async () => {
@@ -122,7 +126,7 @@ describe("Destructive", () => {
     });
 
     it("answers with what the act returned", async () => {
-      expect(await new Removing({ force: true }).remove()).toEqual({
+      expect(await new Removing({ force: true }).remove()).toMatchObject({
         status: "ok",
         data: { acted: true },
       });
@@ -224,7 +228,11 @@ describe("Destructive", () => {
     });
 
     it("ends the run with a settled result, without asking", async () => {
-      const settled = { status: "skipped", reason: "not-live" } as const;
+      const settled = {
+        status: "skipped",
+        reason: "not-live",
+        summary: { title: "Done", sections: [] },
+      } as const;
 
       expect(
         await new Removing({ interactive: true }).remove(async () => new Settled(settled)),
@@ -233,7 +241,12 @@ describe("Destructive", () => {
 
     it("does not ask when prepare settles the run", async () => {
       await new Removing({ interactive: true }).remove(
-        async () => new Settled({ status: "skipped", reason: "not-live" }),
+        async () =>
+          new Settled({
+            summary: { title: "Done", sections: [] },
+            status: "skipped",
+            reason: "not-live",
+          }),
       );
 
       expect(confirm).not.toHaveBeenCalled();

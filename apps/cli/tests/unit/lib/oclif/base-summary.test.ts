@@ -12,7 +12,7 @@ vi.mock("rosie-skills", () => rosie);
 import { BaseCommand } from "../../../../src/lib/oclif/base";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 import { COLUMN_MARK } from "../../../../src/lib/ui/layout";
-import { painted } from "../../../../src/lib/oclif/rendering";
+import { painted, rows } from "../../../../src/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { asTerminal } from "../../../helpers/terminal";
 
@@ -110,37 +110,24 @@ afterEach(() => {
 const widest = (shown: string): number =>
   Math.max(...shown.split("\n").map((line) => line.trimEnd().length));
 
-describe("the generic rendering of a command's data", () => {
+describe("the ending of a status", () => {
   const project = {
     project_id: "proj-01K9AA9M3K7E2QX8VB4T",
-    lifecycle: "configured",
     issuer: "https://auth.acme-corporation.example.com",
   };
 
-  it("says the project as a sentence, not as columns nothing is aligned to", async () => {
-    const shown = await drawn({ status: "ok", data: { title: "Zitadel status.", project } });
-
-    expect(shown).toContain("Project proj-01K9AA9M3K7E2QX8VB4T, lifecycle configured");
-    expect(shown).not.toContain("project=proj-01K9AA9M3K7E2QX8VB4T");
-  });
-
   it("keeps the box 80 columns wide with a hosted issuer in it", async () => {
-    const shown = await drawn({ status: "ok", data: { title: "Zitadel status.", project } });
-
-    expect(widest(shown)).toBeLessThanOrEqual(80);
-  });
-
-  // A leftover of the plan/apply → deploy rename: no command emits the key.
-  it("says nothing about an apply key, which nothing emits any more", async () => {
     const shown = await drawn({
       status: "ok",
-      data: {
-        title: "Zitadel status.",
-        apply: { config_version: 3, hash: "abcdef123456789", environment: "production" },
+      data: {},
+      summary: {
+        title: "Checked the status of the project",
+        sections: [],
+        lines: [`Project ${project.project_id}, lifecycle configured, issuer ${project.issuer}.`],
       },
     });
 
-    expect(shown).not.toContain("Apply:");
+    expect(widest(shown)).toBeLessThanOrEqual(80);
   });
 });
 
@@ -177,12 +164,6 @@ describe("BaseCommand endings for a skip", () => {
     );
     expect(envelope).not.toHaveProperty("summary");
   });
-
-  it("falls back to the rendered reason for a skip that brought no summary", async () => {
-    const shown = await drawn({ status: "skipped", reason: "nothing-to-do" });
-
-    expect(shown).toContain("Skipped: nothing-to-do");
-  });
 });
 
 /**
@@ -194,9 +175,11 @@ describe("BaseCommand endings for a skip", () => {
 describe("the ending of a run nothing is drawn into", () => {
   const STATUS: CommandResult = {
     status: "ok",
-    data: {
-      title: "Zitadel status.",
-      project: { project_id: "proj-1", lifecycle: "configured" },
+    data: {},
+    summary: {
+      title: "Checked the status of the project",
+      sections: [],
+      lines: ["Project proj-1, lifecycle configured."],
     },
     next: { commands: ["zitadel start" as SuggestedCommand] },
   };
@@ -227,7 +210,10 @@ describe("the ending of a run nothing is drawn into", () => {
   });
 
   it("says where a wizard ran at the end, not as a line above its report", async () => {
-    const shown = await written(STATUS, { source: "https://self.example" });
+    const shown = await written({
+      ...STATUS,
+      summary: { ...STATUS.summary, ran: "self.example" },
+    });
 
     expect(shown).toContain("Using your Zitadel server at self.example.");
     expect(shown).not.toContain("(server: self.example)");
@@ -238,7 +224,7 @@ describe("the ending of a run nothing is drawn into", () => {
   // rather than on a sentence with a full stop that no terminal shows.
   it("ends a normal command on its answer and one footer when a terminal is reading", async () => {
     const shown = await written(
-      { status: "ok", data: "No variables found." },
+      { summary: { title: "No variables found", sections: [] }, status: "ok", data: [] },
       { terminal: true, plain: true },
     );
 
@@ -249,7 +235,15 @@ describe("the ending of a run nothing is drawn into", () => {
   // answer — tab-separated rows, the whole record — and a count or a footer
   // under it is what breaks `wc -l` and `cut`.
   it("leaves a normal command's answer alone when a machine is reading", async () => {
-    const shown = await written({ status: "ok", data: "a\tprimary" }, { plain: true });
+    const shown = await written(
+      {
+        summary: { title: "Done", sections: [] },
+        status: "ok",
+        data: "a\tprimary",
+        pretty: rows("a\tprimary"),
+      },
+      { plain: true },
+    );
 
     expect(shown).toBe("a\tprimary");
   });
@@ -260,7 +254,12 @@ describe("the ending of a run nothing is drawn into", () => {
   // of those bytes.
   it("takes the column mark off an answer nothing is going to fold", async () => {
     const shown = await written(
-      { status: "ok", data: "", pretty: painted(`${COLUMN_MARK}value  hello`) },
+      {
+        summary: { title: "Done", sections: [] },
+        status: "ok",
+        data: "",
+        pretty: painted(`${COLUMN_MARK}value  hello`),
+      },
       { plain: true },
     );
 
@@ -280,7 +279,9 @@ describe("looking for the skills offer", () => {
     vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "zitadel-skills-")));
     vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const command = new Command([], { version: "0.0.0-test" } as unknown as Config);
-    await asTerminal(() => command.finish({ status: "ok", data: "x" }, flags));
+    await asTerminal(() =>
+      command.finish({ summary: { title: "Done", sections: [] }, status: "ok", data: "x" }, flags),
+    );
     vi.unstubAllEnvs();
     return rosie.agents.mock.calls.length;
   }

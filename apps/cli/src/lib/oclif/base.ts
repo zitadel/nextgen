@@ -13,7 +13,7 @@ import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
 import { normalizePublicCliCommands, publicCliCommand } from "@/lib/public-cli";
-import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "@/lib/server";
+import { resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
@@ -38,7 +38,6 @@ import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
-import { summaryOfText } from "./result-summary";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -646,11 +645,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // out the colour too.
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
-    const rendered = renderPretty(normalized, this.meta, beside ? "" : next);
+    const rendered = renderPretty(normalized, beside ? "" : next);
     const footer = normalized.status === "ok" ? normalized.footer : undefined;
     // A skip ends on its own summary too, so a deliberate no-op reads like
     // every other ending instead of as the reason token the envelope carries.
-    const ending = this.endingOf(normalized, rendered, footer);
+    const ending = this.endingOf(normalized, footer);
     if (beside) {
       // `--plain` and a write's data are for something to read: nothing frames
       // them, whether or not a person is watching, and their next steps go
@@ -666,10 +665,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       }
     } else if (this.ui.interactive) {
       // A person at a terminal: the result closes the chain the questions began.
-      // A command that said everything itself returns nothing, and draws nothing.
-      if (ending !== undefined) {
-        this.ui.finish(ending);
-      }
+      this.ui.finish(ending);
     } else if (this.rendersForAMachine()) {
       // Nothing folds this text, so nothing takes the mark a builder puts at
       // the head of a row it aligned (`COLUMN_MARK`): it is invisible on
@@ -681,7 +677,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       if (footer !== undefined) {
         this.log(`\n${stripColumnMarks(footer)}`);
       }
-    } else if (ending !== undefined) {
+    } else {
       // Nothing can be drawn, so the same ending is written out instead. It
       // goes through `log`, which `--json` silences, so the envelope still
       // travels alone on stdout.
@@ -699,45 +695,23 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   /**
    * How this command ends, as the one {@link Summary} both renderings are
-   * built from: the command's own, or the one split out of what it printed.
-   * It is settled here rather than per rendering, so a run that is drawn and
-   * a run that is written cannot end on different words.
+   * built from: the one the command stated. It is settled here rather than per
+   * rendering, so a run that is drawn and a run that is written cannot end on
+   * different words.
    *
-   * Nothing at all is an ending only when the command said nothing: no
-   * rendering, no footer, and nothing drawn into the chain on the way.
+   * The next steps are the result's own, stated once; the ending draws the same
+   * ones unless the summary names steps of its own, or the command already
+   * showed them in output of its own.
    */
-  private endingOf(
-    result: CommandResult,
-    rendered: string,
-    footer: string | undefined,
-  ): Summary | undefined {
+  private endingOf(result: CommandResult, footer: string | undefined): Summary {
     const own = result.summary;
-    if (own !== undefined) {
-      // The next steps are the result's own, stated once; the ending draws the
-      // same ones unless the summary names steps of its own, or the command
-      // already showed them in output of its own.
-      const shown = result.status === "ok" && result.nextShown !== undefined;
-      const steps = own.next ?? (shown ? [] : stepsOf(result.next));
-      return this.withOverview({
-        ...own,
-        ...(steps.length === 0 ? {} : { next: steps }),
-        ...(footer === undefined ? {} : { extras: [...(own.extras ?? []), ...footer.split("\n")] }),
-      });
-    }
-    if (rendered === "" && footer === undefined && !this.ui.opened) {
-      return undefined;
-    }
-    return this.withOverview(
-      summaryOfText(
-        this.summarises() && footer !== undefined ? `${rendered}\n\n${footer}` : rendered,
-        false,
-        this.summarises(),
-        this.id,
-        // A command that answers keeps its own trailing line for the footer,
-        // rather than letting it become another body line.
-        this.summarises() || footer === undefined ? [] : footer.split("\n"),
-      ),
-    );
+    const shown = result.status === "ok" && result.nextShown !== undefined;
+    const steps = own.next ?? (shown ? [] : stepsOf(result.next));
+    return this.withOverview({
+      ...own,
+      ...(steps.length === 0 ? {} : { next: steps }),
+      ...(footer === undefined ? {} : { extras: [...(own.extras ?? []), ...footer.split("\n")] }),
+    });
   }
 
   /**
@@ -1023,38 +997,25 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
 }
 
 /**
- * Renders a {@link CommandResult} as human-facing text for non-JSON mode. A
- * command may supply a bespoke `pretty` string (e.g. `deploy`'s summary);
- * otherwise success payloads are summarised by {@link formatData} and skips are
- * shown with their reason. `next` is the rendered next-step block, which
- * follows the rendering whichever it is, and comes before the warnings.
+ * Renders a {@link CommandResult} as human-facing text for non-JSON mode: the
+ * command's own rendering, or the one its summary gives (`normalizeCommandResult`
+ * settles which). `next` is the rendered next-step block, which follows the
+ * rendering, and comes before the warnings.
  */
-function renderPretty(result: CommandResult, meta: GlobalOptions, next: string): string {
+function renderPretty(result: CommandResult, next: string): string {
   // A command's own rendering arrives spelled out, because the factory that
   // made it knew which spelling its shape takes, so interpolating what the
   // server answered is safe wherever a command does it.
-  const own = result.pretty?.text;
-  if (own !== undefined) {
-    // A command's own rendering replaces the generic one, but neither its
-    // next steps nor its warnings: setting a rendering cannot drop them, and
-    // only `warningsShown` says the rendering said every one itself.
-    const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
-    // One blank line before the next steps, whatever newlines the rendering
-    // ends with; a skip's follow directly, as its generic rendering's always have.
-    const gap = result.status === "ok" ? "\n" : "";
-    const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
-    return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
-  }
-  if (result.status === "ok") {
-    // The generic rendering spells out what the data says itself, because it
-    // also carries the colour the CLI put on the next steps and the warnings.
-    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
-  }
-  // The reason is the command's own words, but a command may name what the
-  // server answered in them, so it is spelled out like any other rendering.
-  return [`Skipped: ${escapeControlCharacters(result.reason)}${suffixBlock(meta)}`, next]
-    .filter(Boolean)
-    .join("\n");
+  const own = result.pretty?.text ?? "";
+  // A rendering replaces nothing of its next steps or its warnings: setting one
+  // cannot drop them, and only `warningsShown` says the rendering said every
+  // one itself.
+  const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
+  // One blank line before the next steps, whatever newlines the rendering
+  // ends with; a skip's follow directly.
+  const gap = result.status === "ok" ? "\n" : "";
+  const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
+  return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
 }
 
 /**
@@ -1101,103 +1062,6 @@ function helpFor(meta: GlobalOptions): string {
  */
 function warningLine(warning: string): string {
   return `${statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
-}
-
-/**
- * The generic rendering: what the data says, then the next steps, then the
- * warnings.
- *
- * What the data says is built here out of values the server answered, so it is
- * spelled out here. The next steps and the warning labels are coloured by the
- * CLI, and are appended afterwards rather than spelled out with the rest:
- * spelling a colour out prints the sequence instead of applying it. Each of
- * those two spells out the values it names where it names them.
- */
-function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next: string): string {
-  if (typeof data === "string") {
-    const suffix = sourceSuffix(opts);
-    const said = escapeControlCharacters(suffix ? `${data}\n${suffix}` : data);
-    return next === "" ? said : `${said}\n\n${next}`;
-  }
-
-  const said: string[] = [];
-  const titleLine =
-    isObject(data) && typeof data.title === "string"
-      ? String(data.title)
-      : "Zitadel command completed.";
-  said.push(titleLine);
-  const suffix = sourceSuffix(opts);
-  if (suffix) {
-    said.push(suffix);
-  }
-
-  if (isObject(data)) {
-    renderKnownSections(said, data);
-  }
-
-  // Spelled out line by line, and never with `map(escapeControlCharacters)`:
-  // `map` would pass each index as the escaper's options.
-  const lines = said.map((line) => {
-    return escapeControlCharacters(line);
-  });
-  if (next !== "") {
-    lines.push("", next);
-  }
-
-  for (const warning of warnings) {
-    lines.push(warningLine(warning));
-  }
-  return lines.join("\n");
-}
-
-function renderKnownSections(lines: string[], data: Record<string, unknown>): void {
-  if (isObject(data.project)) {
-    const project = data.project;
-    // One sentence, not `label=value  label=value`: a label and three values
-    // aligned with nothing were a table in appearance only, and the two spaces
-    // holding them apart were enough to carry the line off the right of the
-    // screen. Said as prose it wraps like every other sentence the CLI writes.
-    const said: string[] = [];
-    if (typeof project.project_id === "string") {
-      said.push(`Project ${project.project_id}`);
-    }
-    if (typeof project.lifecycle === "string") {
-      said.push(`lifecycle ${project.lifecycle}`);
-    }
-    if (typeof project.issuer === "string") {
-      said.push(`issuer ${project.issuer}`);
-    }
-    if (said.length > 0) {
-      lines.push(`${said.join(", ")}.`);
-    }
-  }
-
-  if (typeof data.framework === "string") {
-    lines.push(`framework=${data.framework}`);
-  }
-
-  if (Array.isArray(data.files_written) || Array.isArray(data.files_skipped)) {
-    const written = Array.isArray(data.files_written) ? data.files_written.length : 0;
-    const skippedCount = Array.isArray(data.files_skipped) ? data.files_skipped.length : 0;
-    lines.push(`Files: ${written} written, ${skippedCount} unchanged`);
-  }
-}
-
-function sourceSuffix(opts: GlobalOptions): string {
-  try {
-    const url = new URL(opts.source);
-    if (url.host === new URL(DEFAULT_SERVER).host) {
-      return "";
-    }
-    return `(server: ${url.host})`;
-  } catch {
-    return "";
-  }
-}
-
-function suffixBlock(opts: GlobalOptions): string {
-  const suffix = sourceSuffix(opts);
-  return suffix ? ` ${suffix}` : "";
 }
 
 /** The last step of every box: where to find every command. */

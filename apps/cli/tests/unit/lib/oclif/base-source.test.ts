@@ -61,10 +61,7 @@ class Sourced extends BaseCommand {
   }
 
   protected async execute(): Promise<JsonEnvelope> {
-    return this.emit({
-      status: "ok",
-      data: {},
-    });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 
@@ -103,10 +100,7 @@ class Coloured extends BaseCommand {
 
   protected async execute(): Promise<JsonEnvelope> {
     this.answer = this.isColored;
-    return this.emit({
-      status: "ok",
-      data: {},
-    });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 

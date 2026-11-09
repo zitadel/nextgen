@@ -14,7 +14,7 @@ class Unscoped extends Tabulatable(BaseCommand) {
   }
 
   protected async execute() {
-    return this.emit({ status: "ok", data: {} });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 
   drawList(...args: Parameters<Unscoped["listResult"]>) {
@@ -53,7 +53,7 @@ class Running extends Drawing {
 
   protected override async execute() {
     this.drawn = await this.tabulate(["id"], [{ id: "user_1" }]);
-    return this.emit({ status: "ok", data: {} });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 
