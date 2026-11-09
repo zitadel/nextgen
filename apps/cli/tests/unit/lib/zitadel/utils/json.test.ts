@@ -11,6 +11,7 @@ import {
   toJsonObject,
   withoutKey,
 } from "@/lib/zitadel/utils/json";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 describe("isJsonObject", () => {
   it.each([
@@ -48,9 +49,12 @@ describe("toJsonObject", () => {
   it.each([[["list"]], ["text"], [{ nested: Number.POSITIVE_INFINITY }]])(
     "refuses %j, naming what it is",
     (value) => {
-      expect(() => toJsonObject(value, "The flow")).toThrow(
-        new ConfigError("The flow is not a JSON object"),
-      );
+      const error = thrownBy(() => {
+        return toJsonObject(value, "The flow");
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({ message: "The flow is not a JSON object" });
     },
   );
 });
