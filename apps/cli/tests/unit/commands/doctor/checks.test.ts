@@ -18,7 +18,6 @@ import {
   SecretCheck,
   SecretPermissionsCheck,
 } from "@/commands/doctor/checks";
-import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
 import { loadPatchContext } from "@/commands/doctor/patch-context";
 import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
 import { createOrca } from "@/lib/orca";
@@ -2675,23 +2674,5 @@ describe("DependencyVersionCheck", () => {
         details: { remedy_command: `pnpm add --save-exact @zitadel/sdk-next@${RELEASE}` },
       });
     });
-  });
-});
-
-describe("exactZitadelPins", () => {
-  it("is undefined without a package.json", async ({ dir }) => {
-    const pins = await exactZitadelPins(dir);
-
-    expect(pins).toBeUndefined();
-  });
-
-  it("refuses a package.json that is not valid JSON", async ({ dir }) => {
-    await write(dir, { "package.json": "{ not json" });
-
-    const error = await rejectionOf(() => {
-      return exactZitadelPins(dir);
-    });
-
-    expect(error).toBeInstanceOf(SyntaxError);
   });
 });

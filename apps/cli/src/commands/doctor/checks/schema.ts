@@ -1,21 +1,10 @@
 import { createZitadelClient, IdpService } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
+import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
 import { userAgent } from "@/lib/user-agent";
-import {
-  CONFIG_DIRECTORIES,
-  DiskStore,
-  type Issue,
-  type RuleId,
-  ZitadelConfig,
-} from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
-
-/**
- * The rule whose advice only holds before a connection's first deploy, so it
- * can only be judged knowing which connections the project already has.
- */
-const DEPLOYED_DEPENDENT_RULE: RuleId = "sso/subject-claim-unstable";
 
 /**
  * What one read of the configuration found.

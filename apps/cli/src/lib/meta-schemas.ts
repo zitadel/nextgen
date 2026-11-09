@@ -20,7 +20,7 @@ import semver from "semver";
 
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
-import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
+import { exactZitadelPins } from "@/lib/zitadel-pins";
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";
 import { mapBounded } from "./map-bounded";
