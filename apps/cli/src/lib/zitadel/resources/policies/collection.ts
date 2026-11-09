@@ -146,7 +146,7 @@ export class Policies extends Collection<Policy> {
    * @remarks
    * The operations narrow the files by name before any is judged, so a broken
    * file of another operation never blocks the ones asked for. The files are
-   * reported in path order, the order a store reads them in.
+   * reported in path order by code unit, the order a store reads them in.
    *
    * @param documents - The policies or the test files.
    * @param kind - Which of the two they are, which the broken files are
@@ -182,8 +182,15 @@ export class Policies extends Collection<Policy> {
         return { path: file.path, document: undefined, issues: file.issues };
       });
     // The spread makes a fresh list, so sorting it changes nothing anyone else holds.
+    // Paths compare by code unit, the order a store lists files in, whatever the locale.
     const judged = [...checked, ...broken].sort((a, b) => {
-      return a.path.localeCompare(b.path);
+      if (a.path < b.path) {
+        return -1;
+      }
+      if (a.path > b.path) {
+        return 1;
+      }
+      return 0;
     });
     return {
       documents: checked

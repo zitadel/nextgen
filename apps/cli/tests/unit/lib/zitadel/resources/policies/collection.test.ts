@@ -72,6 +72,20 @@ describe("Policies.selectPolicies", () => {
     expect(issues).toEqual([expect.stringContaining(`${POLICY_PATH}: config.min_length`)]);
   });
 
+  it("reports the problems in code-unit path order, whatever the locale", () => {
+    const config = aConfig({
+      policies: { "a.json": aPasswordPolicy({}), "B.json": aPasswordPolicy({}) },
+    });
+
+    const { issues } = config.policies.selectPolicies();
+
+    expect(
+      issues.map((issue) => {
+        return issue.split(":")[0];
+      }),
+    ).toEqual([`${CONFIG_DIRECTORIES.policies}/B.json`, `${CONFIG_DIRECTORIES.policies}/a.json`]);
+  });
+
   it("reports a policy file not named after its operation", () => {
     const config = aConfig({ policies: { "password.json": aPasswordPolicy({}) } });
 
