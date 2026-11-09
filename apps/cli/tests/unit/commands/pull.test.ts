@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
@@ -159,6 +159,97 @@ describe("pull of a release pinning a handle that has no file", () => {
     ]);
 
     expect(existsSync(join(project.cwd, ".zitadel/schemas/good.json"))).toBe(false);
+  });
+});
+
+describe("pull of a release pinning two handles that resolve to one file", () => {
+  /**
+   * Answers a release pinning the given schema handles, in order.
+   *
+   * @param handles - The handles the release pins.
+   * @returns The handlers.
+   */
+  function pinning(handles: readonly string[]) {
+    return [
+      http.get(`${PLATFORM_URL}/api/v1/releases/${RELEASE_ID}`, ({ request }) => {
+        return HttpResponse.json({
+          id: RELEASE_ID,
+          project_id: new URL(request.url).searchParams.get("project_id"),
+          content_hash: `sha256:${"0".repeat(64)}`,
+          metadata: {
+            message: null,
+            git_sha: null,
+            git_dirty: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            created_by: null,
+            created_by_type: "service",
+          },
+          revoked_at: null,
+          pointers: handles.map((handle) => {
+            return { kind: "schema", handle, revision_id: `sch_${handle}` };
+          }),
+        });
+      }),
+      http.get(`${PLATFORM_URL}/api/v1/schemas/:id`, ({ params }) => {
+        return HttpResponse.json({ id: params.id, schema: { objectType: "human-user" } });
+      }),
+    ];
+  }
+
+  it.each([[["signup", "register"]], [["register", "signup"]]])(
+    "refuses it, naming both handles and the file, pinned as %j",
+    async (handles) => {
+      const project = await aProjectWithTwoDeploys("zitadel-pull-");
+      dirs.push(project.cwd);
+      const file = join(project.cwd, ".zitadel/schemas/signup.json");
+      await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
+      await writeFile(file, JSON.stringify({ objectType: "register" }));
+      const before = await readFile(file, "utf8");
+      server.use(...pinning(handles));
+
+      const printed = vi.spyOn(console, "log").mockImplementation(() => {
+        return undefined;
+      });
+      await rejectionOf(() => {
+        return Pull.run([RELEASE_ID, "--cwd", project.cwd, "--server", PLATFORM_URL, "--json"]);
+      });
+      const said = printed.mock.calls.flat().join("\n");
+      printed.mockRestore();
+
+      const envelope = JSON.parse(said);
+      expect(envelope).toMatchObject({ status: "error", code: "E_CONFLICT" });
+      expect(envelope.message).toContain('"signup"');
+      expect(envelope.message).toContain('"register"');
+      expect(envelope.message).toContain(".zitadel/schemas/signup.json");
+      expect(await readFile(file, "utf8")).toBe(before);
+    },
+  );
+});
+
+describe("pull's --json envelope", () => {
+  it.each([
+    [[], ["release_id", "pulled", "skipped", "next_commands"]],
+    [["--dry-run"], ["release_id", "pulled", "skipped", "dry_run", "next_commands"]],
+  ])("holds exactly the keys of a run with flags %j", async (flags, keys) => {
+    const project = await aProjectWithTwoDeploys("zitadel-pull-");
+    dirs.push(project.cwd);
+    server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
+
+    const envelope = await Pull.run([
+      "latest",
+      "--cwd",
+      project.cwd,
+      "--server",
+      PLATFORM_URL,
+      "--json",
+      ...flags,
+    ]);
+
+    expect(envelope.status).toBe("ok");
+    if (envelope.status !== "ok") {
+      return;
+    }
+    expect(Object.keys(Object(envelope.data))).toEqual(keys);
   });
 });
 

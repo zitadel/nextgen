@@ -17,6 +17,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
 
@@ -86,6 +87,19 @@ const TARGET: Refused<PullTarget> = {
   refusal: {
     message: 'Don\'t know how to pull "{value}".',
     hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
+  },
+};
+
+/**
+ * What a release that pins two resources into one file is refused for.
+ */
+const SHARED_FILE_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: 'The release pins "{first}" and "{second}", which both go in {path}.',
+  hint: "Rename one of them in the source configuration and deploy again, or reconcile the file by hand.",
+  details: {
+    path: "{path}",
+    handles: "{handles}",
   },
 };
 
@@ -236,6 +250,7 @@ export default class Pull extends EnvironmentCommand {
       }
       outcomes.push(attempt.outcome);
     }
+    this.refuseSharedFiles(outcomes);
     if (!this.dryRun) {
       for (const outcome of outcomes) {
         if (outcome.kind === "pulled") {
@@ -279,11 +294,42 @@ export default class Pull extends EnvironmentCommand {
         release_id: release.id,
         pulled,
         skipped,
-        dry_run: this.dryRun ? true : undefined,
+        ...(this.dryRun ? { dry_run: true } : {}),
       },
       next: { commands: next },
       pretty: prose(`${headline}\n${summary}`),
     });
+  }
+
+  /**
+   * Refuse a pull in which two pinned resources would be written to one file.
+   *
+   * @remarks
+   * Each change is computed against the configuration as it was loaded, so the
+   * second write over a shared file would silently replace the first. This
+   * runs before anything is written, so the working copy stays untouched.
+   *
+   * @param outcomes - What became of each pinned resource, in pin order.
+   * @throws {@link ZitadelError} With `E_CONFLICT` naming both handles and the
+   *   file when two outcomes target the same path.
+   */
+  private refuseSharedFiles(outcomes: readonly PullOutcome[]): void {
+    const owners = new Map<string, PulledResource>();
+    for (const outcome of outcomes) {
+      if (outcome.kind !== "pulled") {
+        continue;
+      }
+      const owner = owners.get(outcome.resource.path);
+      if (owner !== undefined) {
+        throw refusalError(SHARED_FILE_REFUSAL, {
+          first: owner.handle,
+          second: outcome.resource.handle,
+          path: outcome.resource.path,
+          handles: [owner.handle, outcome.resource.handle],
+        });
+      }
+      owners.set(outcome.resource.path, outcome.resource);
+    }
   }
 
   /**
