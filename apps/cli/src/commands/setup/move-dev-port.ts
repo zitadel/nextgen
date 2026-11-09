@@ -1,3 +1,5 @@
+import { basename } from "node:path";
+
 import {
   DeploymentService,
   OriginService,
@@ -69,6 +71,9 @@ export async function moveDevPort(opts: {
   const issuer = issuerFromPort(devPort);
   const secret = await readZitadelSecret(cwd);
   const moving = previousIssuer !== issuer;
+  // Read before anything changes, so a configuration that cannot be read
+  // stops the move rather than leaving it half made.
+  const ssoProviders = moving ? await connectionSlugs(cwd) : [];
 
   const client = createZitadelClient({
     userAgent: userAgent(),
@@ -157,7 +162,7 @@ export async function moveDevPort(opts: {
     previousIssuer,
     issuer,
     result,
-    ssoProviders: moving ? await connectionSlugs(cwd) : [],
+    ssoProviders,
     ...(staleOrigin === undefined ? {} : { staleOrigin }),
     ...(refused === undefined ? {} : { refused }),
     ...served,
@@ -202,15 +207,33 @@ async function serveNewOrigin(
  * The names of the project's connections, whose redirect URIs name the dev
  * port.
  *
+ * @remarks
+ * A connection file its contract refuses is still a provider whose redirect
+ * URI names the port, so it is listed by its file name beside the valid ones.
+ *
  * @param cwd - The project root.
- * @returns Each connection's name, in path order; none when the
- *   configuration cannot be read.
+ * @returns Each connection's name, in path order.
+ * @throws The error the configuration could not be read with.
  */
 async function connectionSlugs(cwd: string): Promise<readonly string[]> {
-  const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd)).catch(() => {
-    return ZitadelConfig.empty();
-  });
-  return config.connections.all.map((connection) => {
-    return connection.slug;
-  });
+  const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
+  const named = [
+    ...config.connections.all.map((connection) => {
+      return { path: connection.path, name: connection.slug };
+    }),
+    ...config.broken
+      .filter((file) => {
+        return file.kind === "connection";
+      })
+      .map((file) => {
+        return { path: file.path, name: basename(file.path, ".json") };
+      }),
+  ];
+  return named
+    .sort((left, right) => {
+      return left.path.localeCompare(right.path);
+    })
+    .map((connection) => {
+      return connection.name;
+    });
 }
