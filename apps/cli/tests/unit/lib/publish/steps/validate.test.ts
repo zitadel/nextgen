@@ -325,6 +325,34 @@ describe("validateStep", () => {
       });
     });
 
+    it("lists the steps a refusal names under its issue", async () => {
+      const flow = aLoginFlow({ userSchema: "human-user" });
+      const config = aConfig({
+        schemas: { "human-user.json": aUserSchema() },
+        flows: {
+          "default-login.json": {
+            ...flow,
+            steps: [{ name: "identifier", sso_providers: ["google", "google"] }],
+          },
+        },
+      });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        details: {
+          issues: expect.arrayContaining([
+            expect.objectContaining({
+              steps: ["identifier"],
+              path: ".zitadel/flows/default-login.json",
+            }),
+          ]),
+        },
+      });
+    });
+
     it("accepts a field the named schema declares", async () => {
       const config = aFlowNaming("human-user", ["email"]);
 

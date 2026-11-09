@@ -16,7 +16,7 @@ import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
-import { BrokenFilesError, type Change, DiskStore, UserSchema } from "@/lib/zitadel";
+import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -121,6 +121,17 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    */
   writeChange(target: SchemaTarget, change: Change, consent?: Consent): Promise<readonly string[]> {
     return this.write(target, change, consent);
+  }
+
+  /**
+   * Makes a change that may leave no way to sign in, without a run.
+   *
+   * @param target - The schema the change is to.
+   * @param make - Makes the change.
+   * @returns The change with its consent, or `undefined` when the person said no.
+   */
+  confirming(target: SchemaTarget, make: () => Change): Promise<unknown> {
+    return this.confirmIfNoSignInLeft(target, [], make);
   }
 }
 
@@ -377,6 +388,111 @@ describe("AuthMethodCommand", () => {
     });
   });
 
+  describe("with --dry-run and nobody to ask", () => {
+    /**
+     * Runs `auth-method passkey disable` for a Project whose only method is
+     * passkey, as a script, and reads the JSON it printed.
+     *
+     * @param cwd - The Project.
+     * @param flags - Further flags.
+     * @returns The error that ended it, if one did, and what it printed.
+     */
+    async function scripted(cwd: string, ...flags: string[]): Promise<unknown> {
+      await rejectionOf(() => {
+        return AuthMethodPasskeyDisable.run(
+          passkeyDisable(cwd, "--non-interactive", "--json", ...flags),
+          CONFIG,
+        );
+      });
+      const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+      return JSON.parse(printed);
+    }
+
+    it("refuses, asking for a preview again with --force", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
+
+      const printed = await scripted(cwd, "--dry-run");
+
+      expect(printed).toMatchObject({
+        status: "error",
+        code: "E_CONFIRMATION_REQUIRED",
+        details: {
+          suggested_args: [
+            [
+              "auth-method",
+              "passkey",
+              "disable",
+              "--schema",
+              "default-human-user",
+              "--cwd",
+              cwd,
+              "--force",
+              "--dry-run",
+            ],
+            expect.anything(),
+          ],
+        },
+      });
+    });
+
+    it("previews the change when --force answers for them", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
+
+      const printed = await scripted(cwd, "--dry-run", "--force");
+
+      expect(printed).toMatchObject({ status: "skipped", reason: "dry-run" });
+    });
+  });
+
+  describe("without --dry-run and nobody to ask", () => {
+    it("refuses, with a retry that does not preview", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
+
+      await rejectionOf(() => {
+        return AuthMethodPasskeyDisable.run(
+          passkeyDisable(cwd, "--non-interactive", "--json"),
+          CONFIG,
+        );
+      });
+
+      expect(JSON.parse(vi.mocked(console.log).mock.calls.flat().join("\n"))).toMatchObject({
+        code: "E_CONFIRMATION_REQUIRED",
+        details: {
+          suggested_args: [
+            [
+              "auth-method",
+              "passkey",
+              "disable",
+              "--schema",
+              "default-human-user",
+              "--cwd",
+              cwd,
+              "--force",
+            ],
+            expect.anything(),
+          ],
+        },
+      });
+    });
+  });
+
+  describe("when making the change fails for another reason", () => {
+    it("raises that failure as it is, without asking", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
+      const read = await target(cwd);
+      const unrelated = new Error("the flows are broken");
+
+      const error = await rejectionOf(() => {
+        return new ChangeWriter([], CONFIG).confirming(read, () => {
+          throw unrelated;
+        });
+      });
+
+      expect(error).toBe(unrelated);
+      expect(confirm).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when run from inside the Project", () => {
     it("suggests a dry run and a deploy without --cwd", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
@@ -484,6 +600,27 @@ describe("AuthMethodCommand.write", () => {
     expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
       enabled: false,
     });
+  });
+
+  it("writes an edit to a schema that had no way to sign in without consent", async ({ dir }) => {
+    const cwd = await makeProject(dir, {
+      schemas: {
+        "default-human-user": aSchema({
+          password: { enabled: false },
+          passkey: { enabled: false },
+        }),
+      },
+    });
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const edited = UserSchema.create({
+      path: read.schema.path,
+      body: { ...read.schema.body, title: "People" },
+    });
+
+    await writer.writeChange(read, read.config.schemas.put(edited));
+
+    expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty("title", "People");
   });
 
   it("returns the paths it wrote", async ({ dir }) => {
@@ -725,6 +862,24 @@ describe("readSchemaTarget", () => {
       expect(error).toMatchObject({
         problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
       });
+    });
+  });
+
+  describe("when choosing the schema fails for a reason that is no refusal", () => {
+    it("raises that failure, not the broken file", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: { customers: aUserSchema({ objectType: 7 }) },
+      });
+      const unrelated = new TypeError("not a refusal");
+      vi.spyOn(Schemas.prototype, "resolve").mockImplementation(() => {
+        throw unrelated;
+      });
+
+      const error = await rejectionOf(() => {
+        return target(cwd);
+      });
+
+      expect(error).toBe(unrelated);
     });
   });
 
