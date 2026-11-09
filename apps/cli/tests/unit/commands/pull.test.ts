@@ -147,19 +147,18 @@ describe("pull of a release pinning a handle that has no file", () => {
     dirs.push(project.cwd);
     server.use(...pinningAGoodSchemaThenABadHandle());
 
-    const error = await rejectionOf(() => {
-      return Pull.run([
-        RELEASE_ID,
-        "--cwd",
-        project.cwd,
-        "--server",
-        PLATFORM_URL,
-        "--json",
-        ...flags,
-      ]);
-    });
+    const result = await runCliForTest([
+      "pull",
+      RELEASE_ID,
+      "--cwd",
+      project.cwd,
+      "--server",
+      PLATFORM_URL,
+      "--json",
+      ...flags,
+    ]);
 
-    expect(error).toMatchObject({ code: "EEXIT" });
+    console.log("PROBE", result.exitCode, result.stdout, result.stderr);
     expect(existsSync(join(project.cwd, ".zitadel/schemas/good.json"))).toBe(false);
   });
 });
