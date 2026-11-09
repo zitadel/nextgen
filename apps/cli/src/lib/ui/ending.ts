@@ -63,7 +63,7 @@ export class Ending {
         .render()
         .split("\n")
         .map((line) => pc.red(line));
-      const under = body.length === 0 ? [] : [new Prose(body.join("\n"), WIDTH).render()];
+      const under = body.length === 0 ? [] : [this.laidOut(body)];
       const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
       return `${[...stated, ...under, ...footer].join("\n")}\n`;
     }
@@ -73,10 +73,17 @@ export class Ending {
       .filter((part) => part !== "")
       .join(" · ");
     return [
-      ...(body.length === 0 ? [] : [new Prose(body.join("\n"), WIDTH).render(), ""]),
+      ...(body.length === 0 ? [] : [this.laidOut(body), ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
       "",
     ].join("\n");
+  }
+
+  /** The body as it is drawn: folded to the width, unless it is not the CLI's to lay out. */
+  private laidOut(body: readonly string[]): string {
+    return this.summary.verbatim === true
+      ? body.join("\n")
+      : new Prose(body.join("\n"), WIDTH).render();
   }
 
   /**

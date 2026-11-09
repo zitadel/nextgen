@@ -227,6 +227,24 @@ describe("which shape an ending takes", () => {
     expect(shown).toContain("Create an app:\n  $ zitadel setup --server local");
   });
 
+  // A server's log lines are not the CLI's to lay out: folded to 80 columns they
+  // stop being lines a person can search for.
+  it("writes verbatim output exactly as given, however wide", () => {
+    const line = `time=now level=INFO source=server.go:530 msg="${"x".repeat(120)}"`;
+
+    const shown = plain(normally({ lines: [line], verbatim: true }).renderStandalone());
+
+    expect(shown).toContain(`${line}\n`);
+  });
+
+  it("folds ordinary output to the width, which verbatim output is spared", () => {
+    const line = `time=now level=INFO source=server.go:530 msg="${"x ".repeat(60)}"`;
+
+    const shown = plain(normally({ lines: [line] }).renderStandalone());
+
+    expect(shown).not.toContain(`${line}\n`);
+  });
+
   // A dim unmarked footer is right for an answer and wrong for an error: it
   // would make "Error E_NOT_FOUND: …" read exactly like "No variables on the
   // project". With no chain to close in red, the headline itself is red.
