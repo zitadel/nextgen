@@ -6,7 +6,14 @@ import type { JsonObject } from "@/lib/zitadel/types";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
+/**
+ * Where the schema in these tests sits.
+ */
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
+
+/**
+ * The `$id` the flows name the schema by.
+ */
 const SCHEMA_ID = "https://schemas.test.invalid/default-human-user.json";
 
 /**
@@ -60,7 +67,7 @@ function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolea
   if (original === undefined) {
     throw new Error("the configuration has no schema");
   }
-  const edited = original.withMethod(method, enabled);
+  const edited = enabled ? original.withMethod(method) : original.withoutMethod(method);
   return { before: config, after: config.with(edited), original, edited };
 }
 

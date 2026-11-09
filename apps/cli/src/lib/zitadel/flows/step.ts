@@ -2,18 +2,47 @@ import { type StepName, stepName } from "@/lib/zitadel/names";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
-/** One transition out of a step: what fires it, and where it goes. */
+/**
+ * One transition out of a step: what fires it, and where it goes.
+ */
 export type Transition = Readonly<{
+  /**
+   * The outcome that fires it, such as `sso_authenticated`.
+   */
   outcome: string;
+  /**
+   * The step it goes to; empty when it names none.
+   */
   target: string;
-  /** `switch` or `pivot` for a transition to another flow; `null` within this one. */
+  /**
+   * `switch` or `pivot` for a transition to another flow; `null` within this one.
+   */
   action: string | null;
-  /** The purpose it re-purposes to, or `null`. */
+  /**
+   * The purpose it re-purposes to, or `null`.
+   */
   purpose: string | null;
 }>;
 
-/** One action a step declares. */
-export type StepAction = Readonly<{ name: string; kind: string }>;
+/**
+ * One action a step declares.
+ */
+export type StepAction = Readonly<{
+  /**
+   * The action's name, as the step's outcomes refer to it.
+   */
+  name: string;
+  /**
+   * What the action does, such as `passkey`.
+   */
+  kind: string;
+}>;
+
+/**
+ * The outcome the engine raises when a provider's sign-in collides with an
+ * existing account.
+ */
+const COLLISION_OUTCOME = "user_already_exists";
 
 /**
  * One step of a login flow, read-only: the questions the rules ask of it.
@@ -23,9 +52,21 @@ export type StepAction = Readonly<{ name: string; kind: string }>;
  * {@link Flow}.
  */
 export class Step {
+  /**
+   * The step's name; empty when it has none.
+   */
   readonly name: StepName;
+
+  /**
+   * The step's JSON, exactly as the flow holds it.
+   */
   private readonly body: JsonObject;
 
+  /**
+   * Hold a step's JSON.
+   *
+   * @param body - The step's JSON.
+   */
   private constructor(body: JsonObject) {
     this.body = body;
     this.name = stepName(typeof body.name === "string" ? body.name : "");
@@ -41,12 +82,20 @@ export class Step {
     return new Step(body);
   }
 
-  /** The providers `sso_providers` lists, as written. */
+  /**
+   * The providers `sso_providers` lists, as written.
+   *
+   * @returns The strings listed, in order; none when there is no list.
+   */
   get providers(): readonly string[] {
     return stringsIn(this.body.sso_providers);
   }
 
-  /** The providers listed more than once, which offers their button twice. */
+  /**
+   * The providers listed more than once, which offers their button twice.
+   *
+   * @returns Each repeated provider once, in the order first repeated.
+   */
   get repeatedProviders(): readonly string[] {
     const providers = this.providers;
     return [
@@ -58,12 +107,24 @@ export class Step {
     ];
   }
 
-  /** The fields the step asks for, as written. */
+  /**
+   * The fields the step asks for, as written.
+   *
+   * @returns The strings listed, in order; none when there is no list.
+   */
   get fields(): readonly string[] {
     return stringsIn(this.body.fields);
   }
 
-  /** The actions the step declares. */
+  /**
+   * The actions the step declares.
+   *
+   * @remarks
+   * A name or kind that is not a string is spelled out, so a rule can still
+   * name it.
+   *
+   * @returns Each action that is an object, in order; none when there is no list.
+   */
   get actions(): readonly StepAction[] {
     const actions: readonly unknown[] = Array.isArray(this.body.actions) ? this.body.actions : [];
     return actions.filter(isJsonObject).map((action) => {
@@ -74,17 +135,29 @@ export class Step {
     });
   }
 
-  /** Whether the step declares any gate. */
+  /**
+   * Whether the step declares any gate.
+   *
+   * @returns True when `gates` has at least one entry.
+   */
   get hasGates(): boolean {
     return Object.keys(objectAt(this.body, "gates")).length > 0;
   }
 
-  /** Whether completing the step creates a user from a provider's sign-in. */
+  /**
+   * Whether completing the step creates a user from a provider's sign-in.
+   *
+   * @returns True when `on_success` is `create_user_with_sso`.
+   */
   get createsUserFromSso(): boolean {
     return this.body.on_success === "create_user_with_sso";
   }
 
-  /** Every transition out of the step. */
+  /**
+   * Every transition out of the step.
+   *
+   * @returns One per outcome, in the order written; none when there are none.
+   */
   get transitions(): readonly Transition[] {
     return Object.entries(objectAt(this.body, "transitions")).map(([outcome, route]) => {
       const entry = isJsonObject(route) ? route : {};
@@ -98,15 +171,20 @@ export class Step {
   }
 
   /**
-   * The outcomes the step routes. The engine follows an SSO collision only
-   * through a `user_already_exists` transition that has no action: one that
-   * switches or pivots to another flow leaves the step showing the SSO error.
+   * The outcomes the step routes.
+   *
+   * @remarks
+   * The engine follows an SSO collision only through a `user_already_exists`
+   * transition that has no action: one that switches or pivots to another
+   * flow leaves the step showing the SSO error.
+   *
+   * @returns The outcomes the engine follows.
    */
   get routes(): ReadonlySet<string> {
     const transitions = objectAt(this.body, "transitions");
     return new Set(
       Object.keys(transitions).filter((outcome) => {
-        if (outcome !== "user_already_exists") {
+        if (outcome !== COLLISION_OUTCOME) {
           return true;
         }
         const route = transitions[outcome];
@@ -115,10 +193,15 @@ export class Step {
     );
   }
 
-  /** Whether `user_already_exists` is there but carries an action, which the engine does not follow. */
+  /**
+   * Whether `user_already_exists` is there but carries an action, which the
+   * engine does not follow.
+   *
+   * @returns True when the collision transition is written but not routed.
+   */
   get collisionCarriesAction(): boolean {
     const transitions = objectAt(this.body, "transitions");
-    return "user_already_exists" in transitions && !this.routes.has("user_already_exists");
+    return COLLISION_OUTCOME in transitions && !this.routes.has(COLLISION_OUTCOME);
   }
 
   /**

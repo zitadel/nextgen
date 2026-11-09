@@ -26,10 +26,14 @@ import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 import type { Notice } from "@/lib/zitadel/change";
 import type { SkippedRegion } from "@/lib/zitadel/flows/types";
 
-/** What enabling a provider is told beyond the connection itself. */
+/**
+ * What enabling a provider is told beyond the connection itself.
+ */
 export type SsoOptions = LookupOptions &
   Readonly<{
-    /** The settings the developer gave, which an existing connection may not have. */
+    /**
+     * The settings the developer gave, which an existing connection may not have.
+     */
     given?: readonly ConnectionSetting[] | undefined;
   }>;
 
@@ -47,7 +51,7 @@ export type SsoOptions = LookupOptions &
  *   shape it writes.
  */
 export function ssoFlows(config: ZitadelConfig, schema: UserSchema): readonly Flow[] {
-  schema.refuseUneditable(schema.editRefusal());
+  schema.assertProviderEditable();
   const flows = config.flowsFor(schema);
   if (flows.length === 0) {
     throw new NotFoundError(`No login flow runs against ${schema.name}`, {
@@ -58,7 +62,7 @@ export function ssoFlows(config: ZitadelConfig, schema: UserSchema): readonly Fl
     });
   }
   for (const flow of flows) {
-    flow.refuseUneditable(flow.editRefusal());
+    flow.assertProviderEditable();
   }
   return flows;
 }
@@ -97,18 +101,15 @@ export function enableSso(
     });
   }
   const edited = schema.withProvider(slug);
-  const edits = flows.map((flow) => {
-    return flow.withProvider(slug, schema.enabledMethods);
-  });
   const start = existing === undefined ? config.with(candidate) : config;
-  const after = edits.reduce((current, edit) => {
-    return current.with(edit.flow);
+  const after = flows.reduce((current, flow) => {
+    return current.with(flow.withProvider(slug, schema.enabledMethods));
   }, start.with(edited));
   const edit = { before: config, after, original: schema, edited };
   assertFlowsIntact(edit);
-  const skipped = edits.flatMap((flowEdit) => {
-    return flowEdit.skipped.map((region) => {
-      return untouchedNotice(flowEdit.flow, region, slug);
+  const skipped = flows.flatMap((flow) => {
+    return flow.regionsLeftAlone(slug, schema.enabledMethods).map((region) => {
+      return untouchedNotice(flow, region, slug);
     });
   });
   return new Change({

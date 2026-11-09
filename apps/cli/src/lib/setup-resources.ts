@@ -65,7 +65,13 @@ import { isErrno, isMissingEndpoint, ZitadelError } from "./errors";
 import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 import { reportWarning } from "./warnings";
 
+/**
+ * What setup's resources left behind.
+ */
 export type MaterializeSetupResourcesResult = {
+  /**
+   * The project-relative paths of the files written.
+   */
   filesWritten: string[];
   /**
    * The minimum password length the policy setup published holds. A kept
@@ -83,27 +89,48 @@ export type MaterializeSetupResourcesResult = {
  * after the framework patcher has created `.zitadel/{flows,schemas}` and the
  * initial state file.
  *
+ * @remarks
  * The schema is uploaded without an `$id`: the server assigns an opaque id on
  * `POST /schemas`. The flow names the schema by its `objectType`, but is
  * published after it because the server refuses a flow naming no schema.
+ *
+ * @param opts - Where the project is, how to reach the platform, and what to
+ *   scaffold.
+ * @returns The files written, and the minimum password length published.
+ * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
+ *   replace is already there.
  */
 export async function materializeSetupResources(opts: {
-  cwd: string;
-  client: ZitadelClient;
-  projectId: string;
-  force: boolean;
-  /** Sign-in preset (flow + auth methods) to scaffold; defaults to password-first. */
-  preset?: SetupPreset;
-  /** Use case (schema field set) to scaffold; defaults to minimal. */
-  useCase?: SetupUseCase;
   /**
-   * Social provider to enable while scaffolding. Its connection is written
-   * and created before the schema and flow that reference it, so the Project
-   * is never published naming a provider the platform does not hold.
+   * The project root.
    */
+  cwd: string;
+  /**
+   * The client the resources are uploaded through.
+   */
+  client: ZitadelClient;
+  /**
+   * The project the resources belong to.
+   */
+  projectId: string;
+  /**
+   * Whether the default schema and flow may be replaced.
+   */
+  force: boolean;
+  /**
+   * Sign-in preset (flow + auth methods) to scaffold; defaults to password-first.
+   */
+  preset?: SetupPreset;
+  /**
+   * Use case (schema field set) to scaffold; defaults to minimal.
+   */
+  useCase?: SetupUseCase;
   /**
    * The providers to enable, in the order they were chosen. One connection is
    * created per entry, and every slug is added to the schema and the flow.
+   * Each connection is written and created before the schema and flow that
+   * reference it, so the project is never published naming a provider the
+   * platform does not hold.
    */
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
   /**
@@ -206,7 +233,7 @@ export async function materializeSetupResources(opts: {
   // rather than inferred from the preset.
   const flowDocument = slugs.reduce(
     (document, slug) => {
-      return document.withProvider(slug, schemaDocument.enabledMethods).flow;
+      return document.withProvider(slug, schemaDocument.enabledMethods);
     },
     Flow.create({ path: DEFAULT_FLOW_CONFIG_PATH, body: flowTemplate }),
   );
@@ -314,16 +341,37 @@ export async function materializeSetupResources(opts: {
  * file it refuses to write: the default schema or flow without `force`, or a
  * connection for one of the chosen providers, which it never replaces.
  *
+ * @remarks
  * Setup calls this before it creates the project. Those files are written
  * only once the project exists, so a conflict found there leaves the project
  * behind, and a rerun keeps its id and secret in `.env.local`: setup merges
  * only the keys that file is missing.
+ *
+ * @param opts - Where the project is, and what setup would scaffold.
+ * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
+ *   would refuse to write, or `E_VALIDATION` for a kept password policy that
+ *   is not valid.
  */
 export async function assertNoSetupResourceConflicts(opts: {
+  /**
+   * The project root.
+   */
   cwd: string;
+  /**
+   * Whether the default schema and flow may be replaced.
+   */
   force: boolean;
+  /**
+   * The sign-in preset setup would scaffold.
+   */
   preset?: SetupPreset;
+  /**
+   * The use case setup would scaffold.
+   */
   useCase?: SetupUseCase;
+  /**
+   * The providers setup would enable.
+   */
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
 }): Promise<void> {
   const schemaTemplate = getDefaultHumanUserSchemaBody({
@@ -333,14 +381,31 @@ export async function assertNoSetupResourceConflicts(opts: {
   await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
 }
 
-/** The connection a chosen provider gets, and the provider it was chosen as. */
+/**
+ * The connection a chosen provider gets, and the provider it was chosen as.
+ */
 type PlannedConnection = Readonly<{
+  /**
+   * The provider's slug.
+   */
   slug: ConnectionSlug;
+  /**
+   * The connection setup would write for it.
+   */
   connection: Connection;
+  /**
+   * The provider as it was chosen.
+   */
   selection: ProviderSelection;
 }>;
 
-/** The connection each chosen provider gets, scaffolded against the schema setup writes. */
+/**
+ * The connection each chosen provider gets, scaffolded against the schema setup writes.
+ *
+ * @param schemaTemplate - The schema setup writes.
+ * @param sso - The chosen providers, and where each answers.
+ * @returns One planned connection per provider, in the order chosen.
+ */
 function planConnections(
   schemaTemplate: UserSchemaDocument,
   sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
@@ -357,14 +422,23 @@ function planConnections(
 }
 
 /**
- * Throws on the first file setup would refuse to write. A connection is
- * refused with or without `force`, for two reasons: the file is the
- * developer's (see {@link connectionExists}), and finding out after the
+ * Throws on the first file setup would refuse to write.
+ *
+ * @remarks
+ * A connection is refused with or without `force`, for two reasons: the file
+ * is the developer's (see {@link connectionExists}), and finding out after the
  * create would leave the project holding a connection no local file tracks.
  *
  * The same questions `auth-method sso enable` asks: which file holds the slug, and whose
  * variables would collide. A plan that throws names the conflict; one that
  * says reuse means a connection file already holds this provider.
+ *
+ * @param cwd - The project root.
+ * @param force - Whether the default schema and flow may be replaced.
+ * @param connections - The connections setup would write.
+ * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
+ *   would refuse to write, or `E_VALIDATION` for a kept password policy that
+ *   is not valid.
  */
 async function refuseResourceConflicts(
   cwd: string,
@@ -405,9 +479,15 @@ async function refuseResourceConflicts(
 }
 
 /**
- * A kept policy file with the minimum setup was given: unchanged when none was
- * given, without `min_length` for an explicit "none", with the new value
- * otherwise. Its other settings stay as the project chose them.
+ * A kept policy file with the minimum setup was given.
+ *
+ * @remarks
+ * Its other settings stay as the project chose them.
+ *
+ * @param kept - The policy file the project has.
+ * @param minLength - The minimum setup was given.
+ * @returns The file unchanged when none was given, without `min_length` for an
+ *   explicit "none", and with the new value otherwise.
  */
 function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefined): PolicyFile {
   // Unchanged is the file as it is, so setup neither rewrites nor reports it.
@@ -420,9 +500,16 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
 }
 
 /**
- * The password policy file a project already has, or `undefined` when there is
- * none. It must be a valid policy for the password operation: setup publishes
- * it as it is, so a broken one is refused here, before it reaches the server.
+ * The password policy file a project already has.
+ *
+ * @remarks
+ * It must be a valid policy for the password operation: setup publishes it as
+ * it is, so a broken one is refused here, before it reaches the server.
+ *
+ * @param config - The project's configuration.
+ * @returns The policy, or `undefined` when there is none.
+ * @throws {@link ZitadelError} With `E_VALIDATION` when the file is not a
+ *   valid password policy.
  */
 function passwordPolicyOf(config: ZitadelConfig): PolicyFile | undefined {
   const file = config.policies.find((policy) => {
@@ -447,9 +534,17 @@ function passwordPolicyOf(config: ZitadelConfig): PolicyFile | undefined {
 }
 
 /**
- * Write a README file, but never overwrite an existing one. A developer who
- * has edited the README should keep their edits when `setup --force` is
- * re-run.
+ * Write a README file, but never overwrite an existing one.
+ *
+ * @remarks
+ * A developer who has edited the README should keep their edits when
+ * `setup --force` is re-run.
+ *
+ * @param cwd - The project root.
+ * @param relPath - The README's project-relative path.
+ * @param content - What it holds.
+ * @returns Whether it was written; false when one was already there.
+ * @throws Whatever writing the file throws, other than that it exists.
  */
 async function writeReadmeFile(cwd: string, relPath: string, content: string): Promise<boolean> {
   const dest = join(cwd, relPath);
@@ -468,11 +563,15 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
 /**
  * What to do about a connection file setup will not touch.
  *
+ * @remarks
  * Setup neither replaces nor removes one, with or without `--force`: a
  * connection may hold a client id someone registered with the vendor and a slug
  * the schemas and flows already name, and the IdP contract makes these files
  * tenant-owned. So the one rule is that setup does not write there, and the
  * developer decides what happens to the file.
+ *
+ * @param selection - The provider as it was chosen.
+ * @returns The hint, and the command that enables the provider afterwards.
  */
 function connectionExists(selection: ProviderSelection): {
   hint: string;
@@ -489,6 +588,17 @@ function connectionExists(selection: ProviderSelection): {
   };
 }
 
+/**
+ * Write one resource file through the configuration library.
+ *
+ * @param store - Where the file is written.
+ * @param document - The document to write.
+ * @param force - Whether an existing file may be replaced.
+ * @param onExists - What to say when the file is already there.
+ * @returns True once the file is written.
+ * @throws {@link ZitadelError} With `E_CONFLICT` when the file is already
+ *   there and `force` is not set.
+ */
 async function writeResourceFile(
   store: ConfigStore,
   document: AnyDocument,
@@ -506,6 +616,13 @@ async function writeResourceFile(
   }
 }
 
+/**
+ * The refusal for a file setup will not write over.
+ *
+ * @param relPath - The project-relative path that is taken.
+ * @param onExists - What to say instead of the default hint.
+ * @returns The `E_CONFLICT` error.
+ */
 function resourceExists(
   relPath: string,
   onExists?: { hint: string; nextCommands?: SuggestedCommand[] },

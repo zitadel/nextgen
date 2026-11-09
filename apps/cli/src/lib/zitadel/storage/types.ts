@@ -1,4 +1,6 @@
-/** Where the configuration is kept, and how a file is written there. */
+/**
+ * Where the configuration is kept, and how a file is written there.
+ */
 
 import type { ConfigFile, ConfigKind, JsonObject } from "@/lib/zitadel/types";
 
@@ -9,13 +11,18 @@ import type { ConfigFile, ConfigKind, JsonObject } from "@/lib/zitadel/types";
  */
 export type WriteMode = "create" | "replace";
 
-/** What to do with a `$file` reference whose file cannot be read. */
+/**
+ * What to do with a `$file` reference whose file is not there: `throw`
+ * refuses it, `omit` leaves its value out.
+ */
 export type MissingReference = "throw" | "omit";
 
 /**
- * Where the configuration is kept. The library never touches a disk itself: the
- * caller hands it a store, and a test hands it one that holds the files in
- * memory.
+ * Where the configuration is kept.
+ *
+ * @remarks
+ * The library never touches a disk itself: the caller hands it a store, and a
+ * test hands it one that holds the files in memory.
  */
 export interface ConfigStore {
   /**
@@ -23,6 +30,7 @@ export interface ConfigStore {
    *
    * @param kind - The kind of file to read.
    * @returns The files, in file-name order.
+   * @throws {@link ConfigError} When a file cannot be taken as a JSON object.
    */
   read(kind: ConfigKind): Promise<readonly ConfigFile[]>;
 
@@ -40,6 +48,8 @@ export interface ConfigStore {
    *
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
+   * @throws {@link FileExistsError} When the file is already there, under
+   *   `create`.
    */
   write(file: ConfigFile, mode: WriteMode): Promise<void>;
 
@@ -49,6 +59,8 @@ export interface ConfigStore {
    * @param path - The project-relative path.
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
+   * @throws {@link FileExistsError} When the file is already there, under
+   *   `create`.
    */
   writeText(path: string, text: string, mode: WriteMode): Promise<void>;
 
@@ -58,8 +70,10 @@ export interface ConfigStore {
    * from.
    *
    * @param file - The file whose references to resolve.
-   * @param missing - What to do with a reference that cannot be read.
+   * @param missing - What to do with a reference whose file is not there.
    * @returns The body with its references inlined.
+   * @throws {@link ConfigError} When a reference leads outside the project,
+   *   or cannot be read under `throw`.
    */
   inlineReferences(file: ConfigFile, missing: MissingReference): JsonObject;
 
@@ -67,7 +81,8 @@ export interface ConfigStore {
    * The project-relative paths a file's `$file` references point at.
    *
    * @param file - The file.
-   * @returns The paths.
+   * @returns The paths, spelled with `/`.
+   * @throws {@link ConfigError} When a reference leads outside the project.
    */
   referencedPaths(file: ConfigFile): readonly string[];
 }
