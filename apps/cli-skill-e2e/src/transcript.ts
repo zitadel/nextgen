@@ -10,6 +10,10 @@ export interface CommandEntry {
   readonly exit?: number | null;
   /** How long the agent turn that ended on this entry took. */
   readonly ms?: number | null;
+  /** How long the command itself ran, from the agent issuing it to its output coming back. */
+  readonly ran?: number | null;
+  /** How long the model spent before issuing it. */
+  readonly thought?: number | null;
 }
 
 /** The agent changing a file with its own editing tools, not through a shell command. */
@@ -19,6 +23,8 @@ export interface FileEntry {
   readonly tool: string;
   readonly path: string;
   readonly ms?: number | null;
+  readonly ran?: number | null;
+  readonly thought?: number | null;
 }
 
 export interface TextEntry {
@@ -45,6 +51,30 @@ export interface StageResult {
   readonly usage?: Readonly<Record<string, number>>;
 }
 
+/**
+ * Where a stage's wall-clock time went. Commands are the time tools ran, which
+ * the skill cannot shrink; the model is the agent thinking between them, which
+ * fewer calls shrink; `startupMs` is the agent starting up and closing out a
+ * turn; `waitMs` is the simulated developer answering. All are zero for a run
+ * captured before the harness stamped its lines.
+ */
+export interface StageTiming {
+  readonly measured: boolean;
+  readonly commandMs: number;
+  readonly modelMs: number;
+  readonly startupMs: number;
+  readonly waitMs: number;
+}
+
+/** What the agent did in a stage, counted so a question is not mistaken for a step. */
+export interface StageCounts {
+  /** Answers the developer gave: the agent asking, not acting. */
+  readonly questions: number;
+  readonly commands: number;
+  /** Commands that came back as errors. */
+  readonly failed: number;
+}
+
 export interface ParsedStage {
   /** Every command with its output, across all turns, for grading. */
   readonly pairs: ReadonlyArray<{ readonly cmd: string; readonly out: string }>;
@@ -52,6 +82,8 @@ export interface ParsedStage {
   /** The agent's last text block: its closing answer. */
   readonly final: string;
   readonly result: StageResult;
+  readonly timing: StageTiming;
+  readonly counts: StageCounts;
 }
 
 interface ContentBlock {
@@ -77,6 +109,10 @@ interface StreamEvent {
   readonly num_turns?: number;
   readonly duration_ms?: number;
   readonly usage?: Readonly<Record<string, unknown>>;
+  /** When the host saw this line, in epoch milliseconds. */
+  readonly _t?: number;
+  /** How long a simulated developer took to answer. */
+  readonly _ms?: number;
 }
 
 function parseEvent(line: string): StreamEvent | undefined {
@@ -128,10 +164,18 @@ function outcomeOf(result: ContentBlock | undefined): Pick<CommandEntry, "out" |
 
 const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
+/** What one tool call cost: the model's time before it, and the call's own run time. */
+interface CallTiming {
+  readonly thought: number | null;
+  readonly ran: number | null;
+}
+
 const entriesOfBlock = (
   block: ContentBlock,
   results: ReadonlyMap<string, ContentBlock>,
+  timings: ReadonlyMap<string, CallTiming>,
 ): ReadonlyArray<TranscriptEntry> => {
+  const timed = timings.get(block.id ?? "") ?? { thought: null, ran: null };
   if (block.type === "tool_use" && block.name === "Bash" && block.id !== undefined) {
     return [
       {
@@ -139,6 +183,7 @@ const entriesOfBlock = (
         kind: "command",
         cmd: block.input?.command ?? "",
         ...outcomeOf(results.get(block.id)),
+        ...timed,
       },
     ];
   }
@@ -149,6 +194,7 @@ const entriesOfBlock = (
         kind: "file",
         tool: block.name ?? "",
         path: block.input?.file_path ?? block.input?.notebook_path ?? "",
+        ...timed,
       },
     ];
   }
@@ -163,7 +209,10 @@ const entriesOfBlock = (
  * duration is attributed to the turn's last entry, so the report can show how
  * long each step took.
  */
-function entriesOfTurn(events: ReadonlyArray<StreamEvent>): ReadonlyArray<TranscriptEntry> {
+function entriesOfTurn(
+  events: ReadonlyArray<StreamEvent>,
+  timings: ReadonlyMap<string, CallTiming>,
+): ReadonlyArray<TranscriptEntry> {
   const results = new Map(
     events
       .filter((event) => event.type === "user")
@@ -176,7 +225,7 @@ function entriesOfTurn(events: ReadonlyArray<StreamEvent>): ReadonlyArray<Transc
       return [{ role: "user", kind: "answer", text: event.text ?? "" }];
     }
     return event.type === "assistant"
-      ? blocksOf(event).flatMap((block) => entriesOfBlock(block, results))
+      ? blocksOf(event).flatMap((block) => entriesOfBlock(block, results, timings))
       : [];
   });
   const closing = events.find(isResult);
@@ -188,6 +237,78 @@ function entriesOfTurn(events: ReadonlyArray<StreamEvent>): ReadonlyArray<Transc
 }
 
 const sum = (values: ReadonlyArray<number>): number => values.reduce((a, b) => a + b, 0);
+
+interface TurnTiming {
+  readonly calls: ReadonlyMap<string, CallTiming>;
+  readonly commandMs: number;
+  readonly modelMs: number;
+  readonly startupMs: number;
+}
+
+const NO_TIMING: TurnTiming = { calls: new Map(), commandMs: 0, modelMs: 0, startupMs: 0 };
+
+/**
+ * Walk one turn's stamped lines in order. The time from one line to the next
+ * belongs to whoever produced the later one: an assistant message ends a model
+ * step, and a tool result ends a tool call. The turn's own start and its final
+ * result are the agent starting up and closing out, kept apart so they are not
+ * blamed on either. A turn with no stamps has no timing.
+ */
+function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
+  const start = events.find((event) => event.type === "turn_start")?._t;
+  const stamped = events.filter(
+    (event) => event._t !== undefined && (event.type === "assistant" || event.type === "user"),
+  );
+  if (start === undefined || stamped.length === 0) {
+    return NO_TIMING;
+  }
+  const issued = new Map<string, number>();
+  const thought = new Map<string, number>();
+  const ran = new Map<string, number>();
+  let previous = start;
+  let modelMs = 0;
+  let commandMs = 0;
+  for (const event of stamped) {
+    const at = event._t as number;
+    const gap = Math.max(0, at - previous);
+    if (event.type === "assistant") {
+      modelMs += gap;
+      const calls = blocksOf(event).filter(
+        (block) => block.type === "tool_use" && block.id !== undefined,
+      );
+      calls.forEach((block, index) => {
+        issued.set(block.id as string, at);
+        thought.set(block.id as string, index === 0 ? gap : 0);
+      });
+    } else {
+      const results = blocksOf(event).filter((block) => block.type === "tool_result");
+      if (results.length > 0) {
+        commandMs += gap;
+      } else {
+        modelMs += gap;
+      }
+      for (const block of results) {
+        const sent = issued.get(block.tool_use_id ?? "");
+        if (sent !== undefined) {
+          ran.set(block.tool_use_id as string, Math.max(0, at - sent));
+        }
+      }
+    }
+    previous = at;
+  }
+  const end = events.findLast(isResult)?._t ?? previous;
+  return {
+    calls: new Map(
+      [...issued.keys()].map((id) => [
+        id,
+        { thought: thought.get(id) ?? null, ran: ran.get(id) ?? null },
+      ]),
+    ),
+    commandMs,
+    modelMs,
+    startupMs: Math.max(0, start === undefined ? 0 : end - start - commandMs - modelMs),
+  };
+}
 
 const sumUsage = (results: ReadonlyArray<StreamEvent>): Readonly<Record<string, number>> => {
   const usages = results.map((result) => result.usage ?? {});
@@ -228,15 +349,39 @@ function aggregate(results: ReadonlyArray<StreamEvent>): StageResult {
  */
 export function parseStage(file: string): ParsedStage {
   if (!existsSync(file)) {
-    return { pairs: [], transcript: [], final: "", result: {} };
+    return {
+      pairs: [],
+      transcript: [],
+      final: "",
+      result: {},
+      timing: { measured: false, commandMs: 0, modelMs: 0, startupMs: 0, waitMs: 0 },
+      counts: { questions: 0, commands: 0, failed: 0 },
+    };
   }
   const events = readFileSync(file, "utf8")
     .split("\n")
     .filter((line) => line.trim() !== "")
     .map(parseEvent)
     .filter((event): event is StreamEvent => event !== undefined);
-  const transcript = splitAfter(events, isResult).flatMap(entriesOfTurn);
+  const turns = splitAfter(events, isResult);
+  const timings = turns.map(timingOfTurn);
+  const transcript = turns.flatMap((turn, index) =>
+    entriesOfTurn(turn, (timings[index] as TurnTiming).calls),
+  );
+  const commands = transcript.filter((entry) => entry.kind === "command");
   return {
+    timing: {
+      measured: timings.some((timing) => timing !== NO_TIMING),
+      commandMs: sum(timings.map((timing) => timing.commandMs)),
+      modelMs: sum(timings.map((timing) => timing.modelMs)),
+      startupMs: sum(timings.map((timing) => timing.startupMs)),
+      waitMs: sum(events.map((event) => event._ms ?? 0)),
+    },
+    counts: {
+      questions: transcript.filter((entry) => entry.kind === "answer").length,
+      commands: commands.length,
+      failed: commands.filter((entry) => entry.err).length,
+    },
     pairs: transcript.flatMap((entry) =>
       entry.kind === "command" ? [{ cmd: entry.cmd, out: entry.out }] : [],
     ),

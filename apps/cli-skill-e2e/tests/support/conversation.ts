@@ -26,7 +26,12 @@ export async function converse(
   const maxTurns = scenario.skill ? settings.maxTurns : settings.baselineMaxTurns;
   const record = (turn: Turn): Turn => {
     if (turn.lines.length > 0) {
-      appendFileSync(stageFile, `${turn.lines.join("\n")}\n`);
+      // The turn's start anchors the first model step: without it the time
+      // before the agent's first message could not be told from startup.
+      appendFileSync(
+        stageFile,
+        `${JSON.stringify({ type: "turn_start", _t: turn.startedAt })}\n${turn.lines.join("\n")}\n`,
+      );
     }
     // A turn that was killed prints no result of its own; without one, an
     // earlier turn's clean result would stand for the whole stage.
@@ -44,6 +49,7 @@ export async function converse(
     if (remaining === 0 || turn.isError || stage.user === undefined) {
       return;
     }
+    const asked = Date.now();
     const answer = await agent.simulatedUser({
       persona: stage.user,
       agentText: turn.lastText,
@@ -52,7 +58,12 @@ export async function converse(
     if (isDone(answer)) {
       return;
     }
-    appendFileSync(stageFile, `${JSON.stringify({ type: "sim_user", text: answer })}\n`);
+    // `_ms` is how long the simulated developer took to answer, so the report
+    // can show it apart from the agent's own time.
+    appendFileSync(
+      stageFile,
+      `${JSON.stringify({ type: "sim_user", text: answer, _ms: Date.now() - asked })}\n`,
+    );
     const next = record(
       await agent.turn({
         prompt: answer,
