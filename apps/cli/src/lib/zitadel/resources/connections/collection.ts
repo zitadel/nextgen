@@ -1,57 +1,24 @@
-import { IDP_PROVIDERS } from "@zitadel/config/idp";
+import { basename } from "node:path";
+
+import { credentialVariables, IDP_PROVIDERS, parseConnectionSlug } from "@zitadel/config/idp";
 
 import { Change, DocumentChange, type Notice } from "@/lib/zitadel/change";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
-import {
-  type ConnectionSetting,
-  type LookupOptions,
-  paths,
-  pathOf,
-  refuseChangedIssuer,
-  refuseCollidingVariables,
-  refuseDifferentClientId,
-  refuseTakenFileName,
-  refuseTakenSlug,
-  sameIssuer,
-  unappliedSettings,
-} from "@/lib/zitadel/resources/connections/lookup";
+import type {
+  ConnectionSetting,
+  CredentialNames,
+  LookupOptions,
+  SsoOptions,
+  UnusedConnection,
+} from "@/lib/zitadel/resources/connections/types";
 import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel/errors";
-import { assertFlowsIntact } from "@/lib/zitadel/resources/flows/checks";
+import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
-import type { SkippedRegion } from "@/lib/zitadel/resources/flows/types";
+import type { SkippedRegion } from "@/lib/zitadel/resources/document";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ForceOptions } from "@/lib/zitadel/resources/schemas/types";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
-
-/**
- * What enabling a provider is told beyond the connection itself.
- */
-export type SsoOptions = LookupOptions &
-  Readonly<{
-    /**
-     * The settings the developer gave, which an existing connection may not
-     * have.
-     */
-    given?: readonly ConnectionSetting[] | undefined;
-  }>;
-
-/**
- * A connection nothing offers any more, which a removed provider leaves
- * behind, and the project variables only it reads.
- */
-export type UnusedConnection = Readonly<{
-  /**
-   * The connection.
-   */
-  connection: Connection;
-
-  /**
-   * The variables its credentials read that no other connection reads, so
-   * removing them breaks nothing else.
-   */
-  variables: readonly string[];
-}>;
 
 /**
  * The identity-provider connections under `.zitadel/idps/`, in path order,
@@ -98,46 +65,46 @@ export class Connections extends Collection<Connection> {
     if (candidate.template === undefined) {
       const named = this.named(candidate.name, candidate.issuer);
       if (named !== undefined) {
-        refuseDifferentClientId(named, options.clientId);
-        refuseCollidingVariables(this.all, named.credentialNames, candidate.name, named);
+        named.refuseDifferentClientId(options.clientId);
+        this.refuseCollidingVariables(named.credentialNames, candidate.name, named);
       }
       return named;
     }
-    const matches = this.all.filter((connection) => {
+    const matches = this.where((connection) => {
       if (connection.template === candidate.template) {
         return true;
       }
       return connection.declares(candidate.name) && connection.issuer === candidate.issuer;
     });
-    const [match, ...others] = matches;
+    const [match, ...others] = matches.all;
     if (others.length > 0) {
       throw new ConflictError(
-        `More than one ${candidate.displayName ?? candidate.name} connection exists: ${paths(matches)}`,
+        `More than one ${candidate.providerName} connection exists: ${matches.paths.join(", ")}`,
         {
           hint: "Keep the one this Project should use and remove the others, then run the command again.",
-          details: { provider: candidate.name, files: matches.map(pathOf) },
+          details: { provider: candidate.name, files: matches.paths },
         },
       );
     }
     if (match === undefined) {
-      refuseTakenFileName(this.all, candidate);
-      refuseCollidingVariables(this.all, candidate.credentialNames, candidate.name);
+      this.refuseTakenFileName(candidate);
+      this.refuseCollidingVariables(candidate.credentialNames, candidate.name);
       return undefined;
     }
-    refuseDifferentClientId(match, options.clientId);
+    match.refuseDifferentClientId(options.clientId);
     // A file can match on its template while carrying no slug of its own.
     // Inventing the provider's would point the schema and every flow at an
     // identity the connection does not declare.
     if (match.validSlug === undefined) {
       throw new ConfigError(
-        `${match.path} is a ${candidate.displayName ?? candidate.name} connection with no usable slug`,
+        `${match.path} is a ${candidate.providerName} connection with no usable slug`,
         {
           hint: "Give the connection file a slug: the schemas and flows reference it by that name.",
           details: { file: match.path },
         },
       );
     }
-    refuseCollidingVariables(this.all, match.credentialNames, match.name, match);
+    this.refuseCollidingVariables(match.credentialNames, match.name, match);
     return match;
   }
 
@@ -158,24 +125,40 @@ export class Connections extends Collection<Connection> {
    *   another connection's, or an existing one connects to another issuer.
    */
   named(slug: string, issuer?: string): Connection | undefined {
-    const holders = this.all.filter((connection) => {
+    const holders = this.where((connection) => {
       return connection.declares(slug);
     });
-    const [match, ...others] = holders;
+    const [match, ...others] = holders.all;
     if (others.length > 0) {
-      throw new ConflictError(`More than one connection is named ${slug}: ${paths(holders)}`, {
-        hint: "A slug names one connection. Remove or rename all but one, then run the command again.",
-        details: { slug, files: holders.map(pathOf) },
-      });
+      throw new ConflictError(
+        `More than one connection is named ${slug}: ${holders.paths.join(", ")}`,
+        {
+          hint: "A slug names one connection. Remove or rename all but one, then run the command again.",
+          details: { slug, files: holders.paths },
+        },
+      );
     }
     if (match === undefined) {
-      refuseTakenSlug(this.all, slug);
+      this.refuseTakenSlug(slug);
       return undefined;
     }
     if (issuer !== undefined) {
-      refuseChangedIssuer(match, slug, issuer);
+      this.refuseChangedIssuer(match, slug, issuer);
     }
     return match;
+  }
+
+  /**
+   * The connections that reach a candidate's issuer, which a new connection
+   * adds a second sign-in button beside.
+   *
+   * @param candidate - The new connection.
+   * @returns Their paths.
+   */
+  sameIssuer(candidate: Connection): readonly string[] {
+    return this.where((connection) => {
+      return connection.issuer !== undefined && connection.issuer === candidate.issuer;
+    }).paths;
   }
 
   /**
@@ -215,16 +198,19 @@ export class Connections extends Collection<Connection> {
         details: { file: connection.path },
       });
     }
-    const edited = schema.withProvider(slug);
+    const edited = schema.withProvider(slug).document;
     const start = existing === undefined ? this.config.with(candidate) : this.config;
-    const after = flows.reduce((current, flow) => {
-      return current.with(flow.withProvider(slug, schema.enabledMethods));
+    const flowEdits = flows.map((flow) => {
+      return flow.withProvider(slug, schema.enabledMethods);
+    });
+    const after = flowEdits.reduce((current, flowEdit) => {
+      return current.with(flowEdit.document);
     }, start.with(edited));
     const edit = { before: this.config, after, original: schema, edited };
     assertFlowsIntact(edit);
-    const skipped = flows.flatMap((flow) => {
-      return flow.regionsLeftAlone(slug, schema.enabledMethods).map((region) => {
-        return untouchedNotice(flow, region, slug);
+    const skipped = flowEdits.flatMap((flowEdit) => {
+      return flowEdit.skipped.map((region) => {
+        return this.untouchedNotice(flowEdit.document, region, slug);
       });
     });
     return new DocumentChange({
@@ -261,9 +247,9 @@ export class Connections extends Collection<Connection> {
    *   `force` is not set.
    */
   disable(schema: UserSchema, slug: string, options: ForceOptions = {}): Change {
-    const edited = schema.withoutProvider(slug);
+    const edited = schema.withoutProvider(slug).document;
     const after = this.config.flows.for(schema).reduce((current, flow) => {
-      return current.with(flow.withoutProvider(slug));
+      return current.with(flow.withoutProvider(slug).document);
     }, this.config.with(edited));
     const edit = { before: this.config, after, original: schema, edited };
     if (after.changedDocuments.length === 0) {
@@ -301,12 +287,13 @@ export class Connections extends Collection<Connection> {
    * @returns Their paths, schemas first.
    */
   offeredBy(slug: string): readonly string[] {
-    const flows = this.config.flows.all.filter((flow) => {
+    const schemas = this.config.schemas.where((schema) => {
+      return schema.lists(slug);
+    });
+    const flows = this.config.flows.where((flow) => {
       return flow.offers(slug);
     });
-    return [...this.config.schemas.listing(slug), ...flows].map((document) => {
-      return document.path;
-    });
+    return [...schemas.paths, ...flows.paths];
   }
 
   /**
@@ -376,9 +363,9 @@ export class Connections extends Collection<Connection> {
     existing: Connection | undefined,
     given: readonly ConnectionSetting[],
   ): readonly Notice[] {
-    const provider = candidate.displayName ?? candidate.name;
+    const provider = candidate.providerName;
     if (existing !== undefined) {
-      const unapplied = unappliedSettings(existing, candidate, given);
+      const unapplied = existing.unappliedSettings(candidate, given);
       if (unapplied.length === 0) {
         return [];
       }
@@ -399,7 +386,7 @@ export class Connections extends Collection<Connection> {
       ];
     }
     const notices: Notice[] = [];
-    const others = sameIssuer(this.all, candidate);
+    const others = this.sameIssuer(candidate);
     if (candidate.template !== undefined && others.length > 0) {
       notices.push({
         severity: "warning",
@@ -416,7 +403,7 @@ export class Connections extends Collection<Connection> {
       });
     }
     if (candidate.template === undefined && candidate.mappings.length > 0) {
-      notices.push({ severity: "info", message: mappingSummary(candidate, provider) });
+      notices.push({ severity: "info", message: candidate.mappingSummary });
     }
     return notices;
   }
@@ -488,60 +475,157 @@ export class Connections extends Collection<Connection> {
       details: { requested: slug, offered, connections },
     });
   }
-}
 
-/**
- * The claim mappings a connection of the developer's own was written with:
- * which side of each line is their schema's and which the claim the provider
- * must return, then what verifies a value, which a mapping alone does not.
- *
- * @param connection - The connection.
- * @param provider - The provider's name.
- * @returns The summary, one line per row.
- */
-function mappingSummary(connection: Connection, provider: string): string {
-  const mappings = connection.mappings.map(({ property, claim }) => {
-    return `  ${property} ← ${String(claim)}`;
-  });
-  const verifications = connection.verifications.map(({ property, claim }) => {
-    if (claim === true) {
-      return `  ${property} is treated as verified.`;
+  /**
+   * What to say about a region of a flow the edit left alone because it was
+   * edited by hand, and what to do about it.
+   *
+   * @param flow - The flow.
+   * @param region - The region.
+   * @param slug - The provider being added.
+   * @returns The notice.
+   */
+  private untouchedNotice(flow: Flow, region: SkippedRegion, slug: string): Notice {
+    const lead = `${flow.path} ${region.region} has been edited by hand, so it was left alone.`;
+    if (region.step === "password") {
+      return {
+        severity: "warning",
+        message:
+          `${lead} Add ${slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, ` +
+          "sso_user_not_found to register-sso and user_already_exists to sso-conflict.",
+      };
     }
-    return `  ${property} is treated as verified only when ${provider} says so in the ${String(claim)} claim.`;
-  });
-  const verification =
-    verifications.length === 0
-      ? ["Nothing is treated as verified."]
-      : ["Verification, which a mapping alone does not give:", ...verifications];
-  return [
-    `Claim mappings in ${connection.path}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
-    ...mappings,
-    ...verification,
-    "Edit the mappings in that file if your provider returns other claims.",
-  ].join("\n");
-}
+    if (region.step === "sso-conflict") {
+      return { severity: "warning", message: `${lead} Add ${slug} to its sso_providers.` };
+    }
+    return { severity: "warning", message: `${lead} Update it yourself.` };
+  }
 
-/**
- * What to say about a region of a flow the edit left alone because it was
- * edited by hand, and what to do about it.
- *
- * @param flow - The flow.
- * @param region - The region.
- * @param slug - The provider being added.
- * @returns The notice.
- */
-function untouchedNotice(flow: Flow, region: SkippedRegion, slug: string): Notice {
-  const lead = `${flow.path} ${region.region} has been edited by hand, so it was left alone.`;
-  if (region.step === "password") {
-    return {
-      severity: "warning",
-      message:
-        `${lead} Add ${slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, ` +
-        "sso_user_not_found to register-sso and user_already_exists to sso-conflict.",
-    };
+  /**
+   * Refuse a slug no connection has yet, when its file name is another
+   * connection's or the variables it derives are: writing a connection under it
+   * would replace that file or overwrite those credentials.
+   *
+   * @param slug - The slug.
+   * @throws {@link ConflictError} When it is taken either way.
+   */
+  private refuseTakenSlug(slug: string): void {
+    const name = `${slug}.json`;
+    if (
+      this.all.some((connection) => {
+        return basename(connection.path) === name;
+      })
+    ) {
+      const path = `${CONFIG_DIRECTORIES.connections}/${name}`;
+      throw new ConflictError(`${path} already exists and is not the ${slug} connection`, {
+        hint: "Rename or remove that file, or choose another slug, then run the command again.",
+        details: { file: path, slug },
+      });
+    }
+    const parsed = parseConnectionSlug(slug);
+    if (parsed.ok) {
+      this.refuseCollidingVariables(credentialVariables(parsed.value), slug);
+    }
   }
-  if (region.step === "sso-conflict") {
-    return { severity: "warning", message: `${lead} Add ${slug} to its sso_providers.` };
+
+  /**
+   * Refuse a new connection whose file name another connection already has:
+   * writing it would replace that one.
+   *
+   * @param candidate - The new connection.
+   * @throws {@link ConflictError} When the name is taken.
+   */
+  private refuseTakenFileName(candidate: Connection): void {
+    const occupied = this.all.find((connection) => {
+      return basename(connection.path) === basename(candidate.path);
+    });
+    if (occupied === undefined) {
+      return;
+    }
+    if (occupied.declares(candidate.name)) {
+      const issuer = candidate.issuer ?? "the same";
+      throw new ConflictError(
+        `${candidate.path} is a connection called ${candidate.name}, but not to ${candidate.providerName}: its issuer is not ${issuer}`,
+        {
+          hint: "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.",
+          details: { file: candidate.path, slug: candidate.name },
+        },
+      );
+    }
+    throw new ConflictError(
+      `${candidate.path} already exists and is not the ${candidate.name} connection`,
+      {
+        hint: "Rename or remove that file, or choose another slug, then run the command again.",
+        details: { file: candidate.path, slug: occupied.slug ?? null },
+      },
+    );
   }
-  return { severity: "warning", message: `${lead} Update it yourself.` };
+
+  /**
+   * Refuse an issuer other than the one an existing connection was written
+   * with. An applied connection keeps its issuer, and the server compares it
+   * exactly.
+   *
+   * @param connection - The existing connection.
+   * @param slug - Its slug.
+   * @param issuer - The issuer the developer gave.
+   * @throws {@link ConflictError} When they differ.
+   */
+  private refuseChangedIssuer(connection: Connection, slug: string, issuer: string): void {
+    if (connection.issuer === issuer) {
+      return;
+    }
+    const found =
+      connection.issuer === undefined
+        ? `is not an OIDC connection to ${issuer}`
+        : `connects to ${connection.issuer}, not ${issuer}`;
+    throw new ConflictError(`${connection.path} is already named ${slug} and ${found}`, {
+      hint:
+        "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. " +
+        "Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
+      details: {
+        file: connection.path,
+        slug,
+        issuer,
+        existing_issuer: connection.issuer ?? null,
+      },
+    });
+  }
+
+  /**
+   * Refuse credentials that would land in another connection's variable, or
+   * both in one. A publish would overwrite what the other credential put there,
+   * and the loser signs in with the wrong application, which surfaces at the
+   * provider and not here.
+   *
+   * @param ours - The variables this connection reads.
+   * @param slug - Its slug.
+   * @param except - The connection being reused, which is not its own collision.
+   * @throws {@link ConflictError} When a variable is shared.
+   */
+  private refuseCollidingVariables(ours: CredentialNames, slug: string, except?: Connection): void {
+    if (ours.clientId !== undefined && ours.clientId === String(ours.clientSecret)) {
+      throw new ConflictError(`This connection points both credentials at ${ours.clientId}`, {
+        hint: "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.",
+        details: { slug, variable: ours.clientId },
+      });
+    }
+    const names: readonly string[] = [ours.clientId, ours.clientSecret].filter((name) => {
+      return name !== undefined;
+    });
+    for (const connection of this.all) {
+      if (connection === except) {
+        continue;
+      }
+      const shared = names.find((name) => {
+        return connection.variableNames.includes(name);
+      });
+      if (shared !== undefined) {
+        throw new ConflictError(`${connection.path} and ${slug} both use ${shared}`, {
+          hint: "Point one of them at a variable of its own, then run the command again.",
+          details: { file: connection.path, slug, other_slug: connection.name, variable: shared },
+        });
+      }
+    }
+  }
 }

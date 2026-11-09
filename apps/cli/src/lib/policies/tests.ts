@@ -243,8 +243,9 @@ export async function runPolicyTests(
   policies: ReadonlyMap<string, PolicyUnderTest>,
 ): Promise<readonly PolicySuiteResult[]> {
   const runs = tests.flatMap((test, suite) => {
-    return test.cases.map((testCase): CaseRun => {
-      return { suite, operation: test.operation, testCase };
+    const operation = test.readOperation();
+    return test.readCases().map((testCase): CaseRun => {
+      return { suite, operation, testCase };
     });
   });
   const outcomes = await mapBounded(
@@ -277,10 +278,11 @@ export async function runPolicyTests(
       .map((outcome) => {
         return outcome.result;
       });
+    const operation = test.readOperation();
     return {
-      operation: test.operation,
+      operation,
       file: test.path,
-      policy: policies.get(test.operation)?.source ?? null,
+      policy: policies.get(operation)?.source ?? null,
       cases,
     };
   });

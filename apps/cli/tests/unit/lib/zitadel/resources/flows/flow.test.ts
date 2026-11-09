@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Flow, RefusedEditError } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject } from "@/lib/zitadel/utils/json";
+import { isJsonObject, listAt } from "@/lib/zitadel/utils/json";
 import { slug } from "@tests/helpers/idp-values";
 import { loginFlow } from "@tests/helpers/local-project";
 
@@ -373,9 +373,9 @@ describe("Flow.handle", () => {
 
 describe("Flow.asRead", () => {
   it("marks an edited flow as read", () => {
-    const edited = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
 
-    expect(edited.asRead().status).toBe("read");
+    expect(document.asRead().status).toBe("read");
   });
 });
 
@@ -484,19 +484,52 @@ describe("Flow.transitionsInto", () => {
 
 describe("Flow.withProvider", () => {
   it("offers the provider", () => {
-    const edited = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
 
-    expect(edited.offers("google")).toBe(true);
+    expect(document.offers("google")).toBe(true);
   });
 
   it("marks the flow as edited", () => {
-    expect(scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).status).toBe("edited");
+    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+
+    expect(document.status).toBe("edited");
+  });
+
+  it("says it changed the flow", () => {
+    expect(scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).changed).toBe(true);
+  });
+
+  it("leaves nothing alone in the scaffolded flow", () => {
+    expect(scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).skipped).toEqual([]);
   });
 
   it("returns the same flow the second time", () => {
-    const first = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
 
-    expect(first.withProvider(slug("google"), PASSWORD_ONLY)).toBe(first);
+    expect(document.withProvider(slug("google"), PASSWORD_ONLY)).toEqual({
+      document,
+      changed: false,
+      skipped: [],
+    });
+  });
+
+  it("names a generated step that was edited by hand", () => {
+    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const handEdited = flowOf({
+      ...document.body,
+      steps: listAt(document.body, "steps")
+        .filter(isJsonObject)
+        .map((step) => {
+          if (step.name !== "register-sso") {
+            return step;
+          }
+          return { ...step, title: "Hand-written" };
+        }),
+    });
+
+    expect(handEdited.withProvider(slug("google"), PASSWORD_ONLY).skipped).toEqual([
+      { step: "register-sso", region: "steps.register-sso", reason: "hand-edited" },
+    ]);
   });
 
   it("refuses a flow whose steps are not a list", () => {
@@ -508,29 +541,33 @@ describe("Flow.withProvider", () => {
   });
 });
 
-describe("Flow.regionsLeftAlone", () => {
-  it("leaves nothing alone in the scaffolded flow", () => {
-    expect(scaffoldedFlow().regionsLeftAlone(slug("google"), PASSWORD_ONLY)).toEqual([]);
+describe("Flow.offers", () => {
+  it("is false for a flow no step of which offers a provider", () => {
+    expect(scaffoldedFlow().offers()).toBe(false);
   });
 
-  it("names a generated step that was edited by hand", () => {
-    const generated = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
-    const steps: readonly unknown[] = Array.isArray(generated.body.steps)
-      ? generated.body.steps
-      : [];
-    const handEdited = flowOf({
-      ...generated.body,
-      steps: steps.filter(isJsonObject).map((step) => {
-        if (step.name !== "register-sso") {
-          return step;
-        }
-        return { ...step, title: "Hand-written" };
-      }),
-    });
+  it("is true for a provider a step lists", () => {
+    expect(
+      flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("google"),
+    ).toBe(true);
+  });
 
-    expect(handEdited.regionsLeftAlone(slug("google"), PASSWORD_ONLY)).toEqual([
-      { step: "register-sso", region: "steps.register-sso", reason: "hand-edited" },
-    ]);
+  it("is false for a provider no step lists", () => {
+    expect(
+      flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("github"),
+    ).toBe(false);
+  });
+});
+
+describe("Flow.generatedSsoSteps", () => {
+  it("names none for a flow no provider was enabled on", () => {
+    expect(scaffoldedFlow().generatedSsoSteps).toEqual([]);
+  });
+
+  it("names the steps enabling a provider added", () => {
+    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+
+    expect(document.generatedSsoSteps).toEqual(["register-sso", "sso-conflict"]);
   });
 });
 
@@ -552,15 +589,21 @@ describe("Flow.assertProviderEditable", () => {
 
 describe("Flow.withoutProvider", () => {
   it("takes the provider off every step", () => {
-    const offered = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const offered = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).document;
 
-    expect(offered.withoutProvider("google").offers("google")).toBe(false);
+    expect(offered.withoutProvider("google").document.offers("google")).toBe(false);
+  });
+
+  it("says it changed the flow", () => {
+    const offered = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).document;
+
+    expect(offered.withoutProvider("google").changed).toBe(true);
   });
 
   it("returns the same flow for a provider no step offers", () => {
     const flow = scaffoldedFlow();
 
-    expect(flow.withoutProvider("google")).toBe(flow);
+    expect(flow.withoutProvider("google")).toEqual({ document: flow, changed: false, skipped: [] });
   });
 
   it("refuses a step whose provider list was edited by hand", () => {

@@ -34,7 +34,8 @@ export function environmentReferences(value: unknown): string[] {
     return [...new Set(found)].sort();
   }
   if (isJsonObject(value)) {
-    const found = Object.entries(value).flatMap(([key, child]) => {
+    const found = Object.entries(value).flatMap((pair) => {
+      const [key, child] = pair;
       if (key.endsWith("_env") && typeof child === "string" && VARIABLE_NAME.test(child)) {
         return [child];
       }

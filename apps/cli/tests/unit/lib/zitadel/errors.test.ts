@@ -7,7 +7,7 @@ import {
   ConnectionExistsError,
   NoSignInLeftError,
 } from "@/lib/zitadel";
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
+import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
 const FLOW_PATH = ".zitadel/flows/login.json";
@@ -233,7 +233,11 @@ describe("NoSignInLeftError", () => {
   });
 
   it("names the schema, what it enabled and its alternatives in its details", () => {
-    expect(error.details).toEqual({ file: SCHEMA_PATH, usable: ["password"], alternatives: ["passkey"] });
+    expect(error.details).toEqual({
+      file: SCHEMA_PATH,
+      usable: ["password"],
+      alternatives: ["passkey"],
+    });
   });
 });
 

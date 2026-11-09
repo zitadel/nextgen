@@ -17,7 +17,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
  *
  * @typeParam T - The kind of document.
  */
-export abstract class Collection<T extends AnyDocument> {
+export class Collection<T extends AnyDocument> {
   /**
    * Every document of the kind, in the order the files were read and then
    * the order new ones were added.
@@ -39,6 +39,28 @@ export abstract class Collection<T extends AnyDocument> {
   constructor(config: ZitadelConfig, documents: readonly T[]) {
     this.config = config;
     this.all = documents;
+  }
+
+  /**
+   * The project-relative paths of the documents, for a message to name them.
+   *
+   * @returns The paths, in the order of {@link all}.
+   */
+  get paths(): readonly string[] {
+    return this.all.map((document) => {
+      return document.path;
+    });
+  }
+
+  /**
+   * The documents of the collection that pass a test, as a collection of
+   * their own, so a refusal can name them by {@link paths}.
+   *
+   * @param test - Whether a document belongs.
+   * @returns The collection of those documents, in the same configuration.
+   */
+  where(test: (document: T) => boolean): Collection<T> {
+    return new Collection(this.config, this.all.filter(test));
   }
 
   /**

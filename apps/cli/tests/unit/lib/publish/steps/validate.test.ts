@@ -7,13 +7,7 @@ import { ZitadelError } from "@/lib/errors";
 import { validateStep } from "@/lib/publish/steps/validate";
 import type { StepContext } from "@/lib/publish/pipeline";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import {
-  MemoryStore,
-  toBundle,
-  ZitadelConfig,
-  type ConfigFile,
-  type ConfigFiles,
-} from "@/lib/zitadel";
+import { MemoryStore, ZitadelConfig, type ConfigFile, type ConfigFiles } from "@/lib/zitadel";
 import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
@@ -102,7 +96,7 @@ function ctx(
     color: false,
     config,
     store,
-    bundle: toBundle(config, store).bundle,
+    bundle: config.bundle(store).bundle,
     suggest: (args) => {
       return `${args} --env staging` as SuggestedCommand;
     },

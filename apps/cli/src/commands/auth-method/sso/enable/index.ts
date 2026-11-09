@@ -492,7 +492,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       names,
     });
     const change = this.withEndpoints(preview, credentials.endpoints, (endpoints) => {
-      return config.connections.enable(schema, candidate.withEndpoints(endpoints), options);
+      const located = candidate.withEndpoints(endpoints).document;
+      return config.connections.enable(schema, located, options);
     });
     if (reused) {
       consola.success(`Reusing ${connection.path}`);

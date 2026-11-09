@@ -1,9 +1,18 @@
 import { sep } from "node:path";
 
 import { FileExistsError } from "@/lib/zitadel/errors";
-import { CONFIG_DIRECTORIES, type ConfigFile, type ConfigKind, type JsonObject } from "@/lib/zitadel/types";
+import {
+  CONFIG_DIRECTORIES,
+  type ConfigFile,
+  type ConfigKind,
+  type JsonObject,
+} from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
-import { findFileReferences, inlineFileReferences, outsideProject } from "@/lib/zitadel/storage/references";
+import {
+  findFileReferences,
+  inlineFileReferences,
+  outsideProject,
+} from "@/lib/zitadel/storage/references";
 import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 
 /**
@@ -61,13 +70,15 @@ export class MemoryStore implements ConfigStore {
   async read(kind: ConfigKind): Promise<readonly ConfigFile[]> {
     const directory = ROOT.resolve(CONFIG_DIRECTORIES[kind]);
     return [...this.files]
-      .filter(([path]) => {
+      .filter((pair) => {
+        const path = pair[0];
         return path.endsWith(".json") && ROOT.resolve(path).parent.equals(directory);
       })
       .sort(([a], [b]) => {
         return a < b ? -1 : 1;
       })
-      .map(([path, body]) => {
+      .map((pair) => {
+        const [path, body] = pair;
         return { path, body };
       });
   }
@@ -150,7 +161,8 @@ export class MemoryStore implements ConfigStore {
    * @throws {@link ConfigError} When a reference leads outside the project.
    */
   referencedPaths(file: ConfigFile): readonly string[] {
-    return findFileReferences(file.body).map(({ ref }) => {
+    return findFileReferences(file.body).map((item) => {
+      const { ref } = item;
       return this.locate(file, ref);
     });
   }

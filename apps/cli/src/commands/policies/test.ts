@@ -190,10 +190,10 @@ The server evaluates every case, so the command needs a connection to it. By def
     return new Map(
       selected.documents.map((policy): readonly [string, PolicyUnderTest] => {
         const underTest: PolicyUnderTest = {
-          config: policy.config,
+          config: policy.readConfig(),
           source: { file: policy.path },
         };
-        return [policy.operation, underTest];
+        return [policy.readOperation(), underTest];
       }),
     );
   }

@@ -15,16 +15,28 @@ import {
   parseIssuer,
   referencedVariable,
 } from "@zitadel/config/idp";
-import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
-import { ConfigError, ConflictError } from "@/lib/zitadel/errors";
+import {
+  CHECKED_BLOCKS,
+  type ClaimRead,
+  type ClaimRow,
+  CONNECTION_CONTRACT,
+  CONNECTION_SCHEMA_REF,
+  type ConnectionSetting,
+  CREDENTIAL_FIELDS,
+  type CredentialNames,
+  type StoredSettings,
+  type VariableUse,
+} from "@/lib/zitadel/resources/connections/types";
 import {
   ConfigDocument,
   type DocumentFile,
   type DocumentStatus,
+  type Edit,
 } from "@/lib/zitadel/resources/document";
-import { type PropertyName, propertyName } from "@/lib/zitadel/names";
+import { ConfigError, ConflictError } from "@/lib/zitadel/errors";
+import { propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
@@ -33,122 +45,15 @@ import { isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 import { didYouMean } from "@/lib/zitadel/utils/spelling";
 
 /**
- * One row of a connection's `claim_mapping` or `verified_claims`.
- */
-export type ClaimRow = Readonly<{
-  /**
-   * The schema property the row fills or verifies.
-   */
-  property: PropertyName;
-  /**
-   * The claim as written; a well-formed file holds a string.
-   */
-  claim: unknown;
-}>;
-
-/**
- * A credential field that names a project variable instead of holding a value.
- */
-export type VariableUse = Readonly<{
-  /**
-   * The credential field.
-   */
-  field: CredentialField;
-  /**
-   * The variable it names.
-   */
-  variable: string;
-}>;
-
-/**
- * The project variables a connection reads its credentials from.
- *
- * @remarks
- * A credential the file holds as a value names no variable, so it is
- * `undefined`: there is nothing to publish to.
- */
-export type CredentialNames = Readonly<{
-  /**
-   * The variable the client id is read from.
-   */
-  clientId: ClientIdVariable | undefined;
-  /**
-   * The variable the client secret is read from.
-   */
-  clientSecret: ClientSecretVariable | undefined;
-}>;
-
-/**
- * The settings that describe a connection of the developer's own beyond its
- * slug, as a run gives them or a file holds them.
- */
-export type StoredSettings = Readonly<{
-  /**
-   * The name shown on the sign-in button.
-   */
-  displayName?: string | undefined;
-  /**
-   * The provider's issuer.
-   */
-  issuer?: string | undefined;
-}>;
-
-/**
- * A field of the `oidc` block that holds a credential.
- */
-type CredentialField = "client_id" | "client_secret";
-
-/**
- * The fields of the `oidc` block that hold a credential, in the order they are
- * reported.
- */
-const CREDENTIAL_FIELDS: readonly CredentialField[] = ["client_id", "client_secret"];
-
-/**
- * Where `$schema` points in a connection file this library writes.
- *
- * @remarks
- * The meta-schema `zitadel setup` writes under `.zitadel/meta/`, so an editor
- * validates the file as it is typed.
- */
-export const CONNECTION_SCHEMA_REF = "../meta/idp-connection.json";
-
-/**
- * A block of a connection whose fields the contract fixes.
- */
-type CheckedBlock = Readonly<{
-  /**
-   * The block's path from the root, empty for the root.
-   */
-  path: readonly string[];
-  /**
-   * How a message names the block.
-   */
-  where: string;
-}>;
-
-/**
- * The blocks of a connection whose fields the contract fixes.
- */
-const CHECKED_BLOCKS: readonly CheckedBlock[] = [
-  { path: [], where: "a connection" },
-  { path: ["oidc"], where: "the oidc block" },
-  { path: ["provisioning"], where: "the provisioning block" },
-];
-
-/**
- * The connection contract, as the meta-schema the editor validates against
- * states it.
- */
-const CONTRACT: unknown = metaSchemaFiles().find((entry) => {
-  return entry.name === "idp-connection.json";
-})?.body;
-
-/**
  * An identity-provider connection under `.zitadel/idps/`: who signs people in,
  * and which of their claims fill which properties.
  */
 export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+  /**
+   * What kind of document this is: an identity-provider connection.
+   */
+  readonly kind = "connection";
+
   /**
    * Hold a connection's body at its path.
    *
@@ -243,28 +148,24 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const secret = objectAt(this.body, "oidc").client_secret;
     const literalSecret = typeof secret === "string" && !isVariableReference(secret);
     const missing = refusals.length === 0 ? missingEndpoints(this.body.oidc) : [];
+    const secretIssue = this.issue(
+      "connection/literal-secret",
+      'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
+    );
+    const endpointsIssue = this.issue(
+      "connection/endpoints",
+      `oidc names some endpoints but not ${missing.join(", ")}. Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and userinfo_endpoint unless id_token_mapping is true), or none to read them from the issuer's discovery document.`,
+    );
+    const secretIssues = literalSecret ? [secretIssue] : [];
+    const endpointsIssues = missing.length > 0 ? [endpointsIssue] : [];
     return [
       ...refusals.filter((refusal) => {
         return !(literalSecret && refusal.message.includes("client_secret"));
       }),
-      ...(literalSecret
-        ? [
-            this.issue(
-              "connection/literal-secret",
-              'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
-            ),
-          ]
-        : []),
-      ...(missing.length > 0
-        ? [
-            this.issue(
-              "connection/endpoints",
-              `oidc names some endpoints but not ${missing.join(", ")}. Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and userinfo_endpoint unless id_token_mapping is true), or none to read them from the issuer's discovery document.`,
-            ),
-          ]
-        : []),
+      ...secretIssues,
+      ...endpointsIssues,
       ...CHECKED_BLOCKS.flatMap((block) => {
-        const allowed = allowedFields(block.path);
+        const allowed = Connection.allowedFields(block.path);
         const value = block.path.reduce<unknown>((node, key) => {
           return isJsonObject(node) ? node[key] : undefined;
         }, this.body);
@@ -385,8 +286,8 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const derived = slug === undefined ? undefined : credentialVariables(slug);
     const oidc = objectAt(this.body, "oidc");
     return {
-      clientId: variableOf(oidc.client_id, derived?.clientId),
-      clientSecret: variableOf(oidc.client_secret, derived?.clientSecret),
+      clientId: Connection.variableOf(oidc.client_id, derived?.clientId),
+      clientSecret: Connection.variableOf(oidc.client_secret, derived?.clientSecret),
     };
   }
 
@@ -421,7 +322,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   none when there is no mapping.
    */
   get mappings(): readonly ClaimRow[] {
-    return rowsOf(objectAt(this.body, "claim_mapping"));
+    return this.rows("claim_mapping");
   }
 
   /**
@@ -431,7 +332,70 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   written; none when nothing is verified.
    */
   get verifications(): readonly ClaimRow[] {
-    return rowsOf(objectAt(this.body, "verified_claims"));
+    return this.rows("verified_claims");
+  }
+
+  /**
+   * The provider's name as a message gives it: its display name, or its slug
+   * when it has none.
+   *
+   * @returns The name.
+   */
+  get providerName(): string {
+    return this.displayName ?? this.name;
+  }
+
+  /**
+   * The claim mappings the connection was written with: which side of each
+   * line is the schema's and which the claim the provider must return, then
+   * what verifies a value, which a mapping alone does not.
+   *
+   * @returns The summary, one line per row.
+   */
+  get mappingSummary(): string {
+    const provider = this.providerName;
+    const mappings = this.mappings.map((item) => {
+      const { property, claim } = item;
+      return `  ${property} ← ${String(claim)}`;
+    });
+    const verifications = this.verifications.map((item) => {
+      const { property, claim } = item;
+      if (claim === true) {
+        return `  ${property} is treated as verified.`;
+      }
+      return `  ${property} is treated as verified only when ${provider} says so in the ${String(claim)} claim.`;
+    });
+    const verification =
+      verifications.length === 0
+        ? ["Nothing is treated as verified."]
+        : ["Verification, which a mapping alone does not give:", ...verifications];
+    return [
+      `Claim mappings in ${this.path}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
+      ...mappings,
+      ...verification,
+      "Edit the mappings in that file if your provider returns other claims.",
+    ].join("\n");
+  }
+
+  /**
+   * The claims the connection reads, by name: its mappings, then its
+   * verifications, as long as the claim is written as a name.
+   *
+   * @returns Each claim and the block it is read in.
+   */
+  get claimReads(): readonly ClaimRead[] {
+    const blocks = [
+      { field: "claim_mapping", rows: this.mappings },
+      { field: "verified_claims", rows: this.verifications },
+    ];
+    return blocks.flatMap((block) => {
+      return block.rows.flatMap((row) => {
+        if (typeof row.claim !== "string") {
+          return [];
+        }
+        return [{ field: block.field, claim: row.claim }];
+      });
+    });
   }
 
   /**
@@ -526,14 +490,13 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
       );
     }
     return {
-      displayName: usableSetting(
-        this,
+      displayName: this.usableSetting(
         "a display name",
         this.displayName,
         given.displayName,
         parseDisplayName,
       ),
-      issuer: usableSetting(this, "an issuer", issuer, given.issuer, parseIssuer),
+      issuer: this.usableSetting("an issuer", issuer, given.issuer, parseIssuer),
     };
   }
 
@@ -547,100 +510,153 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * vendor does. A missing or blank issuer leaves the connection as it is.
    *
    * @param endpoints - Where the provider answers.
-   * @returns The connection, or the same one when nothing changes.
+   * @returns The edit: the connection pointing at the issuer, or this one when
+   *   nothing changes.
    */
-  withEndpoints(endpoints: ConnectionEndpoints): Connection {
+  withEndpoints(endpoints: ConnectionEndpoints): Edit<Connection<Body>> {
     const issuer = endpoints.issuer;
     if (issuer === undefined || issuer === "") {
-      return this;
+      return { document: this, changed: false, skipped: [] };
     }
     const body = { ...this.body, oidc: { ...objectAt(this.body, "oidc"), issuer } };
-    return new Connection(this.path, body, this.editedStatus);
+    return {
+      document: new Connection(this.path, body, this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
   }
-}
 
-/**
- * A setting a connection's file holds, when a run reusing it uses it.
- *
- * @param connection - The connection.
- * @param what - How a refusal names the setting.
- * @param stored - The setting as the file holds it.
- * @param given - The setting as the run was given it, which replaces the file's.
- * @param parse - The rules a typed answer is held to.
- * @returns The stored setting, or `undefined` when the run was given one or
- *   the file holds none.
- * @throws {@link ConfigError} When the stored setting cannot be used.
- */
-function usableSetting<T>(
-  connection: Connection,
-  what: string,
-  stored: string | undefined,
-  given: string | undefined,
-  parse: (value: string) => Parsed<T>,
-): string | undefined {
-  if (given !== undefined || stored === undefined) {
-    return undefined;
+  /**
+   * The settings the developer gave that this connection, reused in place of
+   * a candidate, does not have, which reusing it does not apply.
+   *
+   * @param candidate - The connection the settings would have written.
+   * @param given - The settings the developer gave.
+   * @returns The settings not applied.
+   */
+  unappliedSettings(
+    candidate: Connection,
+    given: readonly ConnectionSetting[],
+  ): readonly ConnectionSetting[] {
+    return given.filter((setting) => {
+      if (setting === "display name") {
+        return this.displayName !== candidate.displayName;
+      }
+      return (this.scopes ?? []).join(" ") !== (candidate.scopes ?? []).join(" ");
+    });
   }
-  const parsed = parse(stored);
-  if (!parsed.ok) {
-    throw new ConfigError(
-      `${connection.path} holds ${what} that cannot be used: ${parsed.problem}`,
-      {
-        hint: "Fix it in that file, or choose another slug.",
-        details: { file: connection.path, slug: connection.name },
-      },
-    );
-  }
-  return stored;
-}
 
-/**
- * The variable a credential field reads from.
- *
- * @param value - The field as written.
- * @param fallback - The variable an absent field reads from.
- * @returns The variable it references, the fallback when the field is absent,
- *   or `undefined` when it holds a value.
- */
-function variableOf<V extends string>(value: unknown, fallback: V | undefined): V | undefined {
-  if (value === undefined) {
-    return fallback;
+  /**
+   * Refuse a client id other than the one this connection holds as a value.
+   *
+   * @remarks
+   * A connection that references a variable holds no id to disagree with.
+   *
+   * @param clientId - The client id the developer gave.
+   * @throws {@link ConfigError} When they differ.
+   */
+  refuseDifferentClientId(clientId: string | undefined): void {
+    const existing = this.clientId;
+    if (
+      clientId === undefined ||
+      existing === undefined ||
+      isVariableReference(existing) ||
+      existing === clientId
+    ) {
+      return;
+    }
+    throw new ConfigError(`${this.path} already uses client id ${existing}, not ${clientId}`, {
+      hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
+      details: { file: this.path, stored_client_id: existing, supplied_client_id: clientId },
+    });
   }
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  // Whatever a client_id field references is a client id's variable, whatever
-  // it is called, which is what the brand records.
-  return referencedVariable(value) as V | undefined;
-}
 
-/**
- * The rows of a mapping block.
- *
- * @param block - `claim_mapping` or `verified_claims`.
- * @returns Each property and its claim, in the order written.
- */
-function rowsOf(block: JsonObject): ClaimRow[] {
-  return Object.entries(block).map(([property, claim]) => {
-    return { property: propertyName(property), claim };
-  });
-}
-
-/**
- * The field names the contract allows in one block, when it forbids any other.
- *
- * @param path - The block's path from the root, empty for the root.
- * @returns The allowed names, or none when the block takes anything.
- */
-function allowedFields(path: readonly string[]): readonly string[] {
-  const level = path.reduce<unknown>((node, key) => {
-    if (!isJsonObject(node)) {
+  /**
+   * A setting the file holds, when a run reusing the connection uses it.
+   *
+   * @typeParam T - What a typed answer parses to.
+   * @param what - How a refusal names the setting.
+   * @param stored - The setting as the file holds it.
+   * @param given - The setting as the run was given it, which replaces the file's.
+   * @param parse - The rules a typed answer is held to.
+   * @returns The stored setting, or `undefined` when the run was given one or
+   *   the file holds none.
+   * @throws {@link ConfigError} When the stored setting cannot be used.
+   */
+  private usableSetting<T>(
+    what: string,
+    stored: string | undefined,
+    given: string | undefined,
+    parse: (value: string) => Parsed<T>,
+  ): string | undefined {
+    if (given !== undefined || stored === undefined) {
       return undefined;
     }
-    return objectAt(node, "properties")[key];
-  }, CONTRACT);
-  if (!isJsonObject(level) || level.additionalProperties !== false) {
-    return [];
+    const parsed = parse(stored);
+    if (!parsed.ok) {
+      throw new ConfigError(`${this.path} holds ${what} that cannot be used: ${parsed.problem}`, {
+        hint: "Fix it in that file, or choose another slug.",
+        details: { file: this.path, slug: this.name },
+      });
+    }
+    return stored;
   }
-  return Object.keys(objectAt(level, "properties"));
+
+  /**
+   * The rows of a mapping block.
+   *
+   * @param block - `claim_mapping` or `verified_claims`.
+   * @returns Each property and its claim, in the order written; none when the
+   *   block is absent.
+   */
+  private rows(block: "claim_mapping" | "verified_claims"): readonly ClaimRow[] {
+    return Object.entries(objectAt(this.body, block)).map((pair) => {
+      const [property, claim] = pair;
+      return { property: propertyName(property), claim };
+    });
+  }
+
+  /**
+   * The variable a credential field reads from.
+   *
+   * @typeParam V - The kind of variable the field names.
+   * @param value - The field as written.
+   * @param fallback - The variable an absent field reads from.
+   * @returns The variable it references, the fallback when the field is absent,
+   *   or `undefined` when it holds a value.
+   */
+  private static variableOf<V extends string>(
+    value: unknown,
+    fallback: V | undefined,
+  ): V | undefined {
+    if (value === undefined) {
+      return fallback;
+    }
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    // Whatever a client_id field references is a client id's variable, whatever
+    // it is called, which is what the brand records.
+    return referencedVariable(value) as V | undefined;
+  }
+
+  /**
+   * The field names the contract allows in one block, when it forbids any
+   * other.
+   *
+   * @param path - The block's path from the root, empty for the root.
+   * @returns The allowed names, or none when the block takes anything.
+   */
+  private static allowedFields(path: readonly string[]): readonly string[] {
+    const level = path.reduce<unknown>((node, key) => {
+      if (!isJsonObject(node)) {
+        return undefined;
+      }
+      return objectAt(node, "properties")[key];
+    }, CONNECTION_CONTRACT);
+    if (!isJsonObject(level) || level.additionalProperties !== false) {
+      return [];
+    }
+    return Object.keys(objectAt(level, "properties"));
+  }
 }
