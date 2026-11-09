@@ -1,0 +1,51 @@
+get:
+  operationId: getEvent
+  x-zitadel-cli: events get
+  summary: Get an event by ID
+  # Events are not registered in resource_scope_index, so the query must carry
+  # the project scope (ADR 049).
+  description: |
+    Returns one event of a project by its ID. Requires `events.read`.
+
+    Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its
+    `project_id`. An unknown ID and the ID of another project's event both
+    answer `404`.
+
+    A project that is not claimed yet also answers `404`: its events are
+    stored but stay invisible until the
+    [claim](/docs/concepts/project-team-user#claim) succeeds.
+  tags:
+    - Events
+  security:
+    - oauth2:
+        - events.read
+  parameters:
+    - $ref: ../../../components/parameters/event-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: The event.
+      content:
+        application/json:
+          schema:
+            $ref: ../event.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No event was found for the given project and ID, or the project is not claimed yet.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getEvent-error-response.yaml

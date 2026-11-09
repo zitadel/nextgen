@@ -38,13 +38,11 @@ export { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "./documen
 export { findCredential, isSecretKey, redactCredentials } from "./secrets";
 export type { Credential, CredentialContext, References } from "./secrets";
 export { describeRegistry } from "./describe";
-export { collectPages } from "./paging";
 export { DEFAULT_WIRE, wireOf } from "./wire";
 export { parseFilter, parseSort } from "./query";
 export { chosenColumns } from "./columns";
 export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
 export type { FieldPaths } from "./paths";
-export { renderDetail, renderRows, renderTable } from "./table";
 export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";
 export type {
   OperationClass,

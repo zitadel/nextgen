@@ -1,19 +1,35 @@
-import { Flags } from "@oclif/core";
+import { PreviewService } from "@/lib/backend";
+import { Args, Flags } from "@oclif/core";
 
-import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
-import { Promptable } from "../../lib/oclif/promptable";
+import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { deletedData } from "@/lib/oclif/envelope";
+import { Destructive, Settled } from "@/lib/oclif/destructive";
+import { filled, type Refused, taken } from "@/lib/oclif/flags";
+import { prose } from "@/lib/oclif/rendering";
+
+/**
+ * The preview URL to remove. It refuses a blank value, and drops a trailing
+ * slash that names the same origin but, sent as typed, would match nothing.
+ */
+const URL: Refused<string> = {
+  schema: filled.transform((url) => {
+    return url.replace(/\/+$/, "");
+  }),
+  refusal: {
+    message: "{input} was given an empty value",
+    hint: "Pass a value for {input}, or omit it entirely.",
+  },
+};
 
 /**
  * `zitadel preview rm <url>` — end a live preview before it expires.
  *
  * The URL stops being served at once; the deployments to it stay in the
- * history. Idempotent on the server, but destructive from the caller's point of
- * view, so it takes the same `--force`-or-confirm gate the resource deletes use.
+ * history. Idempotent on the server, but destructive from the caller's point
+ * of view.
  */
-export default class PreviewRm extends Promptable(PreviewCommand) {
+export default class PreviewRm extends Destructive(PreviewCommand) {
   static override description = "Remove a live preview from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -21,7 +37,12 @@ export default class PreviewRm extends Promptable(PreviewCommand) {
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app --force",
   ];
   static override args = {
-    url: nonBlankArg({ required: true, description: "The preview URL to remove." }),
+    url: Args.custom<string>({
+      parse: taken(URL),
+    })({
+      required: true,
+      description: "The preview URL to remove.",
+    }),
   };
   static override flags = {
     // `--force` is per command, not global: here it permits a removal.
@@ -32,55 +53,53 @@ export default class PreviewRm extends Promptable(PreviewCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(PreviewRm);
-    await this.toMeta(flags);
-    const { dryRun } = this.meta;
-    // An origin has no path, so a trailing slash is the same URL; sent as
-    // typed it would remove nothing and still answer 204.
-    const url = args.url.replace(/\/+$/, "");
-
-    // A dry run makes no request, so it answers before the connection — the
-    // order the resource deletes use, which keeps `--dry-run --non-interactive`
-    // usable.
-    if (dryRun) {
-      const preview = dryRunResult("remove", "preview", url);
-      return this.emit({ ...preview, pretty: `${preview.pretty} from the project` });
-    }
-
-    // Resolved before the confirmation, so the prompt is answered knowing
-    // which project it removes from, and a missing token fails first.
-    const { client, projectId } = await this.connect();
-
-    // The server answers 204 whether or not the URL was live, so a typo would
-    // otherwise read as a removal. Checked before asking, so nobody confirms
-    // removing what is not there.
-    const previews = await client.listPreviews.all(projectId);
-    if (!previews.some((preview) => preview.origin === url)) {
-      return this.emit({
-        status: "skipped",
-        reason: "not-live",
-        pretty: `${url} is not a live preview of the project; nothing was removed`,
-        next: { commands: [this.suggest("preview list")] },
-      });
-    }
-
-    const confirmed = await this.input({
-      kind: "confirm",
-      name: `remove ${url} from the project`,
-      message: `Remove ${url} from the project?`,
-      retry: this.suggest(`preview rm ${shellArg(url)} --force`),
-    });
-    if (!confirmed) {
-      return this.emit({ status: "skipped", reason: "remove-cancelled" });
-    }
-
-    await client.removePreview(projectId, { origin: url });
-
-    return this.emit({
-      status: "ok",
-      data: deletedData({ url }),
-      pretty: `Stopped serving ${url}`,
-    });
+  protected async execute({ args }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
+    return this.emit(
+      await this.confirmed({
+        verb: "remove",
+        name: `remove ${args.url} from the project`,
+        message: `Remove ${args.url} from the project?`,
+        preview: () => {
+          return dryRunResult({
+            verb: "remove",
+            topic: "preview",
+            id: args.url,
+            clause: "from the project",
+          });
+        },
+        prepare: async () => {
+          const connection = await this.connect();
+          const previewService = new PreviewService(connection.client, connection.projectId);
+          const previews = await previewService.list();
+          // The server answers 204 whether or not the URL was live, so a typo
+          // would otherwise read as a removal. Checked before asking, so
+          // nobody confirms removing what is not there.
+          if (
+            !previews.some((preview) => {
+              return preview.origin === args.url;
+            })
+          ) {
+            return new Settled({
+              status: "skipped",
+              reason: "not-live",
+              pretty: prose(
+                `${args.url} is not a live preview of the project; nothing was removed`,
+              ),
+              next: { commands: [this.suggest("preview list")] },
+            });
+          }
+          return connection;
+        },
+        apply: async (consent, { client, projectId }) => {
+          const previewService = new PreviewService(consent.unlock(client), projectId);
+          await previewService.remove(args.url);
+          return {
+            status: "ok",
+            data: deletedData({ url: args.url }),
+            pretty: prose(`Stopped serving ${args.url}`),
+          };
+        },
+      }),
+    );
   }
 }

@@ -1,6 +1,6 @@
 package harness
 
-import api "github.com/zitadel/nextgen/api/generated"
+import api "go.zitadel.com/zitadel/v5/api"
 
 // StatusClasses is the status_class tag vocabulary: see OpError.StatusClass.
 var StatusClasses = []string{"0", "2xx", "4xx", "5xx"}
@@ -42,6 +42,7 @@ var createFlowCodes = []string{
 	string(api.ProjNotFoundCreateFlowErrorResponse),
 	string(api.ProjOriginNotAllowedCreateFlowErrorResponse),
 	string(api.ProjPreviewNotLiveCreateFlowErrorResponse),
+	string(api.RelNoDefaultCreateFlowErrorResponse),
 	string(api.RelNotDeployedCreateFlowErrorResponse),
 	string(api.RelNotFoundCreateFlowErrorResponse),
 	string(api.RelRevokedCreateFlowErrorResponse),
@@ -73,6 +74,7 @@ var submitFlowStepCodes = []string{
 	string(api.ProjOriginNotAllowedSubmitFlowStepErrorResponse),
 	string(api.ProjPreviewNotLiveSubmitFlowStepErrorResponse),
 	string(api.RelNotFoundSubmitFlowStepErrorResponse),
+	string(api.RelNotDeployedSubmitFlowStepErrorResponse),
 	string(api.RelRevokedSubmitFlowStepErrorResponse),
 	string(api.ReqInvalidSubmitFlowStepErrorResponse),
 	string(api.TknInvalidSubmitFlowStepErrorResponse),

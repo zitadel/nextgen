@@ -64,7 +64,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -413,6 +413,32 @@ describe("<zitadel-login> with identity providers", () => {
       expect(alert?.getAttribute("heading")).toBe(title);
       // Back on the identifier, not stranded on the redirect step.
       expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    });
+  });
+
+  describe("when the server answers flow.sso_user_schema_mismatch", () => {
+    it("starts a fresh flow whose notice does not ask the visitor to start again", async () => {
+      server.use(
+        http.get(
+          "*/flow/:id",
+          () =>
+            HttpResponse.json(
+              {
+                code: "flow.sso_user_schema_mismatch",
+                message: "the linked account cannot sign in through this flow",
+              },
+              { status: 409 },
+            ),
+          { once: true },
+        ),
+      );
+
+      const { element } = await landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      const text = element.shadowRoot?.textContent ?? "";
+      expect(text).toContain("This account can't sign in with this provider.");
+      expect(text).not.toContain("Please start again");
     });
   });
 

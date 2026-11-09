@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { devScriptPortEdit } from "../../../../../../src/lib/orca/patchers/rule/dev-script-port";
+import { devScriptPortEdit } from "@/lib/orca/patchers/rule/dev-script-port";
 
 const pkg = (scripts: Record<string, string>): string =>
   `${JSON.stringify({ name: "app", scripts }, null, 2)}\n`;

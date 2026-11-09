@@ -7,7 +7,7 @@ import { Callout } from "fumadocs-ui/components/callout";
 import { Card, Cards } from "fumadocs-ui/components/card";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-`@zitadel/api` is generated from the OpenAPI source under `api/openapi/`.
+`@zitadel/api` is the typed TypeScript client for the Zitadel API. It is generated from the OpenAPI source under `apps/api/api/openapi/`, so it covers every operation.
 
 It exposes:
 
@@ -17,7 +17,12 @@ It exposes:
 - MSW helpers
 - runtime helpers for base URL and auth
 
-## Install
+## Prerequisites
+
+- A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in).
+- The server URL, the project ID and the project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, and the secret also to `.zitadel/secret`. [Authentication](/docs/reference/api#authentication) explains the secret. Keep it on a server, out of source control and out of the browser.
+
+## Install the package
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -37,19 +42,9 @@ It exposes:
   </Tab>
 </Tabs>
 
-## Usage
+## Make an authenticated call
 
-The package has no root export; import from its subpaths:
-
-- `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token; and `pagedFunctions`, which says for each paged function where a page's items and cursor are, and builds the arguments that fetch the page a cursor names.
-- `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components read. Every SDK except Angular uses it; the Angular SDK has its own `configureZitadel`.
-- `@zitadel/api/generated/model` — request and response types.
-- `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
-- `@zitadel/api/runtime/fetch` — `ApiError` and `NetworkError`, which a call throws when the request fails.
-- `@zitadel/api/runtime/paging` — `pages()`, the cursor walk behind the client's list methods, for a request the client does not make; and `nextToken()` and `itemsOf()`, which read a page's cursor and list.
-- `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth` — low-level settings, such as the base URL and the token the client sets for you.
-
-Call the API from server-side code:
+Call the API from server-side code. This script creates a client with the project secret and reads your project:
 
 ```ts
 import { createZitadelClient } from "@zitadel/api/client";
@@ -64,7 +59,23 @@ const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
 
 `baseUrl` is the server's origin: the client calls the API under `/api/v1` there, and keeps a single prefix when the origin already ends in it. Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
 
-### Lists
+`getProject` sends `GET /projects/{project_id}` with the secret as a bearer token. It resolves to the project, with fields such as `id`, `name` and `origins`. Run the script with the variables from `.env.local` in its environment.
+
+If the secret is missing or wrong, the server answers `401` and the call throws an `ApiError`. If the project ID names no project, the server answers `404` and the call throws the same error.
+
+## Entry points
+
+The package has no root export; import from its subpaths:
+
+- `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token; and `pagedFunctions`, which says for each paged function where a page's items and cursor are, and builds the arguments that fetch the page a cursor names.
+- `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components read. Every SDK except Angular uses it; the Angular SDK has its own `configureZitadel`.
+- `@zitadel/api/generated/model` — request and response types.
+- `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
+- `@zitadel/api/runtime/fetch` — `ApiError` and `NetworkError`, which a call throws when the request fails.
+- `@zitadel/api/runtime/paging` — `Paging`, which reads a page of one list and walks its pages (`walk()`) or gathers them (`collect()`), for a request the client does not make. `Paging.byField()` builds one for a list known only by the names of its fields.
+- `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth` — low-level settings, such as the base URL and the token the client sets for you.
+
+## Page through lists
 
 A paged list method returns one page and its `next_page_token`. Each one also carries `items()`, `pages()` and `all()`, which take the same arguments and follow the cursor for you:
 
@@ -79,7 +90,7 @@ const schemas = await client.listSchemas.all({ project_id, limit: 100 });
 `items()` and `pages()` fetch the next page only when the loop reaches it, so a loop that stops early reads nothing more. `limit` sets the page size, and a `page_token` among the arguments is where the walk starts. To change what every call returns, each page included, pass `onResponse` or `onError` to `createZitadelClient`.
 
 <Callout title="Edit the OpenAPI source" type="warn">
-  Do not hand-edit generated API package output. Update `api/openapi/**` and regenerate through the repo tasks.
+  Do not hand-edit generated API package output. Update `apps/api/api/openapi/**` and regenerate through the repo tasks.
 </Callout>
 
 <Cards>
@@ -90,5 +101,5 @@ const schemas = await client.listSchemas.all({ project_id, limit: 100 });
 
 ## See also
 
-- [API reference](/docs/reference/api) — every endpoint, generated from the same OpenAPI source.
-- [`@zitadel/api` source](https://github.com/zitadel/nextgen/tree/main/packages/api) and the [OpenAPI spec](https://github.com/zitadel/nextgen/tree/main/api/openapi).
+- [API reference](/docs/reference/api): every endpoint, generated from the same OpenAPI source.
+- [`@zitadel/api` source](https://github.com/zitadel/nextgen/tree/main/packages/api) and the [OpenAPI spec](https://github.com/zitadel/nextgen/tree/main/apps/api/api/openapi).

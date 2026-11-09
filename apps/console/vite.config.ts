@@ -12,7 +12,7 @@ import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { type Alias, defineConfig, loadEnv, type Plugin, type ProxyOptions } from "vite";
 
 const defaultConsoleBase = "/ui/console/";
-const consoleOutDir = "../../internal/staticui/console/dist";
+const consoleOutDir = "../api/internal/staticui/console/dist";
 const defaultBackendUrl = "http://localhost:8080";
 
 export default defineConfig(async ({ command, mode, isPreview }) => {
@@ -169,7 +169,7 @@ export function devApiRoute(base: string): {
 // The path the build is served under: the Go server's `/ui/console/`, unless
 // CONSOLE_BASE_PATH names another. The hosted cloud's console service sets
 // `/console/` (repo-root vercel.json) and points the server's console links
-// there (apps/cloud/launcher). Unprefixed for the same reason as CONSOLE_ADDON
+// there (apps/api/cmd/cloud-launcher). Unprefixed for the same reason as CONSOLE_ADDON
 // below. Anything but an absolute path fails the build.
 function consoleBase(mode: string): string {
   const name = "CONSOLE_BASE_PATH";

@@ -7,7 +7,7 @@ import {
   resolveChannel,
   resolveTelemetryEndpoint,
   resolveTelemetryToken,
-} from "../../../../src/lib/telemetry/config";
+} from "@/lib/telemetry/config";
 
 describe("resolveChannel", () => {
   it("defaults to production (single generic build, no channel stamp)", () => {
@@ -72,7 +72,11 @@ describe("resolveTelemetryEndpoint", () => {
   it("matches the cloud's rewrite to Mixpanel's EU host, ahead of the catch-all", async () => {
     const vercelJson = join(import.meta.dirname, "../../../../../../vercel.json");
     const { rewrites } = JSON.parse(await readFile(vercelJson, "utf8")) as {
-      rewrites: { source: string; destination: unknown }[];
+      rewrites: {
+        source: string;
+        has?: { type: string; value?: string }[];
+        destination: unknown;
+      }[];
     };
     const proxy = rewrites.findIndex(
       ({ source, destination }) =>
@@ -82,6 +86,15 @@ describe("resolveTelemetryEndpoint", () => {
     expect(proxy, "vercel.json has no rewrite for the CLI's Mixpanel path").toBeGreaterThanOrEqual(
       0,
     );
-    expect(proxy).toBeLessThan(rewrites.findIndex(({ source }) => source === "/(.*)"));
+    // The catch-all is the first `/(.*)` on the cloud's own host: only
+    // go.zitadel.com's rule is another host's; any other condition, a host
+    // naming another host included, still counts as the cloud's.
+    expect(proxy).toBeLessThan(
+      rewrites.findIndex(
+        ({ source, has }) =>
+          source === "/(.*)" &&
+          !has?.some(({ type, value }) => type === "host" && value === "go.zitadel.com"),
+      ),
+    );
   });
 });

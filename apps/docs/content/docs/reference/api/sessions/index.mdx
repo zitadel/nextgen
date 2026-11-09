@@ -1,8 +1,18 @@
 ---
 title: Sessions
-description: OpenAPI operations for session creation, lookup, exchange, and teardown.
+description: Read, exchange and revoke the sessions of anonymous and signed-in users.
 ---
 
-Sessions represent authenticated and anonymous runtime state.
+A session is the durable record of an anonymous or signed-in user. It holds
+the verified factors and the assurance levels they satisfy. A session
+lives for 24 hours after sign-in by default; the
+[concepts page](/docs/concepts/sessions-auth-attempts#session-lifetime) has
+the lifetimes.
+
+A sign-in ends in a session: exchange the handoff token that an
+[authentication attempt](/docs/reference/api/authentication-attempts) returns.
+From then on the browser holds the session cookie. Your app reads the session
+with `GET /sessions/me` and signs the user out with `DELETE /sessions/me`.
+Operators use the by-ID and query operations with a project secret.
 
 <Operations />

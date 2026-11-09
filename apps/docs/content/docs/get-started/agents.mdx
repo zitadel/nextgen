@@ -1,11 +1,13 @@
 ---
 title: Agent setup
-description: Install the Zitadel Agent Skills, drive the CLI with JSON envelopes, and prove auth in a browser.
+description: Install the Zitadel Agent Skills, drive the CLI with JSON envelopes, and prove sign-in in a browser.
 ---
 
-The CLI is an agent-facing product surface. Agents should prefer structured JSON over prose hints and should prove the generated app in a browser.
+A coding agent can drive the Zitadel CLI end to end. It reads one JSON object per command, instead of prose hints, and proves the generated app in a browser. This page covers the skills to install, the JSON contract, and the browser proof.
 
-## Agent Skills
+Before an agent starts, it needs Node.js 24 or newer, a package manager and browser automation. [Quickstart](/docs/get-started/quickstart#prerequisites) shows how to check Node.js and the package manager. The browser automation is the agent's own tool, such as Playwright; the [UI proof](#stable-ui-proof) uses it.
+
+## Install the Agent Skills
 
 The CLI ships [Agent Skills](https://agentskills.io) so a coding agent can
 drive it and the SDKs with guidance that matches the version you run: the
@@ -35,18 +37,27 @@ When operating outside the current directory, also pass:
 --cwd <path>
 ```
 
-The CLI prints one parseable JSON object on stdout. Installer, audit, and package-manager progress belongs on stderr. Capture stdout and stderr separately when scripting, into files outside the app directory: setup scaffolds a new app only into an empty directory. The contract covers the Zitadel commands; oclif's built-in `help`, `version`, and `commands` print no envelope.
+The CLI prints one parseable JSON object on stdout, the envelope. Installer, audit, and package-manager progress goes to stderr. Capture stdout and stderr separately when scripting, into files outside the app directory: setup scaffolds a new app only into an empty directory. The contract covers the Zitadel commands. The built-in `help`, `version`, and `commands` print no envelope.
 
 ## Envelope shape
 
-Every JSON envelope includes:
+Every envelope includes:
 
 - `cli_version`
 - `command`
 - `source`
 - `status`: `ok`, `skipped`, or `error`
 
-`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Agents should prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
+`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
+
+## Read the results
+
+Each command in the prompt below reports its outcome in the envelope:
+
+- `doctor`: `data.ok` is `true` when every check passed. A failed check returns an `error` envelope instead, and its `next_commands` name the fix.
+- `start`: `data.urls.api` and `data.urls.console` are the server's URLs. `start` returns no console sign-in link.
+- `setup`: `status` is `ok`, `data.project.project_id` is the project ID, `data.files_written` lists the files setup wrote, and `next_commands` holds the next steps. Setup does not return the project secret: it is in `.env.local` as `ZITADEL_PROJECT_SECRET` ([Quickstart](/docs/get-started/quickstart#where-the-project-id-and-secret-are)).
+- `console`: `data.sign_in_url` is the one-time link.
 
 ## Agent prompt
 
@@ -68,9 +79,11 @@ get a new one per visit. The link step 2 returns usually expires before setup fi
 Summarize commands run, JSON statuses, files changed, browser steps completed, and any setup or UI friction.
 ```
 
+The run worked when `setup` returned `status: ok` and the browser loop ends on the signed-in page, with the profile showing the user you registered.
+
 ## Stable UI proof
 
-`<zitadel-login>` and `<zitadel-session>` are web components with shadow DOM, and the fields and buttons inside them have shadow roots of their own. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through every shadow root.
+`<zitadel-login>` and `<zitadel-session>` are web components that render in a shadow DOM, and the fields and buttons inside them have shadow roots of their own. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through every shadow root.
 
 The hooks are `data-testid` values. Useful ones include:
 

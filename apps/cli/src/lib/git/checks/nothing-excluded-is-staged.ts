@@ -1,6 +1,6 @@
-import type { Git } from "../git";
-import type { Check } from "../operation";
-import type { PathFilter } from "../types";
+import type { Git } from "@/lib/git/git";
+import type { Check } from "@/lib/git/operation";
+import type { PathFilter } from "@/lib/git/types";
 
 /**
  * No staged file is one `except` matches.

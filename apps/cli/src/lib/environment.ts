@@ -1,14 +1,18 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
+import { reportWarning } from "./warnings";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
+import type { ZitadelClient } from "./backend";
+import { Publisher } from "./publish";
 import { ZitadelError } from "./errors";
+import { readIfExists } from "./fs";
 import { input } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
-import { unscopedCommand } from "./suggestion";
-import { shellOption } from "./shell";
+import { type SuggestedCommand, unscopedCommand } from "./suggestion";
+import { Cmd } from "./cmd";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -167,14 +171,8 @@ function pick(values: Readonly<Record<string, string | undefined>>): Values {
  * in `local-server/env-vars.ts`: that one is hard-coded to its own keys.
  */
 async function readEnvFile(path: string): Promise<Values | undefined> {
-  try {
-    return pick(parseEnv(await readFile(path, "utf8")));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return undefined;
-    }
-    throw error;
-  }
+  const text = await readIfExists(path);
+  return text === undefined ? undefined : pick(parseEnv(text));
 }
 
 /**
@@ -320,7 +318,7 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
           nextCommands: [
             unscopedCommand(
               `${name === "development" ? "setup" : `env add ${name}`}${
-                environment.cwd === process.cwd() ? "" : ` ${shellOption("--cwd", environment.cwd)}`
+                environment.cwd === process.cwd() ? "" : ` ${Cmd.option("--cwd", environment.cwd)}`
               }`,
             ),
           ],
@@ -416,4 +414,61 @@ export async function readBoundEnvironments(
     }
   }
   return bound;
+}
+
+/** What the first deploy of a project published. */
+export type InitialDeployment = {
+  readonly releaseId: string;
+  readonly contentHash: string;
+  readonly deploymentId: string;
+  readonly origins: readonly string[];
+};
+
+/**
+ * Publish `.zitadel/` to a project nothing has been deployed to, the way
+ * `deploy` does: build the bundle, validate it, create the release and deploy
+ * it to every primary origin. `deploy`'s diff step is left out, because there
+ * is no live release to diff against, and so is its optimistic guard, because
+ * there is no deployment to race with.
+ *
+ * Temporary: `setup` and `env add` offer this deploy until a project is
+ * created with its first release, and both go with it.
+ */
+export async function deployInitialRelease(input: {
+  client: ZitadelClient;
+  projectId: string;
+  cwd: string;
+  env: Record<string, string | undefined>;
+  json: boolean;
+  color: boolean;
+  message: string;
+  suggest: (args: string) => SuggestedCommand;
+}): Promise<InitialDeployment> {
+  const publisher = new Publisher(input.client, input.projectId);
+  const prepared = await publisher.prepare({
+    cwd: input.cwd,
+    env: input.env,
+    mode: "deploy",
+    dryRun: false,
+    compare: false,
+    json: input.json,
+    color: input.color,
+    suggest: input.suggest,
+  });
+  for (const warning of prepared.warnings) {
+    reportWarning(warning);
+  }
+  for (const notice of prepared.notices) {
+    process.stdout.write(notice);
+  }
+  const { release, deployment } = await publisher.deployInitial({
+    prepared,
+    message: input.message,
+  });
+  return {
+    releaseId: release.id,
+    contentHash: release.content_hash,
+    deploymentId: deployment.id,
+    origins: deployment.targets.map((target) => target.origin),
+  };
 }

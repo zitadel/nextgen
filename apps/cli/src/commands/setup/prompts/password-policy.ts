@@ -1,5 +1,5 @@
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
-import type { PasswordMinLength } from "../../../lib/policies";
+import type { PasswordMinLength } from "@/lib/zitadel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -13,7 +13,7 @@ import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
  * of multi-factor sign-in. The developer still decides; the wizard only says
  * which answer is the safe one, and any other length goes into
  * `.zitadel/policies/` or `--password-min-length`. A run with nobody to ask
- * gets the same 15 unless the flag says otherwise (`passwordPolicyFile`).
+ * gets the same 15 unless the flag says otherwise (`PasswordPolicy.initial`).
  *
  * `--password-min-length` is authoritative and skips the question.
  */

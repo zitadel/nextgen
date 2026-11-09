@@ -5,10 +5,10 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "@/test/session.fixture";
-import { listMyProjectsCached } from "../../lib/project-scope";
+import { listMyProjectsCached } from "../../features/projects/my-projects";
 import { _setRuntimeForTesting } from "../../runtime/runtime";
 import { createAppRouter } from "../../router";
-import { _resetClaimAttemptsForTesting } from "../../lib/claim";
+import { _resetClaimAttemptsForTesting } from "@/features/claim/api";
 import { server } from "@/test/msw";
 
 /**

@@ -66,14 +66,14 @@ launcher) and `migrate`. None of the three is cached: the launcher runs with
 the deployment's secrets, and any branch's build can write the team's cache.
 `migrate` sees the deployment's whole environment. The `schemas` service
 runs `schemas` and is rooted here, where `package.json` has no
-dependencies, so Vercel detects no framework (a service takes no
+framework dependencies, so Vercel detects no framework (a service takes no
 `framework: null`); a framework dependency in it would change how that
 service builds. Moon has no project for the package: the launcher's Go
 tests run in the server's `test`.
 
 | File | Role |
 |---|---|
-| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates; `drop-preview` drops a merged branch's database, or every idle one |
+| [`../api/cmd/cloud-launcher/`](../api/cmd/cloud-launcher/) | the function binary, a package of the Go module: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates; `drop-preview` drops a merged branch's database, or every idle one |
 | [`build-launcher.sh`](build-launcher.sh) | the `build` task: compiles the launcher, without the console, into `dist/nextgen-launcher`; it stamps in the branch, which picks a preview's database |
 | [`deploy.sh`](deploy.sh) | the `deploy` task, last in the `server` service's build: copies the migrated launcher to `$VERCEL_OUTPUT_FILE` |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |

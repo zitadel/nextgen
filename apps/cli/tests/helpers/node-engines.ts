@@ -1,13 +1,10 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type MockInstance, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AbstractCLIScaffolder } from "../../src/lib/orca/scaffolders/cli";
-import {
-  NODE_ENGINES_TIMEOUT_MS,
-  describeAcceptedNode,
-} from "../../src/lib/orca/scaffolders/node-engines";
-import { takeReportedWarnings } from "../../src/lib/warnings";
+import type { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
+import { NODE_ENGINES_TIMEOUT_MS, describeAcceptedNode } from "@/lib/orca/scaffolders/node-engines";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 /**
  * A Node that every framework CLI's range accepts, for the tests of a
@@ -34,26 +31,70 @@ export interface NodeEnginesCase {
   readonly refused: ReadonlyArray<string>;
 }
 
-const mockSpawn = vi.mocked(spawnSync);
+/**
+ * What the stubbed `execaSync` answers: the fields of execa's own result, any
+ * of which a stub may leave out, as the code under test reads only a few.
+ */
+type SpawnAnswer = Partial<ReturnType<typeof execaSync>>;
 
-function spawnResult(status: number, stdout = ""): ReturnType<typeof spawnSync> {
-  return { status, stderr: "", stdout, pid: 1, output: [], signal: null } as ReturnType<
-    typeof spawnSync
-  >;
-}
+/** The one form of `execaSync` the scaffolders call: a file, its arguments, options. */
+type Spawn = (
+  file: string,
+  args: ReadonlyArray<string>,
+  options: Record<string, unknown>,
+) => SpawnAnswer;
 
-/** A spawn npm's lookup never finished: killed at the timeout, with no exit status. */
-function timedOut(): ReturnType<typeof spawnSync> {
+/**
+ * The `execaSync` every suite using these helpers mocks with `vi.fn()`.
+ *
+ * The cast stays: `execaSync` is an intersection of generic overloads (a
+ * template tag, an options binder, two call forms), which no stub can
+ * implement, so the mock is narrowed to the one call form the scaffolders use
+ * and to the partial answers {@link SpawnAnswer} allows.
+ */
+const mockSpawn = vi.mocked(execaSync) as unknown as MockInstance<Spawn>;
+
+/**
+ * A spawn that ran to an exit.
+ *
+ * @param status - The exit status, which also decides whether it failed.
+ * @param stdout - What it printed.
+ * @returns The answer the stub gives.
+ */
+function spawnResult(status: number, stdout = ""): SpawnAnswer {
   return {
-    ...spawnResult(0),
-    status: null,
-    signal: "SIGTERM",
-    error: Object.assign(new Error("spawn npm ETIMEDOUT"), { code: "ETIMEDOUT" }),
+    exitCode: status,
+    failed: status !== 0,
+    stderr: "",
+    stdout,
   };
 }
 
-function isLookup(call: ReadonlyArray<unknown>): boolean {
-  return call[0] === "npm" && (call[1] as ReadonlyArray<string>)[0] === "view";
+/**
+ * A spawn npm's lookup never finished: killed at the timeout, with no exit
+ * status.
+ *
+ * @returns The answer the stub gives.
+ */
+function timedOut(): SpawnAnswer {
+  return {
+    ...spawnResult(0),
+    exitCode: undefined,
+    failed: true,
+    timedOut: true,
+    signal: "SIGTERM",
+  };
+}
+
+/**
+ * Whether a spawn was npm's engine lookup rather than the scaffolding.
+ *
+ * @param call - The spawn's arguments, as the mock recorded them.
+ * @returns Whether it was `npm view`.
+ */
+function isLookup(call: Parameters<Spawn>): boolean {
+  const [file, args] = call;
+  return file === "npm" && args[0] === "view";
 }
 
 /** The spawns that were not the engine lookup: the scaffolding command itself. */
@@ -61,13 +102,23 @@ export function scaffoldingCalls(): ReadonlyArray<unknown[]> {
   return mockSpawn.mock.calls.filter((call) => !isLookup(call));
 }
 
-/** npm answers the engine lookup with `answer`, and every other command succeeds. */
-function lookupAnswers(answer: ReturnType<typeof spawnSync>): void {
-  mockSpawn.mockImplementation((command, args) =>
-    command === "npm" && args?.[0] === "view" ? answer : spawnResult(0),
-  );
+/**
+ * npm answers the engine lookup with `answer`, and every other command
+ * succeeds.
+ *
+ * @param answer - What the lookup answers.
+ */
+function lookupAnswers(answer: SpawnAnswer): void {
+  mockSpawn.mockImplementation((command, args) => {
+    return command === "npm" && args[0] === "view" ? answer : spawnResult(0);
+  });
 }
 
+/**
+ * npm says the framework CLI's published engine range is `range`.
+ *
+ * @param range - The `engines.node` range npm prints.
+ */
 function npmPublishes(range: string): void {
   lookupAnswers(spawnResult(0, `${range}\n`));
 }
@@ -76,7 +127,7 @@ function npmPublishes(range: string): void {
  * The Node check every scaffolder that runs a framework CLI carries, as one
  * matrix: each scaffolder's test file calls it with its own CLI's package,
  * fallback range and sample Node versions, so the test names and wording are
- * the same everywhere. The calling file mocks `node:child_process`.
+ * the same everywhere. The calling file mocks `execa`.
  */
 export function describeNodeEngines(c: NodeEnginesCase): void {
   describe("Node check", () => {

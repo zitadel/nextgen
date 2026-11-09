@@ -1,0 +1,51 @@
+title: PatchUserRequest
+# Moving to another schema is the upgrade mechanism of ADR 009 section 4.
+description: |
+  A partial update, merged into the user's current state. At least one of
+  `schema` and `attributes` must be present; an empty patch is rejected with
+  `user.invalid`.
+
+  `attributes` is merged key by key into the stored attributes: an omitted
+  key stays untouched, an object merges recursively, `null` deletes the
+  attribute, and any other value replaces the stored one. The merged result
+  is validated as a whole against the user's schema, so a patch that deletes
+  or invalidates a required property is rejected with `req.invalid`.
+
+  `schema` moves the user to another registered schema, which is how a user
+  upgrades to a newer schema revision. The target must be a revision of the
+  user's current schema (the same `objectType`), newer or older; a schema of
+  another `objectType` is rejected with `user.invalid`. A schema stored
+  without an `objectType` is a revision of nothing, so a user cannot move to
+  or from one. The request must be self-contained: merged attributes are
+  validated against the new schema before commit, and every uniqueness claim
+  is recomputed under the new schema's annotations. Values removed by an
+  earlier move are not restored by moving back.
+type: object
+additionalProperties: false
+minProperties: 1
+properties:
+  schema:
+    type: string
+    minLength: 1
+    description: |
+      The ID of the schema the user follows after this patch: the `id` that
+      `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the
+      current schema. The schema must already be registered and be a revision
+      of the user's current schema.
+  # No default: a client that fills one in would send dry_run: false on every
+  # patch, and a server from before this field refuses that.
+  dry_run:
+    type: boolean
+    description: |
+      Set to `true` to check the patch without applying it. The response is
+      what the real request would answer now; a `200` holds the user as the
+      patch would leave them, with `metadata.updated_at` unchanged. Leave it
+      out to apply the patch. A server from before this field refuses the
+      request with `400` and changes nothing.
+  attributes:
+    type: object
+    additionalProperties: true
+    minProperties: 1
+    description: |
+      The changed attributes only. `null` deletes an attribute; omitted
+      keys are untouched.

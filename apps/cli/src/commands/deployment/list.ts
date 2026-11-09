@@ -1,18 +1,37 @@
+import { DeploymentService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import {
+  type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { Cmd } from "@/lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** The page size `--limit` asks for, as the server bounds it. */
+const LIMIT: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid {input}",
+    hint: "Use a whole number from {min} to {max}.",
+  },
+  values: {
+    min: LIMIT_MIN,
+    max: LIMIT_MAX,
+  },
+};
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -23,7 +42,7 @@ const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as cons
  * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
  * walk it a page at a time.
  */
-export default class DeploymentList extends EnvironmentCommand {
+export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -33,12 +52,14 @@ export default class DeploymentList extends EnvironmentCommand {
     "<%= config.bin %> deployment list --origin https://app.acme.com",
   ];
   static override flags = {
-    origin: Flags.string({ description: "Only deployments that targeted this origin." }),
+    origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: Flags.integer({
+    limit: Flags.custom<number>({
+      parse: reads(LIMIT),
+    })({
+      min: LIMIT_MIN,
+      max: LIMIT_MAX,
       description: "Page size (server default 20, max 100).",
-      min: 1,
-      max: 100,
     }),
     "page-token": nonBlankString({
       description: "Continue from a previous page's next_page_token.",
@@ -48,73 +69,60 @@ export default class DeploymentList extends EnvironmentCommand {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(DeploymentList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const params = {
-      project_id: projectId,
-      origin: flags.origin,
-      live: flags.live,
-      limit: flags.limit,
-      page_token: flags["page-token"],
-    };
-    // One page unless `--all`, as every list does; the walk starts at
-    // `--page-token`, and a drain leaves no next page to report.
-    const { items: deployments, next } = await collectPages(client.listDeployments.pages(params), {
-      items: (page) => page.deployments,
-      all: flags.all === true,
-      next: (page) => page.next_page_token,
+    const deploymentService = new DeploymentService(client, projectId);
+    const listed = await deploymentService.page(
+      {
+        origin: flags.origin,
+        live: flags.live,
+        limit: flags.limit,
+        page_token: flags.pageToken,
+      },
+      {
+        all: flags.all,
+      },
+    );
+
+    const items = listed.items;
+    // Flatten each deployment's targets to one `origins` cell for the table.
+    const rows = items.map((deployment) => {
+      return {
+        id: deployment.id,
+        release_id: deployment.release_id,
+        reason: deployment.metadata.reason,
+        origins: deployment.origins.join(", "),
+        deployed_at: deployment.deployed_at,
+      };
     });
 
-    // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = deployments.map((deployment) => ({
-      id: deployment.id,
-      release_id: deployment.release_id,
-      reason: deployment.metadata.reason,
-      origins: deployment.targets.map((target) => target.origin).join(", "),
-      deployed_at: deployment.deployed_at,
-    }));
+    const columns = COLUMNS;
+    const empty = "No deployments yet.";
+    const footer: string[] = [];
+    const page = {
+      token: listed.next,
+      command: "deployment list",
+      flags: [
+        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
+        ...(flags.live ? ["--live"] : []),
+        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+      ],
+    };
+    const extra = {};
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${shellArg(flags.origin)}`]),
-              ...(flags.live ? ["--live"] : []),
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              // `next` is an opaque server cursor: quote it so whitespace or shell
-              // metacharacters in a copied command cannot execute as server-controlled
-              // text or break the suggestion.
-              `--page-token ${shellArg(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
-
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      data: listData(deployments, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: renderList(COLUMNS, rows, {
-        plain,
-        singular: "deployment",
-        empty: "No deployments yet.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "deployment",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

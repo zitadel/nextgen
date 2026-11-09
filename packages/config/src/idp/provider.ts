@@ -34,12 +34,6 @@ export type ConnectionEndpoints = {
 export type ScaffoldOptions = {
   /** Properties the target user schema defines, which bounds the claim mapping. */
   readonly schemaProperties: Iterable<string>;
-  /**
-   * The properties among them that are unique (`x-unique` of `project` or
-   * `team`). Verification is only read for these, so a verification of any
-   * other is left out of the document. Omit it to leave every one in.
-   */
-  readonly uniqueProperties?: Iterable<string>;
   /** Slug to write under; defaults to the provider's own. */
   readonly slug?: ConnectionSlug;
   /** `$schema` pointer, relative to `.zitadel/idps/`. */
@@ -139,30 +133,35 @@ export function isVariableReference(value: string): boolean {
 }
 
 /**
- * The top-level properties of a user schema that scope their uniqueness, or
- * one of their nested properties does. The engine asks about a verified value
- * at the top-level property in both cases.
+ * The client id variable a `client_id` field's `${{ NAME }}` reference names.
+ *
+ * Whatever a `client_id` field references is a client id's variable, whatever
+ * it is called, which is what the brand records.
+ *
+ * @param value - The field as written.
+ * @returns The variable, or `undefined` when the value is not a reference.
  */
-export function uniquePropertyNames(schema: object): string[] {
-  const properties = (schema as { properties?: unknown }).properties;
-  if (typeof properties !== "object" || properties === null) {
-    return [];
+export function referencedClientIdVariable(value: string): ClientIdVariable | undefined {
+  const name = referencedVariable(value);
+  if (name === undefined) {
+    return undefined;
   }
-  const unique = (definition: unknown): boolean => {
-    if (typeof definition !== "object" || definition === null) {
-      return false;
-    }
-    const record = definition as { "x-unique"?: unknown; properties?: unknown };
-    if (record["x-unique"] === "project" || record["x-unique"] === "team") {
-      return true;
-    }
-    return (
-      typeof record.properties === "object" &&
-      record.properties !== null &&
-      Object.values(record.properties).some(unique)
-    );
-  };
-  return Object.entries(properties)
-    .filter(([, definition]) => unique(definition))
-    .map(([name]) => name);
+  // A brand exists only for the type checker, so a cast is the only way to make one.
+  return name as ClientIdVariable;
+}
+
+/**
+ * The client secret variable a `client_secret` field's `${{ NAME }}`
+ * reference names.
+ *
+ * @param value - The field as written.
+ * @returns The variable, or `undefined` when the value is not a reference.
+ */
+export function referencedClientSecretVariable(value: string): ClientSecretVariable | undefined {
+  const name = referencedVariable(value);
+  if (name === undefined) {
+    return undefined;
+  }
+  // A brand exists only for the type checker, so a cast is the only way to make one.
+  return name as ClientSecretVariable;
 }

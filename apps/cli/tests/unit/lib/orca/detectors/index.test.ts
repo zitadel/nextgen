@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import semver from "semver";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { detectors } from "../../../../../src/lib/orca/detectors";
+import { detectors } from "@/lib/orca/detectors";
 
 const dirs: string[] = [];
 

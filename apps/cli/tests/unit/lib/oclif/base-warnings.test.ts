@@ -1,9 +1,10 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { reportWarning, takeReportedWarnings } from "../../../../src/lib/warnings";
+import { BaseCommand } from "@/lib/oclif/base";
+import { prose } from "@/lib/oclif/rendering";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
 
 /** A command that records what `emit` prints instead of writing it. */
 class WarningCommand extends BaseCommand {
@@ -17,7 +18,7 @@ class WarningCommand extends BaseCommand {
     this.printed.push(message ?? "");
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 
@@ -50,7 +51,7 @@ describe("BaseCommand warnings", () => {
   it("prints a result's warnings after its own terminal text", async () => {
     const cmd = makeCommand();
 
-    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: "Done" });
+    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: prose("Done") });
 
     expect(cmd.printed).toEqual(["Done\nWarning: careful"]);
   });
@@ -58,9 +59,23 @@ describe("BaseCommand warnings", () => {
   it("prints the warnings alone when the terminal text is empty", async () => {
     const cmd = makeCommand();
 
-    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: "" });
+    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: prose("") });
 
     expect(cmd.printed).toEqual(["Warning: careful"]);
+  });
+
+  it("spells out a warning beside a command's own rendering, which names what the server answered", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: {},
+      warnings: ["schema \u001b[2Jwiped has no identifier"],
+      pretty: prose("Deployed"),
+    });
+
+    expect(cmd.printed.join("\n")).not.toContain("\u001b");
+    expect(cmd.printed).toEqual(["Deployed\nWarning: schema \\x1b[2Jwiped has no identifier"]);
   });
 
   it("carries a reported warning into the envelope", async () => {
@@ -76,7 +91,7 @@ describe("BaseCommand warnings", () => {
     const cmd = makeCommand();
     reportWarning("reported early");
 
-    await cmd.finish({ status: "ok", data: {}, pretty: "Done" });
+    await cmd.finish({ status: "ok", data: {}, pretty: prose("Done") });
 
     expect(cmd.printed).toEqual(["Done"]);
   });

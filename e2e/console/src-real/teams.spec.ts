@@ -46,7 +46,7 @@ test("opens a team from the list and renames it", async ({ page, zitadel, seed }
   await expect(page).toHaveURL(/\/teams\/team_[A-Z0-9]+\?project=/);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
-  const field = page.getByLabel("Tenant name");
+  const field = page.getByLabel("Team name");
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
   await field.fill(renamed);
   await page.getByRole("button", { name: "Save", exact: true }).click();

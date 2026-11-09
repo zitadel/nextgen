@@ -6,13 +6,69 @@ import {
   EvaluatePolicyBody,
   PublishPolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { distance } from "fastest-levenshtein";
 import { z } from "zod";
 
 import defaultPasswordPolicy from "../defaults/default-password-policy.json" with { type: "json" };
 import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
-export const schemaConfigSchema = CreateSchemaBody;
+const [userSchemaBody, schemaUrlBody] = CreateSchemaBody.options;
+const authMethodsBody = userSchemaBody.shape["x-auth-methods"];
+const AUTH_METHODS = Object.keys(authMethodsBody.shape);
+
+/** Why `key` is refused under `x-auth-methods`, with the method it is closest to. */
+function unknownAuthMethod(key: string): string {
+  const [near] = AUTH_METHODS.map((method) => ({ method, cost: distance(key, method) }))
+    .filter(({ cost }) => cost <= 2)
+    .sort((a, b) => a.cost - b.cost);
+  return (
+    `${key} is not an authentication method.` +
+    (near ? ` Did you mean ${near.method}?` : "") +
+    ` Allowed: ${AUTH_METHODS.join(", ")}.`
+  );
+}
+
+/**
+ * `x-auth-methods` as `auth-methods.json` states it, unlike the generated body:
+ * strict about its own keys and each method's, and at least one method. The
+ * generated Zod drops an unknown key, so a misspelt `pasword` would pass
+ * `deploy --dry-run` and the server would refuse the request with a
+ * `req.invalid` that names no field. Built from the generated shape, so a
+ * method the API adds is allowed here without an edit; the cast keeps the
+ * generated types, which strictness does not change.
+ */
+const strictAuthMethods = z
+  .strictObject(
+    Object.fromEntries(
+      Object.entries(authMethodsBody.shape).map(([name, method]) => [
+        name,
+        z.strictObject(method.unwrap().shape).optional(),
+      ]),
+    ) as typeof authMethodsBody.shape,
+    {
+      error: (issue) =>
+        issue.code === "unrecognized_keys"
+          ? issue.keys.map(unknownAuthMethod).join(" ")
+          : undefined,
+    },
+  )
+  .refine((methods) => Object.keys(methods).length > 0, {
+    message: "must list at least one authentication method",
+    // Only when every key was a method: a lone `pasword` already has its issue.
+    when: ({ issues }) => issues.length === 0,
+  });
+
+/**
+ * A `.zitadel/schemas/*.json` file: the create body, told apart by `kind` so
+ * an issue is reported at its key rather than as no union branch matching,
+ * with {@link strictAuthMethods} in place of the generated `x-auth-methods`.
+ */
+export const schemaConfigSchema = z.discriminatedUnion("kind", [
+  userSchemaBody.extend({ "x-auth-methods": strictAuthMethods }),
+  schemaUrlBody,
+]);
+
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
 export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
 
@@ -27,7 +83,7 @@ export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
 /**
  * A `.zitadel/policies/<operation>.json` file: the publish body
  * (`POST /policies`) plus `$schema`. Strict at both levels, unlike the
- * generated body: a typo in a setting must fail `plan`, as the editor's
+ * generated body: a typo in a setting must fail `deploy --dry-run`, as the editor's
  * meta-schema (`policy.json`) already flags it.
  *
  * With one operation the generated body is a single object. A second
@@ -42,8 +98,7 @@ export const policyConfigSchema = z.strictObject({
 
 /**
  * The minimum password length NIST SP 800-63B-4 sets for a password that is
- * the only factor. `setup` writes it when given none, and the console warns
- * on a policy under it.
+ * the only factor. `setup` recommends it and writes it when given none.
  */
 export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
 

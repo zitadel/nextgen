@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -42,6 +42,16 @@ describe("origin list", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.admitsAHostileOriginPattern();
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["origin", "list", "--json"] : ["origin", "list"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("refuses an environment holding only the preview token", async () => {
         const app = await anApp();
@@ -85,6 +95,30 @@ describe("origin list", () => {
           { pattern: "https://app.acme.com", kind: "primary" },
           { pattern: "https://*-acme.vercel.app", kind: "preview" },
         ]);
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each origin as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.run(["origin", "list", "--plain"]);
+
+        expect(result).toPrintPlainRows(
+          [SETUP_ORIGIN.pattern, SETUP_ORIGIN.kind],
+          ["https://app.acme.com", "primary"],
+        );
+      });
+
+      it("prints nothing when every origin is removed", async () => {
+        const app = await aSetUpApp();
+        await app.clearOrigins();
+
+        const result = await app.run(["origin", "list", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
       });
     });
   });

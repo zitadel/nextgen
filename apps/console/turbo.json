@@ -35,7 +35,7 @@
         "VERCEL_GIT_COMMIT_SHA"
       ],
       "inputs": ["$TURBO_EXTENDS$", ".env*"],
-      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+      "outputs": ["$TURBO_ROOT$/apps/api/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after
     // the public packages' release builds (tools/release/turbo.json). It
@@ -44,7 +44,7 @@
     "build-release": {
       "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/release#build-public-packages"],
       "env": ["CONSOLE_BASE_PATH", "CONSOLE_ADDON", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
-      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+      "outputs": ["$TURBO_ROOT$/apps/api/internal/staticui/console/dist/**"]
     },
     "test": {
       "dependsOn": ["build"]

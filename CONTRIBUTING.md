@@ -11,7 +11,7 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 ## Prerequisites
 
-- Go version from [`go.mod`](go.mod)
+- Go version from [`apps/api/go.mod`](apps/api/go.mod)
 - Node.js from [`.nvmrc`](.nvmrc)
 - pnpm 12 from [`package.json`](package.json) (`corepack enable`)
 - [Moon](https://moonrepo.dev/moon)
@@ -43,7 +43,6 @@ For changes to the Go server, APIs, or database layer.
 | Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                                   | `moon run workspace:doctor`                |
 | Start the server (builds the console, then Go)        | `moon run workspace:server`                |
-| Start the server (skip the console build)             | `go run . server --migrate`                |
 | Debug and attach VSCode                               | `moon run workspace:server-debug`          |
 | Regenerate Go/OpenAPI artifacts                       | `moon run server:generate`                 |
 | Verify committed generated output                     | `moon run server:check-generate`           |
@@ -56,24 +55,30 @@ node_modules automatically (`.moon/workspace.yml` sets `installDependencies: fal
 ### Starting the server from source
 
 The Go binary embeds a production build of the console: `apps/console` →
-`internal/staticui/console/dist/`.
+`apps/api/internal/staticui/console/dist/`.
 
-`moon run workspace:server` builds it before starting Go. If you have not
-changed any console code, skip the build with `go run . server --migrate`.
-
-To build the console manually (when bypassing the wrapper):
+`moon run workspace:server` builds it before starting Go; when no console code
+changed, that build is a cache hit. The wrapper (`scripts/run-server.mjs`)
+compiles the Go module in `apps/api` and starts the binary from the repository
+root, so the server's config search and a relative `-c` path resolve against
+the checkout. Arguments after `--` go to the server:
 
 ```sh
-moon run console:build
-go run . server --migrate
+moon run workspace:server -- server --migrate -c docs/operations/nextgen.example.yaml
 ```
+
+The dev server keeps its data (the SQLite database and the master key) under
+`dist/server/dev/<branch>/nextgen-data`, one directory per Git branch: it
+survives rebuilds on the same branch, and a branch with other migrations never
+migrates another branch's database. `workspace:server-debug` keeps its own data
+beside its binary in `dist/server/`.
 
 With no database configured, the server uses SQLite at
 `<server.data_dir>/zitadel.db`. Override with `-c docs/operations/nextgen.example.yaml`,
 `NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
 path or DSN you manage. Schema migrations run when you pass `--migrate`;
 `moon run workspace:server` adds that flag. To apply schema and exit without
-serving, run `go run . migrate`.
+serving, run `moon run workspace:server -- migrate`.
 
 Open http://localhost:8080/ui/console/
 
@@ -165,7 +170,7 @@ the server binary.
 | Verify my toolchain                          | `moon run workspace:doctor`                |
 | Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console on a seeded real instance  | `moon run console:dev-real` |
-| Test the built console with the Go server    | `moon run console:build` then `go run . server --migrate` |
+| Test the built console with the Go server    | `moon run workspace:server`                |
 | Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
 
 Run `corepack pnpm install --frozen-lockfile` first.
@@ -334,7 +339,7 @@ SQLite integration tests use a local file database and need no Docker:
 
 ```sh
 moon run server:test-sqlite
-# or: go test -v -tags sqlite_integration -timeout=5m ./...
+# or: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
 ```
 
 Postgres and Spanner integration tests use
@@ -348,7 +353,7 @@ Docker.
 ```sh
 # Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
 moon run server:test-postgres
-# or: go test -v -tags postgres_integration -timeout=10m ./...
+# or: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
 
 # Spanner (prefer the Moon task — see emulator-testcontainer note below)
 moon run server:test-spanner
@@ -357,7 +362,7 @@ moon run server:test-spanner
 To run the Postgres or Spanner suites against a database you manage instead of
 testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or
 `ZITADEL_TEST_SPANNER_URL` (Spanner DSN); those suites honor the env vars and
-connect instead of starting a container, so `go test -tags … ./...` needs no
+connect instead of starting a container, so `go -C apps/api test -tags … ./...` needs no
 Docker. Point them at a throwaway database — the suites run migrations that
 create the `zitadel_nextgen` schema.
 
@@ -378,7 +383,7 @@ If you see a raw `ABORTED` (an injected one reads
 the injection off: both hide the bug. Something on that code path stripped the
 gRPC status off the error, so Spanner's `ReadWriteTransaction` stopped
 recognising it as retryable, or a callback could not run twice. See the
-error-wrapping rules in [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
+error-wrapping rules in [apps/api/internal/storage/AGENTS.md](apps/api/internal/storage/AGENTS.md)
 and #788.
 
 A stalled transaction is a different failure and has a different fix. Read-write

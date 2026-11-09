@@ -11,8 +11,8 @@ import { signIn } from "../support/sign-in";
  *
  * The unit specs cover which criteria each choice sends. What only a live
  * backend proves is that the server honours them together: `schema_object_type
- * equals` with `schema not_equals` the newest revision returns exactly the
- * users left on the older one, and `Latest only` exactly the rest.
+ * equals` with `schema equals` one revision returns exactly that revision's
+ * users, and with `schema not_equals` the newest returns everyone else.
  */
 
 test("narrows the users to one revision of a schema", async ({ page, zitadel, seed }) => {
@@ -42,13 +42,18 @@ test("narrows the users to one revision of a schema", async ({ page, zitadel, se
   await page.getByRole("combobox", { name: "Filter by schema" }).click();
   await page.getByRole("option", { name: `Staff ${suffix}` }).click();
   await page.getByRole("combobox", { name: "Filter by revision" }).click();
-  await page.getByRole("option", { name: "Older revisions" }).click();
+  await page.getByRole("option").and(page.getByTitle(older.id)).click();
   await expect(table.getByRole("link", { name: onOlder })).toBeVisible();
   await expect(table.getByRole("link", { name: onNewer })).toHaveCount(0);
 
   await page.getByRole("combobox", { name: "Filter by revision" }).click();
-  await page.getByRole("option", { name: "Latest only" }).click();
+  await page.getByRole("option").and(page.getByTitle(newer.id)).click();
   await expect(table.getByRole("link", { name: onNewer })).toBeVisible();
   await expect(table.getByRole("link", { name: onOlder })).toHaveCount(0);
+
+  await page.getByRole("combobox", { name: "Filter by revision" }).click();
+  await page.getByRole("option", { name: "Older revisions" }).click();
+  await expect(table.getByRole("link", { name: onOlder })).toBeVisible();
+  await expect(table.getByRole("link", { name: onNewer })).toHaveCount(0);
   await expectNoErrorBoundary(page);
 });

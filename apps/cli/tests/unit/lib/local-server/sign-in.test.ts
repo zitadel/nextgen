@@ -1,9 +1,13 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
-import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
-import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
+import { it } from "@tests/helpers/fixtures";
+
+import type { LocalAdmin } from "@/lib/local-server/admin-credential";
+import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
+import { adminSessionCookie, consoleSignInUrl } from "@/lib/local-server/sign-in";
+
+const signal = new AbortController().signal;
 
 const SERVER = "http://local-admin.invalid:8080";
 
@@ -15,7 +19,7 @@ const admin: LocalAdmin = {
 };
 
 type Call = { path: string; body: unknown; authorization: string | null; origin: string | null };
-let calls: Call[] = [];
+const calls: Call[] = [];
 
 async function record(request: Request): Promise<void> {
   const url = new URL(request.url);
@@ -65,18 +69,17 @@ const signInHandlers = [
   }),
 ];
 
-const server = setupServer(...signInHandlers);
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => {
-  server.resetHandlers();
-  calls = [];
+it.beforeEach(({ server }) => {
+  server.use(...signInHandlers);
 });
-afterAll(() => server.close());
+
+afterEach(() => {
+  calls.length = 0;
+});
 
 describe("local admin sign-in", () => {
   it("proves the identifier, then the password, and links the handoff token", async () => {
-    const url = await consoleSignInUrl(SERVER, admin);
+    const url = await consoleSignInUrl(SERVER, admin, signal);
 
     // The token is a bearer credential in a query string, so it is encoded.
     expect(url).toBe(
@@ -107,31 +110,70 @@ describe("local admin sign-in", () => {
     }
   });
 
-  it("exchanges the handoff token for the session cookie", async () => {
-    let exchanged: unknown;
+  it("exchanges the handoff token for the session cookie", async ({ server }) => {
+    const exchanges: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/sessions/exchange`, async ({ request }) => {
-        exchanged = {
+        exchanges.push({
           project: new URL(request.url).searchParams.get("project_id"),
           body: await request.json(),
-        };
+        });
         return new HttpResponse(null, {
           headers: { "set-cookie": "zitadel_session=sess_cookie_value; Path=/; HttpOnly" },
         });
       }),
     );
 
-    const cookie = await adminSessionCookie(SERVER, admin);
+    const cookie = await adminSessionCookie(SERVER, admin, signal);
 
     expect(cookie).toBe("zitadel_session=sess_cookie_value");
-    expect(exchanged).toEqual({
+    expect(exchanges[0]).toEqual({
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });
   });
 
+  /**
+   * What the exchange failed with, as the CLI would report it.
+   *
+   * The exchange is the one call made without the generated client, so the
+   * transport's failure has to be translated on the way out of the backend or
+   * the CLI reports an unreachable server as a bad request, with the wrong exit
+   * code and none of the "check your connection" guidance.
+   *
+   * It reads no body, only the header the session arrives in, so a body that
+   * cannot be read is not one of its failures; `lib/backend/transport` covers
+   * that for the callers that do read one.
+   */
+  async function exchangeFailure(): Promise<ZitadelError> {
+    return adminSessionCookie(SERVER, admin, signal).then(
+      () => {
+        throw new Error("the exchange was expected to fail");
+      },
+      (error: unknown) => {
+        return toZitadelError(error);
+      },
+    );
+  }
+
+  it("reports an exchange it cannot connect to as a network failure", async ({ server }) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/sessions/exchange`, () => {
+        return HttpResponse.error();
+      }),
+    );
+
+    const failure = await exchangeFailure();
+
+    expect(failure.code).toBe("E_NETWORK");
+    expect(failure.exitCode).toBe(EXIT_CODES.E_NETWORK);
+    expect(failure.hint).toContain("connection");
+  });
+
   // A server reached over https sets the prefixed name, and takes it back.
-  it("keeps the session cookie under the prefixed name an https server sets", async () => {
+  it("keeps the session cookie under the prefixed name an https server sets", async ({
+    server,
+  }) => {
     server.use(
       http.post(
         `${SERVER}/api/v1/sessions/exchange`,
@@ -144,37 +186,39 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    const cookie = await adminSessionCookie(SERVER, admin);
+    const cookie = await adminSessionCookie(SERVER, admin, signal);
 
     expect(cookie).toBe("__Host-zitadel_session=sess_cookie_value");
   });
 
-  it.each([
+  it.for<[string, Record<string, string>]>([
     ["sets no session cookie", {}],
     [
       "sets only a session cookie from before ADR 083",
       { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
     ],
-  ])("fails when the exchange %s", async (_label, headers) => {
+  ])("fails when the exchange %s", async ([_label, headers], { server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/sessions/exchange`, () =>
         HttpResponse.json({}, { status: 200, headers }),
       ),
     );
 
-    await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(
+    await expect(adminSessionCookie(SERVER, admin, signal)).rejects.toThrow(
       "Local admin session exchange failed (200)",
     );
   });
 
-  it("refuses a server that does not host the platform project, and says how to fix it", async () => {
+  it("refuses a server that does not host the platform project, and says how to fix it", async ({
+    server,
+  }) => {
     server.use(
       http.get(`${SERVER}/console/runtime.json`, () =>
         HttpResponse.json({ console_project_id: "proj_other", publishable_key: "pk_other" }),
       ),
     );
 
-    const error = await consoleSignInUrl(SERVER, admin).catch((caught: unknown) => caught);
+    const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
@@ -188,7 +232,9 @@ describe("local admin sign-in", () => {
   // The server reports a failed lookup with the same code as a missing user, so
   // the advice names both causes and never suggests the destructive reset as a
   // command an agent would run.
-  it("explains a rejected identifier without steering an agent into a reset", async () => {
+  it("explains a rejected identifier without steering an agent into a reset", async ({
+    server,
+  }) => {
     server.use(
       http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
@@ -198,7 +244,7 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    const error = await consoleSignInUrl(SERVER, admin).catch((caught: unknown) => caught);
+    const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
       code: "E_AUTH",
@@ -211,7 +257,7 @@ describe("local admin sign-in", () => {
     );
   });
 
-  it("reports a rejected password with the server's own message", async () => {
+  it("reports a rejected password with the server's own message", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
         HttpResponse.json(
@@ -223,7 +269,7 @@ describe("local admin sign-in", () => {
 
     // Only the identifier gets the data-directory explanation; a password
     // failure is reported as the server gave it.
-    await expect(consoleSignInUrl(SERVER, admin)).rejects.toMatchObject({
+    await expect(consoleSignInUrl(SERVER, admin, signal)).rejects.toMatchObject({
       status: 409,
       body: { message: "The proof was rejected." },
     });

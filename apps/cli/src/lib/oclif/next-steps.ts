@@ -1,3 +1,6 @@
+import { command, dim, strong } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+
 /**
  * What a command suggests doing next, and the one place it is shown.
  *
@@ -56,9 +59,18 @@ export function renderNextSteps(next: NextSteps): string {
   if (actions.length === 0 && commands.length === 0) {
     return "";
   }
+  // The block is coloured, so it is printed as it came and cannot be spelled
+  // out as a whole. A suggested command goes through the palette, which spells
+  // out what it is given; an action is prose nothing colours, and it names
+  // what the server answered — a cursor to page with, an id to act on — so it
+  // is spelled out here.
   return [
-    "Next:",
-    ...actions.map((action) => `  ${action}`),
-    ...commands.map((command) => `  $ ${command}`),
+    strong("Next:"),
+    ...actions.map((action) => {
+      return `  ${escapeControlCharacters(action)}`;
+    }),
+    ...commands.map((suggested) => {
+      return `  ${dim("$")} ${command(suggested)}`;
+    }),
   ].join("\n");
 }

@@ -35,7 +35,7 @@
         "$TURBO_ROOT$/apps/cli/skills/**",
         "$TURBO_ROOT$/skills/zitadel/**",
         "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
       ]
     },
     "console-smoke": {
@@ -118,7 +118,7 @@
         "package.json",
         "playwright.shared.ts",
         "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "!**/README.md",
         "!**/AGENTS.md"
       ],
@@ -138,6 +138,7 @@
         "playwright.shared.ts",
         "$TURBO_ROOT$/scripts/release-artifacts.mjs",
         "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/server-build.mjs",
         "!**/README.md",
         "!**/AGENTS.md"
       ],
@@ -227,7 +228,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -242,7 +243,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -261,7 +262,7 @@
         "install-browsers",
         "@zitadel/cli#build",
         "@zitadel/testing#build",
-        "@zitadel/oidc-mock#build",
+        "oidc-mock#build",
         "@zitadel/server#build",
         "@zitadel/sdk-nuxt#build",
         "@zitadel/sdk-react#build",
@@ -272,7 +273,9 @@
         "@zitadel/sdk-qwik#build"
       ],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      // RELEASE_HOST_ONLY: the snapshot it installs may hold only this
+      // machine's server platform package (verify-tarballs.mjs).
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     }
   }
 }

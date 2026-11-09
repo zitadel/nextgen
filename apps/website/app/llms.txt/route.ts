@@ -42,7 +42,8 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 - [Quickstart](/docs/get-started/quickstart.md): from an empty folder to working local auth
 - [Agent setup](/docs/get-started/agents.md): the CLI's JSON contract and the browser proof
 - [Flows and schemas](/docs/concepts/flows-and-schemas.md): how login flows, user schemas and the generated UI relate
-- [Edit the login flow and schema](/docs/guides/plan-apply.md): edit the local configuration and sync it
+- [Edit the login flow](/docs/guides/edit-login-flow.md): change what the login asks for and which flow an app runs
+- [Deploy](/docs/guides/deploy.md): edit the local configuration, preview it and deploy it as a release
 - [Add social sign-in](/docs/guides/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
 - [Customize the login design](/docs/guides/customize-design.md): the stable tokens and CSS parts, or a starter design with your branding, published as a revision
 - [Docs MCP server](/docs/api/mcp): the tools search, list_pages and get_page
@@ -51,6 +52,7 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
 - [Run Zitadel locally](/docs/guides/local-runtime.md): how the CLI starts and stores local Zitadel state
 - [Configuration as code](/docs/concepts/repo-config.md): how the app's auth configuration stays reviewable
+- [Choose a version](/choose-version): what the next version has next to Zitadel v4, and which to pick
 - [Source](https://github.com/zitadel/nextgen): the repository on GitHub
 - [Vision](https://github.com/zitadel/nextgen/blob/main/VISION.md): the four pillars and where each stands
 - [Zitadel v4](https://zitadel.com): the current release, for production

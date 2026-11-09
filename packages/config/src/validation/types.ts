@@ -13,9 +13,9 @@ export type FlowValidationIssue = {
   step?: string;
 };
 
-/** A finding about the project as a whole. Most project rules are errors; a few are warnings. */
+/** A finding about the project as a whole. Every project rule is an error. */
 export type ProjectIssue = {
-  severity: "error" | "warning";
+  severity: "error";
   rule: ProjectRuleId;
   /** Project-relative path of the file the issue is in. */
   file: string;
@@ -48,10 +48,4 @@ export type ProjectTree = {
   readonly flows: ReadonlyMap<string, { readonly body: object; readonly schemaPath?: string }>;
   /** Every connection under `.zitadel/idps/`. */
   readonly connections: ReadonlyMap<string, object>;
-  /**
-   * The slugs of the connections the server already has. A deployed
-   * connection's `subject_claim` can no longer change, so advice to change it
-   * is not given. Absent when the caller cannot tell.
-   */
-  readonly deployed?: ReadonlySet<string>;
 };

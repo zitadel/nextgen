@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GitDidNotStartError, RepositoryError } from "../../../../src/lib/git/errors";
+import { GitDidNotStartError, RepositoryError } from "@/lib/git/errors";
 
 describe("RepositoryError", () => {
   it("carries its message and name", () => {

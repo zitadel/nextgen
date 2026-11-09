@@ -1,11 +1,11 @@
-import { nonBlankString } from "../../flags";
+import { Flags } from "@oclif/core";
 
-import { chosenColumns } from "../columns";
-import { fieldPaths } from "../paths";
-import { idArg, idName, idValue } from "../shared";
-import { renderDetail } from "../table";
-import type { GetSpec } from "../types";
-import type { CommandResult } from "../../types";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
+import type { GetSpec } from "@/lib/oclif/crud/types";
+import type { CommandResult } from "@/lib/oclif/types";
+import { json, painted } from "@/lib/oclif/rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -13,15 +13,23 @@ import {
   ResourceCommand,
 } from "./command";
 
+type ReadInput = OperationInput<
+  Readonly<{
+    fields?: readonly string[];
+  }>,
+  Record<string, string>
+>;
+
 /**
  * `<topic> get <id>`. A terminal gets the record laid out field by field,
  * headed by whatever identifies it; a pipe (and `--json`) gets the object
  * itself, because a script wants the record rather than a view of it.
  */
-export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
+export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadInput> {
   static describe<Ctx>({
     topic,
     resource,
+    spec,
     options,
   }: OperationDefinition<Ctx, GetSpec<Ctx>>): OperationStatics {
     return {
@@ -32,9 +40,18 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
         `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
-        fields: nonBlankString({
+        fields: Flags.custom<
+          readonly string[],
+          Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
+        >({
+          parse: async (input, _command, flag) => {
+            return readColumns(input, flag.fallback, flag.shape);
+          },
+        })({
           description:
             "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          fallback: resource.detail ?? resource.columns,
+          shape: fieldPaths(spec.response),
         }),
         ...options.flags,
       },
@@ -42,29 +59,27 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     };
   }
 
-  protected override async execute({ flags, args }: OperationInput): Promise<CommandResult> {
+  protected override async operate({ flags, args }: ReadInput): Promise<CommandResult> {
     const { resource, spec } = this.definition;
-    // Same as `list`: a schema decides `--fields` before the request is made.
     const shape = fieldPaths(spec.response);
-    const early = shape
-      ? chosenColumns(flags.fields, resource.detail ?? resource.columns, [], shape)
-      : undefined;
     const item = await spec.call(await this.context(), idValue(resource, args));
-    // Validated before the output branch, so the same arguments are valid (or
-    // not) whether the result goes to a terminal or a pipe.
-    const fields =
-      early ?? chosenColumns(flags.fields, resource.detail ?? resource.columns, [item]);
-    if (!process.stdout.isTTY) {
-      return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
+    const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
+    if (!this.isOnScreen) {
+      return { status: "ok", data: item, pretty: json(item) };
     }
-    const sections = flags.fields === undefined ? (spec.sections?.(item) ?? []) : [];
+    const sections =
+      flags.fields === undefined && !this.isJson
+        ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
+        : [];
     return {
       status: "ok",
       data: item,
-      pretty: [
-        renderDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
-        ...sections,
-      ].join("\n\n"),
+      pretty: painted(
+        [
+          this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+          ...sections,
+        ].join("\n\n"),
+      ),
     };
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveConsent } from "../../../../src/lib/telemetry/consent";
+import { resolveConsent } from "@/lib/telemetry/consent";
 
 describe("resolveConsent", () => {
   it("is enabled by default", () => {

@@ -1,16 +1,20 @@
-import { execFile, spawn } from "node:child_process";
-import { type FileHandle, mkdir, open, readFile, stat } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { createReadStream } from "node:fs";
+import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
+import { buffer } from "node:stream/consumers";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
+import { execa } from "execa";
+import pWaitFor from "p-wait-for";
 
-import { ZitadelError, isErrno } from "../../errors";
-import { shellCommand } from "../../suggestion";
-import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
-import type { BinaryRuntimeMetadata } from "../runtime";
-import type { LogSink } from "../server-log";
+import { ZitadelError, errorMessage, isErrno } from "@/lib/errors";
+import { shellCommand } from "@/lib/suggestion";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/local-server/env-vars";
+import type { BinaryRuntimeMetadata } from "@/lib/local-server/runtime";
+import type { LogSink } from "@/lib/local-server/server-log";
 import { type Clock, realClock, stopSignal } from "./clock";
 import { type Launched, type Launcher, launched } from "./lifecycle";
 
@@ -415,12 +419,10 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
     return true;
   }
   const programs = [started, SERVER_PROGRAM];
-  let listing: string;
-  try {
-    // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
-    // such as pnpm and moon export), and the server's long path is cut before its name.
-    listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
-  } catch {
+  // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
+  // such as pnpm and moon export), and the server's long path is cut before its name.
+  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => undefined);
+  if (listing === undefined) {
     return true;
   }
   const candidates = listing.split(/\r?\n/).flatMap((line) => {
@@ -442,10 +444,8 @@ const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  let command: string;
-  try {
-    command = await ps(["eww", "-p", String(pid), "-o", "command="]);
-  } catch {
+  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => undefined);
+  if (command === undefined) {
     return true;
   }
   const at = command.indexOf(DATA_DIR_VARIABLE);
@@ -462,15 +462,8 @@ async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
 /**
  * Runs `ps` and returns its output, rejecting where `ps` is missing or fails.
  */
-function ps(args: string[]): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    execFile(
-      "ps",
-      args,
-      { timeout: 3000, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
-      (error, stdout) => (error ? reject(error) : resolve(stdout)),
-    );
-  });
+async function ps(args: string[]): Promise<string> {
+  return (await execa("ps", args, { timeout: 3000, maxBuffer: 16 * 1024 * 1024 })).stdout;
 }
 
 /**
@@ -521,21 +514,13 @@ async function fileSize(path: string): Promise<number> {
 
 /** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
 async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
-  let file: FileHandle;
   try {
-    file = await open(path, "r");
+    return await buffer(createReadStream(path, { start: position, end: position + length - 1 }));
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return Buffer.alloc(0);
     }
     throw error;
-  }
-  try {
-    const buffer = Buffer.alloc(length);
-    const { bytesRead } = await file.read(buffer, 0, length, position);
-    return buffer.subarray(0, bytesRead);
-  } finally {
-    await file.close();
   }
 }
 
@@ -582,22 +567,12 @@ function signalRuntime(
  * process's child, so there is no exit event to wait on.
  */
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!BinaryLauncher.isRunning(pid)) {
-      return true;
-    }
-    await delay(200);
-  }
-  return !BinaryLauncher.isRunning(pid);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+  const gone = () => !BinaryLauncher.isRunning(pid);
+  await pWaitFor(gone, {
+    interval: 200,
+    timeout: { milliseconds: timeoutMs, fallback: () => undefined },
+  });
+  return gone();
 }
 
 /**

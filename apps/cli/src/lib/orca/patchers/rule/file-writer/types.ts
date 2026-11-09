@@ -1,10 +1,10 @@
-import type { PatchedFile } from "../../types";
+import type { PatchedFile } from "@/lib/orca/patchers/types";
 
 /**
  * A single filesystem mutation in a rule-based patcher's plan. Rule patchers
  * emit these as a declarative description of intended changes so the
- * {@link import("./index").scaffold} file-writer can apply, skip, or dry-run
- * them uniformly. Each variant maps to one handler in the file-writer; the
+ * {@link import("./index").FileWriter} can apply, skip, or dry-run
+ * them uniformly. Each variant maps to one class in `./ops`; the
  * `kind` discriminant is exhaustively switched on. This vocabulary is internal
  * to the rule patcher family — other patcher families need not produce it.
  */

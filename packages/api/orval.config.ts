@@ -1,17 +1,20 @@
 import { defineConfig } from "orval";
 
+import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { writeOperations } from "./scripts/operations.ts";
 
 export default defineConfig({
   zitadel: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
+      target: "../../apps/api/api/openapi/openapi-spec.yaml",
       // `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md),
       // so the spec is almost entirely `$ref`s into sibling files. orval 8.37
       // stopped following external `$ref`s unless allow-listed — a fetch guard
       // aimed at remote documents. Every target is a local file checked in beside
       // the root, so allowing all adds no network reach.
       parserOptions: { externalRefs: { allow: ["*"] } },
+      // The JSDoc's links to docs pages, absolute (scripts/docs-links.ts).
+      override: { transformer: absoluteDocsLinks },
     },
     output: {
       target: "./src/generated/endpoints",
@@ -53,9 +56,10 @@ export default defineConfig({
   },
   zitadelZod: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
-      // See the note on the `zitadel` input above.
+      target: "../../apps/api/api/openapi/openapi-spec.yaml",
+      // See the notes on the `zitadel` input above.
       parserOptions: { externalRefs: { allow: ["*"] } },
+      override: { transformer: absoluteDocsLinks },
     },
     output: {
       mode: "split",

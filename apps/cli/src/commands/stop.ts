@@ -4,10 +4,10 @@ import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   readRuntimeMetadata,
-} from "../lib/local-server/runtime";
-import { LocalServer } from "../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { startedServer } from "./local-server/started";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -19,22 +19,28 @@ export default class Stop extends BaseCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Stop);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  private readonly started = startedServer(readRuntimeMetadata);
+
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
+    return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+  }
+
+  protected async execute({ flags }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
+    // A directory with no server is not refused: there is simply nothing to
+    // stop, which the result says.
+    const runtime = await this.started.of(this.cwd);
 
     if (flags.all) {
       return this.stopAllManagedRuntimes();
     }
 
     const containerName =
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
-    if (this.meta.dryRun) {
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
@@ -52,8 +58,8 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    const { stopped, outcome } = await LocalServer.at(this.meta.cwd, {
-      cliVersion: this.meta.cliVersion,
+    const { stopped, outcome } = await LocalServer.at(this.cwd, {
+      cliVersion: this.cliVersion,
     }).stop();
 
     return this.emit({

@@ -1,6 +1,7 @@
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+
+import { execa } from "execa";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
 
@@ -104,7 +105,7 @@ export class Git {
    * that throws {@link GitDidNotStartError}. Every other failure carries git's
    * own message, or Node's when git wrote nothing.
    */
-  run(
+  async run(
     args: readonly string[],
     allow: readonly number[] = [],
     encoding: "utf8" | "latin1" = "utf8",
@@ -119,36 +120,40 @@ export class Git {
       delete inherited[name];
     }
     const env = { ...inherited, GIT_TERMINAL_PROMPT: "0", ...this.env };
-    return new Promise((resolveResult, reject) => {
-      execFile(
-        "git",
-        [...args],
-        { cwd: this.dir, env, encoding, maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000 },
-        (error, stdout, stderr) => {
-          const failure = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
-          if (failure === null) {
-            resolveResult(new GitResult(0, stdout, stderr));
-            return;
-          }
-          if (typeof failure.code === "number") {
-            const result = new GitResult(failure.code, stdout, stderr);
-            if (allow.includes(failure.code)) {
-              resolveResult(result);
-            } else {
-              reject(new RepositoryError(result.reason() || failure.message));
-            }
-          } else if (failure.code === "ENOENT") {
-            reject(new GitDidNotStartError(failure.message));
-          } else if (failure.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
-            reject(new RepositoryError("git printed more than 16 MB"));
-          } else if (failure.killed) {
-            reject(new RepositoryError("git did not finish in time"));
-          } else {
-            reject(new RepositoryError(stderr.trim() || failure.message));
-          }
-        },
-      );
+    const result = await execa("git", [...args], {
+      cwd: this.dir,
+      env,
+      extendEnv: false,
+      encoding,
+      stripFinalNewline: false,
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 5 * 60 * 1000,
+      reject: false,
     });
+    const stdout = String(result.stdout);
+    const stderr = String(result.stderr);
+    if (!result.failed) {
+      return new GitResult(0, stdout, stderr);
+    }
+    if (result.code === "ENOENT") {
+      throw new GitDidNotStartError(
+        result.originalMessage ?? result.message ?? "git did not start",
+      );
+    }
+    if (result.isMaxBuffer) {
+      throw new RepositoryError("git printed more than 16 MB");
+    }
+    if (result.timedOut) {
+      throw new RepositoryError("git did not finish in time");
+    }
+    if (result.exitCode === undefined) {
+      throw new RepositoryError(stderr.trim() || result.message || "git failed");
+    }
+    const failed = new GitResult(result.exitCode, stdout, stderr);
+    if (allow.includes(result.exitCode)) {
+      return failed;
+    }
+    throw new RepositoryError(failed.reason() || result.message || "git failed");
   }
 
   /**
@@ -171,6 +176,26 @@ export class Git {
    */
   static literal(path: string): string {
     return `:(literal)${path}`;
+  }
+
+  /**
+   * `pattern` as a pathspec that matches what the glob does, with `*` stopping at a `/`.
+   *
+   * `glob` rather than a plain pathspec, whose `*` also matches `/`, so
+   * `dir/*.json` would take in `dir/nested/x.json` as well.
+   */
+  static glob(pattern: string): string {
+    return `:(glob)${pattern}`;
+  }
+
+  /** {@link glob}, leaving out what it matches. */
+  static excluded(pattern: string): string {
+    return `:(exclude,glob)${pattern}`;
+  }
+
+  /** {@link literal}, leaving out only `path` itself. */
+  static excludedLiteral(path: string): string {
+    return `:(exclude,literal)${path}`;
   }
 
   /** Whether `path`, relative to the directory, names something that exists. */

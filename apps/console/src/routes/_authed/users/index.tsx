@@ -1,18 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
-import { Box, MoreVertical, Plus, User } from "lucide-react";
-import {
-  Fragment,
-  type MouseEvent,
-  type PointerEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import { AddUserSheet } from "@/components/add-user-sheet";
-import { DeleteUserDialog } from "@/components/delete-user-dialog";
+import { Plus, User } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -29,7 +18,6 @@ import {
   ResourceMenuHead,
   ResourceRow,
   ResourceTitle,
-  RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -37,44 +25,42 @@ import {
   UserAttributesCell,
   UserIdCell,
   UserIdentityCell,
-} from "@/components/user-cells";
-import { UsersFilter } from "@/components/users-filter";
-import { Badge } from "@/components/ui/badge";
+} from "@/features/users/components/user-cells";
+import { IdText } from "@/components/id-text";
+import { UsersFilter } from "@/features/users/components/users-filter";
 import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuCheckboxItem,
-  ContextMenuContent,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
-import { fetchAllSchemas, fetchSchemaRevisions } from "@/lib/schema";
-import type { UserSchema } from "@/lib/schema";
-import type { UserTeam } from "@/lib/user";
+import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
+import { fetchAllSchemas, fetchLatestSchemaId, fetchSchemaRevisions } from "@/features/schemas/api";
+import type { UserSchema } from "@/features/schemas/model";
+import { columnsForUsers, fetchUsers } from "@/features/users/api";
 import {
   type ColumnGroup,
-  type ColumnPins,
   type SchemaOption,
   type UsersSearch,
+  OLDER_REVISIONS,
   attributeSummary,
   columnsBeyondIdentity,
-  columnsForUsers,
-  fetchUsers,
   pinnedColumns,
-  readColumnPins,
   schemaOptions,
   toUserRow,
   userFilter,
-  writeColumnPins,
-} from "@/lib/user-list";
+} from "@/features/users/list";
 import { Page } from "@/components/layout";
 import { cn } from "@/lib/utils";
+import { useColumnPins } from "@/features/users/column-pins";
+import {
+  ColumnsContextMenu,
+  keepLinkMenu,
+  keepLinkPress,
+} from "@/features/users/components/columns-context-menu";
+import { TeamCell } from "@/features/users/components/team-cell";
+import { UserRowActions } from "@/features/users/components/user-row-actions";
+
+/** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
+const LEGACY_LATEST = "latest";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -84,42 +70,48 @@ export const Route = createFileRoute("/_authed/users/")({
   // The filter lives in the URL, as the Teams tabs do: it is a server-side
   // filter, so it belongs to the request the loader makes, is linkable and
   // survives a reload. Only what the filter can send is kept: a revision
-  // belongs to a schema, so it goes without one.
+  // belongs to a schema, so it goes without one, and `latest`, which earlier
+  // links carry, names no revision.
   validateSearch: (search: Record<string, unknown>): UsersSearch => {
     const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
     const revision =
-      schema && typeof search.revision === "string" && search.revision
+      schema &&
+      typeof search.revision === "string" &&
+      search.revision &&
+      search.revision !== LEGACY_LATEST
         ? search.revision
         : undefined;
-    return { ...(schema ? { schema } : {}), ...(revision ? { revision } : {}) };
+    // Both keys, even unset: the router lays this over the raw search, so a
+    // key left out would keep the URL's value.
+    return { schema, revision };
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    // The filter's options are the project's schemas at their latest revision,
-    // which also names the newest id a `latest` or `older` criterion compares
-    // with; the chosen schema's revisions, with whether each is in use, are
-    // read for it alone. Both are chrome: unreadable, the list still renders,
-    // narrowed by whatever the URL can still express.
-    const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
-    const needsLatest = deps.revision === "latest" || deps.revision === "older";
-    // Only those two criteria wait for the options; the users read runs
-    // beside the schema reads otherwise.
-    const chosenFirst = needsLatest
-      ? (await readingOptions).find((option) => option.objectType === deps.schema)
+    // The filter's options are the project's schemas at their latest revision;
+    // the chosen schema's revisions, with whether each is in use, are read for
+    // it alone. Both are chrome: unreadable, the list still renders, narrowed
+    // by what the URL carries.
+    const readingRevisions = deps.schema
+      ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
+      : Promise.resolve([]);
+    // `older` compares with the newest revision, so its users wait for it.
+    // It is read as the latest of the type, not taken from the history,
+    // which leaves out a revision the viewer may not read. Unreadable, the
+    // URL would claim a filter the list cannot apply, so it drops back to the
+    // schema alone.
+    const older = deps.revision === OLDER_REVISIONS ? deps.schema : undefined;
+    const latestId = older
+      ? await fetchLatestSchemaId(projectId, older).catch(() => undefined)
       : undefined;
-    if (needsLatest && !chosenFirst) {
-      // The URL asks for a comparison nobody can make. Dropping it from the URL
-      // keeps the list from claiming a narrower filter than it sends.
-      throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
+    if (older && !latestId) {
+      throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
     }
-    const filter = userFilter(deps, chosenFirst?.latestId);
+    const filter = userFilter(deps, latestId);
     const [page, options, revisions] = await Promise.all([
       fetchUsers(projectId, undefined, true, filter),
-      readingOptions,
-      deps.schema
-        ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
-        : [],
+      fetchAllSchemas(projectId).then(schemaOptions, () => []),
+      readingRevisions,
     ]);
     return {
       users: page.users,
@@ -235,18 +227,20 @@ function UsersScreen() {
           is a console-wide solution (D19). */}
       <ResourceTitle
         filter={
-          (loaded.options.length > 0 || search.schema) && (
-            <UsersFilter
-              options={loaded.options}
-              revisions={loaded.revisions}
-              search={search}
-              onChange={(next) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
-                })
-              }
-            />
-          )
+          <UsersFilter
+            options={loaded.options}
+            revisions={loaded.revisions}
+            search={search}
+            onChange={(next) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  schema: next.schema,
+                  revision: next.revision,
+                }),
+              })
+            }
+          />
         }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
@@ -323,9 +317,9 @@ function UsersScreen() {
                           to="/schemas/$schemaId"
                           params={{ schemaId: user.schemaId }}
                           title={user.schemaId}
-                          className="hover:text-foreground block truncate underline-offset-2 hover:underline"
+                          className="hover:text-foreground flex min-w-0 underline-offset-2 hover:underline"
                         >
-                          {user.schemaId}
+                          <IdText id={user.schemaId} />
                         </Link>
                       ) : (
                         "—"
@@ -363,7 +357,7 @@ function UsersScreen() {
                         RESOURCE_STICKY_BODY,
                       )}
                     >
-                      <RowActions
+                      <UserRowActions
                         userId={user.id}
                         name={user.name}
                         onDeleted={() => router.invalidate()}
@@ -379,212 +373,5 @@ function UsersScreen() {
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
     </Page>
-  );
-}
-
-/**
- * The viewer's pinned columns for the selected project, kept in their browser
- * (`readColumnPins`). A toggle takes effect at once and is persisted when it
- * can be; without storage it lasts until the page is left.
- */
-function useColumnPins(projectId: string): [ColumnPins, (schemaId: string, key: string) => void] {
-  const [state, setState] = useState(() => ({ projectId, pins: readColumnPins(projectId) }));
-  // Switching project swaps in that project's pins rather than carrying over
-  // another project's: schema ids are unique per project only. Read once, as
-  // the render that sees the new project adjusts the state.
-  if (state.projectId !== projectId) {
-    setState({ projectId, pins: readColumnPins(projectId) });
-  }
-
-  const toggle = useCallback(
-    (schemaId: string, key: string) => {
-      const current = state.pins[schemaId] ?? [];
-      const pins = {
-        ...state.pins,
-        [schemaId]: current.includes(key)
-          ? current.filter((pinned) => pinned !== key)
-          : [...current, key],
-      };
-      writeColumnPins(state.projectId, pins);
-      setState({ projectId: state.projectId, pins });
-    },
-    [state],
-  );
-
-  return [state.pins, toggle];
-}
-
-/**
- * The Columns menu, opened by right-clicking the table (a long press on touch,
- * the context-menu key or Shift+F10 on a focused control in it): a checkbox
- * per schema property, pinning it as its own column. Grouped under each
- * schema's title when the loaded users mix schemas, since a pin belongs to one
- * schema's property.
- *
- * Selecting an item keeps the menu open, so several can be pinned in one go.
- * With nothing to offer, the table keeps the browser's own menu.
- */
-function ColumnsContextMenu({
-  groups,
-  pins,
-  onToggle,
-  children,
-}: {
-  groups: ColumnGroup[];
-  pins: ColumnPins;
-  onToggle: (schemaId: string, key: string) => void;
-  children: ReactNode;
-}) {
-  if (groups.length === 0) return children;
-  const grouped = groups.length > 1;
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="max-h-[min(24rem,var(--radix-context-menu-content-available-height))] w-56">
-        <ContextMenuLabel>Columns</ContextMenuLabel>
-        {groups.map((group) => (
-          <Fragment key={group.schemaId}>
-            <ContextMenuSeparator />
-            {grouped && (
-              <ContextMenuLabel className="text-muted-foreground truncate text-xs font-normal">
-                {group.title}
-              </ContextMenuLabel>
-            )}
-            {group.fields.map((entry) => (
-              <ContextMenuCheckboxItem
-                key={entry.key}
-                checked={pins[group.schemaId]?.includes(entry.key) ?? false}
-                onCheckedChange={() => onToggle(group.schemaId, entry.key)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                <span className="truncate">{entry.label}</span>
-              </ContextMenuCheckboxItem>
-            ))}
-          </Fragment>
-        ))}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-/**
- * A right-click on a link keeps the browser's own menu (open in a new tab,
- * copy the link) rather than the Columns menu: stopping the event here, under
- * the trigger, never prevents its default.
- */
-function keepLinkMenu(event: MouseEvent) {
-  if (event.target instanceof Element && event.target.closest("a")) event.stopPropagation();
-}
-
-/**
- * The same for a long press on touch or pen, which the trigger opens from its
- * own timer on `pointerdown` rather than from `contextmenu`: a press on a
- * link never starts it, so only the browser's link menu opens.
- */
-function keepLinkPress(event: PointerEvent) {
-  if (event.pointerType !== "mouse") keepLinkMenu(event);
-}
-
-/**
- * The teams a user belongs to, glyphed the way the design draws the cell and the
- * way the Teams directory draws a team row. A membership that is not active yet
- * (`pending`) or any more (`inactive`) says so: the roster returns them beside
- * the active ones, and an unmarked name would read as a full member.
- *
- * Each name opens its team, as the Teams directory's own rows do — the embedded
- * entry carries the id, so the link costs no extra read.
- *
- * `+more` is deliberately not a link. The response carries the capped list and a
- * boolean, not the names past the cap, so there is nothing to expand inline
- * without the per-row roster read that `expand` exists to avoid; and the user
- * detail screen does not render teams yet (decisions log D3), so there is no
- * screen to send the operator to. It becomes a link to that screen when the
- * screen lists them.
- */
-function TeamCell({ teams, truncated }: { teams: UserTeam[]; truncated: boolean }) {
-  if (teams.length === 0) return <>—</>;
-  return (
-    <span className="flex items-center gap-1.5">
-      <Box aria-hidden strokeWidth={1.5} className="size-3.5 shrink-0" />
-      {/* The names truncate; the marker does not. Inside the truncating span it
-          is the first thing CSS clips — and a roster long enough to overflow is
-          exactly the one that has more teams to report. */}
-      <span className="truncate">
-        {teams.map((team, index) => (
-          <span key={team.id}>
-            {/* The separator sits outside the anchor: it belongs to the list,
-                not to either team it divides. */}
-            {index > 0 && ", "}
-            <Link
-              to="/teams/$teamId"
-              params={{ teamId: team.id }}
-              className="hover:text-foreground underline-offset-2 hover:underline"
-            >
-              {team.name}
-            </Link>
-            {team.status && team.status !== "active" && (
-              <Badge
-                variant="outline"
-                className="text-muted-foreground ml-1 h-4 rounded-sm border-dashed px-1 align-middle text-[11px] font-normal"
-              >
-                {team.status}
-              </Badge>
-            )}
-          </span>
-        ))}
-      </span>
-      {truncated && <span className="shrink-0">+more</span>}
-    </span>
-  );
-}
-
-/**
- * The row menu carries only actions that reach the API.
- *
- * The design's fuller menu is not buildable yet:
- *
- *   - `Edit user` — no `PATCH`/`PUT /users/{user_id}` endpoint (#693)
- *   - `Deactivate` — no `status` field and no lifecycle endpoint (#553)
- *   - `Reset password` — `PUT /users/{user_id}/password` exists, but the screen
- *     that would collect the new password does not
- *
- * They are left out rather than disabled so the menu is a list of things that
- * work. Add each one back with the change that makes it real.
- */
-function RowActions({
-  userId,
-  name,
-  onDeleted,
-}: {
-  userId: string;
-  name: string;
-  onDeleted: () => void | Promise<void>;
-}) {
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  return (
-    <>
-      <RowMenu name={name} icon={MoreVertical}>
-        <DropdownMenuItem asChild>
-          <Link to="/users/$userId" params={{ userId }}>
-            View details
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
-          Delete
-        </DropdownMenuItem>
-      </RowMenu>
-      {/* Outside the menu, and opened by state rather than a trigger, so the
-          menu closes on select. Nested inside, the still-open menu keeps the
-          rest of the page `aria-hidden` after the dialog is dismissed. */}
-      <DeleteUserDialog
-        userId={userId}
-        name={name}
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        onDeleted={onDeleted}
-      />
-    </>
   );
 }

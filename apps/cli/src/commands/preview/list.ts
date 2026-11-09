@@ -1,13 +1,36 @@
+import { PreviewService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
-import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+import {
+  type Admitted,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+  PreviewCommand,
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
+
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** The page size `--limit` asks for, as the server bounds it. */
+const LIMIT: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid {input}",
+    hint: "Use a whole number from {min} to {max}.",
+  },
+  values: {
+    min: LIMIT_MIN,
+    max: LIMIT_MAX,
+  },
+};
 
 /**
  * `zitadel preview list` — show the project's live previews.
@@ -18,7 +41,7 @@ const COLUMNS = ["url", "expires", "created"] as const;
  * fetches one page and reports `next_page_token`; `--all` drains them,
  * `--limit` / `--page-token` walk them a page at a time.
  */
-export default class PreviewList extends PreviewCommand {
+export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -27,10 +50,12 @@ export default class PreviewList extends PreviewCommand {
     "<%= config.bin %> preview list --plain",
   ];
   static override flags = {
-    limit: Flags.integer({
+    limit: Flags.custom<number>({
+      parse: reads(LIMIT),
+    })({
+      min: LIMIT_MIN,
+      max: LIMIT_MAX,
       description: "Page size (server default 20, max 100).",
-      min: 1,
-      max: 100,
     }),
     "page-token": nonBlankString({
       description: "Continue from a previous page's next_page_token.",
@@ -40,65 +65,51 @@ export default class PreviewList extends PreviewCommand {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(PreviewList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const params = {
-      limit: flags.limit,
-      page_token: flags["page-token"],
-    };
-    // One page unless `--all`, as every list does; the walk starts at
-    // `--page-token`, and a drain leaves no next page to report.
-    const { items: previews, next } = await collectPages(
-      client.listPreviews.pages(projectId, params),
+    const previewService = new PreviewService(client, projectId);
+    const listed = await previewService.page(
       {
-        items: (page) => page.previews,
-        all: flags.all === true,
-        next: (page) => page.next_page_token,
+        limit: flags.limit,
+        page_token: flags.pageToken,
+      },
+      {
+        all: flags.all,
       },
     );
 
-    const rows = previews.map((preview) => ({
-      url: preview.origin,
-      expires: preview.expires_at,
-      created: preview.created_at,
-    }));
+    const items = listed.items;
+    const rows = items.map((preview) => {
+      return {
+        url: preview.origin,
+        expires: preview.expires_at,
+        created: preview.created_at,
+      };
+    });
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "preview list",
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${shellArg(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
+    const columns = COLUMNS;
+    const empty = "No live previews.";
+    const footer: string[] = [];
+    const page = {
+      token: listed.next,
+      command: "preview list",
+      flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
+    };
+    const extra = {};
 
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      data: listData(previews, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: renderList(COLUMNS, rows, {
-        plain,
-        singular: "preview",
-        empty: "No live previews.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "preview",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

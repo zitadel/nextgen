@@ -1,8 +1,6 @@
-import { Flags } from "@oclif/core";
-
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { OriginService } from "@/lib/backend";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;
@@ -14,7 +12,7 @@ const COLUMNS = ["pattern", "kind"] as const;
  * project state, so the server is the authority. An empty list means every
  * origin is admitted until the first pattern is added.
  */
-export default class OriginList extends EnvironmentCommand {
+export default class OriginList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the origin patterns on the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -22,33 +20,32 @@ export default class OriginList extends EnvironmentCommand {
     "<%= config.bin %> origin list --plain",
   ];
   static override flags = {
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(OriginList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof OriginList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const project = await client.getProject(projectId);
-    const origins = project.origins;
+    const originService = new OriginService(client, projectId);
+    const origins = await originService.list();
 
-    // The resource commands' list rendering: a pipe (or `--plain`) gets one
-    // tab-separated record per line, with no header and nothing at all when
-    // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      // The project returns its whole origin set in one page, so the token is null.
-      data: listData(origins),
-      pretty: renderList(COLUMNS, origins, {
-        plain,
-        singular: "origin",
-        empty: "No origins on the project.",
-      }),
+    const items = origins.all;
+    const rows = items;
+    const columns = COLUMNS;
+    const empty = "No origins on the project.";
+    const footer: string[] = [];
+    const page = null;
+    const extra = {};
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "origin",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

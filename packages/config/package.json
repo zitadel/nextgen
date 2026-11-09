@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -13,6 +13,8 @@
     "directory": "packages/config"
   },
   "files": [
+    "bootstrap-user.mjs",
+    "bootstrap-user.d.mts",
     "dist",
     "defaults/*.json",
     "defaults/*.md",
@@ -86,7 +88,11 @@
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./defaults/branding/*": "./defaults/branding/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./bootstrap-user": {
+      "types": "./bootstrap-user.d.mts",
+      "import": "./bootstrap-user.mjs"
+    }
   },
   "publishConfig": {
     "access": "public"
@@ -106,7 +112,9 @@
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
+    "ajv": "catalog:",
     "culori": "catalog:",
+    "fastest-levenshtein": "catalog:",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },
@@ -114,7 +122,6 @@
     "@types/culori": "catalog:",
     "@types/node": "catalog:",
     "@zitadel/vitest-config": "workspace:*",
-    "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "typescript": "catalog:",

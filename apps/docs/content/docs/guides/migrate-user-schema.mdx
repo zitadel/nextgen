@@ -1,12 +1,26 @@
 ---
 title: Migrate users between schema revisions
-description: Move existing users to a new user schema revision through the API.
+description: Move existing users to a new user schema revision through the API or the console.
 ---
 
-A user schema is immutable. Every change you deploy creates a new revision of
-it, and a user stays on the revision they were created on until you move them.
-This guide covers moving them: which changes need data from you, how to send
-it, and how to check progress.
+A user schema defines the attributes of your users and how they sign in. It is
+immutable. Every change you deploy creates a new revision of it, and a user
+stays on the revision they were created on until you move them. This guide
+covers moving them: which changes need data from you, how to send it, and how
+to check progress.
+
+## Before you start
+
+- **A new schema revision.** Edit `.zitadel/schemas/*.json` and
+  [deploy](/docs/guides/deploy). The next section explains what each step does.
+- **The CLI and a project from `zitadel setup`.** Run
+  `npx @zitadel/cli@latest doctor` to check the project state
+  ([Deploy](/docs/guides/deploy#before-you-start) lists what the CLI reads).
+- **The target revision's ID.** Read it from
+  `zitadel schemas list --filter object_type=equals:<objectType>`, as the table
+  in [Three revisions to tell apart](#three-revisions-to-tell-apart) shows.
+- **The user's ID.** Find users with `zitadel users list`
+  ([Find users by revision](#find-users-by-revision)).
 
 ## Three separate steps
 
@@ -71,7 +85,7 @@ runs. Plan when you deploy application changes around that.
 
 If a changed attribute is collected at registration, update the login flow
 too, so the release you deploy pins both the schema and the flow that collects
-it. The [deploy guide](/docs/guides/deploy#walkthrough-add-a-field-to-registration)
+it. [Edit the login flow](/docs/guides/edit-login-flow#collect-a-new-field-at-sign-up)
 shows adding a field to the register step.
 
 ## Migrate a user
@@ -100,6 +114,16 @@ uniqueness rules, then saves the revision and the attributes together.
 The target must be a revision of the user's own schema, the same `objectType`,
 older or newer. A schema with another `objectType` is refused with
 `400 user.invalid`.
+
+Check that it worked: `zitadel users get <user_id>` shows the new revision as
+the user's `schema`, with the merged attributes.
+
+To move one user by hand, open them in the console. Their page says when a newer
+revision is available, and **Review update** (**Change revision** on the newest)
+asks the server for a dry run of the move to the revision you pick, and then asks
+you only for what the server refused. It sends the same request, so the same
+validation applies. The answer holds for that moment: if the server refuses the
+real request, it names what to correct and nothing changes.
 
 ### Examples
 
@@ -161,7 +185,7 @@ by its path in the request body, without the rejected values:
 ```json
 {
   "code": "req.invalid",
-  "message": "…",
+  "message": "<message>",
   "details": {
     "details": { "fields": ["attributes.country"] }
   }
@@ -169,17 +193,46 @@ by its path in the request body, without the rejected values:
 ```
 
 An attribute you didn't send is named too when the merged result fails on it,
-as when the target requires `country` and the user has none. Fix those
-attributes and send the request again.
+as when the target requires `country` and the user has none. A failure inside
+an array item names the item by its index, as in `attributes.phones.0.fax`.
+Fix those attributes and send the request again.
 
 A value that another user already holds under a uniqueness rule answers
 `409 user.already_exists`, with the attributes in the same
 `details.details.fields` list.
 
+### Check a migration before you send it
+
+Add `--dry-run` to ask the server whether the request would succeed:
+
+```sh
+npx @zitadel/cli@latest users update <user_id> \
+  --schema <target revision id> \
+  --attributes country=CH \
+  --dry-run --json
+```
+
+This sends the same request to `PATCH /users/{user_id}` with `"dry_run": true` in the body,
+and it needs the same permission. A refused request gets the same answer as a
+real one. A valid request answers `200` with the user as the migration would
+leave them, in `data.result` from the CLI.
+
+A dry run changes nothing and emits no `user.updated` event. Zitadel still
+records the call itself as a `request.api` event, as it does for every API call.
+
+A dry run answers for the moment you send it. It refuses a unique value that
+another user holds at that moment. It can't reserve a value that is free, so
+another user can take it first, and the real request then answers
+`409 user.already_exists`. Handle that answer even after a successful dry run.
+
+A server from before `dry_run` refuses a request that names it with
+`400 req.invalid` and changes nothing. Upgrade the server to check migrations
+this way.
+
 ### What a migration keeps
 
 A migration changes the schema reference and the attributes, nothing else.
-The user's id, password, passkeys, team memberships and SSO links stay, and
+The user's ID, password, passkeys, team memberships and SSO links stay, and
 the user signs in as before.
 
 ### Moving back to an older revision
@@ -215,7 +268,7 @@ revision was never migrated, and still counts.
 The same filters work on `POST /users/query` (see
 [Users](/docs/reference/api/users)).
 
-## Rolling back
+## Roll back a deploy
 
 [`deployment rollback`](/docs/guides/deploy#releases-deployments-and-rollback)
 serves an earlier release again, and new registrations follow the revision

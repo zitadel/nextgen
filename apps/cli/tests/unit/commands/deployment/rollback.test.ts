@@ -6,8 +6,8 @@ import {
   liveAcrossTwoPages,
   PLATFORM_URL,
   usePlatformServer,
-} from "../../../helpers/platform-project";
-import { runCliForTest } from "../../../helpers/run-cli";
+} from "@tests/helpers/platform-project";
+import { runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -216,5 +216,33 @@ describe("deployment rollback", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data).not.toHaveProperty("pointers");
     expect(envelope.warnings).toEqual([expect.stringContaining("could not be read")]);
+  });
+  it("leaves the origin check out when it cannot run", async () => {
+    const { cwd } = await twoDeploys();
+    server.use(
+      http.get(`${SERVER}/api/v1/deployments/:id`, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const { exitCode, stdout } = await runCliForTest([
+      "deployment",
+      "rollback",
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    const envelope = JSON.parse(stdout) as {
+      data: Record<string, unknown>;
+      warnings: string[];
+    };
+    expect(exitCode).toBe(0);
+    expect(envelope.data).not.toHaveProperty("dropped_origins");
+    expect(envelope.data).not.toHaveProperty("unserved_origins");
+    expect(envelope.warnings).toEqual([expect.stringContaining("Could not check which origins")]);
   });
 });

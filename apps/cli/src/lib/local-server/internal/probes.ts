@@ -2,7 +2,7 @@ import { createConnection, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkLocalServerHealth } from "../runtime";
+import { checkLocalServerHealth } from "@/lib/local-server/runtime";
 import type { HealthProbe, PortProbe } from "./lifecycle";
 import { tryLock } from "./start-lock";
 

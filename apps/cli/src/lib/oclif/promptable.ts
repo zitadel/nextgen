@@ -1,4 +1,4 @@
-import { type Asker, input as askInput } from "../input";
+import { type Asker, input as askInput } from "@/lib/input";
 import type { BaseCommand } from "./base";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
@@ -17,9 +17,10 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
  * ```
  *
  * `input` is {@link askInput} with this invocation's interactivity
- * (`--non-interactive`, `--json`, no terminal) and `--force` filled in, so a
- * command states only the question. See {@link askInput} for the order the
- * answer is looked for in and what is thrown when there is none.
+ * (`--non-interactive`, `--json`, no terminal) filled in, so a command states
+ * only the question. See {@link askInput} for the order the answer is looked
+ * for in and what is thrown when there is none. It cannot ask a `confirm`: a
+ * destructive command extends `Destructive` instead.
  */
 export function Promptable<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
   abstract class PromptableCommand extends Base {

@@ -1,5 +1,6 @@
-import { ZitadelError } from "../../errors";
+import { ZitadelError } from "@/lib/errors";
 import type { FilterField } from "./types";
+import { distance } from "fastest-levenshtein";
 
 /**
  * The `--filter` / `--sort` grammar every list shares.
@@ -31,7 +32,7 @@ export const parseFilter = (
   }
   const field = filters.find((filter) => filter.field === name);
   if (!field) {
-    const near = names.find((candidate) => within(name, candidate, 2));
+    const near = names.find((candidate) => distance(name, candidate) <= 2);
     throw new ZitadelError("E_VALIDATION", `Unknown filter field "${name}"`, {
       hint: `${near ? `Did you mean ${near}? ` : ""}Filterable fields: ${names.join(", ")}.`,
       details: { field: name, ...(near ? { suggestion: near } : {}), fields: names },
@@ -49,7 +50,7 @@ export const parseFilter = (
   // literal: silently filtering for the string `contians:active` would answer
   // a question nobody asked.
   if (rawValue.length > 0) {
-    const typo = operations.find((operation) => within(candidate, operation, 2));
+    const typo = operations.find((operation) => distance(candidate, operation) <= 2);
     if (typo) {
       throw new ZitadelError("E_VALIDATION", `Unknown filter operation "${candidate}"`, {
         hint: `Did you mean ${typo}? For a literal value containing a colon, say so explicitly: ${name}=equals:${expression}.`,
@@ -109,7 +110,7 @@ export const parseSort = (
     });
   }
   if (!fields.includes(field)) {
-    const near = fields.find((candidate) => within(field, candidate, 2));
+    const near = fields.find((candidate) => distance(field, candidate) <= 2);
     throw new ZitadelError("E_VALIDATION", `Unknown sort field "${field}"`, {
       hint: `${near ? `Did you mean ${near}? ` : ""}Sortable fields: ${fields.join(", ")}.`,
       details: { field, ...(near ? { suggestion: near } : {}), fields: [...fields] },
@@ -123,22 +124,8 @@ export const parseSort = (
   return { field, direction };
 };
 
-/** Whether two words are within `max` single-character edits of each other. */
-const within = (a: string, b: string, max: number): boolean => {
-  if (a === b || Math.abs(a.length - b.length) > max) {
-    return a === b;
-  }
-  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i += 1) {
-    const current = [i];
-    for (let j = 1; j <= b.length; j += 1) {
-      current[j] = Math.min(
-        (current[j - 1] ?? 0) + 1,
-        (previous[j] ?? 0) + 1,
-        (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
-    }
-    previous = current;
-  }
-  return (previous[b.length] ?? max + 1) <= max;
-};
+/** A `--filter` entry, read, with the text it was typed as. */
+export type TypedFilter = ParsedFilter & Readonly<{ raw: string }>;
+
+/** A `--sort` entry, read, with the text it was typed as. */
+export type TypedSort = Readonly<{ raw: string; field: string; direction: string }>;

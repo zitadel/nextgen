@@ -1,19 +1,25 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { mutatedData } from "../../lib/oclif/envelope";
-import { revokeRelease } from "../../lib/release";
-import { Promptable } from "../../lib/oclif/promptable";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "@/lib/oclif";
+import { mutatedData } from "@/lib/oclif/envelope";
+import { ReleaseService } from "@/lib/backend";
+import { Destructive } from "@/lib/oclif/destructive";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
  * never served again.
  *
  * A release an origin still serves cannot be revoked; deploy another release
- * there or roll it back first. Revoking is idempotent and cannot be undone, so
- * it takes the same `--force`-or-confirm gate the destructive commands use.
+ * there or roll it back first. Revoking is idempotent and cannot be undone.
  */
-export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
+export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -26,49 +32,40 @@ export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
   static override flags = {
     force: Flags.boolean({
       char: "f",
-      description: "Revoke without the confirmation prompt. Required when non-interactive.",
+      description:
+        "Revoke the release without the confirmation prompt. Required when non-interactive.",
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(ReleaseRevoke);
-    await this.toMeta(flags);
-    const { dryRun } = this.meta;
-    const releaseId = args.release_id;
-
-    // A dry run makes no request, so it answers before the connection and
-    // before the destructive-confirm gate: revoking cannot be undone, and a
-    // dry run must revoke nothing and so needs no confirmation.
-    if (dryRun) {
-      return this.emit({
-        status: "ok",
-        data: { dry_run: true, release_id: releaseId },
-        pretty: `Would revoke ${releaseId}. Nothing was revoked (dry run).`,
-      });
-    }
-
-    const confirmed = await this.input({
-      kind: "confirm",
-      name: `revoke ${releaseId}`,
-      message: `Revoke ${releaseId}? Its content can never be served again.`,
-      retry: this.suggest(`release revoke ${releaseId} --force`),
-    });
-    if (!confirmed) {
-      return this.emit({ status: "skipped", reason: "revoke-cancelled" });
-    }
-
-    const { client, projectId } = await this.connect();
-
-    const release = await revokeRelease(client, projectId, releaseId);
-
-    return this.emit({
-      status: "ok",
-      // The lifecycle-mutation shape every revoke answers with, plus when.
-      data: {
-        ...mutatedData({ release_id: release.id }, "revoked"),
-        revoked_at: release.revoked_at,
-      },
-      pretty: `Revoked ${release.id}`,
-    });
+  protected async execute({ args }: Admitted<typeof ReleaseRevoke>): Promise<JsonEnvelope> {
+    return this.emit(
+      await this.confirmed({
+        verb: "revoke",
+        name: `revoke ${args.releaseId}`,
+        message: `Revoke ${args.releaseId}? Its content can never be served again.`,
+        preview: () => {
+          return {
+            status: "ok",
+            data: { dry_run: true, release_id: args.releaseId },
+            pretty: prose(`Would revoke ${args.releaseId}. Nothing was revoked (dry run).`),
+          };
+        },
+        prepare: () => {
+          return this.connect();
+        },
+        apply: async (consent, { client, projectId }) => {
+          const releaseService = new ReleaseService(consent.unlock(client), projectId);
+          const release = await releaseService.revoke(args.releaseId);
+          return {
+            status: "ok",
+            data: {
+              ...mutatedData({ release_id: release.id }, "revoked"),
+              revoked_at: release.revoked_at,
+            },
+            pretty: prose(`Revoked ${release.id}`),
+          };
+        },
+      }),
+    );
   }
 }

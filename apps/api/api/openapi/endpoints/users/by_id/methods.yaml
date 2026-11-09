@@ -1,0 +1,214 @@
+get:
+  operationId: GetUserByID
+  x-zitadel-cli: users get
+  summary: Get a user by ID
+  description: |
+    Returns a user by ID, with the attributes its schema defines.
+
+    With `team_id`, the user is returned only while they are an active member
+    of that team.
+  tags:
+    - Users
+  parameters:
+    # Declared here rather than shared: `team_id` is the team parameter across
+    # the API, but what it does is the resource's own business. On a user it is
+    # membership, and saying so is the whole point of spelling it out locally.
+    - name: team_id
+      in: query
+      # Membership versus lifecycle ownership is decided in ADR 024.
+      description: |
+        Serves the user only when they hold an active membership in this team,
+        and answers `404` otherwise. Use the `id` that `createTeam` (`POST /teams`) returns or
+        `queryTeams` (`POST /teams/query`) lists.
+
+        This is team membership, not lifecycle ownership: it asks which team
+        the user collaborates in, not which team may deprovision them. The
+        owning team is reported separately as
+        `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
+        while owning their own lifecycle.
+
+        Only active memberships match. A user who has been invited but has not
+        accepted is not served.
+
+        It reads the user's memberships, so it takes the same permission as the
+        `team_id` filter on `POST /users/query`: `team_membership.read` for a
+        project secret, read on the whole project for a console session.
+        Otherwise the answer is `403 user.permission_denied`.
+      schema:
+        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
+  security:
+    - oauth2:
+        - user.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: The user.
+      content:
+        application/json:
+          schema:
+            $ref: ../user.yaml
+    '401':
+      description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        No user has this ID, or `team_id` is set and the user is not an active
+        member of that team.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: GetUserByID-error-response.yaml
+
+patch:
+  operationId: PatchUserByID
+  x-zitadel-cli: users update
+  summary: Update a user by ID
+  description: |
+    Partially updates a user's schema-defined attributes, and optionally
+    moves the user to another registered schema. The merged result is
+    validated against the schema before commit. Concurrent writes are
+    last-write-wins.
+
+    To move the user, send `schema` with the `id` of a registered schema, as
+    `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+
+    To ask whether a patch would succeed, send it with `"dry_run": true`. It takes
+    the same permission and answers the same status and `details` as the real
+    request, and it changes nothing and emits no `user.updated`. The request
+    itself is still recorded as `request.api`, like any other API call. A `200`
+    holds for the moment of the check: a unique value that is free then can be
+    taken before the real request, which then answers `409`.
+
+    `dry_run` is a body field so that a server from before it refuses the
+    request as malformed (`400 req.invalid`) instead of applying the patch.
+  tags:
+    - Users
+  parameters:
+    - $ref: ../../../components/parameters/user-id.yaml
+  security:
+    - oauth2:
+        - user.write
+    - sessionCookie: []
+  requestBody:
+    description: The changes to merge into the user.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: patch-user-request.yaml
+  responses:
+    '200':
+      description: The updated user, or with `dry_run` the user as the patch would leave them.
+      content:
+        application/json:
+          schema:
+            $ref: ../user.yaml
+    '400':
+      description: |
+        Invalid request body, empty patch, unknown schema, or merged attributes
+        failing schema validation.
+
+        Merged attributes that fail the target schema answer `req.invalid`,
+        the same way a malformed body does and the same way a create does:
+        `details.details.fields` lists the dotted path of every failing field
+        from the request body, such as `attributes.country` or
+        `attributes.address.zip`, and a failure inside an array item by the
+        item's index, such as `attributes.phones.0.fax`. A field the patch did
+        not touch is named too when the merged document fails on it, as after a move to a schema
+        that requires it. Only the field names are reported, never the
+        rejected values. Fix the fields listed and send the patch again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The credential may not manage users in this project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: User not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: |
+        A patched value is unique and already taken by another user, or
+        concurrent writes kept the user changing under the patch; retry.
+
+        A taken value answers `user.already_exists`, as on create, with
+        `details.details.fields` naming the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent. Send a
+        different value for each attribute named. Concurrent writes answer
+        `user.conflict`; send the patch again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: PatchUserByID-error-response.yaml
+
+delete:
+    operationId: DeleteUserByID
+    x-zitadel-cli: users delete
+    summary: Delete a user by ID
+    description: |
+      Deletes a user, removes them from every team they belong to, and revokes
+      every grant they hold, on any project.
+
+      The user is removed, not deactivated, and the deletion emits `user.deleted`,
+      plus `authz.revoked` for each grant on that grant's project.
+      With a project secret the request is idempotent: deleting a user that exists
+      in no project succeeds without changing anything. Deleting the last active
+      member of a project's owning team returns 409 `proj.last_owner` and changes
+      nothing.
+    tags:
+      - Users
+    parameters:
+      - $ref: ../../../components/parameters/user-id.yaml
+    security:
+      - oauth2:
+          - user.delete
+      - sessionCookie: []
+    responses:
+      '204':
+        description: The user was deleted.
+      '401':
+        description: Client was not authorized or the session is anonymous.
+        content:
+          application/json:
+            schema:
+              $ref: ../../../components/error-details.yaml
+      '404':
+        description: User not found.
+        content:
+          application/json:
+            schema:
+              $ref: ../../../components/error-details.yaml
+      '409':
+        description: |
+          The user is the last active member of a project's owning team
+          (`proj.last_owner`). Add another member to that team, then retry.
+          `details.details.project_ids` names the projects.
+        content:
+          application/json:
+            schema:
+              $ref: ../../../components/error-details.yaml
+      default:
+        $ref: DeleteUserByID-error-response.yaml

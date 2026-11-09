@@ -1,19 +1,20 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { assertVariableName, variableScope } from "../../lib/variables";
-import { Promptable } from "../../lib/oclif/promptable";
+import { VariableRemoval, VariableService } from "@/lib/backend";
+import { variableNameArg } from "./name";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { Destructive } from "@/lib/oclif/destructive";
+import { deletedData } from "@/lib/oclif/envelope";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
  *
  * `--preview` removes the preview value and leaves the primary one standing;
- * without it the variable is removed for both kinds. Destructive, so it takes the
- * same `--force`-or-confirm gate the resource commands' `rm` uses.
+ * without it the variable is removed for both kinds.
  */
-export default class VariableRm extends Promptable(EnvironmentCommand) {
+export default class VariableRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -22,14 +23,16 @@ export default class VariableRm extends Promptable(EnvironmentCommand) {
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID --force",
   ];
   static override args = {
-    name: nonBlankArg({ required: true, description: "Variable name to remove." }),
+    name: variableNameArg({
+      required: true,
+      description: "Variable name to remove.",
+    }),
   };
   static override flags = {
     preview: Flags.boolean({
       default: false,
       description: "Remove the preview value alone, leaving the primary one standing.",
     }),
-    // `--force` is per command, not global: here it permits a removal.
     force: Flags.boolean({
       char: "f",
       description:
@@ -37,46 +40,52 @@ export default class VariableRm extends Promptable(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariableRm);
-    await this.toMeta(flags);
-    const { dryRun } = this.meta;
-    const name = args.name;
-
-    assertVariableName(name);
-
-    const { client, projectId } = await this.connect();
-    const scope = variableScope(projectId, flags.preview);
-    const kinds = flags.preview ? ["preview"] : ["primary", "preview"];
-
-    // A dry run makes no request, so it answers before the guard — the order
-    // the resource commands' `rm` uses, which keeps `--dry-run
-    // --non-interactive` usable.
-    if (dryRun) {
-      const preview = dryRunResult("remove", "variable", name);
-      return this.emit({
-        ...preview,
-        data: { ...(preview.data as object), kinds },
-        pretty: `${preview.pretty} from the project${flags.preview ? " (preview)" : ""}`,
-      });
-    }
-
-    const confirmed = await this.input({
-      kind: "confirm",
-      name: `remove ${name} from the project`,
-      message: `Remove ${name} from the project?`,
-      retry: this.suggest(`variable rm ${name}${flags.preview ? " --preview" : ""} --force`),
+  protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
+    // The one place this run reads `--preview` as a decision: the removal owns
+    // which kinds it clears from here on.
+    const removal = VariableRemoval.of({
+      preview: flags.preview,
     });
-    if (!confirmed) {
-      return this.emit({ status: "skipped", reason: "remove-cancelled" });
-    }
+    const suffix = removal.preview ? " (preview)" : "";
 
-    await client.deleteVariable(name, scope);
-
-    return this.emit({
-      status: "ok",
-      data: { ...deletedData({ name }), kinds },
-      pretty: `Removed ${name} from the project${flags.preview ? " (preview)" : ""}`,
-    });
+    return this.emit(
+      await this.confirmed({
+        verb: "remove",
+        name: `remove ${args.name} from the project`,
+        message: `Remove ${args.name} from the project?`,
+        preview: () => {
+          const result = dryRunResult({
+            verb: "remove",
+            topic: "variable",
+            id: args.name,
+            clause: `from the project${suffix}`,
+          });
+          return {
+            ...result,
+            data: {
+              ...(result.data as object),
+              kinds: removal.kinds,
+            },
+          };
+        },
+        prepare: () => {
+          return this.connect();
+        },
+        apply: async (consent, { client, projectId }) => {
+          const variableService = new VariableService(consent.unlock(client), projectId);
+          await variableService.remove(args.name, removal);
+          return {
+            status: "ok",
+            data: {
+              ...deletedData({
+                name: args.name,
+              }),
+              kinds: removal.kinds,
+            },
+            pretty: prose(`Removed ${args.name} from the project${suffix}`),
+          };
+        },
+      }),
+    );
   }
 }

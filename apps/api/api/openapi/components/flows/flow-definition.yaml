@@ -1,0 +1,118 @@
+x-meta-schema: true
+type: object
+required: [ name, status, user_schema, purposes, steps ]
+description: |
+  A flow definition is the configuration of one flow: the sequence of screens
+  the login component (`<zitadel-login>`) walks a user through to sign in,
+  register, recover access or similar. Each screen is a step. A step collects
+  fields (inputs taken from properties of the user schema), offers actions
+  (what the user can do, such as submit the form or follow a link) and may
+  require gates (security checks, such as a captcha, that must pass before the
+  server accepts the submission). Transitions say which step follows each
+  action.
+
+  The definition is server-side configuration and is never sent to the
+  frontend. The server evaluates it and returns the current step, with its
+  fields, actions and gates, to the client.
+
+  Administrators create flow definitions, either as `.zitadel/flows/` files
+  that `zitadel deploy` publishes or through the API, and they are stored in
+  the project/team configuration hierarchy. The server selects the matching
+  definition from the purpose and audience when a flow starts with
+  `createFlow` (`POST /flow`).
+additionalProperties: false
+properties:
+  "$schema":
+    type: string
+    description: |
+      Editor affordance: path or URL of this file's JSON meta-schema, so an
+      editor validates and autocompletes it. The CLI strips it before upload;
+      the platform ignores it.
+  name:
+    type: string
+    pattern: '^[a-z][a-z0-9-]*$'
+    examples: [ standard-login, combined-auth ]
+    description: |
+      Stable identifier for this flow, and the name a cross-flow `switch` or
+      `pivot` transition will target once the server runs them. Every
+      revision of a flow shares its `name`; publishing a definition under an
+      existing `name` adds a revision to that flow. Renaming is not
+      supported: the `name` is part of the public contract another
+      definition may reference. It acts as the human display label as well;
+      there is no separate slug.
+
+  status:
+    $ref: flow-definition-status.yaml
+
+  user_schema:
+    type: string
+    description: |
+      The user schema this flow operates on, named by its `objectType`. The
+      flow runs against the revision of that schema its release pins, so
+      publishing a schema revision needs no change to the flow. A schema ID
+      as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
+      schema's `objectType`; reading the definition back returns the
+      `objectType`. A value naming no schema of the project is refused with
+      `flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)
+      returns. Step `fields` reference properties defined in the resolved
+      schema; the server resolves field types, validation, and implicit
+      outcomes from schema annotations at runtime.
+    example: human-user
+
+  purposes:
+    type: object
+    description: |
+      Maps each purpose this definition handles to its entry-point step.
+      A purpose is what the user is doing, such as `login` or `recovery`.
+      Keys are purpose names; values must match a `name` in `steps`. A
+      definition can serve multiple purposes (for example a combined
+      login/register flow) by listing one entry per purpose, or just one: a
+      sign-in-only flow lists `login` alone.
+
+      - `login`: verify an existing user.
+      - `register`: create a user.
+      - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
+        definition may declare them, but the server does not run their
+        journeys yet; `recovery` only asks a password field for a new
+        password.
+    minProperties: 1
+    propertyNames:
+      type: string
+      enum: [ login, register, recovery, profiling, reauth, link_account ]
+    additionalProperties:
+      type: string
+    example:
+      login: identify
+
+  audience:
+    $ref: flow-audience.yaml
+    example:
+      app_ids: [ app_saas ]
+
+  steps:
+    type: array
+    items:
+      $ref: flow-definition-step.yaml
+    minItems: 1
+    description: |
+      The steps of this flow. The order is for human readability: transitions
+      determine the actual step sequencing.
+    example:
+      - name: identify
+        fields: [ email ]
+        actions:
+          - name: submit
+            kind: submit
+            primary: true
+        transitions:
+          submit: { target: authenticate }
+      - name: authenticate
+        fields: [ 'x-auth-methods#password' ]
+        actions:
+          - name: submit 
+            kind: submit
+            primary: true
+        transitions:
+          submit: { target: done }
+      - name: done
+        complete: redirect

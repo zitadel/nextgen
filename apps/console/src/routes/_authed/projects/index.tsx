@@ -4,9 +4,9 @@ import { useCallback, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, validateNextSearch } from "@/auth/session";
-import { useNavItems, useRequestedNavItem } from "@/components/app-shell/use-nav-items";
-import { NewProjectCard } from "@/components/new-project-card";
-import { ProjectLifecycle } from "@/components/project-lifecycle";
+import { useNavItems, useRequestedNavItem } from "@/app-shell/use-nav-items";
+import { NewProjectCard } from "@/features/projects/components/new-project-card";
+import { ProjectLifecycle } from "@/features/projects/components/project-lifecycle";
 import { ProjectMark } from "@/components/project-mark";
 import {
   LoadMore,
@@ -28,8 +28,10 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
-import { byName, primaryHost, useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
+import { byName, primaryHost } from "@/features/projects/model";
+import { useProjectScope, useSelectProjectTarget } from "@/features/projects/project-scope";
 import { HomeColumn, Page } from "@/components/layout";
+import { LIST_PAGE_SIZE } from "@/lib/paging";
 
 /**
  * Projects overview — every project the person can act on.
@@ -81,7 +83,7 @@ export const Route = createFileRoute("/_authed/projects/")({
     // the session cookie — not `POST /projects/query`, which the server pins to
     // the calling credential's one home project (#1237).
     const page = await api.listMyProjects({
-      limit: PAGE_SIZE,
+      limit: LIST_PAGE_SIZE,
       name_contains: deps.q,
       ...consoleSessionProject(),
     });
@@ -91,13 +93,6 @@ export const Route = createFileRoute("/_authed/projects/")({
 });
 
 type ProjectsSearch = { next?: string; q?: string };
-
-/**
- * One page of projects. `GET /users/me/projects` is cursor-paginated, so this is a
- * page size rather than a cap on what the operator can reach — `Load more` walks
- * the rest (design decisions log D5: a button, not pagination controls).
- */
-const PAGE_SIZE = 25;
 
 /** The Name cell clamps at 280px and truncates, as the Users table's User cell does. */
 const NAME_CLAMP = "max-w-70";
@@ -121,7 +116,7 @@ function ProjectsScreen() {
     loaded,
     async (pageToken) => {
       const page = await api.listMyProjects({
-        limit: PAGE_SIZE,
+        limit: LIST_PAGE_SIZE,
         page_token: pageToken,
         // The search the token was issued under: a page token answers one
         // question, and asking another with it is not a narrower list but a

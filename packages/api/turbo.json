@@ -7,7 +7,7 @@
     // the server's generation and its checks rewrite the *-error-response.yaml
     // files this reads.
     "generate": {
-      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/scripts/task-guard.mjs"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/apps/api/api/openapi/**/*.yaml", "$TURBO_ROOT$/scripts/task-guard.mjs"],
       "outputs": ["src/generated/**"]
     },
     "typecheck": {

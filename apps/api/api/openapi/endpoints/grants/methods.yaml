@@ -1,0 +1,104 @@
+post:
+  operationId: createGrant
+  x-zitadel-cli: grants create
+  summary: Create a grant
+  description: |
+    Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.admin` role on a project.
+
+    The project is the one named by the `project_id` query parameter. Name the
+    principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
+    `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
+    `getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team (`project.team`) grants are not
+    created here: a claim, which attaches a project to a team, creates them.
+
+    An unrevoked grant with the same principal and relation holds that binding
+    even after `expires_at`. Revoke it with `deleteGrant` before you create it
+    again.
+
+    Create does not accept `expand`. The `user_id` and team locators return `201`,
+    whose `user` and `team` carry only `user_id` and `team_id`. They still answer
+    `404` or `409` when the principal is missing or the grant already exists.
+    Creating by `user.identifier` answers `202` with no body on every outcome.
+    Granting the session caller's own user is `grant.invalid` on either user
+    locator. A `201` grant names its user or team by ID only: read it back
+    with `getGrant` for the identifier and display name. A `202` returns no
+    grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
+
+    Authenticate with a project secret (`oauth2`) or a console session cookie
+    (`sessionCookie`). A session caller is authorized as the signed-in person
+    against the target project, even when the session belongs to another project.
+    Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-grant-request.yaml
+  responses:
+    '201':
+      description: |
+        The grant was created. Returned for the `user.user_id` and team
+        locators only.
+      content:
+        application/json:
+          schema:
+            $ref: grant.yaml
+    '202':
+      description: |
+        Accepted. Returned only for the `user.identifier` locator, on
+        every outcome. The server does not disclose whether a grant was
+        written, whether one already existed, or whether the identifier
+        matched a user. Read the grant list to see the result.
+    '400':
+      description: The provided parameters were not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: |
+        Project not found, or an id or team-name locator could not be
+        resolved. Identifier create answers 202 instead.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        An unrevoked grant with this principal and relation already
+        exists on the project. Identifier create answers 202 instead. Revoke
+        the existing grant first if you need to replace it.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '429':
+      description: |
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createGrant-error-response.yaml

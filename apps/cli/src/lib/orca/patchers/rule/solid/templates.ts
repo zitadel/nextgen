@@ -1,7 +1,7 @@
-import { MANAGED_MARKER } from "../../../../paths";
+import { MANAGED_MARKER } from "@/lib/paths";
 
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 /**
  * The managed `src/App.tsx`: a minimal path-based router that renders the

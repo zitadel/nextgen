@@ -207,6 +207,36 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 });
 
+describe("<zl-field> help text (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it("gives an error the help text's place, and the help back once the error clears", async () => {
+    host.innerHTML = `<zl-field name="password" error="Too short"><span slot="help">At least 15 characters.</span></zl-field>`;
+    const field = host.querySelector("zl-field") as ZlField;
+    await field.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await field.updateComplete;
+    const help = field.shadowRoot?.querySelector('[part="help"]') as HTMLElement;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(help.hidden).toBe(true);
+    expect(input.getAttribute("aria-describedby")).not.toContain(help.id);
+
+    field.error = "";
+    await field.updateComplete;
+    expect(help.hidden).toBe(false);
+    expect(input.getAttribute("aria-describedby")).toBe(help.id);
+  });
+});
+
 describe("<zl-field> password toggle (chromium)", () => {
   let host: HTMLDivElement;
 

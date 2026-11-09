@@ -1,0 +1,156 @@
+---
+title: Edit the login flow
+description: Change what the login asks for, in which order, and which flow an app runs, then deploy it.
+---
+
+The login flow is a file in your repository. It lists the screens the login component (`<zitadel-login>`) shows, the fields each one collects, and where each button leads. A user schema, another file, says what a user is. Edit the two, preview the change, then deploy it.
+
+You need an app set up with `zitadel setup`, and the local runtime or a project to deploy to.
+
+## Find the files
+
+`zitadel setup` writes them into `.zitadel/`:
+
+| File | What it holds |
+| --- | --- |
+| `.zitadel/flows/default-login.json` | The login flow: its steps, their fields and actions, and the transitions between them |
+| `.zitadel/schemas/default-human-user.json` | The user schema: the properties a user has, which are required, and the sign-in methods |
+
+Each folder has a `README.md` with the full rules. A step's fields name properties of the schema the flow's `user_schema` names, by that schema's `objectType`. The order of `steps` does not set the order of screens: the transitions do.
+
+## Collect a new field at sign-up
+
+Add the property to the schema, then add it to the step that should ask for it. To ask for a company name on the sign-up screen, add `company` to the schema's `properties`:
+
+```json title=".zitadel/schemas/default-human-user.json"
+"properties": {
+  "email": { "type": "string", "format": "email" },
+  "company": { "type": "string", "description": "The user's company." }
+}
+```
+
+Then list it in the `register` step's `fields`:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "name": "register",
+  "fields": ["email", "company"]
+}
+```
+
+To make the field required, also add it to the schema's `required` list:
+
+```json title=".zitadel/schemas/default-human-user.json"
+"required": ["email", "company"]
+```
+
+A required property must be collected by some step of every flow that uses the schema. Otherwise the dry run stops with `required fields [company] in user schema are missing in the flow definition steps`: add the field to a step, or take it out of `required`.
+
+The field's label is its name made readable ("Company") until you give it one; see [Label a step you add](/docs/guides/customize-copy#label-a-step-you-add).
+
+## Change the order of fields
+
+A step shows its fields in the order of its `fields` list. To ask for the email before the company, swap them:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "name": "register",
+  "fields": ["company", "email"]
+}
+```
+
+## Add a step
+
+Add a step object to `steps`, then point a transition at it and give it one of its own. To ask for the company on a screen of its own between the sign-up screen and the password:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "name": "register",
+  "fields": ["email"],
+  "transitions": {
+    "submit": { "target": "company-details" }
+  }
+},
+{
+  "name": "company-details",
+  "fields": ["company"],
+  "actions": [{ "name": "submit", "kind": "submit", "primary": true }],
+  "transitions": {
+    "submit": { "target": "register-password" }
+  }
+}
+```
+
+Keep the other transitions the `register` step has, such as `user_already_exists`. A step you add has no built-in text; [label it](/docs/guides/customize-copy#label-a-step-you-add) with the login component's `locales`.
+
+## Link sign-in and sign-up
+
+A button that switches between signing in and signing up is a `navigate` action with a transition that names a `purpose`. The default flow has one in each direction:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "name": "identifier",
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true },
+    { "name": "register", "kind": "navigate" }
+  ],
+  "transitions": {
+    "submit": { "target": "password" },
+    "register": { "purpose": "register" }
+  }
+}
+```
+
+The transition goes to the entry step of that purpose, the step `purposes` names for it, so it needs no `target`. The purpose must be one the flow's `purposes` lists.
+
+## Offer a password or a passkey
+
+A step offers a password when its `fields` list `x-auth-methods#password`, and a passkey through a `passkey` or `passkey_register` action. The method must also be enabled in the user schema. [Turn password and passkey sign-in on and off](/docs/guides/sign-in-methods) shows the edit for each, and the `zitadel auth-method` commands that switch the schema.
+
+## Add a second flow, selected by name
+
+Copy `default-login.json` to a new file in `.zitadel/flows/`, give it its own `name`, and edit its steps. A name starts with a lowercase letter and holds only lowercase letters, digits and hyphens:
+
+```json title=".zitadel/flows/kiosk-login.json"
+{
+  "$schema": "../meta/flow-definition.json",
+  "name": "kiosk-login",
+  "status": "active",
+  "user_schema": "human-user",
+  "audience": { "team_ids": ["<team-id>"] },
+  "purposes": { "login": "identifier" },
+  "steps": ["<the steps, copied from default-login.json and edited>"]
+}
+```
+
+Then select it by name on the login component, here in React:
+
+```tsx
+<ZitadelLogin flowName="kiosk-login" />
+```
+
+On the plain element, set the `flow-name` attribute: `<zitadel-login flow-name="kiosk-login">`.
+
+Every deploy publishes every file in `.zitadel/flows/`. A login without `flowName` runs the project default: the newest flow the deployed release pins that has no `audience` and serves its purpose. A new flow without an `audience` becomes that default the moment it deploys, for every login that names no flow. To keep a flow you select by name out of the default, give it an `audience` before its first deploy, as above, with a team ID from `zitadel teams list`. The login component sends no team, so the flow then runs only where `flowName` names it.
+
+A login whose `flowName` names no deployed flow, or a flow that does not serve its `purpose`, shows the reason in place of the form.
+
+## Preview and deploy
+
+Preview the change. The dry run checks every file with the rules the server enforces and shows the diff against the live release:
+
+```sh
+npx @zitadel/cli@latest deploy --dry-run
+```
+
+Fix what it reports, then deploy:
+
+```sh
+npx @zitadel/cli@latest deploy
+```
+
+Then open your app's sign-in page, sign up with a new email, and check that each screen asks for what you changed. [Deploy](/docs/guides/deploy) covers releases, messages and rollback.
+
+## What the login does not run yet
+
+A transition with an `action` of `switch` or `pivot` names another flow. The dry run accepts it with a warning, but submitting through it fails with a 400 (`flow.unsupported`). Keep transitions within one flow, and use a purpose switch to move between signing in and signing up.

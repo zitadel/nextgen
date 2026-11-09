@@ -77,3 +77,10 @@ is bound to, and the server never sees it.
 - The exception ADR 035 notes, that a user record carries the user-schema
   revision it was created against, is unchanged and is per project like the
   user.
+
+## Amendment (2026-10-31): callers with no origin
+
+A caller with no `Origin`, and a console origin the project does not list, is
+served the project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). Any other origin still serves
+the newest deployment to it.

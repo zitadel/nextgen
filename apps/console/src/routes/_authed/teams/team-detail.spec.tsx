@@ -83,7 +83,7 @@ describe("team detail", () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     await renderDetail();
 
-    const field = await screen.findByLabelText("Tenant name");
+    const field = await screen.findByLabelText("Team name");
     const save = screen.getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
 
@@ -102,7 +102,7 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    const field = await screen.findByLabelText("Tenant name");
+    const field = await screen.findByLabelText("Team name");
     await userEvent.clear(field);
     await userEvent.type(field, "Acme Group");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -126,7 +126,7 @@ describe("team detail", () => {
     const switcher = await screen.findByRole("button", { name: "Switch team" });
     await waitFor(() => expect(switcher).toHaveTextContent("Acme Web"));
 
-    const field = await screen.findByLabelText("Tenant name");
+    const field = await screen.findByLabelText("Team name");
     await userEvent.clear(field);
     await userEvent.type(field, "Acme Group");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));

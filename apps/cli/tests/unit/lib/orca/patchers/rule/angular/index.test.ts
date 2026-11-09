@@ -2,22 +2,19 @@ import { runInNewContext } from "node:vm";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
-import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
+import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import {
   proxyConfApiPrefixEdit,
   proxyConfApiPrefixVerdict,
-} from "../../../../../../../src/lib/orca/patchers/rule/angular/templates";
-import { SESSION_COOKIE_MARKER } from "../../../../../../../src/lib/orca/patchers/rule/session-cookie";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
-import { REMOTE_HOST, useRemoteServer } from "../../../../../../helpers/remote-server";
-import { bearerOnlyProxyConf, v1ProxyConf } from "../../../../../../helpers/proxy-conf";
-import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
+} from "@/lib/orca/patchers/rule/angular/templates";
+import { SESSION_COOKIE_MARKER } from "@/lib/orca/patchers/rule/session-cookie";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
+import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
+import { aProxyConfApp, type DevApp } from "@tests/helpers/vite";
 
 /** The bearer hook setup writes: the exchange with and without the API prefix. */
 const BEARER = `/* zitadel:proxy:v3 */
@@ -543,20 +540,20 @@ const OTHER_SESSION_COOKIES = [
 
 describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
-  let app: DevApp | undefined;
+  const apps: DevApp[] = [];
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    await Promise.all(apps.splice(0).map((app) => app.close()));
     remote.answerWith(undefined);
   });
 
   async function serve(proxyConf: string, projectId = ""): Promise<DevApp> {
-    app = await aProxyConfApp(proxyConf, {
+    const app = await aProxyConfApp(proxyConf, {
       ZITADEL_URL: remote.url,
       ZITADEL_PROJECT_SECRET: "sk_proj_test",
       ZITADEL_PROJECT_ID: projectId,
     });
+    apps.push(app);
     return app;
   }
 

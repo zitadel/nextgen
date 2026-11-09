@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Repository } from "../../../../src/lib/git";
+import { Repository } from "@/lib/git";
 import {
   GitScratch,
   commitAll as commitEverything,
@@ -14,14 +14,13 @@ import {
   stagedFiles,
   treeFiles,
   write,
-} from "../../../helpers/git-repo";
+} from "@tests/helpers/git-repo";
 
 const scratch = new GitScratch();
 
 beforeEach(isolateGit);
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await scratch.cleanup();
 });
 

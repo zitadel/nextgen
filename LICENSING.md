@@ -18,8 +18,7 @@ This default includes, without limitation:
 
 ```text
 /
-cmd/
-internal/
+apps/api/
 apps/console/
 apps/server/
 apps/server-*/
@@ -58,7 +57,7 @@ CONTRIBUTING.md
 AGENTS.md
 LICENSING.md
 VISION.md
-api/
+apps/api/api/
 docs/
 skills/
 apps/cli/
@@ -67,6 +66,7 @@ apps/demo-next/
 apps/demo-nuxt/
 packages/api/
 packages/components/
+packages/go/
 packages/config/
 packages/design-tokens/
 packages/testing/
@@ -79,9 +79,10 @@ These exceptions cover code and contracts that are intended to be imported,
 generated from, embedded into, or otherwise used by downstream applications
 without imposing AGPL-3.0-only obligations on those applications.
 
-For `api/`, OpenAPI `info.license` metadata describes the exposed API
-contract/specification license. It does not describe or override the
-AGPL-3.0-only license of the Zitadel server implementation.
+For `apps/api/api/`, OpenAPI `info.license` metadata describes the exposed
+API contract/specification license. It does not describe or override the
+AGPL-3.0-only license of the Zitadel server implementation, which lives
+beside it in `apps/api/` (`cmd/`, `internal/`, `main.go`).
 
 Each published MIT-licensed npm package must:
 
@@ -93,7 +94,7 @@ Private demo, design-system, and integration workspaces that are listed above
 are covered by the path exception while they remain private. Add package-level
 MIT `LICENSE` files before publishing any of them as npm packages.
 
-For non-package MIT paths such as `api/` and `docs/`, SPDX headers, generated
+For non-package MIT paths such as `apps/api/api/` and `docs/`, SPDX headers, generated
 metadata, or local README notes are sufficient when the format supports them.
 
 ## External contributions

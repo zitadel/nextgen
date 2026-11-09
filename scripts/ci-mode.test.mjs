@@ -289,7 +289,7 @@ function journeys(gates) {
 
 test("mode: changeset/version files only is version-only", () => {
   assert.equal(computeMode([".changeset/x.md", "apps/server/package.json"]), "version-only");
-  assert.equal(computeMode([".changeset/x.md", "internal/a.go"]), "full");
+  assert.equal(computeMode([".changeset/x.md", "apps/api/internal/a.go"]), "full");
   assert.equal(computeMode([]), "full");
 });
 
@@ -316,7 +316,7 @@ test("docs-only change gates everything off", () => {
 test("go change runs everything but the mock lanes, and the journey matrix collapses to one framework", () => {
   const { gates, matrix } = resolveGates({
     mode: "full",
-    files: ["internal/a.go"],
+    files: ["apps/api/internal/a.go"],
     targets: GO_CLASS,
   });
   // The mock lanes run against api-mock, never the server.
@@ -492,7 +492,7 @@ test("the e2e step follows e2e:all", () => {
     ["e2e/console/src-real/console-real.spec.ts", CONSOLE_SPEC_CLASS, true],
     ["packages/sdk-vue/src/index.ts", SDK_VUE_CLASS, true],
     ["apps/demo-next/src/app/admin/page.tsx", DEMO_NEXT_CLASS, true],
-    ["internal/a.go", GO_CLASS, true],
+    ["apps/api/internal/a.go", GO_CLASS, true],
     ["docs/adrs/001-server-cli-cobra-viper.md", DOCS_CLASS, false],
   ]) {
     const { gates, reason } = resolveGates({ mode: "full", files: [file], targets });
@@ -528,7 +528,7 @@ test("an empty diff forces a full run", () => {
 test("a failed affected query fails open", () => {
   const { gates, reason } = resolveGates({
     mode: "full",
-    files: ["internal/a.go"],
+    files: ["apps/api/internal/a.go"],
     targets: null,
   });
   assert.ok(allTrue(gates));

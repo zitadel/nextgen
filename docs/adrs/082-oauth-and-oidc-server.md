@@ -65,7 +65,7 @@ first-party apps and machine clients as `.zitadel/apps/<slug>.json`,
 customer-managed apps and dynamic registration through the runtime API. The
 IdP connection ships the shape both ask for: `.zitadel/idps/<slug>.json` is
 the body of `POST /idps`
-([`create-idp-request.yaml`](../../api/openapi/endpoints/idps/create-idp-request.yaml)),
+([`create-idp-request.yaml`](../../apps/api/api/openapi/endpoints/idps/create-idp-request.yaml)),
 the CLI syncs the file, a role writes the API, and the server stores one
 resource either way.
 
@@ -198,7 +198,7 @@ layers:
 
 1. **Standard claims** come from the user schema. A property's `x-claim`
    names the claim it releases
-   ([`user-property.json`](../../api/openapi/endpoints/schemas/user-property.json)),
+   ([`user-property.json`](../../apps/api/api/openapi/endpoints/schemas/user-property.json)),
    beside `x-identifier` and `x-unique`, and the default schema gains them
    (`givenName` → `given_name`, and so on). Each scope the token carries
    releases its claims (OpenID Connect Core §5.4).
@@ -435,3 +435,10 @@ APIs under [`packages/config/defaults/`](../../packages/config/defaults/),
 `zitadel resources --json`, the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK READMEs and
 the components README.
+
+## Amendment (2026-10-31): §4, no project default target
+
+There is no project default target: a caller with no `Origin` is served the
+project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). A client credentials request
+still resolves from its issuer, never from its `Origin` header.

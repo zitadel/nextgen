@@ -1,0 +1,19 @@
+title: DeploymentCreatedPayload
+type: object
+description: |
+  Payload for `deployment.created`. The deployment ID is the event's
+  `entity_id`; the fields here say which release went live on which origins.
+properties:
+  release_id:
+    type: string
+  targets:
+    type: array
+    description: The origins the release went live on, sorted.
+    items:
+      type: string
+  reason:
+    type: string
+  message:
+    type: string
+  rollback_to:
+    type: string

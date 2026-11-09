@@ -1,21 +1,19 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { bundleSkills, publicSkills } from "../../../../src/lib/skills/bundle";
+import { it } from "@tests/helpers/fixtures";
 
-let repo: string;
-let out: string;
+import { bundleSkills, publicSkills } from "@/lib/skills/bundle";
 
-beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), "zitadel-skills-repo-"));
-  out = join(await mkdtemp(join(tmpdir(), "zitadel-skills-out-")), "skills");
-});
-
-async function aSkill(path: string, frontmatter: string, files: string[] = []): Promise<void> {
+async function aSkill(
+  repo: string,
+  path: string,
+  frontmatter: string,
+  files: string[] = [],
+): Promise<void> {
   const dir = join(repo, path);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, "SKILL.md"), `---\n${frontmatter}\n---\n\n# Skill\n`);
@@ -26,10 +24,10 @@ async function aSkill(path: string, frontmatter: string, files: string[] = []): 
 }
 
 describe("publicSkills", () => {
-  it("finds the skills of the root, the apps and the packages", async () => {
-    await aSkill("skills/zitadel", "name: zitadel");
-    await aSkill("apps/cli/skills/zitadel-cli", "name: zitadel-cli");
-    await aSkill("packages/sdk-next/skills/zitadel-sdk-next", "name: zitadel-sdk-next");
+  it("finds the skills of the root, the apps and the packages", async ({ dir: repo }) => {
+    await aSkill(repo, "skills/zitadel", "name: zitadel");
+    await aSkill(repo, "apps/cli/skills/zitadel-cli", "name: zitadel-cli");
+    await aSkill(repo, "packages/sdk-next/skills/zitadel-sdk-next", "name: zitadel-sdk-next");
 
     const skills = await publicSkills(repo);
 
@@ -40,9 +38,10 @@ describe("publicSkills", () => {
     ]);
   });
 
-  it("leaves out a skill for working on the repository", async () => {
-    await aSkill("skills/zitadel", "name: zitadel");
+  it("leaves out a skill for working on the repository", async ({ dir: repo }) => {
+    await aSkill(repo, "skills/zitadel", "name: zitadel");
     await aSkill(
+      repo,
       "apps/website/skills/zitadel-changelog-entries",
       "name: zitadel-changelog-entries\nmetadata:\n  internal: true",
     );
@@ -52,15 +51,15 @@ describe("publicSkills", () => {
     expect(skills.map((skill) => skill.name)).toEqual(["zitadel"]);
   });
 
-  it("refuses a skill not named after its folder", async () => {
-    await aSkill("skills/zitadel", "name: zitadel-router");
+  it("refuses a skill not named after its folder", async ({ dir: repo }) => {
+    await aSkill(repo, "skills/zitadel", "name: zitadel-router");
 
     await expect(publicSkills(repo)).rejects.toThrow("not after its folder");
   });
 
-  it("refuses two skills of one name", async () => {
-    await aSkill("skills/zitadel", "name: zitadel");
-    await aSkill("packages/sdk-next/skills/zitadel", "name: zitadel");
+  it("refuses two skills of one name", async ({ dir: repo }) => {
+    await aSkill(repo, "skills/zitadel", "name: zitadel");
+    await aSkill(repo, "packages/sdk-next/skills/zitadel", "name: zitadel");
 
     await expect(publicSkills(repo)).rejects.toThrow("are both named zitadel");
   });
@@ -92,8 +91,8 @@ describe("the repository's public skills", () => {
 });
 
 describe("bundleSkills", () => {
-  it("copies each skill with the files it references", async () => {
-    await aSkill("apps/cli/skills/zitadel-cli", "name: zitadel-cli", [
+  it("copies each skill with the files it references", async ({ dir: repo, other: out }) => {
+    await aSkill(repo, "apps/cli/skills/zitadel-cli", "name: zitadel-cli", [
       "references/driving-login-ui.md",
     ]);
 
@@ -102,8 +101,8 @@ describe("bundleSkills", () => {
     expect(existsSync(join(out, "zitadel-cli/references/driving-login-ui.md"))).toBe(true);
   });
 
-  it("drops a skill an earlier build bundled that is gone", async () => {
-    await aSkill("skills/zitadel", "name: zitadel");
+  it("drops a skill an earlier build bundled that is gone", async ({ dir: repo, other: out }) => {
+    await aSkill(repo, "skills/zitadel", "name: zitadel");
     await mkdir(join(out, "zitadel-removed"), { recursive: true });
 
     await bundleSkills(repo, out);

@@ -1,13 +1,15 @@
-import { pbkdf2Sync, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
+import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import { ZitadelError } from "../errors";
-import { enforceMode } from "../fs-safe";
-import { isObject } from "../json";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { enforceMode } from "@/lib/fs-safe";
+import { ancestors } from "@/lib/paths";
+import { isObject } from "@/lib/json";
 import {
   findUpward,
   LOCAL_RUNTIME_DIR,
@@ -15,7 +17,7 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
-import { shellCommand, unscopedCommand } from "../suggestion";
+import { shellCommand, unscopedCommand } from "@/lib/suggestion";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -35,8 +37,6 @@ export const LOCAL_ADMIN_EMAIL = "admin@zitadel.localhost";
 
 const ADMIN_USER_ID = "user_localadmin";
 const ADMIN_TEAM_ID = "team_localadmin";
-
-const PBKDF2_ROUNDS = 210_000;
 
 export type LocalAdmin = {
   email: string;
@@ -60,44 +60,37 @@ export async function findLocalAdminFor(
   cwd: string,
   serverUrl: string,
 ): Promise<LocalAdmin | undefined> {
-  for (let from = cwd; ; ) {
-    const dir = await findLocalAdminDir(from);
-    if (!dir) return undefined;
+  for (const dir of ancestors(cwd, homedir())) {
+    if ((await findLocalAdminDir(dir)) !== dir) continue;
     const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
-    if (dir === homedir() || dirname(dir) === dir) return undefined;
-    from = dirname(dir);
   }
+  return undefined;
 }
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  let raw: string;
-  try {
-    raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
-  } catch (error) {
+  const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8").catch((error: unknown) => {
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} cannot be read`, {
       hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
-      details: { cause: error instanceof Error ? error.message : String(error) },
+      details: { cause: errorMessage(error) },
     });
-  }
+  });
+  if (raw === undefined) return undefined;
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
     throw malformedAdminFile(error);
   }
-  if (!isLocalAdmin(parsed)) {
-    throw malformedAdminFile();
-  }
-  return parsed;
+  throw malformedAdminFile();
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {
@@ -125,9 +118,7 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
       unscopedCommand("reset --force"),
       unscopedCommand("start"),
     ],
-    ...(cause
-      ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } }
-      : {}),
+    ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
   });
 }
 
@@ -164,7 +155,7 @@ export async function ensureLocalAdmin(
   const staging = `${userFile}.${randomBytes(6).toString("hex")}.tmp`;
   await writeFile(
     staging,
-    `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`,
+    `${JSON.stringify(bootstrapUserDocument({ ...admin, project_id: PLATFORM_PROJECT_ID, schema_url: schemaUrl }), null, 2)}\n`,
     {
       mode: 0o644,
     },
@@ -205,39 +196,4 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
   }
   await enforceMode(path, 0o600);
   return true;
-}
-
-function bootstrapUserDocument(admin: LocalAdmin, schemaUrl: string) {
-  return {
-    header: {
-      project_id: PLATFORM_PROJECT_ID,
-      team_id: admin.team_id,
-      schema_url: schemaUrl,
-      id: admin.user_id,
-    },
-    attributes: {
-      username: admin.email,
-      email: admin.email,
-      "zitadel.source": "cli",
-      "zitadel.default_user": true,
-    },
-    authenticators: {
-      password: { encoded_hash: pbkdf2Hash(admin.password), change_required: false },
-    },
-  };
-}
-
-/**
- * passlib's `$pbkdf2-sha256$rounds$salt$hash`, which passwap verifies on the
- * server (`internal/crypto/passwap.go`). Salt and digest use passlib's adapted
- * base64: `+` becomes `.` and the padding is dropped.
- */
-function pbkdf2Hash(password: string): string {
-  const salt = randomBytes(16);
-  const hash = pbkdf2Sync(password, salt, PBKDF2_ROUNDS, 32, "sha256");
-  return `$pbkdf2-sha256$${String(PBKDF2_ROUNDS)}$${ab64(salt)}$${ab64(hash)}`;
-}
-
-function ab64(bytes: Buffer): string {
-  return bytes.toString("base64").replace(/=+$/, "").replaceAll("+", ".");
 }

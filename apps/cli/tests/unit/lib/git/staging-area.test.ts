@@ -6,10 +6,10 @@ import { promisify } from "node:util";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NothingExcludedIsStaged } from "../../../../src/lib/git/checks/nothing-excluded-is-staged";
-import { SomethingIsStaged } from "../../../../src/lib/git/checks/something-is-staged";
-import { Git } from "../../../../src/lib/git/git";
-import { StagingArea } from "../../../../src/lib/git/staging-area";
+import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
+import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
+import { Git } from "@/lib/git/git";
+import { StagingArea } from "@/lib/git/staging-area";
 import {
   GitScratch,
   git,
@@ -17,7 +17,7 @@ import {
   isolateGit,
   stagedFiles,
   write,
-} from "../../../helpers/git-repo";
+} from "@tests/helpers/git-repo";
 
 const exec = promisify(execFile);
 
@@ -26,7 +26,6 @@ const scratch = new GitScratch();
 beforeEach(isolateGit);
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await scratch.cleanup();
 });
 
@@ -210,14 +209,14 @@ describe("StagingArea", () => {
 
   it("removes its staging area when the work throws", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
-    let index = "";
+    const indexes: string[] = [];
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      index = await indexOf(staging);
+      indexes.push(await indexOf(staging));
       throw new Error("failed");
     }).catch(() => undefined);
 
-    expect(existsSync(dirname(index))).toBe(false);
+    expect(existsSync(dirname(indexes[0] ?? ""))).toBe(false);
   });
 
   it("starts empty before the first commit", async () => {
@@ -311,6 +310,19 @@ describe("StagingArea", () => {
     });
 
     expect(files).toEqual(["b.txt"]);
+  });
+
+  it("marks the untracked files a glob matches, beside a glob that matches none", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "p/b.json": "{}\n", "p/c.md": "c\n", "p/sub/d.json": "{}\n" });
+
+    const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead(new Git(cwd));
+      await staging.markAsAdded([], ["p/*.json", "q/*.json"]);
+      return (await staging.git.run(["ls-files", "-z"])).paths();
+    });
+
+    expect(files).toEqual(["a.txt", "p/b.json"]);
   });
 
   it("marks nothing when no path exists", async () => {

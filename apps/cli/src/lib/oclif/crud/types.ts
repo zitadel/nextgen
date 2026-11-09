@@ -1,7 +1,9 @@
+import type { Tabulate } from "@/lib/oclif/tabulatable";
 import type { Interfaces } from "@oclif/core";
 
-import type { CommandGroup } from "../groups";
-import type { Connection } from "../environment-command";
+import type { Consent } from "@/lib/consent";
+import type { CommandGroup } from "@/lib/oclif/groups";
+import type { Connection } from "@/lib/oclif/environment-command";
 import type { References } from "./secrets";
 
 /**
@@ -164,7 +166,7 @@ export type GetSpec<Ctx, R = unknown> = Readonly<{
    * Blocks a terminal shows under the fields, for a value that does not read
    * on one line (a release's pointers). Skipped when `--fields` picks the view.
    */
-  sections?(item: R): readonly string[];
+  sections?(item: R, tabulate: Tabulate): readonly string[] | Promise<readonly string[]>;
 }>;
 /**
  * What a write answers with: a record, or nothing for a write that answers
@@ -186,6 +188,13 @@ export type UpdateSpec<Ctx, B = Json, U = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
     call(ctx: Ctx, id: string, body: B): Promise<U>;
+    /**
+     * Asks the server what the update would answer, writing nothing. With one,
+     * `--dry-run` connects and reports the server's answer; a refusal is the
+     * command's error, as the real update's would be. Without one, `--dry-run`
+     * only shows the body and never connects.
+     */
+    check?(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 
@@ -223,7 +232,8 @@ export type DeleteSpec<Ctx> = Readonly<{
    * to the verb's own past tense (`deleted`, `revoked`, `deactivated`).
    */
   outcome?: string;
-  call: (ctx: Ctx, id: string) => Promise<void>;
+  /** The deletion, which reaches the client's destructive operations through `consent`. */
+  call: (ctx: Ctx, id: string, consent: Consent) => Promise<void>;
 }>;
 
 /** One CLI topic. The factory turns it into up to five command classes. */

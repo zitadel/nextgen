@@ -1,6 +1,6 @@
-import { ZitadelError } from "../../../../errors";
-import { withLfLineEnds } from "../utils/line-ends";
-import { parseConfigModule } from "../utils/magicast";
+import { ZitadelError } from "@/lib/errors";
+import { withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 /**
  * The settings the hook passes to `createNextgenHandle`, read from
@@ -112,8 +112,8 @@ interface ProxyNode {
 function variablesObject(text: string): AstNode {
   // At tabWidth 1 the node offsets index the source itself; at recast's
   // default a tab counts as four, which a tab-indented file would expose.
-  const mod = parseConfigModule(text, ENV_LABEL, { tabWidth: 1 });
-  const variables = (mod.exports as { variables?: ProxyNode } | undefined)?.variables;
+  const file = ConfigModule.open(text, ENV_LABEL, { tabWidth: 1 });
+  const variables = (file.module.exports as { variables?: ProxyNode } | undefined)?.variables;
   const object = variables?.$type === "function-call" ? variables.$args?.[0] : variables;
   if (object?.$type !== "object") {
     throw new ZitadelError(

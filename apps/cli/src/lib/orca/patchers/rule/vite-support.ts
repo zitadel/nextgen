@@ -1,4 +1,4 @@
-import { builders, generateCode } from "magicast";
+import { builders } from "magicast";
 
 import { configCandidates } from "./config-paths";
 import type { FileOp, WiringVerdict } from "./file-writer/types";
@@ -20,12 +20,7 @@ import {
   viteSessionCookieStatementsV1,
 } from "./session-cookie";
 import { lfText, withLfLineEnds } from "./utils/line-ends";
-import {
-  ensureEditableObject,
-  importIsPresent,
-  parseConfigModule,
-  resolveDefaultExportObject,
-} from "./utils/magicast";
+import { ConfigModule } from "./utils/config-module";
 
 /**
  * Shared Vite dev-server proxy merged into the project's Vite config for the SPA
@@ -167,54 +162,58 @@ export function viteProxyEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     const label = "the Vite config (vite.config.*)";
-    let workingSource = source;
-    if (workingSource !== undefined && isLegacyManagedProxy(workingSource)) {
-      // Replace only the generated bearer listener. User changes elsewhere in
-      // the proxy entry (target, rewrite, TLS options, comments) remain intact.
-      workingSource = workingSource.replace(
-        LEGACY_PROXY_REQUEST_LISTENER,
-        (_listener, indent: string) => exchangeOnlyProxyRequestListener(indent),
-      );
-    } else if (workingSource !== undefined) {
-      assertNoUnreviewedProjectSecretProxy(workingSource, label);
+    if (source !== undefined && !isLegacyManagedProxy(source)) {
+      assertNoUnreviewedProjectSecretProxy(source, label);
     }
-    if (workingSource !== undefined) {
-      workingSource = forwardAppOrigin(workingSource);
-    }
+    // Replace only the generated bearer listener. User changes elsewhere in
+    // the proxy entry (target, rewrite, TLS options, comments) remain intact.
+    const migrated =
+      source !== undefined && isLegacyManagedProxy(source)
+        ? source.replace(LEGACY_PROXY_REQUEST_LISTENER, (_listener, indent: string) =>
+            exchangeOnlyProxyRequestListener(indent),
+          )
+        : source;
+    const workingSource = migrated === undefined ? undefined : forwardAppOrigin(migrated);
 
-    const mod = parseConfigModule(workingSource, label);
-    const config = resolveDefaultExportObject(mod, label);
-    let changed = workingSource !== source;
-    const serverConfig = ensureEditableObject(config, "server");
-    if (
+    const file = ConfigModule.open(workingSource, label);
+    const config = file.exportedObject();
+    config.server ??= {};
+    const serverConfig = file.objectAt(config, "server");
+    const movesPort =
       serverConfig.port === undefined ||
-      (previousPort !== undefined && serverConfig.port === previousPort && devPort !== previousPort)
-    ) {
+      (previousPort !== undefined &&
+        serverConfig.port === previousPort &&
+        devPort !== previousPort);
+    if (movesPort) {
       serverConfig.port = devPort;
-      changed = true;
     }
-    if (serverConfig.strictPort === undefined) {
+    const pinsStrictPort = serverConfig.strictPort === undefined;
+    if (pinsStrictPort) {
       serverConfig.strictPort = true;
-      changed = true;
     }
-    const proxyConfig = ensureEditableObject(serverConfig, "proxy");
-    if (proxyConfig[PROXY_PATH] === undefined) {
+    serverConfig.proxy ??= {};
+    const proxyConfig = file.objectAt(serverConfig, "proxy");
+    const addsProxy = proxyConfig[PROXY_PATH] === undefined;
+    if (addsProxy) {
       proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
-      changed = true;
     }
-    for (const imp of PROXY_IMPORTS) {
-      if (!importIsPresent(mod, imp.local, imp.from)) {
-        mod.imports.$add({ ...imp });
-        changed = true;
-      }
+    const missingImports = PROXY_IMPORTS.filter((imp) => {
+      return !file.module.imports.$items.some((item) => {
+        return item.local === imp.local && item.from === imp.from;
+      });
+    });
+    for (const imp of missingImports) {
+      file.module.imports.$add({ ...imp });
     }
+    const changed =
+      workingSource !== source ||
+      movesPort ||
+      pinsStrictPort ||
+      addsProxy ||
+      missingImports.length > 0;
     // Nothing was missing — return the source untouched so the file-writer skips
     // it instead of letting magicast reformat an already-patched config.
-    if (!changed && source !== undefined) {
-      return source;
-    }
-    const code = generateCode(mod).code;
-    return code.endsWith("\n") ? code : `${code}\n`;
+    return file.render(changed);
   };
 }
 
@@ -316,8 +315,8 @@ const VITE_CONFIG_LABEL = "the Vite config (vite.config.*)";
 function cliEntry(source: string): CliEntry | undefined {
   // At tabWidth 1 the node offsets index the source itself; at recast's
   // default a tab counts as four, which a tab-indented config would expose.
-  const mod = parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
-  return cliEntryOf(resolveDefaultExportObject(mod, VITE_CONFIG_LABEL), source);
+  const file = ConfigModule.open(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+  return cliEntryOf(file.exportedObject(), source);
 }
 
 /** How many statements the hooks before ADR 083 are: the project id, the cookie name and the two listeners. */
@@ -365,7 +364,7 @@ export function viteSessionCookieEdit(): (source: string | undefined) => string 
   return (source) => {
     if (source === undefined) {
       // Throws the E_VALIDATION a missing config gets everywhere.
-      parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+      ConfigModule.open(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
       return "";
     }
     return withLfLineEnds(source, (text) => {
@@ -434,7 +433,7 @@ export function viteApiPrefixEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
       // Throws the E_VALIDATION a missing config gets everywhere.
-      parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+      ConfigModule.open(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
       return "";
     }
     return withLfLineEnds(source, (text) => {

@@ -8,16 +8,16 @@ import {
   SESSION_COOKIE_MARKER,
   viteSessionCookieStatements,
   viteSessionCookieStatementsV1,
-} from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
+} from "@/lib/orca/patchers/rule/session-cookie";
 import {
   viteApiPrefixEdit,
   viteApiPrefixVerdict,
   viteProxyEdit,
   viteSessionCookieEdit,
   viteSessionCookieVerdict,
-} from "../../../../../../src/lib/orca/patchers/rule/vite-support";
-import { REMOTE_HOST, useRemoteServer } from "../../../../../helpers/remote-server";
-import { aViteApp, type DevApp } from "../../../../../helpers/vite";
+} from "@/lib/orca/patchers/rule/vite-support";
+import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
+import { aViteApp, type DevApp } from "@tests/helpers/vite";
 
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 const sessionCookieEdit = viteSessionCookieEdit();
@@ -720,16 +720,16 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   const env = { ZITADEL_PROJECT_SECRET: "sk_proj_test" };
   /** An app whose `.env.local` names its project, as setup writes it. */
   const withProject = { ...env, ZITADEL_PROJECT_ID: "proj_spa" };
-  let app: DevApp | undefined;
+  const apps: DevApp[] = [];
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    await Promise.all(apps.splice(0).map((app) => app.close()));
     remote.answerWith(undefined);
   });
 
   async function serve(config: string, appEnv: Record<string, string> = env): Promise<DevApp> {
-    app = await aViteApp(config, appEnv);
+    const app = await aViteApp(config, appEnv);
+    apps.push(app);
     return app;
   }
 

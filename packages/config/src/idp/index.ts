@@ -96,17 +96,12 @@ export { GoogleProvider } from "./google.js";
 export { isLoopbackIssuer } from "./issuer.js";
 export { OidcProvider } from "./oidc-provider.js";
 export {
-  STANDARD_CLAIMS,
-  standardClaim,
-  type ClaimType,
-  type StandardClaim,
-} from "./standard-claims.js";
-export {
   credentialVariable,
   credentialVariables,
   isVariableReference,
+  referencedClientIdVariable,
+  referencedClientSecretVariable,
   referencedVariable,
-  uniquePropertyNames,
   variableReference,
   type CallbackGuidance,
   type ConnectionEndpoints,

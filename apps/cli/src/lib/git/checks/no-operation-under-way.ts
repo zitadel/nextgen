@@ -1,5 +1,5 @@
-import type { Git } from "../git";
-import type { Check } from "../operation";
+import type { Git } from "@/lib/git/git";
+import type { Check } from "@/lib/git/operation";
 
 /**
  * No merge, rebase, cherry-pick, revert or bisect is under way, so a commit lands where meant.

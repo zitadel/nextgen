@@ -21,7 +21,7 @@
 ## Context
 
 The server mounts the resource API as a catch-all at `/`
-([`buildHTTPMux`](../../cmd/server/server.go)). The few other paths it serves
+([`buildHTTPMux`](../../apps/api/cmd/server/server.go)). The few other paths it serves
 are registered ahead of it: the console (`/ui/console`),
 `/console/runtime.json` and the IdP callbacks
 (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`). The health probes
@@ -69,7 +69,7 @@ break on the scale of a new major, so now is the cheap time.
 
 ### 1. The resource API lives under `/api/v1/`
 
-Every operation in [`api/openapi/`](../../api/openapi/) is served under
+Every operation in [`api/openapi/`](../../apps/api/api/openapi/) is served under
 `/api/v1`: `POST /api/v1/users`, `GET /api/v1/teams/{team_id}`,
 `POST /api/v1/sessions/query`. The spec's paths stay as they are; the prefix
 is its `servers` URL. The cloud and self-hosted servers have the same shape,

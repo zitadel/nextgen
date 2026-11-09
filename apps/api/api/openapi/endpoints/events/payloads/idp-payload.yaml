@@ -1,0 +1,25 @@
+title: IdpPayload
+type: object
+description: |
+  Payload for `idp.created`, which holds every field, and `idp.updated`, which
+  holds only the changed fields plus the new `revision_id`. The identity
+  provider (IdP) connection ID is the event's `entity_id`. The connection
+  document, and with it the reference to its `client_secret`, is never
+  included.
+required:
+  - revision_id
+properties:
+  slug:
+    type: string
+  protocol:
+    type: string
+  template:
+    type: string
+    description: |
+      The rendering template hint. On `idp.updated`, the empty string means
+      the revision removed it.
+  display_name:
+    type: string
+  revision_id:
+    type: string
+    description: The revision the write appended.

@@ -36,7 +36,7 @@ tasks:
       - "$VERCEL_ENV"
       - "$VERCEL_GIT_COMMIT_SHA"
     outputs:
-      - "/internal/staticui/console/dist/**/*"
+      - "/apps/api/internal/staticui/console/dist/**/*"
     options:
       # Replaces the inherited dist/**/* rather than adding to it.
       mergeOutputs: "replace"
@@ -50,7 +50,7 @@ tasks:
     deps:
       - "sdk-react:build-release"
     outputs:
-      - "/internal/staticui/console/dist/**/*"
+      - "/apps/api/internal/staticui/console/dist/**/*"
     options:
       cache: false
       # Release UI builds consume package release output and run from the later

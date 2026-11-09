@@ -23,6 +23,10 @@ Where the two differ on purpose:
   own `retryCount`.
 - The Go `format` and `lint` tasks keep inline scripts here; turbo runs copies
   of them (`scripts/go-format-check.mjs`, `scripts/go-lint.mjs`). Change both.
+- Turbo reads the Go modules from `go.work`: moon's `go`, `bench` and
+  `oidc-mock` are the packages `zitadel/v5`, `bench` and `oidc-mock`, whose
+  `turbo.json` holds each task's command. Turbo follows the module graph where
+  moon lists other modules' files (`serverInputs`, `benchInputs`).
 - `scripts/task-guard.mjs` in api `generate` and config `sync-schemas` acts
   only under turbo; under moon it runs the command once, unchanged.
 - Some scripts set values a moon task's `env` sets too, because turbo cannot.
@@ -65,11 +69,15 @@ covered without a list to maintain. Never write an `inputs` list naming a
 package's own files. The exceptions name only what lies outside the folder:
 
 - A task that reads files outside its project lists `**/*` plus that path
-  (`api:generate` reads `/api/openapi/**/*.yaml`).
-- `server` keeps its file groups because its code lives at the repo root, and
-  `bench` because `tools/bench` compiles the root module through
-  `replace github.com/zitadel/nextgen => ../..` (`tools/bench/go.mod`).
-  Anything compiled in through `//go:embed` or read by a test belongs in them.
+  (`api:generate` reads `/apps/api/api/openapi/**/*.yaml`).
+- `server` keeps its file groups because its code lives in `apps/api`, the Go
+  module, not in `apps/server`, and `bench` because `tools/bench` compiles
+  that module through `replace github.com/zitadel/nextgen => ../../apps/api`
+  (`tools/bench/go.mod`). Anything compiled in through `//go:embed` or read
+  by a test belongs in them.
+- The `server` tasks run from the workspace root and enter the module with
+  `go -C apps/api`; a script does the same through `SERVER_MODULE_DIR`
+  (`scripts/server-build.mjs`).
 - Go builds and generation never hash `_test.go`, `testdata` or nested modules
   (`scripts/task-graph.test.mjs`); keep `//go:generate` out of test files.
 - Native Go compile, vet and test tasks are `cache: false`; generation stays

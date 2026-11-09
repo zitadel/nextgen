@@ -1,16 +1,10 @@
 import { Flags } from "@oclif/core";
 
-import { deletedData, mutatedData } from "../../envelope";
-import type { CommandResult, GlobalOptions } from "../../types";
-import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
-
-/** Past tense reported beside the id, per verb. */
-const PAST: Readonly<Record<string, string>> = {
-  delete: "deleted",
-  revoke: "revoked",
-  deactivate: "deactivated",
-};
-import type { DeleteSpec } from "../types";
+import { deletedData, mutatedData } from "@/lib/oclif/envelope";
+import type { CommandResult } from "@/lib/oclif/types";
+import { article, capitalize, dryRunResult, idArg, idValue } from "@/lib/oclif/crud/shared";
+import type { DeleteSpec, Json } from "@/lib/oclif/crud/types";
+import { prose } from "@/lib/oclif/rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -18,12 +12,21 @@ import {
   ResourceCommand,
 } from "./command";
 
+/** Past tense reported beside the id, per verb. */
+const PAST: Readonly<Record<string, string>> = {
+  delete: "deleted",
+  revoke: "revoked",
+  deactivate: "deactivated",
+};
+
+type DeleteInput = OperationInput<Json, Record<string, string>>;
+
 /**
  * `<topic> delete <id>`, or the lifecycle verb the resource declares
  * (`revoke`, `deactivate`): guarded like `reset` — `--force` in
  * non-interactive mode, a confirm prompt otherwise — and honours `--dry-run`.
  */
-export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> {
+export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, DeleteInput> {
   static describe<Ctx>({
     topic,
     resource,
@@ -47,35 +50,26 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
     };
   }
 
-  protected override async execute(
-    { args }: OperationInput,
-    meta: GlobalOptions,
-  ): Promise<CommandResult> {
+  protected override async operate({ args }: DeleteInput): Promise<CommandResult> {
     const { topic, resource, spec } = this.definition;
     const verb = spec.verb ?? "delete";
     const past = spec.outcome ?? PAST[verb] ?? "deleted";
     const id = idValue(resource, args);
 
-    // A dry run makes no request, so it answers before the guard — the order
-    // `reset` uses, and it keeps `--dry-run --non-interactive` usable.
-    if (meta.dryRun) {
-      return dryRunResult(verb, topic, id);
-    }
-
-    const confirmed = await this.input({
-      kind: "confirm",
+    return this.confirmed({
+      verb,
       name: `${verb} ${resource.singular} ${id}`,
       message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-      retry: this.suggest(`${topic} ${verb} ${id} --force`),
+      preview: () => dryRunResult({ verb, topic, id }),
+      prepare: () => this.context(),
+      apply: async (consent, context) => {
+        await spec.call(context, id, consent);
+        return {
+          status: "ok",
+          data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
+          pretty: prose(`${capitalize(past)} ${resource.singular} ${id}`),
+        };
+      },
     });
-    if (!confirmed) {
-      return { status: "skipped", reason: `${verb}-cancelled` };
-    }
-    await spec.call(await this.context(), id);
-    return {
-      status: "ok",
-      data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
-      pretty: `${capitalize(past)} ${resource.singular} ${id}`,
-    };
   }
 }

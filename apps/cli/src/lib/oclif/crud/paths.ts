@@ -1,4 +1,4 @@
-import { isObject } from "../../json";
+import { isObject } from "@/lib/json";
 import type { Schema } from "./types";
 import { unwrap, type ZodLike } from "./zod";
 

@@ -83,9 +83,9 @@ jobs:
       # returns at once.
       - name: Pull the postgres lane's image
         run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
           if [ -z "$image" ]; then
-            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
             exit 0
           fi
           # Both registries serve the same official image and version.
@@ -97,7 +97,7 @@ jobs:
             fi
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # Keyed on every module's go.sum (tools/bench and tools/oidc-mock are
+      # Keyed on every module's go.sum and go.work.sum (tools/bench and tools/oidc-mock are
       # modules of their own) instead of setup-go's default, go.mod.
       # ci-turbo.yml shared the go.mod key until it got a cache of its own,
       # and its entry there for Go 1.26.8 holds Go's own cache files. On Depot
@@ -105,12 +105,14 @@ jobs:
       # depot-* files in GOCACHE), so it cannot use them.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/api/go.mod
           cache: true
           cache-dependency-path: |
-            go.sum
+            apps/api/go.sum
+            packages/go/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
+            go.work.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -208,7 +210,7 @@ jobs:
         # group fell back to origin/main.
         env:
           MOON_BASE: ${{ env.CI_BASE }}
-        run: moon ci :lint :typecheck :build :test :check-typecheck :check-openapi-rules :check-adrs :check-moon-graph --downstream deep --include-relations
+        run: moon ci :lint :typecheck :build :test :check-typecheck :check-openapi-rules :check-adrs :check-moon-graph :check-go-work --downstream deep --include-relations
 
       - name: Upload component test diagnostics
         if: ${{ failure() && steps.moon-ci.outcome == 'failure' }}

@@ -1,7 +1,7 @@
 import semver from "semver";
 import { describe, expect, it } from "vitest";
 
-import { scaffolders } from "../src/lib/orca/scaffolders";
+import { scaffolders } from "@/lib/orca/scaffolders";
 
 /**
  * Asks the npm advisory database about every package a scaffolder pins

@@ -28,6 +28,10 @@ export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
   outputDir: "test-results/mock",
+  // The standalone api-mock drives one sign-in flow at a time, and every page
+  // that mounts `<zitadel-login>` starts it over: a spec on a parallel worker
+  // would restart or advance the flow of the spec signing in.
+  workers: 1,
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:3001",

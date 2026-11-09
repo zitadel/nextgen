@@ -2,6 +2,7 @@ import { Ellipsis, type LucideIcon } from "lucide-react";
 import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { FormError } from "@/components/form-error";
+import { IdText } from "@/components/id-text";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import {
@@ -81,7 +82,7 @@ export function ResourceTitle({
     <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
       {filter && (
-        <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+        <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
           {filter}
         </div>
       )}
@@ -144,17 +145,15 @@ const ROW_COPY =
 
 /**
  * A row's ID cell. It takes whatever width the other columns leave
- * (`w-full max-w-0`) and truncates inside it, so a table of a few short
- * columns fits a 1024px window without scrolling. The tooltip keeps the whole
+ * (`w-full max-w-0`) and is cut in the middle inside it (`IdText`), so a
+ * table of a few short columns fits a 1024px window without scrolling. The tooltip keeps the whole
  * id, and the copy button copies it however much of it shows.
  */
 export function ResourceIdCell({ id, name }: { id: string; name: string }) {
   return (
     <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
       <span className="flex items-center gap-1">
-        <span className="text-foreground min-w-0 truncate text-sm" title={id}>
-          {id}
-        </span>
+        <IdText id={id} title={id} className="text-foreground text-sm" />
         <CopyButton value={id} label={`Copy the ID of ${name}`} className={ROW_COPY} />
       </span>
     </TableCell>

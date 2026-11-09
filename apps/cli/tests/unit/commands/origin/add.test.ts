@@ -3,21 +3,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { it } from "@tests/helpers/fixtures";
+
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
-const server = setupServer();
 
-let requests: Array<Record<string, unknown>> = [];
+const requests: Array<Record<string, unknown>> = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-beforeEach(() => {
-  requests = [];
+it.beforeEach(({ server }) => {
+  requests.length = 0;
   server.use(
     http.post(`${SERVER}/api/v1/projects/:id/origins`, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
@@ -26,8 +23,6 @@ beforeEach(() => {
     }),
   );
 });
-
-afterEach(() => server.resetHandlers());
 
 const dirs: string[] = [];
 

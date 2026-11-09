@@ -61,7 +61,7 @@ jobs:
       # and an entry of this job's would only take space from CI's.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/api/go.mod
           cache: false
 
       # The console stays out of the build, as in build-launcher.sh: its
@@ -70,10 +70,10 @@ jobs:
         if: github.event_name == 'pull_request_target'
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: go run -tags noconsole ./apps/cloud/launcher drop-preview -- "$BRANCH"
+        run: go -C apps/api run -tags noconsole ./cmd/cloud-launcher drop-preview -- "$BRANCH"
 
       - name: Drop preview databases idle for 30 days
         if: github.event_name != 'pull_request_target'
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && !inputs.drop && '--dry-run' || '' }}
-        run: go run -tags noconsole ./apps/cloud/launcher drop-preview $DRY_RUN --idle-days 30
+        run: go -C apps/api run -tags noconsole ./cmd/cloud-launcher drop-preview $DRY_RUN --idle-days 30

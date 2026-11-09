@@ -326,3 +326,26 @@ platform project, which the console signs operators in to, lists the origin of
 `server.public_base` as its one primary origin. So the console signs in there
 and on a loopback origin; at any other console origin a sign-in opens and its
 first submit is refused, while previewing a project's login keeps working.
+
+## Amendment (2026-10-31): callers with no origin
+
+A request with no `Origin` is served the project's newest primary deployment when
+there is one. So is a request from a console origin the project does not list,
+such as `https://console.example.com` or a console on `http://localhost:8080`. So
+a console origin the platform project does not list still opens a flow.
+
+## Amendment (2026-10-31): an empty allowlist admits nothing
+
+A project with no origin pattern no longer admits every origin. A loopback
+origin is still always admitted. Nothing falls back to the newest revisions: a
+request with no `Origin`, and one from a console origin the project does not
+list, needs a primary deployment, and without one answers `409` with
+`rel.no_default`. A listed origin, a loopback origin, or a live preview with
+nothing deployed answers `409` with `rel.not_deployed`.
+
+## Amendment (2026-10-31): a deployment freezes its origins
+
+A deployment to `primary` freezes the project's primary origins, and a rollback
+restores the ones it names. A primary origin serves the newest primary
+deployment only when that deployment names it and the project still lists it.
+So an added origin waits for a deploy, and removing one takes effect at once.

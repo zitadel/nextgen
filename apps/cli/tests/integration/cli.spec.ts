@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp } from "../helpers/project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp } from "@tests/helpers/project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -170,6 +170,21 @@ describe("the cli", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it.each([["resources"], ["status"], ["logs"]])("accepts -h on %s", async (command) => {
+        const result = await runCliForTest([command, "-h"]);
+
+        expect(result).toPrint("USAGE");
+      });
+
+      /**
+       * Colour itself is not asserted here, and an assertion about it would
+       * mislead: picocolors and consola decide colour when they load, from the
+       * real process streams, so a run in this harness emits no escape byte
+       * whatever the flags say — a check for their absence would hold against
+       * any implementation, broken ones included. What a run decides is pinned
+       * in `tests/unit/lib/oclif/base-source.test.ts`, and that no command
+       * decides for itself is enforced by `biome-plugins/no-own-colour.grit`.
+       */
       it("accepts --no-color", async () => {
         const result = await runCliForTest(["resources", "--no-color", "--json"]);
 

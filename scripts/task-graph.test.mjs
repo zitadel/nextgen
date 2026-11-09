@@ -27,6 +27,7 @@ const gate = [
   "check-openapi-rules",
   "check-adrs",
   "check-moon-graph",
+  "check-go-work",
 ];
 let root;
 let baseline;
@@ -119,11 +120,13 @@ beforeAll(() => {
   );
   for (const file of files) {
     if (
-      !/(^|\/)(package\.json|turbo\.json|moon\.yml)$/.test(file) &&
+      !/(^|\/)(package\.json|turbo\.json|moon\.yml|go\.mod|go\.sum)$/.test(file) &&
       !/^\.moon\/.*\.yml$/.test(file) &&
       ![
         "pnpm-lock.yaml",
         "pnpm-workspace.yaml",
+        "go.work",
+        "go.work.sum",
         ".gitignore",
         ".nvmrc",
         ".npmrc",
@@ -139,14 +142,18 @@ beforeAll(() => {
   delete workspace.remote;
   write(".moon/workspace.yml", stringify(workspace));
   for (const file of [
-    "internal/build/info.go",
-    "internal/build/info_test.go",
+    "apps/api/internal/build/info.go",
+    "apps/api/internal/build/info_test.go",
     "tools/bench/main.go",
     "tools/oidc-mock/main.go",
+    "packages/go/api/client.go",
+    "packages/go/api/client_test.go",
+    "packages/config/defaults/defaults.go",
+    "packages/design-tokens/tokens.go",
   ]) {
     write(file, "package main\n");
   }
-  write("internal/build/testdata/fixture.txt", "test fixture\n");
+  write("apps/api/internal/build/testdata/fixture.txt", "test fixture\n");
   for (const file of ["vitest.shared.mjs", "vitest.shared.d.mts"]) {
     write(
       `packages/vitest-config/${file}`,
@@ -179,11 +186,11 @@ afterAll(() => {
 });
 
 describe.sequential("task graph cache and ordering contracts", () => {
-  test("both CI gates run the typecheck-coverage and OpenAPI-rule checks", () => {
+  test("both CI gates run the typecheck-coverage, OpenAPI-rule and go.work checks", () => {
     const ci = parse(readFileSync(join(repo, ".github/workflows/ci-turbo.yml"), "utf8"));
-    const tasks = ci.jobs["gate-turbo"].env.GATE_TASKS.split(" ");
+    const tasks = ci.jobs.checks.env.TASKS.split(" ");
     const moonCI = readFileSync(join(repo, ".github/workflows/ci.yml"), "utf8");
-    for (const task of ["check-typecheck", "check-openapi-rules"]) {
+    for (const task of ["check-typecheck", "check-openapi-rules", "check-go-work"]) {
       expect(tasks).toContain(task);
       expect(moonCI).toContain(`:${task}`);
       expect(baseline.get(`//#${task}`).command).not.toBe("<NONEXISTENT>");
@@ -191,12 +198,21 @@ describe.sequential("task graph cache and ordering contracts", () => {
   });
 
   test("native Go results and Git-stamped binaries cannot restore another host or revision", () => {
-    for (const project of ["server", "bench", "oidc-mock"]) {
+    for (const [project, pkg] of [
+      ["server", "@zitadel/server"],
+      ["bench", "bench"],
+      ["oidc-mock", "oidc-mock"],
+    ]) {
       for (const task of ["build", "test", "vet", "format"]) {
-        expect(baseline.get(`@zitadel/${project}#${task}`).resolvedTaskDefinition.cache).toBe(
-          false,
-        );
+        expect(baseline.get(`${pkg}#${task}`).resolvedTaskDefinition.cache).toBe(false);
         expect(moonProjects.get(project).tasks[task].options.cache).toBe(false);
+      }
+    }
+    // Turbo gives every module in go.work Go tasks of its own (build, test,
+    // lint), which it would cache.
+    for (const task of baseline.values()) {
+      if (task.command.startsWith("go ")) {
+        expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(false);
       }
     }
     // Generation depends on neither: go.mod pins its toolchain.
@@ -229,7 +245,7 @@ describe.sequential("task graph cache and ordering contracts", () => {
       for (const [from, to] of graph.graph.edges) {
         if (ids.has(from) && ids.has(to)) waitsFor.get(ids.get(from)).push(ids.get(to));
       }
-      // Every Go task on the root module resolves the console's embed.
+      // Every Go task on the server module resolves the console's embed.
       const goReaders = [...waitsFor.keys()].filter((id) =>
         /^server:(?!openapi$|format$)/.test(id),
       );
@@ -274,14 +290,20 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
+  // The builds that compile the server module: the server binary, the
+  // benchmark harness (through its replace directive) and the cloud's
+  // launcher.
+  const serverBuilds = ["@zitadel/server#build", "bench#build", "@zitadel/cloud#build"];
+
   test("Go tests and independent modules do not invalidate production binaries", () => {
-    for (const file of ["internal/build/info_test.go", "internal/build/testdata/fixture.txt"]) {
+    for (const file of [
+      "apps/api/internal/build/info_test.go",
+      "apps/api/internal/build/testdata/fixture.txt",
+    ]) {
       changed(file, "// changed test input\n", () => {
         const next = dry();
-        for (const project of ["server", "bench", "cloud"]) {
-          expect(next.get(`@zitadel/${project}#build`).hash).toBe(
-            baseline.get(`@zitadel/${project}#build`).hash,
-          );
+        for (const task of serverBuilds) {
+          expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
         }
         expect(next.get("@zitadel/server#test").hash).not.toBe(
           baseline.get("@zitadel/server#test").hash,
@@ -295,21 +317,70 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(affected.has("server:test")).toBe(true);
       });
     }
+    // The client module's tests are its own: the server compiles only its
+    // non-test files, through the replace directive.
+    changed("packages/go/api/client_test.go", "package main\n// changed test\n", () => {
+      const next = dry();
+      for (const task of ["@zitadel/server#check-generate", ...serverBuilds]) {
+        expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
+      }
+      expect(next.get("zitadel/v5#test").hash).not.toBe(baseline.get("zitadel/v5#test").hash);
+      const affected = moonAffected();
+      expect(affected.has("server:build")).toBe(false);
+      expect(affected.has("bench:build")).toBe(false);
+      expect(affected.has("go:test")).toBe(true);
+    });
     changed("tools/oidc-mock/main.go", "package main\n// changed mock\n", () => {
       const next = dry();
-      for (const project of ["server", "bench", "cloud"]) {
-        expect(next.get(`@zitadel/${project}#build`).hash).toBe(
-          baseline.get(`@zitadel/${project}#build`).hash,
-        );
+      for (const task of serverBuilds) {
+        expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
       }
-      expect(next.get("@zitadel/oidc-mock#build").hash).not.toBe(
-        baseline.get("@zitadel/oidc-mock#build").hash,
-      );
+      expect(next.get("oidc-mock#build").hash).not.toBe(baseline.get("oidc-mock#build").hash);
       const affected = moonAffected();
       expect(affected.has("server:build")).toBe(false);
       expect(affected.has("bench:build")).toBe(false);
       expect(affected.has("oidc-mock:build")).toBe(true);
     });
+  });
+
+  test("a module the server requires reaches its builds through the module graph", () => {
+    // No input list names these modules: turbo follows go.work and the
+    // server module's requires (`^go-sources`).
+    for (const file of [
+      "packages/go/api/client.go",
+      "packages/config/defaults/defaults.go",
+      "packages/design-tokens/tokens.go",
+    ]) {
+      changed(file, "package main\n// changed module source\n", () => {
+        const next = dry();
+        for (const task of serverBuilds) {
+          expect(next.get(task).hash, `${file}: ${task}`).not.toBe(baseline.get(task).hash);
+        }
+        expect(next.get("oidc-mock#build").hash, file).toBe(baseline.get("oidc-mock#build").hash);
+      });
+    }
+  });
+
+  test("ignored files a build writes change no task's hash", () => {
+    // A fresh checkout, as in CI, has none of them, so the run after a local
+    // build would miss the cache and never share CI's entries.
+    const generated = {
+      // The Workflow routes cloud-functions' build writes, under a
+      // `.gitignore` of their own that ignores itself.
+      "apps/cloud-functions/app/.well-known/workflow/v1/.gitignore": "*",
+      "apps/cloud-functions/app/.well-known/workflow/v1/flow/route.js": "export {};\n",
+      "apps/demo-next/next-env.d.ts": '/// <reference types="next" />\n',
+    };
+    try {
+      for (const [file, content] of Object.entries(generated)) write(file, content);
+      const next = dry();
+      const rehashed = [...baseline]
+        .filter(([id, task]) => task.command !== "<NONEXISTENT>" && next.get(id).hash !== task.hash)
+        .map(([id]) => id);
+      expect(rehashed).toEqual([]);
+    } finally {
+      for (const file of Object.keys(generated)) rmSync(join(root, file), { force: true });
+    }
   });
 
   for (const app of ["docs", "website"]) {

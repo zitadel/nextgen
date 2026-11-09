@@ -50,7 +50,7 @@
   `a11y: { test: "error" }`). The gate runs in CI, not on the deployed
   storybook.
 - **The health endpoints.** `/healthz`, `/livez` and `/readyz` answer `ok`
-  without touching the database ([`health.go`](../../internal/api/health.go)),
+  without touching the database ([`health.go`](../../apps/api/internal/api/health.go)),
   and the spec lists their `fail` under `200`. The CLI's `start`, `doctor`
   and `setup`, the test kit, the benchmark harness and the console's System
   screen read `/healthz`; orchestrators look for all three at the root

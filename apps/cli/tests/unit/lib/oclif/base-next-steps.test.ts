@@ -1,13 +1,14 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { asStepsShown } from "../../../../src/lib/oclif/next-steps";
-import { asTerminal, offTerminal } from "../../../helpers/terminal";
-import { publicCliCommand } from "../../../../src/lib/public-cli";
-import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { type SuggestedCommand, unscopedCommand } from "../../../../src/lib/suggestion";
-import { takeReportedWarnings } from "../../../../src/lib/warnings";
+import { BaseCommand } from "@/lib/oclif/base";
+import { asStepsShown } from "@/lib/oclif/next-steps";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { publicCliCommand } from "@/lib/public-cli";
+import { json, prose, rows } from "@/lib/oclif/rendering";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 /** A command that records what `emit` prints, per stream, instead of writing it. */
 class NextStepsCommand extends BaseCommand {
@@ -25,7 +26,7 @@ class NextStepsCommand extends BaseCommand {
     this.stderr.push(message ?? "");
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 
@@ -110,7 +111,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "ok",
         data: {},
-        pretty: "Deployed",
+        pretty: prose("Deployed"),
         next: { commands: [DEPLOY] },
       });
 
@@ -123,7 +124,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "ok",
         data: {},
-        pretty: "Deployed\n",
+        pretty: prose("Deployed\n"),
         next: { commands: [DEPLOY] },
       });
 
@@ -136,7 +137,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "ok",
         data: {},
-        pretty: "Deployed",
+        pretty: prose("Deployed"),
         warnings: ["careful"],
         next: { commands: [DEPLOY] },
       });
@@ -162,7 +163,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "skipped",
         reason: "not-live",
-        pretty: "Nothing was removed",
+        pretty: prose("Nothing was removed"),
         next: { commands: [DEPLOY] },
       });
 
@@ -187,7 +188,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "ok",
         data: {},
-        pretty: "Done",
+        pretty: prose("Done"),
         next: { commands: [DEPLOY] },
         footer: "See also",
       });
@@ -201,8 +202,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "ok",
         data: {},
-        pretty: "row",
-        machineReadable: true,
+        pretty: rows("row"),
         next: { commands: [DEPLOY] },
       });
 
@@ -216,8 +216,7 @@ describe("BaseCommand next steps", () => {
         cmd.finish({
           status: "ok",
           data: {},
-          pretty: "row",
-          machineReadable: true,
+          pretty: rows("row"),
           next: { commands: [DEPLOY] },
         }),
       );
@@ -232,8 +231,7 @@ describe("BaseCommand next steps", () => {
         cmd.finish({
           status: "ok",
           data: {},
-          pretty: "{}",
-          machineReadable: true,
+          pretty: json({}),
           next: { commands: [DEPLOY] },
         }),
       );
@@ -247,7 +245,7 @@ describe("BaseCommand next steps", () => {
       await cmd.finish({
         status: "ok",
         data: {},
-        pretty: "",
+        pretty: prose(""),
         next: { commands: [DEPLOY] },
         nextShown: asStepsShown(),
       });
@@ -258,7 +256,7 @@ describe("BaseCommand next steps", () => {
     it("prints nothing when there is nothing to do next", async () => {
       const cmd = makeCommand();
 
-      await cmd.finish({ status: "ok", data: {}, pretty: "Done", next: { commands: [] } });
+      await cmd.finish({ status: "ok", data: {}, pretty: prose("Done"), next: { commands: [] } });
 
       expect(cmd.stdout).toEqual(["Done"]);
     });

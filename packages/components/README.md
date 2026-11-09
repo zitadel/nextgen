@@ -172,7 +172,7 @@ form-associated inputs.
 | CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides of atom internals |
 | Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
-| Custom template | `zitadel branding eject` → edit Liquid → `zitadel apply`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
+| Custom template | `zitadel branding eject` → edit Liquid → `zitadel deploy`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
 For styling, start with the generated `--zl-*` variables from
@@ -302,7 +302,10 @@ every applied step including the first, so a host app can drive its own chrome
 (progress, headings, analytics) from mount onwards rather than from the first
 submit. A heading follows `step.purpose`, `login` or `register`: the login
 switches between them by itself when an email does or does not have an account,
-and then shows the visitor a notice saying why.
+and then shows the visitor a notice saying why. To hide the notice, set its text
+to `""` in `locales` (`notice.user_not_found`, `notice.user_already_exists`,
+`notice.sso_user_not_found`). An `""` under `en` hides it in every language,
+unless that language has its own text for it.
 
 `zitadel-flow-redirect` fires when a step hands the browser to an identity
 provider, carrying the URL to send it to. The widget then navigates there

@@ -1,14 +1,18 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno, ZitadelError } from "../errors";
-import { isPortableShellWord, isTrainVersion } from "../public-cli";
-import { unscopedCommand } from "../suggestion";
-import { parseJsonObject } from "../json";
+import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
+import { isPortableShellWord, isTrainVersion } from "@/lib/public-cli";
+import { unscopedCommand } from "@/lib/suggestion";
+import { readIfExists } from "@/lib/fs";
+import { parseJsonObject } from "@/lib/json";
+import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
+import { isLoopbackHost } from "@/lib/host";
+import { userAgent } from "@/lib/user-agent";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -44,9 +48,15 @@ export async function readPlatformRuntime(
 ): Promise<{ publishable_key: string } | undefined> {
   try {
     const res = await fetch(new URL("/console/runtime.json", serverUrl), {
+      headers: { "user-agent": userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) return undefined;
+    if (!res.ok) {
+      // Read to the end rather than left unread: an unread body keeps the abort timer
+      // tied to a live stream, and its abort then lands where nothing handles it.
+      await res.arrayBuffer();
+      return undefined;
+    }
     const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
     return doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string"
       ? { publishable_key: doc.publishable_key }
@@ -56,7 +66,49 @@ export async function readPlatformRuntime(
   }
 }
 
-export type RuntimeBackend = "binary" | "docker";
+/** The local runtimes `--runtime` names, and what a runtime record may hold. */
+export const RUNTIME_BACKENDS = ["binary", "docker"] as const;
+
+export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];
+
+/**
+ * Decides which backend (`binary` or `docker`) a command works with. The first
+ * rule that applies wins:
+ *
+ * 1. The backend asked for with `--runtime`.
+ * 2. The backend the project's existing server already uses, so a later command
+ *    keeps talking to the server that is running instead of switching.
+ * 3. Docker, when an image was named, either with `--image` or through the
+ *    environment, since an image only means something to Docker.
+ * 4. Otherwise the npm-distributed server binary.
+ *
+ * `start` has no existing server to defer to, so it leaves `existingRuntime` out
+ * and skips the second rule. `doctor` passes it.
+ *
+ * @param input.runtime The raw `--runtime` flag value. Anything other than
+ * `"binary"` or `"docker"` (including `undefined`) means "not given".
+ * @param input.image The `--image` flag value.
+ * @param input.envImage The image named by the environment, if any.
+ * @param input.existingRuntime The recorded runtime of the project's server.
+ * @returns The backend to use.
+ */
+export function resolveRuntimeBackend(input: {
+  runtime: unknown;
+  image: string | undefined;
+  envImage: string | undefined;
+  existingRuntime?: { backend: RuntimeBackend } | undefined;
+}): RuntimeBackend {
+  if (input.runtime === "binary" || input.runtime === "docker") {
+    return input.runtime;
+  }
+  if (input.existingRuntime) {
+    return input.existingRuntime.backend;
+  }
+  if (input.image || input.envImage) {
+    return "docker";
+  }
+  return "binary";
+}
 
 type RuntimeMetadataBase = {
   schema_version: 1;
@@ -199,10 +251,12 @@ export async function findUpward(
   file: string,
   stopAt: string = homedir(),
 ): Promise<string | undefined> {
-  for (let dir = cwd; ; dir = dirname(dir)) {
-    if (await isOwnFile(join(dir, file))) return dir;
-    if (dir === stopAt || dirname(dir) === dir) return undefined;
+  for (const dir of ancestors(cwd, stopAt)) {
+    if (await isOwnFile(join(dir, file))) {
+      return dir;
+    }
   }
+  return undefined;
 }
 
 async function isOwnFile(path: string): Promise<boolean> {
@@ -214,10 +268,12 @@ async function isOwnFile(path: string): Promise<boolean> {
     // Only a missing path means "not here". Local state that exists but
     // cannot be read is still the nearest one, and walking past it would
     // pick a parent's server or credential instead.
-    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return false;
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+      return false;
+    }
     throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
       hint: `Check that ${path} and its directory are readable by you.`,
-      details: { cause: error instanceof Error ? error.message : String(error) },
+      details: { cause: errorMessage(error) },
     });
   }
 }
@@ -228,12 +284,11 @@ async function isOwnFile(path: string): Promise<boolean> {
  * may pass `--server http://127.0.0.1:8080` for the same process.
  */
 export function sameLocalServer(a: string, b: string): boolean {
-  const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
   try {
     const [left, right] = [new URL(a), new URL(b)];
     const sameHost =
       left.hostname === right.hostname ||
-      (LOOPBACK.has(left.hostname) && LOOPBACK.has(right.hostname));
+      (isLoopbackHost(left.hostname) && isLoopbackHost(right.hostname));
     return sameHost && left.protocol === right.protocol && left.port === right.port;
   } catch {
     return false;
@@ -270,14 +325,11 @@ export async function readNearestRuntimeMetadata(
   if (!dir) {
     return undefined;
   }
-  let runtime: RuntimeMetadata | undefined;
-  try {
-    runtime = await readRuntimeMetadata(dir);
-  } catch (error) {
+  const runtime = await readRuntimeMetadata(dir).catch((error: unknown) => {
     // A record in a parent is recovered where it is: the bare commands would
     // act on the working directory instead.
     throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
-  }
+  });
   return runtime ? { dir, runtime } : undefined;
 }
 
@@ -296,14 +348,9 @@ export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
-  let raw: string;
-  try {
-    raw = await readFile(paths.runtimeFile, "utf8");
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
+  const raw = await readIfExists(paths.runtimeFile);
+  if (raw === undefined) {
+    return undefined;
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
@@ -335,7 +382,13 @@ export async function checkLocalServerHealth(
 ): Promise<boolean> {
   try {
     const readyUrl = new URL("/readyz", serverUrl);
-    const response = await fetch(readyUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetch(readyUrl, {
+      headers: { "user-agent": userAgent() },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    // Only the status is wanted; the body is read to the end so the abort timer has
+    // no stream left to abort.
+    await response.arrayBuffer();
     return response.ok;
   } catch {
     return false;
@@ -361,14 +414,7 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
 
 async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   const path = join(cwd, ".gitignore");
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if (!isErrno(error, "ENOENT")) {
-      throw error;
-    }
-  }
+  const existing = (await readIfExists(path)) ?? "";
 
   const lines = existing.split(/\r?\n/).map((line) => line.trim());
   if (lines.includes(entry)) {
@@ -444,25 +490,23 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
 }
 
 async function nearestExistingDirectory(path: string): Promise<string> {
-  let current = path;
-  while (true) {
-    try {
-      const info = await stat(current);
-      if (!info.isDirectory()) {
-        throw new Error(`${current} exists but is not a directory`);
-      }
-      return current;
-    } catch (error) {
-      if (!isErrno(error, "ENOENT")) {
+  for (const current of ancestors(path)) {
+    const info = await stat(current).catch((error: unknown) => {
+      // Missing is the only miss to walk past, and the root has nothing above it.
+      if (!isErrno(error, "ENOENT") || dirname(current) === current) {
         throw error;
       }
-      const parent = dirname(current);
-      if (parent === current) {
-        throw error;
-      }
-      current = parent;
+      return undefined;
+    });
+    if (info === undefined) {
+      continue;
     }
+    if (!info.isDirectory()) {
+      throw new Error(`${current} exists but is not a directory`);
+    }
+    return current;
   }
+  throw new Error(`${path} has no existing directory above it`);
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {

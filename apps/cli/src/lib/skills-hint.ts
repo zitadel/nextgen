@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command } from "./box";
+import { command } from "./style";
 import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 
@@ -43,7 +43,11 @@ export async function showSkillsHint({
     if (!interactive || isCI(env) || isOptedOut(env)) {
       return;
     }
-    const shownPath = join(telemetryConfigDir(env), SHOWN_FILE);
+    const configDir = telemetryConfigDir(env);
+    if (configDir === undefined) {
+      return;
+    }
+    const shownPath = join(configDir, SHOWN_FILE);
     if (existsSync(shownPath)) {
       return;
     }
@@ -84,7 +88,7 @@ export async function showSkillsHint({
   }
 }
 
-function isCI(env: NodeJS.ProcessEnv): boolean {
+export function isCI(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.CI) && env.CI !== "0" && env.CI !== "false";
 }
 

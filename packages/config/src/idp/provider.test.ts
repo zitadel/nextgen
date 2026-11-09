@@ -4,8 +4,9 @@ import {
   credentialVariable,
   credentialVariables,
   isVariableReference,
+  referencedClientIdVariable,
+  referencedClientSecretVariable,
   referencedVariable,
-  uniquePropertyNames,
   variableReference,
 } from "./provider.js";
 import { secretVariable, slug } from "./test-support.js";
@@ -59,40 +60,18 @@ describe("variable references", () => {
   });
 });
 
-describe("the unique properties of a schema", () => {
-  it("names a property that scopes its uniqueness to the project or the team", () => {
-    expect(
-      uniquePropertyNames({
-        properties: {
-          email: { "x-unique": "project" },
-          handle: { "x-unique": "team" },
-          name: {},
-        },
-      }),
-    ).toEqual(["email", "handle"]);
+describe("the variable a credential field references", () => {
+  it.each([
+    ["client_id", referencedClientIdVariable],
+    ["client_secret", referencedClientSecretVariable],
+  ])("is the name a %s reference names", (_field, referenced) => {
+    expect(referenced("${{ ACME_CREDENTIAL }}")).toBe("ACME_CREDENTIAL");
   });
 
-  it("does not count an unspecified or null scope", () => {
-    expect(
-      uniquePropertyNames({
-        properties: { a: { "x-unique": "unspecified" }, b: { "x-unique": null } },
-      }),
-    ).toEqual([]);
-  });
-
-  it("counts an object that holds a unique property, as the engine asks at the top level", () => {
-    expect(
-      uniquePropertyNames({
-        properties: {
-          address: { type: "object", properties: { street: { "x-unique": "project" } } },
-        },
-      }),
-    ).toEqual(["address"]);
-  });
-
-  it("reads a schema with no properties, or odd ones, as having none", () => {
-    expect(uniquePropertyNames({})).toEqual([]);
-    expect(uniquePropertyNames({ properties: null })).toEqual([]);
-    expect(uniquePropertyNames({ properties: { a: null, b: "x" } })).toEqual([]);
+  it.each([
+    ["client_id", referencedClientIdVariable],
+    ["client_secret", referencedClientSecretVariable],
+  ])("is nothing for a %s held as a value", (_field, referenced) => {
+    expect(referenced("824.apps.googleusercontent.com")).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
-import { ZitadelError } from "../../lib/errors";
-import { type Author, Repository, RepositoryError } from "../../lib/git";
-import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
+import { errorMessage } from "@/lib/errors";
+import { type Author, Repository, RepositoryError } from "@/lib/git";
+import { isLocalRuntimePath, isSecretPath } from "@/lib/secret-paths";
 
 /**
  * The subject of the commit setup makes. Conventional-commit style, like every
@@ -62,80 +62,62 @@ function isCliOwned(path: string): boolean {
  */
 const FALLBACK_AUTHOR: Author = { name: "Zitadel Setup", email: "setup@zitadel.local" };
 
+/** What the git working tree of a project holds, as setup needs to know before it writes. */
+export type WorktreeState =
+  | { readonly kind: "no-repository" }
+  | { readonly kind: "unknown"; readonly reason: string }
+  | { readonly kind: "blocked"; readonly blocked: string }
+  | {
+      readonly kind: "dirty";
+      readonly modified: readonly string[];
+      readonly untracked: readonly string[];
+    }
+  | { readonly kind: "clean" };
+
 /**
- * Refuse a project whose repository has anything uncommitted, before setup
- * writes a single file.
+ * Reports what the repository of a project holds, before setup writes a single
+ * file.
  *
  * Setup commits what it wrote so the first release records a real commit, and
  * the honest way to know what it wrote is that the tree was clean beforehand:
  * then everything uncommitted afterwards is setup's own work and nothing of
  * the developer's is swept in. A dirty tree makes that impossible to tell
  * apart, and committing someone's work-in-progress under setup's name is worse
- * than any diff it would buy. Checked up front rather than at commit time, so
+ * than any diff it would buy. Asked up front rather than at commit time, so
  * a refusal costs nothing and leaves no half-made project behind.
  *
  * A repository where a commit would land where it should not (during a
  * merge, rebase, cherry-pick, revert or bisect, or on a detached HEAD) is
- * refused here too, for the same reason: found only at commit time, setup
- * would already have done all its work.
+ * `blocked` for the same reason: found only at commit time, setup would
+ * already have done all its work.
  *
- * When git cannot answer, setup refuses rather than carries on: the commit
- * does not check again, so going ahead would stage and commit the very work
- * this guard exists to protect.
+ * When git cannot answer, the state is `unknown`: the commit does not check
+ * again, so going ahead would stage and commit the very work this guard exists
+ * to protect.
  */
-export async function assertCleanWorktree(cwd: string): Promise<void> {
+export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
   const repository = await Repository.open(cwd);
   if (repository === null) {
-    return;
+    return { kind: "no-repository" };
   }
-  const blocked = await repository.readyToCommit().catch(cannotTell);
-  if (blocked !== null) {
-    throw new ZitadelError("E_CONFLICT", `Setup cannot commit here: ${blocked}`, {
-      hint:
-        "Setup commits the project so the first release records a commit. Finish or abort what " +
-        "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
-        "without touching version control.",
-    });
+  try {
+    const blocked = await repository.readyToCommit();
+    if (blocked !== null) {
+      return { kind: "blocked", blocked };
+    }
+    const files = await repository.uncommittedFiles();
+    const dirty = files.filter((file) => !isCliOwned(file.path));
+    if (dirty.length === 0) {
+      return { kind: "clean" };
+    }
+    return {
+      kind: "dirty",
+      modified: dirty.filter((change) => !change.untracked).map((change) => change.path),
+      untracked: dirty.filter((change) => change.untracked).map((change) => change.path),
+    };
+  } catch (error) {
+    return { kind: "unknown", reason: messageOf(error) };
   }
-  const files = await repository.uncommittedFiles().catch(cannotTell);
-  const dirty = files.filter((file) => !isCliOwned(file.path));
-  if (dirty.length === 0) {
-    return;
-  }
-  const modified = dirty.filter((change) => !change.untracked).map((change) => change.path);
-  const untracked = dirty.filter((change) => change.untracked).map((change) => change.path);
-  const parts = [
-    modified.length > 0 ? `${modified.length} uncommitted change${plural(modified)}` : undefined,
-    untracked.length > 0 ? `${untracked.length} untracked file${plural(untracked)}` : undefined,
-  ].filter((part) => part !== undefined);
-  throw new ZitadelError("E_CONFLICT", `The git working tree has ${parts.join(" and ")}`, {
-    hint:
-      "Setup commits the project directory so the first release records a commit, and it will not " +
-      "do that while there is work it did not write, which would be committed under setup's name. " +
-      "Run `git status` to see them, commit or stash them, then run setup again. If you have just scaffolded " +
-      "the app yourself, committing it first is the expected step. To set up without touching " +
-      "version control at all, pass --no-git.",
-    details: { modified, untracked },
-  });
-}
-
-/** The refusal for a repository git could not answer about. */
-function cannotTell(error: unknown): never {
-  throw new ZitadelError(
-    "E_CONFLICT",
-    `Could not tell whether the git working tree is clean: ${messageOf(error)}`,
-    {
-      hint:
-        "Setup commits the files it writes, and will not do that without knowing the tree " +
-        "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
-        "set up without touching version control.",
-    },
-  );
-}
-
-/** `s` unless the list holds exactly one entry. */
-function plural(list: readonly unknown[]): string {
-  return list.length === 1 ? "" : "s";
 }
 
 /**
@@ -145,8 +127,8 @@ function plural(list: readonly unknown[]): string {
  *
  * A repository is created only when there is none; an existing one is used as
  * it stands, never nested inside. Either way the commit covers the project
- * directory, which is safe because {@link assertCleanWorktree} has already
- * refused a repository with anything uncommitted: everything there is to commit
+ * directory, which is safe because {@link inspectWorktree} has already
+ * found nothing uncommitted: everything there is to commit
  * by this point is what setup itself wrote.
  *
  * Nothing here prompts, so it behaves the same interactively and in CI, and no
@@ -191,7 +173,7 @@ function firstLineOf(error: unknown): string {
 
 /** git's own message, so the warning names the real cause. */
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return errorMessage(error);
 }
 
 /** What `setup --json` reports under `git`: whether setup ran `git init`, even if the commit then failed, and the commit, or null. */

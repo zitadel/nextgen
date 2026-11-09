@@ -1,43 +1,50 @@
+import pTimeout from "p-timeout";
+import { UserService } from "@/lib/backend";
+import { isCancellation } from "@/lib/errors";
+
 import {
   claimAction,
   claimCommand,
   claimState,
   claimWindowClosedAction,
   type ClaimState,
-} from "../lib/claim-state";
+} from "@/lib/claim-state";
 import {
   customizeAndPublishActions,
   exploreAllCommands,
   verifyLoginAction,
-} from "../lib/journey-guidance";
+} from "@/lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
   runtimeSummary,
-} from "../lib/local-server/runtime";
-import { LocalServer } from "../lib/local-server/server";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
 import {
+  type Admitted,
   type Connection,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
-} from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
-import { shellArg, shellOption } from "../lib/shell";
+  type MetaOptions,
+} from "@/lib/oclif";
+import type { GlobalOptions } from "@/lib/oclif/types";
+import { resolveCwd } from "@/lib/paths";
+import { Cmd } from "@/lib/cmd";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
-} from "../lib/project";
+} from "@/lib/project";
 import {
   type EnvironmentSelector,
   projectCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../lib/suggestion";
-import { DEPLOY_ARGS } from "../lib/release";
+} from "@/lib/suggestion";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -51,25 +58,30 @@ export default class Status extends EnvironmentCommand {
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 3;
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Status);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    if (flags.server === "local") {
-      await this.toMeta(flags, {
-        resolveServer: false,
-        source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-      });
-    } else {
-      await this.toMeta(flags);
+  protected override async toMeta(
+    flags: Record<string, unknown>,
+    options: MetaOptions = {},
+  ): Promise<GlobalOptions> {
+    if (flags.server !== "local") {
+      return super.toMeta(flags, options);
     }
-    const server = await LocalServer.at(this.meta.cwd, {
-      cliVersion: this.meta.cliVersion,
+    const runtime = await readRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    return super.toMeta(flags, {
+      resolveServer: false,
+      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
+    });
+  }
+
+  protected async execute({ flags }: Admitted<typeof Status>): Promise<JsonEnvelope> {
+    const server = await LocalServer.at(this.cwd, {
+      cliVersion: this.cliVersion,
     }).status();
     const serverLifecycle = server.lifecycle;
 
     const project = await projectStatus(
-      this.meta.cwd,
+      this.cwd,
       this.environment.values.ZITADEL_ISSUER?.value,
       this.environment.values.ZITADEL_PROJECT_ID?.value,
       this.environment.envFile !== undefined || this.environment.name.value !== "development"
@@ -78,24 +90,25 @@ export default class Status extends EnvironmentCommand {
     );
     const users =
       project.lifecycle === "configured"
-        ? await detectUserPresence(() => this.connect({ quiet: true, prompt: false }))
+        ? await detectUserPresence(() => {
+            return this.connect({
+              quiet: true,
+              prompt: false,
+              timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
+            });
+          })
         : "unknown";
     const nextCommands = nextCommandsFor(
       serverLifecycle,
       project,
       users,
-      this.meta.cliVersion,
+      this.cliVersion,
       this.environmentSelector(),
       // `--cwd` as typed, for the follow-ups the selector does not carry: the
       // runtime and the project files they act on live in that directory.
-      typeof flags.cwd === "string" ? ` ${shellOption("--cwd", flags.cwd)}` : "",
+      typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
     );
-    const nextActions = nextActionsFor(
-      project,
-      users,
-      this.meta.cliVersion,
-      this.environmentSelector(),
-    );
+    const nextActions = nextActionsFor(project, users, this.cliVersion, this.environmentSelector());
 
     return this.emit({
       status: "ok",
@@ -114,7 +127,7 @@ export default class Status extends EnvironmentCommand {
         project,
       },
       next: { actions: nextActions, commands: nextCommands },
-      footer: exploreAllCommands(this.meta.cliVersion),
+      footer: exploreAllCommands(this.cliVersion),
     });
   }
 }
@@ -235,24 +248,34 @@ const PRESENCE_PROBE_TIMEOUT_MS = 1500;
 async function detectUserPresence(connect: () => Promise<Connection>): Promise<UserPresence> {
   try {
     const { client } = await connect();
-    const probe = client
-      .queryUsers({ limit: 1 }, undefined, {
-        signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS),
+    const userService = new UserService(client);
+    const probe = userService
+      .exists()
+      .then((exists): UserPresence => {
+        return exists ? "some" : "none";
       })
-      .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
-      .catch((): UserPresence => "unknown");
-    // The abort signal alone is not enough: DNS resolution can outlive it
-    // (getaddrinfo runs on the threadpool and some environments take many
-    // seconds to fail), and `status` must stay snappy. Race a detached timer
-    // so the answer degrades to "unknown" at the deadline no matter what the
-    // socket layer does; unref'd so it never keeps the CLI process alive.
-    return await Promise.race([
-      probe,
-      new Promise<UserPresence>((resolve) => {
-        setTimeout(() => resolve("unknown"), PRESENCE_PROBE_TIMEOUT_MS + 250).unref();
-      }),
-    ]);
-  } catch {
+      .catch((error: unknown): UserPresence => {
+        // Cancelling is not an unknown answer: the person asked `status` to
+        // stop, so it stops rather than reporting a lifecycle it guessed at.
+        if (isCancellation(error)) {
+          throw error;
+        }
+        return "unknown";
+      });
+    // The probe's own connection gives up after PRESENCE_PROBE_TIMEOUT_MS, so
+    // a server that never answers neither holds `status` nor keeps the process
+    // alive once the answer is settled. The timer is the outer bound: DNS
+    // resolution can outlive a request deadline, and `status` stays snappy.
+    return await pTimeout(probe, {
+      milliseconds: PRESENCE_PROBE_TIMEOUT_MS + 250,
+      fallback: (): UserPresence => {
+        return "unknown";
+      },
+    });
+  } catch (error) {
+    if (isCancellation(error)) {
+      throw error;
+    }
     return "unknown";
   }
 }
@@ -322,7 +345,7 @@ function nextCommandsFor(
   }
   if (project.lifecycle === "not-configured" && project.environment !== undefined) {
     commands.push(
-      unscopedCommand(`env add ${shellArg(project.environment)}${cwdSuffix}`, cliVersion),
+      unscopedCommand(`env add ${Cmd.quote(project.environment)}${cwdSuffix}`, cliVersion),
     );
   } else if (project.lifecycle === "not-configured") {
     if (project.env_file === undefined) {

@@ -20,6 +20,13 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
  * in `src-real/`, which runs the same screens through the Vite dev proxy.
  */
 
+test("serves the console's favicons from the binary", async ({ request }) => {
+  const response = await request.get("/ui/console/favicons/dark/favicon-32x32.png");
+  expect(response.ok()).toBe(true);
+  // The handler's SPA fallback answers an unknown path with index.html and a 200.
+  expect(response.headers()["content-type"]).toBe("image/png");
+});
+
 test("signs in end to end against the embedded API", async ({ page, seed }) => {
   const user = await seed.user();
   // The binary sends the console's policies with every page of it; the

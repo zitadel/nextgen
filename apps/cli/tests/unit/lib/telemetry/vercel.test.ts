@@ -1,13 +1,13 @@
 import type { Callback, Mixpanel as MixpanelClient, Properties } from "mixpanel";
 import { describe, expect, it } from "vitest";
 
-import { Telemetry } from "../../../../src/lib/telemetry";
+import { Telemetry } from "@/lib/telemetry";
 import {
   resolveVercelEndpoint,
   VERCEL_ENDPOINT,
   VERCEL_MAX_PROPERTIES,
   vercelEventBody,
-} from "../../../../src/lib/telemetry/vercel";
+} from "@/lib/telemetry/vercel";
 
 const sink = {
   endpoint: VERCEL_ENDPOINT,
@@ -84,6 +84,12 @@ describe("resolveVercelEndpoint", () => {
       ZITADEL_TELEMETRY_VERCEL_ENDPOINT: " https://intake.test/event ",
     };
     expect(resolveVercelEndpoint(env)).toBe("https://intake.test/event");
+  });
+
+  it("names no intake when ZITADEL_TELEMETRY_VERCEL_ENDPOINT is not a URL", () => {
+    const env = { ZITADEL_TELEMETRY_VERCEL_ENDPOINT: "not a url" };
+
+    expect(resolveVercelEndpoint(env)).toBeUndefined();
   });
 });
 

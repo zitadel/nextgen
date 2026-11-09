@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,10 +7,10 @@ import {
   describeAcceptedNode,
   nodeEnginesRange,
   nodeSupport,
-} from "../../../../../src/lib/orca/scaffolders/node-engines";
+} from "@/lib/orca/scaffolders/node-engines";
 
-vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
-const mockSpawn = vi.mocked(spawnSync);
+vi.mock("execa", () => ({ execaSync: vi.fn() }));
+const mockSpawn = vi.mocked(execaSync);
 
 const ANGULAR_22 = "^22.22.3 || ^24.15.0 || >=26.0.0";
 
@@ -62,7 +62,9 @@ describe("describeAcceptedNode", () => {
 
 describe("nodeEnginesRange", () => {
   it("asks npm for the range of the declared package spec", () => {
-    mockSpawn.mockReturnValue({ status: 0, stdout: ">=1.0.0\n" } as ReturnType<typeof spawnSync>);
+    mockSpawn.mockReturnValue({ exitCode: 0, failed: false, stdout: ">=1.0.0\n" } as ReturnType<
+      typeof execaSync
+    >);
 
     expect(nodeEnginesRange(CREATE_VITE_NODE_ENGINES, "/tmp/proj", "linux")).toBe(">=1.0.0");
     expect(mockSpawn.mock.calls[0]?.slice(0, 2)).toEqual([

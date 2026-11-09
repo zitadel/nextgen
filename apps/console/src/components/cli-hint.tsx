@@ -11,7 +11,7 @@ import { InlineCode } from "@/components/ui/inline-code";
  */
 export const CLI = "npx @zitadel/cli@latest";
 
-/** `apply`: writes the local definitions to the project. */
+/** `deploy`: publishes the local definitions to the project as a release. */
 export const CLI_DEPLOY = `${CLI} deploy`;
 
 /** `variable set`: enters or changes a project's variables and secrets. */

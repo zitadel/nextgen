@@ -9,7 +9,7 @@ import {
   QuerySessionsBodyFilterItemOperation,
   QueryTeamsBodyFilterItemOperation,
   QueryUsersBodyFilterItemOperation,
-} from "@zitadel/api/generated/model";
+} from "@/lib/backend/model";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -22,7 +22,7 @@ import {
   QueryTeamsBody,
   QueryUsersBody,
   UpdateTeamBody,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+} from "@/lib/backend/schemas";
 import {
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
@@ -50,14 +50,19 @@ import {
   QuerySessionsResponse,
   QueryTeamsResponse,
   QueryUsersResponse,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { pagedFunctions } from "@zitadel/api/client";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+} from "@/lib/backend/schemas";
 import { isVariableReference } from "@zitadel/config/idp";
 
-import type { ZitadelClient } from "../lib/api-client";
-import { CommandGroups } from "../lib/oclif/groups";
-import { ZitadelError } from "../lib/errors";
+import {
+  type ZitadelClient,
+  pagedFunctions,
+  BrandingService,
+  FlowService,
+  PolicyService,
+  SchemaService,
+} from "@/lib/backend";
+import { CommandGroups } from "@/lib/oclif/groups";
+import { ZitadelError } from "@/lib/errors";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -66,14 +71,17 @@ import {
   type GetSpec,
   type Json,
   type ListSpec,
-  renderTable,
   type ResourceDescriptor,
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
   type WriteResult,
   type WriteShape,
-} from "../lib/oclif/crud";
+} from "@/lib/oclif/crud";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
+
+/** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
+const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -94,7 +102,7 @@ export const create = <B, C>(
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
-  shape: WriteShape = {},
+  shape: WriteShape & Pick<UpdateSpec<Platform, B, U>, "check"> = {},
 ): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
@@ -279,9 +287,12 @@ const OPERATIONS: readonly Operation[] = [
 ];
 
 /** A release's pointers as an indented table, one pinned revision per row. */
-export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
+export const releasePointers = async (
+  release: Pick<GetReleaseById200, "pointers">,
+  tabulate: Tabulate,
+): Promise<string> => {
   const { pointers } = release;
-  const table = renderTable(["kind", "handle", "revision_id"], pointers)
+  const table = (await tabulate(["kind", "handle", "revision_id"], pointers))
     .split("\n")
     .map((line) => `  ${line}`);
   return ["resources", ...table].join("\n");
@@ -339,8 +350,13 @@ export const RESOURCES = {
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
-    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
-    delete: { call: ({ client }, id) => client.deleteUserByID(id) },
+    // dry_run is the global --dry-run's, never a body field of its own.
+    update: update(USER_UPDATE_BODY, ({ client }, id, body) => client.patchUserByID(id, body), {
+      // A server from before dry_run refuses the field rather than applying
+      // the patch, so a dry run needs no check of the server first.
+      check: ({ client }, id, body) => client.patchUserByID(id, { ...body, dry_run: true }),
+    }),
+    delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),
 
   teams: resource({
@@ -371,7 +387,10 @@ export const RESOURCES = {
     update: update(UpdateTeamBody, ({ client }, id, body) => client.updateTeam(id, body)),
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
     // command is named after that rather than claiming the team is gone.
-    delete: { verb: "deactivate", call: ({ client }, id) => client.deleteTeam(id) },
+    delete: {
+      verb: "deactivate",
+      call: ({ client }, id, consent) => consent.unlock(client).deleteTeam(id),
+    },
   }),
 
   sessions: resource({
@@ -398,7 +417,10 @@ export const RESOURCES = {
     get: get({ call: ({ client }, id) => client.getSession(id), response: GetSessionResponse }),
     // The endpoint terminates the session rather than removing a record, so
     // the command says `revoke`. `delete` would tell the caller it is gone.
-    delete: { verb: "revoke", call: ({ client }, id) => client.revokeSession(id) },
+    delete: {
+      verb: "revoke",
+      call: ({ client }, id, consent) => consent.unlock(client).revokeSession(id),
+    },
   }),
 
   events: resource({
@@ -492,7 +514,8 @@ export const RESOURCES = {
       { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
-      call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
+      call: ({ client, projectId }, id, consent) =>
+        consent.unlock(client).deleteGrant(id, { project_id: projectId }),
     },
   }),
 
@@ -591,42 +614,22 @@ export const RESOURCES = {
           default: ListSchemasRevisions.latest,
         },
       ],
-      call: ({ client, projectId }: Platform, params: Query<"listSchemas">) =>
-        client.listSchemas({ ...params, project_id: projectId }),
-      items: pagedFunctions.listSchemas.items,
-      next: pagedFunctions.listSchemas.next,
+      call: ({ client, projectId }: Platform, params: Query<"listSchemas">) => {
+        const schemaService = new SchemaService(client, projectId);
+        return schemaService.page(params);
+      },
+      items: (page) => {
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
+      },
     }),
     get: get({
       response: GetSchemaByIdResponse,
-      // A schema is addressed two ways: a revision id names one immutable
-      // revision and fetches directly, an object type resolves to the current
-      // revision through the list. A revision id is whatever the customer's
-      // `$id` says — `sch_…`, a URL, `urn:example:human`, anything — so there
-      // is no shape to test for. Ask the server instead: fetch, and read a 404
-      // as "that was an object type". The API has no fetch-by-object-type
-      // route yet; when it does, this collapses to one client call like every
-      // other `get`.
-      call: async ({ client, projectId }, ref) => {
-        try {
-          return await client.getSchemaById(ref);
-        } catch (error) {
-          if (!(error instanceof ApiError) || error.status !== 404) {
-            throw error;
-          }
-        }
-        const page = await client.listSchemas({
-          project_id: projectId,
-          object_type: ref,
-          revisions: "latest",
-          limit: 1,
-        });
-        const current = page.schemas[0];
-        if (!current) {
-          throw new ZitadelError("E_NOT_FOUND", `No schema named "${ref}"`, {
-            hint: "Run `schemas list` to see the object types this project has.",
-          });
-        }
-        return current;
+      call: ({ client, projectId }, reference) => {
+        const schemaService = new SchemaService(client, projectId);
+        return schemaService.get(reference);
       },
     }),
   }),
@@ -656,7 +659,7 @@ export const RESOURCES = {
     get: get({
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
-      sections: (release) => [releasePointers(release)],
+      sections: async (release, tabulate) => [await releasePointers(release, tabulate)],
     }),
   }),
 
@@ -685,35 +688,22 @@ export const RESOURCES = {
           default: ListFlowDefinitionsRevisions.latest,
         },
       ],
-      call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) =>
-        client.listFlowDefinitions({
-          ...params,
-          project_id: projectId,
-        }),
-      items: pagedFunctions.listFlowDefinitions.items,
-      next: pagedFunctions.listFlowDefinitions.next,
+      call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) => {
+        const flowService = new FlowService(client, projectId);
+        return flowService.page(params);
+      },
+      items: (page) => {
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
+      },
     }),
     get: get({
       response: GetFlowDefinitionResponse,
-      // `flowdef_…` names one revision. Anything else is a flow name, and the
-      // endpoint returns that flow's revisions newest first, so the first row
-      // is the current one.
-      call: async ({ client, projectId }, ref) => {
-        if (ref.startsWith("flowdef_")) {
-          return client.getFlowDefinition(ref);
-        }
-        const page = await client.listFlowDefinitions({
-          project_id: projectId,
-          name: ref,
-          limit: 1,
-        });
-        const current = page.flow_definitions[0];
-        if (!current) {
-          throw new ZitadelError("E_NOT_FOUND", `No flow definition named "${ref}"`, {
-            hint: "Run `flow-definitions list` to see the flows this project has.",
-          });
-        }
-        return current;
+      call: ({ client, projectId }, reference) => {
+        const flowService = new FlowService(client, projectId);
+        return flowService.get(reference);
       },
     }),
   }),
@@ -730,11 +720,17 @@ export const RESOURCES = {
       // the paging flags are not generated for it.
       paged: false,
       item: ListBrandingResponse.element,
-      call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+      call: ({ client, projectId }) => {
+        const brandingService = new BrandingService(client, projectId);
+        return brandingService.list();
+      },
       items: (page) => page,
     }),
     get: get({
-      call: ({ client }, id) => client.getBrandingById(id),
+      call: ({ client, projectId }, id) => {
+        const brandingService = new BrandingService(client, projectId);
+        return brandingService.get(id);
+      },
       response: GetBrandingByIdResponse,
     }),
   }),
@@ -758,10 +754,16 @@ export const RESOURCES = {
     list: list({
       item: ListPoliciesResponse.shape.policies.element,
       filters: [{ field: "operation", operations: ["equals"] }],
-      call: ({ client, projectId }: Platform, params: Query<"listPolicies">) =>
-        client.listPolicies({ ...params, project_id: projectId }),
-      items: pagedFunctions.listPolicies.items,
-      next: pagedFunctions.listPolicies.next,
+      call: ({ client, projectId }: Platform, params: Query<"listPolicies">) => {
+        const policyService = new PolicyService(client, projectId);
+        return policyService.page(params);
+      },
+      items: (page) => {
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
+      },
     }),
     get: get({
       response: GetPolicyResponse,
@@ -770,8 +772,9 @@ export const RESOURCES = {
       // Anything else names no policy: sending it as the filter would be
       // refused as a malformed query rather than reported as not found.
       call: async ({ client, projectId }, ref) => {
+        const policyService = new PolicyService(client, projectId);
         if (ref.startsWith("pol_")) {
-          return client.getPolicy(ref, { project_id: projectId });
+          return policyService.get(ref);
         }
         const notFound = () =>
           new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
@@ -781,8 +784,7 @@ export const RESOURCES = {
         if (operation === undefined) {
           throw notFound();
         }
-        const page = await client.listPolicies({ project_id: projectId, operation, limit: 1 });
-        const current = page.policies[0];
+        const current = await policyService.ofOperation(operation);
         if (!current) {
           throw notFound();
         }

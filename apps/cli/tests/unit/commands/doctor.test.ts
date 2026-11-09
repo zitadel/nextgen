@@ -1,30 +1,30 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
-import { failureAdvice } from "../../../src/commands/doctor";
-import type { LocalServers } from "../../../src/lib/local-server/processes";
-import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
-import { publicCliCommand } from "../../../src/lib/public-cli";
-import { MANAGED_MARKER } from "../../../src/lib/paths";
-import { advisoryForWarnings } from "../../../src/commands/doctor/index";
-import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
-import { nextPort } from "../../helpers/ports";
+import { it, type Serve } from "@tests/helpers/fixtures";
+
+import { failureAdvice } from "@/commands/doctor";
+import type { LocalServers } from "@/lib/local-server/processes";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { publicCliCommand } from "@/lib/public-cli";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { advisoryForWarnings } from "@/commands/doctor/index";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { nextPort } from "@tests/helpers/ports";
 import {
   aMachineRunning,
   cliVersion,
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
-} from "../../helpers/run-cli";
+} from "@tests/helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
 const tempDirs: string[] = [];
-const servers: Server[] = [];
 
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
@@ -93,8 +93,8 @@ async function setProjectServer(cwd: string, server: string): Promise<void> {
 }
 
 /** Records a healthy local server in `dir`, as `zitadel start` does, and returns its port. */
-async function recordStartedServer(dir: string): Promise<number> {
-  const serverUrl = await startHealthServer();
+async function recordStartedServer(serve: Serve, dir: string): Promise<number> {
+  const serverUrl = await startHealthServer(serve);
   const port = Number(new URL(serverUrl).port);
   await mkdir(join(dir, ".zitadel/local"), { recursive: true });
   await writeFile(
@@ -220,9 +220,6 @@ async function writeDetachedSecret(
 }
 
 afterEach(async () => {
-  for (const server of servers.splice(0)) {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -282,7 +279,9 @@ describe("doctor command", () => {
     );
   });
 
-  it("suggests the claim on the project's own server, not the one doctor was pointed at", async () => {
+  it("suggests the claim on the project's own server, not the one doctor was pointed at", async ({
+    port,
+  }) => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);
     const fake = await fakeDocker();
@@ -294,7 +293,7 @@ describe("doctor command", () => {
         cwd,
         "--json",
         "--port",
-        String(nextPort()),
+        String(port),
         "--server",
         "https://self.example",
       ],
@@ -495,10 +494,12 @@ describe("doctor command", () => {
     expect(dependency?.status).toBe("fail");
   });
 
-  it("reports actionable recovery commands when the local runtime port is occupied", async () => {
+  it("reports actionable recovery commands when the local runtime port is occupied", async ({
+    serve,
+  }) => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-port-"));
     tempDirs.push(cwd);
-    const occupiedUrl = await startHealthServer();
+    const occupiedUrl = await startHealthServer(serve);
     const occupiedPort = Number(new URL(occupiedUrl).port);
 
     const fake = await fakeDocker();
@@ -589,9 +590,9 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       expect(checkNamesOf(res.stdout)).toContain("port");
     });
 
-    it("checks a local server started in its directory", async () => {
+    it("checks a local server started in its directory", async ({ serve }) => {
       const cwd = await makeHealthyProject();
-      await recordStartedServer(cwd);
+      await recordStartedServer(serve, cwd);
 
       const res = await doctorWithoutPort(cwd);
 
@@ -599,9 +600,9 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     });
   });
 
-  it("checks the local runtime of a project set up against a local server", async () => {
+  it("checks the local runtime of a project set up against a local server", async ({ port }) => {
     const cwd = await makeHealthyProject();
-    await setProjectServer(cwd, `http://localhost:${String(nextPort())}`);
+    await setProjectServer(cwd, `http://localhost:${String(port)}`);
 
     const res = await doctorWithoutPort(cwd);
 
@@ -620,25 +621,25 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
   // `zitadel start` tells developers to run setup in the directory it ran in,
   // or one inside it; doctor must check that server, not the default port.
   describe("in an app inside the directory a local server was started in", () => {
-    async function appUnderStartedServer(): Promise<{ app: string; port: number }> {
+    async function appUnderStartedServer(serve: Serve): Promise<{ app: string; port: number }> {
       const parent = await mkdtemp(join(tmpdir(), "zitadel-doctor-parent-"));
       tempDirs.push(parent);
-      const port = await recordStartedServer(parent);
+      const port = await recordStartedServer(serve, parent);
       const app = join(parent, "app");
       await mkdir(app);
       return { app, port };
     }
 
-    it("checks that server's port", async () => {
-      const { app, port } = await appUnderStartedServer();
+    it("checks that server's port", async ({ serve }) => {
+      const { app, port } = await appUnderStartedServer(serve);
 
       const res = await doctorWithoutPort(app);
 
       expect((parseJson(res.stdout) as { data: { port: number } }).data.port).toBe(port);
     });
 
-    it("reports that server healthy", async () => {
-      const { app } = await appUnderStartedServer();
+    it("reports that server healthy", async ({ serve }) => {
+      const { app } = await appUnderStartedServer(serve);
 
       const res = await doctorWithoutPort(app);
 
@@ -649,8 +650,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       });
     });
 
-    it("names the parent folder the healthy server was started in", async () => {
-      const { app } = await appUnderStartedServer();
+    it("names the parent folder the healthy server was started in", async ({ serve }) => {
+      const { app } = await appUnderStartedServer(serve);
 
       const res = await doctorWithoutPort(app);
 
@@ -660,8 +661,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       );
     });
 
-    it("points at that server's log", async () => {
-      const { app } = await appUnderStartedServer();
+    it("points at that server's log", async ({ serve }) => {
+      const { app } = await appUnderStartedServer(serve);
 
       const res = await doctorWithoutPort(app);
 
@@ -857,21 +858,14 @@ process.exit(0);
   return { binDir, logPath };
 }
 
-async function startHealthServer(): Promise<string> {
-  const server = createServer((req, res) => {
+function startHealthServer(serve: Serve): Promise<string> {
+  return serve((req, res) => {
     if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
     res.writeHead(404).end();
-  });
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("health server did not expose a TCP address");
-  }
-  return `http://127.0.0.1:${String(address.port)}`;
+  }, "127.0.0.1");
 }
 
 describe("doctor's managed runtime process check", () => {
@@ -1045,7 +1039,7 @@ describe("advisoryForWarnings", () => {
     expect(advice).toBeUndefined();
   });
 
-  it("suggests doctor --fix for an issuer held as a preview origin, in the directory doctor checked", () => {
+  it("suggests doctor --fix --force for an issuer held as a preview origin, in the directory doctor checked", () => {
     const issuerWarning = {
       name: "issuer-origin",
       status: "warn" as const,
@@ -1060,7 +1054,9 @@ describe("advisoryForWarnings", () => {
       environmentSelectorSuffix({ cwd: "apps/web" }),
     );
 
-    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+    expect(advice?.nextCommands).toEqual([
+      expectedPublicCliCommand("doctor --fix --force --cwd apps/web"),
+    ]);
   });
 });
 

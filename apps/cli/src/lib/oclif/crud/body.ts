@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import { ZitadelError } from "../../errors";
-import { parseJsonObject } from "../../json";
+import { ZitadelError } from "@/lib/errors";
+import { parseJsonObject } from "@/lib/json";
 import type { Json } from "./types";
 
 /**

@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -33,7 +33,7 @@ Two product constraints shape the answers:
 - The console is **embedded into the Go server under a configurable deployment
   prefix** and served as a static SPA with an `index.html` fallback for unknown
   client routes (see
-  [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
+  [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)).
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
@@ -141,10 +141,14 @@ endpoint.
 
 > **Amendment (2026-09-28, #1299):** screens now act on a **selected project**
 > carried as `?project=<id>` on the `_authed` layout, which validates it and
-> retains it on every navigation (`src/lib/project-scope.ts`). `projects/index.tsx`
+> retains it on every navigation (`src/features/projects/project-scope.ts`). `projects/index.tsx`
 > is the Projects overview, where a project is selected; the project's own page
 > moved to the scoped `project/index.tsx` (Project settings), and
 > `projects/$projectId.tsx` only redirects there with that project selected.
+
+> **Amendment (2026-11-05):** where the code behind a route lives is
+> [ADR 0007](0007-console-code-layout.md). The pending, error and not-found
+> boundaries are in `src/app-shell/boundaries.tsx`.
 
 ### 5. Data loading: route loaders, with three required boundaries
 
@@ -237,7 +241,7 @@ the sidebar.
 - [`apps/console/src/router.tsx`](../../src/router.tsx),
   [`apps/console/src/main.tsx`](../../src/main.tsx),
   [`apps/console/vite.config.ts`](../../vite.config.ts).
-- [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
+- [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
 - Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)
   — the shell is built from shadcn/ui in `src/components/ui/`, sharing only

@@ -1,6 +1,8 @@
-import { ENVIRONMENT_KEYS, type EnvironmentKey } from "../../lib/environment";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderTable } from "../../lib/oclif/crud/table";
+import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { painted } from "@/lib/oclif/rendering";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
@@ -20,7 +22,7 @@ const REDACTED = "••••••••";
  * and which source supplied each value. It never prints a secret in full, so
  * the output is safe to paste into a bug report.
  */
-export default class Env extends EnvironmentCommand {
+export default class Env extends Tabulatable(EnvironmentCommand) {
   static override description =
     "Show which server and project resolve, and where each value came from.";
   static override group = CommandGroups.configuration;
@@ -30,9 +32,7 @@ export default class Env extends EnvironmentCommand {
     "<%= config.bin %> env --env-file ./infra/acme-staging.env",
   ];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Env);
-    await this.toMeta(flags);
+  protected async execute(): Promise<JsonEnvelope> {
     const { name, values, consulted } = this.environment;
 
     const resolved = ENVIRONMENT_KEYS.flatMap((key) => {
@@ -60,14 +60,18 @@ export default class Env extends EnvironmentCommand {
           supplied: [...supplied],
         })),
       },
-      pretty: [
-        `Environment  ${name.value} (from ${name.source})`,
-        "",
-        renderTable(["variable", "value", "source"], resolved),
-        "",
-        "Consulted, in order:",
-        renderTable(["source", "present", "supplied"], lookups),
-      ].join("\n"),
+      // Painted, because the two tables below are the CLI's own; the heading
+      // names a value read from a file, so it is spelled out here.
+      pretty: painted(
+        [
+          escapeControlCharacters(`Environment  ${name.value} (from ${name.source})`),
+          "",
+          await this.tabulate(["variable", "value", "source"], resolved),
+          "",
+          "Consulted, in order:",
+          await this.tabulate(["source", "present", "supplied"], lookups),
+        ].join("\n"),
+      ),
     });
   }
 }

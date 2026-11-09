@@ -1,17 +1,18 @@
-import { readFile, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ConfigWiringStatus, EjectActions } from "../../../lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../lib/paths";
-import { readRendererId, readZitadelConfig } from "../../../lib/project";
+import { readIfReadable } from "@/lib/fs";
+import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { readRendererId, readZitadelConfig } from "@/lib/project";
 import {
   hashScaffoldFile,
   readScaffoldManifest,
   writeScaffoldManifest,
-} from "../../../lib/scaffold-manifest";
-import { updateScaffold } from "../../../lib/sync/state";
-import type { ScaffoldFileClass, ScaffoldManifest } from "../../../lib/sync/types";
-import { loadPatchContext } from "../patch-context";
+} from "@/lib/scaffold-manifest";
+import { updateScaffold } from "@/lib/sync/state";
+import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
@@ -192,6 +193,16 @@ export class ManagedFilesCheck implements SanityCheck {
         }
       }
     }
+    // A conditional file (one the plan writes only on an app setup created)
+    // absent now and present after the repair is one the repair wrote: a
+    // template added since this app's setup, such as the route layouts.
+    const conditional = new Set(actions.conditionalFiles ?? []);
+    const conditionalAbsent: string[] = [];
+    for (const path of conditional) {
+      if ((await readIfReadable(join(ctx.cwd, path))) === undefined) {
+        conditionalAbsent.push(path);
+      }
+    }
     await patcher.repair(patchCtx, {
       cwd: ctx.cwd,
       dryRun: ctx.dryRun,
@@ -206,7 +217,13 @@ export class ManagedFilesCheck implements SanityCheck {
       await materializeManifest(ctx, patchCtx);
       return;
     }
-    if (missingBefore.length === 0 && removed.length === 0) {
+    const conditionalWritten = new Set<string>();
+    for (const path of conditionalAbsent) {
+      if ((await readIfReadable(join(ctx.cwd, path))) !== undefined) {
+        conditionalWritten.add(path);
+      }
+    }
+    if (missingBefore.length === 0 && removed.length === 0 && conditionalWritten.size === 0) {
       return;
     }
     // Reconcile the manifest with the current template set before rewriting
@@ -215,14 +232,14 @@ export class ManagedFilesCheck implements SanityCheck {
     // *new* boundary, so a retired entry whose file stays absent must be
     // dropped — keeping it would fail doctor forever, since setup skips
     // initialized projects. Paths the repair newly introduced are adopted
-    // with their class and on-disk hash. A conditional path the repair did
-    // not bring back is one the current plan does not write for this app
-    // (Nuxt's retired plugins), so it is dropped the same way.
+    // with their class and on-disk hash, a conditional one only when this
+    // repair wrote it. A conditional path the repair did not bring back is one
+    // the current plan does not write for this app (Nuxt's retired plugins),
+    // so it is dropped the same way.
     const current = new Set(actions.markedFiles);
-    const conditional = new Set(actions.conditionalFiles ?? []);
-    const files: ScaffoldManifest["files"] = {};
+    const files: Record<string, ScaffoldFileEntry> = {};
     for (const [path, entry] of Object.entries(manifest.files)) {
-      const contents = await readIfExists(join(ctx.cwd, path));
+      const contents = await readIfReadable(join(ctx.cwd, path));
       if (contents === undefined && (!current.has(path) || conditional.has(path))) {
         continue; // retired by a template migration and gone from disk
       }
@@ -232,10 +249,10 @@ export class ManagedFilesCheck implements SanityCheck {
           : entry;
     }
     for (const path of actions.markedFiles) {
-      if (files[path] || conditional.has(path)) {
+      if (files[path] || (conditional.has(path) && !conditionalWritten.has(path))) {
         continue;
       }
-      const contents = await readIfExists(join(ctx.cwd, path));
+      const contents = await readIfReadable(join(ctx.cwd, path));
       if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
         files[path] = {
           hash: hashScaffoldFile(contents),
@@ -269,7 +286,7 @@ async function detectBoundaryConflicts(
   const conflicts: BoundaryConflict[] = [];
   for (const [current, retiredPaths] of Object.entries(actions.retiredAlternates ?? {})) {
     for (const retired of retiredPaths) {
-      const contents = await readIfExists(join(cwd, retired));
+      const contents = await readIfReadable(join(cwd, retired));
       if (contents === undefined) {
         continue;
       }
@@ -331,7 +348,7 @@ async function materializeManifest(
       if (conditional.has(path)) {
         continue;
       }
-      const contents = await readIfExists(join(ctx.cwd, path));
+      const contents = await readIfReadable(join(ctx.cwd, path));
       if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
         marked.push(path);
       }
@@ -354,7 +371,7 @@ async function evaluateManifest(
 ): Promise<{ mode: "manifest"; rows: ScaffoldFileRow[] }> {
   const rows: ScaffoldFileRow[] = [];
   for (const [path, entry] of Object.entries(manifest.files)) {
-    const contents = await readIfExists(join(cwd, path));
+    const contents = await readIfReadable(join(cwd, path));
     rows.push({ path, class: entry.class, state: stateFor(contents, entry.hash) });
   }
   return { mode: "manifest", rows };
@@ -380,7 +397,7 @@ async function evaluateTemplates(
     if (conditional.has(path)) {
       continue;
     }
-    const contents = await readIfExists(join(ctx.cwd, path));
+    const contents = await readIfReadable(join(ctx.cwd, path));
     rows.push({
       path,
       class: actions.fileClasses?.[path] ?? "presentation",
@@ -428,19 +445,11 @@ function stateFor(contents: string | undefined, hash: string | undefined): Scaff
 async function missingManifestPaths(cwd: string, manifest: ScaffoldManifest): Promise<string[]> {
   const missing: string[] = [];
   for (const path of Object.keys(manifest.files)) {
-    if ((await readIfExists(join(cwd, path))) === undefined) {
+    if ((await readIfReadable(join(cwd, path))) === undefined) {
       missing.push(path);
     }
   }
   return missing;
-}
-
-async function readIfExists(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, "utf8");
-  } catch {
-    return undefined;
-  }
 }
 
 function listPaths(rows: ReadonlyArray<ScaffoldFileRow>): string {
