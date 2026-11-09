@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
+	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 )
 
 // Variables returns the set deploymentID froze. A deployment that was never
@@ -155,6 +156,16 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 		raw, err := json.Marshal(branding)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to read a branding revision")
+		}
+		return raw, nil
+	case domain.ReleasePointerKindOauth:
+		settings, err := stmts.GetOAuthSettingsByID(ctx, projectID, pointer.RevisionID)
+		if err != nil {
+			return nil, revisionReadError(err)
+		}
+		raw, err := oauthsettings.Marshal(settings)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to read an oauth settings revision")
 		}
 		return raw, nil
 	default:

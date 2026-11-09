@@ -230,6 +230,7 @@ func newTestReleases(t *testing.T, pool *service.DB, keys service.KeyService) (s
 		service.NewBrandingService(pool),
 		service.NewIDPConnectionService(pool, validator),
 		service.NewPolicyService(pool, engine),
+		service.NewOAuthSettingsService(pool),
 		bases,
 	)
 	return releases, service.NewDeploymentService(pool, service.NewVariableService(pool, keys))
