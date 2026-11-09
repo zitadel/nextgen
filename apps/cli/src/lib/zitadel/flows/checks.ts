@@ -1,6 +1,8 @@
 /**
- * The server's flow rules, run on the login flows a user schema edit touches:
- * the edit is refused when a flow would stop validating after it, or cannot be
+ * The server's flow rules, run on the login flows a user schema edit touches.
+ *
+ * @remarks
+ * The edit is refused when a flow would stop validating after it, or cannot be
  * judged because a flow already fails. `deploy` would reject either, so the
  * edit is refused before anything is written.
  */
@@ -12,8 +14,19 @@ import { BrokenFlowsError } from "@/lib/zitadel/errors";
 import { type Flow, type MethodUse, PASSWORD_FIELD } from "@/lib/zitadel/flows/flow";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
 
-/** A flow rule's finding, and the flow file it is in. */
-export type FlowIssue = Readonly<{ path: string; issue: FlowValidationIssue }>;
+/**
+ * A flow rule's finding, and the flow file it is in.
+ */
+export type FlowIssue = Readonly<{
+  /**
+   * The flow file's project-relative path.
+   */
+  path: string;
+  /**
+   * The finding, as the server's flow rules word it.
+   */
+  issue: FlowValidationIssue;
+}>;
 
 /**
  * A step that uses a method being disabled, the flow file it is in, and the
@@ -21,26 +34,42 @@ export type FlowIssue = Readonly<{ path: string; issue: FlowValidationIssue }>;
  * left with nothing go with that step.
  */
 export type FlowMethodUse = MethodUse &
-  Readonly<{ path: string; staying: MethodUse["targetedBy"] }>;
+  Readonly<{
+    /**
+     * The flow file's project-relative path.
+     */
+    path: string;
+    /**
+     * The transitions into the step that outlive the edit.
+     */
+    staying: MethodUse["targetedBy"];
+  }>;
 
-/** What a change does to the flows that run against its schema. */
+/**
+ * What a change does to the flows that run against its schema.
+ */
 export type FlowCheck = Readonly<{
   /**
    * Errors a flow already has that stop the server's rules short of the ones
    * that read the schema, so whether the change breaks it cannot be told.
    */
   unchecked: readonly FlowIssue[];
-  /** The errors the change brings. One a flow already had is not the change's. */
+  /**
+   * The errors the change brings. One a flow already had is not the change's.
+   */
   introduced: readonly FlowIssue[];
 }>;
 
 /**
  * Refuse a schema edit that would make a flow stop validating, or that cannot
- * be judged because a flow already fails in a way that hides it. An edit that
- * changes nothing breaks nothing.
+ * be judged because a flow already fails in a way that hides it.
+ *
+ * @remarks
+ * An edit that changes nothing breaks nothing.
  *
  * @param edit - The edit.
- * @throws {@link BrokenFlowsError} Naming every issue.
+ * @throws {@link BrokenFlowsError} When a flow cannot be checked, or the edit
+ *   breaks one, naming every issue.
  */
 export function assertFlowsIntact(edit: SchemaEdit): void {
   const introduced = checkedIssues(edit);
@@ -56,14 +85,18 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
 }
 
 /**
- * Refuse turning off a method a flow still uses. Flows are not edited for the
- * developer (ADR 070 §2), so the refusal says what the edit takes: for each
- * step that uses the method, what it keeps without it, whether it is a
- * purpose's entry step, and which transitions lead to it.
+ * Refuse turning off a method a flow still uses.
+ *
+ * @remarks
+ * Flows are not edited for the developer (ADR 070 §2), so the refusal says
+ * what the edit takes: for each step that uses the method, what it keeps
+ * without it, whether it is a purpose's entry step, and which transitions lead
+ * to it.
  *
  * @param edit - The edit that turns the method off.
  * @param method - The method.
- * @throws {@link BrokenFlowsError} Naming every step that uses it.
+ * @throws {@link BrokenFlowsError} When a flow cannot be checked, or a step
+ *   still uses the method, naming every step that uses it.
  */
 export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): void {
   const introduced = checkedIssues(edit);
@@ -102,8 +135,10 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
 }
 
 /**
- * The errors an edit brings to the flows that run against its schema. A flow
- * that cannot be checked at all is refused first.
+ * The errors an edit brings to the flows that run against its schema.
+ *
+ * @remarks
+ * A flow that cannot be checked at all is refused first.
  *
  * @param edit - The edit.
  * @returns The errors it brings; none when it changes nothing.
@@ -136,62 +171,58 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
 }
 
 /**
- * What the developer edits before disabling, naming only the edits these steps
- * need: a step left with nothing goes, so what leads to it changes too.
+ * What the developer edits before disabling.
+ *
+ * @remarks
+ * Only the edits these steps need are named: a step left with nothing goes, so
+ * what leads to it changes too.
  *
  * @param method - The method being disabled.
  * @param uses - The steps that use it.
  * @returns The hint.
  */
 function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): string {
-  const emptied = uses.filter((use) => {
-    return use.keeps.length === 0;
-  });
   const removed = {
     password: `${PASSWORD_FIELD} field`,
     passkey: "passkey actions and their transitions",
   }[method];
-  const parts = [
-    `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
+  const emptied = uses.filter((use) => {
+    return use.keeps.length === 0;
+  });
+  const incoming = emptied.flatMap((use) => {
+    return use.staying;
+  });
+  const viaPurpose = incoming.some(({ purpose }) => {
+    return purpose !== undefined;
+  });
+  const retarget = viaPurpose
+    ? "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)"
+    : "retarget the transitions listed for it";
+  const isEntry = emptied.some((use) => {
+    return use.entryFor.length > 0;
+  });
+  const fixes = [
+    ...(incoming.length > 0 ? [retarget] : []),
+    ...(isEntry ? ["point the purposes key it is the entry step of at another step"] : []),
   ];
-  if (emptied.length > 0) {
-    const incoming = emptied.flatMap((use) => {
-      return use.staying;
-    });
-    const fixes: string[] = [];
-    if (
-      incoming.some(({ purpose }) => {
-        return purpose !== undefined;
-      })
-    ) {
-      fixes.push(
-        "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)",
-      );
-    } else if (incoming.length > 0) {
-      fixes.push("retarget the transitions listed for it");
-    }
-    if (
-      emptied.some((use) => {
-        return use.entryFor.length > 0;
-      })
-    ) {
-      fixes.push("point the purposes key it is the entry step of at another step");
-    }
-    if (fixes.length > 0) {
-      parts.push(`Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`);
-    } else {
-      parts.push("Delete a step left with no field or sign-in method.");
-    }
-  }
-  parts.push("`zitadel deploy --dry-run` checks the edited flow; then run the command again.");
-  return parts.join(" ");
+  const deletion =
+    fixes.length > 0
+      ? `Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`
+      : "Delete a step left with no field or sign-in method.";
+  return [
+    `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
+    ...(emptied.length > 0 ? [deletion] : []),
+    "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  ].join(" ");
 }
 
 /**
- * What a change does to one flow. The flow is held to its contract first, as
- * `deploy` holds it, because the server's rules read a malformed shape
- * leniently; then to the rules that need no schema, which must pass before the
- * ones that read the schema run at all.
+ * What a change does to one flow.
+ *
+ * @remarks
+ * The flow is held to its contract first, as `deploy` holds it, because the
+ * server's rules read a malformed shape leniently; then to the rules that need
+ * no schema, which must pass before the ones that read the schema run at all.
  *
  * @param flow - The flow as the change leaves it.
  * @param previous - The flow's body before the change.

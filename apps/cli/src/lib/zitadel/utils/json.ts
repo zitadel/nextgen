@@ -39,3 +39,18 @@ export function objectAt(body: JsonObject, key: string): JsonObject {
   }
   return {};
 }
+
+/**
+ * The list at a key, or an empty one when the key holds anything else.
+ *
+ * @param body - The object to read.
+ * @param key - The key to read.
+ * @returns The list at the key, as the very list the object holds.
+ */
+export function listAt(body: JsonObject, key: string): readonly unknown[] {
+  const value = body[key];
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return [];
+}
