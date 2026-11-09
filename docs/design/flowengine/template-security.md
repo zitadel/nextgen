@@ -109,6 +109,8 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 └─────────────────────────────────────────────────────┘
 ```
 
+In Layer 2, DOMPurify's DOM clobbering guard (`SANITIZE_DOM`) is disabled, because the sanitised HTML renders inside the `<zitadel-login>` shadow root, which `document` and `window` named access cannot reach, and the only form in that tree is the orchestrator's own. Named access on that form can only shadow the form's own methods, and the orchestrator reads none of its named properties. A field named after a form method, such as `requestSubmit` or `reset`, breaks submit or reset for that template only.
+
 ## Summary
 
 | Vector | Primary Mitigation | Fallback |
