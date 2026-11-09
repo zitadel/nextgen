@@ -2471,6 +2471,24 @@ export async function aFreshCheckoutOf(project: ScaffoldedApp): Promise<Scaffold
 }
 
 /**
+ * A {@link aFreshCheckoutOf} that already holds a local human-user schema its
+ * contract refuses: only the object type the project's own schema has, so a
+ * pull has to replace it rather than write a second schema beside it.
+ *
+ * @param project - The project to check out again.
+ * @returns The checkout, holding the refused schema.
+ */
+export async function aFreshCheckoutHoldingARefusedSchemaOf(
+  project: ScaffoldedApp,
+): Promise<ScaffoldedApp> {
+  const checkout = await aFreshCheckoutOf(project);
+  const schema = JSON.parse(await project.readProjectFile(SCHEMA_FILE));
+  await mkdir(join(checkout.path, ".zitadel/schemas"), { recursive: true });
+  await checkout.writeProjectFile(SCHEMA_FILE, JSON.stringify({ objectType: schema.objectType }));
+  return checkout;
+}
+
+/**
  * An app through `setup` with its commit kept, so a release built from it
  * records a git sha and a later deploy has a baseline to diff against.
  */

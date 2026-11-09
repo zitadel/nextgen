@@ -1,35 +1,14 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
+  aFreshCheckoutHoldingARefusedSchemaOf,
   aFreshCheckoutOf,
   anUndeployedEnvironment,
   aSetUpApp,
-  type ScaffoldedApp,
 } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
-
-/**
- * Where setup writes the human-user schema.
- */
-const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
-
-/**
- * Write a local schema its contract refuses, which holds the object type the
- * app's own schema has.
- *
- * @param project - The app that holds the schema.
- * @param checkout - The checkout to write it in.
- */
-async function aRefusedSchemaIn(project: ScaffoldedApp, checkout: ScaffoldedApp): Promise<void> {
-  const schema = JSON.parse(await project.readProjectFile(SCHEMA_FILE));
-  await mkdir(join(checkout.path, ".zitadel/schemas"), { recursive: true });
-  await checkout.writeProjectFile(SCHEMA_FILE, JSON.stringify({ objectType: schema.objectType }));
-}
 
 describe("pull", () => {
   describe("against an invalid server", () => {
@@ -91,11 +70,20 @@ describe("pull", () => {
         expect(await checkout.deploy()).toSucceed();
       });
 
-      it("replaces a local schema its contract refuses rather than writing a second one", async () => {
+      it("succeeds over a local schema its contract refuses", async () => {
         const project = await aSetUpApp();
         await project.deployData();
-        const checkout = await aFreshCheckoutOf(project);
-        await aRefusedSchemaIn(project, checkout);
+        const checkout = await aFreshCheckoutHoldingARefusedSchemaOf(project);
+
+        const result = await checkout.run(["pull", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("replaces a local schema its contract refuses so the checkout deploys", async () => {
+        const project = await aSetUpApp();
+        await project.deployData();
+        const checkout = await aFreshCheckoutHoldingARefusedSchemaOf(project);
 
         await checkout.run(["pull", "--json"]);
 
