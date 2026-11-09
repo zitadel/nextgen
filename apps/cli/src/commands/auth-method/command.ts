@@ -360,6 +360,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         consola.success(`Updated ${path}`);
       }
     }
+    for (const path of change.removedPaths) {
+      consola.success(`Removed ${path}`);
+    }
     return written;
   }
 

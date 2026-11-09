@@ -113,7 +113,7 @@ import {
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import type { Asker } from "@/lib/input";
-import { type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
+import { Connection, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { normalizePublicCliProse } from "@/lib/public-cli";
@@ -1982,7 +1982,12 @@ export default class Setup extends Destructive(BaseCommand) {
     const scaffold = await scaffoldOf(this.cwd, this.force, answers);
     const store = new DiskStore(this.cwd);
     const saved = await scaffold.change
-      .save(store, { overwrite: this.force })
+      .save(store, {
+        overwrite: this.force,
+        createOnly: (document) => {
+          return document instanceof Connection;
+        },
+      })
       .catch((error: unknown) => {
         throw setupRefusal(error, scaffold.connections);
       });

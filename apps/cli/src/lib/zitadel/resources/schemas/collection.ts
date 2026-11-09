@@ -1,6 +1,5 @@
 import { Change, type Notice } from "@/lib/zitadel/change";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
-import type { DocumentFile } from "@/lib/zitadel/resources/document";
 import { AmbiguousSchemaError, NoSignInLeftError, SchemaNotFoundError } from "@/lib/zitadel/errors";
 import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
@@ -45,16 +44,6 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * Where a document goes when no file holds its handle.
    */
   protected readonly directory = CONFIG_DIRECTORIES.schemas;
-
-  /**
-   * Make a new document of the kind, for a revision a release pinned.
-   *
-   * @param file - Its path and body.
-   * @returns The document.
-   */
-  protected createDocument(file: DocumentFile): UserSchema {
-    return UserSchema.create(file);
-  }
 
   /**
    * Turn a method on for a user schema.

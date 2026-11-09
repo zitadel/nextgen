@@ -3,7 +3,6 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 import { NotFoundError } from "@/lib/zitadel/errors";
 import { type PropertyPath, propertyName, propertyPath, type StepName } from "@/lib/zitadel/names";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
-import type { DocumentFile } from "@/lib/zitadel/resources/document";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import {
@@ -27,16 +26,6 @@ export class Flows extends PinnedCollection<Flow> {
    * Where a flow goes when no file holds its name.
    */
   protected readonly directory = CONFIG_DIRECTORIES.flows;
-
-  /**
-   * Make a new flow, for a revision a release pinned.
-   *
-   * @param file - Its path and body.
-   * @returns The flow.
-   */
-  protected createDocument(file: DocumentFile): Flow {
-    return Flow.create(file);
-  }
 
   /**
    * Every provider a flow step offers, once for each time a step lists it.

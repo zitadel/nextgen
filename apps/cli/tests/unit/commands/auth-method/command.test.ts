@@ -426,6 +426,19 @@ describe("AuthMethodCommand.write", () => {
     expect(success).toHaveBeenCalledWith(`Updated ${SCHEMA_FILE}`);
   });
 
+  it("says it removed a file the change deletes", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const success = vi.spyOn(consola, "success").mockImplementation(() => {
+      return undefined;
+    });
+
+    await writer.writeChange(read, read.config.schemas.remove(SCHEMA_FILE));
+
+    expect(success).toHaveBeenCalledWith(`Removed ${SCHEMA_FILE}`);
+  });
+
   it("writes the change to the Project", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);

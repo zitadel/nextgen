@@ -1,5 +1,7 @@
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
+import { FileExistsError } from "@/lib/zitadel/errors";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
+import type { ConfigFile } from "@/lib/zitadel/types";
 
 /**
  * Every way a caller reports a notice: a warning for something to act on, info
@@ -45,6 +47,18 @@ type TextFile = {
 };
 
 /**
+ * A JSON file a change writes as given, without the contract of any kind
+ * having taken it, such as a revision a release pinned.
+ */
+export type WrittenFile = ConfigFile & {
+  /**
+   * Whether the file replaces one already there, so it counts as edited
+   * rather than created.
+   */
+  readonly replaces: boolean;
+};
+
+/**
  * What saving does about a new file that is already on disk.
  */
 export type SaveOptions = {
@@ -52,6 +66,32 @@ export type SaveOptions = {
    * Replace it instead of refusing, as `--force` asks.
    */
   readonly overwrite?: boolean;
+
+  /**
+   * Which documents are only ever created, even when `overwrite` is set: a
+   * taken path refuses, whether or not the document was read. All of them may be replaced when left out.
+   */
+  readonly createOnly?: (document: AnyDocument) => boolean;
+};
+
+/**
+ * One file write, waiting for its turn.
+ */
+type PendingWrite = {
+  /**
+   * The project-relative path.
+   */
+  readonly path: string;
+
+  /**
+   * Whether it creates the file or replaces it.
+   */
+  readonly mode: WriteMode;
+
+  /**
+   * Write it.
+   */
+  readonly run: () => Promise<void>;
 };
 
 /**
@@ -77,6 +117,12 @@ export type ChangeInput = {
    * The text files it writes beside the documents; none when left out.
    */
   readonly texts?: readonly TextFile[];
+
+  /**
+   * The JSON files it writes as given, beside the documents; none when left
+   * out.
+   */
+  readonly files?: readonly WrittenFile[];
 };
 
 /**
@@ -113,6 +159,11 @@ export class Change {
   private readonly texts: readonly TextFile[];
 
   /**
+   * The JSON files the change writes as given, beside the documents.
+   */
+  private readonly files: readonly WrittenFile[];
+
+  /**
    * Describe an edit that has been made in memory and not yet written.
    *
    * @param input - The configuration before and after, what to say about the
@@ -123,6 +174,7 @@ export class Change {
     this.after = input.after;
     this.notices = input.notices ?? [];
     this.texts = input.texts ?? [];
+    this.files = input.files ?? [];
   }
 
   /**
@@ -131,7 +183,7 @@ export class Change {
    * @returns Their project-relative paths, documents first.
    */
   get changedPaths(): readonly string[] {
-    return this.pathsWithTexts(this.after.changedDocuments);
+    return this.pathsWithTexts(this.after.changedDocuments, this.files);
   }
 
   /**
@@ -143,7 +195,12 @@ export class Change {
     const created = this.after.changedDocuments.filter((document) => {
       return document.status === "created";
     });
-    return this.pathsWithTexts(created);
+    return this.pathsWithTexts(
+      created,
+      this.files.filter((file) => {
+        return !file.replaces;
+      }),
+    );
   }
 
   /**
@@ -180,6 +237,7 @@ export class Change {
       after: this.after,
       notices: this.notices,
       texts: [...this.texts, { path, text }],
+      files: this.files,
     });
   }
 
@@ -187,29 +245,66 @@ export class Change {
    * Write what the change edits, then delete what it removes.
    *
    * @remarks
-   * New files go first, so one that is already on disk refuses the write
-   * before any other file is touched; deletions go last, so a write that
+   * Every write that creates a file, a document or a text, goes first, so one
+   * that is already on disk refuses the write before any file is replaced or
+   * deleted; deletions go last, so a write that
    * fails leaves every file that was there. One file at a time, in that order.
    *
    * @param store - Where the configuration is kept.
-   * @param options - Whether a new file may replace one already there.
-   * @returns The paths written, not those deleted.
+   * @param options - Whether a new file may replace one already there, and
+   *   which documents never may.
+   * @returns The paths written, not those deleted, which
+   *   {@link Change.removedPaths} lists.
    * @throws {@link FileExistsError} When a new file is already on disk and
    *   may not be replaced.
    */
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
     const overwrite = options.overwrite === true;
-    // A copy, so sorting it changes nothing the configuration holds.
-    const documents = [...this.after.changedDocuments].sort((a, b) => {
-      return Number(b.status === "created") - Number(a.status === "created");
+    const keepsCreating = options.createOnly;
+    const documents = this.after.changedDocuments.map((document): PendingWrite => {
+      const mode = this.modeOf(document, overwrite, keepsCreating);
+      return {
+        path: document.path,
+        mode,
+        run: async (): Promise<void> => {
+          await store.write(document.file, mode);
+        },
+      };
     });
-    for (const document of documents) {
-      const mode: WriteMode = overwrite ? "replace" : document.writeMode;
-      await store.write(document.file, mode);
-    }
     const textMode: WriteMode = overwrite ? "replace" : "create";
-    for (const file of this.texts) {
-      await store.writeText(file.path, file.text, textMode);
+    const texts = this.texts.map((file): PendingWrite => {
+      return {
+        path: file.path,
+        mode: textMode,
+        run: async (): Promise<void> => {
+          await store.writeText(file.path, file.text, textMode);
+        },
+      };
+    });
+    const files = this.files.map((file): PendingWrite => {
+      const mode: WriteMode = overwrite || file.replaces ? "replace" : "create";
+      return {
+        path: file.path,
+        mode,
+        run: async (): Promise<void> => {
+          await store.write({ path: file.path, body: file.body }, mode);
+        },
+      };
+    });
+    // A copy, so sorting it changes nothing the configuration holds. The sort
+    // is stable, so create-mode writes keep their order, and so do the rest.
+    const writes = [...documents, ...files, ...texts].sort((a, b) => {
+      return Number(b.mode === "create") - Number(a.mode === "create");
+    });
+    // Every file to create is checked before any is written, so a taken path
+    // refuses with nothing touched, not after the files before it.
+    for (const write of writes) {
+      if (write.mode === "create" && (await store.exists(write.path))) {
+        throw new FileExistsError(write.path);
+      }
+    }
+    for (const write of writes) {
+      await write.run();
     }
     for (const path of this.removedPaths) {
       await store.remove(path);
@@ -218,14 +313,41 @@ export class Change {
   }
 
   /**
-   * The paths of some of the documents the change writes, then of every text
-   * file it writes, which is always new.
+   * How a document's file is written.
+   *
+   * @param document - The document.
+   * @param overwrite - Whether a new file may replace one already there.
+   * @param createOnly - Which documents never may, if any.
+   * @returns `create` for a document that never replaces a file, `replace`
+   *   under overwrite, and otherwise the document's own mode.
+   */
+  private modeOf(
+    document: AnyDocument,
+    overwrite: boolean,
+    createOnly: SaveOptions["createOnly"],
+  ): WriteMode {
+    if (createOnly !== undefined && createOnly(document)) {
+      return "create";
+    }
+    if (overwrite) {
+      return "replace";
+    }
+    return document.writeMode;
+  }
+
+  /**
+   * The paths of some of the documents the change writes, then of some of its
+   * JSON files, then of every text file it writes, which is always new.
    *
    * @param documents - The documents.
+   * @param files - The JSON files.
    * @returns Their project-relative paths, documents first.
    */
-  private pathsWithTexts(documents: readonly AnyDocument[]): readonly string[] {
-    return [...documents, ...this.texts].map((file) => {
+  private pathsWithTexts(
+    documents: readonly AnyDocument[],
+    files: readonly WrittenFile[],
+  ): readonly string[] {
+    return [...documents, ...files, ...this.texts].map((file) => {
       return file.path;
     });
   }

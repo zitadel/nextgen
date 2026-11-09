@@ -87,7 +87,7 @@ type Parts = {
   readonly policyTests: readonly PolicyTest[];
   readonly brandings: readonly Branding[];
   readonly broken: readonly BrokenFile[];
-  readonly removed: readonly AnyDocument[];
+  readonly removed: readonly (AnyDocument | BrokenFile)[];
   readonly options: ConfigOptions;
 };
 
@@ -157,10 +157,10 @@ export class ZitadelConfig {
   readonly options: ConfigOptions;
 
   /**
-   * The documents removed since the configuration was read, in the order they
-   * were removed, whose files saving deletes.
+   * The documents and broken files removed since the configuration was read,
+   * in the order they were removed, whose files saving deletes.
    */
-  readonly removedDocuments: readonly AnyDocument[];
+  readonly removedDocuments: readonly (AnyDocument | BrokenFile)[];
 
   /**
    * Hold the documents of a configuration in their collections.
@@ -530,6 +530,27 @@ export class ZitadelConfig {
       return new ZitadelConfig(parts);
     }
     return new ZitadelConfig({ ...parts, removed: [...this.removedDocuments, document] });
+  }
+
+  /**
+   * The configuration without a broken file, whose file saving then deletes.
+   *
+   * @remarks
+   * The step removing a file no document holds is built from; a caller removes
+   * through a collection, which returns a {@link Change}.
+   *
+   * @param file - The broken file to remove.
+   * @returns The new configuration.
+   */
+  withoutBroken(file: BrokenFile): ZitadelConfig {
+    const broken = this.broken.filter((current) => {
+      return current.path !== file.path;
+    });
+    return new ZitadelConfig({
+      ...this.parts,
+      broken,
+      removed: [...this.removedDocuments, file],
+    });
   }
 
   /**

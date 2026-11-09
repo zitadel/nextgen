@@ -6,6 +6,7 @@ import {
   aFile,
   aLoginFlow,
   aPasswordPolicy,
+  aStore,
   aUserSchema,
   type ConfigDocuments,
 } from "@tests/helpers/config";
@@ -53,6 +54,28 @@ const HUMAN_USER_SCHEMA = aUserSchema({ objectType: "human-user" });
 const HOLDING_HUMAN_USER: ConfigDocuments = {
   schemas: { "default-human-user.json": { $schema: POINTER, ...HUMAN_USER_SCHEMA } },
 };
+
+/**
+ * A body the schema contract refuses, which holds the handle `human-user`.
+ */
+const REFUSED_SCHEMA = { objectType: "human-user" };
+
+/**
+ * The file that holds {@link REFUSED_SCHEMA}.
+ */
+const REFUSED_SCHEMA_FILE = `${CONFIG_DIRECTORIES.schemas}/refused.json`;
+
+/**
+ * A configuration holding {@link REFUSED_SCHEMA} as a broken file.
+ */
+const HOLDING_REFUSED_SCHEMA: ConfigDocuments = {
+  schemas: { "refused.json": REFUSED_SCHEMA },
+};
+
+/**
+ * A flow body the flow contract refuses, which holds the name `default-login`.
+ */
+const REFUSED_FLOW = { name: "default-login" };
 
 /**
  * A new policy at the lockout policy's file, not yet written.
@@ -125,6 +148,38 @@ describe("Collection.findByHandle", () => {
   });
 });
 
+describe("Collection.locate", () => {
+  describe("when a broken schema holds the handle in its raw objectType", () => {
+    it("is that file rather than a second one", () => {
+      const config = aConfig(HOLDING_REFUSED_SCHEMA);
+
+      const path = config.schemas.locate("human-user");
+
+      expect(path).toBe(REFUSED_SCHEMA_FILE);
+    });
+  });
+
+  describe("when a broken flow holds the handle in its raw name", () => {
+    it("is that file rather than a second one", () => {
+      const config = aConfig({ flows: { "refused.json": REFUSED_FLOW } });
+
+      const path = config.flows.locate("default-login");
+
+      expect(path).toBe(`${CONFIG_DIRECTORIES.flows}/refused.json`);
+    });
+  });
+
+  describe("when a broken file of another kind holds the handle", () => {
+    it("is the handle's own file name", () => {
+      const config = aConfig({ flows: { "refused.json": { objectType: "human-user" } } });
+
+      const path = config.schemas.locate("human-user");
+
+      expect(path).toBe(`${CONFIG_DIRECTORIES.schemas}/human-user.json`);
+    });
+  });
+});
+
 describe("Collection.placeRevision", () => {
   describe("when no file holds the handle", () => {
     it("writes the revision as a new file", () => {
@@ -134,33 +189,45 @@ describe("Collection.placeRevision", () => {
 
       expect(change.createdPaths).toEqual([`${CONFIG_DIRECTORIES.schemas}/human-user.json`]);
     });
+
+    it("writes a revision the local contract refuses, as the server answered it", async () => {
+      const store = aStore();
+
+      await ZitadelConfig.empty().schemas.placeRevision("human-user", REFUSED_SCHEMA).save(store);
+
+      expect(await store.read("schemas")).toEqual([
+        { path: `${CONFIG_DIRECTORIES.schemas}/human-user.json`, body: REFUSED_SCHEMA },
+      ]);
+    });
   });
 
   describe("when a file holds the handle", () => {
-    it("carries the editor's $schema pointer over from it", () => {
-      const config = aConfig(HOLDING_HUMAN_USER);
+    it("carries the editor's $schema pointer over from it", async () => {
+      const store = aStore(HOLDING_HUMAN_USER);
 
-      const change = config.schemas.placeRevision("human-user", {
-        ...HUMAN_USER_SCHEMA,
-        type: "object",
-      });
+      await aConfig(HOLDING_HUMAN_USER)
+        .schemas.placeRevision("human-user", { ...HUMAN_USER_SCHEMA, type: "object" })
+        .save(store);
 
-      expect(change.after.schemas.get(HUMAN_USER)?.body).toEqual({
-        ...HUMAN_USER_SCHEMA,
-        type: "object",
-        $schema: POINTER,
-      });
+      expect(await store.read("schemas")).toEqual([
+        {
+          path: HUMAN_USER,
+          body: { ...HUMAN_USER_SCHEMA, type: "object", $schema: POINTER },
+        },
+      ]);
     });
 
-    it("keeps a $schema pointer the revision has of its own", () => {
-      const config = aConfig(HOLDING_HUMAN_USER);
+    it("keeps a $schema pointer the revision has of its own", async () => {
+      const store = aStore(HOLDING_HUMAN_USER);
 
-      const change = config.schemas.placeRevision("human-user", {
-        $schema: "https://example.test/schema.json",
-        ...HUMAN_USER_SCHEMA,
-      });
+      await aConfig(HOLDING_HUMAN_USER)
+        .schemas.placeRevision("human-user", {
+          $schema: "https://example.test/schema.json",
+          ...HUMAN_USER_SCHEMA,
+        })
+        .save(store);
 
-      expect(change.after.schemas.get(HUMAN_USER)?.body.$schema).toBe(
+      expect((await store.read("schemas"))[0]?.body.$schema).toBe(
         "https://example.test/schema.json",
       );
     });
@@ -171,6 +238,42 @@ describe("Collection.placeRevision", () => {
       const change = config.schemas.placeRevision("human-user", HUMAN_USER_SCHEMA);
 
       expect(change.changed).toBe(false);
+    });
+
+    it("counts the replacement as edited, not created", () => {
+      const config = aConfig(HOLDING_HUMAN_USER);
+
+      const change = config.schemas.placeRevision("human-user", {
+        ...HUMAN_USER_SCHEMA,
+        type: "object",
+      });
+
+      expect(change.createdPaths).toEqual([]);
+    });
+
+    it("lists the replaced file as changed", () => {
+      const config = aConfig(HOLDING_HUMAN_USER);
+
+      const change = config.schemas.placeRevision("human-user", {
+        ...HUMAN_USER_SCHEMA,
+        type: "object",
+      });
+
+      expect(change.changedPaths).toEqual([HUMAN_USER]);
+    });
+  });
+
+  describe("when a broken file holds the handle", () => {
+    it("replaces it with the revision rather than writing a second file", async () => {
+      const store = aStore(HOLDING_REFUSED_SCHEMA);
+
+      await aConfig(HOLDING_REFUSED_SCHEMA)
+        .schemas.placeRevision("human-user", HUMAN_USER_SCHEMA)
+        .save(store);
+
+      expect(await store.read("schemas")).toEqual([
+        { path: REFUSED_SCHEMA_FILE, body: HUMAN_USER_SCHEMA },
+      ]);
     });
   });
 });
@@ -230,6 +333,22 @@ describe("Collection.remove", () => {
     const change = config.policies.remove(LOCKOUT);
 
     expect(change.changed).toBe(false);
+  });
+
+  it("deletes a broken file at the path", () => {
+    const config = aConfig(HOLDING_REFUSED_SCHEMA);
+
+    const change = config.schemas.remove(REFUSED_SCHEMA_FILE);
+
+    expect(change.removedPaths).toEqual([REFUSED_SCHEMA_FILE]);
+  });
+
+  it("no longer holds the broken file once removed", () => {
+    const config = aConfig(HOLDING_REFUSED_SCHEMA);
+
+    const change = config.schemas.remove(REFUSED_SCHEMA_FILE);
+
+    expect(change.after.broken).toEqual([]);
   });
 
   it("leaves a document of another kind at the path alone", () => {

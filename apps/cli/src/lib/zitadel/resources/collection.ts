@@ -2,8 +2,34 @@ import { isDeepStrictEqual } from "node:util";
 
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
-import type { DocumentFile } from "@/lib/zitadel/resources/document";
-import type { ConfigDirectory, JsonObject } from "@/lib/zitadel/types";
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
+import type { DocumentKind } from "@/lib/zitadel/resources/document";
+import { CONFIG_DIRECTORIES, type ConfigDirectory, type JsonObject } from "@/lib/zitadel/types";
+
+/**
+ * Where a file of a kind a release pins by handle keeps the handle in its raw
+ * body, so a file its contract refuses can still be found by it.
+ */
+type HandleField = {
+  /**
+   * The kind of document a file there is read as.
+   */
+  readonly kind: DocumentKind;
+
+  /**
+   * The key of the raw body that holds the handle.
+   */
+  readonly key: string;
+};
+
+/**
+ * The handle field of each directory a release pins documents of: a schema's
+ * `objectType` and a flow's `name`.
+ */
+const HANDLE_FIELDS: Readonly<Partial<Record<ConfigDirectory, HandleField>>> = {
+  [CONFIG_DIRECTORIES.schemas]: { kind: "schema", key: "objectType" },
+  [CONFIG_DIRECTORIES.flows]: { kind: "flow", key: "name" },
+};
 
 /**
  * The documents of one kind in a configuration, and the edits every kind
@@ -105,18 +131,23 @@ export class Collection<T extends AnyDocument> {
    * Remove the document at a path, which saving the change deletes.
    *
    * @remarks
-   * A path that holds no document of the kind changes nothing, so removing
-   * one twice is not an error.
+   * A broken file at the path is removed too, since it stands in the way just
+   * as a document does. A path that holds neither changes nothing, so
+   * removing one twice is not an error.
    *
    * @param path - The document's project-relative path.
    * @returns The change.
    */
   remove(path: string): Change {
     const document = this.get(path);
-    if (document === undefined) {
-      return new Change({ before: this.config, after: this.config });
+    if (document !== undefined) {
+      return new Change({ before: this.config, after: this.config.without(document) });
     }
-    return new Change({ before: this.config, after: this.config.without(document) });
+    const broken = this.config.findBroken(path);
+    if (broken !== undefined) {
+      return new Change({ before: this.config, after: this.config.withoutBroken(broken) });
+    }
+    return new Change({ before: this.config, after: this.config });
   }
 }
 
@@ -133,22 +164,18 @@ export abstract class PinnedCollection<T extends AnyDocument> extends Collection
   protected abstract readonly directory: ConfigDirectory;
 
   /**
-   * Make a new document of the kind.
-   *
-   * @param file - Its path and body.
-   * @returns The document.
-   */
-  protected abstract createDocument(file: DocumentFile): T;
-
-  /**
    * Locate where a document a release pins by a handle goes: the file that
    * holds the handle, or `<handle>.json` when none does.
+   *
+   * @remarks
+   * A file its contract refuses still holds the handle in its raw body, and
+   * writing `<handle>.json` beside it would give the handle two files.
    *
    * @param handle - The handle.
    * @returns The project-relative path.
    */
   locate(handle: string): string {
-    const holder = this.findByHandle(handle);
+    const holder = this.findByHandle(handle) ?? this.findBrokenByHandle(handle);
     if (holder !== undefined) {
       return holder.path;
     }
@@ -163,8 +190,10 @@ export abstract class PinnedCollection<T extends AnyDocument> extends Collection
    * The server never echoes the editor-only `$schema` pointer, so the one in
    * the file there is carried over unless the revision has its own. A file
    * that already holds exactly this is left alone, so the change writes
-   * nothing. The revision is written whole, as a new document, so saving the
-   * change over a file already there takes `overwrite`.
+   * nothing. The revision is written as the server answered it, whether or
+   * not the local contract takes it: what a release pinned is what `pull`
+   * writes, and the next deploy validates it. A file already there is
+   * replaced, so it counts as edited, and saving needs no `overwrite`.
    *
    * @param handle - The handle the release pins it by.
    * @param revision - The body as the server answered it.
@@ -172,13 +201,33 @@ export abstract class PinnedCollection<T extends AnyDocument> extends Collection
    */
   placeRevision(handle: string, revision: JsonObject): Change {
     const path = this.locate(handle);
-    const there = this.get(path);
+    const there = this.get(path) ?? this.config.findBroken(path);
     const pointer = there?.body.$schema;
     const carried = typeof pointer === "string" && !("$schema" in revision);
     const body = carried ? { ...revision, $schema: pointer } : revision;
     if (there !== undefined && isDeepStrictEqual(there.body, body)) {
       return new Change({ before: this.config, after: this.config });
     }
-    return this.put(this.createDocument({ path, body }));
+    return new Change({
+      before: this.config,
+      after: this.config,
+      files: [{ path, body, replaces: there !== undefined }],
+    });
+  }
+
+  /**
+   * Find the broken file of the kind whose raw body holds a handle.
+   *
+   * @param handle - The handle.
+   * @returns The first broken file that holds it, or `undefined` when none does.
+   */
+  private findBrokenByHandle(handle: string): BrokenFile | undefined {
+    const field = HANDLE_FIELDS[this.directory];
+    if (field === undefined) {
+      return undefined;
+    }
+    return this.config.broken.find((file) => {
+      return file.kind === field.kind && file.body[field.key] === handle;
+    });
   }
 }

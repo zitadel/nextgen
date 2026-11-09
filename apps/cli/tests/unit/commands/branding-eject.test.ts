@@ -194,6 +194,16 @@ describe("branding eject", () => {
     expect(res.stdout + res.stderr).toContain("E_CONFLICT");
   });
 
+  it("writes no descriptor when the template is already there", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/branding"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/branding/login.liquid"), "mine");
+
+    await eject(cwd);
+
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
+  });
+
   it("--force replaces the scaffolded files with the chosen design", async () => {
     const cwd = await makeProject();
     await eject(cwd);
