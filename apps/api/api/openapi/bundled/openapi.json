@@ -11414,6 +11414,35 @@
         }
       }
     },
+    "oauth_settings.created": {
+      "post": {
+        "operationId": "oauthSettingsCreated",
+        "summary": "oauth_settings.created",
+        "description": "A project published a new revision of its OAuth settings, which say\nwhether its OAuth authorization server answers. A release build\npublishes one when the bundle's `oauth` resource differs from every\nearlier revision.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/oauth_settings-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "origin.added": {
       "post": {
         "operationId": "originAdded",
@@ -18975,6 +19004,46 @@
           }
         }
       },
+      "oauthset-not_found": {
+        "description": "Oauth settings: not found\n\nError code: oauthset.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "oauthset.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "oauthset-permission_denied": {
+        "description": "Oauth settings: requires an operator-grade token bound to the project (project.write or an oauth_settings.* scope)\n\nError code: oauthset.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "oauthset.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "oauth-settings": {
         "x-meta-schema": true,
         "type": "object",
@@ -22870,6 +22939,45 @@
           }
         ]
       },
+      "oauth-settings-created-payload": {
+        "title": "OAuthSettingsCreatedPayload",
+        "type": "object",
+        "description": "Payload for `oauth_settings.created`: the settings the new revision holds.\nThe revision id is the event's `entity_id`.\n",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the project's OAuth authorization server answers."
+          }
+        }
+      },
+      "oauth_settings-created-event": {
+        "title": "OauthSettingsCreatedEvent",
+        "description": "An event of type oauth_settings.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "oauth_settings.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/oauth-settings-created-payload"
+              }
+            }
+          }
+        ]
+      },
       "origin-payload": {
         "title": "OriginPayload",
         "type": "object",
@@ -23794,6 +23902,9 @@
             "$ref": "#/components/schemas/idp-updated-event"
           },
           {
+            "$ref": "#/components/schemas/oauth_settings-created-event"
+          },
+          {
             "$ref": "#/components/schemas/origin-added-event"
           },
           {
@@ -23887,6 +23998,7 @@
             "idp.created": "#/components/schemas/idp-created-event",
             "idp.identity_link.created": "#/components/schemas/idp-identity_link-created-event",
             "idp.updated": "#/components/schemas/idp-updated-event",
+            "oauth_settings.created": "#/components/schemas/oauth_settings-created-event",
             "origin.added": "#/components/schemas/origin-added-event",
             "origin.removed": "#/components/schemas/origin-removed-event",
             "policy.created": "#/components/schemas/policy-created-event",
@@ -25530,6 +25642,20 @@
         "value": {
           "code": "brnd.missing_project_id",
           "message": "branding: missing project id"
+        }
+      },
+      "oauthset-not_found": {
+        "summary": "oauthset.not_found",
+        "value": {
+          "code": "oauthset.not_found",
+          "message": "oauth settings: not found"
+        }
+      },
+      "oauthset-permission_denied": {
+        "summary": "oauthset.permission_denied",
+        "value": {
+          "code": "oauthset.permission_denied",
+          "message": "oauth settings: requires an operator-grade token bound to the project (project.write or an oauth_settings.* scope)"
         }
       },
       "idp-field_immutable": {
@@ -32051,6 +32177,12 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/oauthset-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/oauthset-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -32063,6 +32195,8 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "oauthset.not_found": "#/components/schemas/oauthset-not_found",
+                  "oauthset.permission_denied": "#/components/schemas/oauthset-permission_denied",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
                 }
@@ -32077,6 +32211,12 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "oauthset.not_found": {
+                "$ref": "#/components/examples/oauthset-not_found"
+              },
+              "oauthset.permission_denied": {
+                "$ref": "#/components/examples/oauthset-permission_denied"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"

@@ -134,6 +134,7 @@ const (
 	IdpCreatedOperation                    OperationName = "IdpCreated"
 	IdpIdentityLinkCreatedOperation        OperationName = "IdpIdentityLinkCreated"
 	IdpUpdatedOperation                    OperationName = "IdpUpdated"
+	OauthSettingsCreatedOperation          OperationName = "OauthSettingsCreated"
 	OriginAddedOperation                   OperationName = "OriginAdded"
 	OriginRemovedOperation                 OperationName = "OriginRemoved"
 	PolicyCreatedOperation                 OperationName = "PolicyCreated"

@@ -7,6 +7,8 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/oauthset-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/oauthset-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
@@ -15,6 +17,8 @@ content:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          oauthset.not_found: '../../../components/schemas/errors/oauthset-not_found.yaml'
+          oauthset.permission_denied: '../../../components/schemas/errors/oauthset-permission_denied.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
@@ -24,6 +28,10 @@ content:
         $ref: '../../../components/examples/errors/internal.yaml'
       not_implemented:
         $ref: '../../../components/examples/errors/not_implemented.yaml'
+      oauthset.not_found:
+        $ref: '../../../components/examples/errors/oauthset-not_found.yaml'
+      oauthset.permission_denied:
+        $ref: '../../../components/examples/errors/oauthset-permission_denied.yaml'
       req.invalid:
         $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:

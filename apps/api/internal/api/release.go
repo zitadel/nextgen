@@ -62,11 +62,6 @@ func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest
 	if err := requireBuildKindScopes(ctx, req.Bundle); err != nil {
 		return nil, err
 	}
-	// TODO(#2793): drop once the release service stores OAuth settings.
-	if req.Bundle.OAuth.IsSet() {
-		return oauthSettingsUnsupportedBadRequest(ctx), nil
-	}
-
 	input, err := mapBuildReleaseRequest(projectID, req)
 	if err != nil {
 		return nil, err
@@ -189,6 +184,13 @@ func mapBuildReleaseRequest(projectID string, req *api.BuildReleaseRequest) (ser
 			Shape:          brandingShapeFromAPI(branding.Shape),
 		}
 	}
+
+	if settings, ok := req.Bundle.OAuth.Get(); ok {
+		input.OAuth = &service.CreateOAuthSettingsInput{
+			ProjectID: projectID,
+			Enabled:   settings.Enabled,
+		}
+	}
 	return input, nil
 }
 
@@ -218,22 +220,6 @@ func bundleValidationBadRequest(ctx context.Context, err *service.BundleValidati
 	return buildReleaseBadRequest(resources)
 }
 
-// oauthSettingsUnsupportedBadRequest refuses a bundle that carries oauth while
-// the contract admits it ahead of the service that stores it. The entry names
-// the resource as a validation failure would, so the caller removes it from
-// the bundle and builds again.
-func oauthSettingsUnsupportedBadRequest(ctx context.Context) *api.BuildReleaseBadRequest {
-	err := domain.ErrReleaseInvalid(nil, nil).WithMessage(
-		"release: oauth is not supported by this server yet; remove it from the bundle")
-	errlog.Log(ctx, err)
-	return buildReleaseBadRequest([]api.BundleResourceError{{
-		Code:    api.ErrorCode(err.Code),
-		Message: err.Message,
-		Kind:    api.ReleasePointerKindOAuth,
-		Handle:  api.NewOptString(domain.ReleaseOAuthHandle),
-	}})
-}
-
 // buildReleaseBadRequest wraps the refused resources in the rel.invalid
 // envelope the 400 of POST /releases/build carries.
 func buildReleaseBadRequest(resources []api.BundleResourceError) *api.BuildReleaseBadRequest {
@@ -257,8 +243,7 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 		if err != nil {
 			// The decoder rejects kinds outside the wire enum with req.invalid,
 			// so this is reached only by a kind the contract admits before the
-			// service resolves it: idp and oauth, until the release service
-			// learns them.
+			// service resolves it.
 			return nil, domain.ErrReleaseInvalid("unknown pointer kind", err)
 		}
 		pointers = append(pointers, service.CreateReleasePointer{
