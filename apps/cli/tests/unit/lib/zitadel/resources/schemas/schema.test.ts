@@ -370,3 +370,15 @@ describe("UserSchema.withoutMethod", () => {
     expect(edit).toEqual({ document: schema, changed: false, skipped: [] });
   });
 });
+
+describe("UserSchema.isSignInMethod", () => {
+  it.each([
+    ["password", true],
+    ["passkey", true],
+    ["sso", true],
+    ["otp", false],
+    ["", false],
+  ])("answers %j with %s", (method, expected) => {
+    expect(UserSchema.isSignInMethod(method)).toBe(expected);
+  });
+});

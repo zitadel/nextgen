@@ -26,11 +26,14 @@ import { Step } from "@/lib/zitadel/resources/flows/step";
 import {
   type FlowValue,
   type IncomingTransition,
-  isPasskeyActionKind,
   LOGIN_LEAVING_OUTCOMES,
   type MethodUsage,
   type MethodUse,
+  PASSKEY_ACTION_KINDS,
   PASSWORD_FIELD,
+  type PasskeyActionKind,
+  PROVIDER_OUTCOMES,
+  type ProviderOutcome,
   REGISTER_SSO_STEP,
   SSO_CONFLICT_STEP,
 } from "@/lib/zitadel/resources/flows/types";
@@ -75,6 +78,30 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
     rule: "contract/flow",
     schema: flowConfigSchema,
   };
+
+  /**
+   * Whether an action kind offers or enrols a passkey.
+   *
+   * @param kind - The action's kind, as written.
+   * @returns Whether it is one of {@link PASSKEY_ACTION_KINDS}.
+   */
+  static isPasskeyActionKind(kind: string): kind is PasskeyActionKind {
+    return PASSKEY_ACTION_KINDS.some((known) => {
+      return known === kind;
+    });
+  }
+
+  /**
+   * Whether an outcome is one a provider sign-in ends in.
+   *
+   * @param outcome - The outcome, as a transition names it.
+   * @returns Whether it is one of {@link PROVIDER_OUTCOMES}.
+   */
+  static isProviderOutcome(outcome: string): outcome is ProviderOutcome {
+    return PROVIDER_OUTCOMES.some((known) => {
+      return known === outcome;
+    });
+  }
 
   /**
    * What kind of document this is: a login flow.
@@ -385,7 +412,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
     return this.steps.flatMap((step): readonly MethodUse[] => {
       const passkeys = step.actions
         .filter((action) => {
-          return isPasskeyActionKind(action.kind);
+          return Flow.isPasskeyActionKind(action.kind);
         })
         .map((action) => {
           return `action ${JSON.stringify(action.name)}`;

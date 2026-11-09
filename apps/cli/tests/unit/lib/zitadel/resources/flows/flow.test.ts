@@ -661,3 +661,26 @@ describe("Flow.withoutProvider", () => {
     expect(edit).toEqual({ document: flow, changed: false, skipped: [] });
   });
 });
+
+describe("Flow.isPasskeyActionKind", () => {
+  it.each([
+    ["passkey", true],
+    ["passkey_register", true],
+    ["password", false],
+    ["", false],
+  ])("answers %j with %s", (kind, expected) => {
+    expect(Flow.isPasskeyActionKind(kind)).toBe(expected);
+  });
+});
+
+describe("Flow.isProviderOutcome", () => {
+  it.each([
+    ["sso_authenticated", true],
+    ["sso_user_not_found", true],
+    ["user_already_exists", true],
+    ["password_verified", false],
+    ["", false],
+  ])("answers %j with %s", (outcome, expected) => {
+    expect(Flow.isProviderOutcome(outcome)).toBe(expected);
+  });
+});

@@ -45,18 +45,6 @@ export const PASSKEY_ACTION_KINDS = ["passkey", "passkey_register"] as const;
 export type PasskeyActionKind = (typeof PASSKEY_ACTION_KINDS)[number];
 
 /**
- * Whether an action kind offers or enrols a passkey.
- *
- * @param kind - The action's kind, as written.
- * @returns Whether it is one of {@link PASSKEY_ACTION_KINDS}.
- */
-export function isPasskeyActionKind(kind: string): kind is PasskeyActionKind {
-  return PASSKEY_ACTION_KINDS.some((known) => {
-    return known === kind;
-  });
-}
-
-/**
  * Outcomes the engine answers by switching from login to register without a
  * `purpose` on the transition: the identifier one, plus `sso_user_not_found`.
  */
@@ -79,18 +67,6 @@ export const PROVIDER_OUTCOMES = [
  * An outcome a provider sign-in can end in.
  */
 export type ProviderOutcome = (typeof PROVIDER_OUTCOMES)[number];
-
-/**
- * Whether an outcome is one a provider sign-in ends in.
- *
- * @param outcome - The outcome, as a transition names it.
- * @returns Whether it is one of {@link PROVIDER_OUTCOMES}.
- */
-export function isProviderOutcome(outcome: string): outcome is ProviderOutcome {
-  return PROVIDER_OUTCOMES.some((known) => {
-    return known === outcome;
-  });
-}
 
 /**
  * The outcome the engine raises when a provider's sign-in collides with an

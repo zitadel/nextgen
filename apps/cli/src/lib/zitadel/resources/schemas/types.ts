@@ -104,27 +104,3 @@ export type ForceOptions = {
    */
   readonly force?: boolean | undefined;
 };
-
-/**
- * Whether a method named in a file is one a flow can offer.
- *
- * @param method - The method as written.
- * @returns Whether it is password, passkey or SSO.
- */
-export function isSignInMethod(method: string): method is SignInMethod {
-  return SIGN_IN_METHODS.some((known) => {
-    return known === method;
-  });
-}
-
-/**
- * Whether a method named in a file is one a flag alone switches.
- *
- * @param method - The method as written.
- * @returns Whether it is password or passkey.
- */
-export function isToggleableMethod(method: string): method is ToggleableMethod {
-  return TOGGLEABLE_METHODS.some((known) => {
-    return known === method;
-  });
-}

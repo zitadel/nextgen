@@ -25,9 +25,9 @@ import {
 import {
   type AuthMethodsValue,
   type EnabledMethods,
-  isSignInMethod,
   type PropertiesValue,
   type SchemaValue,
+  SIGN_IN_METHODS,
   type SignInMethod,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
@@ -49,6 +49,18 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
     rule: "contract/schema",
     schema: schemaConfigSchema,
   };
+
+  /**
+   * Whether a method named in a file is one a flow can offer.
+   *
+   * @param method - The method as written.
+   * @returns Whether it is password, passkey or SSO.
+   */
+  static isSignInMethod(method: string): method is SignInMethod {
+    return SIGN_IN_METHODS.some((known) => {
+      return known === method;
+    });
+  }
 
   /**
    * What kind of document this is: a user schema.
@@ -228,7 +240,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @returns The enabled methods among password, passkey and SSO, sorted.
    */
   get usableMethods(): readonly SignInMethod[] {
-    return this.methods.filter(isSignInMethod).filter((method) => {
+    return this.methods.filter(UserSchema.isSignInMethod).filter((method) => {
       if (method === "sso") {
         return this.providers.length > 0;
       }

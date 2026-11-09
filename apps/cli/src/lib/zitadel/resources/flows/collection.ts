@@ -3,15 +3,9 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 import { NotFoundError } from "@/lib/zitadel/errors";
 import { type PropertyPath, propertyName, propertyPath, type StepName } from "@/lib/zitadel/names";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
-import type { Flow } from "@/lib/zitadel/resources/flows/flow";
+import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
-import {
-  isProviderOutcome,
-  type Offer,
-  type PinnedOffer,
-  type SignUpGap,
-  type Visit,
-} from "@/lib/zitadel/resources/flows/types";
+import type { Offer, PinnedOffer, SignUpGap, Visit } from "@/lib/zitadel/resources/flows/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
@@ -230,7 +224,7 @@ export class Flows extends PinnedCollection<Flow> {
           if (next === undefined) {
             return [];
           }
-          if (isProviderOutcome(transition.outcome)) {
+          if (Flow.isProviderOutcome(transition.outcome)) {
             return from.step.providers.map((provider) => {
               return { step: next, provider };
             });
