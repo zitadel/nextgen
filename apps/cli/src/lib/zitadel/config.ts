@@ -14,6 +14,12 @@ import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import {
+  type Scaffold,
+  type ScaffoldedProvider,
+  type ScaffoldOptions,
+  scaffold,
+} from "@/lib/zitadel/scaffold";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { ConfigFiles } from "@/lib/zitadel/types";
 
@@ -242,6 +248,31 @@ export class ZitadelConfig {
         return rule.check(this, context);
       },
     );
+  }
+
+  /**
+   * Scaffold a new project's configuration on top of this one: the default
+   * user schema and login flow, a connection for each chosen provider, and
+   * the password policy.
+   *
+   * @remarks
+   * Every file is refused before anything is built; see {@link scaffold}.
+   *
+   * @typeParam P - The provider as the caller chose it, handed back with its
+   *   connection.
+   * @param options - What to scaffold, and whether files may be replaced.
+   * @returns The change that writes it, and its documents.
+   * @throws {@link ConnectionExistsError} When a chosen provider already has
+   *   a connection.
+   * @throws {@link FileExistsError} Without `force`, when a default file is
+   *   already there.
+   * @throws {@link ConflictError} When a chosen provider's connection would
+   *   collide with another.
+   * @throws {@link ConfigError} When `force` keeps a password policy file
+   *   that is not a valid password policy.
+   */
+  scaffold<P extends ScaffoldedProvider>(options: ScaffoldOptions<P>): Scaffold<P> {
+    return scaffold(this, options);
   }
 
   /**

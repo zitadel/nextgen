@@ -618,14 +618,16 @@ terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
 no app: where it would scaffold one, it previews the project, and
 `data.files_written` is empty, because those files depend on the generated app.
-`setup` also writes and publishes the password policy
-(`.zitadel/policies/auth.factor.password.set.json`) with a minimum length of
+`setup` also writes the password policy, which its first deploy publishes
+(`.zitadel/policies/auth.factor.password.set.json`), with a minimum length of
 15, NIST's minimum for password-only sign-in and the wizard's default. Pass
 `--password-min-length <n>` only when the user asks for another value (`0` sets
 none), and give test users passwords at least that long.
 When setup fails after scaffolding a new app, before its default schema and
-flow are uploaded, it removes the app again and puts back what the directory
-held, so rerunning the same `setup` starts over.
+flow files are written, it removes the app again and puts back what the
+directory held, so rerunning the same `setup` starts over. Setup writes
+`.zitadel/` and publishes it only through its first deploy, so a failed deploy
+leaves every file in place: run the suggested `deploy`, not `setup` again.
 
 `start` reuses a server already running in the directory only when it is the
 release this CLI ships; one an earlier release started is restarted, and its

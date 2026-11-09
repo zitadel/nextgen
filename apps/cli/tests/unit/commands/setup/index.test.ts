@@ -794,38 +794,54 @@ describe("setup command pre-flight", () => {
  * keeps the rerun's app talking to a project with no schema or login flow.
  */
 describe("setup that fails after it created the project", () => {
-  it("removes the .env.local it wrote when the schema upload fails", async ({ serve }) => {
+  it("removes the .env.local it wrote when its configuration cannot be written", async ({
+    serve,
+  }) => {
     const cwd = await makeNextApp();
-    const capture = await startCreateProjectCaptureServer(serve);
-    capture.rejectsSchemaUploads();
+    const capture = await startCreateProjectCaptureServer(serve, {
+      onCreateProject: async () => {
+        await mkdir(join(cwd, ".zitadel"), { recursive: true });
+        await writeFile(join(cwd, ".zitadel/policies"), "");
+      },
+    });
 
     const res = await runSetup(cwd, capture.url);
 
-    expect(res.exitCode).toBe(4);
+    expect(res.exitCode).toBe(3);
     expect(existsSync(join(cwd, ".env.local"))).toBe(false);
   });
 
-  it("puts back the .env.local the app already had when the schema upload fails", async ({
+  it("puts back the .env.local the app already had when its configuration cannot be written", async ({
     serve,
   }) => {
     const cwd = await makeNextApp();
     const own = "# The app's own settings\nDATABASE_URL=postgres://localhost:5432/app";
     await writeFile(join(cwd, ".env.local"), own);
-    const capture = await startCreateProjectCaptureServer(serve);
-    capture.rejectsSchemaUploads();
+    const capture = await startCreateProjectCaptureServer(serve, {
+      onCreateProject: async () => {
+        await mkdir(join(cwd, ".zitadel"), { recursive: true });
+        await writeFile(join(cwd, ".zitadel/policies"), "");
+      },
+    });
 
     const res = await runSetup(cwd, capture.url);
 
-    expect(res.exitCode).toBe(4);
+    expect(res.exitCode).toBe(3);
     expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(own);
   });
 
   it("points the rerun's .env.local at the project the rerun created", async ({ serve }) => {
     const cwd = await makeNextApp();
-    const capture = await startCreateProjectCaptureServer(serve);
-    capture.rejectsSchemaUploads();
-    expect((await runSetup(cwd, capture.url)).exitCode).toBe(4);
-    capture.recovers();
+    const capture = await startCreateProjectCaptureServer(serve, {
+      onCreateProject: async () => {
+        if (capture.projects.length === 0) {
+          await mkdir(join(cwd, ".zitadel"), { recursive: true });
+        await writeFile(join(cwd, ".zitadel/policies"), "");
+        }
+      },
+    });
+    expect((await runSetup(cwd, capture.url)).exitCode).toBe(3);
+    await rm(join(cwd, ".zitadel/policies"));
 
     const res = await runSetup(cwd, capture.url, ["--force"]);
 
@@ -1044,7 +1060,7 @@ describe("setup summary", () => {
     project: { id: "proj_test" } as SummaryInput["project"],
     server: "http://localhost:8080",
     issuer: "http://localhost:3000",
-    sso: [],
+    connections: [],
     signIn: {
       starts_with: "password",
       methods: ["password", "passkey"],
@@ -1144,17 +1160,13 @@ async function startCreateProjectCaptureServer(
   requests: string[];
   /** Every project created, in order. */
   projects: Array<{ id: string; project_secret: string }>;
-  /** Makes `POST /schemas` fail, so setup fails after it created the project. */
-  rejectsSchemaUploads(): void;
-  /** Lets `POST /schemas` succeed again. */
-  recovers(): void;
   /** The body of each `POST /deployments`, and the token it carried. */
   deployments: Array<{ body: Record<string, unknown>; authorization: string | undefined }>;
   /** Makes `POST /releases/build` fail, so setup's first deploy fails. */
   rejectsReleases(): void;
 }> {
   const bodies: Array<Record<string, unknown>> = [];
-  const failing = new Set<"schemas" | "builds">();
+  const failing = new Set<"builds">();
   const deployments: Array<{
     body: Record<string, unknown>;
     authorization: string | undefined;
@@ -1180,30 +1192,6 @@ async function startCreateProjectCaptureServer(
           name: "demo",
           preview_secret: "sk_proj_test_preview",
           origins: [],
-          created_at: "2026-06-01T00:00:00.000Z",
-        }),
-      );
-      return;
-    }
-    if (req.method === "POST" && path === "/api/v1/schemas" && failing.has("schemas")) {
-      res
-        .writeHead(500, { "content-type": "application/json" })
-        .end(JSON.stringify({ code: "internal", message: "boom" }));
-      return;
-    }
-    if (req.method === "POST" && path === "/api/v1/schemas") {
-      res.writeHead(201, { "content-type": "application/json" }).end(
-        JSON.stringify({
-          id: "sch_test",
-          created_at: "2026-06-01T00:00:00.000Z",
-        }),
-      );
-      return;
-    }
-    if (req.method === "POST" && path === "/api/v1/flow_definitions") {
-      res.writeHead(201, { "content-type": "application/json" }).end(
-        JSON.stringify({
-          id: "flow_test",
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
@@ -1245,20 +1233,6 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/api/v1/policies") {
-      res.writeHead(201, { "content-type": "application/json" }).end(
-        JSON.stringify({
-          id: "pol_test",
-          revision_id: "polrev_test",
-          project_id: "proj_test",
-          operation: "auth.factor.password.set",
-          config: {},
-          created_at: "2026-06-01T00:00:00.000Z",
-          updated_at: "2026-06-01T00:00:00.000Z",
-        }),
-      );
-      return;
-    }
     res.writeHead(404).end();
   });
   return {
@@ -1268,12 +1242,6 @@ async function startCreateProjectCaptureServer(
     },
     requests,
     projects,
-    rejectsSchemaUploads() {
-      failing.add("schemas");
-    },
-    recovers() {
-      failing.delete("schemas");
-    },
     deployments,
     rejectsReleases() {
       failing.add("builds");

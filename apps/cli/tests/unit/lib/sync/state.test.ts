@@ -1,11 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
-import { publishedIds, readState, updateState, type ZitadelState } from "@/lib/sync/state";
+import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
 
 const CUSTOMERS = ".zitadel/schemas/customers.json";
 
@@ -24,7 +24,7 @@ describe("readState", () => {
   it("returns the parsed contents of .zitadel/state.json", async ({ dir: cwd }) => {
     const state: ZitadelState = {
       framework: "next",
-      resources: { ".zitadel/schemas/user.json": { id: "schema-1", hash: "abc" } },
+      scaffold: { files: {}, dev_port: 3000 },
     };
     await writeStateFile(cwd, state);
 
@@ -45,67 +45,30 @@ describe("readState", () => {
   });
 });
 
-describe("updateState", () => {
-  it("adds a new resource entry and round-trips through readState", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, { framework: "next", resources: {} });
+describe("updateScaffold", () => {
+  it("records the manifest", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, { framework: "next" });
 
-    await updateState(cwd, ".zitadel/schemas/user.json", {
-      id: "schema-1",
-      hash: "abc",
-    });
+    await updateScaffold(cwd, { files: {} });
 
-    const result = await readState(cwd);
-    expect(result.resources[".zitadel/schemas/user.json"]).toEqual({
-      id: "schema-1",
-      hash: "abc",
-    });
-    expect(result.framework).toBe("next");
+    expect(await readState(cwd)).toEqual({ framework: "next", scaffold: { files: {} } });
   });
 
-  it("merges into an existing entry, preserving unspecified fields", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, {
-      framework: "next",
-      resources: { ".zitadel/flows/default.json": { id: "flow-1", hash: "old" } },
-    });
+  it("keeps the rest of the file", async ({ dir: cwd }) => {
+    await writeStateText(
+      cwd,
+      JSON.stringify({ framework: "next", resources: { [CUSTOMERS]: { id: "sch_1" } } }),
+    );
 
-    await updateState(cwd, ".zitadel/flows/default.json", { hash: "new" });
+    await updateScaffold(cwd, { files: {} });
 
-    const result = await readState(cwd);
-    expect(result.resources[".zitadel/flows/default.json"]).toEqual({
-      id: "flow-1",
-      hash: "new",
-    });
-  });
-
-  it("leaves other resource entries untouched", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, {
-      framework: "next",
-      resources: {
-        ".zitadel/schemas/a.json": { id: "a", hash: "ha" },
-        ".zitadel/schemas/b.json": { id: "b", hash: "hb" },
-      },
-    });
-
-    await updateState(cwd, ".zitadel/schemas/a.json", { hash: "ha2" });
-
-    const result = await readState(cwd);
-    expect(result.resources[".zitadel/schemas/a.json"]).toEqual({ id: "a", hash: "ha2" });
-    expect(result.resources[".zitadel/schemas/b.json"]).toEqual({ id: "b", hash: "hb" });
-  });
-
-  it("writes pretty-printed JSON (two-space indent)", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, { framework: "next", resources: {} });
-
-    await updateState(cwd, ".zitadel/schemas/user.json", { id: "schema-1" });
-
-    const raw = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
-    expect(raw).toContain('\n  "framework"');
+    expect(await publishedIds(cwd, [CUSTOMERS])).toEqual(new Map([[CUSTOMERS, ["sch_1"]]]));
   });
 });
 
 describe("publishedIds", () => {
   it("is the id a file was synced as", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, { framework: "next", resources: { [CUSTOMERS]: { id: "sch_1" } } });
+    await writeStateText(cwd, JSON.stringify({ resources: { [CUSTOMERS]: { id: "sch_1" } } }));
 
     const ids = await publishedIds(cwd, [CUSTOMERS]);
 
@@ -115,10 +78,10 @@ describe("publishedIds", () => {
   it("keeps the id a file was synced as before, which a flow may still name", async ({
     dir: cwd,
   }) => {
-    await writeStateFile(cwd, {
-      framework: "next",
-      resources: { [CUSTOMERS]: { id: "sch_NEW", previousId: "sch_OLD" } },
-    });
+    await writeStateText(
+      cwd,
+      JSON.stringify({ resources: { [CUSTOMERS]: { id: "sch_NEW", previousId: "sch_OLD" } } }),
+    );
 
     const ids = await publishedIds(cwd, [CUSTOMERS]);
 
@@ -126,7 +89,7 @@ describe("publishedIds", () => {
   });
 
   it("leaves out a file that was never synced", async ({ dir: cwd }) => {
-    await writeStateFile(cwd, { framework: "next", resources: {} });
+    await writeStateText(cwd, JSON.stringify({ resources: {} }));
 
     const ids = await publishedIds(cwd, [CUSTOMERS]);
 
@@ -134,6 +97,14 @@ describe("publishedIds", () => {
   });
 
   it("is empty for a project that was never synced", async ({ dir: cwd }) => {
+    const ids = await publishedIds(cwd, [CUSTOMERS]);
+
+    expect(ids.size).toBe(0);
+  });
+
+  it("is empty for a state file with no resources section", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, { framework: "next" });
+
     const ids = await publishedIds(cwd, [CUSTOMERS]);
 
     expect(ids.size).toBe(0);
@@ -151,7 +122,7 @@ describe("publishedIds", () => {
   });
 
   it.for([
-    { problem: "no resources", text: "{}" },
+    { problem: "no object", text: "[]" },
     { problem: "resources as a list", text: JSON.stringify({ resources: [] }) },
     {
       problem: "an entry that is not an object",

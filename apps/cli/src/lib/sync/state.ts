@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { errorMessage, isErrno, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 
-import type { ResourceEntry, ScaffoldManifest, ZitadelState } from "./types.js";
+import type { ScaffoldManifest, ZitadelState } from "./types.js";
 
 export type { ZitadelState } from "./types.js";
 
@@ -19,28 +19,13 @@ export async function readState(cwd: string): Promise<ZitadelState> {
 }
 
 /**
- * Merge an entry into the state file under `key`, preserving any
- * fields the caller did not override. Reads the file, writes it back
- * with sorted keys disabled (state is engine-managed, not human-
- * authored, so deterministic ordering isn't required here).
- */
-export async function updateState(cwd: string, key: string, entry: ResourceEntry): Promise<void> {
-  const current = await readState(cwd);
-  const updated: ZitadelState = {
-    ...current,
-    resources: {
-      ...current.resources,
-      [key]: { ...current.resources[key], ...entry },
-    },
-  };
-  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
-}
-
-/**
- * Replace the scaffold manifest section wholesale, preserving the sync
- * `resources`. Setup owns the full manifest (it knows exactly what it wrote);
+ * Replace the scaffold manifest section wholesale, preserving the rest of the
+ * file. Setup owns the full manifest (it knows exactly what it wrote);
  * `doctor --fix` re-writes it after restoring files. Kept here so state.json
  * retains a single writer module.
+ *
+ * @param cwd - The project root.
+ * @param scaffold - The manifest to record.
  */
 export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
   const current = await readState(cwd);
@@ -55,7 +40,8 @@ export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): P
  * @remarks
  * A flow left behind by an interrupted deploy may still name the replaced id,
  * so both count. A file never synced has no entry and no ids, and a missing
- * state file means nothing was synced. Anything else that does not read as
+ * state file, or one without the `resources` section that only projects set
+ * up before deploy published their files have, means nothing was synced. Anything else that does not read as
  * ids is refused: the state is the authoritative record, and without it a
  * flow is matched on a URL suffix, which could pick one bound to another
  * schema. Saying so beats editing the wrong flow quietly.
@@ -72,7 +58,13 @@ export async function publishedIds(
 ): Promise<ReadonlyMap<string, readonly string[]>> {
   try {
     const state: unknown = await readState(cwd);
-    if (!isObject(state) || !isObject(state.resources)) {
+    if (!isObject(state)) {
+      throw new Error("it is not an object");
+    }
+    if (state.resources === undefined) {
+      return new Map();
+    }
+    if (!isObject(state.resources)) {
       throw new Error("resources is not an object");
     }
     const resources = state.resources;

@@ -21,7 +21,7 @@ import type { PublishPolicyBody } from "@/lib/backend/model";
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
-import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 
 /** Project-relative directory the policy files live in. */
 

@@ -1,20 +1,4 @@
 /**
- * One row in the local state file: the platform `id` returned at create time
- * and the content `hash` last successfully synced. Both fields are optional so
- * the engine can recover from partial writes. For revisioned resources,
- * `previousId` records the revision the current `id` superseded — the planner
- * uses it to recover flow re-pins when a run died between publishing the
- * revision and rewriting the pinned flows.
- */
-export type ResourceEntry = {
-  id?: string;
-  hash?: string;
-  name?: string;
-  status?: string;
-  previousId?: string;
-};
-
-/**
  * Ownership class of one scaffolded app file, recorded in the scaffold
  * manifest. `infrastructure` files (the request boundary, the provider, the
  * custom-elements declarations) are load-bearing for the auth integration —
@@ -63,13 +47,22 @@ export type ScaffoldManifest = {
 };
 
 /**
- * The persisted contents of `.zitadel/state.json`. Maps each managed file path
- * (relative to the project root) to its sync entry, plus the framework id
- * captured during `zitadel setup` and, since the manifest was introduced, the
- * scaffold manifest of generated app files.
+ * The persisted contents of `.zitadel/state.json`: the framework id captured
+ * during `zitadel setup` and, since the manifest was introduced, the scaffold
+ * manifest of generated app files.
+ *
+ * @remarks
+ * Older projects also hold a `resources` section, which nothing writes any
+ * more; `publishedIds` in `state.ts` still reads it.
  */
 export type ZitadelState = {
+  /**
+   * The framework setup patched the app for.
+   */
   framework: string;
-  resources: Record<string, ResourceEntry>;
+
+  /**
+   * The app files setup wrote, absent on apps set up before it existed.
+   */
   scaffold?: ScaffoldManifest;
 };

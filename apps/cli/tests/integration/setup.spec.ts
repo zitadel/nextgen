@@ -393,14 +393,11 @@ describe("setup", () => {
         expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
-      it.each([
-        ["the platform is down", () => platform.isUnavailable()],
-        ["the schema upload fails", () => platform.rejectsSchemaUploads()],
-      ])("leaves the directory start ran in as it was when %s", async (_failure, fail) => {
+      it("leaves the directory start ran in as it was when the platform is down", async () => {
         const app = await aNewAppDirectory();
         await app.startLocalServer();
         const before = await app.snapshot();
-        fail();
+        platform.isUnavailable();
 
         await app.setupNewApp();
 
@@ -574,27 +571,32 @@ describe("setup", () => {
         expect(await app.hasBeenConfigured()).toBe(false);
       });
 
-      it("rolls back the credential env file a failed run created", async () => {
+      it("succeeds when its first deploy is refused", async () => {
         const app = await anApp();
-        platform.rejectsSchemaUploads();
+        platform.rejectsASchema();
 
-        expect(await app.setup()).toFail();
+        const result = await app.setup();
 
-        // setup created `.env.development.local` with the project it had to
-        // abandon; the rollback removes it so a rerun does not inherit the
-        // abandoned project's id (`merge-env` only adds missing keys).
-        await expect(app.readProjectFile(".env.development.local")).rejects.toThrow();
+        expect(result).toSucceed();
       });
 
-      it("lets a rerun finish what a failed run started", async () => {
+      it("deploys nothing when its first deploy is refused", async () => {
         const app = await anApp();
-        platform.rejectsSchemaUploads();
-        expect(await app.setup()).toFail();
+        platform.rejectsASchema();
+
+        await app.setup();
+
+        expect(await app.liveDeploymentCount()).toBe(0);
+      });
+
+      it("leaves what it wrote for deploy to publish when its first deploy is refused", async () => {
+        const app = await anApp();
+        platform.rejectsASchema();
+
+        await app.setup();
+
         platform.recovers();
-
-        expect(await app.setup(["--force"])).toSucceed();
-
-        expect(await app.deployDryRun()).toSucceed();
+        expect(await app.deploy()).toSucceed();
       });
 
       it.each([

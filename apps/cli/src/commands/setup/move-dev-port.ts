@@ -4,11 +4,10 @@ import {
   createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-import { basename } from "node:path";
 
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { DiskStore } from "@/lib/zitadel";
+import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { issuerFromPort, type Orca } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
@@ -199,12 +198,19 @@ async function serveNewOrigin(
   }
 }
 
-/** The names of the connection files under `.zitadel/idps/`, or none when they cannot be read. */
+/**
+ * The names of the project's connections, whose redirect URIs name the dev
+ * port.
+ *
+ * @param cwd - The project root.
+ * @returns Each connection's name, in path order; none when the
+ *   configuration cannot be read.
+ */
 async function connectionSlugs(cwd: string): Promise<string[]> {
-  const files = await new DiskStore(cwd).read("connections").catch(() => {
-    return [];
+  const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd)).catch(() => {
+    return ZitadelConfig.empty();
   });
-  return files.map((file) => {
-    return basename(file.path, ".json");
+  return config.connections.all.map((connection) => {
+    return connection.name;
   });
 }
