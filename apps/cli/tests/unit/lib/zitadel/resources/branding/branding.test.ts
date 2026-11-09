@@ -117,54 +117,30 @@ describe("Branding.read", () => {
     });
   });
 
-  it.each([
-    [
-      "typography.font_url",
-      { typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" } },
-      "typography.font_url must be an absolute https URL.",
-    ],
-    [
-      "typography.font_url that is no URL",
-      { typography: { font_family: "Inter", font_url: "not a url" } },
-      "typography.font_url is not a valid URL.",
-    ],
-    [
-      "typography.font_url without a family",
-      { typography: { font_url: "https://fonts.example.com/css2" } },
-      "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.",
-    ],
-    [
-      "typography.font_family",
-      { typography: { font_family: "Inter;{" } },
-      'typography.font_family must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
-    ],
-    [
-      "theme.light.logo_url",
-      { theme: { light: { logo_url: "http://cdn.example.com/logo.png" } } },
-      "theme.light.logo_url must be an absolute https URL (http is allowed for canonical loopback development hosts only).",
-    ],
-    [
-      "theme.dark.logo_url",
-      { theme: { dark: { logo_url: "http://cdn.example.com/logo.png" } } },
-      "theme.dark.logo_url must be an absolute https URL (http is allowed for canonical loopback development hosts only).",
-    ],
-    [
-      "logo_url",
-      { logo_url: "http://cdn.example.com/logo.png" },
-      "logo_url must be an absolute https URL (http is allowed for canonical loopback development hosts only).",
-    ],
-  ])(
-    "reports a refused %s once, in plain words and without a location",
-    (_field, body, message) => {
-      const reading = Branding.read(aFile("branding", NAME, aBranding(body)));
+  it("reports a refused value once, under the contract, at its own field", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
 
-      expect(reading).toMatchObject({
-        issues: [{ severity: "error", rule: "contract/branding", file: PATH, message }],
-      });
-    },
-  );
+    expect(reading).toMatchObject({
+      issues: [
+        {
+          severity: "error",
+          rule: "contract/branding",
+          file: PATH,
+          message: "typography.font_url must be an absolute https URL with no credentials",
+        },
+      ],
+    });
+  });
 
-  it("keeps the refusals of other fields beside a plain-worded one", () => {
+  it("keeps the refusals of other fields beside it", () => {
     const reading = Branding.read(
       aFile(
         "branding",
@@ -179,12 +155,12 @@ describe("Branding.read", () => {
     expect(reading).toMatchObject({
       issues: [
         { message: expect.stringMatching(/^layout /) },
-        { message: "typography.font_url must be an absolute https URL." },
+        { message: "typography.font_url must be an absolute https URL with no credentials" },
       ],
     });
   });
 
-  it("words a refused URL in plain words beside an unknown key", () => {
+  it("keeps it beside an unknown key", () => {
     const reading = Branding.read(
       aFile(
         "branding",
@@ -198,7 +174,7 @@ describe("Branding.read", () => {
 
     expect(reading).toMatchObject({
       issues: [
-        { message: "typography.font_url must be an absolute https URL." },
+        { message: "typography.font_url must be an absolute https URL with no credentials" },
         { message: '(root) Unrecognized key: "hero_urll"' },
       ],
     });

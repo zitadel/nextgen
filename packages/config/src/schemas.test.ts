@@ -104,200 +104,147 @@ describe("brandingConfigSchema", () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
-  it("rejects a palette colour that could close its CSS declaration", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { light: { palette: { primary: "red; } :host { display: none" } } },
-    });
-    expect(result.success).toBe(false);
-    expect(
-      refusalsOf({
-        ...base,
-        theme: { light: { palette: { primary: "red; } :host { display: none" } } },
-      }),
-    ).toEqual([
-      "theme.light.palette.primary must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch().",
-    ]);
-  });
+  describe("says each refusal once, at its own field, in the words of the spec", () => {
+    const COLOUR =
+      "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch()";
+    const COLOUR_FUNCTIONS =
+      "must be hex (#4F46E5), a CSS colour name, or one of the colour functions rgb(), rgba(), hsl(), hsla(), hwb(), lab(), lch(), oklab(), oklch(), color() or color-mix()";
+    const FONT_STACK =
+      'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural")';
+    const IMAGE_URL =
+      "must be an absolute https URL with no credentials (http is allowed for canonical loopback development hosts only)";
+    const STYLESHEET_URL = "must be an absolute https URL with no credentials";
+    const NEEDS_FAMILY =
+      "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.";
+    const INTER = "Inter";
 
-  it("rejects a non-string palette value", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { light: { palette: { primary: 123 } } },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("expected string");
-  });
-
-  it("rejects a colour that fetches a URL", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { dark: { palette: { background: "url(https://evil.example/beacon.png)" } } },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a font stack that could close its CSS declaration", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      typography: { font_family: "Inter; } :host { display: none" },
-    });
-    expect(result.success).toBe(false);
-    expect(
-      refusalsOf({
-        ...base,
-        typography: { font_family: "Inter; } :host { display: none" },
-      }),
-    ).toEqual([
-      'typography.font_family must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
-    ]);
-  });
-
-  it("rejects an http theme-side logo", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { dark: { logo_url: "http://cdn.example.com/on-dark.svg" } },
-    });
-    expect(result.success).toBe(false);
-    expect(
-      refusalsOf({
-        ...base,
-        theme: { dark: { logo_url: "http://cdn.example.com/on-dark.svg" } },
-      }),
-    ).toEqual([
-      "theme.dark.logo_url must be an absolute https URL (http is allowed for canonical loopback development hosts only).",
-    ]);
-  });
-
-  it("rejects an http font_url — a stylesheet has no loopback carve-out", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
-    });
-    expect(result.success).toBe(false);
-    expect(
-      refusalsOf({
-        ...base,
-        typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
-      }),
-    ).toEqual(["typography.font_url must be an absolute https URL."]);
-  });
-
-  it("words the http font_url error as the server does, without the loopback carve-out", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
-    });
-    const messages = result.error?.issues.map((issue) => issue.message) ?? [];
-    expect(messages).toEqual(["must be an absolute https URL."]);
-  });
-
-  describe("says each refusal once, at its own field, whatever else is wrong", () => {
     it.each([
       [
-        "a font URL that is not https",
-        { typography: { font_family: "Inter", font_url: "http://x.example/f" } },
-        "typography.font_url must be an absolute https URL.",
+        "a palette colour that could close its CSS declaration",
+        { theme: { light: { palette: { primary: "red; } :host { display: none" } } } },
+        [`theme.light.palette.primary ${COLOUR}`],
       ],
       [
-        "a font URL with no host",
-        { typography: { font_family: "Inter", font_url: "https:///fonts.example.com/css2" } },
-        "typography.font_url is not a valid URL.",
+        "a colour that fetches a URL",
+        { theme: { dark: { palette: { background: "url(https://evil.example/beacon.png)" } } } },
+        [`theme.dark.palette.background ${COLOUR}`],
       ],
       [
-        "a light logo with leading space",
-        { theme: { light: { logo_url: " https://cdn.example.com/logo.png" } } },
-        "theme.light.logo_url is not a valid URL.",
+        "a colour function the server does not allow, which the spec's pattern admits",
+        { theme: { light: { palette: { primary: "var(--brand)" } } } },
+        [`theme.light.palette.primary ${COLOUR_FUNCTIONS}`],
       ],
       [
-        "a dark logo with no host",
-        { theme: { dark: { logo_url: "https:///cdn.example.com/logo.png" } } },
-        "theme.dark.logo_url is not a valid URL.",
+        "an unknown function, which the spec's pattern admits",
+        { theme: { dark: { palette: { primary: "local(red)" } } } },
+        [`theme.dark.palette.primary ${COLOUR_FUNCTIONS}`],
       ],
       [
-        "a font URL over the byte limit",
-        { typography: { font_family: "Inter", font_url: `https://f.example/${"a".repeat(2100)}` } },
-        "typography.font_url must be at most 2048 bytes.",
+        "a font stack that could close its CSS declaration",
+        { typography: { font_family: "Inter; } :host { display: none" } },
+        [`typography.font_family ${FONT_STACK}`],
       ],
       [
         "an empty font family",
         { typography: { font_family: "" } },
-        'typography.font_family must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
+        [`typography.font_family ${FONT_STACK}`],
       ],
-    ])("%s", (_name, extra, expected) => {
-      expect(refusalsOf({ ...base, ...extra })).toEqual([expected]);
-    });
-
-    it("keeps every plain refusal beside a mistake of type", () => {
-      expect(
-        refusalsOf({
-          ...base,
-          layout: "sideways",
-          logo_url: "http://cdn.example.com/logo.png",
-          typography: { font_url: "http://x.example/f" },
-          theme: { light: { palette: { primary: "not a colour(" } } },
-        }).map((refusal) => refusal.split(" ")[0]),
-      ).toEqual(
-        expect.arrayContaining([
-          "layout",
-          "logo_url",
-          "typography.font_url",
-          "typography.font_url",
-          "theme.light.palette.primary",
-        ]),
-      );
-    });
-
-    it("keeps a palette refusal beside an unknown key", () => {
-      expect(
-        refusalsOf({
-          layout: "centered",
+      [
+        "an http theme-side logo",
+        { theme: { dark: { logo_url: "http://cdn.example.com/on-dark.svg" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a theme-side logo with leading space",
+        { theme: { light: { logo_url: " https://cdn.example.com/logo.png" } } },
+        [`theme.light.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a theme-side logo with no host",
+        { theme: { dark: { logo_url: "https:///cdn.example.com/logo.png" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "an empty theme-side logo, which the API cannot decode",
+        { theme: { dark: { logo_url: "" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "an empty logo and hero, which the API cannot decode",
+        { logo_url: "", hero_url: "" },
+        [`logo_url ${IMAGE_URL}`, `hero_url ${IMAGE_URL}`],
+      ],
+      [
+        "a logo carrying credentials",
+        { logo_url: "https://user:pass@cdn.example.com/logo.svg" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "an http font_url, which has no loopback carve-out",
+        { typography: { font_family: INTER, font_url: "http://localhost:3000/font.css" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url with no host",
+        { typography: { font_family: INTER, font_url: "https:///fonts.example.com/css2" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url that is no URL",
+        { typography: { font_family: INTER, font_url: "not a url" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "an empty font_url, which the API cannot decode",
+        { typography: { font_url: "" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url carrying credentials",
+        { typography: { font_family: INTER, font_url: "https://user:pass@fonts.example.com/c" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url over the length limit",
+        { typography: { font_family: INTER, font_url: `https://f.example/${"a".repeat(2100)}` } },
+        ["typography.font_url Too big: expected string to have <=2048 characters"],
+      ],
+      [
+        "a font_url without a font family",
+        { typography: { font_url: "https://fonts.example.com/css2" } },
+        [NEEDS_FAMILY],
+      ],
+      [
+        "a font_url that is refused and has no font family",
+        { typography: { font_url: "http://x.example/f" } },
+        [`typography.font_url ${STYLESHEET_URL}`, NEEDS_FAMILY],
+      ],
+      [
+        "an unknown key beside a palette colour",
+        {
           name: "Acme",
           theme: { light: { palette: { primary: "var(--brand)" } } },
-        }),
-      ).toEqual(
-        expect.arrayContaining([
-          '(root) Unrecognized key: "name"',
-          "theme.light.palette.primary must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch().",
-        ]),
-      );
-    });
-
-    it("asks for the family of a font URL even when the URL itself is refused", () => {
-      expect(
-        refusalsOf({ ...base, typography: { font_url: "http://x.example/f" } }).sort(),
-      ).toEqual([
-        "typography.font_url must be an absolute https URL.",
-        "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.",
-      ]);
-    });
-
-    it("refuses an empty stylesheet or theme logo, which the API cannot decode, but not an empty logo", () => {
-      expect(refusalsOf({ ...base, typography: { font_url: "" } })).toEqual([
-        "typography.font_url must be an absolute https URL.",
-      ]);
-      expect(refusalsOf({ ...base, theme: { dark: { logo_url: "" } } })).toEqual([
-        "theme.dark.logo_url must be an absolute https URL.",
-      ]);
-      expect(refusalsOf({ ...base, logo_url: "", hero_url: "" })).toEqual([]);
-    });
-  });
-
-  it("rejects a URL carrying credentials", () => {
-    for (const [field, doc] of [
-      ["logo_url", { ...base, logo_url: "https://user:pass@cdn.example.com/logo.svg" }],
-      [
-        "typography.font_url",
-        {
-          ...base,
-          typography: { font_family: "Inter", font_url: "https://user:pass@fonts.example.com/c" },
         },
+        ['(root) Unrecognized key: "name"', `theme.light.palette.primary ${COLOUR_FUNCTIONS}`],
       ],
-    ] as const) {
-      const result = brandingConfigSchema.safeParse(doc);
-      expect(result.success, `${field} accepted credentials`).toBe(false);
-      expect(JSON.stringify(result.error?.issues)).toContain("credentials");
-    }
+      [
+        "a mistake of type beside a refused URL and a missing family",
+        { layout: "sideways", typography: { font_url: "http://x.example/f" } },
+        [
+          'layout Invalid option: expected one of "centered"|"split"',
+          `typography.font_url ${STYLESHEET_URL}`,
+          NEEDS_FAMILY,
+        ],
+      ],
+    ])("%s", (_name, extra, expected) => {
+      expect(refusalsOf({ ...base, ...extra }).sort()).toEqual([...expected].sort());
+    });
+
+    it("refuses a non-string palette value", () => {
+      expect(refusalsOf({ ...base, theme: { light: { palette: { primary: 123 } } } })).toEqual([
+        expect.stringContaining("expected string"),
+      ]);
+    });
   });
 
   it("accepts the appearance blocks", () => {

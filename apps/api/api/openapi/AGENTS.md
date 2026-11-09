@@ -27,6 +27,14 @@ silently at runtime: an unknown property is dropped, not rejected.
   (`scripts/openapi-casing-rules.test.mjs`) that fail when a rule silently
   stops matching. Keep the fixtures in step with the rules.
 
+## Patterns say what a valid value looks like
+
+- Give every `pattern` an `x-zitadel-pattern-message` beside it: the sentence
+  that follows the field's name when a value fails it (`must be a user ID, which
+  starts with user_`). orval's zod output carries no message of its own, so
+  `moon run api:generate` adds this one (`packages/api/scripts/pattern-messages.ts`)
+  and fails when a pattern has none, or two.
+
 ## Error codes
 
 Errors are `{ code, message, details? }`

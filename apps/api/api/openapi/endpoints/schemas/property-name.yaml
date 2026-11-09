@@ -1,4 +1,5 @@
 x-meta-schema: true
 type: string
 pattern: "^[^.]+$"
+x-zitadel-pattern-message: "must not contain a ."
 description: The name of a single user attribute.

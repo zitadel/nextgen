@@ -1,4 +1,5 @@
 type: string
 pattern: '^att_[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be an attempt ID, which starts with att_"
 example: att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
 description: The unique identifier of this authentication attempt, an opaque string with an `att_` prefix.
