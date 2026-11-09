@@ -1,6 +1,7 @@
 import { basename } from "node:path";
 
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
+import { Change } from "@/lib/zitadel/change";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { ReadableFile } from "@/lib/zitadel/resources/document";
@@ -65,6 +66,28 @@ export class Policies extends Collection<Policy> {
       return policy;
     }
     return undefined;
+  }
+
+  /**
+   * Remove the policy or the test file at a path, which saving the change
+   * deletes.
+   *
+   * @remarks
+   * The collection owns the test files, so one is removed as a policy is, and
+   * a broken file of either kind, as {@link Collection.remove} says. A path
+   * that holds none changes nothing.
+   *
+   * @param path - The file's project-relative path.
+   * @returns The change.
+   */
+  override remove(path: string): Change {
+    const test = this.tests.find((candidate) => {
+      return candidate.path === path;
+    });
+    if (test === undefined) {
+      return super.remove(path);
+    }
+    return new Change({ before: this.config, after: this.config.without(test) });
   }
 
   /**

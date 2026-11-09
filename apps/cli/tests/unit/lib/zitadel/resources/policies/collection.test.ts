@@ -181,3 +181,40 @@ describe("Policies.selectTests", () => {
     ]);
   });
 });
+
+describe("Policies.remove", () => {
+  it("deletes the file of a test file, as it does a policy's", () => {
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_FILE]: aPasswordPolicy(),
+        [PASSWORD_POLICY_TEST_FILE]: aPolicyTest(),
+      },
+    });
+
+    const change = config.policies.remove(TEST_PATH);
+
+    expect(change.removedPaths).toEqual([TEST_PATH]);
+    expect(change.after.policies.tests).toEqual([]);
+  });
+
+  it("leaves the policy beside a removed test file", () => {
+    const config = aConfig({
+      policies: {
+        [PASSWORD_POLICY_FILE]: aPasswordPolicy(),
+        [PASSWORD_POLICY_TEST_FILE]: aPolicyTest(),
+      },
+    });
+
+    const change = config.policies.remove(TEST_PATH);
+
+    expect(change.after.policies.paths).toEqual([POLICY_PATH]);
+  });
+
+  it("changes nothing for a path no file is at", () => {
+    const config = aConfig({ policies: { [PASSWORD_POLICY_TEST_FILE]: aPolicyTest() } });
+
+    const change = config.policies.remove(POLICY_PATH);
+
+    expect(change.changed).toBe(false);
+  });
+});
