@@ -164,12 +164,13 @@ const BRANDING_PALETTE = BRANDING_THEME_SIDE.shape.palette.unwrap();
  * it, do not run.
  *
  * @param pattern - The URL pattern the OpenAPI spec gives the field.
- * @param options - `loopback: false` for a stylesheet, which has no carve-out.
- * @returns The field's schema; an empty string passes, as it does the server.
+ * @param options - `loopback: false` for a stylesheet, which has no carve-out;
+ *   `empty: false` for a field the API decodes as a URI, which refuses "".
+ * @returns The field's schema.
  */
 function brandingAssetUrl(
   pattern: RegExp,
-  options: { loopback?: boolean } = {},
+  options: { loopback?: boolean; empty?: boolean } = {},
 ): z.ZodOptional<z.ZodString> {
   return z
     .string()
@@ -205,7 +206,7 @@ const brandingColour = z
  */
 const brandingThemeSide = (sidePattern: RegExp) =>
   BRANDING_THEME_SIDE.extend({
-    logo_url: brandingAssetUrl(sidePattern),
+    logo_url: brandingAssetUrl(sidePattern, { empty: false }),
     palette: z
       .object(
         Object.fromEntries(
@@ -244,7 +245,10 @@ const brandingTypography = CreateBrandingBody.shape.typography
       .optional(),
     // A stylesheet is styling rather than an image, so it has no loopback
     // carve-out.
-    font_url: brandingAssetUrl(createBrandingBodyTypographyFontUrlRegExp, { loopback: false }),
+    font_url: brandingAssetUrl(createBrandingBodyTypographyFontUrlRegExp, {
+      loopback: false,
+      empty: false,
+    }),
   })
   .superRefine((value, ctx) => {
     if (value.font_url !== undefined && value.font_url !== "" && value.font_family === undefined) {
@@ -302,16 +306,17 @@ export const brandingConfigSchema = z.strictObject({
  * @param pattern - The URL pattern the OpenAPI spec gives the field, which the
  *   API enforces too and which refuses forms the checks above it let through,
  *   such as `https:///host`.
- * @param options - `loopback: false` for a stylesheet.
+ * @param options - `loopback: false` for a stylesheet; `empty: false` when the
+ *   field is a URI the API refuses to decode from "".
  * @returns What is wrong with it, to follow the field's path; `undefined` when
- *   it passes. An empty string passes, as it does the server.
+ *   it passes.
  */
 function brandingAssetUrlProblem(
   value: string,
   pattern: RegExp,
-  options: { loopback?: boolean },
+  options: { loopback?: boolean; empty?: boolean },
 ): string | undefined {
-  if (value === "") {
+  if (value === "" && options.empty !== false) {
     return undefined;
   }
   // The server counts bytes (validateBrandingAssetURL), so a URL with
