@@ -153,7 +153,9 @@ func ValidateApplicationDocument(doc ApplicationDocument) error {
 // stored does not have; on create, stored is the zero document. Each stored
 // client keeps its slug and client_id: next may leave the id out, but may not
 // change it or omit the client. Only a new client is checked for a reserved
-// client_id prefix, so a stored id keeps working.
+// client_id prefix, so a stored id keeps working; every such client is
+// reported at once. next must have passed [ValidateApplicationDocument],
+// which rejects a slug used twice.
 func ApplicationRevisionNewClients(stored, next ApplicationDocument) ([]string, error) {
 	nextIndex := make(map[string]int, len(next.Clients))
 	for i, client := range next.Clients {
@@ -171,16 +173,18 @@ func ApplicationRevisionNewClients(stored, next ApplicationDocument) ([]string, 
 		}
 	}
 	var added []string
+	failures := make(map[string]string)
 	for i, client := range next.Clients {
 		if storedSlugs[client.Slug] {
 			continue
 		}
 		if client.ClientID != nil && hasReservedClientIDPrefix(*client.ClientID) {
-			return nil, ErrApplicationInvalid(map[string]string{
-				fmt.Sprintf("/clients/%d/client_id", i): "a supplied client_id may not start with client_ or dcr_",
-			}, nil)
+			failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with client_ or dcr_"
 		}
 		added = append(added, client.Slug)
+	}
+	if len(failures) > 0 {
+		return nil, ErrApplicationInvalid(failures, nil)
 	}
 	return added, nil
 }

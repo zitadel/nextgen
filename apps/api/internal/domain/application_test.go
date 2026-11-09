@@ -170,16 +170,13 @@ func TestApplicationRevisionNewClients(t *testing.T) {
 			wantDetails: map[string]any{"field": "/clients/web"},
 		},
 		{
-			name:        "a new client with the client_ prefix",
-			next:        []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("client_mine")}},
-			wantErr:     domain.ErrApplicationInvalid(nil, nil),
-			wantDetails: map[string]string{"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_"},
-		},
-		{
-			name:        "a new client with the dcr_ prefix",
-			next:        []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("dcr_mine")}},
-			wantErr:     domain.ErrApplicationInvalid(nil, nil),
-			wantDetails: map[string]string{"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_"},
+			name:    "every new client with a reserved prefix",
+			next:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("client_mine")}, {Slug: "api"}, {Slug: "cli", ClientID: new("dcr_mine")}},
+			wantErr: domain.ErrApplicationInvalid(nil, nil),
+			wantDetails: map[string]string{
+				"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_",
+				"/clients/2/client_id": "a supplied client_id may not start with client_ or dcr_",
+			},
 		},
 	}
 	for _, tt := range tests {
