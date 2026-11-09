@@ -1,9 +1,6 @@
-import { basename } from "node:path";
-
 import {
   type ConnectionEndpoints,
   type ConnectionSlug,
-  credentialVariables,
   type DisplayName,
   type IdpProvider,
   type Issuer,
@@ -15,24 +12,24 @@ import {
   parseIssuer,
   referencedClientIdVariable,
   referencedClientSecretVariable,
+  validated,
 } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import {
   CHECKED_BLOCKS,
-  type ClaimField,
-  type ClaimRead,
   type ClaimRow,
   CONNECTION_CONTRACT,
   CONNECTION_SCHEMA_REF,
+  type ConnectionCredentials,
   type ConnectionPath,
   type ConnectionSetting,
   type ConnectionValue,
-  type CredentialNames,
+  type Credential,
+  type CredentialField,
   type CredentialVariable,
   type GivenSettings,
   type StoredSettings,
-  type VariableUse,
 } from "@/lib/zitadel/resources/connections/types";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
@@ -48,20 +45,8 @@ import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import { CONFIG_DIRECTORIES, type JsonObject, type JsonValue } from "@/lib/zitadel/types";
-import {
-  isJsonArray,
-  isJsonObject,
-  objectAt,
-  stringAt,
-  stringsIn,
-  toJsonObject,
-} from "@/lib/zitadel/utils/json";
+import { isJsonObject, objectAt, stringAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { didYouMean } from "@/lib/zitadel/utils/spelling";
-
-/**
- * The blocks whose rows name a claim.
- */
-type RowBlock = Extract<ClaimField, "claim_mapping" | "verified_claims">;
 
 /**
  * An identity-provider connection under `.zitadel/idps/`: who signs people in,
@@ -94,7 +79,16 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   readonly kind = "connection";
 
   /**
+   * The slug schemas and flows name the connection by.
+   */
+  readonly slug: ConnectionSlug;
+
+  /**
    * Hold a connection the connection contract took.
+   *
+   * @remarks
+   * The contract holds the slug to the pattern a slug is parsed against, so
+   * it always parses.
    *
    * @param file - The project-relative path and the body as written.
    * @param value - What the contract parsed the body to.
@@ -102,6 +96,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   private constructor(file: DocumentFile<Body>, value: ConnectionValue, status: DocumentStatus) {
     super(file, value, status);
+    this.slug = validated(parseConnectionSlug(value.slug));
   }
 
   /**
@@ -296,125 +291,52 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
-   * The slug the connection is known by, as written.
-   *
-   * @returns The slug, or `undefined` when it has none.
-   */
-  get slug(): string | undefined {
-    return stringAt(this.body, "slug");
-  }
-
-  /**
-   * The slug as a schema or flow compares it: without surrounding space.
-   *
-   * @returns The trimmed slug, or `""` when it has none.
-   */
-  get declaredSlug(): string {
-    const slug = this.slug ?? "";
-    return slug.trim();
-  }
-
-  /**
-   * What the connection is called.
-   *
-   * @returns Its `slug`, or its file name without `.json` when the slug is
-   *   missing or blank.
-   */
-  get name(): string {
-    const slug = this.declaredSlug;
-    if (slug === "") {
-      return basename(this.path, ".json");
-    }
-    return slug;
-  }
-
-  /**
-   * The slug, when it is one a schema or flow can name.
-   *
-   * @returns The slug, or `undefined` when it is missing or malformed.
-   */
-  get validSlug(): ConnectionSlug | undefined {
-    const parsed = parseConnectionSlug(this.slug ?? "");
-    if (!parsed.ok) {
-      return undefined;
-    }
-    return parsed.value;
-  }
-
-  /**
    * The catalog entry the connection was written from.
    *
    * @returns The entry's name, or `undefined` for a connection of the
    *   developer's own.
    */
   get template(): string | undefined {
-    return stringAt(this.body, "template");
+    return this.value.template;
   }
 
   /**
-   * The name shown on the sign-in button, as written.
+   * The name shown on the sign-in button.
    *
-   * @returns The name, or `undefined` when it has none.
+   * @returns The name.
    */
-  get displayName(): string | undefined {
-    return stringAt(this.body, "display_name");
+  get displayName(): string {
+    return this.value.display_name;
   }
 
   /**
-   * The provider's issuer, as written.
+   * The provider's issuer.
    *
-   * @returns The issuer, or `undefined` when `oidc.issuer` is not a string.
+   * @returns The issuer, or `undefined` when the file has no `oidc` block.
    */
   get issuer(): string | undefined {
-    return stringAt(objectAt(this.body, "oidc"), "issuer");
+    return this.value.oidc?.issuer;
   }
 
   /**
-   * The client id as written.
+   * The credentials, each a variable reference or a value.
    *
-   * @returns A value or a `${{ NAME }}` reference, or `undefined` when
-   *   `oidc.client_id` is not a string.
+   * @returns The client id and client secret, or `undefined` when the file
+   *   has no `oidc` block.
    */
-  get clientId(): string | undefined {
-    return stringAt(objectAt(this.body, "oidc"), "client_id");
-  }
-
-  /**
-   * The project variables the credentials are read from.
-   *
-   * @remarks
-   * A credential field the file leaves out reads from the variable its slug
-   * derives, which is where a credential for it is published.
-   *
-   * @returns The client id's and client secret's variables.
-   */
-  get credentialNames(): CredentialNames {
-    const slug = this.validSlug;
-    const derived = slug === undefined ? undefined : credentialVariables(slug);
-    const oidc = objectAt(this.body, "oidc");
-    const clientId = Connection.readVariable(
-      oidc.client_id,
-      derived?.clientId,
-      referencedClientIdVariable,
-    );
-    const clientSecret = Connection.readVariable(
-      oidc.client_secret,
-      derived?.clientSecret,
-      referencedClientSecretVariable,
-    );
-    return { clientId, clientSecret };
-  }
-
-  /**
-   * The variable names {@link credentialNames} holds.
-   *
-   * @returns The names, client id first; none when both are held as values.
-   */
-  get variableNames(): readonly CredentialVariable[] {
-    const { clientId, clientSecret } = this.credentialNames;
-    return [clientId, clientSecret].filter((name): name is CredentialVariable => {
-      return name !== undefined;
-    });
+  get credentials(): ConnectionCredentials | undefined {
+    const oidc = this.value.oidc;
+    if (oidc === undefined) {
+      return undefined;
+    }
+    return {
+      clientId: Connection.readCredential("client_id", oidc.client_id, referencedClientIdVariable),
+      clientSecret: Connection.readCredential(
+        "client_secret",
+        oidc.client_secret,
+        referencedClientSecretVariable,
+      ),
+    };
   }
 
   /**
@@ -423,8 +345,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns False only when `provisioning.creation` is `disabled`.
    */
   get createsUsers(): boolean {
-    const provisioning = this.body.provisioning;
-    return !isJsonObject(provisioning) || provisioning.creation !== "disabled";
+    return this.value.provisioning?.creation !== "disabled";
   }
 
   /**
@@ -433,135 +354,46 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns Each property and the claim that fills it, in the order written;
    *   none when there is no mapping.
    */
-  get mappings(): readonly ClaimRow[] {
-    return this.readRows("claim_mapping");
+  get mappings(): readonly ClaimRow<string>[] {
+    const mapping = this.value.claim_mapping ?? {};
+    return Object.entries(mapping).map((entry) => {
+      return { property: propertyName(entry[0]), claim: entry[1] };
+    });
   }
 
   /**
    * The rows of `verified_claims`.
    *
-   * @returns Each property and the claim that verifies it, in the order
-   *   written; none when nothing is verified.
+   * @returns Each property and what verifies it, a claim's name or a fixed
+   *   answer, in the order written; none when nothing is verified.
    */
   get verifications(): readonly ClaimRow[] {
-    return this.readRows("verified_claims");
-  }
-
-  /**
-   * The provider's name as a message gives it: its display name, or its slug
-   * when it has none.
-   *
-   * @returns The name.
-   */
-  get providerName(): string {
-    return this.displayName ?? this.name;
-  }
-
-  /**
-   * The claim mappings the connection was written with: which side of each
-   * line is the schema's and which the claim the provider must return, then
-   * what verifies a value, which a mapping alone does not.
-   *
-   * @returns The summary, one line per row.
-   */
-  get mappingSummary(): string {
-    const provider = this.providerName;
-    const mappings = this.mappings.map((row) => {
-      return `  ${row.property} ← ${String(row.claim)}`;
-    });
-    const verifications = this.verifications.map((row) => {
-      if (row.claim === true) {
-        return `  ${row.property} is treated as verified.`;
-      }
-      return `  ${row.property} is treated as verified only when ${provider} says so in the ${String(row.claim)} claim.`;
-    });
-    const verification =
-      verifications.length === 0
-        ? ["Nothing is treated as verified."]
-        : ["Verification, which a mapping alone does not give:", ...verifications];
-    return [
-      `Claim mappings in ${this.path}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
-      ...mappings,
-      ...verification,
-      "Edit the mappings in that file if your provider returns other claims.",
-    ].join("\n");
-  }
-
-  /**
-   * The claims the connection reads, by name: its mappings, then its
-   * verifications, as long as the claim is written as a name.
-   *
-   * @returns Each claim and the block it is read in.
-   */
-  get claimReads(): readonly ClaimRead[] {
-    const blocks = [
-      { field: "claim_mapping", rows: this.mappings },
-      { field: "verified_claims", rows: this.verifications },
-    ] as const;
-    return blocks.flatMap((block) => {
-      return block.rows.flatMap((row): readonly ClaimRead[] => {
-        if (typeof row.claim !== "string") {
-          return [];
-        }
-        return [{ field: block.field, claim: claimName(row.claim) }];
-      });
+    const verified = this.value.verified_claims ?? {};
+    return Object.entries(verified).map((entry) => {
+      return { property: propertyName(entry[0]), claim: entry[1] };
     });
   }
 
   /**
    * The scopes `oidc.scopes` asks for.
    *
-   * @returns The strings listed, or `undefined` when it lists none.
+   * @returns The scopes, or `undefined` when the file has no `oidc` block.
    */
   get scopes(): readonly string[] | undefined {
-    const scopes = objectAt(this.body, "oidc").scopes;
-    if (!isJsonArray(scopes)) {
-      return undefined;
-    }
-    return stringsIn(scopes);
+    return this.value.oidc?.scopes;
   }
 
   /**
    * The claim identity keys on.
    *
-   * @returns The claim, or `undefined` when `subject_claim` names none.
+   * @returns The claim, or `undefined` when the file names none.
    */
   get subjectClaim(): ClaimName | undefined {
-    const subject = stringAt(this.body, "subject_claim");
+    const subject = this.value.subject_claim;
     if (subject === undefined) {
       return undefined;
     }
     return claimName(subject);
-  }
-
-  /**
-   * The credential fields that name a project variable.
-   *
-   * @returns Each such field and its variable, client id first; none when
-   *   neither names one.
-   */
-  get variables(): readonly VariableUse[] {
-    const oidc = objectAt(this.body, "oidc");
-    const clientId = stringAt(oidc, "client_id");
-    const clientSecret = stringAt(oidc, "client_secret");
-    const idVariable = clientId === undefined ? undefined : referencedClientIdVariable(clientId);
-    const secretVariable =
-      clientSecret === undefined ? undefined : referencedClientSecretVariable(clientSecret);
-    const idUses: readonly VariableUse[] =
-      idVariable === undefined ? [] : [{ field: "client_id", variable: idVariable }];
-    const secretUses: readonly VariableUse[] =
-      secretVariable === undefined ? [] : [{ field: "client_secret", variable: secretVariable }];
-    return [...idUses, ...secretUses];
-  }
-
-  /**
-   * Whether the connection's `slug` is this one, ignoring surrounding space.
-   *
-   * @param slug - The slug, as written or typed.
-   * @returns Whether it declares it.
-   */
-  declares(slug: string): boolean {
-    return this.declaredSlug === slug;
   }
 
   /**
@@ -597,10 +429,10 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const issuer = this.issuer;
     if (issuer === undefined) {
       throw new ConflictError(
-        `${this.path} is already named ${this.name} and is not an OIDC connection`,
+        `${this.path} is already named ${this.slug} and is not an OIDC connection`,
         {
           hint: "Fix the file, or choose another slug, then run the command again.",
-          details: { file: this.path, slug: this.name },
+          details: { file: this.path, slug: this.slug },
         },
       );
     }
@@ -678,19 +510,24 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @throws {@link ConfigError} When they differ.
    */
   refuseDifferentClientId(clientId: string | undefined): void {
-    const existing = this.clientId;
-    if (
-      clientId === undefined ||
-      existing === undefined ||
-      isVariableReference(existing) ||
-      existing === clientId
-    ) {
+    const existing = this.credentials?.clientId;
+    if (clientId === undefined || existing === undefined || existing.kind === "variable") {
       return;
     }
-    throw new ConfigError(`${this.path} already uses client id ${existing}, not ${clientId}`, {
-      hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
-      details: { file: this.path, stored_client_id: existing, supplied_client_id: clientId },
-    });
+    if (existing.value === clientId) {
+      return;
+    }
+    throw new ConfigError(
+      `${this.path} already uses client id ${existing.value}, not ${clientId}`,
+      {
+        hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
+        details: {
+          file: this.path,
+          stored_client_id: existing.value,
+          supplied_client_id: clientId,
+        },
+      },
+    );
   }
 
   /**
@@ -718,53 +555,33 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     if (!parsed.ok) {
       throw new ConfigError(`${this.path} holds ${what} that cannot be used: ${parsed.problem}`, {
         hint: "Fix it in that file, or choose another slug.",
-        details: { file: this.path, slug: this.name },
+        details: { file: this.path, slug: this.slug },
       });
     }
     return parsed.value;
   }
 
   /**
-   * Read the rows of a mapping block.
+   * Read one credential field: the variable it references, or its value.
    *
-   * @param block - `claim_mapping` or `verified_claims`.
-   * @returns Each property and its claim, in the order written; none when the
-   *   block is absent.
-   */
-  private readRows(block: RowBlock): readonly ClaimRow[] {
-    return Object.entries(objectAt(this.body, block)).flatMap((entry): readonly ClaimRow[] => {
-      const claim = entry[1];
-      // A member that is absent is no row.
-      if (claim === undefined) {
-        return [];
-      }
-      return [{ property: propertyName(entry[0]), claim }];
-    });
-  }
-
-  /**
-   * Read the variable a credential field reads from.
-   *
-   * @typeParam V - The kind of variable the field names.
-   * @param value - The field as written.
-   * @param fallback - The variable an absent field reads from.
+   * @typeParam Field - The field.
+   * @typeParam Variable - The kind of variable the field references.
+   * @param field - The field.
+   * @param written - The field as written.
    * @param referenced - The variable a `${{ NAME }}` reference names, branded
    *   for the field.
-   * @returns The variable it references, the fallback when the field is absent,
-   *   or `undefined` when it holds a value.
+   * @returns The credential.
    */
-  private static readVariable<V extends CredentialVariable>(
-    value: JsonValue | undefined,
-    fallback: V | undefined,
-    referenced: (value: string) => V | undefined,
-  ): V | undefined {
-    if (value === undefined) {
-      return fallback;
+  private static readCredential<Field extends CredentialField, Variable extends CredentialVariable>(
+    field: Field,
+    written: string,
+    referenced: (value: string) => Variable | undefined,
+  ): Credential<Field, Variable> {
+    const variable = referenced(written);
+    if (variable === undefined) {
+      return { kind: "literal", field, value: written };
     }
-    if (typeof value !== "string") {
-      return undefined;
-    }
-    return referenced(value);
+    return { kind: "variable", field, variable };
   }
 
   /**

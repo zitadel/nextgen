@@ -8,13 +8,12 @@ import type { Connection } from "@/lib/zitadel/resources/connections/connection"
 import type {
   ConnectionPath,
   ConnectionSetting,
-  CredentialNames,
   CredentialVariable,
   LookupOptions,
   SsoOptions,
   UnusedConnection,
 } from "@/lib/zitadel/resources/connections/types";
-import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel/errors";
+import { ConflictError, NotFoundError } from "@/lib/zitadel/errors";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { SkippedRegion } from "@/lib/zitadel/resources/document";
@@ -60,15 +59,14 @@ export class Connections extends Collection<Connection> {
    * @throws {@link ConflictError} When more than one connection could be it,
    *   its file name or slug is taken, its variables are another connection's,
    *   or an existing one of the developer's own connects to another issuer.
-   * @throws {@link ConfigError} When the existing one has no usable slug or
-   *   holds another client id.
+   * @throws {@link ConfigError} When the existing one holds another client id.
    */
   resolveExisting(candidate: Connection, options: LookupOptions = {}): Connection | undefined {
     if (candidate.template === undefined) {
-      const named = this.resolveBySlug(candidate.name, candidate.issuer);
+      const named = this.resolveBySlug(candidate.slug, candidate.issuer);
       if (named !== undefined) {
         named.refuseDifferentClientId(options.clientId);
-        this.refuseCollidingVariables(named.credentialNames, candidate.name, named);
+        this.refuseCollidingVariables(Connections.readVariables(named), candidate.slug, named);
       }
       return named;
     }
@@ -76,37 +74,25 @@ export class Connections extends Collection<Connection> {
       if (connection.template === candidate.template) {
         return true;
       }
-      return connection.declares(candidate.name) && connection.issuer === candidate.issuer;
+      return connection.slug === candidate.slug && connection.issuer === candidate.issuer;
     });
     if (matches.all.length > 1) {
       throw new ConflictError(
-        `More than one ${candidate.providerName} connection exists: ${matches.paths.join(", ")}`,
+        `More than one ${candidate.displayName} connection exists: ${matches.paths.join(", ")}`,
         {
           hint: "Keep the one this Project should use and remove the others, then run the command again.",
-          details: { provider: candidate.name, files: matches.paths },
+          details: { provider: candidate.slug, files: matches.paths },
         },
       );
     }
     const match = matches.all[0];
     if (match === undefined) {
       this.refuseTakenFileName(candidate);
-      this.refuseCollidingVariables(candidate.credentialNames, candidate.name);
+      this.refuseCollidingVariables(Connections.readVariables(candidate), candidate.slug);
       return undefined;
     }
     match.refuseDifferentClientId(options.clientId);
-    // A file can match on its template while carrying no slug of its own.
-    // Inventing the provider's would point the schema and every flow at an
-    // identity the connection does not declare.
-    if (match.validSlug === undefined) {
-      throw new ConfigError(
-        `${match.path} is a ${candidate.providerName} connection with no usable slug`,
-        {
-          hint: "Give the connection file a slug: the schemas and flows reference it by that name.",
-          details: { file: match.path },
-        },
-      );
-    }
-    this.refuseCollidingVariables(match.credentialNames, match.name, match);
+    this.refuseCollidingVariables(Connections.readVariables(match), match.slug, match);
     return match;
   }
 
@@ -128,7 +114,7 @@ export class Connections extends Collection<Connection> {
    */
   resolveBySlug(slug: string, issuer?: string): Connection | undefined {
     const holders = this.filter((connection) => {
-      return connection.declares(slug);
+      return connection.slug === slug;
     });
     if (holders.all.length > 1) {
       throw new ConflictError(
@@ -180,7 +166,8 @@ export class Connections extends Collection<Connection> {
    *   candidate when it is created, or the one the project already had.
    * @throws {@link NotFoundError} When no flow runs against the schema.
    * @throws {@link ConflictError} When the connection would step on another one.
-   * @throws {@link ConfigError} When the connection has no usable slug.
+   * @throws {@link ConfigError} When the existing connection holds another
+   *   client id.
    * @throws {@link RefusedEditError} When a region the edit writes is not the
    *   shape it writes.
    * @throws {@link BrokenFlowsError} When a flow would stop validating.
@@ -193,13 +180,7 @@ export class Connections extends Collection<Connection> {
     const flows = this.config.flows.resolveForSso(schema);
     const existing = this.resolveExisting(candidate, options);
     const connection = existing ?? candidate;
-    const slug = connection.validSlug;
-    if (slug === undefined) {
-      throw new ConfigError(`${connection.path} has no usable slug`, {
-        hint: "Give the connection file a slug: the schemas and flows reference it by that name.",
-        details: { file: connection.path },
-      });
-    }
+    const slug = connection.slug;
     const edited = schema.withProvider(slug).document;
     const start = existing === undefined ? this.config.with(candidate) : this.config;
     const flowEdits = flows.map((flow) => {
@@ -312,9 +293,9 @@ export class Connections extends Collection<Connection> {
         return other.path !== connection.path;
       })
       .flatMap((other) => {
-        return other.variableNames;
+        return Connections.readVariables(other);
       });
-    return connection.variableNames.filter((name) => {
+    return Connections.readVariables(connection).filter((name) => {
       return !elsewhere.includes(name);
     });
   }
@@ -369,7 +350,7 @@ export class Connections extends Collection<Connection> {
     if (existing !== undefined) {
       return this.describeUnapplied(existing, candidate, given);
     }
-    const provider = candidate.providerName;
+    const provider = candidate.displayName;
     const others = this.findSameIssuer(candidate);
     const secondButton: readonly Notice[] =
       candidate.template !== undefined && others.length > 0
@@ -394,9 +375,40 @@ export class Connections extends Collection<Connection> {
         : [];
     const summary: readonly Notice[] =
       candidate.template === undefined && candidate.mappings.length > 0
-        ? [{ severity: "info", message: candidate.mappingSummary }]
+        ? [{ severity: "info", message: this.summarizeMappings(candidate) }]
         : [];
     return [...secondButton, ...fillsNothing, ...summary];
+  }
+
+  /**
+   * Summarise the claim mappings a new connection was written with: which
+   * side of each line is the schema's and which the claim the provider must
+   * return, then what verifies a value, which a mapping alone does not.
+   *
+   * @param candidate - The new connection.
+   * @returns The summary, one line per row.
+   */
+  private summarizeMappings(candidate: Connection): string {
+    const provider = candidate.displayName;
+    const mappings = candidate.mappings.map((row) => {
+      return `  ${row.property} ← ${row.claim}`;
+    });
+    const verifications = candidate.verifications.map((row) => {
+      if (row.claim === true) {
+        return `  ${row.property} is treated as verified.`;
+      }
+      return `  ${row.property} is treated as verified only when ${provider} says so in the ${String(row.claim)} claim.`;
+    });
+    const verification =
+      verifications.length === 0
+        ? ["Nothing is treated as verified."]
+        : ["Verification, which a mapping alone does not give:", ...verifications];
+    return [
+      `Claim mappings in ${candidate.path}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
+      ...mappings,
+      ...verification,
+      "Edit the mappings in that file if your provider returns other claims.",
+    ].join("\n");
   }
 
   /**
@@ -491,8 +503,8 @@ export class Connections extends Collection<Connection> {
     const inCatalog = IDP_PROVIDERS.some((provider) => {
       return provider === slug;
     });
-    const connections = this.all.map((connection) => {
-      return connection.name;
+    const connections: readonly string[] = this.all.map((connection) => {
+      return connection.slug;
     });
     if (inCatalog || connections.includes(slug)) {
       return;
@@ -553,7 +565,8 @@ export class Connections extends Collection<Connection> {
     }
     const parsed = parseConnectionSlug(slug);
     if (parsed.ok) {
-      this.refuseCollidingVariables(credentialVariables(parsed.value), slug);
+      const derived = credentialVariables(parsed.value);
+      this.refuseCollidingVariables([derived.clientId, derived.clientSecret], slug);
     }
   }
 
@@ -571,21 +584,21 @@ export class Connections extends Collection<Connection> {
     if (occupied === undefined) {
       return;
     }
-    if (occupied.declares(candidate.name)) {
+    if (occupied.slug === candidate.slug) {
       const issuer = candidate.issuer ?? "the same";
       throw new ConflictError(
-        `${candidate.path} is a connection called ${candidate.name}, but not to ${candidate.providerName}: its issuer is not ${issuer}`,
+        `${candidate.path} is a connection called ${candidate.slug}, but not to ${candidate.displayName}: its issuer is not ${issuer}`,
         {
           hint: "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.",
-          details: { file: candidate.path, slug: candidate.name },
+          details: { file: candidate.path, slug: candidate.slug },
         },
       );
     }
     throw new ConflictError(
-      `${candidate.path} already exists and is not the ${candidate.name} connection`,
+      `${candidate.path} already exists and is not the ${candidate.slug} connection`,
       {
         hint: "Rename or remove that file, or choose another slug, then run the command again.",
-        details: { file: candidate.path, slug: occupied.slug ?? null },
+        details: { file: candidate.path, slug: occupied.slug },
       },
     );
   }
@@ -627,37 +640,64 @@ export class Connections extends Collection<Connection> {
    * and the loser signs in with the wrong application, which surfaces at the
    * provider and not here.
    *
-   * @param ours - The variables this connection reads.
+   * @param ours - The variables this connection reads, client id first.
    * @param slug - Its slug.
    * @param except - The connection being reused, which is not its own collision.
    * @throws {@link ConflictError} When a variable is shared.
    */
-  private refuseCollidingVariables(ours: CredentialNames, slug: string, except?: Connection): void {
-    // The two are branded apart, so they are compared as the names they both are.
-    const clientId: string | undefined = ours.clientId;
-    const clientSecret: string | undefined = ours.clientSecret;
-    if (clientId !== undefined && clientId === clientSecret) {
-      throw new ConflictError(`This connection points both credentials at ${clientId}`, {
+  private refuseCollidingVariables(
+    ours: readonly CredentialVariable[],
+    slug: string,
+    except?: Connection,
+  ): void {
+    const doubled = ours.find((name, index) => {
+      return ours.indexOf(name) !== index;
+    });
+    if (doubled !== undefined) {
+      throw new ConflictError(`This connection points both credentials at ${doubled}`, {
         hint: "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.",
-        details: { slug, variable: clientId },
+        details: { slug, variable: doubled },
       });
     }
-    const names = [ours.clientId, ours.clientSecret].filter((name): name is CredentialVariable => {
-      return name !== undefined;
-    });
     const others = this.all.filter((connection) => {
       return connection !== except;
     });
     for (const connection of others) {
-      const shared = names.find((name) => {
-        return connection.variableNames.includes(name);
+      const theirs = Connections.readVariables(connection);
+      const shared = ours.find((name) => {
+        return theirs.includes(name);
       });
       if (shared !== undefined) {
         throw new ConflictError(`${connection.path} and ${slug} both use ${shared}`, {
           hint: "Point one of them at a variable of its own, then run the command again.",
-          details: { file: connection.path, slug, other_slug: connection.name, variable: shared },
+          details: { file: connection.path, slug, other_slug: connection.slug, variable: shared },
         });
       }
     }
+  }
+
+  /**
+   * Read the project variables a connection's credentials are read from.
+   *
+   * @remarks
+   * A connection with no `oidc` block leaves both to the variables its slug
+   * derives, which is where enabling it publishes them.
+   *
+   * @param connection - The connection.
+   * @returns The variables, client id first; none for a credential held as a
+   *   value.
+   */
+  private static readVariables(connection: Connection): readonly CredentialVariable[] {
+    const credentials = connection.credentials;
+    if (credentials === undefined) {
+      const derived = credentialVariables(connection.slug);
+      return [derived.clientId, derived.clientSecret];
+    }
+    return [credentials.clientId, credentials.clientSecret].flatMap((credential) => {
+      if (credential.kind === "literal") {
+        return [];
+      }
+      return [credential.variable];
+    });
   }
 }

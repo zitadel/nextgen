@@ -16,7 +16,7 @@ import type { Connection } from "@/lib/zitadel/resources/connections/connection"
 import type { ClaimRead } from "@/lib/zitadel/resources/connections/types";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import { PROVIDER_OUTCOMES, type ProviderOutcome } from "@/lib/zitadel/resources/flows/types";
-import type { PropertyName } from "@/lib/zitadel/names";
+import { claimName, type PropertyName } from "@/lib/zitadel/names";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
@@ -97,11 +97,31 @@ type Standing = {
 function standing(config: ZitadelConfig): readonly Standing[] {
   return config.connections.all.flatMap((connection) => {
     const slug = connection.slug;
-    if (slug === undefined || config.connections.find(slug) !== connection) {
+    if (config.connections.find(slug) !== connection) {
       return [];
     }
     return [{ connection, slug, listing: config.schemas.listOffering(slug) }];
   });
+}
+
+/**
+ * The claims a connection reads by name: its mappings, then its
+ * verifications that name a claim rather than always verify.
+ *
+ * @param connection - The connection.
+ * @returns Each claim and the block it is read in.
+ */
+function claimReads(connection: Connection): readonly ClaimRead[] {
+  const mapped = connection.mappings.map((row): ClaimRead => {
+    return { field: "claim_mapping", claim: claimName(row.claim) };
+  });
+  const verified = connection.verifications.flatMap((row): readonly ClaimRead[] => {
+    if (typeof row.claim !== "string") {
+      return [];
+    }
+    return [{ field: "verified_claims", claim: claimName(row.claim) }];
+  });
+  return [...mapped, ...verified];
 }
 
 /**
@@ -192,9 +212,8 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       return config.connections.all.flatMap((connection) => {
-        const first =
-          connection.slug === undefined ? undefined : config.connections.find(connection.slug);
-        if (first === undefined || first === connection || connection.slug === undefined) {
+        const first = config.connections.find(connection.slug);
+        if (first === undefined || first === connection) {
           return [];
         }
         return [{ connection, slug: connection.slug, first }];
@@ -213,8 +232,15 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       const uses = config.connections.all.flatMap((connection) => {
-        return connection.variables.map((use) => {
-          return { connection, ...use };
+        const credentials = connection.credentials;
+        if (credentials === undefined) {
+          return [];
+        }
+        return [credentials.clientId, credentials.clientSecret].flatMap((credential) => {
+          if (credential.kind === "literal") {
+            return [];
+          }
+          return [{ connection, field: credential.field, variable: credential.variable }];
         });
       });
       return uses.flatMap((use) => {
@@ -627,7 +653,7 @@ export const SSO_RULES: readonly Rule[] = [
         if (scopes === undefined || !scopes.every(isStandardScope)) {
           return [];
         }
-        const missing = entry.connection.claimReads.flatMap((read) => {
+        const missing = claimReads(entry.connection).flatMap((read) => {
           const scope = standardClaim(read.claim)?.scope;
           if (scope === undefined || scopes.includes(scope)) {
             return [];
@@ -718,7 +744,7 @@ export const SSO_RULES: readonly Rule[] = [
         const subject = entry.connection.subjectClaim;
         const subjectReads: readonly ClaimRead[] =
           subject === undefined ? [] : [{ field: "subject_claim", claim: subject }];
-        return [...entry.connection.claimReads, ...subjectReads].map((read) => {
+        return [...claimReads(entry.connection), ...subjectReads].map((read) => {
           return { connection: entry.connection, ...read };
         });
       });

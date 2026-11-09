@@ -321,7 +321,12 @@ describe("Connections.enable", () => {
 
       expect(change.notices).toContainEqual({
         severity: "info",
-        message: expect.stringContaining("Nothing is treated as verified."),
+        message: [
+          `Claim mappings in ${ACME_SSO_FILE}. Each line is an attribute of your user schema, then the claim Acme SSO must return for it:`,
+          "  email ← mail",
+          "Nothing is treated as verified.",
+          "Edit the mappings in that file if your provider returns other claims.",
+        ].join("\n"),
       });
     });
   });
@@ -391,6 +396,19 @@ describe("Connections.findUnused", () => {
       const unused = config.connections.findUnused("google");
 
       expect(unused?.variables).toEqual([]);
+    });
+
+    it("names the variables its slug derives when the file has no oidc block", () => {
+      const config = aConfig({
+        ...CUSTOMERS_PROJECT,
+        connections: {
+          "google.json": { slug: "google", protocol: "oidc", display_name: "Google" },
+        },
+      });
+
+      const unused = config.connections.findUnused("google");
+
+      expect(unused?.variables).toEqual(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
     });
   });
 
@@ -771,7 +789,11 @@ describe("Connections.resolveExisting", () => {
 
       const existing = config.connections.resolveExisting(ACME_SSO);
 
-      expect(existing?.credentialNames.clientSecret).toBe("ACME_SECRET");
+      expect(existing?.credentials?.clientSecret).toEqual({
+        kind: "variable",
+        field: "client_secret",
+        variable: "ACME_SECRET",
+      });
     });
 
     it.each([
@@ -992,7 +1014,9 @@ describe("Connections.findSameIssuer", () => {
 
   describe("with a connection that names no issuer", () => {
     it("names nothing", () => {
-      const config = aConfig({ connections: { "okta.json": { slug: "okta" } } });
+      const config = aConfig({
+        connections: { "okta.json": { slug: "okta", protocol: "oidc", display_name: "Okta" } },
+      });
 
       const paths = config.connections.findSameIssuer(GOOGLE);
 

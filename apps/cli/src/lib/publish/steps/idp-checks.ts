@@ -113,7 +113,16 @@ function checkCredentialVariables(
   held: ReadonlyMap<string, boolean>,
 ): void {
   const file = connection.path;
-  const uses = connection.variables;
+  const credentials = connection.credentials;
+  if (credentials === undefined) {
+    return;
+  }
+  const uses = [credentials.clientId, credentials.clientSecret].flatMap((credential) => {
+    if (credential.kind === "literal") {
+      return [];
+    }
+    return [credential];
+  });
   const id = uses.find((use) => {
     return use.field === "client_id";
   });

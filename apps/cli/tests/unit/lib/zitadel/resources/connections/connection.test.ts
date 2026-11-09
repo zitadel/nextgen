@@ -5,7 +5,7 @@ import { idpProvider } from "@zitadel/config/idp";
 import { ConfigError, ConflictError, Connection } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@/lib/zitadel/storage";
-import { aFile, aGoogleConnection, anOidcConnection } from "@tests/helpers/config";
+import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { anAcmeSsoProvider, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
 import { issuer } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -208,16 +208,10 @@ describe("Connection.toWireBody", () => {
   });
 });
 
-describe("Connection.credentialNames", () => {
+describe("Connection.credentials", () => {
   it.each([
     [
-      "derives the variables from the slug for fields the file leaves out",
-      "acme.json",
-      { slug: "acme", protocol: "oidc", display_name: "Acme" },
-      { clientId: "ACME_CLIENT_ID", clientSecret: "ACME_CLIENT_SECRET" },
-    ],
-    [
-      "reads the variable a field references, not the one its slug implies",
+      "reads the variable each field references, not the one its slug implies",
       "okta.json",
       {
         slug: "okta",
@@ -229,10 +223,17 @@ describe("Connection.credentialNames", () => {
           client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
         },
       },
-      { clientId: "OKTA_CLIENT_ID", clientSecret: "GOOGLE_CLIENT_SECRET" },
+      {
+        clientId: { kind: "variable", field: "client_id", variable: "OKTA_CLIENT_ID" },
+        clientSecret: {
+          kind: "variable",
+          field: "client_secret",
+          variable: "GOOGLE_CLIENT_SECRET",
+        },
+      },
     ],
     [
-      "names no variable for a client id the file holds as a value",
+      "holds a client id the file holds as a value as that value",
       "google.json",
       {
         slug: "google",
@@ -244,30 +245,33 @@ describe("Connection.credentialNames", () => {
           client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
         },
       },
-      { clientId: undefined, clientSecret: "GOOGLE_CLIENT_SECRET" },
+      {
+        clientId: { kind: "literal", field: "client_id", value: "824.apps.googleusercontent.com" },
+        clientSecret: {
+          kind: "variable",
+          field: "client_secret",
+          variable: "GOOGLE_CLIENT_SECRET",
+        },
+      },
     ],
-  ])("%s", (_claim, name, body, names) => {
+  ])("%s", (_claim, name, body, expected) => {
     const connection = Connection.of(aFile("connections", name, body));
 
-    const credentialNames = connection.credentialNames;
+    const credentials = connection.credentials;
 
-    expect(credentialNames).toEqual(names);
+    expect(credentials).toEqual(expected);
   });
-});
 
-describe("Connection.variableNames", () => {
-  it("lists only the variables it names", () => {
-    const literal = Connection.of(
-      aFile(
-        "connections",
-        "google.json",
-        aGoogleConnection({ oidc: { client_id: "824.apps.googleusercontent.com" } }),
-      ),
-    );
+  describe("when the file has no oidc block", () => {
+    it("is nothing", () => {
+      const bare = Connection.of(
+        aFile("connections", "acme.json", { slug: "acme", protocol: "oidc", display_name: "Acme" }),
+      );
 
-    const names = literal.variableNames;
+      const credentials = bare.credentials;
 
-    expect(names).toEqual(["GOOGLE_CLIENT_SECRET"]);
+      expect(credentials).toBeUndefined();
+    });
   });
 });
 
@@ -506,24 +510,6 @@ describe("Connection.readStoredSettings", () => {
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
         hint: "Fix the file, or choose another slug, then run the command again.",
       });
-    });
-  });
-});
-
-describe("Connection.mappingSummary", () => {
-  describe("with nothing verified", () => {
-    it("says so after the mappings", () => {
-      const acme = Connection.of(
-        aFile("connections", "acme.json", anOidcConnection({ claim_mapping: { email: "email" } })),
-      );
-
-      const summary = acme.mappingSummary;
-
-      expect(summary.split("\n").slice(1)).toEqual([
-        "  email ← email",
-        "Nothing is treated as verified.",
-        "Edit the mappings in that file if your provider returns other claims.",
-      ]);
     });
   });
 });

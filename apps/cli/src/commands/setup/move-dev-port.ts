@@ -211,6 +211,6 @@ async function connectionSlugs(cwd: string): Promise<readonly string[]> {
     return ZitadelConfig.empty();
   });
   return config.connections.all.map((connection) => {
-    return connection.name;
+    return connection.slug;
   });
 }

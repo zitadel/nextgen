@@ -11,7 +11,14 @@
  * prints or knows the command line. It fails only with a {@link ConfigError},
  * and depends on nothing else under `lib/`.
  */
-export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
+export {
+  BRANDING_DESIGN_INFO,
+  Branding,
+  Brandings,
+  PAGE_LAYOUT_HINT,
+  RETIRED_BRANDING_DESIGNS,
+  type BrandingDesignInfo,
+} from "@/lib/zitadel/resources/branding";
 export { BrokenFile, type BrokenFileFields } from "@/lib/zitadel/resources/broken";
 export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
 export { Collection, PinnedCollection } from "@/lib/zitadel/resources/collection";
@@ -21,13 +28,13 @@ export {
   Connection,
   Connections,
   type ClaimRow,
+  type ConnectionCredentials,
   type ConnectionSetting,
-  type CredentialNames,
+  type Credential,
   type LookupOptions,
   type SsoOptions,
   type StoredSettings,
   type UnusedConnection,
-  type VariableUse,
 } from "@/lib/zitadel/resources/connections";
 export type {
   ContractValue,
@@ -86,11 +93,13 @@ export {
   type PasswordMinLength,
   type PolicyBody,
   type PolicyCase,
+  type PolicyCaseResult,
   type PolicyConfig,
   type PolicyExpectation,
   type PolicyOperation,
   type PolicySelection,
   type PolicyTestBody,
+  type PolicyVerdict,
 } from "@/lib/zitadel/resources/policies";
 export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";

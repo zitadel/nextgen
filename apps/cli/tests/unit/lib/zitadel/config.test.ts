@@ -424,7 +424,7 @@ describe("ZitadelConfig.scaffold", () => {
 
       expect(
         connections.map(({ chosen, connection }) => {
-          return [chosen.selection, connection.name];
+          return [chosen.selection, connection.slug];
         }),
       ).toEqual([
         [googleSelection, "google"],
@@ -450,7 +450,11 @@ describe("ZitadelConfig.scaffold", () => {
         sso: [{ selection: googleSelection }],
       });
 
-      expect(connections[0]?.connection.credentialNames.clientSecret).toBe("GOOGLE_CLIENT_SECRET");
+      expect(connections[0]?.connection.credentials?.clientSecret).toEqual({
+        kind: "variable",
+        field: "client_secret",
+        variable: "GOOGLE_CLIENT_SECRET",
+      });
     });
   });
 

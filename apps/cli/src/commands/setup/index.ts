@@ -122,6 +122,7 @@ import {
   ConnectionExistsError,
   DiskStore,
   FileExistsError,
+  PAGE_LAYOUT_HINT,
   type Scaffold,
   type ScaffoldedConnection,
   ZitadelConfig,
@@ -175,7 +176,6 @@ import semver from "semver";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { type ResolvedServer, resolveServer } from "@/lib/server";
-import { PAGE_LAYOUT_HINT } from "@/lib/branding/designs";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { userAgent } from "@/lib/user-agent";
 import { escapeControlCharacters } from "@/lib/terminal-text";

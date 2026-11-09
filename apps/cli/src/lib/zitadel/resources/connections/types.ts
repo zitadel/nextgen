@@ -17,7 +17,7 @@ import type { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 import type { ClaimName, PropertyName } from "@/lib/zitadel/names";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { ContractValue } from "@/lib/zitadel/resources/document";
-import type { CONFIG_DIRECTORIES, JsonObject, JsonValue } from "@/lib/zitadel/types";
+import type { CONFIG_DIRECTORIES, JsonObject } from "@/lib/zitadel/types";
 import { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
 
 /**
@@ -32,17 +32,20 @@ export type ConnectionPath = `${typeof CONFIG_DIRECTORIES.connections}/${string}
 
 /**
  * One row of a connection's `claim_mapping` or `verified_claims`.
+ *
+ * @typeParam Claim - What the block holds for a property: a claim's name in
+ *   `claim_mapping`; a claim's name or a fixed answer in `verified_claims`.
  */
-export type ClaimRow = {
+export type ClaimRow<Claim extends string | boolean = string | boolean> = {
   /**
    * The schema property the row fills or verifies.
    */
   readonly property: PropertyName;
 
   /**
-   * The claim as written; a well-formed file holds a string.
+   * The claim as written.
    */
-  readonly claim: JsonValue;
+  readonly claim: Claim;
 };
 
 /**
@@ -87,39 +90,61 @@ export type CredentialField = (typeof CREDENTIAL_FIELDS)[number];
 export type CredentialVariable = ClientIdVariable | ClientSecretVariable;
 
 /**
- * A credential field that names a project variable instead of holding a value.
+ * One credential field of the `oidc` block, as the file holds it: a
+ * `${{ NAME }}` reference to a project variable, or the value itself.
  *
- * @remarks
- * The variable's brand follows the field: what `client_id` references is a
- * client id's variable, whatever it is called.
+ * @typeParam Field - The field.
+ * @typeParam Variable - The kind of variable the field references, which
+ *   follows the field: what `client_id` references is a client id's variable,
+ *   whatever it is called.
  */
-export type VariableUse =
+export type Credential<Field extends CredentialField, Variable extends CredentialVariable> =
   | {
-      readonly field: "client_id";
-      readonly variable: ClientIdVariable;
+      /**
+       * The field references a project variable.
+       */
+      readonly kind: "variable";
+
+      /**
+       * The field.
+       */
+      readonly field: Field;
+
+      /**
+       * The variable the field references.
+       */
+      readonly variable: Variable;
     }
   | {
-      readonly field: "client_secret";
-      readonly variable: ClientSecretVariable;
+      /**
+       * The field holds its value.
+       */
+      readonly kind: "literal";
+
+      /**
+       * The field.
+       */
+      readonly field: Field;
+
+      /**
+       * The value as written.
+       */
+      readonly value: string;
     };
 
 /**
- * The project variables a connection reads its credentials from.
- *
- * @remarks
- * A credential the file holds as a value names no variable, so it is
- * `undefined`: there is nothing to publish to.
+ * The credentials of a connection's `oidc` block.
  */
-export type CredentialNames = {
+export type ConnectionCredentials = {
   /**
-   * The variable the client id is read from.
+   * The client id.
    */
-  readonly clientId: ClientIdVariable | undefined;
+  readonly clientId: Credential<"client_id", ClientIdVariable>;
 
   /**
-   * The variable the client secret is read from.
+   * The client secret, which the contract holds to a reference.
    */
-  readonly clientSecret: ClientSecretVariable | undefined;
+  readonly clientSecret: Credential<"client_secret", ClientSecretVariable>;
 };
 
 /**

@@ -1,9 +1,12 @@
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
+  type ClientIdVariable,
   type ClientSecret,
+  type ClientSecretVariable,
   type ConnectionEndpoints,
   CUSTOM_PROVIDER,
+  credentialVariables,
   DEFAULT_SCOPES,
   IDP_PROVIDERS,
   parseClientId,
@@ -59,7 +62,7 @@ import {
   type Change,
   Connection,
   type ConnectionSetting,
-  type CredentialNames,
+  type Credential,
   type DocumentChange,
 } from "@/lib/zitadel";
 
@@ -246,6 +249,25 @@ type Published = {
 };
 
 /**
+ * The project variables a connection reads its credentials from.
+ *
+ * @remarks
+ * A credential the file holds as a value names no variable, so it is
+ * `undefined`: there is nothing to publish to.
+ */
+type CredentialNames = {
+  /**
+   * The variable the client id is read from.
+   */
+  readonly clientId: ClientIdVariable | undefined;
+
+  /**
+   * The variable the client secret is read from.
+   */
+  readonly clientSecret: ClientSecretVariable | undefined;
+};
+
+/**
  * What {@link AuthMethodSsoEnable.askCredentials} asks about.
  */
 type CredentialQuestion = {
@@ -427,8 +449,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     // The connection's own route, so its slug decides it: a reused connection
     // keeps the slug it was created with.
-    const callbackUri = callbackUriFor(issuer, connection.name);
-    const names = connection.credentialNames;
+    const callbackUri = callbackUriFor(issuer, connection.slug);
+    const names = credentialNamesOf(connection);
     consola.info(`Project   ${escapeControlCharacters(projectId)}`);
     if (schema.methods.length > 0) {
       consola.info(`Schema    ${schema.path} (${schema.methods.join(", ")})`);
@@ -892,7 +914,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       schema: input.schema,
       connection: {
         action,
-        slug: input.connection.name,
+        slug: input.connection.slug,
         file: input.connection.path,
       },
       callback_uri: input.callbackUri,
@@ -902,6 +924,43 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       secret: storedSecret,
     };
   }
+}
+
+/**
+ * The project variables a connection's credentials are published to.
+ *
+ * @remarks
+ * A connection with no `oidc` block leaves both to the variables its slug
+ * derives.
+ *
+ * @param connection - The connection.
+ * @returns The client id's and client secret's variables.
+ */
+function credentialNamesOf(connection: Connection): CredentialNames {
+  const credentials = connection.credentials;
+  if (credentials === undefined) {
+    return credentialVariables(connection.slug);
+  }
+  return {
+    clientId: variableOf(credentials.clientId),
+    clientSecret: variableOf(credentials.clientSecret),
+  };
+}
+
+/**
+ * The variable a credential references.
+ *
+ * @typeParam Variable - The kind of variable the credential's field references.
+ * @param credential - The credential.
+ * @returns The variable, or `undefined` when the credential is held as a value.
+ */
+function variableOf<Variable extends ClientIdVariable | ClientSecretVariable>(
+  credential: Credential<"client_id" | "client_secret", Variable>,
+): Variable | undefined {
+  if (credential.kind === "literal") {
+    return undefined;
+  }
+  return credential.variable;
 }
 
 /**
