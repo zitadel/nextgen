@@ -164,7 +164,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import semver from "semver";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { GlobalOptions } from "@/lib/oclif/types";
-import { type ResolvedServer, resolveServer } from "@/lib/server";
+import { DEFAULT_SERVER, type ResolvedServer, resolveServer } from "@/lib/server";
 import { PAGE_LAYOUT_HINT } from "@/lib/branding/designs";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { userAgent } from "@/lib/user-agent";
@@ -935,6 +935,9 @@ const RENDERER_FLAG_DESCRIPTION =
 /** The message the release setup publishes carries. */
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from setup";
 
+/** The line a finished setup closes on. */
+const SET_UP_TITLE = "Set up Zitadel in this app";
+
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
  * is an `EnvironmentCommand` that resolves the project and server from the
@@ -1148,6 +1151,13 @@ export default class Setup extends Destructive(BaseCommand) {
       return this.emit({
         status: "skipped",
         reason: "already-initialized",
+        summary: {
+          title: "Zitadel is already set up in this app",
+          sections: [],
+          lines: ["Nothing was changed."],
+          boxed: true,
+          ...ranOn(preflight.server.value),
+        },
       });
     }
 
@@ -1836,7 +1846,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // then and this report is the whole point of running setup. The overview
     // is the last step of both — the base command appends it to a chain's
     // ending, so only the text one names it here.
-    let summary: Summary | undefined;
+    let summary: Summary = { title: SET_UP_TITLE, sections: [] };
     let report = "";
     // Where setup ran, as the box's last line, the way every other command's
     // box states it. Setup learns its project while it works rather than
@@ -1868,7 +1878,7 @@ export default class Setup extends Destructive(BaseCommand) {
         // wizard closes on, and the box it opens is the `Summary` every other
         // box is titled: a run that says "Zitadel is ready" twice in four
         // lines has said it once too often.
-        title: "Set up Zitadel in this app",
+        title: SET_UP_TITLE,
         sections: summarySections(sections),
         next: nextActions,
         boxed: true,
@@ -1878,7 +1888,6 @@ export default class Setup extends Destructive(BaseCommand) {
           ...summary,
           next: [...nextActions, ...exploreAction(this.cliVersion)],
         });
-        summary = undefined;
       }
     }
 
@@ -1891,8 +1900,8 @@ export default class Setup extends Destructive(BaseCommand) {
     // thing on stdout.
     return this.emit({
       status: "ok",
-      pretty: painted(report),
-      ...(summary === undefined ? {} : { summary }),
+      summary,
+      ...(report === "" ? {} : { pretty: painted(report) }),
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -2173,6 +2182,12 @@ export default class Setup extends Destructive(BaseCommand) {
 
     return this.emit({
       status: "ok",
+      summary: {
+        title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
+        sections: [],
+        boxed: true,
+        ...ranOn(this.meta.source),
+      },
       data: {
         title: moved ? `Moved the app to ${move.issuer}.` : `The app is already on ${move.issuer}.`,
         moved,
@@ -2772,6 +2787,20 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
+}
+
+/**
+ * Where an ending says the run happened, for a run that never learned its
+ * project: the server's host, and nothing for the default one, which a reader
+ * does not need told.
+ */
+function ranOn(server: string): { ran?: string } {
+  try {
+    const { host } = new URL(server);
+    return host === new URL(DEFAULT_SERVER).host ? {} : { ran: host };
+  } catch {
+    return {};
+  }
 }
 
 /** The command overview as a step of the summary, split from its sentence. */
