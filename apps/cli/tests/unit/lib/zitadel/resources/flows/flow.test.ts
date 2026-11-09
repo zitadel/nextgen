@@ -3,258 +3,316 @@ import { describe, expect, it } from "vitest";
 import { Flow, RefusedEditError } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, listAt } from "@/lib/zitadel/utils/json";
+import { aFile, aLoginFlow } from "@tests/helpers/config";
+import {
+  aFlow,
+  aPasskeyFirstFlow,
+  aPasskeyFlow,
+  aPasswordFlow,
+  FLOW_PATH,
+  PASSWORD_ONLY,
+  withStep,
+} from "@tests/helpers/flows";
 import { slug } from "@tests/helpers/idp-values";
-import { loginFlow } from "@tests/helpers/local-project";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
- * Where every flow in these tests sits.
+ * The provider the tests enable.
  */
-const PATH = ".zitadel/flows/login.json";
+const GOOGLE = slug("google");
 
 /**
- * The methods a password-only schema enables.
+ * A flow that only registers, collecting a password on the way.
  */
-const PASSWORD_ONLY = { password: true, passkey: false };
-
-/**
- * A flow read from `.zitadel/flows/`.
- *
- * @param body - What the file holds.
- * @returns The flow, as read.
- */
-function flowOf(body: JsonObject): Flow {
-  return Flow.of({ path: PATH, body });
-}
-
-/**
- * The scaffolded login flow, as read.
- *
- * @returns The flow.
- */
-function scaffoldedFlow(): Flow {
-  return flowOf(loginFlow("customers"));
-}
-
-/**
- * The shipped password flow, cut to the steps the validator needs.
- */
-const passwordFlow = {
-  name: "default-login",
+const REGISTER_ONLY = {
   status: "active",
-  user_schema: "https://schemas.test.invalid/default-human-user.json",
+  purposes: { register: "register" },
+  steps: [{ name: "register", fields: ["email", "x-auth-methods#password"] }],
+};
+
+/**
+ * A flow whose login offers a passkey only, and collects a password on the
+ * register side, which the login hands over to with a purpose flip.
+ */
+const SIGNS_IN_AND_REGISTERS = {
+  status: "active",
+  purposes: { login: "start", register: "register" },
+  steps: [
+    {
+      name: "start",
+      actions: [{ name: "passkey", kind: "passkey" }],
+      transitions: { register: { target: "register", purpose: "register" } },
+    },
+    { name: "register", fields: ["x-auth-methods#password"] },
+  ],
+};
+
+/**
+ * A flow whose login reaches its password step by a local transition that
+ * spells out a null action and purpose.
+ */
+const NULL_ACTION_AND_PURPOSE = {
+  status: "active",
   purposes: { login: "identifier" },
   steps: [
     {
       name: "identifier",
-      fields: ["email"],
-      actions: [{ name: "submit", kind: "submit", primary: true }],
-      transitions: { submit: { target: "password" } },
+      transitions: { submit: { target: "password", action: null, purpose: null } },
     },
-    {
-      name: "password",
-      fields: ["x-auth-methods#password"],
-      actions: [{ name: "submit", kind: "submit", primary: true }],
-      transitions: { submit: { target: "done" } },
-    },
-    { name: "done", complete: "show" },
+    { name: "password", fields: ["x-auth-methods#password"] },
   ],
 };
 
 /**
- * A flow whose login entry offers a passkey.
+ * A flow whose login leaves by a `switch` to a step of another flow that
+ * shares its name with a local password step.
  */
-const passkeyFlow = {
-  ...passwordFlow,
-  purposes: { login: "passkey-first" },
+const SWITCHING_TO_ANOTHER_FLOW = {
+  status: "active",
+  purposes: { login: "identifier" },
   steps: [
-    {
-      name: "passkey-first",
-      fields: [],
-      actions: [{ name: "passkey", kind: "passkey", primary: true }],
-      transitions: { passkey: { target: "done" } },
-    },
-    { name: "done", complete: "show" },
+    { name: "identifier", transitions: { other: { target: "password", action: "switch" } } },
+    { name: "password", fields: ["x-auth-methods#password"] },
   ],
 };
 
 /**
- * The passkey-first preset, cut to the steps and transitions that matter here.
+ * The shipped shape: `user_not_found` routes to the register step with no
+ * purpose, which switches the login to registration on its own.
  */
-const passkeyFirstFlow = {
-  purposes: { login: "passkey-first", register: "register" },
+const SWITCHING_TO_REGISTRATION = {
+  status: "active",
+  purposes: { login: "identifier", register: "register" },
   steps: [
-    {
-      name: "passkey-first",
-      fields: [],
-      actions: [
-        { name: "passkey", kind: "passkey" },
-        { name: "email_fallback", kind: "navigate" },
-      ],
-      transitions: { passkey: { target: "done" }, email_fallback: { target: "identifier" } },
-    },
     {
       name: "identifier",
-      fields: ["email"],
-      actions: [
-        { name: "submit", kind: "submit" },
-        { name: "passkey", kind: "passkey" },
-      ],
-      transitions: { submit: { target: "password" }, passkey: { target: "done" } },
+      actions: [{ name: "passkey", kind: "passkey" }],
+      transitions: { user_not_found: { target: "register" } },
     },
-    {
-      name: "password",
-      fields: ["x-auth-methods#password"],
-      actions: [
-        { name: "submit", kind: "submit" },
-        { name: "passkey", kind: "passkey" },
-      ],
-      transitions: { submit: { target: "done" }, passkey: { target: "done" } },
-    },
-    {
-      name: "register",
-      fields: ["email"],
-      actions: [{ name: "sign_in", kind: "navigate" }],
-      transitions: { sign_in: { purpose: "login" } },
-    },
-    {
-      name: "sso-conflict",
-      fields: ["x-auth-methods#password"],
-      actions: [{ name: "sign_in", kind: "navigate" }],
-      transitions: { sign_in: { purpose: "login", target: "passkey-first" } },
-    },
-    { name: "done", complete: "show" },
+    { name: "register", fields: ["x-auth-methods#password"] },
   ],
 };
 
+/**
+ * A flow whose login entry only enrols a passkey.
+ */
+const ENROLS_PASSKEYS = {
+  status: "active",
+  purposes: { login: "register" },
+  steps: [{ name: "register", actions: [{ name: "enrol", kind: "passkey_register" }] }],
+};
+
+/**
+ * A served flow whose login entry offers these providers.
+ *
+ * @param providers - The providers the entry step lists.
+ * @returns The flow document.
+ */
+function offering(...providers: string[]): JsonObject {
+  return {
+    status: "active",
+    purposes: { login: "identifier" },
+    steps: [{ name: "identifier", sso_providers: providers }],
+  };
+}
+
+/**
+ * A login that starts on `start`, which collects nothing, and leaves it by
+ * one transition to a step collecting `email`.
+ *
+ * @param outcome - The transition's outcome.
+ * @param transition - The transition, without its target.
+ * @returns The flow, as read.
+ */
+function leavingStartBy(outcome: string, transition: JsonObject): Flow {
+  return aFlow({
+    purposes: { login: "start", register: "register" },
+    steps: [
+      {
+        name: "start",
+        fields: [],
+        transitions: { [outcome]: { target: "register", ...transition } },
+      },
+      { name: "register", fields: ["email"] },
+    ],
+  });
+}
+
+/**
+ * The scaffolded login flow with Google enabled for a password-only schema.
+ *
+ * @returns The edited flow.
+ */
+function offeringGoogle(): Flow {
+  return aFlow(aLoginFlow()).withProvider(GOOGLE, PASSWORD_ONLY).document;
+}
+
+describe("Flow.of", () => {
+  it("takes the file as read", () => {
+    const flow = Flow.of(aFile("flows", "login.json", aLoginFlow()));
+
+    expect(flow.status).toBe("read");
+  });
+});
+
+describe("Flow.create", () => {
+  it("takes the file as new", () => {
+    const flow = Flow.create(aFile("flows", "login.json", aLoginFlow()));
+
+    expect(flow.status).toBe("created");
+  });
+});
+
+describe("Flow.asRead", () => {
+  it("marks an edited flow as read", () => {
+    const edited = offeringGoogle();
+
+    const flow = edited.asRead();
+
+    expect(flow.status).toBe("read");
+  });
+});
+
+describe("Flow.handle", () => {
+  it("is the name a release pins the flow by, not its file name", () => {
+    const flow = aFlow({ name: "default-login" });
+
+    const handle = flow.handle;
+
+    expect(handle).toBe("default-login");
+  });
+
+  it("is undefined for a flow with no name", () => {
+    const flow = aFlow({});
+
+    const handle = flow.handle;
+
+    expect(handle).toBeUndefined();
+  });
+});
+
+describe("Flow.problems", () => {
+  it("finds nothing wrong with the scaffolded flow", () => {
+    const flow = aFlow(aLoginFlow());
+
+    const issues = flow.problems({});
+
+    expect(issues).toEqual([]);
+  });
+
+  it("reports what the flow contract refuses, under contract/flow", () => {
+    const flow = aFlow({ ...aLoginFlow(), steps: "none" });
+
+    const issues = flow.problems({});
+
+    expect(issues).toContainEqual(
+      expect.objectContaining({ rule: "contract/flow", file: FLOW_PATH }),
+    );
+  });
+});
+
+describe("Flow.wireBody", () => {
+  it("sends the flow without its $schema pointer", () => {
+    const flow = aFlow({ $schema: "../meta/flow-definition.json", name: "login" });
+
+    const body = flow.wireBody(new MemoryStore());
+
+    expect(body).toEqual({ name: "login" });
+  });
+});
+
 describe("Flow.offeredMethods", () => {
-  it("sees password on a step that collects it", () => {
-    expect(flowOf(passwordFlow).offeredMethods([])).toEqual(["password"]);
-  });
+  it.each([
+    { method: "password", reaching: "a step that collects it", flow: aPasswordFlow() },
+    { method: "passkey", reaching: "a step that offers the action", flow: aPasskeyFlow() },
+  ])("sees $method on $reaching", ({ method, flow }) => {
+    const login = aFlow(flow);
 
-  it("sees passkey on a step that offers the action", () => {
-    expect(flowOf(passkeyFlow).offeredMethods([])).toEqual(["passkey"]);
-  });
+    const offered = login.offeredMethods([]);
 
-  it("ignores a flow that is not active", () => {
-    expect(flowOf({ ...passkeyFlow, status: "draft" }).offeredMethods([])).toEqual([]);
-  });
-
-  it("does not count a register-only flow that collects a password", () => {
-    const registerOnly = {
-      status: "active",
-      purposes: { register: "register" },
-      steps: [{ name: "register", fields: ["email", "x-auth-methods#password"] }],
-    };
-
-    expect(flowOf(registerOnly).offeredMethods([])).toEqual([]);
-  });
-
-  it("does not count register steps of a flow that also signs in", () => {
-    // The login journey offers passkey only; password is collected on the
-    // register side, which the login steps hand over to with a purpose flip.
-    const combined = {
-      status: "active",
-      purposes: { login: "start", register: "register" },
-      steps: [
-        {
-          name: "start",
-          actions: [{ name: "passkey", kind: "passkey" }],
-          transitions: { register: { target: "register", purpose: "register" } },
-        },
-        { name: "register", fields: ["x-auth-methods#password"] },
-      ],
-    };
-
-    expect(flowOf(combined).offeredMethods([])).toEqual(["passkey"]);
+    expect(offered).toEqual([method]);
   });
 
   it("follows a local transition with null action and purpose", () => {
-    const flow = {
-      status: "active",
-      purposes: { login: "identifier" },
-      steps: [
-        {
-          name: "identifier",
-          transitions: { submit: { target: "password", action: null, purpose: null } },
-        },
-        { name: "password", fields: ["x-auth-methods#password"] },
-      ],
-    };
+    const flow = aFlow(NULL_ACTION_AND_PURPOSE);
 
-    expect(flowOf(flow).offeredMethods([])).toEqual(["password"]);
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual(["password"]);
+  });
+
+  it("ignores a flow that is not active", () => {
+    const flow = aFlow(aPasskeyFlow({ status: "draft" }));
+
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual([]);
+  });
+
+  it("does not count a register-only flow that collects a password", () => {
+    const flow = aFlow(REGISTER_ONLY);
+
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual([]);
+  });
+
+  it("does not count register steps of a flow that also signs in", () => {
+    const flow = aFlow(SIGNS_IN_AND_REGISTERS);
+
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual(["passkey"]);
   });
 
   it("does not follow a transition into another flow", () => {
-    // `switch` targets a step of another flow that shares a name with a local
-    // one.
-    const flow = {
-      status: "active",
-      purposes: { login: "identifier" },
-      steps: [
-        {
-          name: "identifier",
-          transitions: { other: { target: "password", action: "switch" } },
-        },
-        { name: "password", fields: ["x-auth-methods#password"] },
-      ],
-    };
+    const flow = aFlow(SWITCHING_TO_ANOTHER_FLOW);
 
-    expect(flowOf(flow).offeredMethods([])).toEqual([]);
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual([]);
   });
 
   it("stops at an outcome that switches to registration on its own", () => {
-    // The shipped shape: user_not_found routes to register with no purpose.
-    const flow = {
-      status: "active",
-      purposes: { login: "identifier", register: "register" },
-      steps: [
-        {
-          name: "identifier",
-          actions: [{ name: "passkey", kind: "passkey" }],
-          transitions: { user_not_found: { target: "register" } },
-        },
-        { name: "register", fields: ["x-auth-methods#password"] },
-      ],
-    };
+    const flow = aFlow(SWITCHING_TO_REGISTRATION);
 
-    expect(flowOf(flow).offeredMethods([])).toEqual(["passkey"]);
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual(["passkey"]);
   });
 
   it("does not count a flow that only registers passkeys", () => {
-    const registerOnly = {
-      status: "active",
-      purposes: { login: "register" },
-      steps: [{ name: "register", actions: [{ name: "enrol", kind: "passkey_register" }] }],
-    };
+    const flow = aFlow(ENROLS_PASSKEYS);
 
-    expect(flowOf(registerOnly).offeredMethods([])).toEqual([]);
+    const offered = flow.offeredMethods([]);
+
+    expect(offered).toEqual([]);
   });
 
   it("does not count SSO for a provider it was not given", () => {
-    const githubFlow = {
-      status: "active",
-      purposes: { login: "identifier" },
-      steps: [{ name: "identifier", sso_providers: ["github"] }],
-    };
+    const flow = aFlow(offering("github"));
 
-    expect(flowOf(githubFlow).offeredMethods(["google"])).toEqual([]);
+    const offered = flow.offeredMethods(["google"]);
+
+    expect(offered).toEqual([]);
   });
 
   it("counts SSO on a step that names a provider it was given", () => {
-    const ssoFlow = {
-      status: "active",
-      purposes: { login: "identifier" },
-      steps: [{ name: "identifier", sso_providers: ["google"] }],
-    };
+    const flow = aFlow(offering("google"));
 
-    expect(flowOf(ssoFlow).offeredMethods(["google"])).toEqual(["sso"]);
+    const offered = flow.offeredMethods(["google"]);
+
+    expect(offered).toEqual(["sso"]);
   });
 });
 
 describe("Flow.methodUses", () => {
   it("says what a step keeps without a password and which transitions lead to it", () => {
-    expect(flowOf(passkeyFirstFlow).methodUses("password", ["passkey"])).toEqual([
+    const flow = aFlow(aPasskeyFirstFlow());
+
+    const uses = flow.methodUses("password", ["passkey"]);
+
+    expect(uses).toEqual([
       {
         step: "password",
         uses: "collects password",
@@ -273,7 +331,11 @@ describe("Flow.methodUses", () => {
   });
 
   it("flags an entry step left with nothing, and the transitions that reach it through its purpose", () => {
-    expect(flowOf(passkeyFirstFlow).methodUses("passkey", ["password"])[0]).toEqual({
+    const flow = aFlow(aPasskeyFirstFlow());
+
+    const [entry] = flow.methodUses("passkey", ["password"]);
+
+    expect(entry).toEqual({
       step: "passkey-first",
       uses: 'offers passkey (action "passkey")',
       keeps: [],
@@ -285,8 +347,20 @@ describe("Flow.methodUses", () => {
     });
   });
 
+  it("lists every step that offers a passkey, with what each keeps", () => {
+    const flow = aFlow(aPasskeyFirstFlow());
+
+    const uses = flow.methodUses("passkey", ["password"]);
+
+    expect(uses).toMatchObject([
+      { step: "passkey-first", keeps: [] },
+      { step: "identifier", keeps: ['field "email"'] },
+      { step: "password", keeps: ['field "x-auth-methods#password"'] },
+    ]);
+  });
+
   it("counts sso_providers and gates as what a step keeps", () => {
-    const flow = {
+    const flow = aFlow({
       purposes: { login: "password" },
       steps: [
         {
@@ -296,28 +370,29 @@ describe("Flow.methodUses", () => {
           gates: { consent: {} },
         },
       ],
-    };
+    });
 
-    expect(flowOf(flow).methodUses("password", ["sso"])[0]?.keeps).toEqual([
-      "sso_providers",
-      "gates",
-    ]);
+    const [use] = flow.methodUses("password", ["sso"]);
+
+    expect(use?.keeps).toEqual(["sso_providers", "gates"]);
   });
 
   it("does not count a transition into another flow as targeting a step", () => {
-    const flow = {
+    const flow = aFlow({
       purposes: { login: "password" },
       steps: [
         { name: "start", transitions: { go: { target: "password", action: "switch" } } },
         { name: "password", fields: ["x-auth-methods#password"] },
       ],
-    };
+    });
 
-    expect(flowOf(flow).methodUses("password", [])[0]?.targetedBy).toEqual([]);
+    const [use] = flow.methodUses("password", []);
+
+    expect(use?.targetedBy).toEqual([]);
   });
 
   it("does not count what a method the schema no longer enables offers", () => {
-    const flow = {
+    const flow = aFlow({
       purposes: { login: "password" },
       steps: [
         {
@@ -327,125 +402,51 @@ describe("Flow.methodUses", () => {
           sso_providers: ["google"],
         },
       ],
-    };
+    });
 
-    expect(flowOf(flow).methodUses("password", [])[0]?.keeps).toEqual([]);
-  });
+    const [use] = flow.methodUses("password", []);
 
-  it("lists every step that offers a passkey", () => {
-    const uses = flowOf(passkeyFirstFlow)
-      .methodUses("passkey", ["password"])
-      .map((use) => {
-        return [use.step, use.keeps];
-      });
-
-    expect(uses).toEqual([
-      ["passkey-first", []],
-      ["identifier", ['field "email"']],
-      ["password", ['field "x-auth-methods#password"']],
-    ]);
-  });
-});
-
-describe("Flow.of", () => {
-  it("takes the file as read", () => {
-    expect(scaffoldedFlow().status).toBe("read");
-  });
-});
-
-describe("Flow.create", () => {
-  it("takes the file as new", () => {
-    expect(Flow.create({ path: PATH, body: loginFlow("customers") }).status).toBe("created");
-  });
-});
-
-describe("Flow.handle", () => {
-  it("is the name a release pins the flow by, not its file name", () => {
-    expect(
-      Flow.of({ path: ".zitadel/flows/login.json", body: { name: "default-login" } }).handle,
-    ).toBe("default-login");
-  });
-
-  it("is undefined for a flow with no name", () => {
-    expect(Flow.of({ path: PATH, body: {} }).handle).toBeUndefined();
-  });
-});
-
-describe("Flow.asRead", () => {
-  it("marks an edited flow as read", () => {
-    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
-
-    expect(document.asRead().status).toBe("read");
-  });
-});
-
-describe("Flow.problems", () => {
-  it("finds nothing wrong with the scaffolded flow", () => {
-    expect(scaffoldedFlow().problems({})).toEqual([]);
-  });
-
-  it("reports what the flow contract refuses, under contract/flow", () => {
-    const issues = flowOf({ ...loginFlow("customers"), steps: "none" }).problems({});
-
-    expect(
-      issues.map((issue) => {
-        return [issue.rule, issue.file];
-      }),
-    ).toContainEqual(["contract/flow", PATH]);
-  });
-});
-
-describe("Flow.wireBody", () => {
-  it("sends the flow without its $schema pointer", () => {
-    const flow = flowOf({ $schema: "../meta/flow-definition.json", name: "login" });
-
-    expect(flow.wireBody(new MemoryStore())).toEqual({ name: "login" });
+    expect(use?.keeps).toEqual([]);
   });
 });
 
 describe("Flow.loginJourney", () => {
   it("follows the transitions that stay in the login purpose", () => {
+    const flow = aFlow(aPasskeyFirstFlow());
+
+    const journey = flow.loginJourney;
+
     expect(
-      flowOf(passkeyFirstFlow).loginJourney.map((step) => {
+      journey.map((step) => {
         return step.name;
       }),
     ).toEqual(["passkey-first", "identifier", "password", "done"]);
   });
 
   it("is empty for a flow with no login entry", () => {
-    expect(flowOf({ ...passkeyFirstFlow, purposes: {} }).loginJourney).toEqual([]);
+    const flow = aFlow(aPasskeyFirstFlow({ purposes: {} }));
+
+    const journey = flow.loginJourney;
+
+    expect(journey).toEqual([]);
   });
 });
 
 describe("Flow.loginFields", () => {
-  /**
-   * A login that starts on `start`, which collects nothing, and leaves it by
-   * one transition to a step collecting `email`.
-   *
-   * @param outcome - The transition's outcome.
-   * @param transition - The transition, without its target.
-   * @returns The flow, as read.
-   */
-  const leavingStartBy = (outcome: string, transition: JsonObject): Flow => {
-    return flowOf({
-      purposes: { login: "start", register: "register" },
-      steps: [
-        {
-          name: "start",
-          fields: [],
-          transitions: { [outcome]: { target: "register", ...transition } },
-        },
-        { name: "register", fields: ["email"] },
-      ],
-    });
-  };
-
   it("collects the fields of every step reached from the login entry", () => {
-    expect([...flowOf(passkeyFirstFlow).loginFields]).toEqual(["email", "x-auth-methods#password"]);
+    const flow = aFlow(aPasskeyFirstFlow());
+
+    const fields = flow.loginFields;
+
+    expect([...fields]).toEqual(["email", "x-auth-methods#password"]);
   });
 
   it("follows a plain transition, even to a step that is also the sign-up entry", () => {
-    expect([...leavingStartBy("go", {}).loginFields]).toEqual(["email"]);
+    const flow = leavingStartBy("go", {});
+
+    const fields = flow.loginFields;
+
+    expect([...fields]).toEqual(["email"]);
   });
 
   it.each([
@@ -454,11 +455,19 @@ describe("Flow.loginFields", () => {
     ["switches the login to registration (user_not_found)", "user_not_found", {}],
     ["switches the login to registration (sso_user_not_found)", "sso_user_not_found", {}],
   ])("does not follow a transition that %s", (_case, outcome, transition) => {
-    expect([...leavingStartBy(outcome, transition).loginFields]).toEqual([]);
+    const flow = leavingStartBy(outcome, transition);
+
+    const fields = flow.loginFields;
+
+    expect([...fields]).toEqual([]);
   });
 
   it("is empty for a flow with no login entry", () => {
-    expect([...flowOf({ ...passkeyFirstFlow, purposes: {} }).loginFields]).toEqual([]);
+    const flow = aFlow(aPasskeyFirstFlow({ purposes: {} }));
+
+    const fields = flow.loginFields;
+
+    expect([...fields]).toEqual([]);
   });
 });
 
@@ -469,13 +478,21 @@ describe("Flow.namesSchemaById", () => {
     { named: "an objectType", reference: "human-user", expected: false },
     { named: "nothing", reference: "", expected: false },
   ])("is $expected for $named", ({ reference, expected }) => {
-    expect(flowOf({ user_schema: reference }).namesSchemaById).toBe(expected);
+    const flow = aFlow({ user_schema: reference });
+
+    const byId = flow.namesSchemaById;
+
+    expect(byId).toBe(expected);
   });
 });
 
 describe("Flow.transitionsInto", () => {
   it("names each transition to a step, and the purpose one follows to it", () => {
-    expect(flowOf(passkeyFirstFlow).transitionsInto("passkey-first")).toEqual([
+    const flow = aFlow(aPasskeyFirstFlow());
+
+    const transitions = flow.transitionsInto("passkey-first");
+
+    expect(transitions).toEqual([
       { step: "register", transition: "sign_in", purpose: "login" },
       { step: "sso-conflict", transition: "sign_in" },
     ]);
@@ -484,133 +501,173 @@ describe("Flow.transitionsInto", () => {
 
 describe("Flow.withProvider", () => {
   it("offers the provider", () => {
-    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const flow = aFlow(aLoginFlow());
+
+    const { document } = flow.withProvider(GOOGLE, PASSWORD_ONLY);
 
     expect(document.offers("google")).toBe(true);
   });
 
   it("marks the flow as edited", () => {
-    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const flow = aFlow(aLoginFlow());
+
+    const { document } = flow.withProvider(GOOGLE, PASSWORD_ONLY);
 
     expect(document.status).toBe("edited");
   });
 
   it("says it changed the flow", () => {
-    expect(scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).changed).toBe(true);
+    const flow = aFlow(aLoginFlow());
+
+    const { changed } = flow.withProvider(GOOGLE, PASSWORD_ONLY);
+
+    expect(changed).toBe(true);
   });
 
   it("leaves nothing alone in the scaffolded flow", () => {
-    expect(scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).skipped).toEqual([]);
+    const flow = aFlow(aLoginFlow());
+
+    const { skipped } = flow.withProvider(GOOGLE, PASSWORD_ONLY);
+
+    expect(skipped).toEqual([]);
   });
 
   it("returns the same flow the second time", () => {
-    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const flow = offeringGoogle();
 
-    expect(document.withProvider(slug("google"), PASSWORD_ONLY)).toEqual({
-      document,
-      changed: false,
-      skipped: [],
-    });
+    const edit = flow.withProvider(GOOGLE, PASSWORD_ONLY);
+
+    expect(edit).toEqual({ document: flow, changed: false, skipped: [] });
   });
 
   it("names a generated step that was edited by hand", () => {
-    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
-    const handEdited = flowOf({
-      ...document.body,
-      steps: listAt(document.body, "steps")
-        .filter(isJsonObject)
-        .map((step) => {
-          if (step.name !== "register-sso") {
-            return step;
-          }
-          return { ...step, title: "Hand-written" };
-        }),
-    });
+    const flow = aFlow(
+      withStep(offeringGoogle().body, "register-sso", (step) => {
+        return { ...step, title: "Hand-written" };
+      }),
+    );
 
-    expect(handEdited.withProvider(slug("google"), PASSWORD_ONLY).skipped).toEqual([
+    const { skipped } = flow.withProvider(GOOGLE, PASSWORD_ONLY);
+
+    expect(skipped).toEqual([
       { step: "register-sso", region: "steps.register-sso", reason: "hand-edited" },
     ]);
   });
 
   it("refuses a flow whose steps are not a list", () => {
-    const flow = flowOf({ ...loginFlow("customers"), steps: "none" });
+    const flow = aFlow({ ...aLoginFlow(), steps: "none" });
 
-    expect(() => {
-      return flow.withProvider(slug("google"), PASSWORD_ONLY);
-    }).toThrow(RefusedEditError);
+    const error = thrownBy(() => {
+      return flow.withProvider(GOOGLE, PASSWORD_ONLY);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({ message: `${FLOW_PATH}: steps is not a list` });
   });
 });
 
 describe("Flow.offers", () => {
-  it("is false for a flow no step of which offers a provider", () => {
-    expect(scaffoldedFlow().offers()).toBe(false);
+  it("is false for any provider on a flow no step of which offers one", () => {
+    const flow = aFlow(aLoginFlow());
+
+    const offers = flow.offers();
+
+    expect(offers).toBe(false);
   });
 
-  it("is true for a provider a step lists", () => {
-    expect(
-      flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("google"),
-    ).toBe(true);
-  });
+  it.each([
+    { provider: "google", expected: true },
+    { provider: "github", expected: false },
+  ])(
+    "is $expected for $provider on a flow a step of which lists google",
+    ({ provider, expected }) => {
+      const flow = aFlow({ steps: [{ name: "identifier", sso_providers: ["google"] }] });
 
-  it("is false for a provider no step lists", () => {
-    expect(
-      flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("github"),
-    ).toBe(false);
-  });
+      const offers = flow.offers(provider);
+
+      expect(offers).toBe(expected);
+    },
+  );
 });
 
 describe("Flow.generatedSsoSteps", () => {
   it("names none for a flow no provider was enabled on", () => {
-    expect(scaffoldedFlow().generatedSsoSteps).toEqual([]);
+    const flow = aFlow(aLoginFlow());
+
+    const steps = flow.generatedSsoSteps;
+
+    expect(steps).toEqual([]);
   });
 
   it("names the steps enabling a provider added", () => {
-    const { document } = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const flow = offeringGoogle();
 
-    expect(document.generatedSsoSteps).toEqual(["register-sso", "sso-conflict"]);
+    const steps = flow.generatedSsoSteps;
+
+    expect(steps).toEqual(["register-sso", "sso-conflict"]);
   });
 });
 
 describe("Flow.assertProviderEditable", () => {
   it("accepts the scaffolded flow", () => {
-    expect(() => {
-      scaffoldedFlow().assertProviderEditable();
-    }).not.toThrow();
+    const flow = aFlow(aLoginFlow());
+
+    const error = thrownBy(() => {
+      flow.assertProviderEditable();
+    });
+
+    expect(error).toBeUndefined();
   });
 
   it("refuses a flow with no step that marks where a sign-in ends", () => {
-    const flow = flowOf({ purposes: { login: "identifier" }, steps: [{ name: "identifier" }] });
+    const flow = aFlow({ purposes: { login: "identifier" }, steps: [{ name: "identifier" }] });
 
-    expect(() => {
+    const error = thrownBy(() => {
       flow.assertProviderEditable();
-    }).toThrow(`${PATH}: no step marks where a completed sign-in ends`);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({
+      message: `${FLOW_PATH}: no step marks where a completed sign-in ends`,
+    });
   });
 });
 
 describe("Flow.withoutProvider", () => {
   it("takes the provider off every step", () => {
-    const offered = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).document;
+    const flow = offeringGoogle();
 
-    expect(offered.withoutProvider("google").document.offers("google")).toBe(false);
+    const { document } = flow.withoutProvider("google");
+
+    expect(document.offers("google")).toBe(false);
   });
 
   it("says it changed the flow", () => {
-    const offered = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).document;
+    const flow = offeringGoogle();
 
-    expect(offered.withoutProvider("google").changed).toBe(true);
+    const { changed } = flow.withoutProvider("google");
+
+    expect(changed).toBe(true);
   });
 
   it("returns the same flow for a provider no step offers", () => {
-    const flow = scaffoldedFlow();
+    const flow = aFlow(aLoginFlow());
 
-    expect(flow.withoutProvider("google")).toEqual({ document: flow, changed: false, skipped: [] });
+    const edit = flow.withoutProvider("google");
+
+    expect(edit).toEqual({ document: flow, changed: false, skipped: [] });
   });
 
   it("refuses a step whose provider list was edited by hand", () => {
-    const flow = flowOf({ steps: [{ name: "identifier", sso_providers: "google" }] });
+    const flow = aFlow({ steps: [{ name: "identifier", sso_providers: "google" }] });
 
-    expect(() => {
+    const error = thrownBy(() => {
       return flow.withoutProvider("google");
-    }).toThrow(`${PATH}: steps.identifier.sso_providers is not a list`);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({
+      message: `${FLOW_PATH}: steps.identifier.sso_providers is not a list`,
+    });
   });
 });

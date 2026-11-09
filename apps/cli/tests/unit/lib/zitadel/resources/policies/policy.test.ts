@@ -1,131 +1,167 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFilesError, Policy } from "@/lib/zitadel";
-import { MemoryStore } from "@/lib/zitadel/storage";
-import type { JsonObject } from "@/lib/zitadel/types";
+import { BrokenFilesError, CONFIG_DIRECTORIES, MemoryStore, Policy } from "@/lib/zitadel";
+import { aFile, aPasswordPolicy, PASSWORD_POLICY } from "@tests/helpers/config";
+import { PASSWORD_POLICY_FILE } from "@tests/helpers/policies";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
- * The operation every policy in these tests is for.
+ * Where the password policy sits.
  */
-const OPERATION = "auth.factor.password.set";
+const PATH = `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_FILE}`;
 
 /**
- * A policy the policy contract takes.
+ * The editor's pointer at the policy meta-schema.
  */
-const POLICY = { operation: OPERATION, config: { min_length: 12 } };
-
-/**
- * A policy read from `.zitadel/policies/`.
- *
- * @param name - The file's name.
- * @param body - What it holds.
- * @returns The policy, as read.
- */
-function policyAt(name: string, body: JsonObject): Policy {
-  return Policy.of({ path: `.zitadel/policies/${name}`, body });
-}
+const POINTER = "../meta/policy.json";
 
 describe("Policy.of", () => {
   it("takes the file as read", () => {
-    expect(policyAt(`${OPERATION}.json`, POLICY).status).toBe("read");
+    const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
+
+    expect(policy.status).toBe("read");
   });
 });
 
 describe("Policy.create", () => {
   it("takes the file as new", () => {
-    expect(
-      Policy.create({ path: `.zitadel/policies/${OPERATION}.json`, body: POLICY }).status,
-    ).toBe("created");
+    const policy = Policy.create(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
+
+    expect(policy.status).toBe("created");
   });
 });
 
 describe("Policy.fileName", () => {
   it("names the file after its operation", () => {
-    expect(Policy.fileName(OPERATION)).toBe(`${OPERATION}.json`);
+    const name = Policy.fileName(PASSWORD_POLICY);
+
+    expect(name).toBe(PASSWORD_POLICY_FILE);
   });
 });
 
 describe("Policy.readOperation", () => {
   it("reads the operation the policy guards", () => {
-    expect(policyAt(`${OPERATION}.json`, POLICY).readOperation()).toBe(OPERATION);
+    const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
+
+    const operation = policy.readOperation();
+
+    expect(operation).toBe(PASSWORD_POLICY);
   });
 
   it("refuses a body the policy contract refuses", () => {
-    const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, { operation: PASSWORD_POLICY }),
+    );
 
-    expect(() => {
+    const error = thrownBy(() => {
       return policy.readOperation();
-    }).toThrow(BrokenFilesError);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toMatchObject({ problems: [{ path: PATH }] });
   });
 });
 
 describe("Policy.readConfig", () => {
   it("reads the rules without the $schema pointer", () => {
-    const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, { $schema: POINTER, ...aPasswordPolicy() }),
+    );
 
-    expect(policy.readConfig()).toEqual({ min_length: 12 });
+    const config = policy.readConfig();
+
+    expect(config).toEqual({ min_length: 12 });
   });
 
   it("names the file and what the contract refuses in it", () => {
-    const policy = policyAt(`${OPERATION}.json`, { ...POLICY, config: { min_length: 0 } });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: 0 })),
+    );
 
-    expect(() => {
+    const error = thrownBy(() => {
       return policy.readConfig();
-    }).toThrow(/\.zitadel\/policies\/auth\.factor\.password\.set\.json: config\.min_length/);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH}: config.min_length`),
+    });
   });
 });
 
 describe("Policy.asRead", () => {
   it("marks a new policy as read", () => {
-    const policy = Policy.create({ path: `.zitadel/policies/${OPERATION}.json`, body: POLICY });
+    const policy = Policy.create(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
 
-    expect(policy.asRead().status).toBe("read");
+    const read = policy.asRead();
+
+    expect(read.status).toBe("read");
   });
 });
 
 describe("Policy.problems", () => {
   it("finds nothing wrong with a policy named after its operation", () => {
-    expect(policyAt(`${OPERATION}.json`, POLICY).problems({})).toEqual([]);
+    const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
+
+    const problems = policy.problems({});
+
+    expect(problems).toEqual([]);
   });
 
   it("finds nothing wrong with the editor's $schema pointer", () => {
-    const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, { $schema: POINTER, ...aPasswordPolicy() }),
+    );
 
-    expect(policy.problems({})).toEqual([]);
+    const problems = policy.problems({});
+
+    expect(problems).toEqual([]);
   });
 
   it("names the file a policy must have when it has another", () => {
-    expect(policyAt("password.json", POLICY).problems({})).toEqual([
+    const policy = Policy.of(aFile("policies", "password.json", aPasswordPolicy()));
+
+    const problems = policy.problems({});
+
+    expect(problems).toEqual([
       {
         severity: "error",
         rule: "contract/policy",
-        file: ".zitadel/policies/password.json",
-        message: `holds the ${OPERATION} policy, so it must be named ${OPERATION}.json`,
+        file: `${CONFIG_DIRECTORIES.policies}/password.json`,
+        message: `holds the ${PASSWORD_POLICY} policy, so it must be named ${PASSWORD_POLICY_FILE}`,
       },
     ]);
   });
 
   it("reports what the policy contract refuses, under contract/policy", () => {
-    const policy = policyAt(`${OPERATION}.json`, { ...POLICY, config: { min_length: "twelve" } });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: "twelve" })),
+    );
 
-    expect(
-      policy.problems({}).map((issue) => {
-        return issue.rule;
-      }),
-    ).toEqual(["contract/policy"]);
+    const problems = policy.problems({});
+
+    expect(problems).toMatchObject([{ rule: "contract/policy" }]);
   });
 });
 
 describe("Policy.wireBody", () => {
   it("sends the operation and its rules without the $schema pointer", () => {
-    const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, { $schema: POINTER, ...aPasswordPolicy() }),
+    );
 
-    expect(policy.wireBody(new MemoryStore())).toEqual(POLICY);
+    const body = policy.wireBody(new MemoryStore());
+
+    expect(body).toEqual(aPasswordPolicy());
   });
 
   it("sends a body the contract refuses as it is, for the deploy's checks to name", () => {
-    const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION });
+    const policy = Policy.of(
+      aFile("policies", PASSWORD_POLICY_FILE, { operation: PASSWORD_POLICY }),
+    );
 
-    expect(policy.wireBody(new MemoryStore())).toEqual({ operation: OPERATION });
+    const body = policy.wireBody(new MemoryStore());
+
+    expect(body).toEqual({ operation: PASSWORD_POLICY });
   });
 });

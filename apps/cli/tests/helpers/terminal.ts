@@ -1,3 +1,33 @@
+import { afterEach, beforeEach } from "vitest";
+
+/**
+ * Makes every test in the calling suite run as though a person were at a
+ * terminal: stdout and stdin report `isTTY`, so a command is interactive
+ * unless it is told otherwise. Each test gets the streams back as it found
+ * them, so a stream that had no own `isTTY` gets none back.
+ *
+ * @returns Once the hooks are registered.
+ */
+export function useTerminal(): void {
+  const found = new Map<NodeJS.WriteStream | NodeJS.ReadStream, PropertyDescriptor | undefined>();
+  beforeEach(() => {
+    for (const stream of [process.stdout, process.stdin]) {
+      found.set(stream, Object.getOwnPropertyDescriptor(stream, "isTTY"));
+      Object.defineProperty(stream, "isTTY", { value: true, configurable: true });
+    }
+  });
+  afterEach(() => {
+    for (const [stream, descriptor] of found) {
+      if (descriptor === undefined) {
+        Reflect.deleteProperty(stream, "isTTY");
+      } else {
+        Object.defineProperty(stream, "isTTY", descriptor);
+      }
+    }
+    found.clear();
+  });
+}
+
 /**
  * Runs `run` with stdout and stdin reporting `isTTY` as given, and restores
  * the originals afterwards.

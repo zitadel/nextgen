@@ -23,6 +23,33 @@ export type DocumentsByName = Readonly<Record<string, JsonObject>>;
 export type ConfigDocuments = Partial<Readonly<Record<ConfigKind, DocumentsByName>>>;
 
 /**
+ * One configuration file as a store reads it, at `.zitadel/<directory>/<name>`,
+ * for a test of a single document (`Flow.of(aFile("flows", "login.json", body))`).
+ *
+ * @param kind - The kind of document.
+ * @param name - The file's name under that kind's directory.
+ * @param body - The document.
+ * @returns The file.
+ */
+export function aFile(kind: ConfigKind, name: string, body: JsonObject): ConfigFile {
+  return { path: `${CONFIG_DIRECTORIES[kind]}/${name}`, body };
+}
+
+/**
+ * An `x-auth-methods` block enabling each of `methods`.
+ *
+ * @param methods - The methods to enable, such as `password` or `passkey`.
+ * @returns The block.
+ */
+export function authMethods(...methods: string[]): JsonObject {
+  return Object.fromEntries(
+    methods.map((method) => {
+      return [method, { enabled: true }];
+    }),
+  );
+}
+
+/**
  * The files a configuration holds, each at `.zitadel/<directory>/<name>`.
  *
  * @param documents - The documents of each kind, by file name.
@@ -128,6 +155,29 @@ export function anOidcConnection(overrides: ConnectionOverrides = {}): JsonObjec
       ...oidc,
     },
   };
+}
+
+/**
+ * The catalog Google connection the CLI writes: `google`, whose client secret
+ * is the `${{ GOOGLE_CLIENT_SECRET }}` variable.
+ *
+ * @param overrides - Top-level keys to set, and `oidc` keys to merge.
+ * @returns The connection document.
+ */
+export function aGoogleConnection(overrides: ConnectionOverrides = {}): JsonObject {
+  const { oidc = {}, ...rest } = overrides;
+  return anOidcConnection({
+    slug: "google",
+    template: "google",
+    display_name: "Google",
+    ...rest,
+    oidc: {
+      issuer: "https://accounts.google.com",
+      client_id: "111.apps.googleusercontent.com",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      ...oidc,
+    },
+  });
 }
 
 /**

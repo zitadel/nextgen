@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { findFileReferences, inlineFileReferences, outsideProject } from "@/lib/zitadel/storage/references";
+import { ConfigError } from "@/lib/zitadel";
+import {
+  findFileReferences,
+  inlineFileReferences,
+  outsideProject,
+} from "@/lib/zitadel/storage/references";
+import { thrownBy } from "@tests/helpers/thrown-value";
+
+/**
+ * The one reference {@link readA} can read.
+ */
+const A = { $file: "./a.txt" };
+
+/**
+ * A reference to a file that is not there.
+ */
+const GONE = { $file: "./gone" };
 
 /**
  * A reader that knows one file, `./a.txt`, and nothing else.
@@ -9,56 +25,72 @@ import { findFileReferences, inlineFileReferences, outsideProject } from "@/lib/
  * @returns Its text, or `undefined` for any other reference.
  */
 function readA(ref: string): string | undefined {
-  return ref === "./a.txt" ? "A" : undefined;
+  if (ref === A.$file) {
+    return "A";
+  }
+  return undefined;
 }
 
 describe("findFileReferences", () => {
   it("finds references in objects and lists, in document order", () => {
-    const document = { x: { $file: "./x" }, list: [1, { $file: "./y" }], nested: { deep: { $file: "./z" } } };
+    const document = {
+      x: { $file: "./x" },
+      list: [1, { $file: "./y" }],
+      nested: { deep: { $file: "./z" } },
+    };
 
-    expect(findFileReferences(document)).toEqual([
+    const found = findFileReferences(document);
+
+    expect(found).toEqual([
       { location: ["x"], ref: "./x" },
       { location: ["list", 1], ref: "./y" },
       { location: ["nested", "deep"], ref: "./z" },
     ]);
   });
 
-  it("ignores an object with keys beside $file", () => {
-    expect(findFileReferences({ x: { $file: "./x", other: 1 } })).toEqual([]);
-  });
+  it.each([
+    ["an object with keys beside $file", { x: { $file: "./x", other: 1 } }],
+    ["a $file that is not a string", { x: { $file: 1 } }],
+    ["a scalar", "text"],
+  ])("finds nothing in %s", (_what, document) => {
+    const found = findFileReferences(document);
 
-  it("ignores a $file that is not a string", () => {
-    expect(findFileReferences({ x: { $file: 1 } })).toEqual([]);
-  });
-
-  it("finds nothing in a scalar", () => {
-    expect(findFileReferences("text")).toEqual([]);
+    expect(found).toEqual([]);
   });
 });
 
 describe("inlineFileReferences", () => {
   it("replaces a reference with the text of its file", () => {
-    expect(inlineFileReferences({ t: { $file: "./a.txt" }, keep: 1 }, readA, "throw")).toEqual({ t: "A", keep: 1 });
+    const inlined = inlineFileReferences({ t: A, keep: 1 }, readA, "throw");
+
+    expect(inlined).toEqual({ t: "A", keep: 1 });
   });
 
   it("replaces a reference inside a list", () => {
-    expect(inlineFileReferences({ list: [{ $file: "./a.txt" }] }, readA, "throw")).toEqual({ list: ["A"] });
+    const inlined = inlineFileReferences({ list: [A] }, readA, "throw");
+
+    expect(inlined).toEqual({ list: ["A"] });
   });
 
   it("refuses a missing reference under throw", () => {
-    expect(() => {
-      return inlineFileReferences({ t: { $file: "./gone" } }, readA, "throw");
-    }).toThrow('$file "./gone" cannot be read');
+    const error = thrownBy(() => {
+      return inlineFileReferences({ t: GONE }, readA, "throw");
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({ message: '$file "./gone" cannot be read' });
   });
 
   it("drops the key of a missing reference under omit", () => {
-    expect(inlineFileReferences({ t: { $file: "./gone" }, keep: 1 }, readA, "omit")).toEqual({ keep: 1 });
+    const inlined = inlineFileReferences({ t: GONE, keep: 1 }, readA, "omit");
+
+    expect(inlined).toEqual({ keep: 1 });
   });
 
   it("drops the element of a missing reference from a list under omit", () => {
-    expect(inlineFileReferences({ list: [{ $file: "./gone" }, { $file: "./a.txt" }] }, readA, "omit")).toEqual({
-      list: ["A"],
-    });
+    const inlined = inlineFileReferences({ list: [GONE, A] }, readA, "omit");
+
+    expect(inlined).toEqual({ list: ["A"] });
   });
 
   it("leaves the document it was given unchanged", () => {
@@ -72,10 +104,14 @@ describe("inlineFileReferences", () => {
 
 describe("outsideProject", () => {
   it("names the reference that leaves the project", () => {
-    expect(outsideProject("../x").message).toBe('$file "../x" points outside the project');
+    const error = outsideProject("../x");
+
+    expect(error.message).toBe('$file "../x" points outside the project');
   });
 
   it("says where a referenced file must be", () => {
-    expect(outsideProject("../x").hint).toContain("inside the project");
+    const error = outsideProject("../x");
+
+    expect(error.hint).toContain("inside the project");
   });
 });

@@ -1,51 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFilesError, PolicyTest } from "@/lib/zitadel";
-import { MemoryStore } from "@/lib/zitadel/storage";
-import type { JsonObject } from "@/lib/zitadel/types";
+import { BrokenFilesError, CONFIG_DIRECTORIES, MemoryStore, PolicyTest } from "@/lib/zitadel";
+import { aFile, PASSWORD_POLICY } from "@tests/helpers/config";
+import { aPolicyTest, PASSWORD_POLICY_TEST_FILE, TOO_SHORT_CASE } from "@tests/helpers/policies";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
- * The operation every test file in these tests is for.
+ * Where the password policy's test file sits.
  */
-const OPERATION = "auth.factor.password.set";
+const PATH = `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_TEST_FILE}`;
 
 /**
- * A case the policy test contract takes.
+ * A case expecting a password to be allowed.
  */
-const CASE = {
-  name: "too short",
-  input: { password: "short1" },
-  expect: { allowed: false, violations: ["min_length"] },
-};
-
-/**
- * A test file the policy test contract takes.
- */
-const TEST_FILE = { operation: OPERATION, cases: [CASE] };
-
-/**
- * A policy test file read from `.zitadel/policies/`.
- *
- * @param name - The file's name.
- * @param body - What it holds.
- * @returns The test file, as read.
- */
-function testAt(name: string, body: JsonObject): PolicyTest {
-  return PolicyTest.of({ path: `.zitadel/policies/${name}`, body });
-}
+const LONG_ENOUGH_CASE = { ...TOO_SHORT_CASE, name: "long enough", expect: { allowed: true } };
 
 describe("PolicyTest.of", () => {
   it("takes the file as read", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).status).toBe("read");
+    const test = PolicyTest.of(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
+
+    expect(test.status).toBe("read");
   });
 });
 
 describe("PolicyTest.create", () => {
   it("takes the file as new", () => {
-    const test = PolicyTest.create({
-      path: `.zitadel/policies/${OPERATION}.test.json`,
-      body: TEST_FILE,
-    });
+    const test = PolicyTest.create(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
 
     expect(test.status).toBe("created");
   });
@@ -53,88 +33,117 @@ describe("PolicyTest.create", () => {
 
 describe("PolicyTest.fileName", () => {
   it("names the test file after its operation", () => {
-    expect(PolicyTest.fileName(OPERATION)).toBe(`${OPERATION}.test.json`);
+    const name = PolicyTest.fileName(PASSWORD_POLICY);
+
+    expect(name).toBe(PASSWORD_POLICY_TEST_FILE);
   });
 });
 
 describe("PolicyTest.readOperation", () => {
   it("reads the operation the cases test", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).readOperation()).toBe(OPERATION);
+    const test = PolicyTest.of(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
+
+    const operation = test.readOperation();
+
+    expect(operation).toBe(PASSWORD_POLICY);
   });
 
   it("refuses a body the policy test contract refuses", () => {
-    const test = testAt(`${OPERATION}.test.json`, { operation: OPERATION });
+    const test = PolicyTest.of(
+      aFile("policies", PASSWORD_POLICY_TEST_FILE, { operation: PASSWORD_POLICY }),
+    );
 
-    expect(() => {
+    const error = thrownBy(() => {
       return test.readOperation();
-    }).toThrow(BrokenFilesError);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toMatchObject({ problems: [{ path: PATH }] });
   });
 });
 
 describe("PolicyTest.readCases", () => {
   it("reads the cases in the file's order", () => {
-    const second = { ...CASE, name: "long enough", expect: { allowed: true } };
-    const test = testAt(`${OPERATION}.test.json`, { ...TEST_FILE, cases: [CASE, second] });
+    const test = PolicyTest.of(
+      aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest([TOO_SHORT_CASE, LONG_ENOUGH_CASE])),
+    );
 
-    expect(test.readCases()).toEqual([CASE, second]);
+    const cases = test.readCases();
+
+    expect(cases).toEqual([TOO_SHORT_CASE, LONG_ENOUGH_CASE]);
   });
 
   it("names the file and what the contract refuses in it", () => {
-    const test = testAt(`${OPERATION}.test.json`, {
-      ...TEST_FILE,
-      cases: [{ ...CASE, input: { passwd: "x" } }],
+    const test = PolicyTest.of(
+      aFile(
+        "policies",
+        PASSWORD_POLICY_TEST_FILE,
+        aPolicyTest([{ ...TOO_SHORT_CASE, input: { passwd: "x" } }]),
+      ),
+    );
+
+    const error = thrownBy(() => {
+      return test.readCases();
     });
 
-    expect(() => {
-      return test.readCases();
-    }).toThrow(/\.zitadel\/policies\/auth\.factor\.password\.set\.test\.json: cases\.0\.input/);
+    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toMatchObject({ message: expect.stringContaining(`${PATH}: cases.0.input`) });
   });
 });
 
 describe("PolicyTest.asRead", () => {
   it("marks a new test file as read", () => {
-    const test = PolicyTest.create({
-      path: `.zitadel/policies/${OPERATION}.test.json`,
-      body: TEST_FILE,
-    });
+    const test = PolicyTest.create(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
 
-    expect(test.asRead().status).toBe("read");
+    const read = test.asRead();
+
+    expect(read.status).toBe("read");
   });
 });
 
 describe("PolicyTest.problems", () => {
   it("finds nothing wrong with a test file named after its operation", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).problems({})).toEqual([]);
+    const test = PolicyTest.of(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
+
+    const problems = test.problems({});
+
+    expect(problems).toEqual([]);
   });
 
   it("names the file a test file must have when it has another", () => {
-    expect(
-      testAt("password.test.json", TEST_FILE)
-        .problems({})
-        .map((issue) => {
-          return issue.message;
-        }),
-    ).toEqual([`tests the ${OPERATION} policy, so it must be named ${OPERATION}.test.json`]);
+    const test = PolicyTest.of(aFile("policies", "password.test.json", aPolicyTest()));
+
+    const problems = test.problems({});
+
+    expect(problems).toMatchObject([
+      {
+        message: `tests the ${PASSWORD_POLICY} policy, so it must be named ${PASSWORD_POLICY_TEST_FILE}`,
+      },
+    ]);
   });
 
   it("reports what the test contract refuses, under contract/policy", () => {
-    const test = testAt(`${OPERATION}.test.json`, { operation: OPERATION });
+    const test = PolicyTest.of(
+      aFile("policies", PASSWORD_POLICY_TEST_FILE, { operation: PASSWORD_POLICY }),
+    );
 
-    expect(
-      test.problems({}).map((issue) => {
-        return issue.rule;
-      }),
-    ).toEqual(["contract/policy"]);
+    const problems = test.problems({});
+
+    expect(problems).toMatchObject([{ rule: "contract/policy" }]);
   });
 });
 
 describe("PolicyTest.wireBody", () => {
   it("gives the cases without the $schema pointer", () => {
-    const test = testAt(`${OPERATION}.test.json`, {
-      $schema: "../meta/policy-test.json",
-      ...TEST_FILE,
-    });
+    const test = PolicyTest.of(
+      aFile("policies", PASSWORD_POLICY_TEST_FILE, {
+        $schema: "../meta/policy-test.json",
+        ...aPolicyTest(),
+      }),
+    );
 
-    expect(test.wireBody(new MemoryStore())).toEqual(TEST_FILE);
+    const body = test.wireBody(new MemoryStore());
+
+    expect(body).toEqual(aPolicyTest());
   });
 });

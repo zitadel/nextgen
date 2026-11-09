@@ -5,6 +5,11 @@ import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
+/**
+ * What a project's files look like after a command that wrote nothing.
+ */
+const NO_CHANGES = { added: [], modified: [], removed: [] };
+
 describe("auth-method password disable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -12,7 +17,9 @@ describe("auth-method password disable", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        expect(await app.disableMethod("password")).toFailWith("E_VALIDATION");
+        const result = await app.disableMethod("password");
+
+        expect(result).toFailWith("E_VALIDATION");
       });
     });
 
@@ -21,7 +28,9 @@ describe("auth-method password disable", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        expect(await app.disableMethod("password")).toFailWith("E_VALIDATION");
+        const result = await app.disableMethod("password");
+
+        expect(result).toFailWith("E_VALIDATION");
       });
     });
   });
@@ -32,7 +41,9 @@ describe("auth-method password disable", () => {
       platform.servesAHostileOrigin();
       const args = ["auth-method", "password", "disable", "--force"];
 
-      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+      await app.inEveryRendering((how) => {
+        return app.run(how.json ? [...args, "--json"] : args, how.env);
+      });
     });
 
     describe("--json", () => {
@@ -73,33 +84,36 @@ describe("auth-method password disable", () => {
 
           await app.disableMethod("password");
 
-          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
         });
       });
 
-      it("refuses while a login flow still asks for a password", async () => {
-        const app = await aSetUpApp();
+      describe("while a login flow still asks for a password", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
 
-        expect(await app.disableMethod("password")).toFailWith("E_VALIDATION");
-      });
+          const result = await app.disableMethod("password");
 
-      it("leaves the project as it was when it refuses", async () => {
-        const app = await aSetUpApp();
-        const files = await app.snapshot();
+          expect(result).toFailWith("E_VALIDATION");
+        });
 
-        await app.disableMethod("password");
+        it("leaves the project as it was", async () => {
+          const app = await aSetUpApp();
+          const files = await app.snapshot();
 
-        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
+          await app.disableMethod("password");
 
-      it("leaves nothing to publish when it refuses", async () => {
-        const app = await aSetUpApp();
-        const before = await app.publishData();
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
+        });
 
-        await app.disableMethod("password");
+        it("leaves nothing to publish", async () => {
+          const app = await aSetUpApp();
+          const before = await app.publishData();
 
-        const after = await app.deployData();
-        expect(after.content_hash).toBe(before.content_hash);
+          await app.disableMethod("password");
+
+          expect((await app.deployData()).content_hash).toBe(before.content_hash);
+        });
       });
     });
 
