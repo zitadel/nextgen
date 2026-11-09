@@ -191,6 +191,14 @@ describe("Branding.toWireBody", () => {
 });
 
 describe("Branding.readTemplate", () => {
+  it("reads an inline template as written", () => {
+    const branding = Branding.of(aFile("branding", NAME, { liquid_template: TEMPLATE }));
+
+    const template = branding.readTemplate(new MemoryStore());
+
+    expect(template).toBe(TEMPLATE);
+  });
+
   it("reads the template behind a $file reference", () => {
     const branding = Branding.of(aFile("branding", NAME, { liquid_template: LOGIN_TEMPLATE }));
 
