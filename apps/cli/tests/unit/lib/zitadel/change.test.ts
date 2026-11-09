@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   type Change,
   CONFIG_DIRECTORIES,
+  ConfigError,
   DocumentChange,
   FileExistsError,
   Policy,
@@ -39,6 +40,11 @@ const HOLDING_PASSWORD: ConfigDocuments = {
  * A new policy at the lockout policy's file, not yet written.
  */
 const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", aPasswordPolicy()));
+
+/**
+ * A text file inside `.zitadel/` that is already taken.
+ */
+const TAKEN = `${CONFIG_DIRECTORIES.branding}/taken.liquid`;
 
 /**
  * The user schema's file.
@@ -122,9 +128,9 @@ describe("Change.save", () => {
   });
 
   it("refuses a text file that is taken before it replaces a document", async () => {
-    const store = aStore(HOLDING_SCHEMA, { "taken.liquid": "mine" });
+    const store = aStore(HOLDING_SCHEMA, { [TAKEN]: "mine" });
     const config = await ZitadelConfig.loadUnchecked(store);
-    const replaced = (await editedSchema(config)).withText("taken.liquid", "theirs");
+    const replaced = (await editedSchema(config)).withText(TAKEN, "theirs");
 
     await replaced.save(store).catch(() => {
       return undefined;
@@ -134,9 +140,9 @@ describe("Change.save", () => {
   });
 
   it("writes no new document when a new text file is taken", async () => {
-    const store = aStore({}, { "taken.liquid": "mine" });
+    const store = aStore({}, { [TAKEN]: "mine" });
     const config = await ZitadelConfig.loadUnchecked(store);
-    const creating = config.policies.put(NEW_LOCKOUT).withText("taken.liquid", "theirs");
+    const creating = config.policies.put(NEW_LOCKOUT).withText(TAKEN, "theirs");
 
     await creating.save(store).catch(() => {
       return undefined;
@@ -171,6 +177,24 @@ describe("Change.save", () => {
     });
 
     expect(store.get(PASSWORD)).toEqual(aPasswordPolicy());
+  });
+
+  it("writes nothing when a path to delete is refused", async () => {
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const inside = `${CONFIG_DIRECTORIES.branding}/kept-out.txt`;
+    const removing = config.policies.remove(PASSWORD).withText(inside, "x");
+    vi.spyOn(store, "assertWritable").mockImplementation((path: string) => {
+      if (path === PASSWORD) {
+        throw new ConfigError(`${path} points outside .zitadel/`);
+      }
+    });
+
+    await removing.save(store).catch(() => {
+      return undefined;
+    });
+
+    expect(await store.exists(inside)).toBe(false);
   });
 
   it("keeps a document in createOnly from being replaced under overwrite", async () => {
