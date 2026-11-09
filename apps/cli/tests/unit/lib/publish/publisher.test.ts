@@ -80,7 +80,7 @@ describe("Publisher.deploy", () => {
       createDeployment: async () => deployment("dep_1"),
     });
 
-    const outcome = await live.deploy({ prepared: PREPARED, landing: [] });
+    const outcome = await live.deploy({ prepared: PREPARED });
 
     expect(outcome.release).toMatchObject({ id: "rel_1" });
     expect(outcome.publication).toMatchObject({
@@ -98,7 +98,7 @@ describe("Publisher.deploy", () => {
       },
     });
 
-    const outcome = await live.deploy({ prepared: PREPARED, landing: [] });
+    const outcome = await live.deploy({ prepared: PREPARED });
 
     expect(outcome.release).toMatchObject({ id: "rel_1" });
     expect(outcome.publication).toMatchObject({ outcome: "raced" });
@@ -111,7 +111,7 @@ describe("Publisher.deploy", () => {
       createDeployment,
     });
 
-    await expect(live.deploy({ prepared: PREPARED, landing: [] })).rejects.toMatchObject({
+    await expect(live.deploy({ prepared: PREPARED })).rejects.toMatchObject({
       name: "ConflictError",
     });
     expect(createDeployment).not.toHaveBeenCalled();
