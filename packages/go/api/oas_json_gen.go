@@ -42763,6 +42763,8 @@ func (s *FieldType) Decode(d *jx.Decoder) error {
 		*s = FieldTypeURL
 	case FieldTypeDate:
 		*s = FieldTypeDate
+	case FieldTypeDateTime:
+		*s = FieldTypeDateTime
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
 	case FieldTypeCheckbox:
