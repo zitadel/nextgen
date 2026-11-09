@@ -5,13 +5,7 @@ import {
   type Transition,
 } from "@/lib/zitadel/resources/flows/types";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
-import {
-  isJsonObject,
-  listAt,
-  objectAt,
-  stringAt,
-  stringsIn,
-} from "@/lib/zitadel/utils/json";
+import { isJsonObject, listAt, objectAt, stringAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
  * One step of a login flow, read-only: the questions the rules ask of it.

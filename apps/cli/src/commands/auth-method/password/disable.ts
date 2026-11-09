@@ -30,7 +30,9 @@ export default class AuthMethodPasswordDisable extends AuthMethodCommand {
    * @throws {@link ZitadelError} When the schema cannot be chosen, or the change
    *   would leave no way to sign in and nobody agreed to it.
    */
-  protected async execute(input: Admitted<typeof AuthMethodPasswordDisable>): Promise<JsonEnvelope> {
+  protected async execute(
+    input: Admitted<typeof AuthMethodPasswordDisable>,
+  ): Promise<JsonEnvelope> {
     return this.toggle(input.flags, "password", false);
   }
 }

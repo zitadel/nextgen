@@ -8,7 +8,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { optionArgs } from "@/lib/public-cli";
 import { projectCommand } from "@/lib/suggestion";
-import type { UnusedConnection } from "@/lib/zitadel";
+import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
 /**
  * What a run that names no provider is refused for. The provider is always
@@ -72,15 +72,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const flags = input.flags;
     const target = await this.loadSchemaTarget(flags);
     const { config, schema } = target;
-    const provider = flags.provider;
-    if (provider === undefined) {
-      const offered = schema.providers.join(", ") || "none";
-      throw refusalError(NAME_PROVIDER_REFUSAL, {
-        example: IDP_PROVIDERS[0],
-        schema: schema.name,
-        offered,
-      });
-    }
+    const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
     const retryArgs = [
       "auth-method",
       "sso",
@@ -108,7 +100,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       schema: schema.name,
       file: schema.path,
       method: "sso",
-      provider,
+      provider: provider,
       changed: [...change.changedPaths],
       usable: [...edited.usableMethods],
       notices: change.notices,
@@ -141,6 +133,24 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       data: { ...data, next_args: followUps.args },
       next,
       pretty: prose(summary),
+    });
+  }
+
+  /**
+   * Refuse a run that names no provider. It is always named, because removing
+   * every provider at once would be a different, larger change; the refusal
+   * lists the providers the schema offers, well-formed or not.
+   *
+   * @param schema - The schema the run is about.
+   * @returns Never: it always throws.
+   * @throws {@link ZitadelError} Always, naming the providers the schema offers.
+   */
+  private refuseUnnamedProvider(schema: UserSchema): never {
+    const offered = schema.providers.join(", ") || "none";
+    throw refusalError(NAME_PROVIDER_REFUSAL, {
+      example: IDP_PROVIDERS[0],
+      schema: schema.name,
+      offered,
     });
   }
 

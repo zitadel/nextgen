@@ -206,7 +206,11 @@ describe("BrokenFlowsError", () => {
       ],
       [
         "does not name a transition that goes with its own step",
-        [useOf("password", { targetedBy: [{ step: stepName("identifier"), transition: "submit" }] })],
+        [
+          useOf("password", {
+            targetedBy: [{ step: stepName("identifier"), transition: "submit" }],
+          }),
+        ],
         "Targeted by",
       ],
       [

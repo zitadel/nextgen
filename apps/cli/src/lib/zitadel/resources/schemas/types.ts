@@ -28,7 +28,10 @@ export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
  * SSO is not one of them: a provider needs credentials, a connection file and
  * flow edits.
  */
-export const TOGGLEABLE_METHODS = ["password", "passkey"] as const satisfies readonly SignInMethod[];
+export const TOGGLEABLE_METHODS = [
+  "password",
+  "passkey",
+] as const satisfies readonly SignInMethod[];
 
 /**
  * A method switched on and off by a flag alone.

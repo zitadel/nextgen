@@ -23,7 +23,10 @@ const PATH = `.zitadel/schemas/${SCHEMA_FILE}`;
 /**
  * The shipped minimal schema.
  */
-const SHIPPED = toJsonObject(getDefaultHumanUserSchema({ useCase: "minimal" }), "the shipped schema");
+const SHIPPED = toJsonObject(
+  getDefaultHumanUserSchema({ useCase: "minimal" }),
+  "the shipped schema",
+);
 
 /**
  * A schema with password on, passkey off and SSO on through Google.
@@ -296,7 +299,9 @@ describe("UserSchema.withProvider", () => {
 
     const edited = schema.withProvider(slug("google")).document;
 
-    expect(objectAt(objectAt(edited.body, "x-auth-methods"), "sso").options).toEqual({ prompt: "login" });
+    expect(objectAt(objectAt(edited.body, "x-auth-methods"), "sso").options).toEqual({
+      prompt: "login",
+    });
   });
 
   it("refuses a schema whose sso region was edited by hand", () => {

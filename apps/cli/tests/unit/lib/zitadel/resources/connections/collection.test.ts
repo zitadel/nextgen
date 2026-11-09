@@ -356,7 +356,10 @@ describe("Connections.enable", () => {
 describe("Connections.findUnused", () => {
   describe("when nothing offers the provider any more", () => {
     it("is the connection, with the variables only it reads", () => {
-      const disabled = WITH_GOOGLE.connections.disable(WITH_GOOGLE.schemas.resolve(), "google").after;
+      const disabled = WITH_GOOGLE.connections.disable(
+        WITH_GOOGLE.schemas.resolve(),
+        "google",
+      ).after;
 
       const unused = disabled.connections.findUnused("google");
 
@@ -468,7 +471,9 @@ describe("Connections.disable", () => {
     });
 
     it("removes it when forced", () => {
-      const change = config.connections.disable(config.schemas.resolve(), "google", { force: true });
+      const change = config.connections.disable(config.schemas.resolve(), "google", {
+        force: true,
+      });
 
       expect(change.after.schemas.get(SCHEMA_FILE)?.providers).toEqual([]);
     });

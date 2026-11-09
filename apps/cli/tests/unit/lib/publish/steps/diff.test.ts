@@ -234,7 +234,6 @@ describe("diffStep", () => {
     });
 
     it("records nothing when there is no diff to read", async ({ dir }) => {
-
       const result = await diffStep.run(aRunIn(dir, []));
 
       expect(result?.learned?.schemasOrFlowsChanged).toBeUndefined();

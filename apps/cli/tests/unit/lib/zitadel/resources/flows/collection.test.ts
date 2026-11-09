@@ -357,7 +357,10 @@ describe("Flows.placeRevision", () => {
     it("replaces that file rather than writing a second one", () => {
       const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
 
-      const change = config.flows.placeRevision("default-login", { name: "default-login", steps: [] });
+      const change = config.flows.placeRevision("default-login", {
+        name: "default-login",
+        steps: [],
+      });
 
       expect(change.changedPaths).toEqual([".zitadel/flows/login.json"]);
     });

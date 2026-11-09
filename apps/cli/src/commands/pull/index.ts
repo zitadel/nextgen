@@ -203,26 +203,30 @@ export default class Pull extends EnvironmentCommand {
     const release = await configuration.fetchRelease(releaseId);
 
     // One resource at a time, so the files land in the order the release pins them.
-    const outcomes = await mapBounded(release.pointers, 1, async (pointer): Promise<PullOutcome> => {
-      const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
-      if (!isPullable(pointer.kind)) {
-        return { kind: "skipped", resource };
-      }
-      const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
-      if (!isJsonValue(body) || !isJsonObject(body)) {
-        return { kind: "skipped", resource };
-      }
-      const collection = PULLABLE[pointer.kind](config);
-      if (!this.dryRun) {
-        // The server's canonical form, written whole over the file that holds
-        // the handle, so what lands is exactly what the release pinned.
-        await collection.placeRevision(pointer.handle, body).save(store, { overwrite: true });
-      }
-      return {
-        kind: "pulled",
-        resource: { ...resource, path: collection.locate(pointer.handle) },
-      };
-    });
+    const outcomes = await mapBounded(
+      release.pointers,
+      1,
+      async (pointer): Promise<PullOutcome> => {
+        const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
+        if (!isPullable(pointer.kind)) {
+          return { kind: "skipped", resource };
+        }
+        const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
+        if (!isJsonValue(body) || !isJsonObject(body)) {
+          return { kind: "skipped", resource };
+        }
+        const collection = PULLABLE[pointer.kind](config);
+        if (!this.dryRun) {
+          // The server's canonical form, written whole over the file that holds
+          // the handle, so what lands is exactly what the release pinned.
+          await collection.placeRevision(pointer.handle, body).save(store, { overwrite: true });
+        }
+        return {
+          kind: "pulled",
+          resource: { ...resource, path: collection.locate(pointer.handle) },
+        };
+      },
+    );
     const pulled = outcomes.flatMap((outcome) => {
       if (outcome.kind !== "pulled") {
         return [];

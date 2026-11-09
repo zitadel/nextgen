@@ -469,7 +469,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const writes = preview.changedPaths.map((file) => {
         return `Would write ${file}`;
       });
-      const stores = toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
+      const stores =
+        toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
       const payload = this.payload({
         ...summary,
         change: preview,

@@ -602,13 +602,15 @@ async function disabledMethods(
   // or, for a schema a flow names that the release does not carry, the newest
   // revision, which the server pins in its place.
   const bundled = new Map(
-    ctx.config.schemas.all.flatMap((schema): readonly (readonly [string, readonly Credential[]])[] => {
-      const objectType = schema.objectType;
-      if (objectType === undefined) {
-        return [];
-      }
-      return [[objectType, credentialMethods(schema)]];
-    }),
+    ctx.config.schemas.all.flatMap(
+      (schema): readonly (readonly [string, readonly Credential[]])[] => {
+        const objectType = schema.objectType;
+        if (objectType === undefined) {
+          return [];
+        }
+        return [[objectType, credentialMethods(schema)]];
+      },
+    ),
   );
   const named = new Set(
     flows.map((flow) => {
@@ -652,13 +654,15 @@ async function disabledMethods(
   if (known.length !== live.length) {
     return { changes: [], unreadable: true };
   }
-  const newest = autoPinned.flatMap((objectType): readonly (readonly [string, readonly Credential[]])[] => {
-    const info = listing.byObjectType.get(objectType);
-    if (info === undefined) {
-      return [];
-    }
-    return [[objectType, info.methods]];
-  });
+  const newest = autoPinned.flatMap(
+    (objectType): readonly (readonly [string, readonly Credential[]])[] => {
+      const info = listing.byObjectType.get(objectType);
+      if (info === undefined) {
+        return [];
+      }
+      return [[objectType, info.methods]];
+    },
+  );
   const after = [...bundled, ...newest];
   const changes = after.flatMap((entry): readonly MethodChange[] => {
     const objectType = entry[0];
@@ -910,8 +914,7 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
   const listed = await ctx.schemas.list();
   const revisions = listed.flatMap((entry): readonly (readonly [string, SchemaInfo])[] => {
     const listedBody = entry.schema;
-    const body: JsonObject =
-      isJsonValue(listedBody) && isJsonObject(listedBody) ? listedBody : {};
+    const body: JsonObject = isJsonValue(listedBody) && isJsonObject(listedBody) ? listedBody : {};
     const schema = UserSchema.of({ path: "", body });
     const objectType = schema.body.objectType;
     if (typeof objectType !== "string") {

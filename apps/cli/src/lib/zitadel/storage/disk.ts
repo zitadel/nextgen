@@ -148,14 +148,12 @@ export class DiskStore implements ConfigStore {
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
     const target = this.root.resolve(path);
     await mkdir(target.parent.toString(), { recursive: true });
-    await writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] }).catch(
-      (error: unknown) => {
-        if (DiskStore.errnoOf(error) === "EEXIST") {
-          throw new FileExistsError(path);
-        }
-        throw error;
-      },
-    );
+    await writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] }).catch((error: unknown) => {
+      if (DiskStore.errnoOf(error) === "EEXIST") {
+        throw new FileExistsError(path);
+      }
+      throw error;
+    });
   }
 
   /**
@@ -251,7 +249,8 @@ export class DiskStore implements ConfigStore {
       const text = await readFile(location, "utf8");
       return JSON.parse(text);
     } catch (error) {
-      const position = error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
+      const position =
+        error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
       const parseError =
         position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`;
       throw new ConfigError(`${path} is not valid JSON`, {

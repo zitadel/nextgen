@@ -31,10 +31,7 @@ import type { PolicyCase, PolicyExpectation, PolicyOperation, PolicyTest } from 
  * The shape is the `--json` output's, so each source is told apart by the key
  * it carries rather than by a `kind`.
  */
-export type PolicySource =
-  | { readonly file: string }
-  | { readonly revision_id: string }
-  | null;
+export type PolicySource = { readonly file: string } | { readonly revision_id: string } | null;
 
 /**
  * The policy a test file is evaluated against, by operation.

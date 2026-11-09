@@ -10,7 +10,13 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 import { RefusedEditError } from "@/lib/zitadel";
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
-import { isJsonArray, isJsonObject, listAt, objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
+import {
+  isJsonArray,
+  isJsonObject,
+  listAt,
+  objectAt,
+  toJsonObject,
+} from "@/lib/zitadel/utils/json";
 import {
   actionsIn,
   aShippedLoginFlow,

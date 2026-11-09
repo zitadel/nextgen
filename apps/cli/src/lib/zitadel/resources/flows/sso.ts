@@ -155,9 +155,12 @@ export class SsoGenerator {
     const password = SsoGenerator.offerOnPasswordStep(offered, entries, slug, terminal);
     const rerouted = SsoGenerator.routeRegisterPassword(password.steps);
     const wanted = SsoGenerator.generatedSteps(purposes, rerouted, slug, enabled, login, terminal);
-    const placed = wanted.reduce((staged: Staged, generated) => {
-      return SsoGenerator.placeGeneratedStep(staged, generated, slug, terminal);
-    }, { steps: rerouted, skipped: password.skipped });
+    const placed = wanted.reduce(
+      (staged: Staged, generated) => {
+        return SsoGenerator.placeGeneratedStep(staged, generated, slug, terminal);
+      },
+      { steps: rerouted, skipped: password.skipped },
+    );
     const document: JsonObject = { ...flow, steps: placed.steps };
 
     if (isDeepStrictEqual(document, flow)) {
@@ -437,14 +440,16 @@ export class SsoGenerator {
    */
   private static withProviderRoutes(transitions: JsonObject, terminal: StepName): JsonObject {
     const routes = SsoGenerator.providerRoutes(terminal);
-    const added = PROVIDER_OUTCOMES.flatMap((outcome): readonly (readonly [string, JsonObject])[] => {
-      const target = routes[outcome];
-      const current = transitions[outcome];
-      if (isJsonObject(current) && current.target === target) {
-        return [];
-      }
-      return [[outcome, { target }]];
-    });
+    const added = PROVIDER_OUTCOMES.flatMap(
+      (outcome): readonly (readonly [string, JsonObject])[] => {
+        const target = routes[outcome];
+        const current = transitions[outcome];
+        if (isJsonObject(current) && current.target === target) {
+          return [];
+        }
+        return [[outcome, { target }]];
+      },
+    );
     return { ...transitions, ...Object.fromEntries(added) };
   }
 

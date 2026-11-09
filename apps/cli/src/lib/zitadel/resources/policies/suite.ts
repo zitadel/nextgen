@@ -20,8 +20,8 @@ import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
- * A policy's test suite under `.zitadel/policies/`: cases `zitadel policies
- * test` runs, which a release never carries.
+ * A policy's test suite under `.zitadel/policies/`: the cases that
+ * `zitadel policies test` runs, which a release never carries.
  */
 export class PolicyTest extends ConfigDocument {
   /**
@@ -67,9 +67,7 @@ export class PolicyTest extends ConfigDocument {
    * @param operation - The operation the cases test.
    * @returns The operation followed by `.test.json`.
    */
-  static fileName<Operation extends string>(
-    operation: Operation,
-  ): PolicyTestFileName<Operation> {
+  static fileName<Operation extends string>(operation: Operation): PolicyTestFileName<Operation> {
     return `${operation}${POLICY_TEST_SUFFIX}`;
   }
 

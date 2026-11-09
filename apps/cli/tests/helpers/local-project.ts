@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import type { JsonObject } from "@/lib/zitadel";
-import { isJsonObject } from "@/lib/zitadel/utils/json";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { DEFAULT_SCHEMA, schemaIdOf, writeProject } from "@tests/helpers/auth-method";
 import { aLoginFlow, authMethods, aUserSchema, type DocumentsByName } from "@tests/helpers/config";
 
@@ -146,14 +146,11 @@ export async function writeJson(cwd: string, path: string, body: unknown): Promi
  * @param cwd - The Project's directory.
  * @param path - The file's project-relative path.
  * @returns The object the file holds.
- * @throws {@link Error} When the file holds JSON that is not an object.
+ * @throws {@link ConfigError} When the file holds JSON that is not an object.
  */
-export async function readJson(cwd: string, path: string): Promise<Record<string, unknown>> {
+export async function readJson(cwd: string, path: string): Promise<JsonObject> {
   const parsed: unknown = JSON.parse(await readFile(join(cwd, path), "utf8"));
-  if (!isJsonObject(parsed)) {
-    throw new Error(`${path} does not hold a JSON object`);
-  }
-  return parsed;
+  return toJsonObject(parsed, path);
 }
 
 /**
