@@ -1,26 +1,24 @@
 /**
  * The project's configuration under `.zitadel/`: its user schemas, login flows,
  * identity-provider connections, operation policies and branding, read, edited,
- * checked, bundled and written through one {@link ZitadelConfig}.
+ * checked, bundled and written through one {@link ZitadelConfig}, whose
+ * collections hold each kind of document and every edit and question about it.
  *
+ * @remarks
  * The configuration is kept in a {@link ConfigStore}: {@link DiskStore} for a
  * project's files, {@link MemoryStore} for a test. Nothing in this module
  * prints or knows the command line. It fails only with a {@link ConfigError},
  * and depends on nothing else under `lib/`.
  */
-export { Branding } from "@/lib/zitadel/branding";
+export { Branding, Brandings } from "@/lib/zitadel/branding";
 export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
 export { Change, type Notice, type SaveOptions } from "@/lib/zitadel/change";
-export {
-  ZitadelConfig,
-  type AnyDocument,
-  type ConfigOptions,
-  type Offer,
-  type SignUpGap,
-} from "@/lib/zitadel/config";
+export { Collection } from "@/lib/zitadel/collection";
+export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
 export {
   CONNECTION_SCHEMA_REF,
   Connection,
+  Connections,
   type ClaimRow,
   type ConnectionSetting,
   type CredentialNames,
@@ -45,20 +43,23 @@ export {
 } from "@/lib/zitadel/errors";
 export {
   Flow,
+  Flows,
   PASSWORD_FIELD,
   type FlowCheck,
   type FlowIssue,
   type FlowMethodUse,
   type IncomingTransition,
   type MethodUse,
+  type Offer,
+  type SignUpGap,
+  type SkippedRegion,
   type Step,
   type Transition,
 } from "@/lib/zitadel/flows";
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
-export { Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/policies";
-export { type ForceOptions, UserSchema } from "@/lib/zitadel/schemas";
+export { Policies, Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/policies";
+export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/schemas";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
-export type { SkippedRegion } from "@/lib/zitadel/flows/types";
 export {
   RULE_IDS,
   type Issue,

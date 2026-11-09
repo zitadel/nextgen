@@ -79,7 +79,7 @@ export function readPolicyTests(
   operations: readonly string[] = [],
 ): { suites: PolicyTestSuite[]; issues: string[] } {
   const wanted = new Set(operations.map(policyTestFileName));
-  const entries = config.policyTests
+  const entries = config.policies.tests
     .map((document) => {
       return {
         name: basename(document.path),
@@ -143,7 +143,7 @@ export function policiesFromFiles(
   operations: readonly string[] = [],
 ): { policies: Map<string, PolicyUnderTest>; issues: string[] } {
   const wanted = new Set(operations.map(policyFileName));
-  const entries = config.policies
+  const entries = config.policies.all
     .map((document) => {
       return {
         name: basename(document.path),

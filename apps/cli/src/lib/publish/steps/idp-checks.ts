@@ -24,7 +24,7 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
   // editor's `$schema` pointer the contract would refuse.
   const named = ctx.bundle.idps.map((body, index) => ({
     body,
-    file: ctx.config.connections[index]?.path ?? "(unnamed)",
+    file: ctx.config.connections.all[index]?.path ?? "(unnamed)",
   }));
   // A connection's shape is the configuration's rules to judge. What stays
   // here is the guard that a read which resolved a secret is never sent on.

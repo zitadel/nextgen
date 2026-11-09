@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 
 import { stringify } from "safe-stable-stringify";
 
@@ -116,6 +116,15 @@ export class DiskStore implements ConfigStore {
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
     return this.writeText(file.path, `${stringify(file.body, null, 2) ?? "null"}\n`, mode);
+  }
+
+  /**
+   * Delete one file. A file that is not there is already deleted.
+   *
+   * @param path - The project-relative path.
+   */
+  async remove(path: string): Promise<void> {
+    await rm(this.root.resolve(path).toString(), { force: true });
   }
 
   /**

@@ -10,7 +10,9 @@ import type { JsonObject } from "@/lib/zitadel/types";
 import { environmentReferences } from "@/lib/zitadel/utils/environment";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 
-/** The rules a deploy's environment is held to. */
+/**
+ * The rules a deploy's environment is held to.
+ */
 export const ENVIRONMENT_RULES: readonly Rule[] = [
   defineRule({
     id: "environment/missing-variable",
@@ -23,10 +25,10 @@ export const ENVIRONMENT_RULES: readonly Rule[] = [
       // Branding is judged as it is sent, with its template inlined, since a
       // template may reference a variable too.
       const judged: ReadonlyArray<Readonly<{ document: ConfigDocument; body: JsonObject }>> = [
-        ...[...config.schemas, ...config.flows].map((document) => {
+        ...[...config.schemas.all, ...config.flows.all].map((document) => {
           return { document, body: document.body };
         }),
-        ...config.brandings.map((document) => {
+        ...config.branding.all.map((document) => {
           return {
             document,
             body: context.store === undefined ? document.body : document.wireBody(context.store),

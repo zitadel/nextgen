@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { NoSignInLeftError, type UserSchema, ZitadelConfig } from "@/lib/zitadel";
-import { assertSignInLeft, reachableMethods, signInNotices } from "@/lib/zitadel/schemas/signin";
-import type { JsonObject } from "@/lib/zitadel/types";
+import {
+  BrokenFlowsError,
+  NoSignInLeftError,
+  RefusedEditError,
+  type UserSchema,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
+import type { JsonObject } from "@/lib/zitadel/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -72,7 +77,7 @@ function configOf(schema: JsonObject, flows: readonly JsonObject[] = []): Zitade
  * @throws {@link Error} When the configuration has no schema.
  */
 function schemaIn(config: ZitadelConfig): UserSchema {
-  const schema = config.schema(SCHEMA_PATH);
+  const schema = config.schemas.get(SCHEMA_PATH);
   if (schema === undefined) {
     throw new Error("the configuration has no schema");
   }
@@ -141,7 +146,273 @@ const ssoFlow = (providers: string[]): JsonObject => {
   };
 };
 
-describe("reachableMethods", () => {
+/** The `x-auth-methods` a configuration's schema holds. */
+function methodsIn(config: ZitadelConfig): unknown {
+  return schemaIn(config).body["x-auth-methods"];
+}
+
+/** A flow whose login journey asks for an identifier, then a password. */
+const loginFlow = {
+  name: "login",
+  status: "active",
+  user_schema: SCHEMA_ID,
+  purposes: { login: "identifier" },
+  steps: [
+    {
+      name: "identifier",
+      fields: ["email"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "password" } },
+    },
+    {
+      name: "password",
+      fields: ["x-auth-methods#password"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    },
+    { name: "done", complete: "show" },
+  ],
+};
+
+describe("Schemas.enable", () => {
+  it("switches only the named method", () => {
+    const config = configOf(
+      schemaBody({ password: { enabled: true }, passkey: { enabled: false } }),
+    );
+
+    const change = config.schemas.enable(schemaIn(config), "passkey");
+
+    expect(methodsIn(change.after)).toEqual({
+      password: { enabled: true },
+      passkey: { enabled: true },
+    });
+  });
+
+  it("keeps the other methods as they are", () => {
+    const config = configOf(
+      schemaBody({ passkey: { enabled: false }, sso: { enabled: true, providers: ["google"] } }),
+    );
+
+    const change = config.schemas.enable(schemaIn(config), "passkey");
+
+    expect(methodsIn(change.after)).toEqual({
+      passkey: { enabled: true },
+      sso: { enabled: true, providers: ["google"] },
+    });
+  });
+
+  it("keeps what else the method's entry holds", () => {
+    const config = configOf(
+      schemaBody({ passkey: { enabled: false, user_verification: "required" } }),
+    );
+
+    const change = config.schemas.enable(schemaIn(config), "passkey");
+
+    expect(methodsIn(change.after)).toEqual({
+      passkey: { enabled: true, user_verification: "required" },
+    });
+  });
+
+  it("adds a method the schema does not mention", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }));
+
+    const change = config.schemas.enable(schemaIn(config), "passkey");
+
+    expect(methodsIn(change.after)).toMatchObject({ passkey: { enabled: true } });
+  });
+
+  it("writes the schema", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }));
+
+    expect(config.schemas.enable(schemaIn(config), "passkey").changedPaths).toEqual([SCHEMA_PATH]);
+  });
+
+  it("writes nothing for a method already on", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }), [loginFlow]);
+
+    const change = config.schemas.enable(schemaIn(config), "password");
+
+    expect(change.changed).toBe(false);
+  });
+
+  it("does not change the configuration it was given", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }));
+    const copy = structuredClone(schemaIn(config).body);
+
+    config.schemas.enable(schemaIn(config), "passkey");
+
+    expect(schemaIn(config).body).toEqual(copy);
+  });
+
+  it("warns when no login flow offers the method it enabled", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }), [loginFlow]);
+
+    const change = config.schemas.enable(schemaIn(config), "passkey");
+
+    expect(change.notices).toEqual([
+      {
+        severity: "warning",
+        message: expect.stringContaining("No login flow for customers offers passkey yet."),
+      },
+    ]);
+  });
+
+  it("refuses password on a schema with no identifier", () => {
+    const config = configOf(schemaBody({ passkey: { enabled: true } }, null));
+
+    const error = thrownBy(() => {
+      config.schemas.enable(schemaIn(config), "password");
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({
+      message: `${SCHEMA_PATH} has no x-identifier for password`,
+      details: { file: SCHEMA_PATH, method: "password" },
+    });
+  });
+
+  it("refuses password on a schema whose identifier is blank", () => {
+    const config = configOf(schemaBody({ passkey: { enabled: true } }, " "));
+
+    expect(
+      thrownBy(() => {
+        config.schemas.enable(schemaIn(config), "password");
+      }),
+    ).toBeInstanceOf(RefusedEditError);
+  });
+
+  it("accepts a schema without x-auth-methods", () => {
+    const config = configOf({ type: "object" });
+
+    expect(methodsIn(config.schemas.enable(schemaIn(config), "passkey").after)).toEqual({
+      passkey: { enabled: true },
+    });
+  });
+
+  it("ignores a malformed entry of another method", () => {
+    const config = configOf(schemaBody({ password: true }));
+
+    expect(methodsIn(config.schemas.enable(schemaIn(config), "passkey").after)).toEqual({
+      password: true,
+      passkey: { enabled: true },
+    });
+  });
+
+  it.each([
+    ["x-auth-methods is not an object", []],
+    ["x-auth-methods.passkey is not an object", { passkey: true }],
+    ["x-auth-methods.passkey.enabled is not a boolean", { passkey: {} }],
+    ["x-auth-methods.passkey.enabled is not a boolean", { passkey: { enabled: "true" } }],
+  ])("refuses the edit when %s", (region, methods) => {
+    const config = configOf(schemaBody(methods));
+
+    const error = thrownBy(() => {
+      config.schemas.enable(schemaIn(config), "passkey");
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({
+      message: `${SCHEMA_PATH}: ${region}`,
+      details: { file: SCHEMA_PATH, region },
+    });
+  });
+});
+
+describe("Schemas.disable", () => {
+  it("switches only the named method", () => {
+    const config = configOf(
+      schemaBody({ password: { enabled: true }, passkey: { enabled: true } }),
+    );
+
+    const change = config.schemas.disable(schemaIn(config), "passkey");
+
+    expect(methodsIn(change.after)).toEqual({
+      password: { enabled: true },
+      passkey: { enabled: false },
+    });
+  });
+
+  it("writes nothing for a method already off", () => {
+    const config = configOf(
+      schemaBody({ password: { enabled: true }, passkey: { enabled: false } }),
+    );
+
+    expect(config.schemas.disable(schemaIn(config), "passkey").changed).toBe(false);
+  });
+
+  it("refuses to turn off a method a login flow still uses", () => {
+    const config = configOf(
+      schemaBody({ password: { enabled: true }, passkey: { enabled: true } }),
+      [loginFlow],
+    );
+
+    const error = thrownBy(() => {
+      config.schemas.disable(schemaIn(config), "password");
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({
+      details: { steps: [{ path: FLOW_PATH, step: "password" }] },
+    });
+  });
+
+  it("refuses to turn off the last way to sign in", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }));
+
+    const error = thrownBy(() => {
+      config.schemas.disable(schemaIn(config), "password");
+    });
+
+    expect(error).toBeInstanceOf(NoSignInLeftError);
+    expect(error).toMatchObject({ disabling: "password", usable: ["password"], alternatives: ["passkey"] });
+  });
+
+  it("refuses a flow that still uses the method before the last way to sign in", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }), [loginFlow]);
+
+    expect(
+      thrownBy(() => {
+        config.schemas.disable(schemaIn(config), "password");
+      }),
+    ).toBeInstanceOf(BrokenFlowsError);
+  });
+
+  it("turns off the last way to sign in when forced", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }));
+
+    const change = config.schemas.disable(schemaIn(config), "password", { force: true });
+
+    expect(methodsIn(change.after)).toEqual({ password: { enabled: false } });
+  });
+
+  it("warns that a schema left with no way in is managed only through the API", () => {
+    const config = configOf(schemaBody({ password: { enabled: true } }));
+
+    const change = config.schemas.disable(schemaIn(config), "password", { force: true });
+
+    expect(change.notices).toEqual([
+      {
+        severity: "warning",
+        message:
+          "customers is left with no way to sign in. Its users can only be managed through the API.",
+      },
+    ]);
+  });
+
+  it("refuses the edit when the method's entry is not the shape it edits", () => {
+    const config = configOf(
+      schemaBody({ password: { enabled: true }, passkey: { enabled: "yes" } }),
+    );
+
+    expect(
+      thrownBy(() => {
+        config.schemas.disable(schemaIn(config), "passkey");
+      }),
+    ).toBeInstanceOf(RefusedEditError);
+  });
+});
+
+describe("Schemas.reachableMethods", () => {
   it("counts only methods an active flow offers", () => {
     // The shipped default: passkey is enabled, but the flow offers password
     // only.
@@ -150,7 +421,7 @@ describe("reachableMethods", () => {
       [passwordFlow],
     );
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual(["password"]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual(["password"]);
   });
 
   it("is empty when the flow offers nothing the schema enables", () => {
@@ -159,7 +430,7 @@ describe("reachableMethods", () => {
       [passwordFlow],
     );
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual([]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("does not count a flow that is not active", () => {
@@ -167,7 +438,7 @@ describe("reachableMethods", () => {
       { ...passwordFlow, status: "draft" },
     ]);
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual([]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("does not count a flow that runs against another schema", () => {
@@ -175,7 +446,7 @@ describe("reachableMethods", () => {
       { ...passwordFlow, user_schema: "https://schemas.test.invalid/staff.json" },
     ]);
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual([]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("does not count SSO for a provider the schema does not enable", () => {
@@ -183,7 +454,7 @@ describe("reachableMethods", () => {
       ssoFlow(["github"]),
     ]);
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual([]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("counts SSO on a step that names a provider the schema enables", () => {
@@ -191,7 +462,7 @@ describe("reachableMethods", () => {
       ssoFlow(["google"]),
     ]);
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual(["sso"]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual(["sso"]);
   });
 
   it("does not count SSO whose providers are not valid slugs", () => {
@@ -199,18 +470,18 @@ describe("reachableMethods", () => {
       ssoFlow(["Not A Slug"]),
     ]);
 
-    expect(reachableMethods(config, schemaIn(config))).toEqual([]);
+    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
   });
 });
 
-describe("assertSignInLeft", () => {
+describe("Schemas.assertSignInLeft", () => {
   const passwordOnly = (identifier?: string): ZitadelConfig => {
     return configOf(schemaBody({ password: { enabled: true } }, identifier));
   };
 
   const refusalOf = (edit: SchemaEdit, disabling: string): NoSignInLeftError => {
     const error = thrownBy(() => {
-      assertSignInLeft(edit, disabling, false);
+      edit.before.schemas.assertSignInLeft(edit, disabling, false);
     });
     expect(error).toBeInstanceOf(NoSignInLeftError);
     return error as NoSignInLeftError;
@@ -263,7 +534,7 @@ describe("assertSignInLeft", () => {
     const edit = toggled(passwordOnly(), "password", false);
 
     expect(() => {
-      assertSignInLeft(edit, "password", true);
+      edit.before.schemas.assertSignInLeft(edit, "password", true);
     }).not.toThrow();
   });
 
@@ -273,7 +544,7 @@ describe("assertSignInLeft", () => {
     );
 
     expect(() => {
-      assertSignInLeft(toggled(config, "password", false), "password", false);
+      config.schemas.assertSignInLeft(toggled(config, "password", false), "password", false);
     }).not.toThrow();
   });
 
@@ -281,7 +552,7 @@ describe("assertSignInLeft", () => {
     const config = configOf(schemaBody({ password: { enabled: false }, otp: { enabled: true } }));
 
     expect(() => {
-      assertSignInLeft(toggled(config, "passkey", false), "passkey", false);
+      config.schemas.assertSignInLeft(toggled(config, "passkey", false), "passkey", false);
     }).not.toThrow();
   });
 
@@ -298,9 +569,9 @@ describe("assertSignInLeft", () => {
   });
 });
 
-describe("signInNotices", () => {
+describe("Schemas.signInNotices", () => {
   const messagesOf = (edit: SchemaEdit, enabled?: ToggleableMethod): readonly string[] => {
-    return signInNotices(edit, enabled).map((notice) => {
+    return edit.before.schemas.signInNotices(edit, enabled).map((notice) => {
       expect(notice.severity).toBe("warning");
       return notice.message;
     });

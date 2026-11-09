@@ -11,6 +11,7 @@ import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } f
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import {
   type AnyDocument,
+  type Collection,
   CONFIG_DIRECTORIES,
   type ConfigFile,
   type ConfigStore,
@@ -79,8 +80,8 @@ const TARGET: Refused<ReadablePullTarget> = {
  */
 type Reconstructable = {
   readonly dir: string;
-  /** The documents of this kind the configuration holds. */
-  documents(config: ZitadelConfig): readonly AnyDocument[];
+  /** The collection of this kind in a configuration. */
+  collection(config: ZitadelConfig): Collection<AnyDocument>;
   handleOf(body: JsonObject): string | undefined;
   /** A new document of this kind, for a revision no file holds yet. */
   created(file: ConfigFile): AnyDocument;
@@ -95,7 +96,7 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
   Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
   schema: {
     dir: CONFIG_DIRECTORIES.schemas,
-    documents: (config) => {
+    collection: (config) => {
       return config.schemas;
     },
     handleOf: (body) => {
@@ -107,7 +108,7 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
   },
   flow_definition: {
     dir: CONFIG_DIRECTORIES.flows,
-    documents: (config) => {
+    collection: (config) => {
       return config.flows;
     },
     handleOf: (body) => {
@@ -132,7 +133,7 @@ export function documentForHandle(
   kind: Reconstructable,
   handle: string,
 ): AnyDocument | undefined {
-  return kind.documents(config).find((document) => {
+  return kind.collection(config).all.find((document) => {
     return kind.handleOf(document.body) === handle;
   });
 }
@@ -164,7 +165,10 @@ async function writeRevision(
   if (existing !== undefined && isDeepStrictEqual(existing.body, body)) {
     return;
   }
-  await ZitadelConfig.empty().put(kind.created({ path, body })).save(store, { overwrite: true });
+  await kind
+    .collection(ZitadelConfig.empty())
+    .put(kind.created({ path, body }))
+    .save(store, { overwrite: true });
 }
 
 /**

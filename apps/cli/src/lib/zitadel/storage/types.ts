@@ -54,6 +54,13 @@ export interface ConfigStore {
   write(file: ConfigFile, mode: WriteMode): Promise<void>;
 
   /**
+   * Delete one file. A file that is not there is already deleted.
+   *
+   * @param path - The project-relative path.
+   */
+  remove(path: string): Promise<void>;
+
+  /**
    * Write a file a configuration file references, such as branding's template.
    *
    * @param path - The project-relative path.

@@ -84,7 +84,7 @@ export const diffStep: Step = {
       );
     }
 
-    const referenced = ctx.config.brandings.flatMap((branding) => {
+    const referenced = ctx.config.branding.all.flatMap((branding) => {
       return branding.referencedPaths(ctx.store);
     });
     if (ctx.json) {

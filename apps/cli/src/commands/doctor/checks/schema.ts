@@ -31,7 +31,7 @@ export class SchemaCheck extends AbstractSanityCheck {
     }
     const store = new DiskStore(ctx.cwd);
     const config = await ZitadelConfig.loadUnchecked(store);
-    if (config.schemas.length === 0) {
+    if (config.schemas.all.length === 0) {
       return {
         name: this.name,
         status: "warn",

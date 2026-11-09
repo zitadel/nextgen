@@ -1,5 +1,6 @@
 /**
- * The sign-in methods a user schema enables, and an edit to one schema.
+ * The sign-in methods a user schema enables, an edit to one schema, and what
+ * an edit that may leave it with no way to sign in is told.
  */
 
 import type { ZitadelConfig } from "@/lib/zitadel/config";
@@ -24,11 +25,12 @@ export type ToggleableMethod = (typeof TOGGLEABLE_METHODS)[number];
  */
 export type EnabledMethods = Readonly<{
   /**
-   * Whether the schema enables passwords.
+   * Whether password sign-in is enabled.
    */
   password: boolean;
+
   /**
-   * Whether the schema enables passkeys.
+   * Whether passkey sign-in is enabled.
    */
   passkey: boolean;
 }>;
@@ -38,19 +40,32 @@ export type EnabledMethods = Readonly<{
  */
 export type SchemaEdit = Readonly<{
   /**
-   * The configuration before the edit.
+   * The configuration the edit was made on.
    */
   before: ZitadelConfig;
+
   /**
-   * The configuration after the edit.
+   * The configuration as the edit leaves it.
    */
   after: ZitadelConfig;
+
   /**
    * The schema as it was.
    */
   original: UserSchema;
+
   /**
    * The schema as the edit leaves it.
    */
   edited: UserSchema;
+}>;
+
+/**
+ * What an edit that may leave a schema with no way to sign in is told.
+ */
+export type ForceOptions = Readonly<{
+  /**
+   * Make the edit even when it leaves no way to sign in.
+   */
+  force?: boolean | undefined;
 }>;

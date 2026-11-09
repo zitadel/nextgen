@@ -92,9 +92,9 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
  * @returns One warning per such flow.
  */
 function unpinnedFlows(ctx: StepContext): string[] {
-  return ctx.config.flows
+  return ctx.config.flows.all
     .filter((flow) => {
-      return ctx.config.schemaOf(flow) === undefined && flow.offers();
+      return ctx.config.flows.schemaOf(flow) === undefined && flow.offers();
     })
     .map((flow) => {
       return `${flow.path}: could not tell which local schema this flow pins, so its provider rules were not checked against a schema`;
@@ -115,18 +115,18 @@ function unpinnedFlows(ctx: StepContext): string[] {
  * @returns One finding per such flow.
  */
 async function unresolvedSchemas(ctx: StepContext): Promise<ServerFinding[]> {
-  const local = ctx.config.schemas.flatMap((schema) => {
+  const local = ctx.config.schemas.all.flatMap((schema) => {
     const objectType = schema.body.objectType;
     return typeof objectType === "string" ? [objectType] : [];
   });
   // A schema that learns its objectType only from the server could be the one.
-  if (local.length !== ctx.config.schemas.length) {
+  if (local.length !== ctx.config.schemas.all.length) {
     return [];
   }
   const findings: ServerFinding[] = [];
-  for (const flow of ctx.config.flows) {
+  for (const flow of ctx.config.flows.all) {
     const ref = flow.userSchema;
-    if (ref === undefined || ctx.config.schemaOf(flow) !== undefined || isSchemaId(ref)) {
+    if (ref === undefined || ctx.config.flows.schemaOf(flow) !== undefined || isSchemaId(ref)) {
       continue;
     }
     // Through the schema service, which is bound to the project this run

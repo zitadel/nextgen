@@ -113,6 +113,20 @@ describe("DiskStore", () => {
     });
   });
 
+  describe("remove", () => {
+    it("deletes the file", async ({ dir }) => {
+      await project(dir, { ".zitadel/idps/a.json": "{}" });
+
+      await new DiskStore(dir).remove(".zitadel/idps/a.json");
+
+      expect(await new DiskStore(dir).exists(".zitadel/idps/a.json")).toBe(false);
+    });
+
+    it("takes a file that is not there as already deleted", async ({ dir }) => {
+      await expect(new DiskStore(dir).remove(".zitadel/idps/a.json")).resolves.toBeUndefined();
+    });
+  });
+
   describe("writeText", () => {
     it("writes the text as given, creating the directories", async ({ dir }) => {
       await new DiskStore(dir).writeText(".zitadel/branding/login.liquid", "<main></main>", "create");

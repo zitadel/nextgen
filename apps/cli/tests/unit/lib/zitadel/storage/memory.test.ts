@@ -94,6 +94,20 @@ describe("MemoryStore", () => {
     });
   });
 
+  describe("remove", () => {
+    it("stops holding the file", async () => {
+      const store = new MemoryStore([{ path: ".zitadel/idps/a.json", body: {} }]);
+
+      await store.remove(".zitadel/idps/a.json");
+
+      expect(store.get(".zitadel/idps/a.json")).toBeUndefined();
+    });
+
+    it("takes a file it does not hold as already deleted", async () => {
+      await expect(new MemoryStore().remove(".zitadel/idps/a.json")).resolves.toBeUndefined();
+    });
+  });
+
   describe("writeText", () => {
     it("holds the text for a reference to read", async () => {
       const store = new MemoryStore();

@@ -15,7 +15,8 @@
 import type { Connection } from "@/lib/zitadel/connections/connection";
 import type { Step } from "@/lib/zitadel/flows/step";
 import type { UserSchema } from "@/lib/zitadel/schemas/schema";
-import type { Offer, ZitadelConfig } from "@/lib/zitadel/config";
+import type { ZitadelConfig } from "@/lib/zitadel/config";
+import type { Offer } from "@/lib/zitadel/flows/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { FITS, STANDARD_SCOPES, standardClaim } from "@/lib/zitadel/rules/claims";
 import { closest, didYouMean } from "@/lib/zitadel/utils/spelling";
@@ -26,12 +27,16 @@ import { closest, didYouMean } from "@/lib/zitadel/utils/spelling";
 const SSO_OUTCOMES = ["sso_authenticated", "sso_user_not_found", "user_already_exists"] as const;
 
 /**
- * Names that are not standard claims but are, wherever they appear, an account name a user can change.
+ * Names that are not standard claims but are, wherever they appear, an
+ * account name a user can change.
  */
 const MUTABLE_SUBJECTS: ReadonlySet<string> = new Set(["login", "username"]);
 
 /**
- * A Unicode space at either end of a name: the set Go's `strings.TrimSpace` trims, so both sides agree.
+ * A Unicode space at either end of a name.
+ *
+ * @remarks
+ * The set Go's `strings.TrimSpace` trims, so both sides agree.
  */
 const EDGE_SPACE = /^\p{White_Space}|\p{White_Space}$/u;
 
@@ -63,15 +68,18 @@ function article(word: string): string {
  */
 type Standing = Readonly<{
   /**
-   * The connection.
+   * The connection, the first file in path order with its slug.
    */
   connection: Connection;
+
   /**
    * The slug it stands for.
    */
   slug: string;
+
   /**
-   * The schemas that list the slug, which are the ones that consume its mapping.
+   * The schemas that list the slug, which are the ones that consume its
+   * mapping.
    */
   listing: readonly UserSchema[];
 }>;
@@ -84,12 +92,12 @@ type Standing = Readonly<{
  * @returns Each such connection, with the schemas that list it.
  */
 function standing(config: ZitadelConfig): Standing[] {
-  return config.connections.flatMap((connection) => {
+  return config.connections.all.flatMap((connection) => {
     const slug = connection.slug;
-    if (slug === undefined || config.connection(slug) !== connection) {
+    if (slug === undefined || config.connections.find(slug) !== connection) {
       return [];
     }
-    return [{ connection, slug, listing: config.schemasListing(slug) }];
+    return [{ connection, slug, listing: config.schemas.listing(slug) }];
   });
 }
 
@@ -156,7 +164,7 @@ function claimReads(connection: Connection): Array<{ field: string; claim: strin
  */
 function unroutedOutcomes(config: ZitadelConfig, step: Step): string[] {
   const offersCreation = step.providers.some((slug) => {
-    return config.connection(slug)?.createsUsers ?? true;
+    return config.connections.find(slug)?.createsUsers ?? true;
   });
   const required: readonly string[] = offersCreation ? SSO_OUTCOMES : ["sso_authenticated"];
   return required.filter((outcome) => {
@@ -176,7 +184,7 @@ function unroutedOutcomes(config: ZitadelConfig, step: Step): string[] {
 function meantBySchemaTypos(config: ZitadelConfig, schema: UserSchema): Array<string | undefined> {
   return schema.providers
     .filter((slug) => {
-      return config.connection(slug) === undefined;
+      return config.connections.find(slug) === undefined;
     })
     .map((slug) => {
       return closest(slug, knownSlugs(config));
@@ -198,7 +206,13 @@ function knownSlugs(config: ZitadelConfig): string[] {
 /**
  * An offer on a flow whose schema is known.
  */
-type PinnedOffer = Offer & Readonly<{ schema: UserSchema }>;
+type PinnedOffer = Offer &
+  Readonly<{
+    /**
+     * The local schema the offer's flow runs against.
+     */
+    schema: UserSchema;
+  }>;
 
 /**
  * The offers on flows whose schema is a local file.
@@ -207,8 +221,8 @@ type PinnedOffer = Offer & Readonly<{ schema: UserSchema }>;
  * @returns Each offer with its flow's schema.
  */
 function pinnedOffers(config: ZitadelConfig): PinnedOffer[] {
-  return config.offers.flatMap((offer) => {
-    const schema = config.schemaOf(offer.flow);
+  return config.flows.offers.flatMap((offer) => {
+    const schema = config.flows.schemaOf(offer.flow);
     if (schema === undefined) {
       return [];
     }
@@ -224,9 +238,9 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/duplicate-slug",
     severity: "error",
     each: (config) => {
-      return config.connections.flatMap((connection) => {
+      return config.connections.all.flatMap((connection) => {
         const first =
-          connection.slug === undefined ? undefined : config.connection(connection.slug);
+          connection.slug === undefined ? undefined : config.connections.find(connection.slug);
         if (first === undefined || first === connection || connection.slug === undefined) {
           return [];
         }
@@ -245,7 +259,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/shared-variable",
     severity: "error",
     each: (config) => {
-      const uses = config.connections.flatMap((connection) => {
+      const uses = config.connections.all.flatMap((connection) => {
         return connection.variables.map((use) => {
           return { connection, ...use };
         });
@@ -275,7 +289,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/duplicate-provider",
     severity: "error",
     each: (config) => {
-      return config.schemas.flatMap((schema) => {
+      return config.schemas.all.flatMap((schema) => {
         return schema.repeatedProviders.map((slug) => {
           return { schema, slug };
         });
@@ -296,7 +310,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/duplicate-provider",
     severity: "error",
     each: (config) => {
-      return config.flows.flatMap((flow) => {
+      return config.flows.all.flatMap((flow) => {
         return flow.steps.flatMap((step) => {
           return step.repeatedProviders.map((slug) => {
             return { flow, step, slug };
@@ -325,9 +339,9 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       const known = knownSlugs(config);
-      return config.schemas.flatMap((schema) => {
+      return config.schemas.all.flatMap((schema) => {
         return [...new Set(schema.providers)].map((slug) => {
-          return { schema, slug, known, connection: config.connection(slug) };
+          return { schema, slug, known, connection: config.connections.find(slug) };
         });
       });
     },
@@ -350,8 +364,8 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       const known = knownSlugs(config);
-      return config.offers.map((offer) => {
-        return { ...offer, known, schema: config.schemaOf(offer.flow) };
+      return config.flows.offers.map((offer) => {
+        return { ...offer, known, schema: config.flows.schemaOf(offer.flow) };
       });
     },
     // A provider the flow's schema also lists is reported once, on the
@@ -382,8 +396,8 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/flow-enables-sso",
     severity: "error",
     each: (config) => {
-      return config.flows.flatMap((flow) => {
-        const schema = config.schemaOf(flow);
+      return config.flows.all.flatMap((flow) => {
+        const schema = config.flows.schemaOf(flow);
         if (schema === undefined) {
           return [];
         }
@@ -450,7 +464,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/outcome-routing",
     severity: "error",
     each: (config) => {
-      return config.flows.flatMap((flow) => {
+      return config.flows.all.flatMap((flow) => {
         return flow.steps.map((step) => {
           return { flow, step, missing: unroutedOutcomes(config, step) };
         });
@@ -483,7 +497,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/collection-conflict-routing",
     severity: "error",
     each: (config) => {
-      return config.flows.flatMap((flow) => {
+      return config.flows.all.flatMap((flow) => {
         return flow.steps.map((step) => {
           return { flow, step };
         });
@@ -522,7 +536,7 @@ export const SSO_RULES: readonly Rule[] = [
         if (connection === undefined || !connection.createsUsers) {
           return [];
         }
-        return [{ ...offer, connection, listing: config.schemasListing(offer.slug) }];
+        return [{ ...offer, connection, listing: config.schemas.listing(offer.slug) }];
       });
     },
     // When no schema that lists the connection defines any mapped name, each
@@ -566,7 +580,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/collection-misses-required",
     severity: "error",
     each: (config) => {
-      return config.signUpGaps;
+      return config.flows.signUpGaps;
     },
     file: (gap) => {
       return gap.flow.path;
@@ -772,7 +786,7 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       return standing(config).flatMap((entry) => {
         const subject = entry.connection.subjectClaim;
-        if (subject === undefined || config.isDeployed(entry.slug)) {
+        if (subject === undefined || config.connections.isDeployed(entry.slug)) {
           return [];
         }
         return [{ connection: entry.connection, subject }];

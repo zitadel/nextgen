@@ -51,19 +51,19 @@ function documentRule(
  */
 export const CONTRACT_RULES: readonly Rule[] = [
   documentRule(["contract/schema"], (config) => {
-    return config.schemas;
+    return config.schemas.all;
   }),
   documentRule(["contract/flow"], (config) => {
-    return config.flows;
+    return config.flows.all;
   }),
   documentRule(
     ["contract/connection", "connection/literal-secret", "connection/endpoints"],
     (config) => {
-      return config.connections;
+      return config.connections.all;
     },
   ),
   documentRule(["contract/policy"], (config) => {
-    return config.policies;
+    return config.policies.all;
   }),
   documentRule(
     [
@@ -73,7 +73,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
       "branding/template",
     ],
     (config) => {
-      return config.brandings;
+      return config.branding.all;
     },
   ),
 ];

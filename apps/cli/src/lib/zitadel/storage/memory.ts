@@ -98,6 +98,15 @@ export class MemoryStore implements ConfigStore {
   }
 
   /**
+   * Stop holding one configuration file. A file not held is already deleted.
+   *
+   * @param path - The project-relative path.
+   */
+  async remove(path: string): Promise<void> {
+    this.files.delete(path);
+  }
+
+  /**
    * Hold another file's text, such as a template a `$file` reference names.
    *
    * @param path - The project-relative path.

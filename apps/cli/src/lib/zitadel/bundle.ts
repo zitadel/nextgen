@@ -70,38 +70,38 @@ export function toBundle(config: ZitadelConfig, store: ConfigStore): BuiltBundle
   // A project has one branding, so the bundle carries a single one. The cap
   // below would not catch a second descriptor, so it is refused here, before
   // anything is inlined or sent.
-  if (config.brandings.length > 1) {
+  if (config.branding.all.length > 1) {
     throw new ConfigError(
-      `A release carries at most one branding, but .zitadel/branding/ holds ${config.brandings.length}`,
+      `A release carries at most one branding, but .zitadel/branding/ holds ${config.branding.all.length}`,
       { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
     );
   }
-  const branding = config.brandings[0]?.wireBody(store);
+  const branding = config.branding.all[0]?.wireBody(store);
   const bundle: ConfigurationBundle = {
-    schemas: config.schemas.map((schema) => {
+    schemas: config.schemas.all.map((schema) => {
       return schema.wireBody(store);
     }),
-    flow_definitions: config.flows.map((flow) => {
+    flow_definitions: config.flows.all.map((flow) => {
       return flow.wireBody(store);
     }),
-    idps: config.connections.map((connection) => {
+    idps: config.connections.all.map((connection) => {
       return connection.wireBody(store);
     }),
-    ...(config.policies.length === 0
+    ...(config.policies.all.length === 0
       ? {}
       : {
-          policies: config.policies.map((policy) => {
+          policies: config.policies.all.map((policy) => {
             return policy.wireBody(store);
           }),
         }),
     ...(branding === undefined ? {} : { branding }),
   };
   const resourceCount =
-    config.schemas.length +
-    config.flows.length +
-    config.connections.length +
-    config.policies.length +
-    config.brandings.length;
+    config.schemas.all.length +
+    config.flows.all.length +
+    config.connections.all.length +
+    config.policies.all.length +
+    config.branding.all.length;
   if (resourceCount === 0) {
     throw new ConfigError("There is nothing in .zitadel/ to deploy", {
       hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",

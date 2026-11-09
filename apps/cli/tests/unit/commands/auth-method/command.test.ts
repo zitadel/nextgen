@@ -297,7 +297,7 @@ async function aWriter(cwd: string) {
 
 /** A change that adds a new schema file to the Project. */
 function aNewSchema(read: SchemaTarget): Change {
-  return read.config.put(
+  return read.config.schemas.put(
     UserSchema.create({
       path: ".zitadel/schemas/employees.json",
       body: schemaWith({ passkey: { enabled: true } }),
@@ -321,7 +321,7 @@ describe("auth-method write", () => {
     const { writer, read } = await aWriter(cwd);
     const success = vi.spyOn(consola, "success").mockImplementation(() => undefined);
 
-    await writer.writeChange(read, read.config.enableMethod(read.schema, "password"));
+    await writer.writeChange(read, read.config.schemas.enable(read.schema, "password"));
 
     expect(success).toHaveBeenCalledWith("Updated .zitadel/schemas/default-human-user.json");
   });
@@ -331,7 +331,7 @@ describe("auth-method write", () => {
     const { writer, read } = await aWriter(cwd);
     vi.spyOn(consola, "success").mockImplementation(() => undefined);
 
-    await writer.writeChange(read, read.config.enableMethod(read.schema, "password"));
+    await writer.writeChange(read, read.config.schemas.enable(read.schema, "password"));
 
     expect(await methodOf(cwd, "password")).toEqual({ enabled: true });
   });
@@ -351,7 +351,7 @@ describe("auth-method write", () => {
     const { writer, read } = await aWriter(cwd);
     const success = vi.spyOn(consola, "success").mockImplementation(() => undefined);
 
-    await writer.writeChange(read, read.config.enableMethod(read.schema, "passkey"));
+    await writer.writeChange(read, read.config.schemas.enable(read.schema, "passkey"));
 
     expect(success).not.toHaveBeenCalled();
   });
@@ -496,5 +496,30 @@ describe("readSchemaTarget", () => {
         url: "https://schemas.test.invalid/remote.json",
       },
     });
+  });
+
+  it("finds the flows that name the schema by the id it was published as", async () => {
+    const cwd = await makeProject({
+      schemas: { customers: { ...defaultSchema, $id: "https://a.test/customers.json" } },
+      flows: { login: { name: "login", user_schema: "sch_PUBLISHED" } },
+    });
+    await writeJson(cwd, ".zitadel/state.json", {
+      resources: { ".zitadel/schemas/customers.json": { id: "sch_PUBLISHED" } },
+    });
+
+    const read = await target(cwd);
+
+    expect(
+      read.config.flows.for(read.schema).map((flow) => {
+        return flow.path;
+      }),
+    ).toEqual([".zitadel/flows/login.json"]);
+  });
+
+  it("refuses a state file it cannot read rather than guess the schema's flows", async () => {
+    const cwd = await makeProject({ schemas: { customers: defaultSchema } });
+    await writeJson(cwd, ".zitadel/state.json", { resources: [] });
+
+    await expect(target(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });
