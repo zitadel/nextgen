@@ -2,7 +2,7 @@ import { consola } from "consola";
 
 import { ZitadelError } from "@/lib/errors";
 import { optionArgs } from "@/lib/public-cli";
-import { publishedSchemaIds } from "@/lib/sync/state";
+import { publishedIds } from "@/lib/sync/state";
 import { reportWarning } from "@/lib/warnings";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
@@ -11,6 +11,7 @@ import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import {
   AmbiguousSchemaError,
+  BrokenFilesError,
   type Change,
   type ConfigStore,
   DiskStore,
@@ -156,8 +157,10 @@ const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
  * own, so it is refused. A deployed flow may name its schema by the id the
  * platform assigned it, which only `.zitadel/state.json` records, so the
  * configuration every change is made on is read knowing the ids the chosen
- * schema was published as. Every file is held to its contract, so a broken
- * file is refused rather than left out of what the run edits.
+ * schema was published as, and no others: the schema is chosen from the files
+ * first, so its refusals come before the state is read. Every file is held to
+ * its contract, so a broken file is refused rather than left out of what the
+ * run edits.
  *
  * @param input - The run's directory, what `--schema` named, and whether
  *   `--cwd` was given.
@@ -168,17 +171,21 @@ const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
  */
 export async function readSchemaTarget(input: SchemaTargetInput): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
-  // The state is read first, for every schema, so the configuration is read
-  // once: which schema is chosen is only known after reading it.
-  const published = await publishedSchemaIds(input.cwd);
-  const config = await ZitadelConfig.load(store, { published });
-  const schema = chosenSchema(config.schemas, input.schema);
-  if (schema.isExternal) {
+  // The schema is chosen from the files alone, so a refusal about the schema
+  // comes before anything else, the state file included.
+  const loaded = await ZitadelConfig.loadUnchecked(store);
+  const chosen = chosenOrBroken(loaded, input.schema);
+  if (chosen.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
-      file: schema.path,
-      url: String(schema.body.url),
+      file: chosen.path,
+      url: String(chosen.body.url),
     });
   }
+  // Only the chosen schema's ids are read, so an entry the state holds for
+  // another schema is no concern of this run. The files are read once.
+  const published = await publishedIds(input.cwd, [chosen.path]);
+  const config = loaded.withOptions({ published }).refuseBroken(store);
+  const schema = chosenSchema(config.schemas, input.schema);
   const cwdArgs = input.cwdGiven ? optionArgs("--cwd", input.cwd) : [];
   return {
     cwd: input.cwd,
@@ -188,6 +195,42 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
     schema,
     schemaFlag: config.schemas.nameUniquely(schema),
   };
+}
+
+/**
+ * The schema a run is about, from a configuration no file of which has been
+ * held to its contract yet.
+ *
+ * @remarks
+ * A broken schema file is no schema, so a Project whose only (or named)
+ * schema is broken would be told it has none. When no schema can be chosen
+ * and a schema file is broken, the broken file is what the person has to fix,
+ * so that is what is refused.
+ *
+ * @param config - The configuration, read without refusing a broken file.
+ * @param requested - What `--schema` named, if anything.
+ * @returns The chosen schema.
+ * @throws {@link BrokenFilesError} Naming the broken schema files, when no
+ *   schema can be chosen and some are broken.
+ * @throws {@link ZitadelError} When no schema, or more than one, fits
+ *   `--schema` and no schema file is broken.
+ */
+function chosenOrBroken(config: ZitadelConfig, requested: string | undefined): UserSchema {
+  try {
+    return chosenSchema(config.schemas, requested);
+  } catch (error) {
+    const broken = config.broken.filter((file) => {
+      return file.kind === "schema";
+    });
+    if (error instanceof ZitadelError && broken.length > 0) {
+      throw new BrokenFilesError(
+        broken.flatMap((file) => {
+          return file.problems;
+        }),
+      );
+    }
+    throw error;
+  }
 }
 
 /**

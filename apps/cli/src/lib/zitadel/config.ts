@@ -196,19 +196,7 @@ export class ZitadelConfig {
    */
   static async load(store: ConfigStore, options: ConfigOptions = {}): Promise<ZitadelConfig> {
     const config = await ZitadelConfig.loadUnchecked(store, options);
-    const problems = CONTRACT_RULES.flatMap((rule) => {
-      return rule.check(config, { store });
-    })
-      .filter((issue) => {
-        return issue.severity === "error";
-      })
-      .map((issue) => {
-        return { path: issue.file, problem: issue.message };
-      });
-    if (problems.length > 0) {
-      throw new BrokenFilesError(problems);
-    }
-    return config;
+    return config.refuseBroken(store);
   }
 
   /**
@@ -510,6 +498,51 @@ export class ZitadelConfig {
       return file.path !== document.path;
     });
     return new ZitadelConfig({ ...parts, broken, removed });
+  }
+
+  /**
+   * The same configuration, knowing more than it did.
+   *
+   * @remarks
+   * Replaces the options and keeps everything else: the documents, the broken
+   * files and what was removed. For a caller that has to read the files to
+   * learn what to pass, such as the ids a chosen schema was published as.
+   *
+   * @param options - What is known beyond the files, in place of what was.
+   * @returns The new configuration.
+   */
+  withOptions(options: ConfigOptions): ZitadelConfig {
+    return new ZitadelConfig({ ...this.parts, options });
+  }
+
+  /**
+   * This configuration, once every file is held to its contract.
+   *
+   * @remarks
+   * Refuses every broken file, and every finding a document makes about
+   * itself, so a configuration that passes is one whose files validate on
+   * their own. A broken policy test file is left to `zitadel policies test`,
+   * as no release carries one.
+   *
+   * @param store - Where the configuration is kept, for the rules that read
+   *   beside the files.
+   * @returns This configuration.
+   * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
+   */
+  refuseBroken(store: ConfigStore): ZitadelConfig {
+    const problems = CONTRACT_RULES.flatMap((rule) => {
+      return rule.check(this, { store });
+    })
+      .filter((issue) => {
+        return issue.severity === "error";
+      })
+      .map((issue) => {
+        return { path: issue.file, problem: issue.message };
+      });
+    if (problems.length > 0) {
+      throw new BrokenFilesError(problems);
+    }
+    return this;
   }
 
   /**

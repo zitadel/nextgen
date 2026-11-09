@@ -4,13 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import {
-  publishedIds,
-  publishedSchemaIds,
-  readState,
-  updateScaffold,
-  type ZitadelState,
-} from "@/lib/sync/state";
+import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
 import { it } from "@tests/helpers/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -176,24 +170,4 @@ describe("publishedIds", () => {
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     },
   );
-});
-
-describe("publishedSchemaIds", () => {
-  it("answers the ids of every schema and none of the other files", async ({ dir }) => {
-    await writeState(
-      dir,
-      JSON.stringify({
-        resources: {
-          [CUSTOMERS]: { id: "sch_1", previousId: "sch_0" },
-          [LOGIN_FLOW]: { id: "flow_1" },
-        },
-      }),
-    );
-
-    expect(await publishedSchemaIds(dir)).toEqual(new Map([[CUSTOMERS, ["sch_1", "sch_0"]]]));
-  });
-
-  it("answers nothing when the project was never synced", async ({ dir }) => {
-    expect(await publishedSchemaIds(dir)).toEqual(new Map());
-  });
 });

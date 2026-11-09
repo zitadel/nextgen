@@ -79,51 +79,6 @@ export async function publishedIds(
   cwd: string,
   paths: readonly string[],
 ): Promise<ReadonlyMap<string, readonly string[]>> {
-  return readPublishedIds(cwd, () => {
-    return paths;
-  });
-}
-
-/**
- * The platform ids of every user schema the state file records, so a caller
- * that has not read the configuration yet need not know the schema paths.
- *
- * @remarks
- * Reads the state file once and answers as {@link publishedIds} does, for each
- * entry under `.zitadel/schemas/`.
- *
- * @param cwd - The project root.
- * @returns The ids, by schema path; a schema with none is left out.
- * @throws {@link ZitadelError} With `E_VALIDATION` when the state file cannot
- *   be read or parsed, or a schema's entry is malformed.
- */
-export async function publishedSchemaIds(
-  cwd: string,
-): Promise<ReadonlyMap<string, readonly string[]>> {
-  return readPublishedIds(cwd, (resources) => {
-    return Object.keys(resources).filter((path) => {
-      return path.startsWith(SCHEMAS_PREFIX);
-    });
-  });
-}
-
-/**
- * Where the state file keys the user schemas.
- */
-const SCHEMAS_PREFIX = ".zitadel/schemas/";
-
-/**
- * Read the ids the state file records for the paths a selector picks.
- *
- * @param cwd - The project root.
- * @param select - Picks the paths to look up from the state's `resources`.
- * @returns The ids, by path; a path with none is left out.
- * @throws {@link ZitadelError} With `E_VALIDATION` as {@link publishedIds} does.
- */
-async function readPublishedIds(
-  cwd: string,
-  select: (resources: Readonly<Record<string, unknown>>) => readonly string[],
-): Promise<ReadonlyMap<string, readonly string[]>> {
   try {
     const state = await readState(cwd);
     const resources = state.resources;
@@ -133,29 +88,27 @@ async function readPublishedIds(
     if (!isObject(resources)) {
       throw new Error("resources is not an object");
     }
-    const entries = select(resources).flatMap(
-      (path): readonly (readonly [string, readonly string[]])[] => {
-        const entry = resources[path];
-        if (entry === undefined) {
-          return [];
-        }
-        if (!isObject(entry)) {
-          throw new Error(`resources["${path}"] is not an object`);
-        }
-        const ids = [entry.id, entry.previousId].filter((id) => {
-          return id !== undefined;
-        });
-        // An empty id is corrupt too: dropping it would fall back to URL
-        // matching and could skip the flow pinned to the real published id.
-        const valid = ids.filter((id): id is string => {
-          return typeof id === "string" && id !== "";
-        });
-        if (valid.length !== ids.length) {
-          throw new Error(`resources["${path}"] has an id that is not a non-empty string`);
-        }
-        return [[path, valid]];
-      },
-    );
+    const entries = paths.flatMap((path): readonly (readonly [string, readonly string[]])[] => {
+      const entry = resources[path];
+      if (entry === undefined) {
+        return [];
+      }
+      if (!isObject(entry)) {
+        throw new Error(`resources["${path}"] is not an object`);
+      }
+      const ids = [entry.id, entry.previousId].filter((id) => {
+        return id !== undefined;
+      });
+      // An empty id is corrupt too: dropping it would fall back to URL
+      // matching and could skip the flow pinned to the real published id.
+      const valid = ids.filter((id): id is string => {
+        return typeof id === "string" && id !== "";
+      });
+      if (valid.length !== ids.length) {
+        throw new Error(`resources["${path}"] has an id that is not a non-empty string`);
+      }
+      return [[path, valid]];
+    });
     return new Map(entries);
   } catch (error) {
     if (isErrno(error, "ENOENT")) {

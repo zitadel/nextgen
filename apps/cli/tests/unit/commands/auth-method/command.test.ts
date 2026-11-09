@@ -1,3 +1,6 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import { beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => {
@@ -12,9 +15,9 @@ import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/comm
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { ZitadelError } from "@/lib/errors";
-import { type Change, DiskStore, UserSchema } from "@/lib/zitadel";
+import { BrokenFilesError, type Change, DiskStore, UserSchema } from "@/lib/zitadel";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
-import { aLoginFlow } from "@tests/helpers/config";
+import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import {
   defaultSchema,
@@ -623,8 +626,9 @@ describe("readSchemaTarget", () => {
   });
 
   describe("with no schema", () => {
-    it("refuses the Project", async ({ dir }) => {
+    it("refuses the Project before reading a state file it cannot read", async ({ dir }) => {
       const cwd = await makeProject(dir);
+      await writeJson(cwd, ".zitadel/state.json", { resources: [] });
 
       const error = await rejectionOf(() => {
         return target(cwd);
@@ -642,6 +646,7 @@ describe("readSchemaTarget", () => {
           remote: { kind: "schema-url", url: "https://schemas.test.invalid/remote.json" },
         },
       });
+      await writeJson(cwd, ".zitadel/state.json", { resources: [] });
 
       const error = await rejectionOf(() => {
         return target(cwd);
@@ -655,6 +660,57 @@ describe("readSchemaTarget", () => {
           file: ".zitadel/schemas/remote.json",
           url: "https://schemas.test.invalid/remote.json",
         },
+      });
+    });
+  });
+
+  describe("with a schema file its contract refuses", () => {
+    it("names the broken file when it is the only schema", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: { customers: aUserSchema({ objectType: 7 }) },
+      });
+
+      const error = await rejectionOf(() => {
+        return target(cwd);
+      });
+
+      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toMatchObject({
+        problems: [expect.objectContaining({ path: ".zitadel/schemas/customers.json" })],
+      });
+    });
+
+    it("names the broken file when --schema names it", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: { customers: defaultSchema, employees: aUserSchema({ objectType: 7 }) },
+      });
+
+      const error = await rejectionOf(() => {
+        return target(cwd, { schema: "employees" });
+      });
+
+      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toMatchObject({
+        problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
+      });
+    });
+  });
+
+  describe("with a file of another kind its contract refuses", () => {
+    it("refuses the run, naming the file", async ({ dir }) => {
+      const cwd = await makeProject(dir, { schemas: { customers: defaultSchema } });
+      await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+      await writeJson(cwd, ".zitadel/idps/broken.json", anOidcConnection({ protocol: "saml" }));
+
+      const error = await rejectionOf(() => {
+        return target(cwd);
+      });
+
+      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toMatchObject({
+        problems: expect.arrayContaining([
+          expect.objectContaining({ path: ".zitadel/idps/broken.json" }),
+        ]),
       });
     });
   });
@@ -690,7 +746,17 @@ describe("readSchemaTarget", () => {
           return kind === "schemas";
         }),
       ).toHaveLength(1);
-      reads.mockRestore();
+    });
+
+    it("ignores a malformed entry the state holds for another schema", async ({ dir }) => {
+      const cwd = await makeProject(dir, { schemas: { customers: defaultSchema } });
+      await writeJson(cwd, ".zitadel/state.json", {
+        resources: { ".zitadel/schemas/other.json": { id: 7 } },
+      });
+
+      const read = await target(cwd);
+
+      expect(read.schema.path).toBe(".zitadel/schemas/customers.json");
     });
 
     it("refuses one it cannot read rather than guess the schema's flows", async ({ dir }) => {
