@@ -2,7 +2,7 @@ import type { QueryIdps200IdpsItem } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
-import { isCancellation } from "@/lib/errors";
+import { BackendError } from "@/lib/backend/errors";
 
 /** An identity-provider connection, at its newest revision, as the list of them returns it. */
 export type IdpSummary = QueryIdps200IdpsItem;
@@ -51,13 +51,14 @@ export class IdpService extends ApiService {
    * only holds before a connection's first deploy can be left out for them.
    *
    * @remarks
-   * Best effort. When the listing cannot be read, such as a token that may not
-   * list connections or a server that answers something other than the
-   * listing, the slugs are unknown and the result says so. Only the person
-   * stopping the command is passed on.
+   * Best effort. When the server will not give the listing, such as a token
+   * that may not list connections or a server that cannot be reached, the
+   * slugs are unknown and the result says so. Anything else, the person
+   * stopping the command included, is passed on.
    *
-   * @returns The slugs, or undefined when the listing could not be read.
-   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   * @returns The slugs, or undefined when the server would not give them.
+   * @throws Whatever else stopped the listing, such as the person stopping
+   *   the command.
    */
   async deployedSlugs(): Promise<ReadonlySet<string> | undefined> {
     try {
@@ -68,10 +69,10 @@ export class IdpService extends ApiService {
         }),
       );
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
+      if (error instanceof BackendError) {
+        return undefined;
       }
-      return undefined;
+      throw error;
     }
   }
 }
