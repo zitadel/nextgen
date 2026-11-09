@@ -215,14 +215,43 @@ export class ZitadelConfig {
     store: ConfigStore,
     options: ConfigOptions = {},
   ): Promise<ZitadelConfig> {
-    const [schemas, flows, connections, policies, branding] = await Promise.all([
+    const settled = await Promise.allSettled([
       store.read("schemas"),
       store.read("flows"),
       store.read("connections"),
       store.read("policies"),
       store.read("branding"),
     ]);
-    return ZitadelConfig.of({ schemas, flows, connections, policies, branding }, options);
+    return ZitadelConfig.of(
+      {
+        schemas: ZitadelConfig.unwrap(settled[0]),
+        flows: ZitadelConfig.unwrap(settled[1]),
+        connections: ZitadelConfig.unwrap(settled[2]),
+        policies: ZitadelConfig.unwrap(settled[3]),
+        branding: ZitadelConfig.unwrap(settled[4]),
+      },
+      options,
+    );
+  }
+
+  /**
+   * Take what one kind's read gave, or fail as it failed.
+   *
+   * @remarks
+   * The reads run together, so the kinds are unwrapped in the order of
+   * the kinds' fixed order (schemas, flows, connections, policies, branding): when several fail, the same one is named every time
+   * rather than whichever settled first.
+   *
+   * @typeParam T - What the read gave.
+   * @param result - How the read ended.
+   * @returns What the read gave.
+   * @throws The error the read failed with.
+   */
+  private static unwrap<T>(result: PromiseSettledResult<T>): T {
+    if (result.status === "rejected") {
+      throw result.reason;
+    }
+    return result.value;
   }
 
   /**

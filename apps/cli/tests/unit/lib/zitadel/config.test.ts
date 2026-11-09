@@ -15,7 +15,9 @@ import {
   PasswordPolicy,
   Policy,
   PolicyTest,
+  type ConfigKind,
   type ScaffoldOptions,
+  type StoredFile,
   UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
@@ -262,7 +264,60 @@ describe("ZitadelConfig.load", () => {
   });
 });
 
+/**
+ * A store whose reads of the kinds given fail, each after its own delay.
+ */
+class FailingStore extends MemoryStore {
+  /**
+   * How long each failing kind takes to fail, in milliseconds.
+   */
+  private readonly delays: ReadonlyMap<ConfigKind, number>;
+
+  /**
+   * A store whose reads of some kinds fail.
+   *
+   * @param delays - How long each failing kind takes to fail, in milliseconds.
+   */
+  constructor(delays: ReadonlyMap<ConfigKind, number>) {
+    super();
+    this.delays = delays;
+  }
+
+  /**
+   * Fail for a kind that fails, after its delay; read as usual otherwise.
+   *
+   * @param kind - The kind of file to read.
+   * @returns The files, for a kind that does not fail.
+   * @throws {@link Error} Naming the kind, for a kind that fails.
+   */
+  override async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
+    const delay = this.delays.get(kind);
+    if (delay === undefined) {
+      return super.read(kind);
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, delay);
+    });
+    throw new Error(`cannot read ${kind}`);
+  }
+}
+
 describe("ZitadelConfig.loadUnchecked", () => {
+  it("names the first unreadable kind in the kinds' order, whichever fails first", async () => {
+    const store = new FailingStore(
+      new Map<ConfigKind, number>([
+        ["branding", 0],
+        ["flows", 30],
+      ]),
+    );
+
+    const error = await rejectionOf(() => {
+      return ZitadelConfig.loadUnchecked(store);
+    });
+
+    expect(error).toEqual(new Error("cannot read flows"));
+  });
+
   it("keeps a broken file on the configuration", async () => {
     const store = aStore(SOUND_AND_BROKEN);
 
