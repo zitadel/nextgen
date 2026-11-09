@@ -28,8 +28,9 @@ const (
 	reviseApplicationStmt = `INSERT INTO zitadel_nextgen.application_revisions ` +
 		`(project_id, id, application_id, document, created_at) VALUES ($1, $2, $3, $4, clock_timestamp()) RETURNING created_at`
 
+	// Binds the stamp of the revision that adds the client.
 	createApplicationClientStmt = `INSERT INTO zitadel_nextgen.application_clients ` +
-		`(project_id, id, application_id, slug, client_id, secret_hash) VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`
+		`(project_id, id, application_id, slug, client_id, secret_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	lockApplicationStmt = `SELECT id FROM zitadel_nextgen.applications` +
 		` WHERE project_id = $1 AND id = $2 FOR UPDATE`
@@ -92,7 +93,7 @@ func (s applicationStatements) CreateApplication(ctx context.Context, applicatio
 		}
 		// pgx scans timestamptz in Local; reads normalize to UTC.
 		application.CreatedAt, application.UpdatedAt = application.CreatedAt.UTC(), application.UpdatedAt.UTC()
-		if err := insertApplicationClients(ctx, tx, clients); err != nil {
+		if err := insertApplicationClients(ctx, tx, clients, application.UpdatedAt); err != nil {
 			return err
 		}
 		rsi := newResourceScopeStatements(tx)
@@ -121,12 +122,13 @@ func (s applicationStatements) ReviseApplication(ctx context.Context, applicatio
 		).Scan(&updatedAt); err != nil {
 			return idpconnection.ReviseNotFound(wrapError(err))
 		}
-		if err := insertApplicationClients(ctx, tx, clients); err != nil {
+		updatedAt = updatedAt.UTC()
+		if err := insertApplicationClients(ctx, tx, clients, updatedAt); err != nil {
 			return err
 		}
 		// Set last: a failed client insert rolls the revision back, so the
 		// entity keeps the revision that is still newest.
-		application.UpdatedAt, application.RevisionID = updatedAt.UTC(), revisionID
+		application.UpdatedAt, application.RevisionID = updatedAt, revisionID
 		return nil
 	})
 }
@@ -204,19 +206,20 @@ func ensureClientIDs(application *domain.Application, clients []*domain.Applicat
 	return nil
 }
 
-func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient) error {
+func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient, createdAt time.Time) error {
 	for _, client := range clients {
-		if err := tx.QueryRow(ctx, createApplicationClientStmt,
+		if _, err := tx.Exec(ctx, createApplicationClientStmt,
 			client.ProjectID,
 			client.ID,
 			client.ApplicationID,
 			client.Slug,
 			client.ClientID,
 			client.SecretHash,
-		).Scan(&client.CreatedAt); err != nil {
+			createdAt,
+		); err != nil {
 			return wrapError(err)
 		}
-		client.CreatedAt = client.CreatedAt.UTC()
+		client.CreatedAt = createdAt
 	}
 	return nil
 }

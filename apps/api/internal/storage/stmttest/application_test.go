@@ -109,6 +109,7 @@ func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
 		assert.NotEqual(t, firstRevisionID, application.RevisionID)
 		assert.True(t, domain.PrefixApplicationRevision.Matches(application.RevisionID))
 		assert.True(t, application.UpdatedAt.After(application.CreatedAt))
+		assert.True(t, api.CreatedAt.Equal(application.UpdatedAt), "a client takes the stamp of the revision that adds it")
 
 		got, err := d.stmts.GetApplication(t.Context(), applicationByID(projectID, application.ID))
 		require.NoError(t, err)
