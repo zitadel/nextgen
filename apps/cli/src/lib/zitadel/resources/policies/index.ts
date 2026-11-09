@@ -1,13 +1,7 @@
 /**
- * Operation policies under `.zitadel/policies/`, their test files, and the
- * password policy `setup` writes.
+ * Operation policies under `.zitadel/policies/`, and their test files.
  */
 export { Policies } from "@/lib/zitadel/resources/policies/collection";
-export {
-  PASSWORD_POLICY_PATH,
-  parsePasswordMinLength,
-  passwordPolicy,
-} from "@/lib/zitadel/resources/policies/password";
 export { Policy } from "@/lib/zitadel/resources/policies/policy";
 export { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 export {

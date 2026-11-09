@@ -25,6 +25,46 @@ function policyAt(name: string, body: JsonObject): Policy {
   return Policy.of({ path: `.zitadel/policies/${name}`, body });
 }
 
+describe("Policy.PASSWORD_PATH", () => {
+  it("is where the policy syncer expects the password policy", () => {
+    expect(Policy.PASSWORD_PATH).toBe(".zitadel/policies/auth.factor.password.set.json");
+  });
+});
+
+describe("Policy.password", () => {
+  describe("when no minimum was given", () => {
+    it("sets the recommended minimum", () => {
+      expect(Policy.password().body).toEqual({
+        $schema: "../meta/policy.json",
+        operation: "auth.factor.password.set",
+        config: { min_length: 15 },
+      });
+    });
+  });
+
+  describe("with an explicit none", () => {
+    it("enforces nothing", () => {
+      expect(Policy.password(null).config).toEqual({});
+    });
+  });
+
+  describe("with a minimum", () => {
+    it("sets it", () => {
+      expect(Policy.password(12).config).toEqual({ min_length: 12 });
+    });
+
+    it("is a policy the contract takes", () => {
+      expect(Policy.password(12).problems({})).toEqual([]);
+    });
+  });
+
+  it("is a new file at the password policy's path", () => {
+    const policy = Policy.password();
+
+    expect([policy.path, policy.status]).toEqual([Policy.PASSWORD_PATH, "created"]);
+  });
+});
+
 describe("Policy.of", () => {
   it("takes the file as read", () => {
     expect(policyAt(`${OPERATION}.json`, POLICY).status).toBe("read");
@@ -94,17 +134,17 @@ describe("Policy.withMinLength", () => {
     ["none was given", undefined],
     ["the minimum is already that one", 12],
   ])("keeps the same policy when %s", (_case, minLength) => {
-    expect(kept.withMinLength(minLength)).toBe(kept);
+    expect(kept.withMinLength(minLength)).toEqual({ document: kept, changed: false, skipped: [] });
   });
 
   it("keeps the same policy when none is asked of a policy without a minimum", () => {
     const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION, config: {} });
 
-    expect(policy.withMinLength(null)).toBe(policy);
+    expect(policy.withMinLength(null)).toEqual({ document: policy, changed: false, skipped: [] });
   });
 
   it("drops the minimum for an explicit none, keeping the other settings", () => {
-    expect(kept.withMinLength(null).body).toEqual({
+    expect(kept.withMinLength(null).document.body).toEqual({
       $schema: "../meta/policy.json",
       operation: OPERATION,
       config: { max_length: 40 },
@@ -112,11 +152,11 @@ describe("Policy.withMinLength", () => {
   });
 
   it("sets a new minimum, keeping the other settings", () => {
-    expect(kept.withMinLength(20).config).toEqual({ min_length: 20, max_length: 40 });
+    expect(kept.withMinLength(20).document.config).toEqual({ min_length: 20, max_length: 40 });
   });
 
   it("marks a read policy as edited", () => {
-    expect(kept.withMinLength(20).status).toBe("edited");
+    expect(kept.withMinLength(20).document.status).toBe("edited");
   });
 });
 

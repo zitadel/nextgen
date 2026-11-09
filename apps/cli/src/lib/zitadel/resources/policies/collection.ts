@@ -2,7 +2,6 @@ import { basename } from "node:path";
 
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import { PASSWORD_POLICY_PATH } from "@/lib/zitadel/resources/policies/password";
 import { Policy } from "@/lib/zitadel/resources/policies/policy";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 import type { PolicySelection } from "@/lib/zitadel/resources/policies/types";
@@ -37,7 +36,7 @@ export class Policies extends Collection<Policy> {
    * @returns The policy at its file, or `undefined` when there is none.
    */
   get password(): Policy | undefined {
-    return this.get(PASSWORD_POLICY_PATH);
+    return this.get(Policy.PASSWORD_PATH);
   }
 
   /**

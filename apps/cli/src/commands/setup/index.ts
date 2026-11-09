@@ -38,6 +38,7 @@ import {
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 import { consola } from "consola";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { BOX_STYLE, renderBoxActions, wrapForBox } from "@/lib/box";
@@ -107,11 +108,7 @@ import {
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import type { Asker } from "@/lib/input";
-import {
-  parsePasswordMinLength,
-  PASSWORD_POLICY_PATH,
-  type PasswordMinLength,
-} from "@/lib/zitadel";
+import { type PasswordMinLength, Policy } from "@/lib/zitadel";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import {
@@ -858,6 +855,39 @@ function accepted(parse: (value: string) => Parsed<unknown>) {
     }
     return value;
   });
+}
+
+/**
+ * The bounds the policy contract sets on a minimum password length, so the
+ * flag and the server cannot disagree on them.
+ */
+const PASSWORD_MIN_LENGTH_BOUNDS = policyConfigSchema.shape.config.shape.min_length.unwrap();
+
+/**
+ * Read a minimum password length as `--password-min-length` and its prompt
+ * take one.
+ *
+ * @remarks
+ * A minimum of 0 enforces nothing, so it means none: the file keeps one form
+ * for "off", the setting left out, which its bounds (1 and up) teach.
+ *
+ * @param value - The text given.
+ * @returns `null` for an empty answer or 0, the length for a whole number the
+ *   contract's bounds accept, and the problem for anything else.
+ */
+function parsePasswordMinLength(value: string): Parsed<PasswordMinLength> {
+  const text = value.trim();
+  if (text === "" || /^0+$/.test(text)) {
+    return { ok: true, value: null };
+  }
+  const result = PASSWORD_MIN_LENGTH_BOUNDS.safeParse(Number(text));
+  if (!/^\d+$/.test(text) || !result.success) {
+    return {
+      ok: false,
+      problem: `Must be a whole number from ${PASSWORD_MIN_LENGTH_BOUNDS.minValue} to ${PASSWORD_MIN_LENGTH_BOUNDS.maxValue}, or 0 for none`,
+    };
+  }
+  return { ok: true, value: result.data };
 }
 
 /** What one of those parsers makes of a trimmed value. See {@link accepted}. */
@@ -2676,7 +2706,7 @@ export function buildSummary(opts: {
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
-    ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
+    ["Password policy", Policy.PASSWORD_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) {

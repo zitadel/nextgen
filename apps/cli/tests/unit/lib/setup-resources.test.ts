@@ -16,7 +16,7 @@ import {
 
 import { assertNoSetupResourceConflicts, materializeSetupResources } from "@/lib/setup-resources";
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
-import { PASSWORD_POLICY_PATH } from "@/lib/zitadel";
+import { Policy } from "@/lib/zitadel";
 import { CONFIG_DIRECTORIES, ConflictError } from "@/lib/zitadel";
 import { stableStringify } from "@/lib/json";
 import { hashForState } from "@/lib/sync";
@@ -301,7 +301,7 @@ describe("materializeSetupResources password policy", () => {
       { operation: "auth.factor.password.set", config: { min_length: 15 } },
       { project_id: "project_123" },
     );
-    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as object;
+    const written = JSON.parse(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")) as object;
     expect(written).toEqual({
       $schema: "../meta/policy.json",
       operation: "auth.factor.password.set",
@@ -326,7 +326,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: {},
     });
-    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+    const written = JSON.parse(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")) as {
       config: object;
     };
     expect(written.config).toEqual({});
@@ -338,7 +338,7 @@ describe("materializeSetupResources password policy", () => {
     // stays without one when none was given, whatever the default.
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
-      join(cwd, PASSWORD_POLICY_PATH),
+      join(cwd, Policy.PASSWORD_PATH),
       `{"operation":"auth.factor.password.set","config":{"history_depth":2}}\n`,
     );
 
@@ -369,7 +369,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 12 },
     });
-    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+    const written = JSON.parse(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")) as {
       config: object;
     };
     expect(written.config).toEqual({ min_length: 12 });
@@ -387,7 +387,7 @@ describe("materializeSetupResources password policy", () => {
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
-    expect(state.resources[PASSWORD_POLICY_PATH]).toEqual({
+    expect(state.resources[Policy.PASSWORD_PATH]).toEqual({
       id: "pol_01KWHP",
       hash: hashForState(
         {
@@ -417,7 +417,7 @@ describe("materializeSetupResources password policy", () => {
   it("refuses an existing policy file before creating anything", async ({ dir: cwd }) => {
     const platform = client();
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
-    await writeFile(join(cwd, PASSWORD_POLICY_PATH), "{}\n");
+    await writeFile(join(cwd, Policy.PASSWORD_PATH), "{}\n");
 
     await expect(
       materializeSetupResources({
@@ -442,7 +442,7 @@ describe("materializeSetupResources password policy", () => {
     const platform = client();
     const existing = `{"$schema":"../meta/policy.json","operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`;
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
-    await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
+    await writeFile(join(cwd, Policy.PASSWORD_PATH), existing);
 
     const result = await materializeSetupResources({
       cwd,
@@ -456,8 +456,8 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 14, history_depth: 2 },
     });
-    expect(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")).toBe(existing);
-    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+    expect(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, Policy.PASSWORD_PATH));
   });
 
   it("puts a given minimum into an existing policy file under --force, keeping its other settings", async ({
@@ -466,7 +466,7 @@ describe("materializeSetupResources password policy", () => {
     const platform = client();
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
-      join(cwd, PASSWORD_POLICY_PATH),
+      join(cwd, Policy.PASSWORD_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
     );
 
@@ -483,7 +483,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 10, history_depth: 2 },
     });
-    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+    const written = JSON.parse(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")) as {
       config: object;
     };
     expect(written.config).toEqual({ min_length: 10, history_depth: 2 });
@@ -494,7 +494,7 @@ describe("materializeSetupResources password policy", () => {
   }) => {
     const existing = `{"operation":"auth.factor.password.set","config":{"min_length":14}}\n`;
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
-    await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
+    await writeFile(join(cwd, Policy.PASSWORD_PATH), existing);
 
     const result = await materializeSetupResources({
       cwd,
@@ -505,8 +505,8 @@ describe("materializeSetupResources password policy", () => {
       passwordMinLength: 14,
     });
 
-    expect(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")).toBe(existing);
-    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+    expect(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, Policy.PASSWORD_PATH));
   });
 
   it("removes the minimum from an existing policy file under --force on an explicit none", async ({
@@ -515,7 +515,7 @@ describe("materializeSetupResources password policy", () => {
     const platform = client();
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
-      join(cwd, PASSWORD_POLICY_PATH),
+      join(cwd, Policy.PASSWORD_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
     );
 
@@ -532,7 +532,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { history_depth: 2 },
     });
-    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+    const written = JSON.parse(await readFile(join(cwd, Policy.PASSWORD_PATH), "utf8")) as {
       config: object;
     };
     expect(written.config).toEqual({ history_depth: 2 });
@@ -543,7 +543,7 @@ describe("materializeSetupResources password policy", () => {
   }) => {
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
-      join(cwd, PASSWORD_POLICY_PATH),
+      join(cwd, Policy.PASSWORD_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
     );
 
@@ -558,7 +558,7 @@ describe("materializeSetupResources password policy", () => {
     const platform = client();
     await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
-      join(cwd, PASSWORD_POLICY_PATH),
+      join(cwd, Policy.PASSWORD_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
     );
 
@@ -591,13 +591,13 @@ describe("materializeSetupResources password policy", () => {
       force: false,
     });
 
-    expect(existsSync(join(cwd, PASSWORD_POLICY_PATH))).toBe(false);
+    expect(existsSync(join(cwd, Policy.PASSWORD_PATH))).toBe(false);
     expect(existsSync(join(cwd, CONFIG_DIRECTORIES.policies, "README.md"))).toBe(false);
-    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+    expect(result.filesWritten).not.toContain(join(cwd, Policy.PASSWORD_PATH));
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
-    expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
+    expect(state.resources[Policy.PASSWORD_PATH]).toBeUndefined();
     expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
     expect(result.passwordMinLength).toBeNull();
   });

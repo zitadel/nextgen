@@ -55,14 +55,11 @@ export {
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
 export {
   PASSWORD_POLICY_OPERATION,
-  PASSWORD_POLICY_PATH,
   Policies,
   Policy,
   POLICY_FILE_SUFFIX,
   POLICY_TEST_SUFFIX,
   PolicyTest,
-  parsePasswordMinLength,
-  passwordPolicy,
   type PasswordMinLength,
   type PolicyBody,
   type PolicyCase,

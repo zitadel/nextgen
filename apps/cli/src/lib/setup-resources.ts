@@ -44,10 +44,8 @@ import {
   DiskStore,
   FileExistsError,
   Flow,
-  PASSWORD_POLICY_PATH,
   type PasswordMinLength,
-  type Policy,
-  passwordPolicy,
+  Policy,
   UserSchema,
   ZitadelConfig,
   CONFIG_DIRECTORIES,
@@ -267,8 +265,8 @@ export async function materializeSetupResources(opts: {
   const kept = opts.force ? passwordPolicyOf(await ZitadelConfig.loadUnchecked(store)) : undefined;
   const policy =
     kept === undefined
-      ? passwordPolicy(opts.passwordMinLength)
-      : kept.withMinLength(opts.passwordMinLength);
+      ? Policy.password(opts.passwordMinLength)
+      : kept.withMinLength(opts.passwordMinLength).document;
   const policyService = new PolicyService(opts.client, opts.projectId);
   const published: PublishedPolicy | undefined = await policyService
     .publish({ operation: policy.operation, config: policy.config })
@@ -288,9 +286,9 @@ export async function materializeSetupResources(opts: {
       (kept === undefined || policy !== kept) &&
       (await writeResourceFile(store, ZitadelConfig.empty().policies.put(policy), opts.force))
     ) {
-      filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
+      filesWritten.push(join(opts.cwd, Policy.PASSWORD_PATH));
     }
-    await updateState(opts.cwd, PASSWORD_POLICY_PATH, {
+    await updateState(opts.cwd, Policy.PASSWORD_PATH, {
       id: published.id,
       hash: hashForState({}, policy.wireBody(store)),
     });
@@ -469,8 +467,8 @@ async function refuseResourceConflicts(
       throw resourceExists(path);
     }
   }
-  if (await store.exists(PASSWORD_POLICY_PATH)) {
-    throw resourceExists(PASSWORD_POLICY_PATH, {
+  if (await store.exists(Policy.PASSWORD_PATH)) {
+    throw resourceExists(Policy.PASSWORD_PATH, {
       hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
     });
   }
@@ -496,10 +494,10 @@ function passwordPolicyOf(config: ZitadelConfig): Policy | undefined {
   if (policy.problems({}).length > 0) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${PASSWORD_POLICY_PATH} is not a valid password policy`,
+      `${Policy.PASSWORD_PATH} is not a valid password policy`,
       {
         hint: "Setup keeps an existing policy file and publishes it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
-        details: { file: PASSWORD_POLICY_PATH },
+        details: { file: Policy.PASSWORD_PATH },
       },
     );
   }

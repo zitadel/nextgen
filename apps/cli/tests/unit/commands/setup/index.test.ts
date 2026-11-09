@@ -1360,6 +1360,27 @@ async function parse(input: string) {
 }
 
 describe("password-min-length", () => {
+  it.each([
+    ["0", null],
+    ["00", null],
+    ["1", 1],
+    ["15", 15],
+    ["64", 64],
+  ])("reads %j as %j", async (text, value) => {
+    await expect(
+      parseFlag(Setup.flags["password-min-length"], text, "password-min-length"),
+    ).resolves.toBe(value);
+  });
+
+  it.each(["65", "12.5", "-3", "twelve", "1e1"])("refuses %j with the contract's bounds", async (text) => {
+    await expect(
+      parseFlag(Setup.flags["password-min-length"], text, "password-min-length"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "Must be a whole number from 1 to 64, or 0 for none",
+    });
+  });
+
   it("reads a whole number", async () => {
     await expect(parse("12")).resolves.toBe(12);
   });

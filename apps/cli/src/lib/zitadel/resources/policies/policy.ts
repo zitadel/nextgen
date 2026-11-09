@@ -1,14 +1,17 @@
 import { basename } from "node:path";
 
-import { policyConfigSchema } from "@zitadel/config/schemas";
+import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
+import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 
 import { BrokenFilesError } from "@/lib/zitadel/errors";
 import {
   ConfigDocument,
   type DocumentFile,
   type DocumentStatus,
+  type Edit,
 } from "@/lib/zitadel/resources/document";
 import {
+  PASSWORD_POLICY_OPERATION,
   type PasswordMinLength,
   POLICY_FILE_SUFFIX,
   type PolicyBody,
@@ -17,7 +20,7 @@ import {
 } from "@/lib/zitadel/resources/policies/types";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { JsonObject } from "@/lib/zitadel/types";
+import { CONFIG_DIRECTORIES, type JsonObject } from "@/lib/zitadel/types";
 
 /**
  * An operation policy under `.zitadel/policies/` (ADR 066): the rules one
@@ -28,6 +31,12 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * What kind of document this is: an operation policy.
    */
   readonly kind = "policy";
+
+  /**
+   * Where the password policy lives, relative to the project root: the file
+   * {@link fileName} names for its operation.
+   */
+  static readonly PASSWORD_PATH = `${CONFIG_DIRECTORIES.policies}/${Policy.fileName(PASSWORD_POLICY_OPERATION)}`;
 
   /**
    * Hold a policy's body at its path.
@@ -59,6 +68,27 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    */
   static create<Body extends JsonObject>(file: DocumentFile<Body>): Policy<Body> {
     return new Policy(file.path, file.body, "created");
+  }
+
+  /**
+   * The password policy `setup` writes for a new project.
+   *
+   * @param minLength - The minimum setup was given: a length, `null` for an
+   *   explicit "none", or `undefined` when none was given.
+   * @returns A new policy at {@link PASSWORD_PATH} with the given minimum,
+   *   {@link RECOMMENDED_PASSWORD_MIN_LENGTH} when none was given, and an
+   *   empty `config`, which enforces nothing, for "none".
+   */
+  static password(minLength?: PasswordMinLength): Policy {
+    const value = minLength === undefined ? RECOMMENDED_PASSWORD_MIN_LENGTH : minLength;
+    return Policy.create({
+      path: Policy.PASSWORD_PATH,
+      body: {
+        $schema: POLICY_FILE_SCHEMA_REF,
+        operation: PASSWORD_POLICY_OPERATION,
+        config: value === null ? {} : { min_length: value },
+      },
+    });
   }
 
   /**
@@ -111,24 +141,22 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    *
    * @param minLength - The minimum: a length, `null` for an explicit "none",
    *   or `undefined` when none was given.
-   * @returns The same policy when none was given or the minimum is already
-   *   that one; otherwise the policy without `min_length` for "none", or with
-   *   the new length.
+   * @returns The edit: the same policy when none was given or the minimum is
+   *   already that one; otherwise the policy without `min_length` for "none",
+   *   or with the new length.
    * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
-  withMinLength(minLength: PasswordMinLength | undefined): Policy {
+  withMinLength(minLength: PasswordMinLength | undefined): Edit<Policy<Body>> {
     if (minLength === undefined || (minLength ?? undefined) === this.config.min_length) {
-      return this;
+      return { document: this, changed: false, skipped: [] };
     }
     const { min_length: _replaced, ...kept } = this.config;
-    if (minLength === null) {
-      return new Policy(this.path, { ...this.body, config: kept }, this.editedStatus);
-    }
-    return new Policy(
-      this.path,
-      { ...this.body, config: { ...kept, min_length: minLength } },
-      this.editedStatus,
-    );
+    const config = minLength === null ? kept : { ...kept, min_length: minLength };
+    return {
+      document: new Policy(this.path, { ...this.body, config }, this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
   }
 
   /**
