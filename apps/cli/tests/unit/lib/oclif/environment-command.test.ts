@@ -48,7 +48,7 @@ class RepeatedProbe extends EnvironmentCommand {
     throw new Error("unused");
   }
 
-  async probe(...asked: ReadonlyArray<{ quiet?: boolean; prompt?: boolean }>) {
+  async probe(...asked: ReadonlyArray<{ timeoutMs?: number; prompt?: boolean }>) {
     const { flags } = await this.parse(RepeatedProbe);
     await this.toMeta(flags);
     const opened = [];
@@ -138,8 +138,8 @@ describe("EnvironmentCommand.connect", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
     const opened = await new RepeatedProbe(["--cwd", dir, "--env-file", file], config).probe(
-      { quiet: true, prompt: false },
-      { prompt: false, quiet: true },
+      { timeoutMs: 1000, prompt: false },
+      { prompt: false, timeoutMs: 1000 },
     );
 
     expect(opened[0]).toBe(opened[1]);
@@ -151,7 +151,6 @@ describe("EnvironmentCommand.connect", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
     const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe({
-      quiet: true,
       prompt: false,
       timeoutMs: 1500,
     });
@@ -162,9 +161,9 @@ describe("EnvironmentCommand.connect", () => {
   it("leaves a connection nobody hurried on the default deadline", async ({ dir }) => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
-    const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe({
-      quiet: true,
-    });
+    const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe(
+      {},
+    );
 
     expect(connectionOf(connection.client).timeoutMs).toBe(REQUEST_TIMEOUT_MS);
   });

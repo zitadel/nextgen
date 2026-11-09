@@ -1,4 +1,4 @@
-import { box, stripAnsi } from "consola/utils";
+import { colors, stripAnsi } from "consola/utils";
 import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
 
@@ -279,6 +279,35 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
 };
 
 /**
+ * A rounded green frame round `text`, with `title` set into the top border: what
+ * `consola.box` draws for `padding: 1`, measured in the columns a terminal shows.
+ *
+ * It is drawn here rather than by consola because consola pads a line by its
+ * length in code units, so a line holding double-width characters is padded for
+ * the width it does not have and its right border lands out of line.
+ */
+const drawBox = (text: string, title: string): string => {
+  const padding = 2;
+  const edge = (character: string): string => colors.green(character);
+  const lines = text.split("\n");
+  const width = Math.max(...lines.map(visible), visible(title)) + padding;
+  const left = Math.floor((width - visible(title)) / 2);
+  const right = width - visible(title) - left + padding;
+  const blank = `\u0020${edge("\u2502")}${" ".repeat(width + padding)}${edge("\u2502")}`;
+  return [
+    `\u0020${edge("\u256d")}${edge("\u2500").repeat(left)}${colors.green(title)}${edge("\u2500").repeat(right)}${edge("\u256e")}`,
+    blank,
+    ...lines.map(
+      (line) =>
+        `\u0020${edge("\u2502")}${" ".repeat(padding)}${line}${" ".repeat(width - visible(line))}${edge("\u2502")}`,
+    ),
+    blank,
+    `\u0020${edge("\u2570")}${edge("\u2500").repeat(width + padding)}${edge("\u256f")}`,
+    "",
+  ].join("\n");
+};
+
+/**
  * The one box the CLI draws: a {@link WIDTH}-wide frame holding what the command
  * produced and, under it, what to do next. Every command's box is the same
  * width and lays its steps out the same way, so two commands are comparable at
@@ -328,10 +357,7 @@ export class Frame implements Renderable {
     const last = lines.length - 1;
     const tail = lines[last] ?? "";
     lines[last] = tail + " ".repeat(Math.max(0, Frame.INNER - visible(tail)));
-    return box(lines.join("\n"), {
-      title: this.title,
-      style: { padding: 1, borderStyle: "rounded", borderColor: "green", marginTop: 0 },
-    });
+    return drawBox(lines.join("\n"), this.title);
   }
 
   private step(step: BoxAction): string {

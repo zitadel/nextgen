@@ -180,7 +180,6 @@ export type Connection = Readonly<{
 
 /** How a project command opens its {@link Connection}. */
 export type ConnectOptions = Readonly<{
-  quiet?: boolean;
   prompt?: boolean;
   /**
    * How long one request on this connection may take, for a caller that must

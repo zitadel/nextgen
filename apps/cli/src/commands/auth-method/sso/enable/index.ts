@@ -335,7 +335,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const connections = await readConnectionFiles(target.cwd);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
-    const { client, projectId, server } = await this.connect({ quiet: true });
+    const { client, projectId, server } = await this.connect();
     // The schema and flow edits for a slug, with the refusals they bring (an
     // edit the editors cannot make, or a flow `deploy` would then reject), so
     // the run stops with nothing changed (ADR 070 §3).

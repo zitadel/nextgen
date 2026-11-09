@@ -153,10 +153,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * credential. It fails, naming the variable, when the server, the project or
    * the credential is missing.
    *
-   * Which project and server the command is about is worth stating to a person,
-   * but those lines share stdout with the result, so they are printed only on a
-   * terminal: on a pipe the result travels alone, and `--json` silences them
-   * either way. `quiet` is for a command whose own output is that summary.
+   * Which project and server the command is about is recorded for its ending
+   * to state once, at its foot; nothing is printed here.
    *
    * One connection is opened per set of options and shared by every caller,
    * a requirement that needs the project and the command's own `execute`
@@ -207,8 +205,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
     // Recorded, never printed here: the summary says where the command ran,
-    // once, at its foot. `quiet` used to suppress two `ℹ` lines printed at this
-    // point; there are none to suppress, so every command records it.
+    // once, at its foot.
     this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
     return {
       client: createZitadelClient({

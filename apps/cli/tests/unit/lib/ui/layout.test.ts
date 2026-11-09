@@ -245,15 +245,18 @@ describe("wrapCommand", () => {
 });
 
 describe("Frame", () => {
-  it("pads a last line of double-width characters by the columns they take", () => {
+  // A body line of double-width characters is narrower in code units than the
+  // frame and wider in columns. It has to be folded by columns, or the frame is
+  // widened for it and is no longer the 80 columns every box is.
+  it("folds a body line of double-width characters so the box stays 80 columns", () => {
     const columns = (line: string) =>
       [...line].reduce((sum, c) => sum + (/[\u4e00-\u9fff]/.test(c) ? 2 : 1), 0);
-    const box = new Frame("Summary", ["名前"], [], "名前").render();
-    const lines = stripAnsi(box)
-      .split("\n")
-      .filter((line) => line.includes("名前"));
+    const body = Array(15).fill("名前").join(" ");
 
-    expect(new Set(lines.map(columns)).size).toBe(1);
+    const box = stripAnsi(new Frame("Summary", [body], []).render());
+
+    expect(Math.max(...box.split("\n").map(columns))).toBeLessThanOrEqual(80);
+    expect(box.split("\n").filter((line) => line.includes("名前")).length).toBeGreaterThan(1);
   });
 
   it("is the same width whatever it holds", () => {

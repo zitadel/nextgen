@@ -103,7 +103,6 @@ export default class Status extends EnvironmentCommand {
       project.lifecycle === "configured"
         ? await detectUserPresence(() => {
             return this.connect({
-              quiet: true,
               prompt: false,
               timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
             });
