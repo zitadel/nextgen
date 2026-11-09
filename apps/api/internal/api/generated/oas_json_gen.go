@@ -92813,6 +92813,54 @@ func (s ListProjectMembersErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMissingIDListProjectMembersErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundListProjectMembersErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPermissionDeniedListProjectMembersErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.permission_denied")
+		{
+			s := s.ProjPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListProjectMembersErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -92880,6 +92928,15 @@ func (s *ListProjectMembersErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedListProjectMembersErrorResponse
 					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDListProjectMembersErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundListProjectMembersErrorResponse
+					found = true
+				case "proj.permission_denied":
+					s.Type = ProjPermissionDeniedListProjectMembersErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListProjectMembersErrorResponse
 					found = true
@@ -92910,6 +92967,18 @@ func (s *ListProjectMembersErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedListProjectMembersErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDListProjectMembersErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundListProjectMembersErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjPermissionDeniedListProjectMembersErrorResponse:
+		if err := s.ProjPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidListProjectMembersErrorResponse:

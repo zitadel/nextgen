@@ -1162,10 +1162,6 @@ type Invoker interface {
 	// check, the list does not look at a person's user status beyond that, so a direct grant to a
 	// suspended person is listed.
 	//
-	// A person whose access comes only through teams the caller is not a member of is left out. A team the
-	// caller is not in is named by `team_id` only. The grant to such a team still shows in the project's
-	// grants.
-	//
 	// The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
 	// (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
 	// project.
@@ -14017,10 +14013,6 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 // person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
 // check, the list does not look at a person's user status beyond that, so a direct grant to a
 // suspended person is listed.
-//
-// A person whose access comes only through teams the caller is not a member of is left out. A team the
-// caller is not in is named by `team_id` only. The grant to such a team still shows in the project's
-// grants.
 //
 // The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
 // (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
