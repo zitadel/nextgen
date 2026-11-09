@@ -1108,6 +1108,10 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "Idempotency-Key",
+					In:   "header",
+				}: params.IdempotencyKey,
 			},
 			Raw: r,
 		}

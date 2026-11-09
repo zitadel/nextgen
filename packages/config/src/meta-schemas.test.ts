@@ -48,7 +48,6 @@ describe("meta-schemas", () => {
       "auth-method.json",
       "sso-auth-method.json",
       "idp-connection.json",
-      "application.json",
       "branding.json",
       "policy.json",
       "policy-test.json",

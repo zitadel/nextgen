@@ -609,12 +609,12 @@ func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseD
 }
 
 // An application that authenticates its users via Zitadel, with its OAuth
-// clients. The document is the body of `createApplication`
-// (`POST /applications`).
+// clients. The document is the `application` field of the `createApplication`
+// (`POST /applications`) body.
 // Ref: #
 type Application struct {
-	// Editor affordance: path or URL of this schema so editors validate and autocomplete the file
-	// (application files point at `.zitadel/meta/application.json`). Ignored by the platform.
+	// Editor affordance: path or URL of this schema so editors validate and autocomplete the file.
+	// Ignored by the platform.
 	Schema OptString `json:"$schema"`
 	// Stable identifier of the application, unique within the project and
 	// fixed for its life. Flows and other documents reference it.

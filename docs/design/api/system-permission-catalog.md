@@ -248,7 +248,7 @@ grant them via `team.write`.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `application.read` | `GET /applications/{id}`; `GET /applications/{id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
+| `application.read` | `GET /applications/{id}`; `POST /applications/query` (#2789), `GET /applications/{id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
 | `application.write` | `POST /applications` | Create + revise: the `slug` in the submitted document decides whether it creates a registered application or appends a revision to an existing one in the project. A new client's secret is returned once. |
 | `application.delete` | `DELETE /applications/{id}` | **Not yet exposed** — target shape. |
 

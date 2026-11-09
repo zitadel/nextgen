@@ -12,7 +12,7 @@ import (
 
 var (
 	rn11AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
+		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
 	rn42AllowedHeaders = map[string]string{
 		"GET": "Authorization",

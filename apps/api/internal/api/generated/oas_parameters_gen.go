@@ -343,6 +343,10 @@ type CreateApplicationParams struct {
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 func unpackCreateApplicationParams(packed middleware.Parameters) (params CreateApplicationParams) {
@@ -353,11 +357,21 @@ func unpackCreateApplicationParams(packed middleware.Parameters) (params CreateA
 		}
 		params.ProjectID = packed[key].(ProjectID)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Idempotency-Key",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.IdempotencyKey = v.(OptString)
+		}
+	}
 	return params
 }
 
 func decodeCreateApplicationParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateApplicationParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
+	h := uri.NewHeaderDecoder(r.Header)
 	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
@@ -406,6 +420,45 @@ func decodeCreateApplicationParams(args [0]string, argsEscaped bool, r *http.Req
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
 			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode header: Idempotency-Key.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Idempotency-Key",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotIdempotencyKeyVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotIdempotencyKeyVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.IdempotencyKey.SetTo(paramsDotIdempotencyKeyVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Idempotency-Key",
+			In:   "header",
 			Err:  err,
 		}
 	}

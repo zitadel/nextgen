@@ -6673,6 +6673,10 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency-key",
+            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `client_secrets` included,\ninstead of creating another revision. Without it, a retry after a\nlost response finds the clients already stored and returns no\nsecret.\n"
           }
         ],
         "requestBody": {
@@ -18516,7 +18520,7 @@
       "application": {
         "x-meta-schema": true,
         "title": "Application",
-        "description": "An application that authenticates its users via Zitadel, with its OAuth\nclients. The document is the body of `createApplication`\n(`POST /applications`).\n",
+        "description": "An application that authenticates its users via Zitadel, with its OAuth\nclients. The document is the `application` field of the `createApplication`\n(`POST /applications`) body.\n",
         "type": "object",
         "required": [
           "slug",
@@ -18528,7 +18532,7 @@
           "$schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file (application files point at `.zitadel/meta/application.json`). Ignored by the platform."
+            "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file. Ignored by the platform."
           },
           "slug": {
             "type": "string",

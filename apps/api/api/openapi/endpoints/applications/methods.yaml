@@ -40,6 +40,13 @@ post:
         - application.write
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key. A retry carrying the same key within the retry
+        window returns the first response, `client_secrets` included,
+        instead of creating another revision. Without it, a retry after a
+        lost response finds the clients already stored and returns no
+        secret.
   requestBody:
     required: true
     content:

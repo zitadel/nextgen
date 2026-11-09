@@ -2,8 +2,8 @@ x-meta-schema: true
 title: Application
 description: |
   An application that authenticates its users via Zitadel, with its OAuth
-  clients. The document is the body of `createApplication`
-  (`POST /applications`).
+  clients. The document is the `application` field of the `createApplication`
+  (`POST /applications`) body.
 type: object
 required:
   - slug
@@ -15,7 +15,7 @@ properties:
     type: string
     minLength: 1
     description: 'Editor affordance: path or URL of this schema so editors validate and autocomplete the
-      file (application files point at `.zitadel/meta/application.json`). Ignored by the platform.'
+      file. Ignored by the platform.'
   slug:
     type: string
     pattern: ^[a-z0-9][a-z0-9_-]*$
