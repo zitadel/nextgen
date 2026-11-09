@@ -10,9 +10,8 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import {
-  policiesFromFiles,
+  type PolicyUnderTest,
   policiesFromRelease,
-  readPolicyTests,
   renderPolicyTestResults,
   runPolicyTests,
 } from "@/lib/policies/tests";
@@ -59,14 +58,14 @@ The server evaluates every case, so the command needs a connection to it. By def
   protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
     const operations = args.operation === undefined ? [] : [args.operation];
     const config = await ZitadelConfig.loadUnchecked(new DiskStore(this.cwd));
-    const { suites, issues } = readPolicyTests(config, operations);
+    const { documents: tests, issues } = config.policies.testsFor(operations);
     if (issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
         details: { issues },
         hint: issues.join("\n"),
       });
     }
-    if (suites.length === 0) {
+    if (tests.length === 0) {
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",
@@ -86,16 +85,9 @@ The server evaluates every case, so the command needs a connection to it. By def
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
-    const source = fromRelease ?? policiesFromFiles(config, operations);
-    if ("issues" in source && source.issues.length > 0) {
-      throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
-        details: { issues: source.issues },
-        hint: source.issues.join("\n"),
-      });
-    }
-    const policies = source.policies;
+    const policies = fromRelease?.policies ?? this.policiesFromFiles(config, operations);
 
-    const results = await runPolicyTests(policyService, suites, policies);
+    const results = await runPolicyTests(policyService, tests, policies);
     const cases = results.flatMap((result) => result.cases);
     const failed = cases.filter((testCase) => !testCase.passed).length;
     this.recordTelemetry({
@@ -127,5 +119,32 @@ The server evaluates every case, so the command needs a connection to it. By def
       data,
       pretty: prose(pretty),
     });
+  }
+
+  /**
+   * The project's policies of some operations, to test against.
+   *
+   * @param config - The project's configuration.
+   * @param operations - The operations to read the policies of; every one when empty.
+   * @returns The rules of each operation's policy file, by operation.
+   * @throws {@link ZitadelError} With `E_VALIDATION` when a policy file asked
+   *   for has a problem, naming each one.
+   */
+  private policiesFromFiles(
+    config: ZitadelConfig,
+    operations: readonly string[],
+  ): ReadonlyMap<string, PolicyUnderTest> {
+    const { documents, issues } = config.policies.for(operations);
+    if (issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
+        details: { issues },
+        hint: issues.join("\n"),
+      });
+    }
+    return new Map(
+      documents.map((policy): [string, PolicyUnderTest] => {
+        return [policy.operation, { config: policy.config, source: { file: policy.path } }];
+      }),
+    );
   }
 }

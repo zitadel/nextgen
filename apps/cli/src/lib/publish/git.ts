@@ -1,6 +1,5 @@
 import { type DiffedFile, Repository } from "@/lib/git";
-import { POLICY_FILES_GLOB, POLICY_TEST_FILES_GLOB } from "@/lib/policies";
-import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, RELEASE_POLICY_GLOBS } from "@/lib/zitadel";
 
 /**
  * The directories a release is built from, the only paths a deploy diffs.
@@ -25,10 +24,10 @@ const CONFIG_PATHS: readonly string[] = [
  * so its `README.md` and anything in a subdirectory, which no release carries,
  * do not show as changes.
  */
-const CONFIG_GLOBS = [POLICY_FILES_GLOB];
+const CONFIG_GLOBS = [RELEASE_POLICY_GLOBS.included];
 
 /** Policy test files sit beside the policies, but `policies test` runs them and no release carries them. */
-const EXCLUDED = [POLICY_TEST_FILES_GLOB];
+const EXCLUDED = [RELEASE_POLICY_GLOBS.excluded];
 
 /** The current commit, or null when there is no repo or no commit yet. */
 export async function headSha(cwd: string): Promise<string | null> {
