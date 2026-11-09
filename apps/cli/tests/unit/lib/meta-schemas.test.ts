@@ -92,13 +92,54 @@ describe("writeMetaSchemas", () => {
     });
   });
 
+  describe("when the project pins a package newer than the CLI", () => {
+    /**
+     * Pins a `@zitadel/*` package newer than the CLI the tests write for.
+     *
+     * @param cwd - The project directory.
+     */
+    async function pinNewer(cwd: string): Promise<void> {
+      await writeFile(
+        join(cwd, "package.json"),
+        JSON.stringify({ devDependencies: { "@zitadel/config": "99.0.0" } }),
+      );
+    }
+
+    it("leaves an outdated file as it was and names the pin", async ({ dir }) => {
+      await mkdir(join(dir, META), { recursive: true });
+      await writeFile(join(dir, BRANDING), '{"title": "a newer dialect"}\n');
+      await pinNewer(dir);
+
+      const result = await writeMetaSchemas(dir, [brandingMetaSchema()], { dryRun: false });
+
+      expect(result.written).toEqual([]);
+      expect(result.newerPin).toEqual({ name: "@zitadel/config", version: "99.0.0" });
+      expect(await readFile(join(dir, BRANDING), "utf8")).toBe('{"title": "a newer dialect"}\n');
+    });
+
+    it("writes no missing file either", async ({ dir }) => {
+      await pinNewer(dir);
+
+      const result = await writeMetaSchemas(dir, [brandingMetaSchema()], { dryRun: false });
+
+      expect(result.written).toEqual([]);
+      expect(await readdir(dir)).not.toContain(".zitadel");
+    });
+  });
+
   describe("with a current file", () => {
     it("leaves it alone and reports it unchanged", async ({ dir }) => {
       await writeMetaSchemas(dir, [brandingMetaSchema()], { dryRun: false });
 
       const result = await writeMetaSchemas(dir, [brandingMetaSchema()], { dryRun: false });
 
-      expect(result).toEqual({ written: [], unchanged: [BRANDING], linked: [], unreadable: [] });
+      expect(result).toEqual({
+        written: [],
+        unchanged: [BRANDING],
+        linked: [],
+        unreadable: [],
+        newerPin: undefined,
+      });
     });
   });
 

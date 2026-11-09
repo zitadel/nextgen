@@ -16,8 +16,11 @@ import { lstat, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
+import semver from "semver";
+
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
+import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";
 import { mapBounded } from "./map-bounded";
@@ -40,6 +43,19 @@ export type ProjectMetaSchema = {
    */
   readonly body: object;
   readonly contents: string;
+
+  /**
+   * The CLI version whose command mentions the file carries.
+   */
+  readonly cliVersion: string;
+};
+
+/**
+ * A `@zitadel/*` package a project pins to a version newer than this CLI.
+ */
+export type NewerPin = {
+  readonly name: string;
+  readonly version: string;
 };
 
 /**
@@ -108,6 +124,12 @@ export type MetaSchemaWrites = {
    * The files that could not be read.
    */
   readonly unreadable: readonly UnreadableMetaSchema[];
+
+  /**
+   * The pin that kept this CLI from writing its own, older, schemas, when
+   * one did: nothing was written, so a newer CLI's copy is never downgraded.
+   */
+  readonly newerPin: NewerPin | undefined;
 };
 
 /**
@@ -133,6 +155,9 @@ type Stale = {
  * {@link metaSchemaState} decides each file. A current one is left alone, a
  * `linked` one is never written, since the write would land on whatever the
  * link names, and one that cannot be read is reported rather than replaced.
+ * When the project pins a `@zitadel/*` package newer than the CLI the files
+ * are for, nothing is written, so no caller can downgrade schemas a newer
+ * CLI wrote.
  * The directory a file goes in is created when it is missing, and listed
  * before the first file written into it.
  *
@@ -155,7 +180,7 @@ export async function writeMetaSchemas(
       return { kind: "unreadable", file, reason: readErrorReason(error) };
     }
   });
-  const stale = judged.flatMap((entry): readonly Stale[] => {
+  const wanted = judged.flatMap((entry): readonly Stale[] => {
     if (entry.kind !== "judged") {
       return [];
     }
@@ -167,6 +192,8 @@ export async function writeMetaSchemas(
     }
     return [];
   });
+  const newer = await newerPinFor(cwd, wanted);
+  const stale = newer === undefined ? wanted : [];
   const directories = [
     ...new Set(
       stale.map((entry) => {
@@ -209,7 +236,37 @@ export async function writeMetaSchemas(
       }
       return [{ path: entry.file.path, reason: entry.reason }];
     }),
+    newerPin: newer,
   };
+}
+
+/**
+ * The first exact `@zitadel/*` pin newer than the CLI the files to write are
+ * for, when both are releases.
+ *
+ * @param cwd - The project root.
+ * @param stale - The files to write.
+ * @returns The pin, or `undefined` when there is none or nothing is to be written.
+ */
+async function newerPinFor(cwd: string, stale: readonly Stale[]): Promise<NewerPin | undefined> {
+  const first = stale[0];
+  if (first === undefined) {
+    return undefined;
+  }
+  const cliVersion = first.file.cliVersion;
+  if (semver.valid(cliVersion) === null) {
+    return undefined;
+  }
+  const pins = await exactZitadelPins(cwd).catch(() => {
+    return undefined;
+  });
+  const pin = pins?.find(([, version]) => {
+    return semver.gt(version, cliVersion);
+  });
+  if (pin === undefined) {
+    return undefined;
+  }
+  return { name: pin[0], version: pin[1] };
 }
 
 /**
@@ -256,6 +313,7 @@ export function projectMetaSchemas(cliVersion: string): readonly ProjectMetaSche
       path,
       body,
       contents: `${JSON.stringify(body, null, 2)}\n`,
+      cliVersion,
     };
   });
 }
