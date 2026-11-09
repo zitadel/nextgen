@@ -49,6 +49,7 @@ import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import { CONFIG_DIRECTORIES, type JsonObject, type JsonValue } from "@/lib/zitadel/types";
 import { isJsonObject, objectAt, stringAt, toJsonObject } from "@/lib/zitadel/utils/json";
+import { isStandardScope, standardClaim } from "@/lib/zitadel/rules/claims";
 import { didYouMean } from "@/lib/zitadel/utils/spelling";
 
 /**
@@ -152,7 +153,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * file its slug names.
    *
    * @remarks
-   * Its claim mapping covers only the properties the schema defines.
+   * Its claim mapping covers only the properties the schema defines, and
+   * only the standard claims the requested scopes return.
    *
    * @param provider - The provider, from the catalog or the developer's own settings.
    * @param schema - The user schema its sign-ins fill.
@@ -172,9 +174,53 @@ export class Connection extends ConfigDocument<ConnectionValue> {
       schemaRef: CONNECTION_SCHEMA_REF,
       endpoints,
     });
-    const body = toJsonObject(generated, `the ${provider.slug} connection`);
+    const body = Connection.withoutUnrequestedClaims(
+      toJsonObject(generated, `the ${provider.slug} connection`),
+    );
     const path: ConnectionPath = `${CONFIG_DIRECTORIES.connections}/${provider.slug}.json`;
     return Connection.create({ path, body });
+  }
+
+  /**
+   * A connection's body without the mappings of standard claims its scopes do
+   * not return.
+   *
+   * @remarks
+   * Only a list of standard scopes alone can be said to leave a claim out: a
+   * scope the standard does not define may bundle claims. A mapping dropped
+   * takes the property's `verified_claims` entry with it, which would have
+   * nothing to verify.
+   *
+   * @param body - The connection's body as the provider generated it.
+   * @returns The body, with those mappings removed.
+   */
+  private static withoutUnrequestedClaims(body: JsonObject): JsonObject {
+    const scopes = objectAt(body, "oidc").scopes;
+    if (!Array.isArray(scopes) || !scopes.every(isStandardScope)) {
+      return body;
+    }
+    const returned = (claim: JsonValue | undefined): boolean => {
+      const scope = standardClaim(claim)?.scope;
+      return scope === undefined || scopes.includes(scope);
+    };
+    const mapping = objectAt(body, "claim_mapping");
+    const dropped = Object.keys(mapping).filter((property) => {
+      return !returned(mapping[property]);
+    });
+    const keep = (block: JsonObject): JsonObject => {
+      return Object.fromEntries(
+        Object.entries(block).filter((entry) => {
+          return !dropped.includes(entry[0]);
+        }),
+      );
+    };
+    const claimMapping = isJsonObject(body.claim_mapping) ? keep(mapping) : undefined;
+    const verified = isJsonObject(body.verified_claims) ? keep(body.verified_claims) : undefined;
+    return {
+      ...body,
+      ...(claimMapping === undefined ? {} : { claim_mapping: claimMapping }),
+      ...(verified === undefined ? {} : { verified_claims: verified }),
+    };
   }
 
   /**

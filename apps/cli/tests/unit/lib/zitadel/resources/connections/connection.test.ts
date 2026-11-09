@@ -6,11 +6,12 @@ import {
   ConfigError,
   Connection,
   NotOidcConnectionError,
+  UserSchema,
   UnusableSettingError,
 } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@/lib/zitadel/storage";
-import { aFile, anOidcConnection } from "@tests/helpers/config";
+import { aFile, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { anAcmeSsoProvider, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
 import { issuer } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -397,6 +398,49 @@ describe("Connection.forProvider", () => {
         template: undefined,
         issuer: "https://sso.acme.example",
       });
+    });
+  });
+
+  describe("with scopes that leave a standard claim out", () => {
+    const schema = UserSchema.of(
+      aFile(
+        "schemas",
+        "customers.json",
+        aUserSchema({
+          objectType: "customers",
+          properties: {
+            email: { type: "string" },
+            givenName: { type: "string" },
+            familyName: { type: "string" },
+          },
+        }),
+      ),
+    );
+
+    it("maps only the claims the scopes return", () => {
+      const acme = Connection.forProvider(
+        anAcmeSsoProvider({ scopes: ["openid", "email"] }),
+        schema,
+      );
+
+      expect(
+        acme.mappings.map((row) => {
+          return row.property;
+        }),
+      ).toEqual(["email"]);
+    });
+
+    it("maps the claims of a scope that was asked for", () => {
+      const acme = Connection.forProvider(
+        anAcmeSsoProvider({ scopes: ["openid", "email", "profile"] }),
+        schema,
+      );
+
+      expect(
+        acme.mappings.map((row) => {
+          return row.property;
+        }),
+      ).toEqual(["email", "givenName", "familyName"]);
     });
   });
 
