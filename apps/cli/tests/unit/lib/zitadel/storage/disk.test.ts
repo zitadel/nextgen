@@ -54,6 +54,20 @@ describe("DiskStore.read", () => {
     });
   });
 
+  it("reports a file that cannot be read as unreadable, not as invalid json", async ({ dir }) => {
+    await mkdir(join(dir, IDP), { recursive: true });
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({
+      message: `${IDP} cannot be read (EISDIR)`,
+      details: { file: IDP, code: "EISDIR" },
+    });
+  });
+
   it("refuses a file that holds json other than an object", async ({ dir }) => {
     await write(dir, { [IDP]: "[1, 2]" });
 
@@ -73,6 +87,30 @@ describe("DiskStore.exists", () => {
     const exists = await new DiskStore(dir).exists(IDP);
 
     expect(exists).toBe(true);
+  });
+
+  it("is false for a file that is not there", async ({ dir }) => {
+    const exists = await new DiskStore(dir).exists(IDP);
+
+    expect(exists).toBe(false);
+  });
+
+  it("is false for a path through a regular file", async ({ dir }) => {
+    await write(dir, { [TEMPLATE]: MAIN });
+
+    const exists = await new DiskStore(dir).exists(`${TEMPLATE}/x`);
+
+    expect(exists).toBe(false);
+  });
+
+  it("rethrows an access error that is not an absent file", async ({ dir }) => {
+    await symlink(join(dir, "loop"), join(dir, "loop"));
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).exists("loop");
+    });
+
+    expect(error).toMatchObject({ code: "ELOOP" });
   });
 });
 

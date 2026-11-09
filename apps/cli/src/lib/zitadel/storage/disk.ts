@@ -98,14 +98,20 @@ export class DiskStore implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Whether it exists.
+   * @throws The access error, when it is anything but the file or one of its
+   *   directories being absent: a permission failure is not "absent".
    */
   async exists(path: string): Promise<boolean> {
     return access(this.root.resolve(path).toString()).then(
       () => {
         return true;
       },
-      () => {
-        return false;
+      (error: unknown) => {
+        const code = DiskStore.errnoOf(error);
+        if (code === "ENOENT" || code === "ENOTDIR") {
+          return false;
+        }
+        throw error;
       },
     );
   }
@@ -242,11 +248,21 @@ export class DiskStore implements ConfigStore {
    * @param location - The file's absolute path.
    * @param path - The project-relative path, for the message.
    * @returns Whatever the text parses to.
-   * @throws {@link ConfigError} When the file cannot be read or is not valid JSON.
+   * @throws {@link ConfigError} When the file cannot be read, naming the error code,
+   *   or is not valid JSON.
    */
   private static async readJson(location: string, path: string): Promise<unknown> {
+    const text = await readFile(location, "utf8").catch((error: unknown) => {
+      const code = DiskStore.errnoOf(error);
+      throw new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
+        hint: "Check that the file is readable, then run the command again.",
+        details: {
+          file: path,
+          ...(code === undefined ? {} : { code }),
+        },
+      });
+    });
     try {
-      const text = await readFile(location, "utf8");
       return JSON.parse(text);
     } catch (error) {
       const position =
