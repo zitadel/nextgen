@@ -7,7 +7,9 @@ import type { AppCheckSpec } from "../../src/journey.ts";
 
 /** One agent turn, as the container's agent server reported it. */
 export interface Turn {
-  /** Every stream-json line the agent printed, in order. */
+  /** When the host asked for the turn, in epoch milliseconds. */
+  readonly startedAt: number;
+  /** Every stream-json line the agent printed, in order, each stamped with its arrival time. */
   readonly lines: ReadonlyArray<string>;
   readonly sessionId: string | null;
   readonly lastText: string;
@@ -59,24 +61,46 @@ interface TurnEnd {
 /** One line of a streamed answer, and its `type` when it is JSON that has one. */
 interface Line {
   readonly line: string;
+  /** When the line reached the host, in epoch milliseconds. */
+  readonly at: number;
   readonly type: string | undefined;
 }
 
-const classify = (line: string): Line => {
+const classify = (line: string, at: number): Line => {
   try {
-    return { line, type: (JSON.parse(line) as { readonly type?: string }).type };
+    return { line, at, type: (JSON.parse(line) as { readonly type?: string }).type };
   } catch {
     // Not every line the agent prints is JSON; it is kept, and read as untyped.
-    return { line, type: undefined };
+    return { line, at, type: undefined };
   }
 };
 
-/** Every non-empty line of a streamed answer. */
+/**
+ * A line with the moment it reached the host (`_t`, epoch ms). The agent
+ * server writes each line as the agent prints it, so the arrival time is how
+ * the report tells a command's run time from the model's thinking time.
+ */
+const stamp = ({ line, at }: Line): string => {
+  try {
+    const parsed = JSON.parse(line) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? JSON.stringify({ ...parsed, _t: at })
+      : line;
+  } catch {
+    return line;
+  }
+};
+
+/** Every non-empty line of a streamed answer, each with the time it arrived. */
 async function lines(response: Response): Promise<ReadonlyArray<Line>> {
   const body = Readable.fromWeb(response.body as unknown as ReadableStream);
-  return (await Array.fromAsync(createInterface({ input: body })))
-    .filter((line) => line.trim() !== "")
-    .map(classify);
+  const arrived: Line[] = [];
+  for await (const line of createInterface({ input: body })) {
+    if (line.trim() !== "") {
+      arrived.push(classify(line, Date.now()));
+    }
+  }
+  return arrived;
 }
 
 export function createAgentClient(base: string, token: string): AgentClient {
@@ -125,6 +149,7 @@ export function createAgentClient(base: string, token: string): AgentClient {
     },
 
     async turn(request) {
+      const startedAt = Date.now();
       const events = await lines(await post("/turn", request));
       const end = events.find((event) => event.type === "turn_end");
       if (end === undefined) {
@@ -132,9 +157,10 @@ export function createAgentClient(base: string, token: string): AgentClient {
       }
       const { sessionId, lastText, isError } = JSON.parse(end.line) as TurnEnd;
       return {
+        startedAt,
         lines: events
           .filter((event) => event.type !== "heartbeat" && event.type !== "turn_end")
-          .map((event) => event.line),
+          .map((event) => stamp(event)),
         sessionId,
         lastText,
         isError,
