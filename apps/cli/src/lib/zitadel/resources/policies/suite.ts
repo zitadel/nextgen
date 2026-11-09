@@ -14,9 +14,12 @@ import {
   POLICY_TEST_SUFFIX,
   type PolicyTestFileName,
   type PolicyCase,
+  type PolicyCaseResult,
+  type PolicyExpectation,
   type PolicyOperation,
   type PolicyTestBody,
   type PolicyTestValue,
+  type PolicyVerdict,
 } from "@/lib/zitadel/resources/policies/types";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
@@ -96,6 +99,56 @@ export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
    */
   static fileName<Operation extends string>(operation: Operation): PolicyTestFileName<Operation> {
     return `${operation}${POLICY_TEST_SUFFIX}`;
+  }
+
+  /**
+   * A case's outcome against the decision the server made for it.
+   *
+   * @remarks
+   * The case passes when the decision agrees on `allowed` always, on `code`
+   * when the case gives one, and on `violations` when the case gives them, as
+   * exactly that set of rule names, so a rule that fails unexpectedly fails
+   * the case too.
+   *
+   * @param testCase - The case, with the decision it expects.
+   * @param actual - The decision the server made for the case's input.
+   * @returns The case's name, whether it passed, and both decisions.
+   */
+  static resultOf(testCase: PolicyCase, actual: PolicyVerdict): PolicyCaseResult {
+    return {
+      name: testCase.name,
+      passed: PolicyTest.holds(testCase.expect, actual),
+      expected: testCase.expect,
+      actual,
+    };
+  }
+
+  /**
+   * Whether a decision is what a case expects.
+   *
+   * @param expected - The decision the case expects.
+   * @param actual - The decision the server made.
+   * @returns Whether they agree on `allowed`, and on the code and the set of
+   *   violated rules where the case names them.
+   */
+  private static holds(expected: PolicyExpectation, actual: PolicyVerdict): boolean {
+    if (expected.allowed !== actual.allowed) {
+      return false;
+    }
+    if (expected.code !== undefined && expected.code !== actual.code) {
+      return false;
+    }
+    if (expected.violations === undefined) {
+      return true;
+    }
+    const got = new Set(Object.keys(actual.violations ?? {}));
+    const want = new Set(expected.violations);
+    if (got.size !== want.size) {
+      return false;
+    }
+    return [...got].every((name) => {
+      return want.has(name);
+    });
   }
 
   /**

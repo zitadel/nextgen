@@ -21,6 +21,16 @@ const PATH = `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_TEST_FILE}`;
  */
 const LONG_ENOUGH_CASE = { ...TOO_SHORT_CASE, name: "long enough", expect: { allowed: true } };
 
+/**
+ * What the server decides for a password the policy refused for being too
+ * short.
+ */
+const TOO_SHORT = {
+  allowed: false,
+  code: "user.password_policy_violation",
+  violations: { min_length: 12 },
+};
+
 describe("PolicyTest.read", () => {
   it("takes a test file the policy test contract takes as a test file", () => {
     const reading = PolicyTest.read(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
@@ -91,6 +101,44 @@ describe("PolicyTest.fileName", () => {
     const name = PolicyTest.fileName(PASSWORD_POLICY);
 
     expect(name).toBe(PASSWORD_POLICY_TEST_FILE);
+  });
+});
+
+describe("PolicyTest.resultOf", () => {
+  it.each([
+    ["passes an allowed password expected allowed", { allowed: true }, { allowed: true }, true],
+    ["fails a refused password expected allowed", { allowed: true }, TOO_SHORT, false],
+    ["passes a refusal expected with no code", { allowed: false }, TOO_SHORT, true],
+    [
+      "fails a refusal expected with another code",
+      { allowed: false, code: "user.password_empty" },
+      TOO_SHORT,
+      false,
+    ],
+    [
+      "passes a refusal expected with exactly its violations",
+      { allowed: false, violations: ["min_length"] },
+      TOO_SHORT,
+      true,
+    ],
+    [
+      "fails a refusal expected with fewer violations than it has",
+      { allowed: false, violations: ["min_length"] },
+      { ...TOO_SHORT, violations: { min_length: 12, max_length: 10 } },
+      false,
+    ],
+    [
+      "fails a refusal expected with other violations",
+      { allowed: false, violations: ["max_length"] },
+      TOO_SHORT,
+      false,
+    ],
+  ])("%s", (_case, expected, actual, passes) => {
+    const testCase = { ...TOO_SHORT_CASE, expect: expected };
+
+    const result = PolicyTest.resultOf(testCase, actual);
+
+    expect(result.passed).toBe(passes);
   });
 });
 

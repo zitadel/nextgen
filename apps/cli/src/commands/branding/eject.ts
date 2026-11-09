@@ -1,7 +1,15 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { Branding, CONFIG_DIRECTORIES, DiskStore, ZitadelConfig } from "@/lib/zitadel";
+import {
+  BRANDING_DESIGN_INFO,
+  Branding,
+  CONFIG_DIRECTORIES,
+  DiskStore,
+  PAGE_LAYOUT_HINT,
+  RETIRED_BRANDING_DESIGNS,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
@@ -16,11 +24,6 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import {
-  BRANDING_DESIGN_INFO,
-  PAGE_LAYOUT_HINT,
-  RETIRED_BRANDING_DESIGNS,
-} from "@/lib/branding/designs";
 import { isErrno, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { hasZitadelConfig } from "@/lib/project";

@@ -85,6 +85,56 @@ export type PolicyCase = PolicyTestBody["cases"][number];
 export type PolicyExpectation = PolicyCase["expect"];
 
 /**
+ * The decision the server reached for a case, as a case is held to it.
+ *
+ * @remarks
+ * The shape of `POST /policies/evaluate`'s answer, spelled out here so the
+ * library depends on nothing that talks to the server.
+ */
+export type PolicyVerdict = {
+  /**
+   * Whether the operation would go ahead.
+   */
+  readonly allowed: boolean;
+
+  /**
+   * The error code a refusal answers with, when it refuses.
+   */
+  readonly code?: string | undefined;
+
+  /**
+   * Every failed rule keyed by name, with the value of the setting it is
+   * named after.
+   */
+  readonly violations?: Readonly<Record<string, unknown>> | undefined;
+};
+
+/**
+ * One case's outcome: what it expected and what the server decided.
+ */
+export type PolicyCaseResult = {
+  /**
+   * The case's name.
+   */
+  readonly name: string;
+
+  /**
+   * Whether the decision is what the case expects.
+   */
+  readonly passed: boolean;
+
+  /**
+   * The decision the case expects.
+   */
+  readonly expected: PolicyExpectation;
+
+  /**
+   * The decision the server made.
+   */
+  readonly actual: PolicyVerdict;
+};
+
+/**
  * A minimum password length as `setup` was given it.
  *
  * @remarks
