@@ -152,8 +152,8 @@ export type Edit<Document> = {
 
 /**
  * One configuration file its contract took, as the library holds it: its
- * path, its body exactly as written, the typed value its contract parsed the
- * body to, and where it stands against the file on disk.
+ * path, its body as read with every unknown key kept, the typed value its
+ * contract parsed the body to, and where it stands against the file on disk.
  *
  * @remarks
  * A document only exists when its body passes its kind's contract: a file the
@@ -197,8 +197,9 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
   readonly path: string;
 
   /**
-   * The body exactly as written, including the editor-only `$schema` pointer
-   * and every key the contract does not know.
+   * The body as read, including the editor-only `$schema` pointer and every key
+   * the contract does not know. Keys are written back sorted, not in the order
+   * the file had them.
    *
    * @remarks
    * Only for writing the file back: read what the document holds from
