@@ -1,6 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
 import semver from "semver";
 
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
@@ -10,6 +7,7 @@ import {
   metaSchemaState,
   projectMetaSchemas,
   type ProjectMetaSchema,
+  writeMetaSchemas,
 } from "@/lib/meta-schemas";
 import { exactZitadelPins } from "./dependency-version";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
@@ -97,16 +95,22 @@ export class MetaSchemasCheck implements SanityCheck {
     };
   }
 
+  /**
+   * Writes this CLI's version of every missing or outdated meta-schema through
+   * {@link writeMetaSchemas}, which leaves a linked or unreadable file alone.
+   * Writes nothing in a dry run, or when the project pins a newer
+   * `@zitadel/*` package than this CLI.
+   *
+   * @param ctx - The project and how to treat it.
+   * @returns Nothing; what differs is read again by the next {@link run}.
+   * @throws When a directory cannot be created or a file cannot be written.
+   */
   async fix(ctx: CheckContext): Promise<void> {
     const { missing, outdated } = await drift(ctx);
     if (ctx.dryRun || (await newerPin(ctx)) !== undefined) {
       return;
     }
-    for (const file of [...missing, ...outdated]) {
-      const dest = join(ctx.cwd, file.path);
-      await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, file.contents);
-    }
+    await writeMetaSchemas(ctx.cwd, [...missing, ...outdated], { dryRun: false });
   }
 }
 

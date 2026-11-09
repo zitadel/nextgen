@@ -51,10 +51,10 @@ export async function readIfExists(path: string): Promise<string | undefined> {
  * Lists the names in a directory, treating a directory that does not exist as an
  * empty one.
  *
- * The CLI keeps optional folders in a project (`.zitadel/idps`,
- * `.zitadel/schemas`, ...) that a project has only once it uses the feature, so
- * "no such folder" and "no files in the folder" mean the same thing to the
- * caller. Only a missing directory (`ENOENT`) is treated that way. A directory
+ * Some directories the CLI lists may not exist yet, such as the directory
+ * `setup` is about to scaffold an app into, so "no such folder" and "no files in
+ * the folder" mean the same thing to the caller. Only a missing directory
+ * (`ENOENT`) is treated that way. A directory
  * that exists but cannot be listed, such as one without read permission, or a
  * file where a directory should be (`ENOTDIR`), still throws, so a broken layout
  * is reported and not mistaken for an empty folder.

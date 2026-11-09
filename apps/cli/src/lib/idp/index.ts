@@ -14,7 +14,8 @@
  *
  * **Dependency rule.** No upward imports (`commands/`, `sync/`). It depends
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
+ * `lib/errors` (`ZitadelError`), `lib/input` (`Asker`), `lib/warnings`
+ * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
  */
 export {
   customFlagText,

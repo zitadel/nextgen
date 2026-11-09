@@ -26,7 +26,7 @@ import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/
 import { hasZitadelConfig } from "@/lib/project";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { filled, reads, suggesterOf } from "@/lib/oclif/flags";
-import { metaSchemaState, projectMetaSchemas } from "@/lib/meta-schemas";
+import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { normalizePublicCliProse } from "@/lib/public-cli";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
@@ -183,13 +183,13 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     // in, so the CLI-owned meta-schema is written when missing or outdated,
     // as `doctor --fix` does; one that cannot be read, or sits behind a
     // symlink, is doctor's to report.
-    const brandingMeta = projectMetaSchemas(this.cliVersion).find(
-      (file) => file.path === `${META_SCHEMA_DIR}/branding.json`,
-    );
-    if (brandingMeta) {
-      const state = await metaSchemaState(this.cwd, brandingMeta).catch(() => "current" as const);
-      if (state === "missing" || state === "outdated") {
-        await write(brandingMeta.path, brandingMeta.contents, true);
+    const brandingMeta = projectMetaSchemas(this.cliVersion).filter((file) => {
+      return file.path === `${META_SCHEMA_DIR}/branding.json`;
+    });
+    const metaWrites = await writeMetaSchemas(this.cwd, brandingMeta, { dryRun: false });
+    for (const artifact of metaWrites.written) {
+      if (artifact.kind === "file") {
+        filesWritten.push(artifact.path);
       }
     }
 
