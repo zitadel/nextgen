@@ -1137,6 +1137,37 @@ type Invoker interface {
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
+	// ListProjectMembers invokes listProjectMembers operation.
+	//
+	// Lists the people who have a role on a project, with each person's strongest
+	// role and how they hold it.
+	// A person appears once, with their strongest `relation` (`viewer`, `editor`
+	// or `admin`; a stronger role includes the weaker ones) and one entry in
+	// `sources` per way they hold that role:
+	// - `owning_team`: an active member of the team that owns the project, the
+	// team a claim attaches the project to. It holds `admin`. Removing a grant
+	// does not remove this access. It ends only when the person leaves the
+	// team or the project changes owner.
+	// - `grant`: an unexpired grant on the project, which is a role given to the
+	// person (`grant_id` only) or to a team they are an active member of
+	// (`grant_id` and `team`). Revoking that grant removes this source.
+	// Grants of a weaker role than the person's strongest are not in `sources`;
+	// they still show in the project's grants (`queryGrants`,
+	// `POST /grants/query`).
+	// Pass `relation` to list only the people whose strongest role is at least
+	// that strong: `relation=admin` lists the people who can administer the
+	// project.
+	// The list follows the authorization check. A person who left a team, or
+	// whose team or user was deactivated, is not listed through it. Expired
+	// grants are left out. Like the check, the list does not look at a person's
+	// user status beyond that, so a direct grant to a suspended person is
+	// listed.
+	// The list is ordered by `user_id` and paginated with `page_token`.
+	// Authenticate with a project secret (`oauth2`), or with the session cookie
+	// (`sessionCookie`) of a signed-in person who can read the project.
+	//
+	// GET /projects/{project_id}/members
+	ListProjectMembers(ctx context.Context, params ListProjectMembersParams) (ListProjectMembersRes, error)
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first. A release is a snapshot of the
@@ -13034,6 +13065,233 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 
 	stage = "DecodeResponse"
 	result, err := decodeListProjectAdminsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListProjectMembers invokes listProjectMembers operation.
+//
+// Lists the people who have a role on a project, with each person's strongest
+// role and how they hold it.
+// A person appears once, with their strongest `relation` (`viewer`, `editor`
+// or `admin`; a stronger role includes the weaker ones) and one entry in
+// `sources` per way they hold that role:
+// - `owning_team`: an active member of the team that owns the project, the
+// team a claim attaches the project to. It holds `admin`. Removing a grant
+// does not remove this access. It ends only when the person leaves the
+// team or the project changes owner.
+// - `grant`: an unexpired grant on the project, which is a role given to the
+// person (`grant_id` only) or to a team they are an active member of
+// (`grant_id` and `team`). Revoking that grant removes this source.
+// Grants of a weaker role than the person's strongest are not in `sources`;
+// they still show in the project's grants (`queryGrants`,
+// `POST /grants/query`).
+// Pass `relation` to list only the people whose strongest role is at least
+// that strong: `relation=admin` lists the people who can administer the
+// project.
+// The list follows the authorization check. A person who left a team, or
+// whose team or user was deactivated, is not listed through it. Expired
+// grants are left out. Like the check, the list does not look at a person's
+// user status beyond that, so a direct grant to a suspended person is
+// listed.
+// The list is ordered by `user_id` and paginated with `page_token`.
+// Authenticate with a project secret (`oauth2`), or with the session cookie
+// (`sessionCookie`) of a signed-in person who can read the project.
+//
+// GET /projects/{project_id}/members
+func (c *Client) ListProjectMembers(ctx context.Context, params ListProjectMembersParams) (ListProjectMembersRes, error) {
+	res, err := c.sendListProjectMembers(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListProjectMembers(ctx context.Context, params ListProjectMembersParams) (res ListProjectMembersRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listProjectMembers"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/members"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListProjectMembersOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/members"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "relation" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "relation",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Relation.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListProjectMembersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListProjectMembersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListProjectMembersResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

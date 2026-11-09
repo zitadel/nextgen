@@ -365,6 +365,10 @@ type ListProjectAdminsRes interface {
 	listProjectAdminsRes()
 }
 
+type ListProjectMembersRes interface {
+	listProjectMembersRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }

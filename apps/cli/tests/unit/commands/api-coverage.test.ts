@@ -136,6 +136,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
+  listProjectMembers: "not yet exposed; a project sub-resource listing, no command reads it yet",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
