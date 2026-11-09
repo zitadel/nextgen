@@ -380,6 +380,29 @@ describe("validateStep", () => {
       });
     });
 
+    it("refuses a file its contract refuses before it asks the project anything", async () => {
+      const listSchemas = vi.fn(() => {
+        throw new Error("the server is unreachable");
+      });
+      const schemas = new SchemaService(
+        fakeClient({ listSchemas: { pages: listSchemas } }),
+        PROJECT_ID,
+      );
+      const config = aConfig({
+        schemas: { "human-user.json": aUserSchema(), "a.json": { objectType: "a" } },
+        flows: { "default-login.json": aLoginFlow({ userSchema: "missing", collects: ["email"] }) },
+      });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, schemas }));
+      });
+
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/schemas/a.json"),
+      });
+    });
+
     it.each(["sch_01J000000000000000000000", "https://schemas.zitadel.com/human-user/v1"])(
       "leaves a user_schema that is a schema id (%s) to the server",
       async (reference) => {

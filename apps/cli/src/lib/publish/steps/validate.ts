@@ -21,8 +21,10 @@ export const validateStep: Step = {
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<StepResult> {
     const issues = ctx.config.validate({ store: ctx.store, environment: ctx.env });
-    const unresolved = await unresolvedSchemas(ctx);
-    refuseErrors(ctx, [...issues, ...unresolved]);
+    // The local findings are refused before the server is asked anything, so
+    // a server that cannot be reached never hides them.
+    refuseErrors(ctx, issues);
+    refuseErrors(ctx, await unresolvedSchemas(ctx));
     await validateConnections(ctx);
     const branding = ctx.bundle.branding;
     const brandings = branding === undefined ? [] : [branding];
