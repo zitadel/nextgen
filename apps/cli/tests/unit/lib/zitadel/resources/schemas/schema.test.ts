@@ -85,7 +85,7 @@ describe("UserSchema.handle", () => {
 
 describe("UserSchema.asRead", () => {
   it("marks an edited schema as read", () => {
-    const edited = shippedSchema().withProvider(slug("google"));
+    const edited = shippedSchema().withProvider(slug("google")).document;
 
     expect(edited.asRead().status).toBe("read");
   });
@@ -186,7 +186,7 @@ describe("UserSchema.withProvider", () => {
   it("enables the provider without touching password or passkey", () => {
     const schema = shippedSchema();
 
-    const edited = schema.withProvider(slug("google"));
+    const edited = schema.withProvider(slug("google")).document;
 
     expect(methodsOf(edited)).toEqual({
       ...methodsOf(schema),
@@ -195,19 +195,27 @@ describe("UserSchema.withProvider", () => {
   });
 
   it("marks the schema as edited", () => {
-    expect(shippedSchema().withProvider(slug("google")).status).toBe("edited");
+    expect(shippedSchema().withProvider(slug("google")).document.status).toBe("edited");
+  });
+
+  it("says it changed the schema", () => {
+    expect(shippedSchema().withProvider(slug("google")).changed).toBe(true);
   });
 
   it("returns the same schema the second time", () => {
-    const first = shippedSchema().withProvider(slug("google"));
+    const first = shippedSchema().withProvider(slug("google")).document;
 
-    expect(first.withProvider(slug("google"))).toBe(first);
+    expect(first.withProvider(slug("google"))).toEqual({
+      document: first,
+      changed: false,
+      skipped: [],
+    });
   });
 
   it("keeps a provider that is already enabled when adding another", () => {
-    const first = shippedSchema().withProvider(slug("google"));
+    const first = shippedSchema().withProvider(slug("google")).document;
 
-    const second = first.withProvider(slug("github"));
+    const second = first.withProvider(slug("github")).document;
 
     expect(objectAt(methodsOf(second), "sso").providers).toEqual(["google", "github"]);
   });
@@ -215,7 +223,7 @@ describe("UserSchema.withProvider", () => {
   it("keeps the schema's keys in their order", () => {
     const schema = shippedSchema();
 
-    const edited = schema.withProvider(slug("google"));
+    const edited = schema.withProvider(slug("google")).document;
 
     expect(Object.keys(edited.body)).toEqual(Object.keys(schema.body));
   });
@@ -235,7 +243,7 @@ describe("UserSchema.withProvider", () => {
       "x-auth-methods": { sso: { enabled: false, providers: [], options } },
     });
 
-    const edited = schema.withProvider(slug("google"));
+    const edited = schema.withProvider(slug("google")).document;
 
     expect(objectAt(methodsOf(edited), "sso").options).not.toBe(options);
   });
@@ -251,19 +259,19 @@ describe("UserSchema.withProvider", () => {
 
 describe("UserSchema.withoutProvider", () => {
   it("takes one provider out and keeps the rest", () => {
-    const edited = withProviders(["google", "github"]).withoutProvider("google");
+    const edited = withProviders(["google", "github"]).withoutProvider("google").document;
 
     expect(methodsOf(edited).sso).toEqual({ enabled: true, providers: ["github"] });
   });
 
   it("turns SSO off when the last provider goes", () => {
-    const edited = withProviders(["google"]).withoutProvider("google");
+    const edited = withProviders(["google"]).withoutProvider("google").document;
 
     expect(methodsOf(edited).sso).toEqual({ enabled: false });
   });
 
   it("leaves password and passkey as they are", () => {
-    const edited = withProviders(["google"]).withoutProvider("google");
+    const edited = withProviders(["google"]).withoutProvider("google").document;
 
     expect([methodsOf(edited).password, methodsOf(edited).passkey]).toEqual([
       { enabled: true },
@@ -283,7 +291,11 @@ describe("UserSchema.withoutProvider", () => {
   it("returns the same schema for a provider it does not offer", () => {
     const schema = withProviders(["github"]);
 
-    expect(schema.withoutProvider("google")).toBe(schema);
+    expect(schema.withoutProvider("google")).toEqual({
+      document: schema,
+      changed: false,
+      skipped: [],
+    });
   });
 
   it("refuses a schema whose provider list was edited by hand", () => {
@@ -299,7 +311,7 @@ describe("UserSchema.withMethod", () => {
   it("switches a method on and keeps what else its entry holds", () => {
     const schema = schemaOf({ "x-auth-methods": { passkey: { enabled: false, label: "Key" } } });
 
-    const edited = schema.withMethod("passkey");
+    const edited = schema.withMethod("passkey").document;
 
     expect(methodsOf(edited).passkey).toEqual({ enabled: true, label: "Key" });
   });
@@ -307,7 +319,11 @@ describe("UserSchema.withMethod", () => {
   it("returns the same schema when the method is already on", () => {
     const schema = withProviders([]);
 
-    expect(schema.withMethod("password")).toBe(schema);
+    expect(schema.withMethod("password")).toEqual({
+      document: schema,
+      changed: false,
+      skipped: [],
+    });
   });
 
   it("refuses password on a schema with no identifier", () => {
@@ -331,7 +347,7 @@ describe("UserSchema.withoutMethod", () => {
   it("switches a method off and keeps what else its entry holds", () => {
     const schema = schemaOf({ "x-auth-methods": { passkey: { enabled: true, label: "Key" } } });
 
-    const edited = schema.withoutMethod("passkey");
+    const edited = schema.withoutMethod("passkey").document;
 
     expect(methodsOf(edited).passkey).toEqual({ enabled: false, label: "Key" });
   });
@@ -339,7 +355,11 @@ describe("UserSchema.withoutMethod", () => {
   it("returns the same schema when the method is already off", () => {
     const schema = withProviders([]);
 
-    expect(schema.withoutMethod("passkey")).toBe(schema);
+    expect(schema.withoutMethod("passkey")).toEqual({
+      document: schema,
+      changed: false,
+      skipped: [],
+    });
   });
 
   it("refuses a method whose container was edited by hand", () => {

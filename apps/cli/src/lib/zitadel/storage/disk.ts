@@ -4,9 +4,18 @@ import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promise
 import { stringify } from "safe-stable-stringify";
 
 import { ConfigError, FileExistsError } from "@/lib/zitadel/errors";
-import { CONFIG_DIRECTORIES, type ConfigFile, type ConfigKind, type JsonObject } from "@/lib/zitadel/types";
+import {
+  CONFIG_DIRECTORIES,
+  type ConfigFile,
+  type ConfigKind,
+  type JsonObject,
+} from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
-import { findFileReferences, inlineFileReferences, outsideProject } from "@/lib/zitadel/storage/references";
+import {
+  findFileReferences,
+  inlineFileReferences,
+  outsideProject,
+} from "@/lib/zitadel/storage/references";
 import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 import { isJsonObject } from "@/lib/zitadel/utils/json";
 
@@ -51,7 +60,7 @@ export class DiskStore implements ConfigStore {
     const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
       // Only an absent directory means the project has none: a permission
       // failure reported as "no files" would hide a file that is right there.
-      if (errnoOf(error) === "ENOENT") {
+      if (DiskStore.errnoOf(error) === "ENOENT") {
         return [];
       }
       throw error;
@@ -71,17 +80,21 @@ export class DiskStore implements ConfigStore {
           .catch((error: unknown) => {
             // Only the position is kept: V8 quotes the source it choked on,
             // and a connection file is where a pasted secret would be.
-            const position = error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
+            const position =
+              error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
             throw new ConfigError(`${path} is not valid JSON`, {
               hint: "Fix the file, then run the command again.",
               details: {
                 file: path,
-                parse_error: position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`,
+                parse_error:
+                  position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`,
               },
             });
           });
         if (!isJsonObject(body)) {
-          throw new ConfigError(`${path} does not contain a JSON object`, { details: { file: path } });
+          throw new ConfigError(`${path} does not contain a JSON object`, {
+            details: { file: path },
+          });
         }
         return { path, body };
       }),
@@ -115,7 +128,8 @@ export class DiskStore implements ConfigStore {
    *   `create`.
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
-    return this.writeText(file.path, `${stringify(file.body, null, 2) ?? "null"}\n`, mode);
+    const json = stringify(file.body, null, 2) ?? "null";
+    return this.writeText(file.path, `${json}\n`, mode);
   }
 
   /**
@@ -141,7 +155,7 @@ export class DiskStore implements ConfigStore {
     await mkdir(target.parent.toString(), { recursive: true });
     await writeFile(target.toString(), text, { flag: mode === "create" ? "wx" : "w" }).catch(
       (error: unknown) => {
-        if (errnoOf(error) === "EEXIST") {
+        if (DiskStore.errnoOf(error) === "EEXIST") {
           throw new FileExistsError(path);
         }
         throw error;
@@ -170,7 +184,7 @@ export class DiskStore implements ConfigStore {
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          const code = errnoOf(error);
+          const code = DiskStore.errnoOf(error);
           if (code === "ENOENT" || code === "ENOTDIR") {
             return undefined;
           }
@@ -191,7 +205,8 @@ export class DiskStore implements ConfigStore {
    * @throws {@link ConfigError} When a reference leads outside the project.
    */
   referencedPaths(file: ConfigFile): readonly string[] {
-    return findFileReferences(file.body).map(({ ref }) => {
+    return findFileReferences(file.body).map((item) => {
+      const { ref } = item;
       return this.locate(file, ref).relativeTo(this.root);
     });
   }
@@ -224,17 +239,17 @@ export class DiskStore implements ConfigStore {
     }
     return target;
   }
-}
 
-/**
- * The error code of a failed file operation.
- *
- * @param error - What the operation threw.
- * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
- */
-function errnoOf(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("code" in error)) {
-    return undefined;
+  /**
+   * The error code of a failed file operation.
+   *
+   * @param error - What the operation threw.
+   * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
+   */
+  private static errnoOf(error: unknown): string | undefined {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+      return undefined;
+    }
+    return typeof error.code === "string" ? error.code : undefined;
   }
-  return typeof error.code === "string" ? error.code : undefined;
 }

@@ -143,7 +143,10 @@ The server evaluates every case, so the command needs a connection to it. By def
     }
     return new Map(
       documents.map((policy): [string, PolicyUnderTest] => {
-        return [policy.operation, { config: policy.config, source: { file: policy.path } }];
+        return [
+          policy.readOperation(),
+          { config: policy.readConfig(), source: { file: policy.path } },
+        ];
       }),
     );
   }

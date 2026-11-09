@@ -4,15 +4,115 @@ import { describe, expect, it } from "vitest";
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
 import {
+  Branding,
   CONFIG_DIRECTORIES,
   ConfigError,
   ConflictError,
   ConnectionExistsError,
   FileExistsError,
+  Flow,
   MemoryStore,
-  PASSWORD_POLICY_PATH,
+  PasswordPolicy,
+  Policy,
+  PolicyTest,
+  UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import type { ConfigFile, ConfigFiles } from "@/lib/zitadel/types";
+
+const POLICY = ".zitadel/policies/password.json";
+const POLICY_TEST = ".zitadel/policies/password.test.json";
+
+/**
+ * A configuration holding the password policy and its test file.
+ *
+ * @returns The configuration.
+ */
+function withPolicyAndTest(): ZitadelConfig {
+  return ZitadelConfig.of({
+    schemas: [],
+    flows: [],
+    connections: [],
+    policies: [
+      { path: POLICY, body: { operation: "password" } },
+      { path: POLICY_TEST, body: { operation: "password", cases: [] } },
+    ],
+    branding: [],
+  });
+}
+
+/**
+ * The paths of a list of documents.
+ *
+ * @param documents - The documents.
+ * @returns Their paths, in order.
+ */
+function pathsOf(documents: readonly { path: string }[]): readonly string[] {
+  return documents.map((document) => {
+    return document.path;
+  });
+}
+
+describe("ZitadelConfig.with", () => {
+  it.each([
+    ["schema", UserSchema.create({ path: ".zitadel/schemas/user.json", body: {} }), "schemas"],
+    ["flow", Flow.create({ path: ".zitadel/flows/login.json", body: {} }), "flows"],
+    ["policy", Policy.create({ path: ".zitadel/policies/lockout.json", body: {} }), "policies"],
+    ["branding", Branding.create({ path: ".zitadel/branding/login.json", body: {} }), "branding"],
+  ] as const)("places a %s in its own collection", (_kind, document, collection) => {
+    const config = ZitadelConfig.empty().with(document);
+
+    expect(pathsOf(config[collection].all)).toEqual([document.path]);
+  });
+
+  it("places a policy test file among the policies' tests", () => {
+    const test = PolicyTest.create({ path: ".zitadel/policies/lockout.test.json", body: {} });
+
+    expect(pathsOf(ZitadelConfig.empty().with(test).policies.tests)).toEqual([test.path]);
+  });
+
+  it("replaces a policy test file at the same path, where it was", () => {
+    const test = PolicyTest.create({ path: POLICY_TEST, body: { operation: "password" } });
+
+    expect(withPolicyAndTest().with(test).policies.tests).toEqual([test]);
+  });
+
+  it("leaves the policies alone when a policy test file is placed", () => {
+    const test = PolicyTest.create({ path: POLICY_TEST, body: { operation: "password" } });
+
+    expect(pathsOf(withPolicyAndTest().with(test).policies.all)).toEqual([POLICY]);
+  });
+});
+
+describe("ZitadelConfig.without", () => {
+  it("removes a policy test file", () => {
+    const config = withPolicyAndTest();
+    const [test] = config.policies.tests;
+
+    expect(test === undefined ? [] : config.without(test).policies.tests).toEqual([]);
+  });
+
+  it("deletes the removed policy test file's file", () => {
+    const config = withPolicyAndTest();
+    const [test] = config.policies.tests;
+
+    expect(test === undefined ? [] : pathsOf(config.without(test).removedDocuments)).toEqual([
+      POLICY_TEST,
+    ]);
+  });
+});
+
+describe("ZitadelConfig.changedDocuments", () => {
+  it("includes a new policy test file", () => {
+    const test = PolicyTest.create({ path: ".zitadel/policies/lockout.test.json", body: {} });
+
+    expect(pathsOf(ZitadelConfig.empty().with(test).changedDocuments)).toEqual([test.path]);
+  });
+
+  it("leaves out the documents as read", () => {
+    expect(withPolicyAndTest().changedDocuments).toEqual([]);
+  });
+});
 
 describe("ZitadelConfig.scaffold", () => {
   describe("with no provider", () => {
@@ -27,7 +127,7 @@ describe("ZitadelConfig.scaffold", () => {
       expect(scaffold.change.changedPaths).toEqual([
         DEFAULT_SCHEMA_CONFIG_PATH,
         DEFAULT_FLOW_CONFIG_PATH,
-        PASSWORD_POLICY_PATH,
+        PasswordPolicy.PATH,
       ]);
     });
 
@@ -108,7 +208,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: false,
       });
 
-      expect(policy.config.min_length).toBe(minimum);
+      expect(policy.readMinLength()).toBe(minimum);
     });
   });
 
@@ -182,16 +282,18 @@ describe("ZitadelConfig.scaffold", () => {
   });
 
   describe("when a default file is already there", () => {
-    it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH, PASSWORD_POLICY_PATH])(
+    it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH, PasswordPolicy.PATH])(
       "refuses %s without force",
       async (path) => {
-        const store = new MemoryStore([
-          { path: DEFAULT_SCHEMA_CONFIG_PATH, body: {} },
-          { path: DEFAULT_FLOW_CONFIG_PATH, body: {} },
-          { path: PASSWORD_POLICY_PATH, body: {} },
-        ].filter((file) => {
-          return file.path === path;
-        }));
+        const store = new MemoryStore(
+          [
+            { path: DEFAULT_SCHEMA_CONFIG_PATH, body: {} },
+            { path: DEFAULT_FLOW_CONFIG_PATH, body: {} },
+            { path: PasswordPolicy.PATH, body: {} },
+          ].filter((file) => {
+            return file.path === path;
+          }),
+        );
         const config = await ZitadelConfig.loadUnchecked(store);
 
         const error = thrownBy(() => {
@@ -234,7 +336,7 @@ describe("ZitadelConfig.scaffold", () => {
     it("leaves a policy given no minimum unwritten", async () => {
       const store = new MemoryStore([
         {
-          path: PASSWORD_POLICY_PATH,
+          path: PasswordPolicy.PATH,
           body: { operation: "auth.factor.password.set", config: { min_length: 9 } },
         },
       ]);
@@ -247,13 +349,13 @@ describe("ZitadelConfig.scaffold", () => {
         force: true,
       });
 
-      expect(scaffold.change.changedPaths).not.toContain(PASSWORD_POLICY_PATH);
+      expect(scaffold.change.changedPaths).not.toContain(PasswordPolicy.PATH);
     });
 
     it("leaves a policy given the minimum it already holds unwritten", async () => {
       const store = new MemoryStore([
         {
-          path: PASSWORD_POLICY_PATH,
+          path: PasswordPolicy.PATH,
           body: { operation: "auth.factor.password.set", config: { min_length: 9 } },
         },
       ]);
@@ -267,38 +369,41 @@ describe("ZitadelConfig.scaffold", () => {
         force: true,
       });
 
-      expect(scaffold.change.changedPaths).not.toContain(PASSWORD_POLICY_PATH);
+      expect(scaffold.change.changedPaths).not.toContain(PasswordPolicy.PATH);
     });
 
     it.each([
       { given: 20, config: { max_length: 64, min_length: 20 } },
       { given: null, config: { max_length: 64 } },
-    ])("puts a minimum of $given into it, keeping its other settings", async ({ given, config }) => {
-      const store = new MemoryStore([
-        {
-          path: PASSWORD_POLICY_PATH,
-          body: {
-            operation: "auth.factor.password.set",
-            config: { max_length: 64, min_length: 9 },
+    ])(
+      "puts a minimum of $given into it, keeping its other settings",
+      async ({ given, config }) => {
+        const store = new MemoryStore([
+          {
+            path: PasswordPolicy.PATH,
+            body: {
+              operation: "auth.factor.password.set",
+              config: { max_length: 64, min_length: 9 },
+            },
           },
-        },
-      ]);
-      const loaded = await ZitadelConfig.loadUnchecked(store);
+        ]);
+        const loaded = await ZitadelConfig.loadUnchecked(store);
 
-      const { policy } = loaded.scaffold({
-        preset: "password-first",
-        useCase: "minimal",
-        sso: [],
-        passwordMinLength: given,
-        force: true,
-      });
+        const { policy } = loaded.scaffold({
+          preset: "password-first",
+          useCase: "minimal",
+          sso: [],
+          passwordMinLength: given,
+          force: true,
+        });
 
-      expect(policy.config).toEqual(config);
-    });
+        expect(policy.readConfig()).toEqual(config);
+      },
+    );
 
     it("refuses one that is not a valid password policy", async () => {
       const store = new MemoryStore([
-        { path: PASSWORD_POLICY_PATH, body: { operation: "auth.factor.other" } },
+        { path: PasswordPolicy.PATH, body: { operation: "auth.factor.other" } },
       ]);
       const config = await ZitadelConfig.loadUnchecked(store);
 
@@ -312,7 +417,7 @@ describe("ZitadelConfig.scaffold", () => {
       });
 
       expect(error).toBeInstanceOf(ConfigError);
-      expect(error).toMatchObject({ details: { file: PASSWORD_POLICY_PATH } });
+      expect(error).toMatchObject({ details: { file: PasswordPolicy.PATH } });
     });
   });
 
@@ -440,5 +545,190 @@ describe("ZitadelConfig.scaffold", () => {
         `${CONFIG_DIRECTORIES.connections}/acme.json`,
       );
     });
+  });
+});
+
+/**
+ * A configuration of the given files, every other kind empty.
+ *
+ * @param files - The files, by kind.
+ * @returns The configuration.
+ */
+function bundledConfigOf(files: Partial<ConfigFiles>): ZitadelConfig {
+  return ZitadelConfig.of({
+    schemas: [],
+    flows: [],
+    connections: [],
+    policies: [],
+    branding: [],
+    ...files,
+  });
+}
+
+describe("ZitadelConfig.bundle", () => {
+  it("groups the resources by kind and strips the $schema affordance", () => {
+    const config = bundledConfigOf({
+      schemas: [
+        {
+          path: ".zitadel/schemas/human-user.json",
+          body: { $schema: "../meta/user-schema.json", objectType: "human-user" },
+        },
+      ],
+      flows: [
+        {
+          path: ".zitadel/flows/default-login.json",
+          body: { $schema: "../meta/flow-definition.json", name: "default-login" },
+        },
+      ],
+      connections: [
+        {
+          path: ".zitadel/idps/google.json",
+          body: { $schema: "../meta/idp.json", slug: "google" },
+        },
+      ],
+    });
+
+    const { bundle, resourceCount } = config.bundle(new MemoryStore());
+
+    expect(resourceCount).toBe(3);
+    expect(bundle.schemas).toEqual([{ objectType: "human-user" }]);
+    expect(bundle.flow_definitions).toEqual([{ name: "default-login" }]);
+    expect(bundle.idps).toEqual([{ slug: "google" }]);
+    expect(bundle.branding).toBeUndefined();
+  });
+
+  it("sends the branding as one object under `branding`, never a `brandings` list", () => {
+    const config = bundledConfigOf({
+      schemas: [{ path: ".zitadel/schemas/human-user.json", body: { objectType: "human-user" } }],
+      branding: [{ path: ".zitadel/branding/branding.json", body: { layout: "centered" } }],
+    });
+
+    const { bundle, resourceCount } = config.bundle(new MemoryStore());
+
+    expect(resourceCount).toBe(2);
+    expect(bundle.branding).toMatchObject({ layout: "centered" });
+    expect(bundle).not.toHaveProperty("brandings");
+  });
+
+  it("inlines the branding's $file template and drops its $schema pointer", () => {
+    const store = new MemoryStore([], { ".zitadel/branding/login.liquid": "<main></main>" });
+    const config = bundledConfigOf({
+      branding: [
+        {
+          path: ".zitadel/branding/branding.json",
+          body: { $schema: "../meta/branding.json", liquid_template: { $file: "./login.liquid" } },
+        },
+      ],
+    });
+
+    const { bundle } = config.bundle(store);
+
+    expect(bundle.branding).toEqual({ liquid_template: "<main></main>" });
+  });
+
+  it("carries policy files under `policies` without their $schema pointer", () => {
+    const config = bundledConfigOf({
+      policies: [
+        {
+          path: ".zitadel/policies/auth.factor.password.set.json",
+          body: {
+            $schema: "../meta/policy.json",
+            operation: "auth.factor.password.set",
+            config: { min_length: 12 },
+          },
+        },
+      ],
+    });
+
+    const { bundle, resourceCount } = config.bundle(new MemoryStore());
+
+    expect(resourceCount).toBe(1);
+    expect(bundle.policies).toEqual([
+      { operation: "auth.factor.password.set", config: { min_length: 12 } },
+    ]);
+  });
+
+  it("never carries a policy test file, valid or not", () => {
+    const config = bundledConfigOf({
+      policies: [
+        {
+          path: ".zitadel/policies/auth.factor.password.set.json",
+          body: { operation: "auth.factor.password.set", config: {} },
+        },
+        {
+          path: ".zitadel/policies/auth.factor.password.set.test.json",
+          body: { cases: "not a policy" },
+        },
+      ],
+    });
+
+    const { bundle, resourceCount } = config.bundle(new MemoryStore());
+
+    expect(resourceCount).toBe(1);
+    expect(bundle.policies).toEqual([{ operation: "auth.factor.password.set", config: {} }]);
+  });
+
+  it("leaves `policies` out when there are none, so a server without the kind takes it", () => {
+    const config = bundledConfigOf({
+      schemas: [{ path: ".zitadel/schemas/human-user.json", body: { objectType: "human-user" } }],
+    });
+
+    const { bundle } = config.bundle(new MemoryStore());
+
+    expect(bundle).not.toHaveProperty("policies");
+  });
+
+  it("refuses an empty configuration", () => {
+    expect(() => {
+      return ZitadelConfig.empty().bundle(new MemoryStore());
+    }).toThrow(
+      expect.objectContaining({
+        name: "ConfigError",
+        message: "There is nothing in .zitadel/ to deploy",
+      }),
+    );
+  });
+
+  it("refuses more than one branding descriptor", () => {
+    const config = bundledConfigOf({
+      branding: [
+        { path: ".zitadel/branding/one.json", body: { name: "one" } },
+        { path: ".zitadel/branding/two.json", body: { name: "two" } },
+      ],
+    });
+
+    expect(() => {
+      return config.bundle(new MemoryStore());
+    }).toThrow(
+      expect.objectContaining({
+        name: "ConfigError",
+        message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      }),
+    );
+  });
+
+  it("refuses a bundle over the fifty-resource cap", () => {
+    const schemas: ConfigFile[] = Array.from({ length: 51 }, (_, i) => {
+      return { path: `.zitadel/schemas/schema-${i}.json`, body: { objectType: `type-${i}` } };
+    });
+
+    expect(() => {
+      return bundledConfigOf({ schemas }).bundle(new MemoryStore());
+    }).toThrow(
+      expect.objectContaining({
+        name: "ConfigError",
+        message: "A release pins at most 50 resources, but .zitadel/ holds 51",
+      }),
+    );
+  });
+
+  it("takes exactly fifty resources", () => {
+    const schemas: ConfigFile[] = Array.from({ length: 50 }, (_, i) => {
+      return { path: `.zitadel/schemas/schema-${i}.json`, body: { objectType: `type-${i}` } };
+    });
+
+    const { resourceCount } = bundledConfigOf({ schemas }).bundle(new MemoryStore());
+
+    expect(resourceCount).toBe(50);
   });
 });

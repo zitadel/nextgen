@@ -1,12 +1,27 @@
+import {
+  DEFAULT_FLOW_CONFIG_PATH,
+  DEFAULT_SCHEMA_CONFIG_PATH,
+  getDefaultHumanUserSchemaBody,
+  getDefaultLoginFlow,
+} from "@zitadel/config/defaults";
+import { providerOf } from "@zitadel/config/idp";
+
+import { Change } from "@/lib/zitadel/change";
 import { Branding } from "@/lib/zitadel/resources/branding/branding";
 import { Brandings } from "@/lib/zitadel/resources/branding/collection";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
-import { BrokenFilesError } from "@/lib/zitadel/errors";
+import {
+  BrokenFilesError,
+  ConfigError,
+  ConnectionExistsError,
+  FileExistsError,
+} from "@/lib/zitadel/errors";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import { Flows } from "@/lib/zitadel/resources/flows/collection";
 import { Policies } from "@/lib/zitadel/resources/policies/collection";
-import { Policy } from "@/lib/zitadel/resources/policies/policy";
+import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
+import type { Policy } from "@/lib/zitadel/resources/policies/policy";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 import { POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies/types";
 import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
@@ -16,20 +31,21 @@ import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
-import {
-  type Scaffold,
-  type ScaffoldedProvider,
-  type ScaffoldOptions,
-  scaffold,
-} from "@/lib/zitadel/scaffold";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { ConfigFiles } from "@/lib/zitadel/types";
+import type {
+  BuiltBundle,
+  ConfigFiles,
+  ConfigurationBundle,
+  Scaffold,
+  ScaffoldedProvider,
+  ScaffoldOptions,
+} from "@/lib/zitadel/types";
 
 /**
  * Any document of the configuration that a collection holds and a change
  * writes.
  */
-export type AnyDocument = UserSchema | Flow | Connection | Policy | Branding;
+export type AnyDocument = UserSchema | Flow | Connection | Policy | PolicyTest | Branding;
 
 /**
  * What a configuration knows beyond its files, which the caller keeps
@@ -73,6 +89,14 @@ type Parts = Readonly<{
 }>;
 
 /**
+ * An edit to the documents of one kind: a list, and the document it places or
+ * leaves out.
+ *
+ * @typeParam T - The kind of document.
+ */
+type ListEdit = <T extends AnyDocument>(documents: readonly T[], document: T) => readonly T[];
+
+/**
  * A project's whole configuration under `.zitadel/`: its user schemas, login
  * flows, identity-provider connections, operation policies and branding, read
  * and written together.
@@ -85,6 +109,12 @@ type Parts = Readonly<{
  * removed.
  */
 export class ZitadelConfig {
+  /**
+   * The most resources a release may pin: the cap `POST /releases/build`
+   * enforces.
+   */
+  private static readonly MAX_BUNDLE_RESOURCES = 50;
+
   /**
    * The user schemas under `.zitadel/schemas/`.
    */
@@ -209,7 +239,7 @@ export class ZitadelConfig {
         .filter((file) => {
           return !file.path.endsWith(POLICY_TEST_SUFFIX);
         })
-        .map(Policy.of),
+        .map(Policies.read),
       policyTests: files.policies
         .filter((file) => {
           return file.path.endsWith(POLICY_TEST_SUFFIX);
@@ -253,12 +283,80 @@ export class ZitadelConfig {
   }
 
   /**
-   * Scaffold a new project's configuration on top of this one: the default
-   * user schema and login flow, a connection for each chosen provider, and
-   * the password policy.
+   * Assemble the bundle a deploy sends: each document's wire body, grouped by
+   * kind.
    *
    * @remarks
-   * Every file is refused before anything is built; see {@link scaffold}.
+   * An empty configuration and one over the cap both fail before any server
+   * call, with the messages the server would answer.
+   *
+   * @param store - Where branding's referenced files are read from.
+   * @returns The bundle and how many resources it carries.
+   * @throws {@link ConfigError} When there is nothing to deploy, more than one
+   *   branding, or more resources than a release may pin.
+   */
+  bundle(store: ConfigStore): BuiltBundle {
+    // A project has one branding, so the bundle carries a single one. The cap
+    // below would not catch a second descriptor, so it is refused here, before
+    // anything is inlined or sent.
+    if (this.branding.all.length > 1) {
+      throw new ConfigError(
+        `A release carries at most one branding, but .zitadel/branding/ holds ${this.branding.all.length}`,
+        { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
+      );
+    }
+    const branding = this.branding.all[0]?.wireBody(store);
+    const policyBodies = this.policies.all.map((policy) => {
+      return policy.wireBody(store);
+    });
+    const policies = policyBodies.length === 0 ? {} : { policies: policyBodies };
+    const brandingPart = branding === undefined ? {} : { branding };
+    const bundle: ConfigurationBundle = {
+      schemas: this.schemas.all.map((schema) => {
+        return schema.wireBody(store);
+      }),
+      flow_definitions: this.flows.all.map((flow) => {
+        return flow.wireBody(store);
+      }),
+      idps: this.connections.all.map((connection) => {
+        return connection.wireBody(store);
+      }),
+      ...policies,
+      ...brandingPart,
+    };
+    const resourceCount =
+      this.schemas.all.length +
+      this.flows.all.length +
+      this.connections.all.length +
+      this.policies.all.length +
+      this.branding.all.length;
+    if (resourceCount === 0) {
+      throw new ConfigError("There is nothing in .zitadel/ to deploy", {
+        hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+      });
+    }
+    if (resourceCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
+      throw new ConfigError(
+        `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${resourceCount}`,
+      );
+    }
+    return { bundle, resourceCount };
+  }
+
+  /**
+   * Scaffold a new project's configuration on top of this one: the default
+   * user schema and login flow for a preset and use case, a connection for
+   * each chosen provider, and the password policy.
+   *
+   * @remarks
+   * Every file is refused before anything is built, so a conflict is found
+   * before the caller creates anything that depends on it. A connection is
+   * refused with or without `force`: the file is the developer's, holding a
+   * client id registered with the vendor and a slug other files may name, so
+   * it is never replaced. Each connection's claim mapping reads the template's
+   * properties, which enabling a provider does not change. A password policy
+   * kept by `force` is deployed as it is, so it must be a sound password
+   * policy.
    *
    * @typeParam P - The provider as the caller chose it, handed back with its
    *   connection.
@@ -266,15 +364,73 @@ export class ZitadelConfig {
    * @returns The change that writes it, and its documents.
    * @throws {@link ConnectionExistsError} When a chosen provider already has
    *   a connection.
-   * @throws {@link FileExistsError} Without `force`, when a default file is
-   *   already there.
+   * @throws {@link FileExistsError} Without `force`, when the default schema,
+   *   flow or password policy file is already there.
    * @throws {@link ConflictError} When a chosen provider's connection would
-   *   collide with another.
+   *   collide with another connection, by file name, slug or variables.
    * @throws {@link ConfigError} When `force` keeps a password policy file
-   *   that is not a valid password policy.
+   *   that is not a sound password policy.
    */
   scaffold<P extends ScaffoldedProvider>(options: ScaffoldOptions<P>): Scaffold<P> {
-    return scaffold(this, options);
+    const template = UserSchema.create({
+      path: DEFAULT_SCHEMA_CONFIG_PATH,
+      body: getDefaultHumanUserSchemaBody({ preset: options.preset, useCase: options.useCase }),
+    });
+    const connections = options.sso.map((chosen) => {
+      const provider = providerOf(chosen.selection);
+      return { chosen, connection: Connection.forProvider(provider, template, chosen.endpoints) };
+    });
+    for (const scaffolded of connections) {
+      const connection = scaffolded.connection;
+      const existing =
+        this.connections.existing(connection) ?? this.connections.get(connection.path);
+      if (existing !== undefined) {
+        throw new ConnectionExistsError(existing.path, scaffolded.chosen.selection);
+      }
+    }
+    const defaults = [
+      this.schemas.get(DEFAULT_SCHEMA_CONFIG_PATH),
+      this.flows.get(DEFAULT_FLOW_CONFIG_PATH),
+      this.policies.get(PasswordPolicy.PATH),
+    ];
+    for (const taken of defaults) {
+      if (!options.force && taken !== undefined) {
+        throw new FileExistsError(taken.path);
+      }
+    }
+    const policy = this.scaffoldedPasswordPolicy(options);
+    const slugs = options.sso.map((chosen) => {
+      return providerOf(chosen.selection).slug;
+    });
+    // The edits are additive and idempotent, so folding them builds one schema
+    // that names every chosen provider.
+    const schema = slugs.reduce((document, slug) => {
+      return document.withProvider(slug).document;
+    }, template);
+    // The conflict step a provider needs can only offer what this schema
+    // enables, so the methods are read off the composed schema rather than
+    // inferred from the preset.
+    const login = Flow.create({
+      path: DEFAULT_FLOW_CONFIG_PATH,
+      body: getDefaultLoginFlow({ preset: options.preset, useCase: options.useCase }),
+    });
+    const flow = slugs.reduce((document, slug) => {
+      return document.withProvider(slug, schema.enabledMethods).document;
+    }, login);
+    const written = connections.map((scaffolded) => {
+      return scaffolded.connection;
+    });
+    const documents: readonly AnyDocument[] = [schema, flow, ...written, policy];
+    const after = documents.reduce((current: ZitadelConfig, document) => {
+      return current.with(document);
+    }, this);
+    return {
+      change: new Change({ before: this, after }),
+      schema,
+      flow,
+      connections,
+      policy,
+    };
   }
 
   /**
@@ -289,26 +445,13 @@ export class ZitadelConfig {
    * @returns The new configuration.
    */
   with(document: AnyDocument): ZitadelConfig {
-    // A document put back where one was removed is written, not deleted.
-    const parts = {
-      ...this.parts,
+    return new ZitadelConfig({
+      ...ZitadelConfig.edited(this.parts, document, ZitadelConfig.placed),
+      // A document put back where one was removed is written, not deleted.
       removed: this.removed.filter((gone) => {
         return gone.path !== document.path;
       }),
-    };
-    if (document instanceof UserSchema) {
-      return new ZitadelConfig({ ...parts, schemas: placed(this.schemas.all, document) });
-    }
-    if (document instanceof Flow) {
-      return new ZitadelConfig({ ...parts, flows: placed(this.flows.all, document) });
-    }
-    if (document instanceof Connection) {
-      return new ZitadelConfig({ ...parts, connections: placed(this.connections.all, document) });
-    }
-    if (document instanceof Policy) {
-      return new ZitadelConfig({ ...parts, policies: placed(this.policies.all, document) });
-    }
-    return new ZitadelConfig({ ...parts, brandings: placed(this.branding.all, document) });
+    });
   }
 
   /**
@@ -324,26 +467,15 @@ export class ZitadelConfig {
    * @returns The new configuration.
    */
   without(document: AnyDocument): ZitadelConfig {
-    const removed = document.status === "created" ? this.removed : [...this.removed, document];
-    const parts = { ...this.parts, removed };
-    if (document instanceof UserSchema) {
-      return new ZitadelConfig({ ...parts, schemas: kept(this.schemas.all, document) });
-    }
-    if (document instanceof Flow) {
-      return new ZitadelConfig({ ...parts, flows: kept(this.flows.all, document) });
-    }
-    if (document instanceof Connection) {
-      return new ZitadelConfig({ ...parts, connections: kept(this.connections.all, document) });
-    }
-    if (document instanceof Policy) {
-      return new ZitadelConfig({ ...parts, policies: kept(this.policies.all, document) });
-    }
-    return new ZitadelConfig({ ...parts, brandings: kept(this.branding.all, document) });
+    return new ZitadelConfig({
+      ...ZitadelConfig.edited(this.parts, document, ZitadelConfig.kept),
+      removed: document.status === "created" ? this.removed : [...this.removed, document],
+    });
   }
 
   /**
    * The documents an edit has changed or created since the configuration
-   * was read.
+   * was read, of every kind, policy test files included.
    *
    * @returns The documents, by kind.
    */
@@ -353,6 +485,7 @@ export class ZitadelConfig {
       ...this.flows.all,
       ...this.connections.all,
       ...this.policies.all,
+      ...this.policies.tests,
       ...this.branding.all,
     ];
     return documents.filter((document) => {
@@ -368,6 +501,32 @@ export class ZitadelConfig {
    */
   get removedDocuments(): readonly AnyDocument[] {
     return this.removed;
+  }
+
+  /**
+   * The password policy a scaffold leaves the project with: the one `force`
+   * keeps, with the minimum it was given, or a new one.
+   *
+   * @param options - Whether files may be replaced, and the minimum given.
+   * @returns The policy.
+   * @throws {@link ConfigError} When `force` keeps a password policy file that
+   *   is not a sound password policy.
+   */
+  private scaffoldedPasswordPolicy(options: ScaffoldOptions): PasswordPolicy {
+    const kept = this.policies.password;
+    if (!options.force) {
+      return PasswordPolicy.initial(options.passwordMinLength);
+    }
+    if (this.policies.get(PasswordPolicy.PATH) === undefined) {
+      return PasswordPolicy.initial(options.passwordMinLength);
+    }
+    if (kept === undefined || kept.problems({}).length > 0) {
+      throw new ConfigError(`${PasswordPolicy.PATH} is not a valid password policy`, {
+        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
+        details: { file: PasswordPolicy.PATH },
+      });
+    }
+    return kept.withMinLength(options.passwordMinLength).document;
   }
 
   /**
@@ -388,41 +547,75 @@ export class ZitadelConfig {
       options: this.options,
     };
   }
-}
 
-/**
- * A list of documents with one in place: replacing the document at the same
- * path, where it was, or appended when there is none.
- *
- * @param documents - The documents.
- * @param edited - The document to place.
- * @returns The new list.
- */
-function placed<T extends AnyDocument>(documents: readonly T[], edited: T): T[] {
-  if (
-    !documents.some((current) => {
-      return current.path === edited.path;
-    })
-  ) {
-    return [...documents, edited];
-  }
-  return documents.map((current) => {
-    if (current.path === edited.path) {
-      return edited;
+  /**
+   * The parts of a configuration with one list edited: the list the document's
+   * kind is held in.
+   *
+   * @param parts - The parts.
+   * @param document - The document the edit places or leaves out.
+   * @param edit - The edit to its list.
+   * @returns The new parts.
+   */
+  private static edited(parts: Parts, document: AnyDocument, edit: ListEdit): Parts {
+    switch (document.kind) {
+      case "schema": {
+        return { ...parts, schemas: edit(parts.schemas, document) };
+      }
+      case "flow": {
+        return { ...parts, flows: edit(parts.flows, document) };
+      }
+      case "connection": {
+        return { ...parts, connections: edit(parts.connections, document) };
+      }
+      case "policy": {
+        return { ...parts, policies: edit(parts.policies, document) };
+      }
+      case "policy-test": {
+        return { ...parts, policyTests: edit(parts.policyTests, document) };
+      }
+      case "branding": {
+        return { ...parts, brandings: edit(parts.brandings, document) };
+      }
     }
-    return current;
-  });
-}
+  }
 
-/**
- * A list of documents without the one at a document's path.
- *
- * @param documents - The documents.
- * @param removed - The document to leave out.
- * @returns The new list.
- */
-function kept<T extends AnyDocument>(documents: readonly T[], removed: AnyDocument): T[] {
-  return documents.filter((current) => {
-    return current.path !== removed.path;
-  });
+  /**
+   * A list of documents with one in place: replacing the document at the same
+   * path, where it was, or appended when there is none.
+   *
+   * @typeParam T - The kind of document.
+   * @param documents - The documents.
+   * @param document - The document to place.
+   * @returns The new list.
+   */
+  private static placed<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
+    if (
+      !documents.some((current) => {
+        return current.path === document.path;
+      })
+    ) {
+      return [...documents, document];
+    }
+    return documents.map((current) => {
+      if (current.path === document.path) {
+        return document;
+      }
+      return current;
+    });
+  }
+
+  /**
+   * A list of documents without the one at a document's path.
+   *
+   * @typeParam T - The kind of document.
+   * @param documents - The documents.
+   * @param document - The document to leave out.
+   * @returns The new list.
+   */
+  private static kept<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
+    return documents.filter((current) => {
+      return current.path !== document.path;
+    });
+  }
 }

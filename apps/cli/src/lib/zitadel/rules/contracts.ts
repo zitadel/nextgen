@@ -4,42 +4,43 @@
  *
  * @remarks
  * Each document says what is wrong with it through its own `problems`; this
- * list only says which kinds are held to which rules, and in what order their
- * findings are reported. The same rules decide what {@link ZitadelConfig.load}
+ * list only says which kinds are held, and in what order their findings are
+ * reported. Which rules a kind breaks is the document's to say, so none of its
+ * findings can be left out here. The same rules decide what {@link ZitadelConfig.load}
  * refuses, so a file that loads is one that validates, and the other way round.
  */
 
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { ConfigDocument } from "@/lib/zitadel/resources/document";
 import type { Rule } from "@/lib/zitadel/rules/rule";
-import type { RuleId } from "@/lib/zitadel/rules/types";
 
 /**
  * The rule that holds one kind of file to the rules its documents check
  * themselves against.
  *
  * @remarks
- * Findings are reported rule by rule, in the order given, and within a rule in
- * the order of the documents, so one mistake made in several files reads as
- * one run of lines.
+ * Every finding a document reports is kept. They are grouped rule by rule, in
+ * the order the documents first report each rule, and within a rule in the
+ * order of the documents, so one mistake made in several files reads as one
+ * run of lines.
  *
- * @param ids - The rules, in the order their findings are reported. A finding
- *   of any other rule is left to the rule list that owns it.
  * @param documents - The documents of that kind.
  * @returns The rule.
  */
-function documentRule(
-  ids: readonly RuleId[],
-  documents: (config: ZitadelConfig) => readonly ConfigDocument[],
-): Rule {
+function documentRule(documents: (config: ZitadelConfig) => readonly ConfigDocument[]): Rule {
   return {
     check: (config, context) => {
       const issues = documents(config).flatMap((document) => {
         return document.problems(context);
       });
-      return ids.flatMap((id) => {
+      const rules = new Set(
+        issues.map((issue) => {
+          return issue.rule;
+        }),
+      );
+      return [...rules].flatMap((rule) => {
         return issues.filter((issue) => {
-          return issue.rule === id;
+          return issue.rule === rule;
         });
       });
     },
@@ -50,30 +51,19 @@ function documentRule(
  * The rules every file is held to on its own, one per kind.
  */
 export const CONTRACT_RULES: readonly Rule[] = [
-  documentRule(["contract/schema"], (config) => {
+  documentRule((config) => {
     return config.schemas.all;
   }),
-  documentRule(["contract/flow"], (config) => {
+  documentRule((config) => {
     return config.flows.all;
   }),
-  documentRule(
-    ["contract/connection", "connection/literal-secret", "connection/endpoints"],
-    (config) => {
-      return config.connections.all;
-    },
-  ),
-  documentRule(["contract/policy"], (config) => {
+  documentRule((config) => {
+    return config.connections.all;
+  }),
+  documentRule((config) => {
     return config.policies.all;
   }),
-  documentRule(
-    [
-      "branding/legacy-template-key",
-      "contract/branding",
-      "branding/template-file",
-      "branding/template",
-    ],
-    (config) => {
-      return config.branding.all;
-    },
-  ),
+  documentRule((config) => {
+    return config.branding.all;
+  }),
 ];

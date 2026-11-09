@@ -57,26 +57,26 @@ describe("PolicyTest.fileName", () => {
   });
 });
 
-describe("PolicyTest.operation", () => {
+describe("PolicyTest.readOperation", () => {
   it("reads the operation the cases test", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).operation).toBe(OPERATION);
+    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).readOperation()).toBe(OPERATION);
   });
 
   it("refuses a body the policy test contract refuses", () => {
     const test = testAt(`${OPERATION}.test.json`, { operation: OPERATION });
 
     expect(() => {
-      return test.operation;
+      return test.readOperation();
     }).toThrow(BrokenFilesError);
   });
 });
 
-describe("PolicyTest.cases", () => {
+describe("PolicyTest.readCases", () => {
   it("reads the cases in the file's order", () => {
     const second = { ...CASE, name: "long enough", expect: { allowed: true } };
     const test = testAt(`${OPERATION}.test.json`, { ...TEST_FILE, cases: [CASE, second] });
 
-    expect(test.cases).toEqual([CASE, second]);
+    expect(test.readCases()).toEqual([CASE, second]);
   });
 
   it("names the file and what the contract refuses in it", () => {
@@ -86,7 +86,7 @@ describe("PolicyTest.cases", () => {
     });
 
     expect(() => {
-      return test.cases;
+      return test.readCases();
     }).toThrow(/\.zitadel\/policies\/auth\.factor\.password\.set\.test\.json: cases\.0\.input/);
   });
 });

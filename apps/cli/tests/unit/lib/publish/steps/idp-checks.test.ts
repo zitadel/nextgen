@@ -7,7 +7,7 @@ import { DeploymentService, VariableService, SchemaService, UserService } from "
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { ForbiddenError } from "@/lib/backend/errors";
-import { MemoryStore, toBundle, ZitadelConfig } from "@/lib/zitadel";
+import { MemoryStore, ZitadelConfig } from "@/lib/zitadel";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
 const googleBody = (over: Record<string, unknown> = {}) => {
@@ -77,7 +77,7 @@ function ctx(
     color: false,
     config,
     store,
-    bundle: toBundle(config, store).bundle,
+    bundle: config.bundle(store).bundle,
     suggest: (args) => {
       return `${args} --env staging` as SuggestedCommand;
     },

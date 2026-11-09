@@ -836,7 +836,7 @@ describe("setup that fails after it created the project", () => {
       onCreateProject: async () => {
         if (capture.projects.length === 0) {
           await mkdir(join(cwd, ".zitadel"), { recursive: true });
-        await writeFile(join(cwd, ".zitadel/policies"), "");
+          await writeFile(join(cwd, ".zitadel/policies"), "");
         }
       },
     });

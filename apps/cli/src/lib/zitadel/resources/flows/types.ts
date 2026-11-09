@@ -1,7 +1,10 @@
 /**
- * What a login flow edit reports back, and what the flows are asked about the
- * providers their steps offer.
+ * The types and constants of login flows: their steps and transitions, how a
+ * step uses a method, and what the flows are asked about the providers their
+ * steps offer.
  */
+
+import { PURPOSE_FLIP_TARGETS } from "@zitadel/config/validate";
 
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
@@ -9,23 +12,174 @@ import type { Step } from "@/lib/zitadel/resources/flows/step";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
- * A region an edit left alone because it was changed by hand.
+ * The field a step collects a password with.
  */
-export type SkippedRegion = Readonly<{
+export const PASSWORD_FIELD = "x-auth-methods#password";
+
+/**
+ * The action kinds that offer or enrol a passkey.
+ */
+export const PASSKEY_ACTION_KINDS: ReadonlySet<string> = new Set(["passkey", "passkey_register"]);
+
+/**
+ * Outcomes the engine answers by switching from login to register without a
+ * `purpose` on the transition: the identifier one, plus `sso_user_not_found`.
+ */
+export const LOGIN_LEAVING_OUTCOMES: ReadonlySet<string> = new Set([
+  ...Object.keys(PURPOSE_FLIP_TARGETS.login ?? {}),
+  "sso_user_not_found",
+]);
+
+/**
+ * The outcome the engine raises when a provider's sign-in collides with an
+ * existing account.
+ */
+export const COLLISION_OUTCOME = "user_already_exists";
+
+/**
+ * The outcomes a provider sign-in can end in, which carry the provider to the
+ * next step.
+ */
+export const SSO_OUTCOMES: ReadonlySet<string> = new Set([
+  "sso_authenticated",
+  "sso_user_not_found",
+  COLLISION_OUTCOME,
+]);
+
+/**
+ * The step enabling a provider adds, which the engine sends a new external
+ * identity to.
+ */
+export const REGISTER_SSO_STEP = "register-sso";
+
+/**
+ * The step enabling a provider adds, shown when the provider's email already
+ * has an account.
+ */
+export const SSO_CONFLICT_STEP = "sso-conflict";
+
+/**
+ * A JSON object the SSO generator is building.
+ *
+ * @remarks
+ * Never handed out before it is done.
+ */
+export type Draft = Record<string, unknown>;
+
+/**
+ * The step that asks the identified user for a password.
+ */
+export const PASSWORD_STEP = "password";
+
+/**
+ * The step that registers someone with a password, which shares the
+ * `user_already_exists` outcome with the generated steps.
+ */
+export const REGISTER_PASSWORD_STEP = "register-password";
+
+/**
+ * Outcome keys the previous CLI wrote, and the names the engine now raises.
+ */
+export const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
+  ["callback", "sso_authenticated"],
+  ["identity_unknown", "sso_user_not_found"],
+];
+
+/**
+ * One transition out of a step: what fires it, and where it goes.
+ */
+export type Transition = Readonly<{
   /**
-   * The step that was left alone, such as `sso-conflict`.
+   * The outcome that fires it, such as `sso_authenticated`.
+   */
+  outcome: string;
+  /**
+   * The step it goes to; empty when it names none.
+   */
+  target: string;
+  /**
+   * `switch` or `pivot` for a transition to another flow; `null` within this one.
+   */
+  action: string | null;
+  /**
+   * The purpose it re-purposes to, or `null`.
+   */
+  purpose: string | null;
+}>;
+
+/**
+ * One action a step declares.
+ */
+export type StepAction = Readonly<{
+  /**
+   * The action's name, as the step's outcomes refer to it.
+   */
+  name: string;
+  /**
+   * What the action does, such as `passkey`.
+   */
+  kind: string;
+}>;
+
+/**
+ * A transition of another step that leads to a step.
+ */
+export type IncomingTransition = Readonly<{
+  /**
+   * The step the transition belongs to.
    */
   step: string;
+  /**
+   * The outcome that fires it.
+   */
+  transition: string;
+  /**
+   * The purpose it follows, when it names only a purpose and so leads to that
+   * purpose's entry step.
+   */
+  purpose?: string;
+}>;
+
+/**
+ * How one step uses a method, and what the step would be without it.
+ */
+export type MethodUse = Readonly<{
+  /**
+   * The step.
+   */
+  step: string;
+  /**
+   * How it uses the method, as a message names it.
+   */
+  uses: string;
+  /**
+   * The fields and sign-in methods it keeps without the method.
+   */
+  keeps: readonly string[];
+  /**
+   * The purposes that start on it.
+   */
+  entryFor: readonly string[];
+  /**
+   * The transitions that lead to it.
+   */
+  targetedBy: readonly IncomingTransition[];
+}>;
+
+/**
+ * A step reached while walking a flow, and the provider chosen on the way
+ * there.
+ */
+export type Visit = Readonly<{
+  /**
+   * The step reached.
+   */
+  step: Step;
 
   /**
-   * Where in the file, such as `steps.sso-conflict`.
+   * The provider chosen on the way, or an empty string when none was.
    */
-  region: string;
-
-  /**
-   * Why it was left alone.
-   */
-  reason: "hand-edited";
+  provider: string;
 }>;
 
 /**
@@ -52,6 +206,17 @@ export type Offer = Readonly<{
    */
   connection: Connection | undefined;
 }>;
+
+/**
+ * A provider a flow step offers, on a flow whose schema is a local file.
+ */
+export type PinnedOffer = Offer &
+  Readonly<{
+    /**
+     * The local schema the offer's flow runs against.
+     */
+    schema: UserSchema;
+  }>;
 
 /**
  * A way to sign up that reaches a step creating a user without ever asking

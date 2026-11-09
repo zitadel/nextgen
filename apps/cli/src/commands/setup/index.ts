@@ -113,11 +113,7 @@ import {
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import type { Asker } from "@/lib/input";
-import {
-  parsePasswordMinLength,
-  PASSWORD_POLICY_PATH,
-  type PasswordMinLength,
-} from "@/lib/zitadel";
+import { type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { normalizePublicCliProse } from "@/lib/public-cli";
@@ -1068,7 +1064,7 @@ export default class Setup extends Destructive(BaseCommand) {
     "password-min-length": Flags.custom<PasswordMinLength>({
       parse: readsFilled(
         {
-          schema: made(parsePasswordMinLength),
+          schema: made(PasswordPolicy.parseMinLength),
           refusal: {
             message: "{problem}",
             hint: "Pass a whole number for {input}, or 0 for none.",
@@ -1316,7 +1312,7 @@ export default class Setup extends Destructive(BaseCommand) {
               : "none"
             : "multiple",
       // Whether a minimum goes into the password policy, never the value. None
-      // given is the recommended one (`passwordPolicy`), unless `--force`
+      // given is the recommended one (`PasswordPolicy.initial`), unless `--force`
       // keeps a policy file: `files_patched` records what was published.
       password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
@@ -1997,26 +1993,24 @@ export default class Setup extends Destructive(BaseCommand) {
         { directory: CONFIG_DIRECTORIES.policies, text: policiesReadmeContent() },
       ].map(async ({ directory, text }) => {
         const path = `${directory}/${README}`;
-        return store
-          .writeText(path, normalizePublicCliProse(text, this.cliVersion), "create")
-          .then(
-            () => {
-              return [path];
-            },
-            (error: unknown) => {
-              if (error instanceof FileExistsError) {
-                return [];
-              }
-              throw error;
-            },
-          );
+        return store.writeText(path, normalizePublicCliProse(text, this.cliVersion), "create").then(
+          () => {
+            return [path];
+          },
+          (error: unknown) => {
+            if (error instanceof FileExistsError) {
+              return [];
+            }
+            throw error;
+          },
+        );
       }),
     );
     return {
       filesWritten: [...saved, ...readmes.flat()].map((path) => {
         return join(this.cwd, path);
       }),
-      passwordMinLength: scaffold.policy.config.min_length ?? null,
+      passwordMinLength: scaffold.policy.readMinLength() ?? null,
     };
   }
 
@@ -2392,7 +2386,7 @@ function setupRefusal(error: unknown, connections: readonly ScaffoldedConnection
   if (planned !== undefined) {
     return connectionRefusal(error.path, planned.chosen.selection);
   }
-  if (error.path === PASSWORD_POLICY_PATH) {
+  if (error.path === PasswordPolicy.PATH) {
     return new ZitadelError("E_CONFLICT", error.message, {
       hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
       details: error.details,
@@ -2742,7 +2736,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   [`${CONFIG_DIRECTORIES.flows}/${README}`]: { subject: "the flows folder README" },
   [DEFAULT_SCHEMA_CONFIG_PATH]: { subject: "the editable default human user schema" },
   [`${CONFIG_DIRECTORIES.schemas}/${README}`]: { subject: "the schemas folder README" },
-  [PASSWORD_POLICY_PATH]: { subject: "the editable password policy" },
+  [PasswordPolicy.PATH]: { subject: "the editable password policy" },
   [`${CONFIG_DIRECTORIES.policies}/${README}`]: { subject: "the policies folder README" },
   [`${META_SCHEMA_DIR}/policy.json`]: { subject: "the policy dialect spec (editor $schema)" },
   [`${META_SCHEMA_DIR}/flow-definition.json`]: {
@@ -2855,7 +2849,7 @@ export function buildSummary(opts: {
   for (const [label, suffix, dir] of [
     ["User schema", DEFAULT_SCHEMA_CONFIG_PATH, CONFIG_DIRECTORIES.schemas],
     ["Login flow", DEFAULT_FLOW_CONFIG_PATH, CONFIG_DIRECTORIES.flows],
-    ["Password policy", PASSWORD_POLICY_PATH, CONFIG_DIRECTORIES.policies],
+    ["Password policy", PasswordPolicy.PATH, CONFIG_DIRECTORIES.policies],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) {

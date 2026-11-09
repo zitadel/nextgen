@@ -380,7 +380,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         ? preview
         : config.connections.enable(
             schema,
-            candidate.withEndpoints(credentials.endpoints),
+            candidate.withEndpoints(credentials.endpoints).document,
             options,
           );
     if (reused) {

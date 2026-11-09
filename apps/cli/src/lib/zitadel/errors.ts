@@ -1,6 +1,6 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
 
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
+import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
@@ -91,9 +91,10 @@ export class BrokenFilesError extends ConfigError {
    * @param problems - Every broken file, and what is wrong with each.
    */
   constructor(problems: readonly FileProblem[]) {
+    const files = problems.length === 1 ? "file is" : "files are";
     super(
       [
-        `${problems.length} configuration ${problems.length === 1 ? "file is" : "files are"} not valid:`,
+        `${problems.length} configuration ${files} not valid:`,
         ...problems.map((entry) => {
           return `  - ${entry.path}: ${entry.problem}`;
         }),
@@ -443,18 +444,21 @@ export class BrokenFlowsError extends ConfigError {
    */
   constructor(input: BrokenFlows) {
     const uses = input.uses ?? [];
-    const unexplained = input.issues.filter(({ path, issue }) => {
+    const unexplained = input.issues.filter((item) => {
+      const { path, issue } = item;
       return !uses.some((use) => {
         return use.path === path && use.step === issue.step;
       });
     });
     const lines = [
-      ...uses.map(useLine),
-      ...unexplained.map(({ path, issue }) => {
+      ...uses.map(BrokenFlowsError.useLine),
+      ...unexplained.map((item) => {
+        const { path, issue } = item;
         return `${path}: ${issue.message}`;
       }),
     ];
-    const issues = input.issues.map(({ path, issue }) => {
+    const issues = input.issues.map((item) => {
+      const { path, issue } = item;
       if (issue.step === undefined) {
         return { path, rule: issue.rule, message: issue.message };
       }
@@ -485,36 +489,37 @@ export class BrokenFlowsError extends ConfigError {
       },
     );
   }
-}
 
-/**
- * How a step that uses a method being disabled is listed.
- *
- * @remarks
- * Only a step left with nothing says what starts on it and leads to it, since
- * it is the one to go.
- *
- * @param use - The step.
- * @returns Its line.
- */
-function useLine(use: FlowMethodUse): string {
-  const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
-  if (use.keeps.length > 0) {
-    return `${at}\n    Still has ${use.keeps.join(", ")}.`;
-  }
-  const purposes = use.entryFor.map((purpose) => {
-    return `purposes.${purpose}`;
-  });
-  const transitions = use.staying.map(({ step, transition, purpose }) => {
-    if (purpose === undefined) {
-      return `${step}.${transition}`;
+  /**
+   * How a step that uses a method being disabled is listed.
+   *
+   * @remarks
+   * Only a step left with nothing says what starts on it and leads to it, since
+   * it is the one to go.
+   *
+   * @param use - The step.
+   * @returns Its line.
+   */
+  private static useLine(use: FlowMethodUse): string {
+    const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
+    if (use.keeps.length > 0) {
+      return `${at}\n    Still has ${use.keeps.join(", ")}.`;
     }
-    return `${step}.${transition} (via purposes.${purpose})`;
-  });
-  const notes = [
-    "Left with no field or sign-in method.",
-    ...(purposes.length > 0 ? [`Entry step of ${purposes.join(", ")}.`] : []),
-    ...(transitions.length > 0 ? [`Targeted by ${transitions.join(", ")}.`] : []),
-  ];
-  return [at, notes.join(" ")].join("\n    ");
+    const purposes = use.entryFor.map((purpose) => {
+      return `purposes.${purpose}`;
+    });
+    const transitions = use.staying.map((item) => {
+      const { step, transition, purpose } = item;
+      if (purpose === undefined) {
+        return `${step}.${transition}`;
+      }
+      return `${step}.${transition} (via purposes.${purpose})`;
+    });
+    const entry = `Entry step of ${purposes.join(", ")}.`;
+    const targeted = `Targeted by ${transitions.join(", ")}.`;
+    const entryNotes = purposes.length > 0 ? [entry] : [];
+    const targetedNotes = transitions.length > 0 ? [targeted] : [];
+    const notes = ["Left with no field or sign-in method.", ...entryNotes, ...targetedNotes];
+    return [at, notes.join(" ")].join("\n    ");
+  }
 }

@@ -35,7 +35,8 @@ export const ENVIRONMENT_RULES: readonly Rule[] = [
           };
         }),
       ];
-      return judged.flatMap(({ document, body }) => {
+      return judged.flatMap((item) => {
+        const { document, body } = item;
         return environmentReferences(body)
           .filter((name) => {
             return !environment[name];

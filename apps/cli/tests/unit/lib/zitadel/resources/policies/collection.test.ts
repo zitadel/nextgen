@@ -65,7 +65,7 @@ describe("Policies.for", () => {
     expect([
       issues,
       documents.map((policy) => {
-        return [policy.path, policy.operation, policy.config];
+        return [policy.path, policy.readOperation(), policy.readConfig()];
       }),
     ]).toEqual([[], [[`.zitadel/policies/${OPERATION}.json`, OPERATION, { min_length: 12 }]]]);
   });
@@ -108,7 +108,7 @@ describe("Policies.for", () => {
     expect([
       issues,
       documents.map((policy) => {
-        return policy.operation;
+        return policy.readOperation();
       }),
     ]).toEqual([[], [OPERATION]]);
   });
@@ -132,7 +132,7 @@ describe("Policies.testsFor", () => {
     expect([
       issues,
       documents.map((test) => {
-        return [test.path, test.operation, test.cases];
+        return [test.path, test.readOperation(), test.readCases()];
       }),
     ]).toEqual([[], [[`.zitadel/policies/${OPERATION}.test.json`, OPERATION, [CASE]]]]);
   });
@@ -159,7 +159,7 @@ describe("Policies.testsFor", () => {
     expect([
       issues,
       documents.map((test) => {
-        return test.operation;
+        return test.readOperation();
       }),
     ]).toEqual([[], [OPERATION]]);
   });

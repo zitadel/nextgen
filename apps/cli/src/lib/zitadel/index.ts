@@ -11,7 +11,6 @@
  * and depends on nothing else under `lib/`.
  */
 export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
-export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
 export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
 export { Collection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
@@ -28,7 +27,7 @@ export {
   type UnusedConnection,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections";
-export type { DocumentStatus } from "@/lib/zitadel/resources/document";
+export type { DocumentStatus, Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
 export {
   AmbiguousSchemaError,
   BrokenFilesError,
@@ -50,28 +49,22 @@ export {
   Flow,
   Flows,
   PASSWORD_FIELD,
-  type FlowCheck,
-  type FlowIssue,
-  type FlowMethodUse,
   type IncomingTransition,
   type MethodUse,
   type Offer,
   type SignUpGap,
-  type SkippedRegion,
   type Step,
   type Transition,
 } from "@/lib/zitadel/resources/flows";
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
 export {
   PASSWORD_POLICY_OPERATION,
-  PASSWORD_POLICY_PATH,
+  PasswordPolicy,
   Policies,
   Policy,
   POLICY_FILE_SUFFIX,
   POLICY_TEST_SUFFIX,
   PolicyTest,
-  parsePasswordMinLength,
-  passwordPolicy,
   type PasswordMinLength,
   type PolicyBody,
   type PolicyCase,
@@ -82,15 +75,12 @@ export {
   type PolicyTestBody,
 } from "@/lib/zitadel/resources/policies";
 export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
-export type {
-  Scaffold,
-  ScaffoldedConnection,
-  ScaffoldedProvider,
-  ScaffoldOptions,
-} from "@/lib/zitadel/scaffold";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
 export {
   RULE_IDS,
+  type FlowCheck,
+  type FlowIssue,
+  type FlowMethodUse,
   type Issue,
   type RuleId,
   type Severity,
@@ -106,10 +96,15 @@ export type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/sto
 export {
   CONFIG_DIRECTORIES,
   CONFIG_KINDS,
+  type BuiltBundle,
   type ConfigFile,
+  type ConfigurationBundle,
   type ConfigFiles,
   type ConfigKind,
-  type EditResult,
   type JsonObject,
+  type Scaffold,
+  type ScaffoldedConnection,
+  type ScaffoldedProvider,
+  type ScaffoldOptions,
   RELEASE_POLICY_GLOBS,
 } from "@/lib/zitadel/types";
