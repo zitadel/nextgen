@@ -1257,6 +1257,31 @@ describe("setup", () => {
     );
   });
 
+  describe("with a default flow that fails its contract", () => {
+    const STUB = '{"steps":"not a flow"}\n';
+
+    it("refuses with E_CONFLICT without --force, naming the file", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      await write(dir, { ".zitadel/flows/default-login.json": STUB });
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(scriptedAgainst(dir, platform.url));
+
+      expect(res).toFailWith("E_CONFLICT");
+      expect(res).toExplain("default-login.json");
+    });
+
+    it("replaces it with --force", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      await write(dir, { ".zitadel/flows/default-login.json": STUB });
+      const platform = await aCapturingPlatform(serve);
+
+      await runCliForTest(scriptedAgainst(dir, platform.url, "--force"));
+
+      expect(await readFile(join(dir, ".zitadel/flows/default-login.json"), "utf8")).not.toBe(STUB);
+    });
+  });
+
   describe("with a --framework the app is not", () => {
     it("refuses with E_CONFLICT instead of offering --force to scaffold over it", async ({
       dir,

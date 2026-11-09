@@ -2330,10 +2330,11 @@ type ScaffoldedConfiguration = {
  * @remarks
  * Every file it would refuse is refused here, so setup calls it before it
  * creates the project: those files are written only once the project exists,
- * and a conflict found then would leave the project behind. The whole
- * configuration is read and held to its contracts, so a file under
- * `.zitadel/` that does not parse, or that its contract refuses, is refused
- * too, before the first deploy would refuse it.
+ * and a conflict found then would leave the project behind. The files are
+ * read without being held to their contracts: a default schema, flow or
+ * password policy that is broken stands in the way like a valid one, so it is
+ * replaced with `force` and refused without it, and a broken file setup does
+ * not write is left for the deploy to refuse.
  *
  * @param cwd - The project root.
  * @param force - Whether the default schema and flow may be replaced, and an
@@ -2341,8 +2342,8 @@ type ScaffoldedConfiguration = {
  * @param answers - What to scaffold.
  * @returns The configuration, and the change that writes it.
  * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
- *   would refuse to write, or `E_VALIDATION` for a file that does not parse,
- *   a file its contract refuses, or a kept password policy that is not valid.
+ *   would refuse to write, or `E_VALIDATION` for a kept password policy that
+ *   is not valid.
  */
 async function scaffoldOf(
   cwd: string,
@@ -2350,7 +2351,10 @@ async function scaffoldOf(
   answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
 ): Promise<Scaffold<SsoDraft>> {
   try {
-    const config = await ZitadelConfig.load(new DiskStore(cwd));
+    // Read without refusing a broken file: the scaffold knows which paths it
+    // would write, so it alone decides whether a broken default is replaced
+    // (`force`) or refused, and any other broken file is left to the deploy.
+    const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
     return config.scaffold({
       preset: answers.preset,
       useCase: answers.useCase,
