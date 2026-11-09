@@ -200,3 +200,37 @@ export class Change {
     });
   }
 }
+
+/**
+ * A change made about one document, such as the connection
+ * `config.connections.enable` offers, which says what became of it.
+ *
+ * @typeParam T - The kind of document.
+ */
+export class DocumentChange<T extends AnyDocument> extends Change {
+  /**
+   * The document the change is about, as the change leaves it.
+   */
+  readonly document: T;
+
+  /**
+   * Describe an edit about one document.
+   *
+   * @param input - What a {@link Change} is made of, and the document it is
+   *   about.
+   */
+  constructor(input: ConstructorParameters<typeof Change>[0] & Readonly<{ document: T }>) {
+    super(input);
+    this.document = input.document;
+  }
+
+  /**
+   * Whether the change creates the document, rather than finding it already
+   * there.
+   *
+   * @returns True when saving the change writes the document's file anew.
+   */
+  get created(): boolean {
+    return this.createdPaths.includes(this.document.path);
+  }
+}

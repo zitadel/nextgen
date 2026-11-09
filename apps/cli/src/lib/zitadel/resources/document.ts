@@ -141,6 +141,18 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   }
 
   /**
+   * The name a release pins the document by.
+   *
+   * @remarks
+   * A kind a release pins by name overrides this; any other kind has none.
+   *
+   * @returns The handle, or `undefined` when the document has none.
+   */
+  get handle(): string | undefined {
+    return undefined;
+  }
+
+  /**
    * How saving the document writes its file.
    *
    * @remarks

@@ -3,7 +3,6 @@ import {
   type ClientId,
   type ClientSecret,
   type ConnectionEndpoints,
-  type ConnectionSlug,
   CUSTOM_PROVIDER,
   DEFAULT_SCOPES,
   IDP_PROVIDERS,
@@ -28,7 +27,6 @@ import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/com
 import { VariableService, VariableWrite, type ZitadelClient } from "@/lib/backend";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { resolveEnvironment } from "@/lib/environment";
-import { ZitadelError } from "@/lib/errors";
 import {
   askConnectionEndpoints,
   callbackUriFor,
@@ -76,12 +74,6 @@ type SsoProvider = {
   readonly selection: ProviderSelection | undefined;
   readonly values: CustomFlagValues;
 };
-
-function hasAllCustomSettings(values: CustomFlagValues): boolean {
-  return (
-    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
-  );
-}
 
 /**
  * The client id a value holds, trimmed as the one a prompt would have
@@ -139,7 +131,16 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
   hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
 };
 
-/** What the flags say about the provider to add. */
+/**
+ * What the flags say about the provider to add.
+ *
+ * @param flags - The provider and custom-connection flags the run was given.
+ * @param run - Whether someone is there to ask for the settings left out.
+ * @returns The provider, or only the given settings when a person will be
+ *   asked for the rest.
+ * @throws ZitadelError When a script, a dry run or `--non-interactive` leaves
+ *   out a custom connection's setting.
+ */
 export function ssoProvider(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   run: { interactive: boolean },
@@ -150,7 +151,9 @@ export function ssoProvider(
   // will ask for the rest has nothing left to check: the settings that were
   // given are already good, and being turned away after typing a secret would
   // mean typing it again.
-  const askLater = provider === CUSTOM_PROVIDER && run.interactive && !hasAllCustomSettings(values);
+  const complete =
+    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined;
+  const askLater = provider === CUSTOM_PROVIDER && run.interactive && !complete;
   return {
     selection: askLater
       ? undefined
@@ -290,9 +293,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // first: a connection that would step on another, a region the edits cannot
     // write, or a flow `deploy` would then reject (ADR 070 §3).
     const candidate = Connection.forProvider(provider, schema);
-    const existing = config.connections.existing(candidate, options);
-    const connection = existing ?? candidate;
     const preview = config.connections.enable(schema, candidate, options);
+    const connection = preview.document;
+    const reused = !preview.created;
 
     // A loopback issuer works only on a server that may fetch from this machine.
     const loopback = loopbackIssuerWarning(selection, await loopbackReach(target.cwd, server));
@@ -312,16 +315,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // Before the dry-run return, so a preview is enough to register the
     // client. Shown on reuse too: rerunning this command is how a developer
     // finds the callback URI to register.
-    if (existing === undefined) {
+    if (!reused) {
       consola.info(`${provider.displayName} needs an OAuth application.`);
     }
     consola.info(`Callback URI   ${callbackUri}`);
     // A custom provider has no console to send the developer to: it is
     // theirs, and the issuer they gave is the only address known.
-    if (existing === undefined && provider.consoleUrl === undefined) {
+    if (!reused && provider.consoleUrl === undefined) {
       consola.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
     }
-    if (existing === undefined && provider.consoleUrl !== undefined) {
+    if (!reused && provider.consoleUrl !== undefined) {
       consola.info(`Create it at   ${provider.consoleUrl}`);
     }
 
@@ -330,7 +333,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       provider: selectionName(selection),
       schema: schema.name,
       connection,
-      reused: existing !== undefined,
+      reused,
       callbackUri,
     };
     if (this.dryRun) {
@@ -339,7 +342,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // given, and a dry run reads no piped secret, so none is listed.
       const reusedId =
         flags.clientId !== undefined && names.clientId !== undefined ? [names.clientId] : [];
-      const toStore = existing === undefined ? [names.clientId, names.clientSecret] : reusedId;
+      const toStore = reused ? reusedId : [names.clientId, names.clientSecret];
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -366,7 +369,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 
     const credentials = await this.askCredentials({
       selection,
-      existing,
+      reused,
       givenClientId: flags.clientId,
       names,
     });
@@ -377,16 +380,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         ? preview
         : config.connections.enable(
             schema,
-            Connection.forProvider(provider, schema, credentials.endpoints),
+            candidate.withEndpoints(credentials.endpoints).document,
             options,
           );
-    if (existing !== undefined) {
-      consola.success(`Reusing ${existing.path}`);
+    if (reused) {
+      consola.success(`Reusing ${connection.path}`);
     }
     const written = await this.write(target, change);
     const published = await this.publish({
       publish: this.publisher(client, projectId),
       connection,
+      reused,
       names,
       credentials,
     });
@@ -417,7 +421,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       ],
       scopeArgs,
     );
-    const unpublished = existing === undefined || written.length > 0;
+    const unpublished = !reused || written.length > 0;
     const stored =
       published.secret?.published === "stored" &&
       published.clientId !== "deferred" &&
@@ -457,15 +461,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * them fails at the provider, in a browser, not here. A reused one is given
    * only what the developer passes: the project may already hold its
    * credentials, and an unattended rerun should not start asking for them.
+   *
+   * @param input - The provider, whether the connection is reused, the
+   *   client id `--client-id` gave, and the variables the credentials go to.
+   * @returns The credentials, and the endpoints a development run answered.
    */
   private async askCredentials(input: {
     selection: ProviderSelection;
-    existing: Connection | undefined;
+    reused: boolean;
     givenClientId: ClientId | undefined;
     names: CredentialNames;
   }): Promise<Credentials> {
     const provider = providerOf(input.selection);
-    if (input.existing !== undefined) {
+    if (input.reused) {
       // Only read so that a rerun can replace a secret the project holds.
       const secret = await this.input({
         kind: "secret",
@@ -532,16 +540,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * connection reads them from, the client id first: it is the half the
    * developer can read back afterwards. A credential the connection holds as a
    * value has no variable to go to, which is said instead.
+   *
+   * @param input - Where the credentials go, the connection, whether it is
+   *   reused, its variables, and the credentials.
+   * @returns What became of each credential.
    */
   private async publish(input: {
     publish: SecretPublisher | undefined;
     connection: Connection;
+    reused: boolean;
     names: CredentialNames;
     credentials: Credentials;
   }): Promise<Published> {
-    const { publish, connection, names, credentials } = input;
+    const { publish, connection, reused, names, credentials } = input;
     const selector = this.environmentSelector();
-    const reused = connection.status === "read";
     if (credentials.clientId !== undefined && names.clientId === undefined) {
       reportWarning(
         `${connection.path} holds its client id directly, so nothing was published. Edit the file to change it.`,
@@ -619,7 +631,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     target.config.flows.forSso(target.schema, slug);
     // An existing connection is described by its file, so nothing it already
     // holds is asked again; reuse never applies scopes, so they are not asked.
-    const stored = existing === undefined ? undefined : usableStoredSettings(existing, slug, given);
+    const stored = existing?.storedSettings(given);
     const displayName = await this.input({
       kind: "text",
       name: "display name",
@@ -714,75 +726,4 @@ function givenSettings(
     return ["display name", "scopes"];
   }
   return ["display name"];
-}
-
-/**
- * What the file of an existing custom connection holds, checked as a typed
- * answer is, or a refusal that names the file and the setting: a stored value
- * that cannot be used would otherwise surface as an error about a flag the
- * person never passed. A file with no issuer is not an OIDC connection to
- * reuse at all, whatever issuer is typed.
- */
-function usableStoredSettings(
-  connection: Connection,
-  slug: ConnectionSlug,
-  given: CustomFlagValues,
-): CustomFlagValues {
-  if (connection.issuer === undefined) {
-    throw new ZitadelError(
-      "E_CONFLICT",
-      `${connection.path} is already named ${slug} and is not an OIDC connection`,
-      {
-        hint: `Fix the file, or choose another ${ENABLE_FLAG_NAMES.slug}, then run the command again.`,
-        details: { file: connection.path, slug },
-      },
-    );
-  }
-  return {
-    displayName: storedSetting(
-      connection,
-      slug,
-      "a display name",
-      connection.displayName,
-      given.displayName,
-      parseDisplayName,
-    ),
-    issuer: storedSetting(
-      connection,
-      slug,
-      "an issuer",
-      connection.issuer,
-      given.issuer,
-      parseIssuer,
-    ),
-  };
-}
-
-/**
- * One stored setting, when it will be used: one a flag replaces is not read at
- * all, and one that is used is held to the same rules as a typed answer.
- */
-function storedSetting<T>(
-  connection: Connection,
-  slug: ConnectionSlug,
-  what: string,
-  value: string | undefined,
-  flag: string | undefined,
-  parse: (value: string) => Parsed<T>,
-): string | undefined {
-  if (flag !== undefined || value === undefined) {
-    return undefined;
-  }
-  const parsed = parse(value);
-  if (!parsed.ok) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `${connection.path} holds ${what} that cannot be used: ${parsed.problem}`,
-      {
-        hint: `Fix it in that file, or choose another ${ENABLE_FLAG_NAMES.slug}.`,
-        details: { file: connection.path, slug },
-      },
-    );
-  }
-  return value;
 }

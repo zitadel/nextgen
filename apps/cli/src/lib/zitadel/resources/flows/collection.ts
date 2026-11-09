@@ -1,8 +1,9 @@
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
+import type { Change } from "@/lib/zitadel/change";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import { NotFoundError } from "@/lib/zitadel/errors";
-import type { Flow } from "@/lib/zitadel/resources/flows/flow";
+import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import {
   type Offer,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/zitadel/resources/flows/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
+import { CONFIG_DIRECTORIES, type JsonObject } from "@/lib/zitadel/types";
 import { walk } from "@/lib/zitadel/utils/graph";
 
 /**
@@ -107,6 +109,32 @@ export class Flows extends Collection<Flow> {
         return typeof schema.body.$id !== "string" && reference.endsWith(`/${schema.name}.json`);
       })
     );
+  }
+
+  /**
+   * Where a flow a release pins by a handle goes: the file that holds the
+   * handle, or `<handle>.json` when none does.
+   *
+   * @param handle - The flow's `name`.
+   * @returns The project-relative path.
+   */
+  pathFor(handle: string): string {
+    return this.holding(handle)?.path ?? `${CONFIG_DIRECTORIES.flows}/${handle}.json`;
+  }
+
+  /**
+   * Place a flow revision a release pinned at {@link pathFor}, replacing the
+   * file there.
+   *
+   * @param handle - The flow's `name`.
+   * @param body - The revision as the server answered it.
+   * @returns The change; one that writes nothing when the file already holds
+   *   exactly this.
+   */
+  revision(handle: string, body: JsonObject): Change {
+    return this.placeRevision(this.pathFor(handle), body, (file) => {
+      return Flow.create(file);
+    });
   }
 
   /**

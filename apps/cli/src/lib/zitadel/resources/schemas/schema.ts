@@ -120,6 +120,15 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
+   * The name a release pins the schema by: its `objectType`.
+   *
+   * @returns The object type, or `undefined` when it is missing or empty.
+   */
+  override get handle(): string | undefined {
+    return this.objectType;
+  }
+
+  /**
    * The property that identifies a user, which `x-identifier` designates.
    *
    * @remarks

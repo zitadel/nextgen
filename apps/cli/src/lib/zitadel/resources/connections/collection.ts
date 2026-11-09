@@ -2,7 +2,7 @@ import { basename } from "node:path";
 
 import { credentialVariables, IDP_PROVIDERS, parseConnectionSlug } from "@zitadel/config/idp";
 
-import { Change, type Notice } from "@/lib/zitadel/change";
+import { Change, DocumentChange, type Notice } from "@/lib/zitadel/change";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type {
@@ -10,6 +10,7 @@ import type {
   CredentialNames,
   LookupOptions,
   SsoOptions,
+  UnusedConnection,
 } from "@/lib/zitadel/resources/connections/types";
 import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel/errors";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
@@ -173,7 +174,8 @@ export class Connections extends Collection<Connection> {
    * @param candidate - The connection to write when the project has none for
    *   the provider.
    * @param options - What is known beyond the connection.
-   * @returns The change.
+   * @returns The change, about the connection the schema now lists: the
+   *   candidate when it is created, or the one the project already had.
    * @throws {@link NotFoundError} When no flow runs against the schema.
    * @throws {@link ConflictError} When the connection would step on another one.
    * @throws {@link ConfigError} When the connection has no usable slug.
@@ -181,7 +183,11 @@ export class Connections extends Collection<Connection> {
    *   shape it writes.
    * @throws {@link BrokenFlowsError} When a flow would stop validating.
    */
-  enable(schema: UserSchema, candidate: Connection, options: SsoOptions = {}): Change {
+  enable(
+    schema: UserSchema,
+    candidate: Connection,
+    options: SsoOptions = {},
+  ): DocumentChange<Connection> {
     const flows = this.config.flows.forSso(schema);
     const existing = this.existing(candidate, options);
     const connection = existing ?? candidate;
@@ -207,9 +213,10 @@ export class Connections extends Collection<Connection> {
         return this.untouchedNotice(flowEdit.document, region, slug);
       });
     });
-    return new Change({
+    return new DocumentChange({
       before: this.config,
       after,
+      document: connection,
       notices: [
         ...this.connectionNotices(schema, candidate, existing, options.given ?? []),
         ...skipped,
@@ -309,6 +316,26 @@ export class Connections extends Collection<Connection> {
   }
 
   /**
+   * The connection a provider leaves behind once no schema lists it and no
+   * flow offers it, with the variables only it reads.
+   *
+   * @remarks
+   * Asked of the collection after a provider is removed, so what still
+   * offers the provider is what the removal leaves.
+   *
+   * @param slug - The provider.
+   * @returns The connection and its variables, or `undefined` when no file
+   *   has the provider or something still offers it.
+   */
+  unused(slug: string): UnusedConnection | undefined {
+    const connection = this.find(slug);
+    if (connection === undefined || this.offeredBy(slug).length > 0) {
+      return undefined;
+    }
+    return { connection, variables: this.unsharedVariables(connection) };
+  }
+
+  /**
    * Whether the server is known to have a connection already.
    *
    * @param slug - The connection's slug.
@@ -392,20 +419,20 @@ export class Connections extends Collection<Connection> {
    * @returns The notices; none when no file has the provider.
    */
   private keptNotices(slug: string): readonly Notice[] {
-    const connection = this.find(slug);
-    if (connection === undefined) {
-      return [];
-    }
-    const usedBy = this.offeredBy(slug);
-    if (usedBy.length > 0) {
+    const unused = this.unused(slug);
+    if (unused === undefined) {
+      const connection = this.find(slug);
+      if (connection === undefined) {
+        return [];
+      }
       return [
         {
           severity: "info",
-          message: `${connection.path} stays: ${slug} is still offered by ${usedBy.join(", ")}.`,
+          message: `${connection.path} stays: ${slug} is still offered by ${this.offeredBy(slug).join(", ")}.`,
         },
       ];
     }
-    const variables = this.unsharedVariables(connection);
+    const { connection, variables } = unused;
     const kept =
       variables.length > 0
         ? `${connection.path} and the project variables ${variables.join(" and ")}`

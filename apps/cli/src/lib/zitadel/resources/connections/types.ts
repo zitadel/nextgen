@@ -8,6 +8,7 @@ import type { ClientIdVariable, ClientSecretVariable } from "@zitadel/config/idp
 import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
 import type { PropertyName } from "@/lib/zitadel/names";
+import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 
 /**
  * One row of a connection's `claim_mapping` or `verified_claims`.
@@ -53,6 +54,21 @@ export type CredentialNames = Readonly<{
    * The variable the client secret is read from.
    */
   clientSecret: ClientSecretVariable | undefined;
+}>;
+
+/**
+ * The settings that describe a connection of the developer's own beyond its
+ * slug, as a run gives them or a file holds them.
+ */
+export type StoredSettings = Readonly<{
+  /**
+   * The name shown on the sign-in button.
+   */
+  displayName?: string | undefined;
+  /**
+   * The provider's issuer.
+   */
+  issuer?: string | undefined;
 }>;
 
 /**
@@ -134,3 +150,20 @@ export type SsoOptions = LookupOptions &
      */
     given?: readonly ConnectionSetting[] | undefined;
   }>;
+
+/**
+ * A connection nothing offers any more, which a removed provider leaves
+ * behind, and the project variables only it reads.
+ */
+export type UnusedConnection = Readonly<{
+  /**
+   * The connection.
+   */
+  connection: Connection;
+
+  /**
+   * The variables its credentials read that no other connection reads, so
+   * removing them breaks nothing else.
+   */
+  variables: readonly string[];
+}>;

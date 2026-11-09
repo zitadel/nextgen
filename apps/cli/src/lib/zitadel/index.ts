@@ -12,7 +12,7 @@
  */
 export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
 export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
-export { Change, type Notice, type SaveOptions } from "@/lib/zitadel/change";
+export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
 export { Collection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
 export {
@@ -24,10 +24,13 @@ export {
   type CredentialNames,
   type LookupOptions,
   type SsoOptions,
+  type StoredSettings,
+  type UnusedConnection,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections";
 export type { DocumentStatus, Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
 export {
+  AmbiguousSchemaError,
   BrokenFilesError,
   BrokenFlowsError,
   ConfigError,
@@ -36,6 +39,7 @@ export {
   NoSignInLeftError,
   NotFoundError,
   RefusedEditError,
+  SchemaNotFoundError,
   type BrokenFlows,
   type ConfigErrorOptions,
   type FileProblem,

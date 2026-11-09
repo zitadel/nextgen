@@ -116,6 +116,20 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   }
 
   /**
+   * The name a release pins the flow by: its `name`, which its file name
+   * need not match.
+   *
+   * @returns The name, or `undefined` when it is missing or empty.
+   */
+  override get handle(): string | undefined {
+    const name = this.body.name;
+    if (typeof name !== "string" || name === "") {
+      return undefined;
+    }
+    return name;
+  }
+
+  /**
    * Whether the flow can sign anyone in.
    *
    * @returns True when it is `active`, the only status that is served, and has
