@@ -15,6 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/idpidentitylink"
+	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/preview"
 	"github.com/zitadel/nextgen/internal/storage/release"
@@ -38,6 +39,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("user_totp", usertotp.Schema)...)
 	cols = append(cols, schematest.Columns("team_memberships", teammembership.Schema)...)
 	cols = append(cols, schematest.Columns("branding", branding.Schema)...)
+	cols = append(cols, schematest.Columns("oauth_settings", oauthsettings.Schema)...)
 	cols = append(cols, schematest.Columns("releases", release.Schema)...)
 	cols = append(cols, schematest.Columns("variables", variable.Schema)...)
 	cols = append(cols, schematest.Columns("deployments", deployment.NewSchema(deployment.Tables{Deployments: "deployments", Origins: "deployment_origins", Previews: "previews", ProjectOrigins: "project_origins"}))...)
