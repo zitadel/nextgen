@@ -164,18 +164,18 @@ func (s applicationStatements) GetApplication(ctx context.Context, filter databa
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	application, err := pgx.CollectExactlyOneRow(rows, func(row pgx.CollectableRow) (*domain.Application, error) {
-		application := new(domain.Application)
-		if err := row.Scan(&application.ProjectID, &application.ID, &application.Slug, &application.RevisionID, &application.Document, &application.CreatedAt, &application.UpdatedAt); err != nil {
+	entity, err := pgx.CollectExactlyOneRow(rows, func(row pgx.CollectableRow) (*domain.Application, error) {
+		entity := new(domain.Application)
+		if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.Slug, &entity.RevisionID, &entity.Document, &entity.CreatedAt, &entity.UpdatedAt); err != nil {
 			return nil, err
 		}
-		application.CreatedAt, application.UpdatedAt = application.CreatedAt.UTC(), application.UpdatedAt.UTC()
-		return application, nil
+		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
+		return entity, nil
 	})
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return application, nil
+	return entity, nil
 }
 
 // ListApplicationClients implements [service.ApplicationStatements].
