@@ -61,8 +61,35 @@ export const stripColumnMarks = (text: string): string => text.replaceAll(COLUMN
  */
 const bare = (line: string): string => stripColumnMarks(stripAnsi(line));
 
+/**
+ * The columns a character takes: none for a combining mark or a zero-width
+ * joiner, two for the East Asian wide and fullwidth forms and for emoji, one
+ * for everything else. Counting code units instead would measure a name in
+ * Chinese as half its width, so a line that overflows would be left unfolded
+ * and a box's border would land in the wrong place.
+ */
+const columnsOf = (character: string): number => {
+  const code = character.codePointAt(0) ?? 0;
+  if (/^(?:\p{M}|[\u200B-\u200D\u2060])$/u.test(character)) {
+    return 0;
+  }
+  const wide =
+    (code >= 0x1100 && code <= 0x115f) ||
+    (code >= 0x2e80 && code <= 0xa4cf) ||
+    (code >= 0xac00 && code <= 0xd7a3) ||
+    (code >= 0xf900 && code <= 0xfaff) ||
+    (code >= 0xfe30 && code <= 0xfe6f) ||
+    (code >= 0xff00 && code <= 0xff60) ||
+    (code >= 0xffe0 && code <= 0xffe6) ||
+    (code >= 0x1f300 && code <= 0x1f64f) ||
+    (code >= 0x1f900 && code <= 0x1f9ff) ||
+    (code >= 0x20000 && code <= 0x3fffd);
+  return wide ? 2 : 1;
+};
+
 /** How wide a line looks on screen. */
-const visible = (line: string): number => bare(line).length;
+const visible = (line: string): number =>
+  [...bare(line)].reduce((width, character) => width + columnsOf(character), 0);
 
 /**
  * Where each column after the first begins, inside the line.

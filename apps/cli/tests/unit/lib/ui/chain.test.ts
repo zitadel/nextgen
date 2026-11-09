@@ -5,7 +5,7 @@ vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).c
 
 import { intro, log, note, outro, spinner } from "@clack/prompts";
 
-import { ZitadelError } from "../../../../src/lib/errors";
+import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
 import { Chain } from "../../../../src/lib/ui/chain";
 import { GUIDE } from "../../../../src/lib/ui/marks";
 import { asTerminalTyping } from "../../../helpers/terminal";
@@ -168,9 +168,19 @@ describe("Chain", () => {
     chain.describe("Removing an origin");
     chain.narrate("i", "asked");
 
-    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+    chain.abort(new PromptCancelled());
 
     expect(outro).not.toHaveBeenCalled();
+  });
+
+  it("closes the chain for a cancellation that was not a prompt's, whatever it says", () => {
+    const chain = watching();
+    chain.describe("Removing an origin");
+    chain.narrate("i", "asked");
+
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+
+    expect(outro).toHaveBeenCalled();
   });
 
   // Ctrl-C in the middle of the work closes nothing by itself, so without

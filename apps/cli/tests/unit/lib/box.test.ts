@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { renderBoxActions, wrapForBox } from "@/lib/box";
-import { command } from "@/lib/style";
+import { wrapForBox } from "@/lib/box";
 import { stripAnsi } from "@tests/helpers/run-cli";
 
 describe("wrapForBox", () => {
@@ -42,17 +41,5 @@ describe("wrapForBox", () => {
   it("falls back to 80 columns when the stream has no width (not a TTY)", () => {
     const line = "word ".repeat(20).trim();
     expect(wrapForBox(line, undefined)).toBe(wrapForBox(line, 80));
-  });
-});
-
-describe("renderBoxActions", () => {
-  it("puts each command on its own indented styled line", () => {
-    const out = renderBoxActions([
-      { text: "Install dependencies:", command: "npm install" },
-      { text: "Verify auth in the browser." },
-    ]);
-    expect(out).toBe(
-      `Install dependencies:\n\n  ${command("npm install")}\n\nVerify auth in the browser.`,
-    );
   });
 });

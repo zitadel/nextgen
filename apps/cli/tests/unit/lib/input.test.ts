@@ -720,6 +720,18 @@ describe("plainAsker", () => {
       expect(talk.shown()).toContain("Please answer with a number between 1 and 2.");
     });
 
+    it("takes a number named twice as one choice, as the drawn prompt would", async () => {
+      const talk = typing("1,1,2");
+
+      const answer = await plainAsker({
+        ...ask,
+        stdin: talk.stdin,
+        stdout: talk.stdout,
+      }).multiselect(framework);
+
+      expect(answer).toEqual(["a", "b"]);
+    });
+
     it("takes an empty answer as the initial value", async () => {
       const talk = typing("");
 

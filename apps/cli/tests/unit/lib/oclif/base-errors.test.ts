@@ -76,6 +76,16 @@ describe("BaseCommand errors", () => {
     expect(cmd.stderr).toEqual(["Error E_VALIDATION: Bad port\nUse 1 to 65535."]);
   });
 
+  // A failure is what a script wrapping the CLI reads on stderr, at a terminal
+  // as much as off one: `zitadel deploy 2>errors.log` must not lose it.
+  it("keeps a normal command's failure on stderr at a terminal", async () => {
+    const cmd = new FailingCommand(false);
+
+    await asTerminal(() => cmd.fail(new ZitadelError("E_VALIDATION", "Bad port")));
+
+    expect(cmd.stderr.join("\n")).toContain("Bad port");
+  });
+
   it("spells out the message and the hint, which name what the server answered", async () => {
     const cmd = new FailingCommand(false);
 

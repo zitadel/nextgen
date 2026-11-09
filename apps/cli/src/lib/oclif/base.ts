@@ -525,11 +525,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
     this.ui.bridgeNarration();
-    this.skillsOffered = await eligibleForSkills({
-      env: process.env,
-      interactive: !this.meta.nonInteractive,
-      cliVersion: this.config.version,
-    });
+    // Only a box carries the offer, so only a wizard looks for it, and a dry
+    // run changes nothing, so it does not spend the one offer a machine gets.
+    this.skillsOffered =
+      this.summarises() && !this.meta.dryRun
+        ? await eligibleForSkills({
+            env: process.env,
+            interactive: !this.meta.nonInteractive,
+            cliVersion: this.config.version,
+          })
+        : false;
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
   }
@@ -845,11 +850,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
       this.ui.stop(zitadelError);
     } else {
       // A failure has no machine form — `--json` is where a machine reads one
-      // — so it is said in the command's own shape either way, drawn when
-      // there is a terminal and written when there is not. It stays on
-      // stderr off a terminal, where a script expects to find it.
+      // — so it is said in the command's own shape either way. It closes the
+      // chain a wizard has drawn, which is on stdout; every other failure is
+      // written to stderr, where a script expects to find it, terminal or not.
       const ending = summaryOfText(renderError(zitadelError, meta), true, false, this.id);
-      if (this.ui.interactive) {
+      if (this.ui.interactive && this.ui.opened) {
         this.ui.finish(ending);
       } else {
         this.logAside(this.ui.written(ending).replace(/\n+$/, ""));

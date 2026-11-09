@@ -2,7 +2,7 @@ import { intro, log, note, outro } from "@clack/prompts";
 import { consola } from "consola";
 import pc from "picocolors";
 
-import { CANCELLED, ZitadelError } from "../errors";
+import { CANCELLED, PromptCancelled, ZitadelError } from "../errors";
 import { asker, plainAsker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
@@ -211,7 +211,7 @@ export class Chain implements Drawing, Narratable {
       process.stdout.write(`\n${pc.red(CANCELLED)}\n`);
       return;
     }
-    const closedItself = error instanceof ZitadelError && error.message === "Cancelled by user";
+    const closedItself = error instanceof PromptCancelled;
     if (closedItself || !this.opened) {
       return;
     }

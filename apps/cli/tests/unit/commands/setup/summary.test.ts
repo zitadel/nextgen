@@ -9,7 +9,6 @@ import {
   formatFrameworkLine,
   relativeDisplayPath,
   signInOf,
-  signInSummary,
 } from "@/commands/setup/summary";
 import { stripAnsi } from "@tests/helpers/run-cli";
 import { summarySections } from "@/commands/setup/summary";
@@ -149,50 +148,6 @@ describe("signInOf", () => {
     expect(signIn.providers).toEqual(["google"]);
     // The schema setup publishes enables sso for a chosen provider.
     expect(signIn.methods).toEqual(["password", "passkey", "sso"]);
-  });
-});
-
-describe("signInSummary", () => {
-  it("says what password-first enables and what registration asks for", () => {
-    const signIn = signInOf({
-      preset: "password-first",
-      useCase: "consumer",
-      sso: [],
-      passwordMinLength: null,
-    });
-    expect(signInSummary(signIn, [])).toBe(
-      [
-        "Users see email and password first; passkeys are enabled but not shown at sign-in.",
-        "Password and passkey are enabled in the user schema.",
-        "Registration requires email; givenName and familyName are optional.",
-        "Passwords have no minimum length.",
-        "No external providers will be added.",
-      ].join("\n"),
-    );
-  });
-
-  it("says passkey-first shows a passkey first, with email and password as the alternative", () => {
-    const signIn = signInOf({ preset: "passkey-first", useCase: "minimal", sso: [] });
-    expect(signInSummary(signIn, [])).toContain(
-      "Users see a passkey first, with email and password as the alternative.",
-    );
-  });
-
-  it("leaves out the optional clause when every field is required", () => {
-    const signIn = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
-    expect(signInSummary(signIn, [])).toContain("Registration requires email.");
-  });
-
-  it("says the minimum password length", () => {
-    const signIn = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
-    expect(signInSummary(signIn, [])).toContain("Passwords need at least 15 characters.");
-  });
-
-  it("names the selected providers", () => {
-    const signIn = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
-    const summary = signInSummary(signIn, ["Google", "Acme SSO"]);
-    expect(summary).toContain("External providers: Google, Acme SSO.");
-    expect(summary).not.toContain("No external providers");
   });
 });
 

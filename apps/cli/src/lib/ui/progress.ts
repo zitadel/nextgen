@@ -85,7 +85,14 @@ export class Progress {
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
       consola.start(label);
-      const result = await work(report);
+      let result: T;
+      try {
+        result = await work(report);
+      } catch (error) {
+        // Closed as failed, as the drawn step is, so the step never dangles.
+        consola.error(`${label} failed`);
+        throw error;
+      }
       for (const { verb, subject } of lines) {
         consola.info(`${verb} ${subject}`);
       }
@@ -151,7 +158,15 @@ export class Progress {
       }
     };
     return {
-      detail: (text) => details.push(text),
+      // A detail given after the step has ended is drawn at once, under it,
+      // rather than waiting for an end that already happened.
+      detail: (text) => {
+        if (ended) {
+          this.detail(text);
+          return;
+        }
+        details.push(text);
+      },
       done: (text) => end(MARK.done, text ?? label),
       fail: (text) => end(MARK.failed, text ?? `${label} failed`),
     };

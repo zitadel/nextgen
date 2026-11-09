@@ -144,6 +144,14 @@ describe("Prose", () => {
 
     expect(new Prose(row, 6, false).render()).toBe("ab  cd");
   });
+
+  // A double-width character takes two columns, so a line of them that is
+  // narrower in code units than the width is still wider on screen.
+  it("folds a line of double-width characters by the columns they take", () => {
+    const wide = Array(6).fill("名前").join(" ");
+
+    expect(new Prose(wide, 20, false).render().split("\n").length).toBeGreaterThan(1);
+  });
 });
 
 describe("wrapCommand", () => {
@@ -237,6 +245,17 @@ describe("wrapCommand", () => {
 });
 
 describe("Frame", () => {
+  it("pads a last line of double-width characters by the columns they take", () => {
+    const columns = (line: string) =>
+      [...line].reduce((sum, c) => sum + (/[\u4e00-\u9fff]/.test(c) ? 2 : 1), 0);
+    const box = new Frame("Summary", ["名前"], [], "名前").render();
+    const lines = stripAnsi(box)
+      .split("\n")
+      .filter((line) => line.includes("名前"));
+
+    expect(new Set(lines.map(columns)).size).toBe(1);
+  });
+
   it("is the same width whatever it holds", () => {
     const narrow = new Frame("Next steps", [], [{ text: "Short." }]).render();
     const wide = new Frame(

@@ -1,3 +1,5 @@
+import { stripAnsi } from "consola/utils";
+
 import type { BoxAction } from "../box";
 import { CANCELLED } from "../errors";
 import type { Summary } from "../ui";
@@ -19,12 +21,15 @@ const RUN_NEXT = "Run next:";
  * heading that already says something.
  */
 function sentence(id: string | undefined, title: string): string {
+  // Only a command that lists things headlines with a bare count. For any
+  // other command a leading number is part of its own sentence (`3 files
+  // written`), which is not a count to be reworded.
   const count = /^(\d+) (.+)$/.exec(title);
-  if (count !== null) {
+  if (count !== null && (id === undefined || /(^|:)(list|ls|resources)$/.test(id))) {
     return `Found ${count[1]} ${count[2]}`;
   }
   const environment = /^Environment\s+(\S+)(.*)$/.exec(title);
-  if (environment !== null) {
+  if (environment !== null && (id === undefined || id === "env")) {
     return `Using the ${environment[1]} environment${environment[2]}`;
   }
   if (title === "Zitadel status") {
@@ -61,7 +66,10 @@ const INLINE = /^(.*?): ((?:zitadel|npx|npm|pnpm|yarn|bun|rm|git) .+)$/;
  * makes a line a step, so a list of file names stays a list of file names and
  * a variable assignment is never offered as something to execute.
  */
-const asksForACommand = (line: string): boolean => line.startsWith("$ ") || INLINE.test(line);
+const asksForACommand = (line: string): boolean => {
+  const bare = stripAnsi(line);
+  return bare.startsWith("$ ") || INLINE.test(bare);
+};
 
 /**
  * Splits a boxed command's own text into the report it wrote and the steps it
@@ -121,7 +129,11 @@ export function nextSteps(lines: readonly string[]): BoxAction[] {
     lead = [];
     commands = [];
   };
-  for (const raw of lines) {
+  for (const coloured of lines) {
+    // A command's text is coloured at a terminal (`Next:` is bold, the `$` is
+    // dim), and a step is recognised by its words, so they are read bare. The
+    // box colours its own steps.
+    const raw = stripAnsi(coloured);
     const line = raw.trim();
     const indent = raw.length - raw.trimStart().length;
     const inline = INLINE.exec(line);
@@ -169,7 +181,7 @@ export function summaryOfText(
   // What follows `Next:` is what to do next, not what happened, so it is set
   // aside before anything below decides what the closing line is or what trails
   // it: left in, a command's `Next:` block was folded into the footer.
-  const nextAt = lines.findIndex((line) => line.trim() === "Next:");
+  const nextAt = lines.findIndex((line) => stripAnsi(line).trim() === "Next:");
   const nextBlock = nextAt < 0 ? [] : lines.splice(nextAt);
   while (lines.at(-1)?.trim() === "") {
     lines.pop();
@@ -177,7 +189,10 @@ export function summaryOfText(
   const columns = (line: string | undefined) => line !== undefined && /\S {2,}\S/.test(line);
   const at = failed
     ? -1
-    : lines.findIndex((line) => RESULT.test(line) && !line.startsWith("No diff"));
+    : lines.findIndex((line) => {
+        const bare = stripAnsi(line);
+        return RESULT.test(bare) && !bare.startsWith("No diff");
+      });
   // A table with nothing that says what happened: the closing line is plain, the table stays.
   const noHeadline = at < 0 && !failed && columns(lines[0]);
   let title = "Done";
@@ -194,16 +209,18 @@ export function summaryOfText(
     [title = "Done"] = lines.splice(at < 0 ? 0 : at, 1);
   }
   // `(server: host)` says where the command ran. It closes the headline, not a line of its own.
-  const serverAt = lines.findIndex((line) => /^\(server: .+\)$/.test(line.trim()));
+  const serverAt = lines.findIndex((line) => /^\(server: .+\)$/.test(stripAnsi(line).trim()));
   const ran =
     serverAt < 0
       ? undefined
-      : /^\(server: (.+)\)$/.exec(lines.splice(serverAt, 1)[0]?.trim() ?? "")?.[1];
+      : /^\(server: (.+)\)$/.exec(stripAnsi(lines.splice(serverAt, 1)[0] ?? "").trim())?.[1];
   const extras = [...given, ...trailing];
   if (title === "Zitadel command completed.") {
     title = "Done";
   }
-  title = sentence(id, title.replace(/\.$/, ""));
+  // The closing line is drawn in the chain's own colours, so a headline the
+  // command coloured is read bare, or its escapes would count towards its width.
+  title = sentence(id, (failed ? title : stripAnsi(title)).replace(/\.$/, ""));
 
   // A success too long to read as one line is replaced by "Done" and said in
   // full underneath: its headline is a label, and a label nobody can read is

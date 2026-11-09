@@ -26,41 +26,37 @@ function shownFile(env: NodeJS.ProcessEnv): string | undefined {
 }
 
 /**
- * Tell a developer who has AI coding agents installed how to give them the
- * Zitadel skills, once per machine and after the command's own next steps.
- * The note adds nothing itself: it names `zitadel skills add` and the
- * developer runs it. Modelled on Wrangler's skills suggestion, minus the prompt.
- *
- * The marker lives in the user's CLI config directory (`telemetryConfigDir`),
- * not in a project, so a second project on the same machine does not show it
- * again. It is written only once the note is about to be shown, and removed
- * again if showing it fails.
- *
- * Silent in CI, in non-interactive runs, when no agent is detected, once it has
- * been shown, and when `NO_SKILLS_PROMPT` is set. Fail-open: nothing here may
- * fail the command the user actually ran, and losing the race to create the marker
- * (`EEXIST`) just means another run is showing the note.
+ * The marker's path when this machine is still to be offered the skills:
+ * someone is watching, nothing opts out, an agent is installed, and the offer
+ * has not been made before. Reads the filesystem. Both ways of offering the
+ * skills decide through this, so the conditions cannot drift apart.
  */
+async function pendingOffer({ env, interactive }: SkillsHintInput): Promise<string | undefined> {
+  if (!interactive || isCI(env) || isOptedOut(env)) {
+    return undefined;
+  }
+  const shownPath = shownFile(env);
+  // No config directory to hold the marker, so the offer could never be
+  // recorded as made, and would be made on every run.
+  if (shownPath === undefined || existsSync(shownPath)) {
+    return undefined;
+  }
+  // Detected agents only decide whether the offer is relevant; it does not
+  // name them.
+  const detected = (await rosie.agents()).some(
+    (agent) => agent.detected && agent.installPath !== null,
+  );
+  return detected ? shownPath : undefined;
+}
+
 /**
- * Whether this machine should be offered the skills: someone is watching, an
- * agent is installed, and the offer has not been made before. Reads the
- * filesystem, so it is resolved while the command runs and {@link claimSkills}
- * is what spends the offer, at the moment the summary is built.
+ * Whether this machine should be offered the skills, resolved while the
+ * command runs. {@link claimSkills} is what spends the offer, at the moment the
+ * summary is built.
  */
-export async function eligibleForSkills({ env, interactive }: SkillsHintInput): Promise<boolean> {
+export async function eligibleForSkills(input: SkillsHintInput): Promise<boolean> {
   try {
-    if (!interactive || isCI(env) || isOptedOut(env)) {
-      return false;
-    }
-    const shownPath = shownFile(env);
-    // No config directory to hold the marker, so the offer could never be
-    // recorded as made, and would be made on every run.
-    if (shownPath === undefined || existsSync(shownPath)) {
-      return false;
-    }
-    // Detected agents only decide whether the offer is relevant; it does not
-    // name them.
-    return (await rosie.agents()).some((agent) => agent.detected && agent.installPath !== null);
+    return (await pendingOffer(input)) !== undefined;
   } catch {
     // Nothing here may fail the command the person actually ran.
     return false;
@@ -91,29 +87,27 @@ export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxActi
   }
 }
 
-export async function showSkillsHint({
-  env,
-  interactive,
-  cliVersion,
-}: SkillsHintInput): Promise<void> {
+/**
+ * Tell a developer who has AI coding agents installed how to give them the
+ * Zitadel skills, once per machine and after the command's own next steps.
+ * The note adds nothing itself: it names `zitadel skills add` and the
+ * developer runs it. Modelled on Wrangler's skills suggestion, minus the prompt.
+ *
+ * The marker lives in the user's CLI config directory (`telemetryConfigDir`),
+ * not in a project, so a second project on the same machine does not show it
+ * again. It is written only once the note is about to be shown, and removed
+ * again if showing it fails.
+ *
+ * Silent in CI, in non-interactive runs, when no agent is detected, once it has
+ * been shown, and when `NO_SKILLS_PROMPT` is set. Fail-open: nothing here may
+ * fail the command the user actually ran, and losing the race to create the marker
+ * (`EEXIST`) just means another run is showing the note.
+ */
+export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
+  const { cliVersion } = input;
   try {
-    if (!interactive || isCI(env) || isOptedOut(env)) {
-      return;
-    }
-    const configDir = telemetryConfigDir(env);
-    if (configDir === undefined) {
-      return;
-    }
-    const shownPath = join(configDir, SHOWN_FILE);
-    if (existsSync(shownPath)) {
-      return;
-    }
-    // Detected agents only decide whether the note is relevant; it does not
-    // name them.
-    const detected = (await rosie.agents()).some(
-      (agent) => agent.detected && agent.installPath !== null,
-    );
-    if (!detected) {
+    const shownPath = await pendingOffer(input);
+    if (shownPath === undefined) {
       return;
     }
     // Created exclusively and before printing: of two concurrent first runs only

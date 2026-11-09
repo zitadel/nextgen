@@ -51,6 +51,17 @@ describe("Progress", () => {
       await expect(new Progress(chain(true)).run("Fetching", async () => 42)).resolves.toBe(42);
     });
 
+    it("closes the step as failed when nobody is watching and the work throws", async () => {
+      await expect(
+        new Progress(chain(false)).run("Fetching", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+
+      expect(consola.start).toHaveBeenCalledWith("Fetching");
+      expect(consola.error).toHaveBeenCalledWith("Fetching failed");
+    });
+
     it("spins while it runs and says so when it is done", async () => {
       await new Progress(chain(true)).run("Removing the origin", async () => undefined);
 
@@ -141,6 +152,14 @@ describe("Progress", () => {
       const step = new Progress(chain(true)).begin("Patching project files");
       step.detail("src/app/page.tsx");
       step.done("Patched 1 file");
+
+      expect(drawn()).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
+    });
+
+    it("draws a detail given after the step has ended, under it, rather than losing it", () => {
+      const step = new Progress(chain(true)).begin("Patching project files");
+      step.done("Patched 1 file");
+      step.detail("src/app/page.tsx");
 
       expect(drawn()).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
     });

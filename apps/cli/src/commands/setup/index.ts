@@ -2632,7 +2632,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
 };
 
 /**
- * Builds the section list driving {@link renderSummary} for the setup command.
+ * Builds the section list driving {@link summarySections} for the setup command.
  * Exported so its wording is unit-tested.
  */
 export function buildSummary(opts: {

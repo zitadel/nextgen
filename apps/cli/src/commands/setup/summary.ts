@@ -16,7 +16,7 @@ import type { Detector } from "@/lib/orca/detectors/types";
 import { type Fact, type Section as UiSection, section as uiSection } from "@/lib/ui";
 import { readPackageJson } from "@/lib/npm";
 import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
-import { arrow, dim, mark } from "@/lib/style";
+import { dim } from "@/lib/style";
 import type { PasswordMinLength } from "@/lib/policies";
 
 /**
@@ -74,31 +74,6 @@ export function summarySections(sections: Section[]): UiSection[] {
         ),
       ),
     );
-}
-
-/**
- * Renders the section list as a single multi-line string. Labels are
- * padded to a common width per section so the `✓ label  value` columns
- * line up, the title prints in dim gray, and `✓` is green. Values come
- * in pre-styled — use the palette in `lib/style` to keep the colours
- * consistent with the mock. That is also what spells a value out: this box is
- * written straight to the terminal rather than through `emit`, so a value put
- * in raw reaches the reader as it came.
- */
-export function renderSummary(sections: Section[]): string {
-  const lines: string[] = [];
-  for (const section of sections) {
-    if (section.rows.length === 0) continue;
-    if (lines.length > 0) lines.push("");
-    lines.push(dim(section.title.toUpperCase()));
-    const labelWidth = Math.max(...section.rows.map((r) => r.label.length)) + 3;
-    for (const row of section.rows) {
-      const labelCol = row.label.padEnd(labelWidth);
-      const secondary = row.secondary ? `   ${arrow} ${row.secondary}` : "";
-      lines.push(`${mark.pass} ${labelCol}${row.value}${secondary}`);
-    }
-  }
-  return lines.join("\n");
 }
 
 /**
@@ -232,36 +207,4 @@ export function signInOf(answers: {
         : (answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH),
     providers: slugs,
   };
-}
-
-/** The wizard's closing note: {@link SignIn} as sentences. */
-export function signInSummary(signIn: SignIn, providerNames: readonly string[]): string {
-  const required = signIn.fields.filter((field) => field.required).map((f) => f.name);
-  const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
-  return [
-    signIn.starts_with === "passkey"
-      ? "Users see a passkey first, with email and password as the alternative."
-      : "Users see email and password first; passkeys are enabled but not shown at sign-in.",
-    `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
-    `Registration requires ${listOf(required)}` +
-      (optional.length === 0
-        ? "."
-        : `; ${listOf(optional)} ${optional.length === 1 ? "is" : "are"} optional.`),
-    signIn.password_min_length === null
-      ? "Passwords have no minimum length."
-      : `Passwords need at least ${signIn.password_min_length} characters.`,
-    providerNames.length === 0
-      ? "No external providers will be added."
-      : `External providers: ${providerNames.join(", ")}.`,
-  ].join("\n");
-}
-
-/** `["a"]` → "a", `["a", "b"]` → "a and b", `["a", "b", "c"]` → "a, b and c". */
-function listOf(items: readonly string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
-}
-
-function capitalise(text: string): string {
-  return text.length > 0 ? `${text[0]?.toUpperCase()}${text.slice(1)}` : text;
 }

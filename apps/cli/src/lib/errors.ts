@@ -129,6 +129,18 @@ export class ZitadelError extends Error {
   }
 }
 
+/**
+ * A prompt the person walked away from. A drawn prompt closes its own chain
+ * when that happens, so whoever ends the run needs to tell this from any
+ * other cancellation, which leaves the chain open: the class says so, where a
+ * match on the message would break the day the message is reworded.
+ */
+export class PromptCancelled extends ZitadelError {
+  constructor() {
+    super("E_CANCELLED", "Cancelled by user");
+  }
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<UnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",

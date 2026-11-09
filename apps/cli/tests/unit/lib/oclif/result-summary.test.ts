@@ -50,6 +50,36 @@ describe("summaryOfText", () => {
     expect(summary.lines).not.toContain("(server: api.zitadel.cloud)");
   });
 
+  // The text a command prints is coloured at a terminal (`Next:` bold, the `$`
+  // dim) and is recognised by its words, so the summary must be the same whether
+  // or not the colour is there.
+  it("splits a coloured Next: block into the same steps as a plain one", () => {
+    const plain = "Set X on the project\n\nNext:\n  $ zitadel deploy";
+    const coloured =
+      "Set X on the project\n\n\u001b[1mNext:\u001b[22m\n  \u001b[2m$\u001b[22m zitadel deploy";
+
+    expect(summaryOfText(coloured, false, true)).toEqual(summaryOfText(plain, false, true));
+  });
+
+  it("finds the headline of a coloured result the way it finds a plain one", () => {
+    expect(summaryOfText("\u001b[32mDeployed 3 resources\u001b[39m").title).toBe(
+      "Deployed 3 resources",
+    );
+  });
+
+  it("does not make a count of a headline that merely starts with a number", () => {
+    expect(summaryOfText("3 files written", false, false, "pull").title).toBe("3 files written");
+    expect(summaryOfText("1 variable", false, false, "variable:list").title).toBe(
+      "Found 1 variable",
+    );
+  });
+
+  it("does not read a headline that merely starts with Environment as the env command's", () => {
+    expect(summaryOfText("Environment file not found", false, false, "pull").title).toBe(
+      "Environment file not found",
+    );
+  });
+
   it("puts a failure's next steps through the box, so no raw Next: survives", () => {
     const summary = summaryOfText("Error E_X: broke\nNext:\n  $ zitadel deploy", true);
 

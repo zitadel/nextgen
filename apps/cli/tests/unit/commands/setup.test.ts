@@ -468,6 +468,30 @@ describe("setup command", () => {
     expect(stripAnsi(res.stdout)).toMatch(/Deployed sha256:[0-9a-f]{12} to 1 origin$/m);
   });
 
+  // The words are stored on the first release and shown by `release list`, so a
+  // change to them is a change to data and is pinned where it is sent.
+  it("records its first release as 'Initial deployment from setup'", async () => {
+    const cwd = await makeNextProject();
+    const sent: string[] = [];
+    server.use(
+      http.post("*/releases/build", async ({ request }) => {
+        sent.push(await request.clone().text());
+      }),
+      http.post("*/deployments", async ({ request }) => {
+        sent.push(await request.clone().text());
+      }),
+    );
+
+    const res = await runCliForTest([
+      ...["setup", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ...["--non-interactive", "--skip-install", "--no-git", "--framework", "next"],
+      ...PINNED_DEV_PORT,
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(sent.join("\n")).toContain("Initial deployment from setup");
+  });
+
   it("names the deploy in the box when its own deploy failed", async () => {
     const cwd = await makeNextProject();
     server.use(

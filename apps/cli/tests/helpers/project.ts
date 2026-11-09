@@ -1835,7 +1835,36 @@ export function assertNothingDrivesTheTerminal(
       );
     }
   }
+  assertEndingIsWellFormed(result, where);
   assertAJsonBodyParses(result, where);
+}
+
+/**
+ * A run's ending is built from the command's own words, which at a colour
+ * terminal carry escapes, so a rule that reads them only when they are bare
+ * leaves a coloured run ending differently from a plain one. Two symptoms say
+ * so for any command, in any rendering: the command overview named twice, and
+ * a step's `$ command` line left raw inside the box instead of being laid out
+ * as a step. Both are checked here, on every invocation, because the command
+ * that breaks them is never the one a spec for colour was written for.
+ */
+export function assertEndingIsWellFormed(
+  result: { stdout: string; stderr: string },
+  where: string,
+): void {
+  for (const [stream, raw] of [
+    ["stdout", result.stdout],
+    ["stderr", result.stderr],
+  ] as const) {
+    const text = raw.replace(SGR, "");
+    const overview = text.match(/Explore all commands:/g)?.length ?? 0;
+    expect(
+      overview,
+      `${where}: ${stream} names the command overview ${overview} times`,
+    ).toBeLessThan(2);
+    const raw$ = text.split("\n").filter((line) => /^\s*│\s+\$ /.test(line));
+    expect(raw$, `${where}: ${stream} has a raw $ command line inside its box`).toEqual([]);
+  }
 }
 
 /**

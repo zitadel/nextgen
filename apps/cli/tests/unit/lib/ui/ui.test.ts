@@ -6,7 +6,7 @@ vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).c
 import { confirm, intro, outro, spinner } from "@clack/prompts";
 import { consola } from "consola";
 
-import { ZitadelError } from "../../../../src/lib/errors";
+import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
 import { Ui } from "../../../../src/lib/ui/ui";
 
 const watched = () => new Ui({ interactive: true, force: false });
@@ -83,7 +83,7 @@ describe("Ui", () => {
       ui.describe("Listing origins");
       ui.say("something happened");
 
-      ui.stop(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+      ui.stop(new PromptCancelled());
 
       expect(outro).not.toHaveBeenCalled();
     });

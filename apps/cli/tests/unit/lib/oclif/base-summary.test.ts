@@ -1,6 +1,13 @@
 import type { Config } from "@oclif/core";
 import { stripAnsi } from "consola/utils";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
+vi.mock("rosie-skills", () => rosie);
 
 import { BaseCommand } from "../../../../src/lib/oclif/base";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
@@ -258,5 +265,35 @@ describe("the ending of a run nothing is drawn into", () => {
     );
 
     expect(shown).toBe("value  hello");
+  });
+});
+
+describe("looking for the skills offer", () => {
+  const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
+
+  /** How often a run looked for an installed agent, on a machine that has not been offered. */
+  async function looked(Command: typeof SummarisingCommand, flags: Record<string, unknown> = {}) {
+    rosie.agents.mockReset();
+    rosie.agents.mockResolvedValue([CLAUDE]);
+    vi.stubEnv("CI", "");
+    vi.stubEnv("NO_SKILLS_PROMPT", "");
+    vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "zitadel-skills-")));
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const command = new Command([], { version: "0.0.0-test" } as unknown as Config);
+    await asTerminal(() => command.finish({ status: "ok", data: "x" }, flags));
+    vi.unstubAllEnvs();
+    return rosie.agents.mock.calls.length;
+  }
+
+  it("is done by a command that draws a box, which is the one that carries the offer", async () => {
+    expect(await looked(SummarisingCommand)).toBe(1);
+  });
+
+  it("is not done by a normal command, which would pay for a scan it never uses", async () => {
+    expect(await looked(AnsweringCommand)).toBe(0);
+  });
+
+  it("is not done on a dry run, which must not spend the one offer a machine gets", async () => {
+    expect(await looked(SummarisingCommand, { "dry-run": true })).toBe(0);
   });
 });

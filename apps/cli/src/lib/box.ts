@@ -1,7 +1,5 @@
 import wrapAnsi from "wrap-ansi";
 
-import { command } from "./style";
-
 /**
  * Frame overhead of a `consola.box` with `padding: 1`: two border columns,
  * the padding columns, and consola's left margin. Content wrapped to the
@@ -38,18 +36,10 @@ export function wrapForBox(message: string, columns = process.stdout.columns): s
  * A next-step line for the human box: prose plus, when the step is literally
  * a command to run, that command pulled out of the sentence. The JSON
  * envelope keeps its own plain `next_actions`/`next_commands` strings; this
- * shape exists only so {@link renderBoxActions} can put the command alone on
+ * shape exists only so the summary's frame can put the command alone on
  * an indented styled line, where it stands out and a drag-select copies it
  * without surrounding prose. (Line selection such as triple-click still
  * includes the box border and padding — commands that must copy as a whole
  * physical line belong outside a frame, like the claim URL.)
  */
 export type BoxAction = { text: string; command?: string };
-
-export function renderBoxActions(actions: BoxAction[]): string {
-  return actions
-    .map((action) =>
-      action.command ? `${action.text}\n\n  ${command(action.command)}` : action.text,
-    )
-    .join("\n\n");
-}

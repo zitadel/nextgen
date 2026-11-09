@@ -5,7 +5,7 @@ import { cancel, confirm, isCancel, multiselect, password, select, text } from "
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { CANCELLED, confirmationHint, ZitadelError } from "./errors";
+import { CANCELLED, confirmationHint, PromptCancelled, ZitadelError } from "./errors";
 import type {
   Choice,
   ConfirmQuestion,
@@ -66,7 +66,7 @@ export type Session = {
 };
 
 /** The one thing a cancelled prompt throws, whichever prompter was asking. */
-const cancelledByUser = (): ZitadelError => new ZitadelError("E_CANCELLED", "Cancelled by user");
+const cancelledByUser = (): ZitadelError => new PromptCancelled();
 
 /** How a typed answer is refused as it is typed: the problem, or nothing. */
 type Validate = (value: string | undefined) => string | undefined;
@@ -228,7 +228,8 @@ class PlainPrompter implements Prompter {
       }
       const picked = typed.split(",").map((part) => this.pick(part.trim(), choices.length));
       if (picked.every((at) => at !== undefined)) {
-        return picked.map((at) => choices[at]?.value);
+        // A number named twice is one choice, as it is in the drawn prompt.
+        return [...new Set(picked)].map((at) => choices[at]?.value);
       }
       this.say(`Please answer with numbers between 1 and ${choices.length}, separated by commas.`);
     }

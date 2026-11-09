@@ -162,6 +162,27 @@ describe("eligibleForSkills", () => {
   });
 });
 
+// Both ways of offering the skills decide through one function, so what makes
+// one silent makes the other silent. They once had two copies of the rule, and
+// a guard added to one was missing from the other.
+describe("the two ways of offering the skills", () => {
+  it.each([
+    ["in CI", { CI: "1" }, true],
+    ["when opted out", { NO_SKILLS_PROMPT: "1" }, true],
+    ["when nobody is watching", {}, false],
+  ])("agree they have nothing to offer %s", async (_when, extra, interactive) => {
+    const dir = (await import("node:fs")).mkdtempSync(
+      join((await import("node:os")).tmpdir(), "zitadel-skills-agree-"),
+    );
+    const env = { ...envIn(dir), ...extra };
+
+    await showSkillsHint({ env, interactive, cliVersion });
+
+    expect(log).not.toHaveBeenCalled();
+    expect(await eligibleForSkills({ env, interactive, cliVersion })).toBe(false);
+  });
+});
+
 describe("claimSkills", () => {
   it("names the CLI's own command at the version that is running", ({ dir }) => {
     // The skills ship inside the CLI, so the step adds the ones this release
