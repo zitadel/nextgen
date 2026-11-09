@@ -4,12 +4,35 @@ import { RefusedEditError } from "@/lib/zitadel/errors";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
 import type { ConfigFile, JsonObject } from "@/lib/zitadel/types";
+import { withoutKey } from "@/lib/zitadel/utils/json";
 
 /**
- * Where a document stands against the file it is saved to: as it was read,
- * edited since, or new and not yet written.
+ * Every way a document can stand against the file it is saved to: as it was
+ * read, edited since, or new and not yet written.
  */
-export type DocumentStatus = "read" | "edited" | "created";
+export const DOCUMENT_STATUSES = ["read", "edited", "created"] as const;
+
+/**
+ * Where a document stands against the file it is saved to.
+ */
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
+
+/**
+ * Every kind of document the configuration holds, which it files each under.
+ */
+export const DOCUMENT_KINDS = [
+  "schema",
+  "flow",
+  "connection",
+  "policy",
+  "policy-test",
+  "branding",
+] as const;
+
+/**
+ * Which kind of document one is.
+ */
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 /**
  * A file a document is made from: its project-relative path and its body.
@@ -17,37 +40,40 @@ export type DocumentStatus = "read" | "edited" | "created";
  * @remarks
  * The body's type is kept, so a caller that holds a typed body gets a document
  * of that body back.
+ *
+ * @typeParam Body - The body's type.
  */
-export type DocumentFile<Body extends JsonObject = JsonObject> = Readonly<{
+export type DocumentFile<Body extends JsonObject = JsonObject> = {
   /**
    * The project-relative path of the file.
    */
-  path: string;
+  readonly path: string;
+
   /**
    * The file's parsed body.
    */
-  body: Body;
-}>;
+  readonly body: Body;
+};
 
 /**
  * A region an edit left alone because it was changed by hand.
  */
-export type SkippedRegion = Readonly<{
+export type SkippedRegion = {
   /**
    * The step that was left alone, such as `sso-conflict`.
    */
-  step: string;
+  readonly step: string;
 
   /**
    * Where in the file, such as `steps.sso-conflict`.
    */
-  region: string;
+  readonly region: `steps.${string}`;
 
   /**
    * Why it was left alone.
    */
-  reason: "hand-edited";
-}>;
+  readonly reason: "hand-edited";
+};
 
 /**
  * What an edit made of a document: every `with…` and `without…` returns one.
@@ -58,23 +84,23 @@ export type SkippedRegion = Readonly<{
  *
  * @typeParam Document - What was edited.
  */
-export type Edit<Document> = Readonly<{
+export type Edit<Document> = {
   /**
    * The document as the edit leaves it: a new one, or the same one when
    * nothing changed.
    */
-  document: Document;
+  readonly document: Document;
 
   /**
    * False when the edit changed nothing.
    */
-  changed: boolean;
+  readonly changed: boolean;
 
   /**
    * The regions the edit left alone because they were changed by hand.
    */
-  skipped: readonly SkippedRegion[];
-}>;
+  readonly skipped: readonly SkippedRegion[];
+};
 
 /**
  * One configuration file, as the library holds it: its path, its body exactly
@@ -84,10 +110,11 @@ export type Edit<Document> = Readonly<{
  * Every kind of document follows the same standard:
  *
  * - it is made with `static of(file)` when read and `static create(file)` when
- *   new, and {@link asRead} marks it saved;
- * - {@link problems} says everything wrong with the file on its own;
- * - {@link wireBody} gives the body the server receives;
- * - it names its {@link kind}, which the configuration files it under;
+ *   new, and {@link markRead} marks it saved;
+ * - {@link check} says everything wrong with the file on its own;
+ * - {@link toWireBody} gives the body the server receives;
+ * - it names its {@link kind}, which the configuration files it under and
+ *   which tells one kind of document from another;
  * - an edit is a `with…` or `without…` method that returns an {@link Edit}
  *   holding a new document, or the same one when there is nothing to change,
  *   and throws {@link RefusedEditError} when it cannot be made.
@@ -96,12 +123,14 @@ export type Edit<Document> = Readonly<{
  * be compared with what an edit made of it. The body is kept whole, including
  * fields the library has no use for, so writing a document back loses nothing
  * its author put there.
+ *
+ * @typeParam Body - The body's type.
  */
 export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   /**
    * Which kind of document this is, which the configuration files it under.
    */
-  abstract readonly kind: string;
+  abstract readonly kind: DocumentKind;
 
   /**
    * The project-relative path of the file the document is saved to.
@@ -136,7 +165,7 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
    *
    * @returns True once it has been edited, or while it is new and unwritten.
    */
-  get changed(): boolean {
+  get isUnsaved(): boolean {
     return this.status !== "read";
   }
 
@@ -172,44 +201,19 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
    *
    * @returns Its path and body.
    */
-  toFile(): ConfigFile {
+  get file(): ConfigFile {
     return { path: this.path, body: this.body };
   }
 
   /**
-   * The document as saved: what it holds is now what the file holds.
+   * The body as its contract and every rule judges it, and as the server
+   * receives it when the kind has no references to inline.
    *
-   * @returns The same document, marked as read.
+   * @returns The body without the editor-only `$schema` pointer.
    */
-  abstract asRead(): ConfigDocument<Body>;
-
-  /**
-   * Everything wrong with this one file on its own: what its kind's contract
-   * refuses, and what a file of its kind must never hold.
-   *
-   * @remarks
-   * A finding that needs other files, such as a flow naming a schema that is
-   * not there, is never one of these. A check that needs what the context does
-   * not give is skipped.
-   *
-   * @param context - What some checks need beyond the file, such as the store
-   *   a `$file` reference is read from.
-   * @returns Every finding, in the order the rules list them; none when the
-   *   file is sound.
-   */
-  abstract problems(context: ValidationContext): readonly Issue[];
-
-  /**
-   * The body the server receives for this file.
-   *
-   * @remarks
-   * Never the editor-only `$schema` pointer, and every `$file` reference
-   * inlined for a kind that has them.
-   *
-   * @param store - Where referenced files are read from.
-   * @returns The body to send.
-   */
-  abstract wireBody(store: ConfigStore): JsonObject;
+  get contractBody(): JsonObject {
+    return withoutKey(this.body, "$schema");
+  }
 
   /**
    * The status an edit leaves a document in.
@@ -227,41 +231,67 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   }
 
   /**
-   * The body as its contract and every rule judges it, and as the server
-   * receives it when the kind has no references to inline.
+   * The document as saved: what it holds is now what the file holds.
    *
-   * @returns The body without the editor-only `$schema` pointer.
+   * @returns The same document, marked as read.
    */
-  get contractBody(): JsonObject {
-    const { $schema: _editorOnly, ...body } = this.body;
-    return body;
-  }
+  abstract markRead(): ConfigDocument<Body>;
 
   /**
-   * One error-level finding about this file.
+   * Check this one file on its own: what its kind's contract refuses, and what
+   * a file of its kind must never hold.
+   *
+   * @remarks
+   * A finding that needs other files, such as a flow naming a schema that is
+   * not there, is never one of these. A check that needs what the context does
+   * not give is skipped.
+   *
+   * @param context - What some checks need beyond the file, such as the store
+   *   a `$file` reference is read from.
+   * @returns Every finding, in the order the rules list them; none when the
+   *   file is sound.
+   */
+  abstract check(context: ValidationContext): readonly Issue[];
+
+  /**
+   * Build the body the server receives for this file.
+   *
+   * @remarks
+   * Never the editor-only `$schema` pointer, and every `$file` reference
+   * inlined for a kind that has them.
+   *
+   * @param store - Where referenced files are read from.
+   * @returns The body to send.
+   * @throws {@link ConfigError} When a referenced file cannot be read.
+   */
+  abstract toWireBody(store: ConfigStore): JsonObject;
+
+  /**
+   * Make one error-level finding about this file.
    *
    * @param rule - The rule it breaks.
    * @param message - What is wrong, and what to change.
    * @returns The finding.
    */
-  protected issue(rule: RuleId, message: string): Issue {
+  protected makeIssue(rule: RuleId, message: string): Issue {
     return { severity: "error", rule, file: this.path, message };
   }
 
   /**
-   * What a contract refuses in this file, one finding per refusal.
+   * Check this file against a contract, one finding per refusal.
    *
    * @param rule - The rule that holds the file to the contract.
    * @param contract - The contract.
    * @returns The findings; none when the contract takes the file.
    */
-  protected contractIssues(rule: RuleId, contract: ZodType): readonly Issue[] {
+  protected checkContract(rule: RuleId, contract: ZodType): readonly Issue[] {
     const result = contract.safeParse(this.contractBody);
     if (result.success) {
       return [];
     }
     return result.error.issues.map((refusal) => {
-      return this.issue(rule, `${refusal.path.join(".") || "(root)"} ${refusal.message}`);
+      const where = refusal.path.join(".") || "(root)";
+      return this.makeIssue(rule, `${where} ${refusal.message}`);
     });
   }
 

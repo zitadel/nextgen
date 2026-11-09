@@ -657,7 +657,7 @@ describe("readSchemaTarget", () => {
 
       const read = await target(cwd);
 
-      expect(read.config.flows.for(read.schema)).toEqual([
+      expect(read.config.flows.findForSchema(read.schema)).toEqual([
         expect.objectContaining({ path: ".zitadel/flows/login.json" }),
       ]);
     });

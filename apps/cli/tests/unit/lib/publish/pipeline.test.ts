@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runSteps, type Step, type StepResult } from "@/lib/publish/pipeline";
+import { runSteps, type Step, type StepContext, type StepResult } from "@/lib/publish/pipeline";
 import { aStepContext } from "@tests/helpers/step-context";
 
 /**
@@ -46,6 +46,24 @@ describe("runSteps", () => {
     const outcome = await runSteps([diff, silent], aStepContext());
 
     expect(outcome.data).toEqual({ diff: { files: [] } });
+  });
+
+  it("hands a later step what an earlier one learned", async () => {
+    const runs: string[] = [];
+    const learns = aStep("diff", runs, {}, { learned: { schemasOrFlowsChanged: false } });
+    const seen: StepContext["learned"][] = [];
+    const reads: Step = {
+      name: "lockout",
+      runsFor: ["deploy"],
+      run: async (context) => {
+        seen.push(context.learned);
+        return undefined;
+      },
+    };
+
+    await runSteps([learns, reads], aStepContext({ learned: {} }));
+
+    expect(seen).toEqual([{ schemasOrFlowsChanged: false }]);
   });
 
   describe("when the mode is one a step does not run for", () => {

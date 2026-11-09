@@ -60,19 +60,46 @@ import {
   Connection,
   type ConnectionSetting,
   type CredentialNames,
+  type DocumentChange,
 } from "@/lib/zitadel";
 
 /**
- * The provider the run was asked for. `selection` is undefined for a custom
- * provider whose settings a person will be asked for once everything that can
- * fail has passed; `values` are the settings the flags gave. A person at a
- * terminal is asked for the settings they left out, but later: here the ones
- * they did give are only checked. A script, a dry run or `--non-interactive`
- * is held to the flags and told which are missing.
+ * The provider the run was asked for.
+ *
+ * @remarks
+ * `selection` is undefined for a custom provider whose settings a person will
+ * be asked for once everything that can fail has passed; `values` are the
+ * settings the flags gave. A person at a terminal is asked for the settings
+ * they left out, but later: here the ones they did give are only checked. A
+ * script, a dry run or `--non-interactive` is held to the flags and told which
+ * are missing.
  */
 type SsoProvider = {
   readonly selection: ProviderSelection | undefined;
   readonly values: CustomFlagValues;
+};
+
+/**
+ * The provider and custom-connection flags, by the names they are read as.
+ */
+type ProviderFlags = {
+  readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string;
+};
+
+/**
+ * Whether a person is there to ask for the settings left out.
+ */
+type SsoRun = {
+  readonly interactive: boolean;
+};
+
+/**
+ * The flags that pick the environment a run reads its issuer from.
+ */
+type EnvironmentFlags = {
+  readonly server?: string | undefined;
+  readonly env?: string | undefined;
+  readonly envFile?: string | undefined;
 };
 
 /**
@@ -92,9 +119,16 @@ const CLIENT_ID: Refused<ClientId> = {
 
 /**
  * One of the settings that describe a custom connection, refused with what
- * the platform's own parser found wrong with it. The flag names itself in the
- * refusal, because a run gives four of them and the complaint belongs to one.
- * `setup` declares the same settings under its own `--sso-*` names.
+ * the platform's own parser found wrong with it.
+ *
+ * @remarks
+ * The flag names itself in the refusal, because a run gives four of them and
+ * the complaint belongs to one. `setup` declares the same settings under its
+ * own `--sso-*` names.
+ *
+ * @param flag - The flag, as the command spells it.
+ * @param parse - The platform's parser for the setting.
+ * @returns The flag's definition, waiting for its description.
  */
 function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
   return Flags.custom<string>({
@@ -138,13 +172,10 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
  * @param run - Whether someone is there to ask for the settings left out.
  * @returns The provider, or only the given settings when a person will be
  *   asked for the rest.
- * @throws ZitadelError When a script, a dry run or `--non-interactive` leaves
- *   out a custom connection's setting.
+ * @throws {@link ZitadelError} When a script, a dry run or `--non-interactive`
+ *   leaves out a custom connection's setting.
  */
-export function ssoProvider(
-  flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
-  run: { interactive: boolean },
-): SsoProvider {
+export function ssoProvider(flags: ProviderFlags, run: SsoRun): SsoProvider {
   const provider = String(flags.provider);
   const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
   // Each setting was refused under its own flag on its way in, so a run that
@@ -154,31 +185,33 @@ export function ssoProvider(
   const complete =
     values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined;
   const askLater = provider === CUSTOM_PROVIDER && run.interactive && !complete;
-  return {
-    selection: askLater
-      ? undefined
-      : selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, customExample(ENABLE_FLAG_NAMES)),
-    values,
-  };
+  if (askLater) {
+    return { selection: undefined, values };
+  }
+  const example = customExample(ENABLE_FLAG_NAMES);
+  return { selection: selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, example), values };
 }
 
-/** What a Project with no development issuer is refused for. */
+/**
+ * What a Project with no development issuer is refused for.
+ */
 const NO_ISSUER_REFUSAL: Refusal = {
   message: "This Project has no development issuer",
   hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
 };
 
 /**
- * The origin the app serves from, as the run's environment names it. A Project
- * that has none has not been set up.
+ * The origin the app serves from, as the run's environment names it.
+ *
+ * @param cwd - The project root.
+ * @param flags - The flags that pick the environment.
+ * @param env - The process environment.
+ * @returns The issuer.
+ * @throws {@link ZitadelError} When the Project has none, so it has not been set up.
  */
 export async function developmentIssuer(
   cwd: string,
-  flags: {
-    server?: string | undefined;
-    env?: string | undefined;
-    envFile?: string | undefined;
-  },
+  flags: EnvironmentFlags,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
   const environment = await resolveEnvironment({
@@ -194,6 +227,92 @@ export async function developmentIssuer(
   }
   return issuer;
 }
+
+/**
+ * The credentials a run was given or asked for.
+ */
+type Credentials = {
+  readonly endpoints: ConnectionEndpoints | undefined;
+  readonly clientId: ClientId | undefined;
+  readonly secret: ClientSecret | undefined;
+};
+
+/**
+ * What became of each credential sent to the project.
+ */
+type Published = {
+  readonly clientId: PublishState | undefined;
+  readonly secret: SecretOutcome | undefined;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.askCredentials} asks about.
+ */
+type CredentialQuestion = {
+  readonly selection: ProviderSelection;
+  readonly reused: boolean;
+  readonly givenClientId: ClientId | undefined;
+  readonly names: CredentialNames;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.publish} sends, and where.
+ */
+type CredentialDelivery = {
+  readonly publish: SecretPublisher | undefined;
+  readonly connection: Connection;
+  readonly reused: boolean;
+  readonly names: CredentialNames;
+  readonly credentials: Credentials;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.payload} words the result from.
+ */
+type PayloadInput = {
+  /**
+   * The Project the run addresses. `--json` suppresses the console line that
+   * otherwise carries it, and a result that names only the schema does not
+   * say which Project was changed.
+   */
+  readonly projectId: string;
+  readonly provider: ProviderName;
+  readonly schema: string;
+  readonly connection: Connection;
+  readonly reused: boolean;
+  readonly callbackUri: string;
+  readonly change: Change;
+  readonly clientId: PublishState | undefined;
+  readonly secret: SecretOutcome | undefined;
+  readonly names: CredentialNames;
+};
+
+/**
+ * A credential's variable, and whether the project holds its value.
+ */
+type PublishedVariable = {
+  readonly variable: string;
+  readonly published: PublishState;
+};
+
+/**
+ * The machine-readable result. Never the secret, only whether it is held.
+ */
+type Payload = {
+  readonly project_id: string;
+  readonly provider: ProviderName;
+  readonly schema: string;
+  readonly connection: {
+    readonly action: "reuse" | "create";
+    readonly slug: string;
+    readonly file: string;
+  };
+  readonly callback_uri: string;
+  readonly changed: readonly string[];
+  readonly notices: Change["notices"];
+  readonly client_id: PublishedVariable | null;
+  readonly secret: PublishedVariable | null;
+};
 
 /**
  * The `auth-method sso enable` command (ADR 070) — add a provider to a
@@ -260,7 +379,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     environment: true,
   };
 
-  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+  /**
+   * Add the provider to the schema and its login flows, and publish its
+   * credentials to the project.
+   *
+   * @param input - The provider, its settings, the schema and the environment flags.
+   * @returns The result.
+   * @throws {@link ZitadelError} When no provider is named, a setting is
+   *   refused, the schema cannot be chosen, or no flow can offer the provider.
+   */
+  protected async execute(input: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+    const flags = input.flags;
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
@@ -268,22 +397,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       interactive: !this.nonInteractive && !this.dryRun,
     });
     const issuer = await developmentIssuer(this.cwd, flags, this.env);
-    const target = await this.schemaTarget(flags);
+    const target = await this.loadSchemaTarget(flags);
     const { config, schema } = target;
     // Refused before anything is asked: a provider no flow offers is no
     // sign-in button however well everything else goes.
-    config.flows.forSso(schema);
+    config.flows.resolveForSso(schema);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
-    const selection =
-      project.selection ??
-      selectionFromFlags(
-        CUSTOM_PROVIDER,
-        await this.askCustomSettings(target, project.values),
-        ENABLE_FLAG_NAMES,
-        customExample(ENABLE_FLAG_NAMES),
-      );
+    const selection = project.selection ?? (await this.askCustomSelection(target, project.values));
     const provider = providerOf(selection);
     const options = {
       clientId: flags.clientId,
@@ -298,7 +420,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const reused = !preview.created;
 
     // A loopback issuer works only on a server that may fetch from this machine.
-    const loopback = loopbackIssuerWarning(selection, await loopbackReach(target.cwd, server));
+    const reach = await loopbackReach(target.cwd, server);
+    const loopback = loopbackIssuerWarning(selection, reach);
     if (loopback !== undefined) {
       reportWarning(loopback);
     }
@@ -343,27 +466,22 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const reusedId =
         flags.clientId !== undefined && names.clientId !== undefined ? [names.clientId] : [];
       const toStore = reused ? reusedId : [names.clientId, names.clientSecret];
+      const writes = preview.changedPaths.map((file) => {
+        return `Would write ${file}`;
+      });
+      const stores = toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
+      const payload = this.payload({
+        ...summary,
+        change: preview,
+        clientId: undefined,
+        secret: undefined,
+        names,
+      });
       return this.emit({
         status: "skipped",
         reason: "dry-run",
-        data: {
-          ...this.payload({
-            ...summary,
-            change: preview,
-            clientId: undefined,
-            secret: undefined,
-            names,
-          }),
-          would_store: toStore,
-        },
-        pretty: prose(
-          [
-            ...preview.changedPaths.map((file) => {
-              return `Would write ${file}`;
-            }),
-            ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
-          ].join("\n"),
-        ),
+        data: { ...payload, would_store: toStore },
+        pretty: prose([...writes, ...stores].join("\n")),
       });
     }
 
@@ -373,16 +491,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       givenClientId: flags.clientId,
       names,
     });
-    // The endpoints a development run answered for change only a new
-    // connection's body, never which files the change writes.
-    const change =
-      credentials.endpoints === undefined
-        ? preview
-        : config.connections.enable(
-            schema,
-            candidate.withEndpoints(credentials.endpoints).document,
-            options,
-          );
+    const change = this.withEndpoints(preview, credentials.endpoints, (endpoints) => {
+      const located = candidate.withEndpoints(endpoints).document;
+      return config.connections.enable(schema, located, options);
+    });
     if (reused) {
       consola.success(`Reusing ${connection.path}`);
     }
@@ -395,15 +507,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       credentials,
     });
     this.report(change);
-    if (
-      credentials.endpoints?.issuer !== undefined &&
-      credentials.endpoints.issuer !== provider.issuer
-    ) {
+    const endpointIssuer = credentials.endpoints?.issuer;
+    if (endpointIssuer !== undefined && endpointIssuer !== provider.issuer) {
       // A connection pointing somewhere other than the vendor is not what the
       // developer will want in the end, and nothing else would show it.
-      reportWarning(
-        `${provider.displayName} points at ${credentials.endpoints.issuer}, not the provider`,
-      );
+      reportWarning(`${provider.displayName} points at ${endpointIssuer}, not the provider`);
     }
     if (written.length === 0 && change.notices.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${provider.displayName}`);
@@ -428,50 +536,95 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       published.clientId !== "failed";
     const name = provider.displayName;
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
-    const title = unpublished
+    const configured = unpublished
       ? `${name} sign-in is configured locally.`
       : `${name} sign-in is already configured locally.`;
+    const title =
+      stored && unpublished
+        ? `${configured} Provider credentials are stored on your Project.`
+        : configured;
     const actions = [
       `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
     ];
+    const payload = this.payload({
+      ...summary,
+      change,
+      clientId: published.clientId,
+      secret: published.secret,
+      names,
+    });
+    const next = unpublished
+      ? { actions, commands: followUps.commands }
+      : { commands: followUps.commands };
 
     return this.emit({
       status: "ok",
       data: {
-        title:
-          stored && unpublished
-            ? `${title} Provider credentials are stored on your Project.`
-            : title,
-        ...this.payload({
-          ...summary,
-          change,
-          clientId: published.clientId,
-          secret: published.secret,
-          names,
-        }),
+        title,
+        ...payload,
         next_args: followUps.args,
       },
-      next: { ...(unpublished ? { actions } : {}), commands: followUps.commands },
+      next,
     });
   }
 
   /**
+   * The custom connection a person describes, asking for the settings the
+   * flags left out.
+   *
+   * @param target - What the run read.
+   * @param values - The settings the flags gave.
+   * @returns The provider, checked.
+   * @throws {@link ZitadelError} When a setting is refused.
+   */
+  private async askCustomSelection(
+    target: SchemaTarget,
+    values: CustomFlagValues,
+  ): Promise<ProviderSelection> {
+    const settings = await this.askCustomSettings(target, values);
+    const example = customExample(ENABLE_FLAG_NAMES);
+    return selectionFromFlags(CUSTOM_PROVIDER, settings, ENABLE_FLAG_NAMES, example);
+  }
+
+  /**
+   * The change to write: the preview, or the same change made again with the
+   * endpoints a development run answered.
+   *
+   * @remarks
+   * The endpoints change only a new connection's body, never which files the
+   * change writes.
+   *
+   * @param preview - The change worked out before anything was asked.
+   * @param endpoints - The endpoints a development run answered, if any.
+   * @param remake - Makes the change again with the endpoints.
+   * @returns The change.
+   */
+  private withEndpoints(
+    preview: DocumentChange<Connection>,
+    endpoints: ConnectionEndpoints | undefined,
+    remake: (endpoints: ConnectionEndpoints) => DocumentChange<Connection>,
+  ): DocumentChange<Connection> {
+    if (endpoints === undefined) {
+      return preview;
+    }
+    return remake(endpoints);
+  }
+
+  /**
    * The credentials the connection needs, asked for once nothing is left that
-   * could refuse the run. A new connection needs both: a sign-in button without
-   * them fails at the provider, in a browser, not here. A reused one is given
-   * only what the developer passes: the project may already hold its
-   * credentials, and an unattended rerun should not start asking for them.
+   * could refuse the run.
+   *
+   * @remarks
+   * A new connection needs both: a sign-in button without them fails at the
+   * provider, in a browser, not here. A reused one is given only what the
+   * developer passes: the project may already hold its credentials, and an
+   * unattended rerun should not start asking for them.
    *
    * @param input - The provider, whether the connection is reused, the
    *   client id `--client-id` gave, and the variables the credentials go to.
    * @returns The credentials, and the endpoints a development run answered.
    */
-  private async askCredentials(input: {
-    selection: ProviderSelection;
-    reused: boolean;
-    givenClientId: ClientId | undefined;
-    names: CredentialNames;
-  }): Promise<Credentials> {
+  private async askCredentials(input: CredentialQuestion): Promise<Credentials> {
     const provider = providerOf(input.selection);
     if (input.reused) {
       // Only read so that a rerun can replace a secret the project holds.
@@ -489,14 +642,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // provider may be a local stand-in, and the client is registered with
     // whatever answers. Not asked of a custom connection, whose issuer the
     // developer has already given.
-    const endpoints =
-      input.selection.kind === "catalog"
-        ? await askConnectionEndpoints({
-            provider: input.selection.id,
-            developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-            ask: this.input,
-          })
-        : undefined;
+    const endpoints = await this.askEndpoints(input.selection);
     const clientId = await this.input({
       kind: "text",
       name: `client id for ${provider.displayName}`,
@@ -504,7 +650,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flag: "--client-id",
       parse: parseClientId,
       given: input.givenClientId,
-      retry: this.retryFor(input.selection, "<client-id>"),
+      retry: this.retryFor(input.selection, "<client-id>", ""),
     });
     const secret = await this.input({
       kind: "secret",
@@ -518,13 +664,37 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
+   * Where a catalog provider lives, on a development run only.
+   *
+   * @param selection - The provider.
+   * @returns The endpoints, or `undefined` for a custom provider or a normal run.
+   */
+  private async askEndpoints(
+    selection: ProviderSelection,
+  ): Promise<ConnectionEndpoints | undefined> {
+    if (selection.kind !== "catalog") {
+      return undefined;
+    }
+    return askConnectionEndpoints({
+      provider: selection.id,
+      developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
+      ask: this.input,
+    });
+  }
+
+  /**
    * What an agent can run once a missing credential is to hand. Only for a
    * catalog provider: a custom connection needs its settings repeated too.
+   *
+   * @param selection - The provider.
+   * @param clientId - The client id, or a placeholder for it.
+   * @param pipe - What feeds the secret on stdin, if anything.
+   * @returns The command, or `undefined` for a custom provider.
    */
   private retryFor(
     selection: ProviderSelection,
     clientId: string,
-    pipe = "",
+    pipe: string,
   ): SuggestedCommand | undefined {
     if (selection.kind !== "catalog") {
       return undefined;
@@ -538,20 +708,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   /**
    * Store the credentials the developer gave in the project variables the
    * connection reads them from, the client id first: it is the half the
-   * developer can read back afterwards. A credential the connection holds as a
-   * value has no variable to go to, which is said instead.
+   * developer can read back afterwards.
+   *
+   * @remarks
+   * A credential the connection holds as a value has no variable to go to,
+   * which is said instead.
    *
    * @param input - Where the credentials go, the connection, whether it is
    *   reused, its variables, and the credentials.
    * @returns What became of each credential.
    */
-  private async publish(input: {
-    publish: SecretPublisher | undefined;
-    connection: Connection;
-    reused: boolean;
-    names: CredentialNames;
-    credentials: Credentials;
-  }): Promise<Published> {
+  private async publish(input: CredentialDelivery): Promise<Published> {
     const { publish, connection, reused, names, credentials } = input;
     const selector = this.environmentSelector();
     if (credentials.clientId !== undefined && names.clientId === undefined) {
@@ -565,14 +732,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           "Replace it with a ${{ NAME }} reference so the secret is not committed.",
       );
     }
-    const clientId =
-      credentials.clientId === undefined || names.clientId === undefined
-        ? undefined
-        : await publishClientId({ name: names.clientId, value: credentials.clientId, publish });
-    const secret =
-      credentials.secret === undefined || names.clientSecret === undefined
-        ? undefined
-        : await storeClientSecret({ name: names.clientSecret, value: credentials.secret, publish });
+    const clientId = await this.publishClientId(names, credentials, publish);
+    const secret = await this.storeSecret(names, credentials, publish);
     if (clientId !== undefined && names.clientId !== undefined) {
       reportClientIdOutcome(names.clientId, clientId, this.cliVersion, selector);
     }
@@ -583,29 +744,82 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * How the connection's credentials reach the project, or `undefined` when
-   * there is no project behind this run: `--source mock` answers from fixtures
-   * and has no variables to write. It writes to the project's own variables,
-   * which is where the engine resolves a connection's `${{ NAME }}` references
-   * from.
+   * Publish the client id, when there is one and a variable to hold it.
+   *
+   * @param names - The connection's variables.
+   * @param credentials - The credentials.
+   * @param publish - Where it goes.
+   * @returns Whether it reached the project, or `undefined` when nothing was sent.
+   */
+  private async publishClientId(
+    names: CredentialNames,
+    credentials: Credentials,
+    publish: SecretPublisher | undefined,
+  ): Promise<PublishState | undefined> {
+    if (credentials.clientId === undefined || names.clientId === undefined) {
+      return undefined;
+    }
+    return publishClientId({ name: names.clientId, value: credentials.clientId, publish });
+  }
+
+  /**
+   * Store the client secret, when there is one and a variable to hold it.
+   *
+   * @param names - The connection's variables.
+   * @param credentials - The credentials.
+   * @param publish - Where it goes.
+   * @returns Where it ended up, or `undefined` when nothing was sent.
+   */
+  private async storeSecret(
+    names: CredentialNames,
+    credentials: Credentials,
+    publish: SecretPublisher | undefined,
+  ): Promise<SecretOutcome | undefined> {
+    if (credentials.secret === undefined || names.clientSecret === undefined) {
+      return undefined;
+    }
+    return storeClientSecret({ name: names.clientSecret, value: credentials.secret, publish });
+  }
+
+  /**
+   * How the connection's credentials reach the project.
+   *
+   * @remarks
+   * It writes to the project's own variables, which is where the engine
+   * resolves a connection's `${{ NAME }}` references from.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project.
+   * @returns The publisher, or `undefined` when there is no project behind this
+   *   run: `--source mock` answers from fixtures and has no variables to write.
    */
   private publisher(client: ZitadelClient, projectId: string): SecretPublisher | undefined {
     if (this.meta.source === "mock") {
       return undefined;
     }
     const variableService = new VariableService(client, projectId);
-    return async (name, value, { secret }) => {
-      await variableService.set(name, value, VariableWrite.of({ secret, preview: false }));
+    return async (name, value, options) => {
+      const write = VariableWrite.of({ secret: options.secret, preview: false });
+      await variableService.set(name, value, write);
     };
   }
 
   /**
    * The settings of a custom connection, asking only for the ones not already
-   * given. The slug comes first because it decides the most: a connection that
+   * given.
+   *
+   * @remarks
+   * The slug comes first because it decides the most: a connection that
    * already has it answers the rest from its file, and one that connects to
    * another issuer, or that a login flow would reject, is refused the moment
-   * the slug is typed. A given value goes
-   * through the same parser as a typed one.
+   * the slug is typed. A given value goes through the same parser as a typed
+   * one.
+   *
+   * @param target - What the run read.
+   * @param given - The settings the flags gave.
+   * @returns Every setting.
+   * @throws {@link ZitadelError} When the slug names a connection to another
+   *   issuer, or a flow would reject the provider.
    */
   private async askCustomSettings(
     target: SchemaTarget,
@@ -622,16 +836,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       given: given.slug,
     });
     const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
-    const existing = target.config.connections.named(
-      slug,
-      givenIssuer?.ok ? givenIssuer.value : undefined,
-    );
+    const checkedIssuer = givenIssuer?.ok ? givenIssuer.value : undefined;
+    const existing = target.config.connections.resolveBySlug(slug, checkedIssuer);
     // A flow `deploy` would reject once it offers the slug is refused now,
     // before the rest of the connection is asked for.
-    target.config.flows.forSso(target.schema, slug);
+    target.config.flows.resolveForSso(target.schema, slug);
     // An existing connection is described by its file, so nothing it already
     // holds is asked again; reuse never applies scopes, so they are not asked.
-    const stored = existing?.storedSettings(given);
+    const stored = existing?.readStoredSettings(given);
     const displayName = await this.input({
       kind: "text",
       name: "display name",
@@ -646,74 +858,76 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       parse: parseIssuer,
       given: given.issuer ?? stored?.issuer,
     });
+    const defaultScopes = DEFAULT_SCOPES.join(" ");
+    const keptScopes = existing === undefined ? undefined : defaultScopes;
     const scopes = await this.input({
       kind: "text",
       name: "scopes",
       message: "Which scopes should we request? Separate them with spaces.",
       parse: parseScopes,
-      given: given.scopes ?? (existing === undefined ? undefined : DEFAULT_SCOPES.join(" ")),
-      initialValue: DEFAULT_SCOPES.join(" "),
+      given: given.scopes ?? keptScopes,
+      initialValue: defaultScopes,
     });
     return { slug, displayName, issuer, scopes: scopes.join(" ") };
   }
 
-  /** The machine-readable result. Never the secret, only whether it is held. */
-  private payload(input: {
-    /**
-     * The Project the run addresses. `--json` suppresses the console line that
-     * otherwise carries it, and a result that names only the schema does not
-     * say which Project was changed.
-     */
-    projectId: string;
-    provider: ProviderName;
-    schema: string;
-    connection: Connection;
-    reused: boolean;
-    callbackUri: string;
-    change: Change;
-    clientId: PublishState | undefined;
-    secret: SecretOutcome | undefined;
-    names: CredentialNames;
-  }): Record<string, unknown> {
-    const { clientId, secret, names } = input;
+  /**
+   * The machine-readable result. Never the secret, only whether it is held.
+   *
+   * @param input - The run's project, provider, schema, connection, change and
+   *   what became of each credential.
+   * @returns The result's data.
+   */
+  private payload(input: PayloadInput): Payload {
+    const names = input.names;
+    const secret = input.secret;
+    const action = input.reused ? "reuse" : "create";
+    const clientId = publishedClientId(names, input.clientId);
+    const storedSecret =
+      secret === undefined ? null : { variable: secret.name, published: secret.published };
     return {
       project_id: input.projectId,
       provider: input.provider,
       schema: input.schema,
       connection: {
-        action: input.reused ? "reuse" : "create",
+        action,
         slug: input.connection.name,
         file: input.connection.path,
       },
       callback_uri: input.callbackUri,
       changed: [...input.change.changedPaths],
       notices: input.change.notices,
-      client_id:
-        clientId === undefined || names.clientId === undefined
-          ? null
-          : { variable: names.clientId, published: clientId },
-      secret: secret === undefined ? null : { variable: secret.name, published: secret.published },
+      client_id: clientId,
+      secret: storedSecret,
     };
   }
 }
 
-/** The credentials a run was given or asked for. */
-type Credentials = Readonly<{
-  endpoints: ConnectionEndpoints | undefined;
-  clientId: ClientId | undefined;
-  secret: ClientSecret | undefined;
-}>;
-
-/** What became of each credential sent to the project. */
-type Published = Readonly<{
-  clientId: PublishState | undefined;
-  secret: SecretOutcome | undefined;
-}>;
+/**
+ * The client id's variable and what became of it, for the result.
+ *
+ * @param names - The connection's variables.
+ * @param published - What became of the client id, if it was sent.
+ * @returns Both, or `null` when it was not sent or has no variable.
+ */
+function publishedClientId(
+  names: CredentialNames,
+  published: PublishState | undefined,
+): PublishedVariable | null {
+  if (published === undefined || names.clientId === undefined) {
+    return null;
+  }
+  return { variable: names.clientId, published };
+}
 
 /**
  * The connection settings the developer gave, which an existing connection
  * may not have: a custom connection's display name, and its scopes when
  * `--scopes` was passed. A catalog provider's settings are the catalog's.
+ *
+ * @param selection - The provider.
+ * @param scopesGiven - Whether `--scopes` was passed.
+ * @returns The settings given.
  */
 function givenSettings(
   selection: ProviderSelection,

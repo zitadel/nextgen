@@ -13,17 +13,21 @@
  */
 
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
+import type { ClaimRead } from "@/lib/zitadel/resources/connections/types";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
+import { PROVIDER_OUTCOMES, type ProviderOutcome } from "@/lib/zitadel/resources/flows/types";
+import type { PropertyName } from "@/lib/zitadel/names";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
-import { FITS, STANDARD_SCOPES, standardClaim } from "@/lib/zitadel/rules/claims";
+import { fits, isStandardScope, standardClaim } from "@/lib/zitadel/rules/claims";
 import { closest, didYouMean } from "@/lib/zitadel/utils/spelling";
 
 /**
- * The outcomes a step offering a provider that creates users must route.
+ * The outcome every step offering a provider must route, and the only one a
+ * step offering only providers that never create users needs.
  */
-const SSO_OUTCOMES = ["sso_authenticated", "sso_user_not_found", "user_already_exists"] as const;
+const SIGNED_IN_OUTCOMES = ["sso_authenticated"] as const satisfies readonly ProviderOutcome[];
 
 /**
  * Names that are not standard claims but are, wherever they appear, an
@@ -65,23 +69,23 @@ function article(word: string): string {
 /**
  * A connection that stands for its slug, with what the rules ask about it.
  */
-type Standing = Readonly<{
+type Standing = {
   /**
    * The connection, the first file in path order with its slug.
    */
-  connection: Connection;
+  readonly connection: Connection;
 
   /**
-   * The slug it stands for.
+   * The slug it stands for, as the file writes it.
    */
-  slug: string;
+  readonly slug: string;
 
   /**
    * The schemas that list the slug, which are the ones that consume its
    * mapping.
    */
-  listing: readonly UserSchema[];
-}>;
+  readonly listing: readonly UserSchema[];
+};
 
 /**
  * The connections that stand for their slug: the first file in path order
@@ -90,13 +94,13 @@ type Standing = Readonly<{
  * @param config - The configuration.
  * @returns Each such connection, with the schemas that list it.
  */
-function standing(config: ZitadelConfig): Standing[] {
+function standing(config: ZitadelConfig): readonly Standing[] {
   return config.connections.all.flatMap((connection) => {
     const slug = connection.slug;
     if (slug === undefined || config.connections.find(slug) !== connection) {
       return [];
     }
-    return [{ connection, slug, listing: config.schemas.listing(slug) }];
+    return [{ connection, slug, listing: config.schemas.listOffering(slug) }];
   });
 }
 
@@ -109,7 +113,7 @@ function standing(config: ZitadelConfig): Standing[] {
  * @param property - The property's name.
  * @returns Whether the property cannot be read.
  */
-function unreadable(entry: Standing, property: string): boolean {
+function unreadable(entry: Standing, property: PropertyName): boolean {
   if (entry.listing.length === 0) {
     return false;
   }
@@ -124,7 +128,7 @@ function unreadable(entry: Standing, property: string): boolean {
  * @param entry - The connection and the schemas that list it.
  * @returns Their property names.
  */
-function readableProperties(entry: Standing): string[] {
+function readableProperties(entry: Standing): readonly PropertyName[] {
   return entry.listing.flatMap((schema) => {
     return schema.propertyNames;
   });
@@ -139,11 +143,13 @@ function readableProperties(entry: Standing): string[] {
  * @param step - The step.
  * @returns The outcomes it is missing.
  */
-function unroutedOutcomes(config: ZitadelConfig, step: Step): string[] {
+function unroutedOutcomes(config: ZitadelConfig, step: Step): readonly ProviderOutcome[] {
   const offersCreation = step.providers.some((slug) => {
     return config.connections.find(slug)?.createsUsers ?? true;
   });
-  const required: readonly string[] = offersCreation ? SSO_OUTCOMES : ["sso_authenticated"];
+  const required: readonly ProviderOutcome[] = offersCreation
+    ? PROVIDER_OUTCOMES
+    : SIGNED_IN_OUTCOMES;
   return required.filter((outcome) => {
     return !step.routes.has(outcome);
   });
@@ -171,7 +177,7 @@ function repeatedProviders(providers: readonly string[]): readonly string[] {
  * @param config - The configuration.
  * @returns The slugs.
  */
-function knownSlugs(config: ZitadelConfig): string[] {
+function knownSlugs(config: ZitadelConfig): readonly string[] {
   return standing(config).map((entry) => {
     return entry.slug;
   });
@@ -312,7 +318,7 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       const known = knownSlugs(config);
       return config.flows.offers.map((offer) => {
-        return { ...offer, known, schema: config.flows.schemaOf(offer.flow) };
+        return { ...offer, known, schema: config.flows.findSchemaOf(offer.flow) };
       });
     },
     // A provider the flow's schema also lists is reported once, on the
@@ -344,7 +350,7 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       return config.flows.all.flatMap((flow) => {
-        const schema = config.flows.schemaOf(flow);
+        const schema = config.flows.findSchemaOf(flow);
         if (schema === undefined) {
           return [];
         }
@@ -354,7 +360,7 @@ export const SSO_RULES: readonly Rule[] = [
       });
     },
     when: (fact) => {
-      return fact.step.providers.length > 0 && !fact.schema.ssoEnabled;
+      return fact.step.providers.length > 0 && !fact.schema.isSsoEnabled;
     },
     file: (fact) => {
       return fact.flow.path;
@@ -395,7 +401,7 @@ export const SSO_RULES: readonly Rule[] = [
     // provider it was meant to be is not reported again here.
     when: (fact) => {
       return (
-        fact.schema.ssoEnabled &&
+        fact.schema.isSsoEnabled &&
         fact.connection !== undefined &&
         !fact.schema.lists(fact.slug) &&
         !fact.meant.includes(fact.slug)
@@ -493,7 +499,7 @@ export const SSO_RULES: readonly Rule[] = [
         if (connection === undefined || !connection.createsUsers) {
           return [];
         }
-        return [{ ...offer, connection, listing: config.schemas.listing(offer.slug) }];
+        return [{ ...offer, connection, listing: config.schemas.listOffering(offer.slug) }];
       });
     },
     // When no schema that lists the connection defines any mapped name, each
@@ -561,7 +567,7 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config, context) => {
       return standing(config).flatMap((entry) => {
-        return entry.connection.problems(context).filter((issue) => {
+        return entry.connection.check(context).filter((issue) => {
           return issue.rule === "sso/unknown-connection-field";
         });
       });
@@ -618,12 +624,7 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       return standing(config).flatMap((entry) => {
         const scopes = entry.connection.scopes;
-        if (
-          scopes === undefined ||
-          !scopes.every((scope) => {
-            return STANDARD_SCOPES.has(scope);
-          })
-        ) {
+        if (scopes === undefined || !scopes.every(isStandardScope)) {
           return [];
         }
         const missing = entry.connection.claimReads.flatMap((read) => {
@@ -715,7 +716,7 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       return standing(config).flatMap((entry) => {
         const subject = entry.connection.subjectClaim;
-        const subjectReads =
+        const subjectReads: readonly ClaimRead[] =
           subject === undefined ? [] : [{ field: "subject_claim", claim: subject }];
         return [...entry.connection.claimReads, ...subjectReads].map((read) => {
           return { connection: entry.connection, ...read };
@@ -770,7 +771,7 @@ export const SSO_RULES: readonly Rule[] = [
             return [];
           }
           const declared = entry.listing.flatMap((schema) => {
-            const types = schema.declaredTypes(row.property);
+            const types = schema.findDeclaredTypes(row.property);
             if (types === undefined) {
               return [];
             }
@@ -793,7 +794,7 @@ export const SSO_RULES: readonly Rule[] = [
         fact.declared.length > 0 &&
         !fact.declared.some((types) => {
           return types.some((type) => {
-            return FITS[fact.standard.type].includes(type);
+            return fits(fact.standard.type, type);
           });
         })
       );

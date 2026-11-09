@@ -32,6 +32,7 @@ import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 import type {
   BuiltBundle,
   ConfigFiles,
@@ -51,7 +52,7 @@ export type AnyDocument = UserSchema | Flow | Connection | Policy | PolicyTest |
  * What a configuration knows beyond its files, which the caller keeps
  * elsewhere and hands in.
  */
-export type ConfigOptions = Readonly<{
+export type ConfigOptions = {
   /**
    * The slugs of the connections the server already has.
    *
@@ -59,7 +60,7 @@ export type ConfigOptions = Readonly<{
    * Some advice only holds before a connection's first deploy. Absent when
    * the caller cannot tell, and the advice is then given anyway.
    */
-  deployed?: ReadonlySet<string> | undefined;
+  readonly deployed?: ReadonlySet<string> | undefined;
 
   /**
    * The platform ids each user schema was published as, by the schema's
@@ -70,23 +71,23 @@ export type ConfigOptions = Readonly<{
    * Absent before a first deploy, and for a caller that does not keep them;
    * a flow is then matched to its schema by what the schema file states.
    */
-  published?: ReadonlyMap<string, readonly string[]> | undefined;
-}>;
+  readonly published?: ReadonlyMap<string, readonly string[]> | undefined;
+};
 
 /**
  * The documents of a configuration by kind, what it knows beyond them, and
  * the documents removed since it was read.
  */
-type Parts = Readonly<{
-  schemas: readonly UserSchema[];
-  flows: readonly Flow[];
-  connections: readonly Connection[];
-  policies: readonly Policy[];
-  policyTests: readonly PolicyTest[];
-  brandings: readonly Branding[];
-  removed: readonly AnyDocument[];
-  options: ConfigOptions;
-}>;
+type Parts = {
+  readonly schemas: readonly UserSchema[];
+  readonly flows: readonly Flow[];
+  readonly connections: readonly Connection[];
+  readonly policies: readonly Policy[];
+  readonly policyTests: readonly PolicyTest[];
+  readonly brandings: readonly Branding[];
+  readonly removed: readonly AnyDocument[];
+  readonly options: ConfigOptions;
+};
 
 /**
  * An edit to the documents of one kind: a list, and the document it places or
@@ -147,10 +148,10 @@ export class ZitadelConfig {
   readonly options: ConfigOptions;
 
   /**
-   * The documents removed since the configuration was read, whose files
-   * saving deletes.
+   * The documents removed since the configuration was read, in the order they
+   * were removed, whose files saving deletes.
    */
-  private readonly removed: readonly AnyDocument[];
+  readonly removedDocuments: readonly AnyDocument[];
 
   /**
    * Hold the documents of a configuration in their collections.
@@ -164,7 +165,7 @@ export class ZitadelConfig {
     this.policies = new Policies(this, parts.policies, parts.policyTests);
     this.branding = new Brandings(this, parts.brandings);
     this.options = parts.options;
-    this.removed = parts.removed;
+    this.removedDocuments = parts.removed;
   }
 
   /**
@@ -305,21 +306,21 @@ export class ZitadelConfig {
         { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
       );
     }
-    const branding = this.branding.all[0]?.wireBody(store);
+    const branding = this.branding.all[0]?.toWireBody(store);
     const policyBodies = this.policies.all.map((policy) => {
-      return policy.wireBody(store);
+      return policy.toWireBody(store);
     });
     const policies = policyBodies.length === 0 ? {} : { policies: policyBodies };
     const brandingPart = branding === undefined ? {} : { branding };
     const bundle: ConfigurationBundle = {
       schemas: this.schemas.all.map((schema) => {
-        return schema.wireBody(store);
+        return schema.toWireBody(store);
       }),
       flow_definitions: this.flows.all.map((flow) => {
-        return flow.wireBody(store);
+        return flow.toWireBody(store);
       }),
       idps: this.connections.all.map((connection) => {
-        return connection.wireBody(store);
+        return connection.toWireBody(store);
       }),
       ...policies,
       ...brandingPart,
@@ -372,10 +373,12 @@ export class ZitadelConfig {
    *   that is not a sound password policy.
    */
   scaffold<P extends ScaffoldedProvider>(options: ScaffoldOptions<P>): Scaffold<P> {
-    const template = UserSchema.create({
-      path: DEFAULT_SCHEMA_CONFIG_PATH,
-      body: getDefaultHumanUserSchemaBody({ preset: options.preset, useCase: options.useCase }),
-    });
+    const variant = { preset: options.preset, useCase: options.useCase };
+    // The defaults are typed by the API's generated models, so each enters the
+    // library through the one JSON check.
+    const schemaBody = toJsonObject(getDefaultHumanUserSchemaBody(variant), "The default schema");
+    const flowBody = toJsonObject(getDefaultLoginFlow(variant), "The default login flow");
+    const template = UserSchema.create({ path: DEFAULT_SCHEMA_CONFIG_PATH, body: schemaBody });
     const connections = options.sso.map((chosen) => {
       const provider = providerOf(chosen.selection);
       return { chosen, connection: Connection.forProvider(provider, template, chosen.endpoints) };
@@ -383,7 +386,7 @@ export class ZitadelConfig {
     for (const scaffolded of connections) {
       const connection = scaffolded.connection;
       const existing =
-        this.connections.existing(connection) ?? this.connections.get(connection.path);
+        this.connections.resolveExisting(connection) ?? this.connections.get(connection.path);
       if (existing !== undefined) {
         throw new ConnectionExistsError(existing.path, scaffolded.chosen.selection);
       }
@@ -410,10 +413,7 @@ export class ZitadelConfig {
     // The conflict step a provider needs can only offer what this schema
     // enables, so the methods are read off the composed schema rather than
     // inferred from the preset.
-    const login = Flow.create({
-      path: DEFAULT_FLOW_CONFIG_PATH,
-      body: getDefaultLoginFlow({ preset: options.preset, useCase: options.useCase }),
-    });
+    const login = Flow.create({ path: DEFAULT_FLOW_CONFIG_PATH, body: flowBody });
     const flow = slugs.reduce((document, slug) => {
       return document.withProvider(slug, schema.enabledMethods).document;
     }, login);
@@ -445,13 +445,12 @@ export class ZitadelConfig {
    * @returns The new configuration.
    */
   with(document: AnyDocument): ZitadelConfig {
-    return new ZitadelConfig({
-      ...ZitadelConfig.edited(this.parts, document, ZitadelConfig.placed),
-      // A document put back where one was removed is written, not deleted.
-      removed: this.removed.filter((gone) => {
-        return gone.path !== document.path;
-      }),
+    const parts = ZitadelConfig.editParts(this.parts, document, ZitadelConfig.place);
+    // A document put back where one was removed is written, not deleted.
+    const removed = this.removedDocuments.filter((gone) => {
+      return gone.path !== document.path;
     });
+    return new ZitadelConfig({ ...parts, removed });
   }
 
   /**
@@ -467,10 +466,11 @@ export class ZitadelConfig {
    * @returns The new configuration.
    */
   without(document: AnyDocument): ZitadelConfig {
-    return new ZitadelConfig({
-      ...ZitadelConfig.edited(this.parts, document, ZitadelConfig.kept),
-      removed: document.status === "created" ? this.removed : [...this.removed, document],
-    });
+    const parts = ZitadelConfig.editParts(this.parts, document, ZitadelConfig.leaveOut);
+    if (document.status === "created") {
+      return new ZitadelConfig(parts);
+    }
+    return new ZitadelConfig({ ...parts, removed: [...this.removedDocuments, document] });
   }
 
   /**
@@ -489,18 +489,8 @@ export class ZitadelConfig {
       ...this.branding.all,
     ];
     return documents.filter((document) => {
-      return document.changed;
+      return document.isUnsaved;
     });
-  }
-
-  /**
-   * The documents removed since the configuration was read, whose files
-   * saving deletes.
-   *
-   * @returns The documents, in the order they were removed.
-   */
-  get removedDocuments(): readonly AnyDocument[] {
-    return this.removed;
   }
 
   /**
@@ -520,7 +510,7 @@ export class ZitadelConfig {
     if (this.policies.get(PasswordPolicy.PATH) === undefined) {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
-    if (kept === undefined || kept.problems({}).length > 0) {
+    if (kept === undefined || kept.check({}).length > 0) {
       throw new ConfigError(`${PasswordPolicy.PATH} is not a valid password policy`, {
         hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
         details: { file: PasswordPolicy.PATH },
@@ -543,21 +533,25 @@ export class ZitadelConfig {
       policies: this.policies.all,
       policyTests: this.policies.tests,
       brandings: this.branding.all,
-      removed: this.removed,
+      removed: this.removedDocuments,
       options: this.options,
     };
   }
 
   /**
-   * The parts of a configuration with one list edited: the list the document's
-   * kind is held in.
+   * Edit one list of a configuration's parts: the list the document's kind is
+   * held in.
+   *
+   * @remarks
+   * Switches on the document's `kind`, so a new kind of document that is not
+   * handled here does not compile.
    *
    * @param parts - The parts.
    * @param document - The document the edit places or leaves out.
    * @param edit - The edit to its list.
    * @returns The new parts.
    */
-  private static edited(parts: Parts, document: AnyDocument, edit: ListEdit): Parts {
+  private static editParts(parts: Parts, document: AnyDocument, edit: ListEdit): Parts {
     switch (document.kind) {
       case "schema": {
         return { ...parts, schemas: edit(parts.schemas, document) };
@@ -581,20 +575,19 @@ export class ZitadelConfig {
   }
 
   /**
-   * A list of documents with one in place: replacing the document at the same
-   * path, where it was, or appended when there is none.
+   * Place a document in a list: replacing the document at the same path, where
+   * it was, or appended when there is none.
    *
    * @typeParam T - The kind of document.
    * @param documents - The documents.
    * @param document - The document to place.
    * @returns The new list.
    */
-  private static placed<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
-    if (
-      !documents.some((current) => {
-        return current.path === document.path;
-      })
-    ) {
+  private static place<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
+    const there = documents.some((current) => {
+      return current.path === document.path;
+    });
+    if (!there) {
       return [...documents, document];
     }
     return documents.map((current) => {
@@ -606,14 +599,17 @@ export class ZitadelConfig {
   }
 
   /**
-   * A list of documents without the one at a document's path.
+   * Leave the document at a document's path out of a list.
    *
    * @typeParam T - The kind of document.
    * @param documents - The documents.
    * @param document - The document to leave out.
    * @returns The new list.
    */
-  private static kept<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
+  private static leaveOut<T extends AnyDocument>(
+    documents: readonly T[],
+    document: T,
+  ): readonly T[] {
     return documents.filter((current) => {
       return current.path !== document.path;
     });

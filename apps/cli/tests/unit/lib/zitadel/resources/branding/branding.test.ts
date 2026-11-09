@@ -55,21 +55,21 @@ describe("Branding.create", () => {
   });
 });
 
-describe("Branding.asRead", () => {
+describe("Branding.markRead", () => {
   it("marks a new descriptor as read", () => {
     const branding = Branding.create(aFile("branding", NAME, aBranding()));
 
-    const read = branding.asRead();
+    const read = branding.markRead();
 
     expect(read.status).toBe("read");
   });
 });
 
-describe("Branding.problems", () => {
+describe("Branding.check", () => {
   it("finds nothing wrong with an inline template the server's rules take", () => {
     const branding = Branding.of(aFile("branding", NAME, aBranding()));
 
-    const problems = branding.problems({ store: new MemoryStore() });
+    const problems = branding.check({ store: new MemoryStore() });
 
     expect(problems).toEqual([]);
   });
@@ -79,7 +79,7 @@ describe("Branding.problems", () => {
       aFile("branding", NAME, aBranding({ liquid_template: LOGIN_TEMPLATE })),
     );
 
-    const problems = branding.problems({ store: HOLDING_TEMPLATE });
+    const problems = branding.check({ store: HOLDING_TEMPLATE });
 
     expect(problems).toEqual([]);
   });
@@ -89,7 +89,7 @@ describe("Branding.problems", () => {
       aFile("branding", NAME, { layout: "centered", liquid_template_file: "./brand.liquid" }),
     );
 
-    const problems = branding.problems({});
+    const problems = branding.check({});
 
     expect(problems).toEqual([
       {
@@ -107,7 +107,7 @@ describe("Branding.problems", () => {
       aFile("branding", NAME, { layout: "centered", liquid_template_file: true }),
     );
 
-    const problems = branding.problems({});
+    const problems = branding.check({});
 
     expect(problems).toMatchObject([
       {
@@ -120,7 +120,7 @@ describe("Branding.problems", () => {
   it("reports what the branding contract refuses, under contract/branding", () => {
     const branding = Branding.of(aFile("branding", NAME, { layout: "sideways" }));
 
-    const problems = branding.problems({});
+    const problems = branding.check({});
 
     expect(problems).toMatchObject([{ rule: "contract/branding" }]);
   });
@@ -130,7 +130,7 @@ describe("Branding.problems", () => {
       aFile("branding", NAME, aBranding({ liquid_template: MISSING_TEMPLATE })),
     );
 
-    const problems = branding.problems({ store: new MemoryStore() });
+    const problems = branding.check({ store: new MemoryStore() });
 
     expect(problems).toMatchObject([{ rule: "branding/template-file" }]);
   });
@@ -138,7 +138,7 @@ describe("Branding.problems", () => {
   it("holds the template to the server's template rules", () => {
     const branding = Branding.of(aFile("branding", NAME, aBranding({ liquid_template: NO_GATES })));
 
-    const problems = branding.problems({ store: new MemoryStore() });
+    const problems = branding.check({ store: new MemoryStore() });
 
     expect(problems).toMatchObject([{ rule: "branding/template" }]);
   });
@@ -146,13 +146,13 @@ describe("Branding.problems", () => {
   it("skips the template checks without a store", () => {
     const branding = Branding.of(aFile("branding", NAME, aBranding({ liquid_template: NO_GATES })));
 
-    const problems = branding.problems({});
+    const problems = branding.check({});
 
     expect(problems).toEqual([]);
   });
 });
 
-describe("Branding.wireBody", () => {
+describe("Branding.toWireBody", () => {
   it("inlines a $file reference and drops the $schema pointer", () => {
     const branding = Branding.of(
       aFile("branding", NAME, {
@@ -162,7 +162,7 @@ describe("Branding.wireBody", () => {
       }),
     );
 
-    const body = branding.wireBody(HOLDING_TEMPLATE);
+    const body = branding.toWireBody(HOLDING_TEMPLATE);
 
     expect(body).toEqual({ layout: "centered", liquid_template: TEMPLATE });
   });
@@ -172,17 +172,17 @@ describe("Branding.wireBody", () => {
       aFile("branding", NAME, aBranding({ liquid_template: MISSING_TEMPLATE })),
     );
 
-    const body = branding.wireBody(new MemoryStore());
+    const body = branding.toWireBody(new MemoryStore());
 
     expect(body).toEqual({ layout: "centered" });
   });
 });
 
-describe("Branding.template", () => {
+describe("Branding.readTemplate", () => {
   it("reads the template behind a $file reference", () => {
     const branding = Branding.of(aFile("branding", NAME, { liquid_template: LOGIN_TEMPLATE }));
 
-    const template = branding.template(HOLDING_TEMPLATE);
+    const template = branding.readTemplate(HOLDING_TEMPLATE);
 
     expect(template).toBe(TEMPLATE);
   });
@@ -190,7 +190,7 @@ describe("Branding.template", () => {
   it("is undefined for a descriptor with no template", () => {
     const branding = Branding.of(aFile("branding", NAME, { layout: "centered" }));
 
-    const template = branding.template(new MemoryStore());
+    const template = branding.readTemplate(new MemoryStore());
 
     expect(template).toBeUndefined();
   });
@@ -199,7 +199,7 @@ describe("Branding.template", () => {
     const branding = Branding.of(aFile("branding", NAME, { liquid_template: MISSING_TEMPLATE }));
 
     const error = thrownBy(() => {
-      return branding.template(new MemoryStore());
+      return branding.readTemplate(new MemoryStore());
     });
 
     expect(error).toBeInstanceOf(ConfigError);
@@ -207,11 +207,11 @@ describe("Branding.template", () => {
   });
 });
 
-describe("Branding.referencedPaths", () => {
+describe("Branding.listReferencedPaths", () => {
   it("names the files the references point at", () => {
     const branding = Branding.of(aFile("branding", NAME, { liquid_template: LOGIN_TEMPLATE }));
 
-    const paths = branding.referencedPaths(new MemoryStore());
+    const paths = branding.listReferencedPaths(new MemoryStore());
 
     expect(paths).toEqual([`${CONFIG_DIRECTORIES.branding}/login.liquid`]);
   });

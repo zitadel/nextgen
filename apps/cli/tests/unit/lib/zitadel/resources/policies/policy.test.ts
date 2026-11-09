@@ -89,21 +89,21 @@ describe("Policy.readConfig", () => {
   });
 });
 
-describe("Policy.asRead", () => {
+describe("Policy.markRead", () => {
   it("marks a new policy as read", () => {
     const policy = Policy.create(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
 
-    const read = policy.asRead();
+    const read = policy.markRead();
 
     expect(read.status).toBe("read");
   });
 });
 
-describe("Policy.problems", () => {
+describe("Policy.check", () => {
   it("finds nothing wrong with a policy named after its operation", () => {
     const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
 
-    const problems = policy.problems({});
+    const problems = policy.check({});
 
     expect(problems).toEqual([]);
   });
@@ -113,7 +113,7 @@ describe("Policy.problems", () => {
       aFile("policies", PASSWORD_POLICY_FILE, { $schema: POINTER, ...aPasswordPolicy() }),
     );
 
-    const problems = policy.problems({});
+    const problems = policy.check({});
 
     expect(problems).toEqual([]);
   });
@@ -121,7 +121,7 @@ describe("Policy.problems", () => {
   it("names the file a policy must have when it has another", () => {
     const policy = Policy.of(aFile("policies", "password.json", aPasswordPolicy()));
 
-    const problems = policy.problems({});
+    const problems = policy.check({});
 
     expect(problems).toEqual([
       {
@@ -138,19 +138,19 @@ describe("Policy.problems", () => {
       aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: "twelve" })),
     );
 
-    const problems = policy.problems({});
+    const problems = policy.check({});
 
     expect(problems).toMatchObject([{ rule: "contract/policy" }]);
   });
 });
 
-describe("Policy.wireBody", () => {
+describe("Policy.toWireBody", () => {
   it("sends the operation and its rules without the $schema pointer", () => {
     const policy = Policy.of(
       aFile("policies", PASSWORD_POLICY_FILE, { $schema: POINTER, ...aPasswordPolicy() }),
     );
 
-    const body = policy.wireBody(new MemoryStore());
+    const body = policy.toWireBody(new MemoryStore());
 
     expect(body).toEqual(aPasswordPolicy());
   });
@@ -160,7 +160,7 @@ describe("Policy.wireBody", () => {
       aFile("policies", PASSWORD_POLICY_FILE, { operation: PASSWORD_POLICY }),
     );
 
-    const body = policy.wireBody(new MemoryStore());
+    const body = policy.toWireBody(new MemoryStore());
 
     expect(body).toEqual({ operation: PASSWORD_POLICY });
   });

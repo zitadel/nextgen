@@ -10,12 +10,13 @@ import {
   POLICY_FILE_SUFFIX,
 } from "@/lib/zitadel/resources/policies/types";
 import { CONFIG_DIRECTORIES, type JsonObject } from "@/lib/zitadel/types";
+import { objectAt, withoutKey } from "@/lib/zitadel/utils/json";
 
 /**
  * The password policy under `.zitadel/policies/`: the policy of the password
  * operation, which `setup` writes and keeps, and whose minimum length it sets.
  */
-export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy<Body> {
+export class PasswordPolicy extends Policy {
   /**
    * The operation the password policy guards.
    */
@@ -44,7 +45,7 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    * @param file - The file.
    * @returns The policy, marked as read.
    */
-  static override of<Body extends JsonObject>(file: DocumentFile<Body>): PasswordPolicy<Body> {
+  static override of(file: DocumentFile): PasswordPolicy {
     return new PasswordPolicy(file.path, file.body, "read");
   }
 
@@ -55,7 +56,7 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    * @param file - Where it goes, and what it holds.
    * @returns The policy, marked as created.
    */
-  static override create<Body extends JsonObject>(file: DocumentFile<Body>): PasswordPolicy<Body> {
+  static override create(file: DocumentFile): PasswordPolicy {
     return new PasswordPolicy(file.path, file.body, "created");
   }
 
@@ -72,15 +73,32 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    *   empty `config`, which enforces nothing, for "none".
    */
   static initial(minLength?: PasswordMinLength): PasswordPolicy {
-    const value = minLength === undefined ? RECOMMENDED_PASSWORD_MIN_LENGTH : minLength;
     return PasswordPolicy.create({
       path: PasswordPolicy.PATH,
       body: {
         $schema: POLICY_FILE_SCHEMA_REF,
         operation: PASSWORD_POLICY_OPERATION,
-        config: value === null ? {} : { min_length: value },
+        config: PasswordPolicy.minLengthConfig(minLength),
       },
     });
+  }
+
+  /**
+   * The `config` keys a minimum given to `setup` writes.
+   *
+   * @param minLength - The minimum: a length, `null` for an explicit "none",
+   *   or `undefined` when none was given.
+   * @returns `min_length` with the length, or the recommended one when none
+   *   was given; nothing for "none".
+   */
+  private static minLengthConfig(minLength: PasswordMinLength | undefined): JsonObject {
+    if (minLength === null) {
+      return {};
+    }
+    if (minLength === undefined) {
+      return { min_length: RECOMMENDED_PASSWORD_MIN_LENGTH };
+    }
+    return { min_length: minLength };
   }
 
   /**
@@ -126,7 +144,7 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    *
    * @returns The same policy, marked as read.
    */
-  override asRead(): PasswordPolicy<Body> {
+  override markRead(): PasswordPolicy {
     return new PasswordPolicy(this.path, this.body, "read");
   }
 
@@ -143,12 +161,22 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    *   or with the new length.
    * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
-  withMinLength(minLength: PasswordMinLength | undefined): Edit<PasswordPolicy<Body>> {
-    if (minLength === undefined || (minLength ?? undefined) === this.readMinLength()) {
-      return { document: this, changed: false, skipped: [] };
+  withMinLength(minLength: PasswordMinLength | undefined): Edit<PasswordPolicy> {
+    const unchanged: Edit<PasswordPolicy> = { document: this, changed: false, skipped: [] };
+    if (minLength === undefined) {
+      return unchanged;
     }
-    const { min_length: _replaced, ...kept } = this.readConfig();
-    const config = minLength === null ? kept : { ...kept, min_length: minLength };
+    const current = this.readMinLength();
+    if (minLength === null && current === undefined) {
+      return unchanged;
+    }
+    if (minLength === current) {
+      return unchanged;
+    }
+    // The body is sound once `readMinLength` returned, so its `config` is the
+    // contract's, and every key but `min_length` stays as the project wrote it.
+    const kept = withoutKey(objectAt(this.body, "config"), "min_length");
+    const config = { ...kept, ...PasswordPolicy.minLengthConfig(minLength) };
     return {
       document: new PasswordPolicy(this.path, { ...this.body, config }, this.editedStatus),
       changed: true,

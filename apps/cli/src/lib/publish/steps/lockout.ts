@@ -4,17 +4,38 @@ import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext } from "@/lib/publish/pipeline";
-import { type JsonObject, UserSchema } from "@/lib/zitadel";
+import { isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
-/** Users read per page, and the most the whole check reads, shared out across its scans. */
+/**
+ * Users read per page.
+ */
 const PAGE_SIZE = 100;
+
+/**
+ * The most users the whole check reads, shared out across its scans.
+ */
 const SCAN_CAP = 1000;
-/** The most stranded users whose identity links are looked up. */
+
+/**
+ * The most stranded users whose identity links are looked up.
+ */
 const LINK_CHECKS = 200;
-/** Identity-link reads in flight at once. */
+
+/**
+ * Identity-link reads in flight at once.
+ */
 const CONCURRENCY = 10;
 
+/**
+ * The ways in a user can hold a credential for, in the order a schema lists them.
+ */
+const CREDENTIALS: readonly Credential[] = ["password", "passkey", "sso"];
+
+/**
+ * One filter of a user query.
+ */
 type UserFilter = NonNullable<UserQuery["filter"]>[number];
+
 /**
  * A flow the engine can select: the object type of its schema, and the
  * identifier its login path looks users up by, when it collects one.
@@ -23,43 +44,135 @@ type Served = {
   /**
    * The object type of the flow's schema.
    */
-  schema: string;
+  readonly schema: string;
+
   /**
-   * The property the login path looks users up by; absent when it collects none.
+   * The property the login path looks users up by; `undefined` when it collects none.
    */
-  identifier?: string;
+  readonly identifier: string | undefined;
 };
+
 /**
  * What a scan found, whose users it only partly read without finding anything,
  * and whether a request failed.
  */
-type Scan = { warnings: string[]; partial: string[]; failed: boolean };
-/** A schema as the project lists it: its object type, designated identifier and the ways in it enables. */
-type SchemaInfo = { objectType: string; identifier?: string; methods: readonly Credential[] };
-/** A schema whose users this release takes a way to sign in from, and the ways it keeps. */
+type Scan = {
+  readonly warnings: readonly string[];
+  readonly partial: readonly string[];
+  readonly failed: boolean;
+};
+
+/**
+ * A schema as the project lists it: its object type, designated identifier and
+ * the ways in it enables.
+ */
+type SchemaInfo = {
+  readonly objectType: string;
+  readonly identifier: string | undefined;
+  readonly methods: readonly Credential[];
+};
+
+/**
+ * A schema whose users this release takes a way to sign in from, and the ways it keeps.
+ */
 type MethodChange = {
-  objectType: string;
-  disabled: readonly Credential[];
-  kept: readonly Credential[];
+  readonly objectType: string;
+  readonly disabled: readonly Credential[];
+  readonly kept: readonly Credential[];
 };
-/** The project's schemas by revision id and by object type, or nothing when the listing could not be read. */
+
+/**
+ * The project's schemas by revision id and by object type.
+ */
 type Listing = {
-  byId: ReadonlyMap<string, SchemaInfo>;
-  /** The newest revision of each object type, which is what a flow naming the object type runs on. */
-  byObjectType: ReadonlyMap<string, SchemaInfo>;
+  readonly byId: ReadonlyMap<string, SchemaInfo>;
+
+  /**
+   * The newest revision of each object type, which is what a flow naming the
+   * object type runs on.
+   */
+  readonly byObjectType: ReadonlyMap<string, SchemaInfo>;
 };
+
+/**
+ * The project's listing, read on first use, or nothing when it could not be read.
+ */
 type Names = () => Promise<Listing | undefined>;
-/** A scan with nothing to report. */
-const nothing = (): Scan => ({ warnings: [], partial: [], failed: false });
-/** Several scans as one. */
-const merged = (scans: readonly Scan[]): Scan => ({
-  warnings: scans.flatMap((scan) => scan.warnings),
-  partial: scans.flatMap((scan) => scan.partial),
-  failed: scans.some((scan) => scan.failed),
-});
-/** What stranded users are counted under when their schema could not be named. */
+
+/**
+ * What a flow came to when its schema was looked up.
+ */
+type FlowLookup =
+  | { readonly kind: "served"; readonly flow: Served }
+  | { readonly kind: "ignored" }
+  | { readonly kind: "unresolved" }
+  | { readonly kind: "unreadable" };
+
+/**
+ * The flows the engine can select, and why the unserved check cannot run, if
+ * it cannot.
+ */
+type ServedFlows = {
+  readonly flows: readonly Served[];
+
+  /**
+   * Whether a flow names a schema neither the release nor the project holds.
+   */
+  readonly unresolved: boolean;
+
+  /**
+   * Whether the listing that would say so could not be read.
+   */
+  readonly unreadable: boolean;
+};
+
+/**
+ * What the live release's schemas say about the methods this release disables.
+ */
+type DisabledMethods = {
+  readonly changes: readonly MethodChange[];
+  readonly unreadable: boolean;
+};
+
+/**
+ * A release live on a primary origin: whether it pins a flow, and the schema
+ * revisions it pins.
+ */
+type LiveRelease = {
+  readonly pinsFlow: boolean;
+  readonly schemas: readonly string[];
+};
+
+/**
+ * Some of the users a query matches, and whether there were more.
+ */
+type ReadUsers = {
+  readonly users: readonly QueriedUser[];
+  readonly truncated: boolean;
+};
+
+/**
+ * Users stranded on one schema, and how many of them have a provider linked.
+ */
+type Stranded = {
+  readonly name: string | typeof UNNAMED;
+  readonly users: number;
+  readonly linked: number;
+};
+
+/**
+ * A scan with nothing to report.
+ */
+const NOTHING: Scan = { warnings: [], partial: [], failed: false };
+
+/**
+ * What stranded users are counted under when their schema could not be named.
+ */
 const UNNAMED = Symbol("unnamed");
-/** Only active users can sign in, so only they can be locked out. */
+
+/**
+ * Only active users can sign in, so only they can be locked out.
+ */
 const ACTIVE: UserFilter = { field: "status", operation: "equals", value: "active" };
 
 /**
@@ -92,7 +205,7 @@ export const lockoutStep: Step = {
     if (
       ctx.learned?.schemasOrFlowsChanged === false &&
       !ctx.config.flows.all.some((flow) => {
-        return flow.userSchema !== undefined && ctx.config.flows.schemaOf(flow) === undefined;
+        return flow.userSchema !== undefined && ctx.config.flows.findSchemaOf(flow) === undefined;
       })
     ) {
       return undefined;
@@ -115,64 +228,129 @@ export const lockoutStep: Step = {
   },
 };
 
-async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
-  // Names are only needed for flows that name a schema by id and for the SSO
-  // warning, so they are read on first use, and a failed read costs the names.
+/**
+ * Several scans as one.
+ *
+ * @param scans - The scans.
+ * @returns Every warning and partial schema, and whether any request failed.
+ */
+function merged(scans: readonly Scan[]): Scan {
+  return {
+    warnings: scans.flatMap((scan) => {
+      return scan.warnings;
+    }),
+    partial: scans.flatMap((scan) => {
+      return scan.partial;
+    }),
+    failed: scans.some((scan) => {
+      return scan.failed;
+    }),
+  };
+}
+
+/**
+ * The project's listing, read once on first use.
+ *
+ * @remarks
+ * Names are only needed for flows that name a schema by id and for the SSO
+ * warning, so they are read on first use, and a failed read costs the names.
+ * The read is remembered so every scan shares one request.
+ *
+ * @param ctx - The step's context.
+ * @returns The listing, read on first use.
+ */
+function lazyNames(ctx: StepContext): Names {
+  // The one piece of state the check keeps: the read, once it is started.
   let listed: Promise<Listing | undefined> | undefined;
-  const names: Names = () => {
-    listed ??= objectTypes(ctx).catch(() => undefined);
+  return () => {
+    listed ??= objectTypes(ctx).catch(() => {
+      return undefined;
+    });
     return listed;
   };
-  const { flows, unresolved, unreadable } = await servedFlows(ctx, names);
-  // Why the unserved-schema check cannot run, if it cannot. A release with no
-  // flow definitions runs it like any other: the server serves only what a
-  // release pins, so such a release serves no sign-in and strands every user.
-  const ssoSkipped = unreadable
-    ? "Skipped the check for users of schemas no flow serves: the project's schemas could not be read."
-    : unresolved
-      ? "Skipped the check for users of schemas no flow serves: a flow names a schema that this release does not define."
-      : undefined;
+}
+
+/**
+ * Why the unserved-schema check cannot run, if it cannot.
+ *
+ * @remarks
+ * A release with no flow definitions runs it like any other: the server serves
+ * only what a release pins, so such a release serves no sign-in and strands
+ * every user.
+ *
+ * @param served - The flows served, and what kept a flow's schema unknown.
+ * @returns The note saying why it was skipped, or `undefined` when it runs.
+ */
+function unservedSkipped(served: ServedFlows): string | undefined {
+  if (served.unreadable) {
+    return "Skipped the check for users of schemas no flow serves: the project's schemas could not be read.";
+  }
+  if (served.unresolved) {
+    return "Skipped the check for users of schemas no flow serves: a flow names a schema that this release does not define.";
+  }
+  return undefined;
+}
+
+/**
+ * Every lockout warning, then the notes that say what the check could not do.
+ *
+ * @param ctx - The step's context.
+ * @returns The warnings, then the notes.
+ */
+async function lockoutWarnings(ctx: StepContext): Promise<readonly string[]> {
+  const names = lazyNames(ctx);
+  const served = await servedFlows(ctx, names);
+  const flows = served.flows;
+  const ssoSkipped = unservedSkipped(served);
   const disabling = await disabledMethods(ctx, names, flows);
   // Every scan gets its own share of the cap up front, so none can starve
   // another and the total stays within it.
   const scanned = new Set(
-    flows.filter((flow) => flow.identifier !== undefined).map((flow) => flow.schema),
+    flows
+      .filter((flow) => {
+        return flow.identifier !== undefined;
+      })
+      .map((flow) => {
+        return flow.schema;
+      }),
   );
   const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1 + disabling.changes.length)));
   // One scan failing must not discard what the other found.
   const settled = await Promise.allSettled([
     lookupWarnings(ctx, flows, share),
-    ssoSkipped === undefined ? unservedWarnings(ctx, flows, names, share) : nothing(),
+    ssoSkipped === undefined ? unservedWarnings(ctx, flows, names, share) : NOTHING,
     credentialWarnings(ctx, disabling.changes, share),
   ]);
-  const scans = settled.flatMap((outcome) =>
-    outcome.status === "fulfilled" ? [outcome.value] : [],
-  );
+  const scans = settled.flatMap((outcome) => {
+    if (outcome.status !== "fulfilled") {
+      return [];
+    }
+    return [outcome.value];
+  });
+  const scan = merged(scans);
   // A clean result must not look the same as a check that did not run fully.
-  const notes: string[] = [];
-  if (
-    settled.some((outcome) => outcome.status === "rejected") ||
-    scans.some((scan) => scan.failed)
-  ) {
-    notes.push(
-      "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
-    );
-  }
-  if (ssoSkipped) {
-    notes.push(ssoSkipped);
-  }
-  if (disabling.unreadable) {
-    notes.push(
-      "Skipped the check for users whose only way to sign in this release disables: the live release's schemas could not be read.",
-    );
-  }
-  const partial = scans.flatMap((scan) => scan.partial);
-  if (partial.length > 0) {
-    notes.push(
-      `Checked only some of the users of ${partial.join(", ")} for sign-in lockouts (the read limit was reached), so a clean result is not proof.`,
-    );
-  }
-  return [...scans.flatMap((scan) => scan.warnings), ...notes];
+  const rejected = settled.some((outcome) => {
+    return outcome.status === "rejected";
+  });
+  const failedNote =
+    rejected || scan.failed
+      ? [
+          "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
+        ]
+      : [];
+  const skippedNote = ssoSkipped === undefined ? [] : [ssoSkipped];
+  const disablingNote = disabling.unreadable
+    ? [
+        "Skipped the check for users whose only way to sign in this release disables: the live release's schemas could not be read.",
+      ]
+    : [];
+  const partialNote =
+    scan.partial.length > 0
+      ? [
+          `Checked only some of the users of ${scan.partial.join(", ")} for sign-in lockouts (the read limit was reached), so a clean result is not proof.`,
+        ]
+      : [];
+  return [...scan.warnings, ...failedNote, ...skippedNote, ...disablingNote, ...partialNote];
 }
 
 /**
@@ -197,27 +375,23 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
  *   nor the project holds, and whether the listing that would say so could not
  *   be read.
  */
-async function servedFlows(
-  ctx: StepContext,
-  names: Names,
-): Promise<{ flows: Served[]; unresolved: boolean; unreadable: boolean }> {
-  const flows: Served[] = [];
-  let unresolved = false;
-  let unreadable = false;
-  for (const flow of ctx.config.flows.all) {
+async function servedFlows(ctx: StepContext, names: Names): Promise<ServedFlows> {
+  // One flow at a time: the first to need the listing reads it for the rest.
+  const lookups = await mapBounded(ctx.config.flows.all, 1, async (flow): Promise<FlowLookup> => {
     const reference = flow.userSchema;
     if (reference === undefined || flow.body.status === "draft") {
-      continue;
+      return { kind: "ignored" };
     }
-    const carried = ctx.config.flows.schemaOf(flow)?.objectType;
+    const carried = ctx.config.flows.findSchemaOf(flow)?.objectType;
     const listing = carried === undefined ? await names() : undefined;
-    const schema =
-      carried ?? (listing?.byId.get(reference) ?? listing?.byObjectType.get(reference))?.objectType;
+    const listed = listing?.byId.get(reference) ?? listing?.byObjectType.get(reference);
+    const schema = carried ?? listed?.objectType;
     if (schema === undefined) {
       // Without the listing it is not known whether the schema exists.
-      unreadable ||= listing === undefined;
-      unresolved ||= listing !== undefined;
-      continue;
+      if (listing === undefined) {
+        return { kind: "unreadable" };
+      }
+      return { kind: "unresolved" };
     }
     const bundled = ctx.config.schemas.all.find((candidate) => {
       return candidate.objectType === schema;
@@ -225,80 +399,124 @@ async function servedFlows(
     const identifier =
       bundled === undefined ? listing?.byObjectType.get(schema)?.identifier : bundled.identifier;
     const looksUp = identifier !== undefined && flow.loginFields.has(identifier);
-    flows.push({ schema, ...(looksUp ? { identifier } : {}) });
-  }
-  return { flows, unresolved, unreadable };
+    return {
+      kind: "served",
+      flow: { schema, identifier: looksUp ? identifier : undefined },
+    };
+  });
+  return {
+    flows: lookups.flatMap((lookup) => {
+      if (lookup.kind !== "served") {
+        return [];
+      }
+      return [lookup.flow];
+    }),
+    unresolved: lookups.some((lookup) => {
+      return lookup.kind === "unresolved";
+    }),
+    unreadable: lookups.some((lookup) => {
+      return lookup.kind === "unreadable";
+    }),
+  };
 }
 
-/** A field the login flow looks users up by that the users of its schema lack. */
+/**
+ * A field the login flow looks users up by that the users of its schema lack.
+ *
+ * @param ctx - The step's context.
+ * @param flows - The flows served.
+ * @param share - The most users this scan reads per schema.
+ * @returns What the scan found.
+ */
 async function lookupWarnings(
   ctx: StepContext,
   flows: readonly Served[],
   share: number,
 ): Promise<Scan> {
   // The designated identifier belongs to the schema, so there is one per schema.
-  const lookups = new Map<string, string>();
-  for (const flow of flows) {
-    if (flow.identifier !== undefined) {
-      lookups.set(flow.schema, flow.identifier);
-    }
-  }
-  const scans = await mapBounded(
-    [...lookups],
-    CONCURRENCY,
-    async ([objectType, identifier]): Promise<Scan> => {
-      try {
-        const { users, truncated } = await readUsers(
-          ctx,
-          [{ field: "schema_object_type", operation: "equals", value: objectType }, ACTIVE],
-          share,
-        );
-        const missing = users.filter((user) => !carries(user, identifier));
-        if (missing.length === 0) {
-          return { warnings: [], partial: truncated ? [quote(objectType)] : [], failed: false };
+  const lookups = [
+    ...new Map(
+      flows.flatMap((flow): readonly (readonly [string, string])[] => {
+        if (flow.identifier === undefined) {
+          return [];
         }
-        return {
-          warnings: [
-            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${ctx.suggest(`users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`)}`,
-          ],
-          partial: [],
-          failed: false,
-        };
-      } catch {
-        // One schema's failed read must not discard the warnings of the others.
-        return { warnings: [], partial: [], failed: true };
+        return [[flow.schema, flow.identifier]];
+      }),
+    ),
+  ];
+  const scans = await mapBounded(lookups, CONCURRENCY, async (lookup): Promise<Scan> => {
+    const objectType = lookup[0];
+    const identifier = lookup[1];
+    try {
+      const read = await readUsers(
+        ctx,
+        [{ field: "schema_object_type", operation: "equals", value: objectType }, ACTIVE],
+        share,
+      );
+      const missing = read.users.filter((user) => {
+        return !carries(user, identifier);
+      });
+      if (missing.length === 0) {
+        const partial = read.truncated ? [quote(objectType)] : [];
+        return { warnings: [], partial, failed: false };
       }
-    },
-  );
+      const missingCount = count(missing.length, read.truncated);
+      const userCount = count(read.users.length, read.truncated);
+      const users = plural(read.users.length, "user");
+      const verb = missing.length === 1 ? "has" : "have";
+      const fix = ctx.suggest(
+        `users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
+      );
+      return {
+        warnings: [
+          `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${verb} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,
+        ],
+        partial: [],
+        failed: false,
+      };
+    } catch {
+      // One schema's failed read must not discard the warnings of the others.
+      return { warnings: [], partial: [], failed: true };
+    }
+  });
   return merged(scans);
 }
 
-/** Users on a schema no flow serves any more, and which of them have a provider linked. */
+/**
+ * Users on a schema no flow serves any more, and which of them have a provider linked.
+ *
+ * @param ctx - The step's context.
+ * @param flows - The flows served.
+ * @param names - The project's schemas, read on first use.
+ * @param share - The most users this scan reads.
+ * @returns What the scan found.
+ * @throws When the users cannot be read.
+ */
 async function unservedWarnings(
   ctx: StepContext,
   flows: readonly Served[],
   names: Names,
   share: number,
 ): Promise<Scan> {
-  const served = [...new Set(flows.map((flow) => flow.schema))];
-  const read = await readUsers(
-    ctx,
-    [
-      ...served.map(
-        (value): UserFilter => ({ field: "schema_object_type", operation: "not_equals", value }),
-      ),
-      ACTIVE,
-    ],
-    share,
-  );
+  const served = [
+    ...new Set(
+      flows.map((flow) => {
+        return flow.schema;
+      }),
+    ),
+  ];
+  const notServed = served.map((value): UserFilter => {
+    return { field: "schema_object_type", operation: "not_equals", value };
+  });
+  const read = await readUsers(ctx, [...notServed, ACTIVE], share);
   // Every one of them is stranded, linked or not. The link read is one request
   // per user, so only the first few are asked, and the SSO count says so.
   const stranded = read.users;
   const linkChecked = stranded.slice(0, LINK_CHECKS);
   const linksPartial = stranded.length > LINK_CHECKS || read.truncated;
   // Its own boundary: a link read that fails (a user deleted since the query)
-  // must not discard the other warnings.
-  let failed = false;
+  // must not discard the other warnings, so it is `undefined` and only makes
+  // the count a lower bound.
   const hasLink = await mapBounded(linkChecked, CONCURRENCY, async (user) => {
     try {
       // A user deleted since the query holds no links, which the service
@@ -308,63 +526,98 @@ async function unservedWarnings(
       if (isCancellation(error)) {
         throw error;
       }
-      failed = true;
-      return false;
+      return undefined;
     }
   });
-  // Revisions of one schema share an object type, so they are one count.
-  const found = new Map<string | symbol, { users: number; linked: number }>();
+  const failed = hasLink.includes(undefined);
   const linksUnsure = linksPartial || failed;
-  const nameOf = stranded.length > 0 ? await names() : undefined;
-  stranded.forEach((user, index) => {
-    const name = nameOf?.byId.get(user.schema)?.objectType ?? UNNAMED;
-    const entry = found.get(name) ?? { users: 0, linked: 0 };
-    entry.users += 1;
-    entry.linked += hasLink[index] ? 1 : 0;
-    found.set(name, entry);
+  const listing = stranded.length > 0 ? await names() : undefined;
+  // Revisions of one schema share an object type, so they are one count.
+  const schemaOf = stranded.map((user) => {
+    return listing?.byId.get(user.schema)?.objectType ?? UNNAMED;
   });
-  const warnings = [...found].map(([name, { users, linked }]) => {
-    const label = typeof name === "string" ? quote(name) : "schemas whose names could not be read";
-    const sso =
-      linked > 0
-        ? ` (${count(linked, linksUnsure)} of them ${linked === 1 ? "has" : "have"} an SSO link)`
-        : "";
-    return `${count(users, read.truncated)} existing ${plural(users, "user")} of ${label} ${users === 1 ? "is" : "are"} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
+  const counted = [...new Set(schemaOf)].map((name): Stranded => {
+    const indexes = schemaOf.flatMap((schema, index) => {
+      if (schema !== name) {
+        return [];
+      }
+      return [index];
+    });
+    const linked = indexes.filter((index) => {
+      return hasLink[index] === true;
+    });
+    return { name, users: indexes.length, linked: linked.length };
   });
-  return {
-    warnings,
-    partial: read.truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [],
-    failed,
-  };
+  const warnings = counted.map((entry) => {
+    return strandedWarning(entry, read.truncated, linksUnsure);
+  });
+  const partial = read.truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [];
+  return { warnings, partial, failed };
+}
+
+/**
+ * The warning for the users stranded on one schema.
+ *
+ * @param entry - The schema, how many users it strands and how many are linked.
+ * @param truncated - Whether the users were only partly read.
+ * @param linksUnsure - Whether the links were only partly read.
+ * @returns The warning.
+ */
+function strandedWarning(entry: Stranded, truncated: boolean, linksUnsure: boolean): string {
+  const label =
+    typeof entry.name === "string" ? quote(entry.name) : "schemas whose names could not be read";
+  const users = `${count(entry.users, truncated)} existing ${plural(entry.users, "user")}`;
+  const verb = entry.users === 1 ? "is" : "are";
+  const linkedVerb = entry.linked === 1 ? "has" : "have";
+  const sso =
+    entry.linked > 0
+      ? ` (${count(entry.linked, linksUnsure)} of them ${linkedVerb} an SSO link)`
+      : "";
+  return `${users} of ${label} ${verb} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
 }
 
 /**
  * The schemas whose revision in the live release enables a way to sign in
- * that the revision this release pins does not: its own, or the newest one
- * for a schema a flow names that the release does not carry. The live release is the baseline, not
- * the newest revision listed: a schema switched off and back on again pins an
- * older revision. A schema nothing live pins has no users of the live login to
+ * that the revision this release pins does not.
+ *
+ * @remarks
+ * Its own revision, or the newest one for a schema a flow names that the
+ * release does not carry. The live release is the baseline, not the newest
+ * revision listed: a schema switched off and back on again pins an older
+ * revision. A schema nothing live pins has no users of the live login to
  * strand, and nothing deployed means nothing to compare.
+ *
+ * @param ctx - The step's context.
+ * @param names - The project's schemas, read on first use.
+ * @param flows - The flows served.
+ * @returns Each schema's disabled and kept methods, and whether the live
+ *   schemas could not be read.
  */
 async function disabledMethods(
   ctx: StepContext,
   names: Names,
   flows: readonly Served[],
-): Promise<{ changes: MethodChange[]; unreadable: boolean }> {
+): Promise<DisabledMethods> {
   // What each schema enables after this release: the release's own revision,
   // or, for a schema a flow names that the release does not carry, the newest
   // revision, which the server pins in its place.
   const bundled = new Map(
-    ctx.config.schemas.all.flatMap((schema): [string, Credential[]][] => {
-      if (schema.objectType === undefined) {
+    ctx.config.schemas.all.flatMap((schema): readonly (readonly [string, readonly Credential[]])[] => {
+      const objectType = schema.objectType;
+      if (objectType === undefined) {
         return [];
       }
-      return [[schema.objectType, credentialMethods(schema)]];
+      return [[objectType, credentialMethods(schema)]];
     }),
   );
-  const autoPinned = [...new Set(flows.map((flow) => flow.schema))].filter(
-    (objectType) => !bundled.has(objectType),
+  const named = new Set(
+    flows.map((flow) => {
+      return flow.schema;
+    }),
   );
+  const autoPinned = [...named].filter((objectType) => {
+    return !bundled.has(objectType);
+  });
   if (bundled.size === 0 && autoPinned.length === 0) {
     return { changes: [], unreadable: false };
   }
@@ -379,69 +632,82 @@ async function disabledMethods(
   if (listing === undefined) {
     return { changes: [], unreadable: true };
   }
-  // Every primary origin's release counts: a method any of them enables is in use.
-  const live = new Map<string, Set<Credential>>();
-  const use = (info: SchemaInfo) => {
-    const methods = live.get(info.objectType) ?? new Set<Credential>();
-    for (const method of info.methods) {
-      methods.add(method);
-    }
-    live.set(info.objectType, methods);
-  };
-  for (const release of releases) {
-    // A release that pins no flow serves no sign-in, so none of its methods
-    // are in use.
-    if (!release.pinsFlow) {
-      continue;
-    }
-    for (const id of release.schemas) {
-      const info = listing.byId.get(id);
-      // A live revision the listing does not show leaves its methods unknown.
-      if (info === undefined) {
-        return { changes: [], unreadable: true };
-      }
-      use(info);
-    }
+  // Every primary origin's release counts: a method any of them enables is in
+  // use. A release that pins no flow serves no sign-in, so none of its methods
+  // are in use.
+  const liveIds = releases
+    .filter((release) => {
+      return release.pinsFlow;
+    })
+    .flatMap((release) => {
+      return release.schemas;
+    });
+  const live = liveIds.map((id) => {
+    return listing.byId.get(id);
+  });
+  // A live revision the listing does not show leaves its methods unknown.
+  const known = live.filter((info): info is SchemaInfo => {
+    return info !== undefined;
+  });
+  if (known.length !== live.length) {
+    return { changes: [], unreadable: true };
   }
-  const changes: MethodChange[] = [];
-  const after = new Map(bundled);
-  for (const objectType of autoPinned) {
-    const newest = listing.byObjectType.get(objectType);
-    if (newest !== undefined) {
-      after.set(objectType, [...newest.methods]);
+  const newest = autoPinned.flatMap((objectType): readonly (readonly [string, readonly Credential[]])[] => {
+    const info = listing.byObjectType.get(objectType);
+    if (info === undefined) {
+      return [];
     }
-  }
-  for (const [objectType, kept] of after) {
-    const disabled = [...(live.get(objectType) ?? [])].filter((method) => !kept.includes(method));
-    if (disabled.length > 0) {
-      changes.push({ objectType, disabled, kept });
+    return [[objectType, info.methods]];
+  });
+  const after = [...bundled, ...newest];
+  const changes = after.flatMap((entry): readonly MethodChange[] => {
+    const objectType = entry[0];
+    const kept = entry[1];
+    const enabled = known
+      .filter((info) => {
+        return info.objectType === objectType;
+      })
+      .flatMap((info) => {
+        return info.methods;
+      });
+    const disabled = [...new Set(enabled)].filter((method) => {
+      return !kept.includes(method);
+    });
+    if (disabled.length === 0) {
+      return [];
     }
-  }
+    return [{ objectType, disabled, kept }];
+  });
   return { changes, unreadable: false };
 }
 
 /**
  * The releases live on the primary origins: whether each pins a flow, and the
- * schema revisions it pins. Nothing when they could not be read.
+ * schema revisions it pins.
+ *
+ * @param ctx - The step's context.
+ * @returns The releases, or nothing when they could not be read.
+ * @throws When the person stopped the command.
  */
-async function liveReleases(
-  ctx: StepContext,
-): Promise<{ pinsFlow: boolean; schemas: string[] }[] | undefined> {
+async function liveReleases(ctx: StepContext): Promise<readonly LiveRelease[] | undefined> {
   try {
     const deployments = await ctx.deployments.primary({ expand: ["release"] });
-    return deployments.flatMap((deployment) => {
+    return deployments.flatMap((deployment): readonly LiveRelease[] => {
       const pointers = deployment.release?.pointers;
       if (pointers === undefined) {
         return [];
       }
-      return [
-        {
-          pinsFlow: pointers.some((pointer) => pointer.kind === "flow_definition"),
-          schemas: pointers
-            .filter((pointer) => pointer.kind === "schema")
-            .map((pointer) => pointer.revision_id),
-        },
-      ];
+      const pinsFlow = pointers.some((pointer) => {
+        return pointer.kind === "flow_definition";
+      });
+      const schemas = pointers
+        .filter((pointer) => {
+          return pointer.kind === "schema";
+        })
+        .map((pointer) => {
+          return pointer.revision_id;
+        });
+      return [{ pinsFlow, schemas }];
     });
   } catch (error) {
     if (isCancellation(error)) {
@@ -453,9 +719,17 @@ async function liveReleases(
 
 /**
  * Users who hold a credential of a method their schema loses and none of a
- * method it keeps. A user who holds no credential at all could not sign in
- * before either, so is not counted. The credential reads are a few requests per
- * user, so only the first users are asked, and the count says so.
+ * method it keeps.
+ *
+ * @remarks
+ * A user who holds no credential at all could not sign in before either, so
+ * is not counted. The credential reads are a few requests per user, so only
+ * the first users are asked, and the count says so.
+ *
+ * @param ctx - The step's context.
+ * @param changes - The schemas losing a method.
+ * @param share - The most users this scan reads per schema.
+ * @returns What the scan found.
  */
 async function credentialWarnings(
   ctx: StepContext,
@@ -463,59 +737,68 @@ async function credentialWarnings(
   share: number,
 ): Promise<Scan> {
   // One schema at a time, so at most CONCURRENCY users are read at once.
-  const scans = await mapBounded(
-    [...changes],
-    1,
-    async ({ objectType, disabled, kept }): Promise<Scan> => {
-      try {
-        const read = await readUsers(
-          ctx,
-          [{ field: "schema_object_type", operation: "equals", value: objectType }, ACTIVE],
-          share,
-        );
-        const checked = read.users.slice(0, LINK_CHECKS);
-        const partial = read.truncated || read.users.length > LINK_CHECKS;
-        const asked = [...disabled, ...kept];
-        // Its own boundary per user: one failed read must not discard the
-        // counts of the others, so it only makes the count a lower bound.
-        let failed = false;
-        const held = await mapBounded(checked, CONCURRENCY, async (user) => {
-          try {
-            return await ctx.users.credentials(user.id, asked);
-          } catch (error) {
-            if (isCancellation(error)) {
-              throw error;
-            }
-            failed = true;
-            return undefined;
+  const scans = await mapBounded(changes, 1, async (change): Promise<Scan> => {
+    const objectType = change.objectType;
+    const disabled = change.disabled;
+    const kept = change.kept;
+    try {
+      const read = await readUsers(
+        ctx,
+        [{ field: "schema_object_type", operation: "equals", value: objectType }, ACTIVE],
+        share,
+      );
+      const checked = read.users.slice(0, LINK_CHECKS);
+      const partial = read.truncated || read.users.length > LINK_CHECKS;
+      const asked = [...disabled, ...kept];
+      // Its own boundary per user: one failed read must not discard the
+      // counts of the others, so it only makes the count a lower bound.
+      const held = await mapBounded(checked, CONCURRENCY, async (user) => {
+        try {
+          return await ctx.users.credentials(user.id, asked);
+        } catch (error) {
+          if (isCancellation(error)) {
+            throw error;
           }
+          return undefined;
+        }
+      });
+      const failed = held.includes(undefined);
+      const stranded = held.filter((credentials) => {
+        if (credentials === undefined) {
+          return false;
+        }
+        const losesOne = disabled.some((method) => {
+          return credentials.has(method);
         });
-        const stranded = held.filter(
-          (credentials) =>
-            credentials !== undefined &&
-            disabled.some((method) => credentials.has(method)) &&
-            !kept.some((method) => credentials.has(method)),
-        ).length;
-        if (stranded === 0) {
-          return { warnings: [], partial: partial ? [quote(objectType)] : [], failed };
-        }
-        const methods = disabled.join(" or ");
-        return {
-          warnings: [
-            `${count(stranded, partial || failed)} of ${count(read.users.length, read.truncated)} existing ${plural(read.users.length, "user")} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${disabled.length === 1 ? methods : "them"} enabled until they have another way in.`,
-          ],
-          partial: [],
-          failed,
-        };
-      } catch (error) {
-        if (isCancellation(error)) {
-          throw error;
-        }
-        // One schema's failed read must not discard the warnings of the others.
-        return { warnings: [], partial: [], failed: true };
+        const keepsOne = kept.some((method) => {
+          return credentials.has(method);
+        });
+        return losesOne && !keepsOne;
+      }).length;
+      if (stranded === 0) {
+        const unsure = partial ? [quote(objectType)] : [];
+        return { warnings: [], partial: unsure, failed };
       }
-    },
-  );
+      const methods = disabled.join(" or ");
+      const strandedCount = count(stranded, partial || failed);
+      const userCount = count(read.users.length, read.truncated);
+      const users = plural(read.users.length, "user");
+      const keep = disabled.length === 1 ? methods : "them";
+      return {
+        warnings: [
+          `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${keep} enabled until they have another way in.`,
+        ],
+        partial: [],
+        failed,
+      };
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      // One schema's failed read must not discard the warnings of the others.
+      return { warnings: [], partial: [], failed: true };
+    }
+  });
   return merged(scans);
 }
 
@@ -531,47 +814,82 @@ async function credentialWarnings(
  * @param schema - The schema, from the release or the project's listing.
  * @returns The usable methods among password, passkey and SSO.
  */
-function credentialMethods(schema: UserSchema): Credential[] {
-  return schema.usableMethods.filter((method): method is Credential => {
-    return method === "password" || method === "passkey" || method === "sso";
+function credentialMethods(schema: UserSchema): readonly Credential[] {
+  return schema.usableMethods.filter(isCredential);
+}
+
+/**
+ * Whether a method is one a user can hold a credential for.
+ *
+ * @param method - A method a schema enables.
+ * @returns Whether it is password, passkey or SSO.
+ */
+function isCredential(method: string): method is Credential {
+  return CREDENTIALS.some((credential) => {
+    return credential === method;
   });
 }
 
+/**
+ * Read the users a query matches, a page at a time, up to a limit.
+ *
+ * @param ctx - The step's context.
+ * @param filter - The query's filters.
+ * @param max - The most users to read.
+ * @param read - The users read so far, and the token of the next page.
+ * @returns The users, and whether there were more.
+ * @throws When a page cannot be read.
+ */
 async function readUsers(
   ctx: StepContext,
-  filter: UserFilter[],
+  filter: readonly UserFilter[],
   max: number,
-): Promise<{ users: QueriedUser[]; truncated: boolean }> {
-  const users: QueriedUser[] = [];
-  let pageToken: string | undefined;
-  let more = true;
-  while (more && users.length < max) {
-    const page = await ctx.users.page({
-      limit: Math.min(PAGE_SIZE, max - users.length),
-      filter,
-      ...(pageToken === undefined ? {} : { page_token: pageToken }),
-    });
-    users.push(...page.items);
-    pageToken = page.next ?? undefined;
-    // An empty page that still offers another is not progress.
-    more = pageToken !== undefined && page.items.length > 0;
+  read: { readonly users: readonly QueriedUser[]; readonly pageToken?: string } = { users: [] },
+): Promise<ReadUsers> {
+  const pageToken = read.pageToken;
+  const page = await ctx.users.page({
+    limit: Math.min(PAGE_SIZE, max - read.users.length),
+    filter: [...filter],
+    page_token: pageToken,
+  });
+  const users = [...read.users, ...page.items];
+  const next = page.next ?? undefined;
+  // An empty page that still offers another is not progress.
+  const more = next !== undefined && page.items.length > 0;
+  if (!more || users.length >= max) {
+    return { users, truncated: next !== undefined };
   }
-  return { users, truncated: pageToken !== undefined };
+  return readUsers(ctx, filter, max, { users, pageToken: next });
 }
 
-/** Whether the user holds a value at the (dotted) attribute path. */
-function carries(user: QueriedUser, path: string): boolean {
-  let node: unknown = user.attributes;
-  for (const key of path.split(".")) {
-    if (typeof node !== "object" || node === null) {
-      return false;
-    }
-    if (!Object.hasOwn(node, key)) {
-      return false;
-    }
-    node = (node as Record<string, unknown>)[key];
+/**
+ * The value at a dotted path, or `undefined` when a step along it is missing.
+ *
+ * @param node - Where the path starts.
+ * @param keys - The path's keys.
+ * @returns The value, or `undefined`.
+ */
+function valueAt(node: unknown, keys: readonly string[]): unknown {
+  const key = keys[0];
+  if (key === undefined) {
+    return node;
   }
-  return node !== undefined && node !== null && node !== "";
+  if (!isObject(node) || !Object.hasOwn(node, key)) {
+    return undefined;
+  }
+  return valueAt(node[key], keys.slice(1));
+}
+
+/**
+ * Whether the user holds a value at the (dotted) attribute path.
+ *
+ * @param user - The user.
+ * @param path - The dotted path.
+ * @returns Whether a non-empty value is there.
+ */
+function carries(user: QueriedUser, path: string): boolean {
+  const value = valueAt(user.attributes, path.split("."));
+  return value !== undefined && value !== null && value !== "";
 }
 
 /**
@@ -590,31 +908,75 @@ function carries(user: QueriedUser, path: string): boolean {
  */
 async function objectTypes(ctx: StepContext): Promise<Listing> {
   const listed = await ctx.schemas.list();
-  const revisions = listed.flatMap((entry): [string, SchemaInfo][] => {
-    const body: JsonObject = isObject(entry.schema) ? entry.schema : {};
+  const revisions = listed.flatMap((entry): readonly (readonly [string, SchemaInfo])[] => {
+    const listedBody = entry.schema;
+    const body: JsonObject =
+      isJsonValue(listedBody) && isJsonObject(listedBody) ? listedBody : {};
     const schema = UserSchema.of({ path: "", body });
     const objectType = schema.body.objectType;
     if (typeof objectType !== "string") {
       return [];
     }
-    const identifier = schema.identifier;
     const info: SchemaInfo = {
       objectType,
+      identifier: schema.identifier,
       methods: credentialMethods(schema),
-      ...(identifier === undefined ? {} : { identifier }),
     };
     return [[entry.id, info]];
   });
-  const newest = new Map<string, SchemaInfo>();
-  for (const [, info] of revisions) {
-    if (!newest.has(info.objectType)) {
-      newest.set(info.objectType, info);
-    }
-  }
-  return { byId: new Map(revisions), byObjectType: newest };
+  const infos = revisions.map((revision) => {
+    return revision[1];
+  });
+  const newest = infos.filter((info, index) => {
+    const first = infos.findIndex((other) => {
+      return other.objectType === info.objectType;
+    });
+    return first === index;
+  });
+  return {
+    byId: new Map(revisions),
+    byObjectType: new Map(
+      newest.map((info) => {
+        return [info.objectType, info];
+      }),
+    ),
+  };
 }
 
-const quote = (value: string) => `"${value}"`;
-const plural = (n: number, noun: string) =>
-  new Intl.PluralRules("en").select(n) === "one" ? noun : `${noun}s`;
-const count = (n: number, truncated: boolean) => (truncated ? `at least ${n}` : `${n}`);
+/**
+ * A name as a warning quotes it.
+ *
+ * @param value - The name.
+ * @returns The name in double quotes.
+ */
+function quote(value: string): string {
+  return `"${value}"`;
+}
+
+/**
+ * A noun in the number a count calls for.
+ *
+ * @param n - The count.
+ * @param noun - The noun in the singular.
+ * @returns The noun, with an `s` unless the count is one.
+ */
+function plural(n: number, noun: string): string {
+  if (new Intl.PluralRules("en").select(n) === "one") {
+    return noun;
+  }
+  return `${noun}s`;
+}
+
+/**
+ * A count, as a lower bound when it was only partly read.
+ *
+ * @param n - The count.
+ * @param truncated - Whether it is only a lower bound.
+ * @returns The count in words.
+ */
+function count(n: number, truncated: boolean): string {
+  if (truncated) {
+    return `at least ${n}`;
+  }
+  return `${n}`;
+}

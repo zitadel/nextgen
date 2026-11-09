@@ -21,6 +21,21 @@ export const POLICY_FILE_SUFFIX = ".json";
 export const POLICY_TEST_SUFFIX = ".test.json";
 
 /**
+ * The name of the policy file of an operation.
+ *
+ * @typeParam Operation - The operation, as spelled.
+ */
+export type PolicyFileName<Operation extends string> = `${Operation}${typeof POLICY_FILE_SUFFIX}`;
+
+/**
+ * The name of the test file of an operation.
+ *
+ * @typeParam Operation - The operation, as spelled.
+ */
+export type PolicyTestFileName<Operation extends string> =
+  `${Operation}${typeof POLICY_TEST_SUFFIX}`;
+
+/**
  * The operation the password policy guards, which names its file.
  */
 export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set" satisfies PolicyOperation;
@@ -74,13 +89,14 @@ export type PasswordMinLength = number | null;
  *
  * @typeParam T - The kind of document.
  */
-export type PolicySelection<T> = Readonly<{
+export type PolicySelection<T> = {
   /**
    * The documents with nothing wrong, in file order.
    */
-  documents: readonly T[];
+  readonly documents: readonly T[];
+
   /**
    * One line per problem found, each naming its file.
    */
-  issues: readonly string[];
-}>;
+  readonly issues: readonly string[];
+};

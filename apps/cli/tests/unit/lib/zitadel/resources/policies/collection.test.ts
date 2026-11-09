@@ -42,7 +42,7 @@ describe("Policies.password", () => {
   });
 });
 
-describe("Policies.for", () => {
+describe("Policies.selectPolicies", () => {
   it("holds each sound policy file, without the test files", () => {
     const config = aConfig({
       policies: {
@@ -51,7 +51,7 @@ describe("Policies.for", () => {
       },
     });
 
-    const { documents, issues } = config.policies.for();
+    const { documents, issues } = config.policies.selectPolicies();
 
     expect(issues).toEqual([]);
     expect(
@@ -66,7 +66,7 @@ describe("Policies.for", () => {
       policies: { [PASSWORD_POLICY_FILE]: aPasswordPolicy({ min_length: 0 }) },
     });
 
-    const { documents, issues } = config.policies.for();
+    const { documents, issues } = config.policies.selectPolicies();
 
     expect(documents).toEqual([]);
     expect(issues).toEqual([expect.stringContaining(`${POLICY_PATH}: config.min_length`)]);
@@ -75,7 +75,7 @@ describe("Policies.for", () => {
   it("reports a policy file not named after its operation", () => {
     const config = aConfig({ policies: { "password.json": aPasswordPolicy({}) } });
 
-    const { issues } = config.policies.for();
+    const { issues } = config.policies.selectPolicies();
 
     expect(issues).toEqual([
       `${CONFIG_DIRECTORIES.policies}/password.json: holds the ${PASSWORD_POLICY} policy, so it must be named ${PASSWORD_POLICY_FILE}`,
@@ -90,7 +90,7 @@ describe("Policies.for", () => {
       },
     });
 
-    const { documents, issues } = config.policies.for([PASSWORD_POLICY]);
+    const { documents, issues } = config.policies.selectPolicies([PASSWORD_POLICY]);
 
     expect(issues).toEqual([]);
     expect(
@@ -103,13 +103,13 @@ describe("Policies.for", () => {
   it("holds nothing for an operation without a policy file", () => {
     const config = aConfig();
 
-    const policies = config.policies.for([PASSWORD_POLICY]);
+    const policies = config.policies.selectPolicies([PASSWORD_POLICY]);
 
     expect(policies).toEqual({ documents: [], issues: [] });
   });
 });
 
-describe("Policies.testsFor", () => {
+describe("Policies.selectTests", () => {
   it("holds only the test files", () => {
     const config = aConfig({
       policies: {
@@ -118,7 +118,7 @@ describe("Policies.testsFor", () => {
       },
     });
 
-    const { documents, issues } = config.policies.testsFor();
+    const { documents, issues } = config.policies.selectTests();
 
     expect(issues).toEqual([]);
     expect(
@@ -131,7 +131,7 @@ describe("Policies.testsFor", () => {
   it("names an operation asked for that has no test file", () => {
     const config = aConfig({ policies: { [PASSWORD_POLICY_TEST_FILE]: aPolicyTest() } });
 
-    const { documents, issues } = config.policies.testsFor([UNKNOWN]);
+    const { documents, issues } = config.policies.selectTests([UNKNOWN]);
 
     expect(documents).toEqual([]);
     expect(issues).toEqual([`${CONFIG_DIRECTORIES.policies}/${UNKNOWN}.test.json does not exist`]);
@@ -145,7 +145,7 @@ describe("Policies.testsFor", () => {
       },
     });
 
-    const { documents, issues } = config.policies.testsFor([PASSWORD_POLICY]);
+    const { documents, issues } = config.policies.selectTests([PASSWORD_POLICY]);
 
     expect(issues).toEqual([]);
     expect(
@@ -158,7 +158,7 @@ describe("Policies.testsFor", () => {
   it("names a test file not named after its operation", () => {
     const config = aConfig({ policies: { "password.test.json": aPolicyTest() } });
 
-    const { documents, issues } = config.policies.testsFor();
+    const { documents, issues } = config.policies.selectTests();
 
     expect(documents).toEqual([]);
     expect(issues).toEqual([
@@ -173,7 +173,7 @@ describe("Policies.testsFor", () => {
       },
     });
 
-    const { issues } = config.policies.testsFor();
+    const { issues } = config.policies.selectTests();
 
     expect(issues).toEqual([
       expect.stringContaining(`${TEST_PATH}: cases.0.input.password `),

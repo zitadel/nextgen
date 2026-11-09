@@ -1,11 +1,17 @@
-import { type StepName, stepName } from "@/lib/zitadel/names";
+import { type PropertyPath, type StepName, stepName } from "@/lib/zitadel/names";
 import {
   COLLISION_OUTCOME,
   type StepAction,
   type Transition,
 } from "@/lib/zitadel/resources/flows/types";
-import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
+import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
+import {
+  isJsonObject,
+  listAt,
+  objectAt,
+  stringAt,
+  stringsIn,
+} from "@/lib/zitadel/utils/json";
 
 /**
  * One step of a login flow, read-only: the questions the rules ask of it.
@@ -32,7 +38,7 @@ export class Step {
    */
   private constructor(body: JsonObject) {
     this.body = body;
-    this.name = stepName(typeof body.name === "string" ? body.name : "");
+    this.name = stepName(stringAt(body, "name") ?? "");
   }
 
   /**
@@ -77,8 +83,8 @@ export class Step {
       .filter(isJsonObject)
       .map((action) => {
         return {
-          name: typeof action.name === "string" ? action.name : String(action.name),
-          kind: typeof action.kind === "string" ? action.kind : String(action.kind),
+          name: stringAt(action, "name") ?? String(action.name),
+          kind: stringAt(action, "kind") ?? String(action.kind),
         };
       });
   }
@@ -107,16 +113,35 @@ export class Step {
    * @returns One per outcome, in the order written; none when there are none.
    */
   get transitions(): readonly Transition[] {
-    return Object.entries(objectAt(this.body, "transitions")).map((pair) => {
-      const [outcome, route] = pair;
-      const entry = isJsonObject(route) ? route : {};
-      return {
-        outcome,
-        target: typeof entry.target === "string" ? entry.target : "",
-        action: typeof entry.action === "string" ? entry.action : null,
-        purpose: typeof entry.purpose === "string" ? entry.purpose : null,
-      };
+    return Object.entries(objectAt(this.body, "transitions")).map((entry) => {
+      return Step.transitionOf(entry[0], entry[1]);
     });
+  }
+
+  /**
+   * One transition, as the engine reads it.
+   *
+   * @param outcome - The outcome that fires it.
+   * @param route - Where it goes, as written.
+   * @returns The transition: an `action` leaves the flow, a target names a
+   *   step, a lone purpose names that purpose's entry step.
+   */
+  private static transitionOf(outcome: string, route: JsonValue | undefined): Transition {
+    const entry = isJsonObject(route) ? route : {};
+    const action = stringAt(entry, "action");
+    const target = stringAt(entry, "target");
+    const purpose = stringAt(entry, "purpose");
+    const named = target === undefined || target === "" ? undefined : stepName(target);
+    if (action !== undefined) {
+      return { kind: "cross-flow", outcome, action, target: named };
+    }
+    if (named !== undefined) {
+      return { kind: "step", outcome, target: named, purpose };
+    }
+    if (purpose !== undefined) {
+      return { kind: "purpose", outcome, purpose };
+    }
+    return { kind: "nowhere", outcome };
   }
 
   /**
@@ -160,7 +185,7 @@ export class Step {
    * @param path - The property's dotted path.
    * @returns Whether a field covers it.
    */
-  asksFor(path: string): boolean {
+  asksFor(path: PropertyPath): boolean {
     return this.fields.some((field) => {
       return field === path || field.startsWith(`${path}.`) || path.startsWith(`${field}.`);
     });

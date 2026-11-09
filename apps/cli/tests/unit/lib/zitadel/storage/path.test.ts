@@ -110,18 +110,18 @@ describe("Path.relativeTo", () => {
   });
 });
 
-describe("Path.real", () => {
+describe("Path.resolveReal", () => {
   it("resolves a symlinked directory on the way", async ({ dir, other }) => {
     await writeFile(join(other, "x.txt"), "x");
     await symlink(other, join(dir, "link"));
 
-    const real = Path.of(dir, "link", "x.txt").real();
+    const real = Path.of(dir, "link", "x.txt").resolveReal();
 
     expect(real).toEqual(Path.of(await realpath(other), "x.txt"));
   });
 
   it("keeps the segments that do not exist yet", async ({ dir }) => {
-    const real = Path.of(dir, "not", "yet.txt").real();
+    const real = Path.of(dir, "not", "yet.txt").resolveReal();
 
     expect(real).toEqual(Path.of(await realpath(dir), "not", "yet.txt"));
   });
@@ -129,7 +129,7 @@ describe("Path.real", () => {
   it("is undefined through a symlink that resolves nowhere", async ({ dir }) => {
     await symlink(join(dir, "gone"), join(dir, "dangling"));
 
-    const real = Path.of(dir, "dangling", "x.txt").real();
+    const real = Path.of(dir, "dangling", "x.txt").resolveReal();
 
     expect(real).toBeUndefined();
   });
@@ -137,7 +137,7 @@ describe("Path.real", () => {
   it("is undefined for a symlink that resolves nowhere itself", async ({ dir }) => {
     await symlink(join(dir, "gone"), join(dir, "dangling"));
 
-    const real = Path.of(dir, "dangling").real();
+    const real = Path.of(dir, "dangling").resolveReal();
 
     expect(real).toBeUndefined();
   });
@@ -146,7 +146,7 @@ describe("Path.real", () => {
     await mkdir(join(dir, "a"));
     await writeFile(join(dir, "a", "file.txt"), "x");
 
-    const real = Path.of(dir, "a", "file.txt", "x").real();
+    const real = Path.of(dir, "a", "file.txt", "x").resolveReal();
 
     expect(real).toEqual(Path.of(await realpath(dir), "a", "file.txt", "x"));
   });

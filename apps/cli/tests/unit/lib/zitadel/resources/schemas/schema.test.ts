@@ -4,7 +4,7 @@ import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
 import { RefusedEditError, UserSchema } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
-import { objectAt } from "@/lib/zitadel/utils/json";
+import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { aFile, aUserSchema } from "@tests/helpers/config";
 import { slug } from "@tests/helpers/idp-values";
 import { aSchemaListing } from "@tests/helpers/schemas";
@@ -23,7 +23,7 @@ const PATH = `.zitadel/schemas/${SCHEMA_FILE}`;
 /**
  * The shipped minimal schema.
  */
-const SHIPPED = getDefaultHumanUserSchema({ useCase: "minimal" });
+const SHIPPED = toJsonObject(getDefaultHumanUserSchema({ useCase: "minimal" }), "the shipped schema");
 
 /**
  * A schema with password on, passkey off and SSO on through Google.
@@ -77,22 +77,22 @@ describe("UserSchema.handle", () => {
   });
 });
 
-describe("UserSchema.asRead", () => {
+describe("UserSchema.markRead", () => {
   it("marks an edited schema as read", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
     const edited = schema.withProvider(slug("google")).document;
 
-    const read = edited.asRead();
+    const read = edited.markRead();
 
     expect(read.status).toBe("read");
   });
 });
 
-describe("UserSchema.problems", () => {
+describe("UserSchema.check", () => {
   it("finds nothing wrong with the shipped schema", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
 
-    const issues = schema.problems({});
+    const issues = schema.check({});
 
     expect(issues).toEqual([]);
   });
@@ -100,7 +100,7 @@ describe("UserSchema.problems", () => {
   it("reports what the schema contract refuses, under contract/schema", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, { objectType: 7 }));
 
-    const issues = schema.problems({});
+    const issues = schema.check({});
 
     expect(issues).toContainEqual(
       expect.objectContaining({ rule: "contract/schema", file: PATH, severity: "error" }),
@@ -108,12 +108,12 @@ describe("UserSchema.problems", () => {
   });
 });
 
-describe("UserSchema.wireBody", () => {
+describe("UserSchema.toWireBody", () => {
   it("sends the schema without its $schema pointer", () => {
     const body = { $schema: "../meta/user-schema.json", objectType: "customers" };
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, body));
 
-    const wire = schema.wireBody(new MemoryStore());
+    const wire = schema.toWireBody(new MemoryStore());
 
     expect(wire).toEqual({ objectType: "customers" });
   });
@@ -166,6 +166,14 @@ describe("UserSchema.signInProviders", () => {
     const providers = schema.signInProviders;
 
     expect(providers).toEqual(["google"]);
+  });
+
+  it("does not take a slug the connection contract accepts only once trimmed", () => {
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, aSchemaListing([" google"])));
+
+    const providers = schema.signInProviders;
+
+    expect(providers).toEqual([]);
   });
 });
 
@@ -278,7 +286,7 @@ describe("UserSchema.withProvider", () => {
     expect(schema.body).toEqual(before);
   });
 
-  it("shares nothing under sso with the schema it was given", () => {
+  it("keeps what else sits under sso as the file wrote it", () => {
     const options = { prompt: "login" };
     const schema = UserSchema.of(
       aFile("schemas", SCHEMA_FILE, {
@@ -288,7 +296,7 @@ describe("UserSchema.withProvider", () => {
 
     const edited = schema.withProvider(slug("google")).document;
 
-    expect(objectAt(objectAt(edited.body, "x-auth-methods"), "sso").options).not.toBe(options);
+    expect(objectAt(objectAt(edited.body, "x-auth-methods"), "sso").options).toEqual({ prompt: "login" });
   });
 
   it("refuses a schema whose sso region was edited by hand", () => {

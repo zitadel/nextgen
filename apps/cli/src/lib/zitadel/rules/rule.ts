@@ -7,60 +7,65 @@ import type { Issue, RuleId, Severity, ValidationContext } from "@/lib/zitadel/r
  * @remarks
  * Steps with the same cause are one mistake: they are reported together, as
  * one issue naming every step.
+ *
+ * @typeParam Fact - What the rule looks at.
  */
-export type StepGrouping<Fact> = Readonly<{
+export type StepGrouping<Fact> = {
   /**
    * The step a fact is about.
    */
-  step: (fact: Fact) => string;
+  readonly step: (fact: Fact) => string;
+
   /**
    * What two facts share when they are the same mistake.
    */
-  cause: (fact: Fact) => string;
-}>;
+  readonly cause: (fact: Fact) => string;
+};
 
 /**
  * One rule, stated declaratively: for each fact in the configuration, when the
  * condition holds, say this.
+ *
+ * @typeParam Fact - What the rule looks at.
  */
-export type RuleSpec<Fact> = Readonly<{
+export type RuleSpec<Fact> = {
   /**
-   * The rule's id.
+   * The rule's id, or, for a rule that reports several (such as the server's
+   * flow rules), the id each fact breaks.
    */
-  id: RuleId;
+  readonly id: RuleId | ((fact: Fact) => RuleId);
+
   /**
-   * How serious the rule's findings are.
+   * How serious the rule's findings are, or how serious each fact is for a
+   * rule whose facts differ.
    */
-  severity: Severity;
+  readonly severity: Severity | ((fact: Fact) => Severity);
+
   /**
    * The facts the rule looks at, given what the run knows beyond the files.
    */
-  each: (config: ZitadelConfig, context: ValidationContext) => readonly Fact[];
+  readonly each: (config: ZitadelConfig, context: ValidationContext) => readonly Fact[];
+
   /**
    * Whether a fact is a problem. Every fact is when there is no condition.
    */
-  when?: (fact: Fact) => boolean;
+  readonly when?: (fact: Fact) => boolean;
+
   /**
    * The file the problem is in.
    */
-  file: (fact: Fact) => string;
+  readonly file: (fact: Fact) => string;
+
   /**
    * The connection slug the problem is about, when it is about one.
    */
-  slug?: (fact: Fact) => string;
+  readonly slug?: (fact: Fact) => string;
+
   /**
    * How facts about steps group into one issue, for a rule about steps.
    */
-  steps?: StepGrouping<Fact>;
-  /**
-   * The rule a fact breaks, for a rule that reports several, such as the
-   * server's flow rules.
-   */
-  rule?: (fact: Fact) => RuleId;
-  /**
-   * How serious a fact is, for a rule whose facts differ.
-   */
-  severityOf?: (fact: Fact) => Severity;
+  readonly steps?: StepGrouping<Fact>;
+
   /**
    * What to say.
    *
@@ -68,32 +73,35 @@ export type RuleSpec<Fact> = Readonly<{
    * `where` names the steps (`step "a"` or `steps "a", "b"`) for a rule about
    * steps, and is empty otherwise.
    */
-  says: (fact: Fact, where: string) => string;
-}>;
+  readonly says: (fact: Fact, where: string) => string;
+};
 
 /**
  * A rule ready to run: the check that finds its issues.
  */
-export type Rule = Readonly<{
+export type Rule = {
   /**
    * Find the rule's issues in a configuration.
    */
-  check: (config: ZitadelConfig, context: ValidationContext) => readonly Issue[];
-}>;
+  readonly check: (config: ZitadelConfig, context: ValidationContext) => readonly Issue[];
+};
 
 /**
  * Facts that are one mistake: the first, which speaks for them, and every step.
+ *
+ * @typeParam Fact - What the rule looks at.
  */
-type Group<Fact> = Readonly<{
+type Group<Fact> = {
   /**
    * The fact that speaks for the group.
    */
-  first: Fact;
+  readonly first: Fact;
+
   /**
    * The step of every fact in the group, in the order they were found.
    */
-  steps: readonly string[];
-}>;
+  readonly steps: readonly string[];
+};
 
 /**
  * Make a rule from its statement.
@@ -107,12 +115,13 @@ export function defineRule<Fact>(spec: RuleSpec<Fact>): Rule {
       const problems = spec.each(config, context).filter((fact) => {
         return spec.when === undefined || spec.when(fact);
       });
-      if (spec.steps === undefined) {
+      const grouping = spec.steps;
+      if (grouping === undefined) {
         return problems.map((fact) => {
           return issueOf(spec, fact, undefined);
         });
       }
-      return groupByCause(problems, spec.file, spec.steps).map((group) => {
+      return groupByCause(problems, spec.file, grouping).map((group) => {
         return issueOf(spec, group.first, group.steps);
       });
     },
@@ -120,7 +129,7 @@ export function defineRule<Fact>(spec: RuleSpec<Fact>): Rule {
 }
 
 /**
- * Facts grouped by the file they are in and their cause, in the order each
+ * Group facts by the file they are in and their cause, in the order each
  * group was first found.
  *
  * @param facts - The facts that are problems.
@@ -132,7 +141,7 @@ function groupByCause<Fact>(
   facts: readonly Fact[],
   file: (fact: Fact) => string,
   grouping: StepGrouping<Fact>,
-): Group<Fact>[] {
+): readonly Group<Fact>[] {
   const keyOf = (fact: Fact): string => {
     return JSON.stringify([file(fact), grouping.cause(fact)]);
   };
@@ -162,17 +171,21 @@ function issueOf<Fact>(
   fact: Fact,
   steps: readonly string[] | undefined,
 ): Issue {
-  const where = steps === undefined ? "" : stepsText(steps);
-  const stepsPart = steps === undefined ? {} : { steps };
-  const slugPart = spec.slug === undefined ? {} : { slug: spec.slug(fact) };
-  return {
-    severity: spec.severityOf?.(fact) ?? spec.severity,
-    rule: spec.rule?.(fact) ?? spec.id,
-    file: spec.file(fact),
-    ...stepsPart,
-    ...slugPart,
-    message: spec.says(fact, where),
-  };
+  const severity = typeof spec.severity === "function" ? spec.severity(fact) : spec.severity;
+  const rule = typeof spec.id === "function" ? spec.id(fact) : spec.id;
+  const file = spec.file(fact);
+  const slug = spec.slug?.(fact);
+  if (steps === undefined && slug === undefined) {
+    return { severity, rule, file, message: spec.says(fact, "") };
+  }
+  if (steps === undefined) {
+    return { severity, rule, file, slug, message: spec.says(fact, "") };
+  }
+  const message = spec.says(fact, stepsText(steps));
+  if (slug === undefined) {
+    return { severity, rule, file, steps, message };
+  }
+  return { severity, rule, file, steps, slug, message };
 }
 
 /**
@@ -185,8 +198,9 @@ function stepsText(steps: readonly string[]): string {
   const quoted = steps.map((step) => {
     return JSON.stringify(step);
   });
-  if (quoted.length === 1) {
-    return `step ${quoted.join("")}`;
+  const only = quoted[0];
+  if (quoted.length === 1 && only !== undefined) {
+    return `step ${only}`;
   }
   return `steps ${quoted.join(", ")}`;
 }

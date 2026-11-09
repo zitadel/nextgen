@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFlowsError } from "@/lib/zitadel";
+import { BrokenFlowsError, type JsonObject } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
 import { aFlowOffering, aMethodEdit, HUMAN_USER } from "@tests/helpers/schemas";
+import { withStepChanged } from "@tests/helpers/connections";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -83,21 +84,16 @@ const PASSKEY_FLOW = {
  * which reads as no fields to the semantic validator and would hide the
  * password step.
  */
-const MALFORMED_FLOW = {
-  ...PASSWORD_FLOW,
-  steps: [
-    PASSWORD_FLOW.steps[0],
-    { ...PASSWORD_FLOW.steps[1], fields: "x-auth-methods#password" },
-    PASSWORD_FLOW.steps[2],
-  ],
-};
+const MALFORMED_FLOW: JsonObject = withStepChanged(PASSWORD_FLOW, "password", {
+  fields: "x-auth-methods#password",
+});
 
 /**
  * The password flow with a purpose whose entry step does not exist: a
  * structural error, which stops the validator before the schema rules would
  * notice the password step.
  */
-const STRUCTURALLY_BROKEN_FLOW = {
+const STRUCTURALLY_BROKEN_FLOW: JsonObject = {
   ...PASSWORD_FLOW,
   purposes: { login: "identifier", register: "missing" },
 };
@@ -114,14 +110,9 @@ const WARNED_FLOW = {
 /**
  * The password flow whose password step also collects the email.
  */
-const PASSWORD_BESIDE_EMAIL_FLOW = {
-  ...PASSWORD_FLOW,
-  steps: [
-    PASSWORD_FLOW.steps[0],
-    { ...PASSWORD_FLOW.steps[1], fields: ["email", "x-auth-methods#password"] },
-    PASSWORD_FLOW.steps[2],
-  ],
-};
+const PASSWORD_BESIDE_EMAIL_FLOW: JsonObject = withStepChanged(PASSWORD_FLOW, "password", {
+  fields: ["email", "x-auth-methods#password"],
+});
 
 /**
  * The passkey-first preset, cut to the steps and transitions that matter here.

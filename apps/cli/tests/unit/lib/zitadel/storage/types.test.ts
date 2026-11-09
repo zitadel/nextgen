@@ -311,7 +311,7 @@ describe("ConfigStore.inlineReferences", () => {
   });
 });
 
-describe("ConfigStore.referencedPaths", () => {
+describe("ConfigStore.listReferencedPaths", () => {
   describe.each(STORES)("with a %s", (_store, open) => {
     it.for([
       [
@@ -327,7 +327,7 @@ describe("ConfigStore.referencedPaths", () => {
     ] as const)("lists %s", async ([_reference, ref, path], { dir }) => {
       const store = await open(dir);
 
-      const paths = store.referencedPaths(aBrandingReferencing(ref));
+      const paths = store.listReferencedPaths(aBrandingReferencing(ref));
 
       expect(paths).toEqual([path]);
     });
@@ -336,7 +336,7 @@ describe("ConfigStore.referencedPaths", () => {
       const store = await open(dir);
 
       const error = thrownBy(() => {
-        return store.referencedPaths(aBrandingReferencing("../../../outside.txt"));
+        return store.listReferencedPaths(aBrandingReferencing("../../../outside.txt"));
       });
 
       expect(error).toBeInstanceOf(ConfigError);

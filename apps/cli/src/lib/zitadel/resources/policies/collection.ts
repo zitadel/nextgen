@@ -62,7 +62,8 @@ export class Policies extends Collection<Policy> {
   }
 
   /**
-   * The sound policies of some operations, and what is wrong with the rest.
+   * Select the sound policies of some operations, and say what is wrong with
+   * the rest.
    *
    * @remarks
    * A policy with a problem is never "no policy": testing `{}` in its place
@@ -72,12 +73,13 @@ export class Policies extends Collection<Policy> {
    *   when empty.
    * @returns The sound policies, and a line per problem found.
    */
-  for(operations: readonly string[] = []): PolicySelection<Policy> {
+  selectPolicies(operations: readonly string[] = []): PolicySelection<Policy> {
     return this.select(this.all, Policy.fileName, operations);
   }
 
   /**
-   * The sound test files of some operations, and what is wrong with the rest.
+   * Select the sound test files of some operations, and say what is wrong with
+   * the rest.
    *
    * @remarks
    * An operation asked for that has no test file is a problem too, so a typo
@@ -87,7 +89,7 @@ export class Policies extends Collection<Policy> {
    *   when empty.
    * @returns The sound test files, and a line per problem found.
    */
-  testsFor(operations: readonly string[] = []): PolicySelection<PolicyTest> {
+  selectTests(operations: readonly string[] = []): PolicySelection<PolicyTest> {
     const selection = this.select(this.tests, PolicyTest.fileName, operations);
     const missing = operations
       .map(PolicyTest.fileName)
@@ -103,7 +105,8 @@ export class Policies extends Collection<Policy> {
   }
 
   /**
-   * The sound documents of some operations, and what is wrong with the rest.
+   * Select the sound documents of some operations, and say what is wrong with
+   * the rest.
    *
    * @remarks
    * The operations narrow the documents by file name before any is checked,
@@ -124,13 +127,21 @@ export class Policies extends Collection<Policy> {
     const chosen = documents.filter((document) => {
       return wanted.size === 0 || wanted.has(basename(document.path));
     });
+    // Each document is checked once, and judged and reported from that one check.
+    const checked = chosen.map((document) => {
+      return { document, issues: document.check({}) };
+    });
     return {
-      documents: chosen.filter((document) => {
-        return document.problems({}).length === 0;
-      }),
-      issues: chosen.flatMap((document) => {
-        return document.problems({}).map((issue) => {
-          return `${document.path}: ${issue.message}`;
+      documents: checked
+        .filter((entry) => {
+          return entry.issues.length === 0;
+        })
+        .map((entry) => {
+          return entry.document;
+        }),
+      issues: checked.flatMap((entry) => {
+        return entry.issues.map((issue) => {
+          return `${entry.document.path}: ${issue.message}`;
         });
       }),
     };

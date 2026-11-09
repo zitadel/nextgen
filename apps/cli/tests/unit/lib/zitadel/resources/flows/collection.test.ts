@@ -117,7 +117,7 @@ const BROKEN_LOGIN = withStep(CUSTOMERS_LOGIN, "identifier", (step) => {
   return { ...step, transitions: { submit: { target: "nowhere" } } };
 });
 
-describe("Flows.for", () => {
+describe("Flows.findForSchema", () => {
   it.each<NamedBy>([
     {
       by: "the schema's objectType",
@@ -160,7 +160,7 @@ describe("Flows.for", () => {
   ])("matches a flow that names it by $by", ({ schema, others, flows, options }) => {
     const config = aConfig({ schemas: { [CUSTOMERS_FILE]: schema, ...others }, flows }, options);
 
-    const matched = config.flows.for(customers(schema));
+    const matched = config.flows.findForSchema(customers(schema));
 
     expect(
       matched.map((flow) => {
@@ -201,13 +201,13 @@ describe("Flows.for", () => {
       options,
     );
 
-    const matched = config.flows.for(customers(schema));
+    const matched = config.flows.findForSchema(customers(schema));
 
     expect(matched).toEqual([]);
   });
 });
 
-describe("Flows.schemaOf", () => {
+describe("Flows.findSchemaOf", () => {
   it("is the schema a flow names", () => {
     const config = aConfig({
       schemas: {
@@ -216,7 +216,7 @@ describe("Flows.schemaOf", () => {
       },
     });
 
-    const schema = config.flows.schemaOf(aFlow(flowFor("employee")));
+    const schema = config.flows.findSchemaOf(aFlow(flowFor("employee")));
 
     expect(schema?.name).toBe("staff");
   });
@@ -226,7 +226,7 @@ describe("Flows.schemaOf", () => {
       schemas: { [CUSTOMERS_FILE]: {}, "staff.json": { $id: CUSTOMERS_ID } },
     });
 
-    const schema = config.flows.schemaOf(aFlow(flowFor(CUSTOMERS_ID)));
+    const schema = config.flows.findSchemaOf(aFlow(flowFor(CUSTOMERS_ID)));
 
     expect(schema?.name).toBe("staff");
   });
@@ -238,20 +238,20 @@ describe("Flows.schemaOf", () => {
   ])("is undefined for a flow that %s", (_, body) => {
     const config = aConfig({ schemas: { [CUSTOMERS_FILE]: { objectType: "customer" } } });
 
-    const schema = config.flows.schemaOf(aFlow(body));
+    const schema = config.flows.findSchemaOf(aFlow(body));
 
     expect(schema).toBeUndefined();
   });
 });
 
-describe("Flows.forSso", () => {
+describe("Flows.resolveForSso", () => {
   it("is the flows that run against the schema", () => {
     const config = aConfig({
       schemas: { [CUSTOMERS_FILE]: ssoSchema() },
       flows: { [CUSTOMERS_LOGIN_FILE]: CUSTOMERS_LOGIN },
     });
 
-    const flows = config.flows.forSso(customers(ssoSchema()));
+    const flows = config.flows.resolveForSso(customers(ssoSchema()));
 
     expect(
       flows.map((flow) => {
@@ -266,7 +266,7 @@ describe("Flows.forSso", () => {
       flows: { [CUSTOMERS_LOGIN_FILE]: BROKEN_LOGIN },
     });
 
-    const flows = config.flows.forSso(customers(ssoSchema()));
+    const flows = config.flows.resolveForSso(customers(ssoSchema()));
 
     expect(flows).toHaveLength(1);
   });
@@ -275,7 +275,7 @@ describe("Flows.forSso", () => {
     const config = aConfig({ schemas: { [CUSTOMERS_FILE]: ssoSchema() } });
 
     const error = thrownBy(() => {
-      return config.flows.forSso(customers(ssoSchema()));
+      return config.flows.resolveForSso(customers(ssoSchema()));
     });
 
     expect(error).toBeInstanceOf(NotFoundError);
@@ -293,7 +293,7 @@ describe("Flows.forSso", () => {
     });
 
     const error = thrownBy(() => {
-      return config.flows.forSso(customers(schema));
+      return config.flows.resolveForSso(customers(schema));
     });
 
     expect(error).toBeInstanceOf(RefusedEditError);
@@ -307,7 +307,7 @@ describe("Flows.forSso", () => {
     });
 
     const error = thrownBy(() => {
-      return config.flows.forSso(customers(ssoSchema()));
+      return config.flows.resolveForSso(customers(ssoSchema()));
     });
 
     expect(error).toBeInstanceOf(RefusedEditError);
@@ -323,19 +323,19 @@ describe("Flows.forSso", () => {
     });
 
     const error = thrownBy(() => {
-      return config.flows.forSso(customers(ssoSchema()), slug("acme-sso"));
+      return config.flows.resolveForSso(customers(ssoSchema()), slug("acme-sso"));
     });
 
     expect(error).toBeInstanceOf(BrokenFlowsError);
   });
 });
 
-describe("Flows.pathFor", () => {
+describe("Flows.locate", () => {
   describe("when a file holds the handle", () => {
     it("is that file, whatever it is called", () => {
       const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
 
-      const path = config.flows.pathFor("default-login");
+      const path = config.flows.locate("default-login");
 
       expect(path).toBe(".zitadel/flows/login.json");
     });
@@ -345,19 +345,19 @@ describe("Flows.pathFor", () => {
     it("is <handle>.json", () => {
       const config = aConfig();
 
-      const path = config.flows.pathFor("default-login");
+      const path = config.flows.locate("default-login");
 
       expect(path).toBe(".zitadel/flows/default-login.json");
     });
   });
 });
 
-describe("Flows.revision", () => {
+describe("Flows.placeRevision", () => {
   describe("when a file holds the handle", () => {
     it("replaces that file rather than writing a second one", () => {
       const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
 
-      const change = config.flows.revision("default-login", { name: "default-login", steps: [] });
+      const change = config.flows.placeRevision("default-login", { name: "default-login", steps: [] });
 
       expect(change.changedPaths).toEqual([".zitadel/flows/login.json"]);
     });

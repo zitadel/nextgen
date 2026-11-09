@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Flow, RefusedEditError } from "@/lib/zitadel";
+import { stepName } from "@/lib/zitadel/names";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { aFile, aLoginFlow } from "@tests/helpers/config";
@@ -163,11 +164,11 @@ describe("Flow.create", () => {
   });
 });
 
-describe("Flow.asRead", () => {
+describe("Flow.markRead", () => {
   it("marks an edited flow as read", () => {
     const edited = offeringGoogle();
 
-    const flow = edited.asRead();
+    const flow = edited.markRead();
 
     expect(flow.status).toBe("read");
   });
@@ -191,11 +192,11 @@ describe("Flow.handle", () => {
   });
 });
 
-describe("Flow.problems", () => {
+describe("Flow.check", () => {
   it("finds nothing wrong with the scaffolded flow", () => {
     const flow = aFlow(aLoginFlow());
 
-    const issues = flow.problems({});
+    const issues = flow.check({});
 
     expect(issues).toEqual([]);
   });
@@ -203,7 +204,7 @@ describe("Flow.problems", () => {
   it("reports what the flow contract refuses, under contract/flow", () => {
     const flow = aFlow({ ...aLoginFlow(), steps: "none" });
 
-    const issues = flow.problems({});
+    const issues = flow.check({});
 
     expect(issues).toContainEqual(
       expect.objectContaining({ rule: "contract/flow", file: FLOW_PATH }),
@@ -211,24 +212,24 @@ describe("Flow.problems", () => {
   });
 });
 
-describe("Flow.wireBody", () => {
+describe("Flow.toWireBody", () => {
   it("sends the flow without its $schema pointer", () => {
     const flow = aFlow({ $schema: "../meta/flow-definition.json", name: "login" });
 
-    const body = flow.wireBody(new MemoryStore());
+    const body = flow.toWireBody(new MemoryStore());
 
     expect(body).toEqual({ name: "login" });
   });
 });
 
-describe("Flow.offeredMethods", () => {
+describe("Flow.findOfferedMethods", () => {
   it.each([
     { method: "password", reaching: "a step that collects it", flow: aPasswordFlow() },
     { method: "passkey", reaching: "a step that offers the action", flow: aPasskeyFlow() },
   ])("sees $method on $reaching", ({ method, flow }) => {
     const login = aFlow(flow);
 
-    const offered = login.offeredMethods([]);
+    const offered = login.findOfferedMethods([]);
 
     expect(offered).toEqual([method]);
   });
@@ -236,7 +237,7 @@ describe("Flow.offeredMethods", () => {
   it("follows a local transition with null action and purpose", () => {
     const flow = aFlow(NULL_ACTION_AND_PURPOSE);
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual(["password"]);
   });
@@ -244,7 +245,7 @@ describe("Flow.offeredMethods", () => {
   it("ignores a flow that is not active", () => {
     const flow = aFlow(aPasskeyFlow({ status: "draft" }));
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual([]);
   });
@@ -252,7 +253,7 @@ describe("Flow.offeredMethods", () => {
   it("does not count a register-only flow that collects a password", () => {
     const flow = aFlow(REGISTER_ONLY);
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual([]);
   });
@@ -260,7 +261,7 @@ describe("Flow.offeredMethods", () => {
   it("does not count register steps of a flow that also signs in", () => {
     const flow = aFlow(SIGNS_IN_AND_REGISTERS);
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual(["passkey"]);
   });
@@ -268,7 +269,7 @@ describe("Flow.offeredMethods", () => {
   it("does not follow a transition into another flow", () => {
     const flow = aFlow(SWITCHING_TO_ANOTHER_FLOW);
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual([]);
   });
@@ -276,7 +277,7 @@ describe("Flow.offeredMethods", () => {
   it("stops at an outcome that switches to registration on its own", () => {
     const flow = aFlow(SWITCHING_TO_REGISTRATION);
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual(["passkey"]);
   });
@@ -284,7 +285,7 @@ describe("Flow.offeredMethods", () => {
   it("does not count a flow that only registers passkeys", () => {
     const flow = aFlow(ENROLS_PASSKEYS);
 
-    const offered = flow.offeredMethods([]);
+    const offered = flow.findOfferedMethods([]);
 
     expect(offered).toEqual([]);
   });
@@ -292,7 +293,7 @@ describe("Flow.offeredMethods", () => {
   it("does not count SSO for a provider it was not given", () => {
     const flow = aFlow(offering("github"));
 
-    const offered = flow.offeredMethods(["google"]);
+    const offered = flow.findOfferedMethods(["google"]);
 
     expect(offered).toEqual([]);
   });
@@ -300,17 +301,17 @@ describe("Flow.offeredMethods", () => {
   it("counts SSO on a step that names a provider it was given", () => {
     const flow = aFlow(offering("google"));
 
-    const offered = flow.offeredMethods(["google"]);
+    const offered = flow.findOfferedMethods(["google"]);
 
     expect(offered).toEqual(["sso"]);
   });
 });
 
-describe("Flow.methodUses", () => {
+describe("Flow.findMethodUses", () => {
   it("says what a step keeps without a password and which transitions lead to it", () => {
     const flow = aFlow(aPasskeyFirstFlow());
 
-    const uses = flow.methodUses("password", ["passkey"]);
+    const uses = flow.findMethodUses("password", ["passkey"]);
 
     expect(uses).toEqual([
       {
@@ -333,7 +334,7 @@ describe("Flow.methodUses", () => {
   it("flags an entry step left with nothing, and the transitions that reach it through its purpose", () => {
     const flow = aFlow(aPasskeyFirstFlow());
 
-    const [entry] = flow.methodUses("passkey", ["password"]);
+    const [entry] = flow.findMethodUses("passkey", ["password"]);
 
     expect(entry).toEqual({
       step: "passkey-first",
@@ -350,7 +351,7 @@ describe("Flow.methodUses", () => {
   it("lists every step that offers a passkey, with what each keeps", () => {
     const flow = aFlow(aPasskeyFirstFlow());
 
-    const uses = flow.methodUses("passkey", ["password"]);
+    const uses = flow.findMethodUses("passkey", ["password"]);
 
     expect(uses).toMatchObject([
       { step: "passkey-first", keeps: [] },
@@ -372,7 +373,7 @@ describe("Flow.methodUses", () => {
       ],
     });
 
-    const [use] = flow.methodUses("password", ["sso"]);
+    const [use] = flow.findMethodUses("password", ["sso"]);
 
     expect(use?.keeps).toEqual(["sso_providers", "gates"]);
   });
@@ -386,7 +387,7 @@ describe("Flow.methodUses", () => {
       ],
     });
 
-    const [use] = flow.methodUses("password", []);
+    const [use] = flow.findMethodUses("password", []);
 
     expect(use?.targetedBy).toEqual([]);
   });
@@ -404,7 +405,7 @@ describe("Flow.methodUses", () => {
       ],
     });
 
-    const [use] = flow.methodUses("password", []);
+    const [use] = flow.findMethodUses("password", []);
 
     expect(use?.keeps).toEqual([]);
   });
@@ -486,11 +487,11 @@ describe("Flow.namesSchemaById", () => {
   });
 });
 
-describe("Flow.transitionsInto", () => {
+describe("Flow.findTransitionsInto", () => {
   it("names each transition to a step, and the purpose one follows to it", () => {
     const flow = aFlow(aPasskeyFirstFlow());
 
-    const transitions = flow.transitionsInto("passkey-first");
+    const transitions = flow.findTransitionsInto(stepName("passkey-first"));
 
     expect(transitions).toEqual([
       { step: "register", transition: "sign_in", purpose: "login" },
@@ -570,7 +571,7 @@ describe("Flow.offers", () => {
   it("is false for any provider on a flow no step of which offers one", () => {
     const flow = aFlow(aLoginFlow());
 
-    const offers = flow.offers();
+    const offers = flow.offersSso;
 
     expect(offers).toBe(false);
   });

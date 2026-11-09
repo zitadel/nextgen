@@ -26,32 +26,68 @@ import type { JsonEnvelope } from "@/lib/oclif/types";
 import { Destructive } from "@/lib/oclif/destructive";
 import { prose } from "@/lib/oclif/rendering";
 
-/** What every `auth-method` command reads before changing anything. */
+/**
+ * What every `auth-method` command reads before changing anything.
+ */
 export type SchemaTarget = {
   readonly cwd: string;
-  readonly cwdArgs: string[];
-  /** The whole configuration as the run read it, which every change is made on. */
+  readonly cwdArgs: readonly string[];
+
+  /**
+   * The whole configuration as the run read it, which every change is made on.
+   */
   readonly config: ZitadelConfig;
   readonly store: ConfigStore;
-  /** The schema the run changes. */
+
+  /**
+   * The schema the run changes.
+   */
   readonly schema: UserSchema;
-  /** The `--schema` value that names the schema and no other. */
+
+  /**
+   * The `--schema` value that names the schema and no other.
+   */
   readonly schemaFlag: string;
 };
 
-/** The flags every `auth-method` command reads its schema by. */
-type SchemaFlags = Readonly<{
+/**
+ * The flags every `auth-method` command reads its schema by.
+ */
+type SchemaFlags = {
   /**
    * The schema `--schema` names, if any.
    */
-  schema?: string | undefined;
+  readonly schema?: string | undefined;
+
   /**
    * The `--cwd` the run was given, if any.
    */
-  cwd?: string | undefined;
-}>;
+  readonly cwd?: string | undefined;
+};
 
-/** What a schema pointing at an external URL is refused for. */
+/**
+ * What {@link readSchemaTarget} reads the schema by.
+ */
+export type SchemaTargetInput = {
+  /**
+   * The run's directory.
+   */
+  readonly cwd: string;
+
+  /**
+   * What `--schema` named, if anything.
+   */
+  readonly schema: string | undefined;
+
+  /**
+   * Whether `--cwd` was given, so follow-ups repeat it.
+   */
+  readonly cwdGiven: boolean;
+};
+
+/**
+ * What a schema pointing at an external URL is refused for.
+ */
 const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
   message: "{file} points at an external schema",
   hint:
@@ -63,14 +99,18 @@ const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
   },
 };
 
-/** What a Project with no user schema at all is refused for. */
+/**
+ * What a Project with no user schema at all is refused for.
+ */
 const NO_SCHEMA_REFUSAL: Refusal = {
   code: "E_NOT_FOUND",
   message: "This Project has no user schema under .zitadel/schemas",
   hint: "Run `zitadel setup` first.",
 };
 
-/** What a `--schema` that names no schema is refused for. */
+/**
+ * What a `--schema` that names no schema is refused for.
+ */
 const UNKNOWN_SCHEMA_REFUSAL: Refusal = {
   code: "E_NOT_FOUND",
   message: "This Project has no user schema named {requested}",
@@ -82,7 +122,9 @@ const UNKNOWN_SCHEMA_REFUSAL: Refusal = {
   },
 };
 
-/** What a run that names no schema, where there are several, is refused for. */
+/**
+ * What a run that names no schema, where there are several, is refused for.
+ */
 const UNNAMED_SCHEMA_REFUSAL: Refusal = {
   message: "This Project has more than one user schema",
   hint: "Name the one to change with --schema. Known schemas: {labels}",
@@ -92,7 +134,9 @@ const UNNAMED_SCHEMA_REFUSAL: Refusal = {
   },
 };
 
-/** What a `--schema` that more than one schema answers to is refused for. */
+/**
+ * What a `--schema` that more than one schema answers to is refused for.
+ */
 const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
   message: "More than one user schema is named {requested}: {labels}",
   hint: "Name the one to change by its file: {flags}",
@@ -105,24 +149,22 @@ const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
 
 /**
  * The schema the run is about, chosen by `--schema` or as the Project's only
- * one, and the login flows that run against it. A schema that points at an
- * external URL holds no sign-in methods of its own, so it is refused.
+ * one, and the login flows that run against it.
  *
- * A deployed flow may name its schema by the id the platform assigned it,
- * which only `.zitadel/state.json` records, so the configuration every change
- * is made on is read knowing the ids the chosen schema was published as.
+ * @remarks
+ * A schema that points at an external URL holds no sign-in methods of its
+ * own, so it is refused. A deployed flow may name its schema by the id the
+ * platform assigned it, which only `.zitadel/state.json` records, so the
+ * configuration every change is made on is read knowing the ids the chosen
+ * schema was published as.
  *
  * @param input - The run's directory, what `--schema` named, and whether
  *   `--cwd` was given.
  * @returns What the run read.
- * @throws ZitadelError When no schema, or more than one, fits `--schema`, or
- *   the one that does points at an external schema.
+ * @throws {@link ZitadelError} When no schema, or more than one, fits
+ *   `--schema`, or the one that does points at an external schema.
  */
-export async function readSchemaTarget(input: {
-  cwd: string;
-  schema: string | undefined;
-  cwdGiven: boolean;
-}): Promise<SchemaTarget> {
+export async function readSchemaTarget(input: SchemaTargetInput): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
   const unpublished = await ZitadelConfig.loadUnchecked(store);
   const chosen = chosenSchema(unpublished.schemas, input.schema);
@@ -132,22 +174,52 @@ export async function readSchemaTarget(input: {
       url: String(chosen.body.url),
     });
   }
-  const config = await ZitadelConfig.loadUnchecked(store, {
-    published: await publishedIds(input.cwd, [chosen.path]),
-  });
+  const published = await publishedIds(input.cwd, [chosen.path]);
+  const config = await ZitadelConfig.loadUnchecked(store, { published });
   const schema = config.schemas.get(chosen.path) ?? chosen;
+  const cwdArgs = input.cwdGiven ? optionArgs("--cwd", input.cwd) : [];
   return {
     cwd: input.cwd,
-    cwdArgs: input.cwdGiven ? optionArgs("--cwd", input.cwd) : [],
+    cwdArgs,
     config,
     store,
     schema,
-    schemaFlag: config.schemas.nameFor(schema),
+    schemaFlag: config.schemas.nameUniquely(schema),
   };
 }
 
-/** The message `deploy` needs, which only the caller can write. */
+/**
+ * The message `deploy` needs, which only the caller can write.
+ */
 const DEPLOY_MESSAGE = "<what changed>";
+
+/**
+ * A result's follow-up commands, as strings and as argument lists.
+ */
+export type FollowUps = {
+  /**
+   * The commands, when every argument is safe to run as written.
+   */
+  readonly commands: readonly SuggestedCommand[];
+
+  /**
+   * The same commands as argument lists, always (`next_args`).
+   */
+  readonly args: readonly (readonly string[])[];
+};
+
+/**
+ * The shared environment flags, hidden: most `auth-method` commands only edit
+ * files and resolve no environment.
+ *
+ * @remarks
+ * Typed as the shared flags, so the one command that lists them again
+ * (`auth-method sso enable`) declares the same flags, only shown.
+ */
+const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"> = {
+  env: { ...environmentFlags.env, hidden: true },
+  "env-file": { ...environmentFlags["env-file"], hidden: true },
+};
 
 /**
  * What the `auth-method` commands share (ADR 070): finding the schema, asking
@@ -167,11 +239,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   // to the project lists them among its own flags.
   static override baseFlags = {
     ...EnvironmentCommand.baseFlags,
-    env: { ...environmentFlags.env, hidden: true } as typeof environmentFlags.env,
-    "env-file": {
-      ...environmentFlags["env-file"],
-      hidden: true,
-    } as (typeof environmentFlags)["env-file"],
+    ...HIDDEN_ENVIRONMENT_FLAGS,
     schema: nonBlankString({
       description:
         "User schema to change, by file name or objectType. Required when the Project has more than one.",
@@ -189,10 +257,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    *
    * @param flags - The run's `--schema` and `--cwd`.
    * @returns What the run read.
-   * @throws ZitadelError When no schema, or more than one, fits `--schema`, or
-   *   the one that does points at an external schema.
+   * @throws {@link ZitadelError} When no schema, or more than one, fits
+   *   `--schema`, or the one that does points at an external schema.
    */
-  protected schemaTarget(flags: SchemaFlags): Promise<SchemaTarget> {
+  protected loadSchemaTarget(flags: SchemaFlags): Promise<SchemaTarget> {
     return readSchemaTarget({
       cwd: this.cwd,
       schema: flags.schema,
@@ -202,10 +270,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
   /**
    * Make a change that may leave the schema with no way to sign in (ADR 070
-   * §3). It is made without `force` first; when the configuration refuses it
-   * with {@link NoSignInLeftError}, the person is asked, and a yes makes it
-   * again with `force`. `--force` answers for them, and with nobody to ask and
-   * no `--force` the run is refused.
+   * §3).
+   *
+   * @remarks
+   * It is made without `force` first; when the configuration refuses it with
+   * {@link NoSignInLeftError}, the person is asked, and a yes makes it again
+   * with `force`. `--force` answers for them, and with nobody to ask and no
+   * `--force` the run is refused.
    *
    * A dry run asks nobody: it writes nothing, so there is nothing to confirm,
    * and it shows the change as `--force` would make it. It still refuses where
@@ -217,10 +288,12 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    *   again with `--force`.
    * @param make - Makes the change, with or without `force`.
    * @returns The change, or `undefined` when the person said no.
+   * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
+   *   be asked and `--force` was not given.
    */
   protected async confirmIfNoSignInLeft(
     target: SchemaTarget,
-    retryArgs: string[],
+    retryArgs: readonly string[],
     make: (options: ForceOptions) => Change,
   ): Promise<Change | undefined> {
     try {
@@ -274,6 +347,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * @param target - What the run read.
    * @param change - The change.
    * @returns The paths written.
+   * @throws When a file cannot be written.
    */
   protected async write(target: SchemaTarget, change: Change): Promise<readonly string[]> {
     const written = await change.save(target.store);
@@ -288,9 +362,11 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   }
 
   /**
-   * Tell the person what the configuration said about a change. Called once
-   * the change is previewed or written, never before: a failed write must not
-   * claim it.
+   * Tell the person what the configuration said about a change.
+   *
+   * @remarks
+   * Called once the change is previewed or written, never before: a failed
+   * write must not claim it.
    *
    * @param change - The change.
    */
@@ -313,17 +389,18 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * @param cwdArgs - `--cwd` for `deploy`, from the run's target.
    * @param leading - Commands that come first, such as publishing a credential
    *   that did not reach the project.
+   * @returns The commands and their argument lists.
    */
   protected followUps(
     changed: boolean,
-    cwdArgs: string[],
-    leading: string[][] = [],
-  ): { commands: readonly SuggestedCommand[]; args: string[][] } {
+    cwdArgs: readonly string[],
+    leading: readonly (readonly string[])[] = [],
+  ): FollowUps {
     const deploys = [
       ["deploy", "--dry-run", ...cwdArgs],
       ["deploy", "-m", DEPLOY_MESSAGE, ...cwdArgs],
     ];
-    const args = changed ? [...leading, ...deploys] : [...leading];
+    const args = changed ? [...leading, ...deploys] : leading;
     return {
       // The message is a placeholder the caller fills in, so it is quoted in
       // the command string and listed as written in `next_args`.
@@ -346,13 +423,15 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * @param method - The method.
    * @param enabled - Whether the method is turned on or off.
    * @returns The result.
+   * @throws {@link ZitadelError} When the schema cannot be chosen, or the change
+   *   would leave no way to sign in and nobody agreed to it.
    */
   protected async toggle(
     flags: SchemaFlags,
     method: ToggleableMethod,
     enabled: boolean,
   ): Promise<JsonEnvelope> {
-    const target = await this.schemaTarget(flags);
+    const target = await this.loadSchemaTarget(flags);
     const { config, schema } = target;
     const retryArgs = [
       "auth-method",
@@ -378,7 +457,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const edited = change.after.schemas.get(schema.path) ?? schema;
     // Judged on the login journey: a passkey that a register step only
     // enrols is not offered to anyone signing in.
-    const offered = !enabled || change.after.schemas.reachableMethods(edited).includes(method);
+    const offered = !enabled || change.after.schemas.listReachableMethods(edited).includes(method);
     const notOffered: readonly ToggleableMethod[] = offered ? [] : [method];
     const data = {
       schema: schema.name,
@@ -393,11 +472,12 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     if (this.dryRun) {
       this.report(change);
+      const preview = change.changed ? `Would ${verb} ${method} for ${schema.name}` : unchanged;
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: prose(change.changed ? `Would ${verb} ${method} for ${schema.name}` : unchanged),
+        pretty: prose(preview),
       });
     }
     const written = await this.write(target, change);
@@ -406,42 +486,52 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     }
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
+    const summary = change.changed ? `${done} ${method} for ${schema.name}` : unchanged;
 
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { commands: followUps.commands },
-      pretty: prose(change.changed ? `${done} ${method} for ${schema.name}` : unchanged),
+      pretty: prose(summary),
     });
   }
 }
 
 /**
- * Refuse leaving a schema with no way to sign in, without --force. The exact
- * re-run comes first, then enabling each method the schema could take
- * instead. Only `--json` names `details.suggested_args`: a person reads the
- * same commands under Next.
+ * What {@link refuseNoSignInLeft} words its refusal from.
  */
-function refuseNoSignInLeft(input: {
-  target: SchemaTarget;
-  error: NoSignInLeftError;
-  question: string;
-  retry: string[];
-  cliVersion: string;
-  json: boolean;
-}): never {
+type NoSignInLeftRefusal = {
+  readonly target: SchemaTarget;
+  readonly error: NoSignInLeftError;
+  readonly question: string;
+  readonly retry: readonly string[];
+  readonly cliVersion: string;
+  readonly json: boolean;
+};
+
+/**
+ * Refuse leaving a schema with no way to sign in, without --force.
+ *
+ * @remarks
+ * The exact re-run comes first, then enabling each method the schema could
+ * take instead. Only `--json` names `details.suggested_args`: a person reads
+ * the same commands under Next.
+ *
+ * @param input - The run, the refusal, the question a person would be asked,
+ *   and the re-run.
+ * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED`, always.
+ */
+function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
   const { schemaFlag, cwdArgs } = input.target;
-  const { error } = input;
+  const error = input.error;
   // Every suggestion as an argument list, the re-run first. The schema name
   // comes from a file name and the --cwd path from the user; one that would
   // need quoting leaves the strings out, because quoting differs between POSIX
   // shells, PowerShell and cmd.exe and none is safe on all of them.
-  const suggestedArgs = [
-    input.retry,
-    ...error.alternatives.map((method) => {
-      return ["auth-method", method, "enable", ...optionArgs("--schema", schemaFlag), ...cwdArgs];
-    }),
-  ];
+  const alternatives = error.alternatives.map((method) => {
+    return ["auth-method", method, "enable", ...optionArgs("--schema", schemaFlag), ...cwdArgs];
+  });
+  const suggestedArgs = [input.retry, ...alternatives];
   const where = input.json
     ? " (the first of details.suggested_args holds the exact arguments)."
     : ".";
@@ -476,14 +566,34 @@ function labelOf(schema: UserSchema): string {
 }
 
 /**
+ * A schema as a refusal lists it for a script.
+ */
+type SchemaDetail = {
+  readonly name: string;
+  readonly object_type: string | null;
+};
+
+/**
  * The schemas a refusal names, for a script: each file name with its `objectType`.
  *
  * @param schemas - The schemas.
  * @returns Their names.
  */
-function detailsOf(schemas: readonly UserSchema[]) {
+function detailsOf(schemas: readonly UserSchema[]): readonly SchemaDetail[] {
   return schemas.map((schema) => {
     return { name: schema.name, object_type: schema.objectType ?? null };
+  });
+}
+
+/**
+ * The file names of some schemas.
+ *
+ * @param schemas - The schemas.
+ * @returns Each one's name.
+ */
+function namesOf(schemas: readonly UserSchema[]): readonly string[] {
+  return schemas.map((schema) => {
+    return schema.name;
   });
 }
 
@@ -494,12 +604,12 @@ function detailsOf(schemas: readonly UserSchema[]) {
  * @param schemas - Every schema.
  * @param requested - What `--schema` named, if anything.
  * @returns The schema.
- * @throws ZitadelError When there is none, the name matches none or several,
- *   or several exist and none is named.
+ * @throws {@link ZitadelError} When there is none, the name matches none or
+ *   several, or several exist and none is named.
  */
 function chosenSchema(schemas: Schemas, requested: string | undefined): UserSchema {
   try {
-    return schemas.named(requested);
+    return schemas.resolve(requested);
   } catch (error) {
     if (error instanceof SchemaNotFoundError && error.known.length === 0) {
       throw refusalError(NO_SCHEMA_REFUSAL, {});
@@ -508,33 +618,26 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
       throw refusalError(UNKNOWN_SCHEMA_REFUSAL, {
         requested: error.requested,
         labels: error.known.map(labelOf).join(", "),
-        known: error.known.map((schema) => {
-          return schema.name;
-        }),
+        known: namesOf(error.known),
         schemas: detailsOf(error.known),
       });
     }
     if (error instanceof AmbiguousSchemaError && error.requested === undefined) {
       throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
         labels: error.candidates.map(labelOf).join(", "),
-        known: error.candidates.map((schema) => {
-          return schema.name;
-        }),
+        known: namesOf(error.candidates),
         schemas: detailsOf(error.candidates),
       });
     }
     if (error instanceof AmbiguousSchemaError) {
+      const flags = error.candidates.map((schema) => {
+        return optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
+      });
       throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
         requested: error.requested,
         labels: error.candidates.map(labelOf).join(", "),
-        flags: error.candidates
-          .map((schema) => {
-            return optionArgs("--schema", schemas.nameFor(schema)).join(" ");
-          })
-          .join(" or "),
-        candidates: error.candidates.map((schema) => {
-          return schema.name;
-        }),
+        flags: flags.join(" or "),
+        candidates: namesOf(error.candidates),
         schemas: detailsOf(error.candidates),
       });
     }

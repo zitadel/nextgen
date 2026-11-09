@@ -133,11 +133,11 @@ describe("Schemas.enable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       password: { enabled: true },
       passkey: { enabled: true },
     });
@@ -148,11 +148,11 @@ describe("Schemas.enable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       passkey: { enabled: true },
       sso: { enabled: true, providers: ["google"] },
     });
@@ -163,29 +163,29 @@ describe("Schemas.enable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       passkey: { enabled: true, user_verification: "required" },
     });
   });
 
   it("adds a method the schema does not mention", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toMatchObject({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toMatchObject({
       passkey: { enabled: true },
     });
   });
 
   it("writes the schema", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
@@ -197,7 +197,7 @@ describe("Schemas.enable", () => {
       schemas: { [SCHEMA_FILE]: aUserSchema() },
       flows: { [FLOW_FILE]: LOGIN_FLOW },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "password");
 
@@ -206,12 +206,12 @@ describe("Schemas.enable", () => {
 
   it("does not change the configuration it was given", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
     const before = structuredClone(schema.body);
 
     config.schemas.enable(schema, "passkey");
 
-    expect(config.schemas.named().body).toEqual(before);
+    expect(config.schemas.resolve().body).toEqual(before);
   });
 
   it("warns when no login flow offers the method it enabled", () => {
@@ -219,7 +219,7 @@ describe("Schemas.enable", () => {
       schemas: { [SCHEMA_FILE]: aUserSchema() },
       flows: { [FLOW_FILE]: LOGIN_FLOW },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
@@ -233,11 +233,11 @@ describe("Schemas.enable", () => {
 
   it("accepts a schema without x-auth-methods", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchemaWithout("x-auth-methods") } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       passkey: { enabled: true },
     });
   });
@@ -246,11 +246,11 @@ describe("Schemas.enable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": { password: true } }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.enable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       password: true,
       passkey: { enabled: true },
     });
@@ -261,7 +261,7 @@ describe("Schemas.enable", () => {
     ["a blank", aUserSchema({ "x-auth-methods": authMethods("passkey"), "x-identifier": " " })],
   ])("refuses password on a schema with %s identifier", (_identifier, body) => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: body } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const error = thrownBy(() => {
       return config.schemas.enable(schema, "password");
@@ -283,7 +283,7 @@ describe("Schemas.enable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const error = thrownBy(() => {
       return config.schemas.enable(schema, "passkey");
@@ -304,11 +304,11 @@ describe("Schemas.disable", () => {
         [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": authMethods("password", "passkey") }),
       },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.disable(schema, "passkey");
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       password: { enabled: true },
       passkey: { enabled: false },
     });
@@ -319,7 +319,7 @@ describe("Schemas.disable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.disable(schema, "passkey");
 
@@ -333,7 +333,7 @@ describe("Schemas.disable", () => {
       },
       flows: { [FLOW_FILE]: LOGIN_FLOW },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const error = thrownBy(() => {
       return config.schemas.disable(schema, "password");
@@ -347,7 +347,7 @@ describe("Schemas.disable", () => {
 
   it("refuses to turn off the last way to sign in", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const error = thrownBy(() => {
       return config.schemas.disable(schema, "password");
@@ -366,7 +366,7 @@ describe("Schemas.disable", () => {
       schemas: { [SCHEMA_FILE]: aUserSchema() },
       flows: { [FLOW_FILE]: LOGIN_FLOW },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const error = thrownBy(() => {
       return config.schemas.disable(schema, "password");
@@ -377,18 +377,18 @@ describe("Schemas.disable", () => {
 
   it("turns off the last way to sign in when forced", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.disable(schema, "password", { force: true });
 
-    expect(change.after.schemas.named().body["x-auth-methods"]).toEqual({
+    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
       password: { enabled: false },
     });
   });
 
   it("warns that a schema left with no way in is managed only through the API", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const change = config.schemas.disable(schema, "password", { force: true });
 
@@ -406,7 +406,7 @@ describe("Schemas.disable", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
     const error = thrownBy(() => {
       return config.schemas.disable(schema, "passkey");
@@ -416,7 +416,7 @@ describe("Schemas.disable", () => {
   });
 });
 
-describe("Schemas.reachableMethods", () => {
+describe("Schemas.listReachableMethods", () => {
   it("counts only methods an active flow offers", () => {
     const config = aConfig({
       schemas: {
@@ -424,9 +424,9 @@ describe("Schemas.reachableMethods", () => {
       },
       flows: { [FLOW_FILE]: PASSWORD_FLOW },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
-    const reachable = config.schemas.reachableMethods(schema);
+    const reachable = config.schemas.listReachableMethods(schema);
 
     expect(reachable).toEqual(["password"]);
   });
@@ -437,9 +437,9 @@ describe("Schemas.reachableMethods", () => {
       schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
       flows: { [FLOW_FILE]: PASSWORD_FLOW },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
-    const reachable = config.schemas.reachableMethods(schema);
+    const reachable = config.schemas.listReachableMethods(schema);
 
     expect(reachable).toEqual([]);
   });
@@ -449,9 +449,9 @@ describe("Schemas.reachableMethods", () => {
       schemas: { [SCHEMA_FILE]: aSchemaListing(["google"]) },
       flows: { [FLOW_FILE]: aFlowOffering(["google"]) },
     });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
-    const reachable = config.schemas.reachableMethods(schema);
+    const reachable = config.schemas.listReachableMethods(schema);
 
     expect(reachable).toEqual(["sso"]);
   });
@@ -475,9 +475,9 @@ describe("Schemas.reachableMethods", () => {
     ],
   ])("does not count %s", (_case, body, flow) => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: body }, flows: { [FLOW_FILE]: flow } });
-    const schema = config.schemas.named();
+    const schema = config.schemas.resolve();
 
-    const reachable = config.schemas.reachableMethods(schema);
+    const reachable = config.schemas.listReachableMethods(schema);
 
     expect(reachable).toEqual([]);
   });
@@ -620,7 +620,7 @@ describe("Schemas.assertSignInLeft", () => {
   });
 });
 
-describe("Schemas.signInNotices", () => {
+describe("Schemas.describeSignIn", () => {
   it("says nothing when an enabled method is offered", () => {
     const config = aConfig({
       schemas: {
@@ -630,7 +630,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "password", true);
 
-    const notices = config.schemas.signInNotices(edit, "password");
+    const notices = config.schemas.describeSignIn(edit, "password");
 
     expect(notices).toEqual([]);
   });
@@ -642,7 +642,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "passkey", true);
 
-    const notices = config.schemas.signInNotices(edit, "passkey");
+    const notices = config.schemas.describeSignIn(edit, "passkey");
 
     expect(notices).toEqual([
       {
@@ -659,7 +659,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "password", true);
 
-    const notices = config.schemas.signInNotices(edit, "password");
+    const notices = config.schemas.describeSignIn(edit, "password");
 
     expect(notices).toEqual([
       {
@@ -676,7 +676,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "passkey", true);
 
-    const notices = config.schemas.signInNotices(edit, "passkey");
+    const notices = config.schemas.describeSignIn(edit, "passkey");
 
     expect(notices).toContainEqual({
       severity: WARNING,
@@ -691,7 +691,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "passkey", true);
 
-    const notices = config.schemas.signInNotices(edit, "passkey");
+    const notices = config.schemas.describeSignIn(edit, "passkey");
 
     expect(notices).toContainEqual({
       severity: WARNING,
@@ -710,7 +710,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "passkey", false);
 
-    const notices = config.schemas.signInNotices(edit);
+    const notices = config.schemas.describeSignIn(edit);
 
     expect(notices).toEqual([
       {
@@ -728,7 +728,7 @@ describe("Schemas.signInNotices", () => {
     });
     const edit = aMethodEdit(config, "password", false);
 
-    const notices = config.schemas.signInNotices(edit);
+    const notices = config.schemas.describeSignIn(edit);
 
     expect(notices).toEqual([
       {
@@ -740,12 +740,12 @@ describe("Schemas.signInNotices", () => {
   });
 });
 
-describe("Schemas.named", () => {
+describe("Schemas.resolve", () => {
   describe("with one schema", () => {
     it("picks it when no name is given", () => {
       const config = aConfig({ schemas: { [SCHEMA_FILE]: {} } });
 
-      const schema = config.schemas.named();
+      const schema = config.schemas.resolve();
 
       expect(schema.path).toBe(SCHEMA_PATH);
     });
@@ -759,7 +759,7 @@ describe("Schemas.named", () => {
     ])("picks the schema by %s", (_how, requested, path) => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
-      const schema = config.schemas.named(requested);
+      const schema = config.schemas.resolve(requested);
 
       expect(schema.path).toBe(path);
     });
@@ -768,7 +768,7 @@ describe("Schemas.named", () => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
       const error = thrownBy(() => {
-        return config.schemas.named("customer");
+        return config.schemas.resolve("customer");
       });
 
       expect(error).toBeInstanceOf(AmbiguousSchemaError);
@@ -782,7 +782,7 @@ describe("Schemas.named", () => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
       const error = thrownBy(() => {
-        return config.schemas.named();
+        return config.schemas.resolve();
       });
 
       expect(error).toBeInstanceOf(AmbiguousSchemaError);
@@ -797,7 +797,7 @@ describe("Schemas.named", () => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
       const error = thrownBy(() => {
-        return config.schemas.named("staff.json");
+        return config.schemas.resolve("staff.json");
       });
 
       expect(error).toBeInstanceOf(SchemaNotFoundError);
@@ -814,7 +814,7 @@ describe("Schemas.named", () => {
       const config = ZitadelConfig.empty();
 
       const error = thrownBy(() => {
-        return config.schemas.named("customers");
+        return config.schemas.resolve("customers");
       });
 
       expect(error).toBeInstanceOf(SchemaNotFoundError);
@@ -826,7 +826,7 @@ describe("Schemas.named", () => {
   });
 });
 
-describe("Schemas.nameFor", () => {
+describe("Schemas.nameUniquely", () => {
   it.each([
     ["its file name", EMPLOYEES_FILE, "employees"],
     [
@@ -841,19 +841,19 @@ describe("Schemas.nameFor", () => {
     });
 
     const names = schemas.map((schema) => {
-      return config.schemas.nameFor(schema);
+      return config.schemas.nameUniquely(schema);
     });
 
     expect(names).toEqual([name]);
   });
 });
 
-describe("Schemas.pathFor", () => {
+describe("Schemas.locate", () => {
   describe("when a file holds the handle", () => {
     it("is that file", () => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
-      const path = config.schemas.pathFor("customer");
+      const path = config.schemas.locate("customer");
 
       expect(path).toBe(CUSTOMERS_FILE);
     });
@@ -863,19 +863,19 @@ describe("Schemas.pathFor", () => {
     it("is <handle>.json", () => {
       const config = ZitadelConfig.empty();
 
-      const path = config.schemas.pathFor("human-user");
+      const path = config.schemas.locate("human-user");
 
       expect(path).toBe(".zitadel/schemas/human-user.json");
     });
   });
 });
 
-describe("Schemas.revision", () => {
+describe("Schemas.placeRevision", () => {
   describe("when a file holds the handle", () => {
     it("replaces that file rather than writing a second one", () => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
-      const change = config.schemas.revision("customer", {
+      const change = config.schemas.placeRevision("customer", {
         objectType: "customer",
         type: "object",
       });

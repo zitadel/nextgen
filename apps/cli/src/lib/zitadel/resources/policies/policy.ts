@@ -11,6 +11,7 @@ import {
 import {
   POLICY_FILE_SUFFIX,
   type PolicyBody,
+  type PolicyFileName,
   type PolicyConfig,
   type PolicyOperation,
 } from "@/lib/zitadel/resources/policies/types";
@@ -22,7 +23,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
  * An operation policy under `.zitadel/policies/` (ADR 066): the rules one
  * operation is held to, in a file named after the operation.
  */
-export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+export class Policy extends ConfigDocument {
   /**
    * What kind of document this is: an operation policy.
    */
@@ -35,7 +36,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @param body - The body as written.
    * @param status - Where it stands against the file on disk.
    */
-  protected constructor(path: string, body: Body, status: DocumentStatus) {
+  protected constructor(path: string, body: JsonObject, status: DocumentStatus) {
     super(path, body, status);
   }
 
@@ -45,7 +46,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @param file - The file.
    * @returns The policy, marked as read.
    */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): Policy<Body> {
+  static of(file: DocumentFile): Policy {
     return new Policy(file.path, file.body, "read");
   }
 
@@ -56,7 +57,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @param file - Where it goes, and what it holds.
    * @returns The policy, marked as created.
    */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): Policy<Body> {
+  static create(file: DocumentFile): Policy {
     return new Policy(file.path, file.body, "created");
   }
 
@@ -67,7 +68,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @param operation - The operation the policy guards.
    * @returns The operation followed by `.json`.
    */
-  static fileName(operation: string): string {
+  static fileName<Operation extends string>(operation: Operation): PolicyFileName<Operation> {
     return `${operation}${POLICY_FILE_SUFFIX}`;
   }
 
@@ -76,7 +77,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    *
    * @returns The operation, as the policy contract types it.
    * @throws {@link BrokenFilesError} When the policy contract refuses the
-   *   body; a policy with no {@link problems} never throws.
+   *   body; a policy {@link check} finds sound never throws.
    */
   readOperation(): PolicyOperation {
     return this.parse().operation;
@@ -87,7 +88,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    *
    * @returns The rules, as the policy contract types them.
    * @throws {@link BrokenFilesError} When the policy contract refuses the
-   *   body; a policy with no {@link problems} never throws.
+   *   body; a policy {@link check} finds sound never throws.
    */
   readConfig(): PolicyConfig {
     return this.parse().config;
@@ -98,7 +99,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    *
    * @returns The same policy, marked as read.
    */
-  asRead(): Policy<Body> {
+  markRead(): Policy {
     return new Policy(this.path, this.body, "read");
   }
 
@@ -109,17 +110,18 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @param _context - Unused: the policy contract needs nothing beyond the file.
    * @returns The `contract/policy` findings; none when the policy is sound.
    */
-  problems(_context: ValidationContext): readonly Issue[] {
-    const refusals = this.contractIssues("contract/policy", policyConfigSchema);
+  check(_context: ValidationContext): readonly Issue[] {
+    const refusals = this.checkContract("contract/policy", policyConfigSchema);
     if (refusals.length > 0) {
       return refusals;
     }
-    const expected = Policy.fileName(this.readOperation());
+    const operation = this.readOperation();
+    const expected = Policy.fileName(operation);
     if (basename(this.path) !== expected) {
       return [
-        this.issue(
+        this.makeIssue(
           "contract/policy",
-          `holds the ${this.readOperation()} policy, so it must be named ${expected}`,
+          `holds the ${operation} policy, so it must be named ${expected}`,
         ),
       ];
     }
@@ -131,12 +133,12 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    *
    * @remarks
    * Loose like every document's, since a deploy builds its bundle before its
-   * checks run; {@link operation} and {@link config} are the typed parts.
+   * checks run; {@link readOperation} and {@link readConfig} are the typed parts.
    *
    * @param _store - Unused: a policy holds no `$file` references.
    * @returns The body without the editor-only `$schema` pointer.
    */
-  wireBody(_store: ConfigStore): JsonObject {
+  toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
 
@@ -151,7 +153,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
     const result = policyConfigSchema.safeParse(this.contractBody);
     if (!result.success) {
       throw new BrokenFilesError(
-        this.problems({}).map((issue) => {
+        this.check({}).map((issue) => {
           return { path: this.path, problem: issue.message };
         }),
       );

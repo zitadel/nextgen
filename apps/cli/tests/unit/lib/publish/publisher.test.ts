@@ -45,7 +45,7 @@ describe("Publisher.landing", () => {
       PROJECT_ID,
     );
 
-    const origins = await publisher.landing();
+    const origins = await publisher.fetchLanding();
 
     expect(origins.primary).toEqual(["https://app.acme.com"]);
   });

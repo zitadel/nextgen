@@ -2,20 +2,22 @@ import type { ProviderSelection } from "@zitadel/config/idp";
 
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
  * What a configuration failure carries beyond its message.
  */
-export type ConfigErrorOptions = Readonly<{
+export type ConfigErrorOptions = {
   /**
    * What to do about it.
    */
-  hint?: string | undefined;
+  readonly hint?: string | undefined;
+
   /**
    * Structured facts about the failure, for a `--json` reader.
    */
-  details?: unknown;
-}>;
+  readonly details?: JsonObject | undefined;
+};
 
 /**
  * Anything `lib/zitadel` fails with.
@@ -38,7 +40,7 @@ export class ConfigError extends Error {
   /**
    * Structured facts about the failure, for a `--json` reader.
    */
-  readonly details: unknown;
+  readonly details: JsonObject | undefined;
 
   /**
    * Make a configuration failure.
@@ -56,16 +58,17 @@ export class ConfigError extends Error {
 /**
  * One file that could not be taken as configuration, and why.
  */
-export type FileProblem = Readonly<{
+export type FileProblem = {
   /**
    * The file's project-relative path.
    */
-  path: string;
+  readonly path: string;
+
   /**
    * What is wrong with it.
    */
-  problem: string;
-}>;
+  readonly problem: string;
+};
 
 /**
  * Files that are not what their kind of file must be, such as a connection
@@ -92,18 +95,13 @@ export class BrokenFilesError extends ConfigError {
    */
   constructor(problems: readonly FileProblem[]) {
     const files = problems.length === 1 ? "file is" : "files are";
-    super(
-      [
-        `${problems.length} configuration ${files} not valid:`,
-        ...problems.map((entry) => {
-          return `  - ${entry.path}: ${entry.problem}`;
-        }),
-      ].join("\n"),
-      {
-        hint: "Fix the files named above, then run the command again; nothing was changed.",
-        details: { problems },
-      },
-    );
+    const lines = problems.map((entry) => {
+      return `  - ${entry.path}: ${entry.problem}`;
+    });
+    super([`${problems.length} configuration ${files} not valid:`, ...lines].join("\n"), {
+      hint: "Fix the files named above, then run the command again; nothing was changed.",
+      details: { problems },
+    });
     this.problems = problems;
   }
 }
@@ -140,6 +138,18 @@ export class NotFoundError extends ConfigError {
 }
 
 /**
+ * The names of some schemas, for a failure's details.
+ *
+ * @param schemas - The schemas.
+ * @returns Each one's name, in order.
+ */
+function namesOf(schemas: readonly UserSchema[]): readonly string[] {
+  return schemas.map((schema) => {
+    return schema.name;
+  });
+}
+
+/**
  * A user schema asked for by a name no schema has, or asked for in a
  * configuration that has none.
  */
@@ -167,16 +177,14 @@ export class SchemaNotFoundError extends NotFoundError {
    * @param known - Every schema the configuration has.
    */
   constructor(requested: string | undefined, known: readonly UserSchema[]) {
-    const message =
-      requested === undefined || known.length === 0
-        ? "There is no user schema under .zitadel/schemas"
-        : `No user schema is named ${requested}`;
+    const unnamed = requested === undefined || known.length === 0;
+    const message = unnamed
+      ? "There is no user schema under .zitadel/schemas"
+      : `No user schema is named ${requested}`;
     super(message, {
       details: {
         requested: requested ?? null,
-        known: known.map((schema) => {
-          return schema.name;
-        }),
+        known: namesOf(known),
       },
     });
     this.requested = requested;
@@ -224,9 +232,7 @@ export class AmbiguousSchemaError extends ConfigError {
     super(message, {
       details: {
         requested: requested ?? null,
-        candidates: candidates.map((schema) => {
-          return schema.name;
-        }),
+        candidates: namesOf(candidates),
       },
     });
     this.requested = requested;
@@ -237,28 +243,32 @@ export class AmbiguousSchemaError extends ConfigError {
 /**
  * The user schema a change would leave with no way to sign in.
  */
-export type NoSignInLeft = Readonly<{
+export type NoSignInLeft = {
   /**
    * The schema's file.
    */
-  path: string;
+  readonly path: string;
+
   /**
    * The schema's name.
    */
-  schema: string;
+  readonly schema: string;
+
   /**
    * What is being turned off: a method, or a provider.
    */
-  disabling: string;
+  readonly disabling: string;
+
   /**
    * The methods the schema enables before the change.
    */
-  usable: readonly string[];
+  readonly usable: readonly string[];
+
   /**
    * The methods the schema could enable instead.
    */
-  alternatives: readonly string[];
-}>;
+  readonly alternatives: readonly string[];
+};
 
 /**
  * A change that turns off the last way to sign in to a user schema.
@@ -266,9 +276,10 @@ export type NoSignInLeft = Readonly<{
  * @remarks
  * The server allows it, for a schema whose users are only managed through the
  * API, so the change is made only when the caller asks for it again with
- * `force`.
+ * `force`. It implements {@link NoSignInLeft}, so its fields cannot drift from
+ * what it is made from.
  */
-export class NoSignInLeftError extends ConfigError {
+export class NoSignInLeftError extends ConfigError implements NoSignInLeft {
   /**
    * The class's name, which a log or a stack trace shows.
    */
@@ -393,34 +404,48 @@ export class ConnectionExistsError extends ConflictError {
 }
 
 /**
- * What a {@link BrokenFlowsError} reports.
+ * What every {@link BrokenFlows} report carries.
  */
-export type BrokenFlows = Readonly<{
+type BrokenFlowsBase = {
   /**
    * The user schema the change edits.
    */
-  file: string;
+  readonly file: string;
+
   /**
    * The line the listed issues follow.
    */
-  heading: string;
+  readonly heading: string;
+
   /**
    * What to do about the issues.
    */
-  hint: string;
+  readonly hint: string;
+
   /**
    * Every issue, as the server's flow rules word it.
    */
-  issues: readonly FlowIssue[];
-  /**
-   * The steps that use a method being disabled.
-   *
-   * @remarks
-   * Each is listed in place of the issues on it; any other issue is listed as
-   * the server's rules word it.
-   */
-  uses?: readonly FlowMethodUse[] | undefined;
-}>;
+  readonly issues: readonly FlowIssue[];
+};
+
+/**
+ * What a {@link BrokenFlowsError} reports: issues a change brings or a flow
+ * already has, or a method being disabled that steps still use.
+ */
+export type BrokenFlows =
+  | (BrokenFlowsBase & { readonly kind: "broken" })
+  | (BrokenFlowsBase & {
+      readonly kind: "method-in-use";
+
+      /**
+       * The steps that use the method being disabled.
+       *
+       * @remarks
+       * Each is listed in place of the issues on it; any other issue is listed
+       * as the server's rules word it.
+       */
+      readonly uses: readonly FlowMethodUse[];
+    });
 
 /**
  * A change a login flow would no longer validate after, or one that cannot be
@@ -443,51 +468,72 @@ export class BrokenFlowsError extends ConfigError {
    *   that use a method being disabled.
    */
   constructor(input: BrokenFlows) {
-    const uses = input.uses ?? [];
+    const uses = BrokenFlowsError.usesOf(input);
     const unexplained = input.issues.filter((item) => {
-      const { path, issue } = item;
       return !uses.some((use) => {
-        return use.path === path && use.step === issue.step;
+        return use.path === item.path && use.step === item.issue.step;
       });
     });
-    const lines = [
-      ...uses.map(BrokenFlowsError.useLine),
-      ...unexplained.map((item) => {
-        const { path, issue } = item;
-        return `${path}: ${issue.message}`;
-      }),
-    ];
-    const issues = input.issues.map((item) => {
-      const { path, issue } = item;
-      if (issue.step === undefined) {
-        return { path, rule: issue.rule, message: issue.message };
-      }
-      return { path, rule: issue.rule, message: issue.message, step: issue.step };
+    const unexplainedLines = unexplained.map((item) => {
+      return `${item.path}: ${item.issue.message}`;
     });
-    const steps = uses.map((use) => {
+    const lines = [...uses.map(BrokenFlowsError.useLine), ...unexplainedLines];
+    const listed = lines.map((line) => {
+      return `  - ${line}`;
+    });
+    const issues = input.issues.map((item): JsonObject => {
+      const issue = item.issue;
+      if (issue.step === undefined) {
+        return { path: item.path, rule: issue.rule, message: issue.message };
+      }
+      return { path: item.path, rule: issue.rule, message: issue.message, step: issue.step };
+    });
+    super([input.heading, ...listed].join("\n"), {
+      hint: input.hint,
+      details: BrokenFlowsError.detailsOf(input, issues),
+    });
+  }
+
+  /**
+   * The steps a report says use a method being disabled.
+   *
+   * @param input - The report.
+   * @returns The steps; none for a report of issues alone.
+   */
+  private static usesOf(input: BrokenFlows): readonly FlowMethodUse[] {
+    if (input.kind === "broken") {
+      return [];
+    }
+    return input.uses;
+  }
+
+  /**
+   * The details a report carries for a `--json` reader.
+   *
+   * @param input - The report.
+   * @param issues - Its issues, as the details list them.
+   * @returns The schema and the issues, and for a method in use, each step.
+   */
+  private static detailsOf(input: BrokenFlows, issues: readonly JsonObject[]): JsonObject {
+    if (input.kind === "broken") {
+      return { file: input.file, issues };
+    }
+    const steps = input.uses.map((use): JsonObject => {
+      const targetedBy = use.targetedBy.map((item): JsonObject => {
+        if (item.purpose === undefined) {
+          return { step: item.step, transition: item.transition };
+        }
+        return { step: item.step, transition: item.transition, purpose: item.purpose };
+      });
       return {
         path: use.path,
         step: use.step,
         keeps: use.keeps,
         entry_for: use.entryFor,
-        targeted_by: use.targetedBy,
+        targeted_by: targetedBy,
       };
     });
-    super(
-      [
-        input.heading,
-        ...lines.map((line) => {
-          return `  - ${line}`;
-        }),
-      ].join("\n"),
-      {
-        hint: input.hint,
-        details:
-          input.uses === undefined
-            ? { file: input.file, issues }
-            : { file: input.file, issues, steps },
-      },
-    );
+    return { file: input.file, issues, steps };
   }
 
   /**
@@ -509,11 +555,10 @@ export class BrokenFlowsError extends ConfigError {
       return `purposes.${purpose}`;
     });
     const transitions = use.staying.map((item) => {
-      const { step, transition, purpose } = item;
-      if (purpose === undefined) {
-        return `${step}.${transition}`;
+      if (item.purpose === undefined) {
+        return `${item.step}.${item.transition}`;
       }
-      return `${step}.${transition} (via purposes.${purpose})`;
+      return `${item.step}.${item.transition} (via purposes.${item.purpose})`;
     });
     const entry = `Entry step of ${purposes.join(", ")}.`;
     const targeted = `Targeted by ${transitions.join(", ")}.`;

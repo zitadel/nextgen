@@ -38,9 +38,9 @@ const SAMPLE_CONTRACT = z.strictObject({ name: z.string() });
  */
 class Sample extends ConfigDocument {
   /**
-   * What kind of document this is: a sample.
+   * What kind of document this is: a schema's kind, borrowed for the test.
    */
-  readonly kind = "sample";
+  readonly kind = "schema";
 
   /**
    * Hold a sample's body at its path.
@@ -78,7 +78,7 @@ class Sample extends ConfigDocument {
    *
    * @returns The same sample, marked as read.
    */
-  asRead(): Sample {
+  markRead(): Sample {
     return new Sample(this.path, this.body, "read");
   }
 
@@ -88,8 +88,8 @@ class Sample extends ConfigDocument {
    * @param _context - Unused.
    * @returns The findings.
    */
-  problems(_context: ValidationContext): readonly Issue[] {
-    return this.contractIssues("contract/schema", SAMPLE_CONTRACT);
+  check(_context: ValidationContext): readonly Issue[] {
+    return this.checkContract("contract/schema", SAMPLE_CONTRACT);
   }
 
   /**
@@ -98,7 +98,7 @@ class Sample extends ConfigDocument {
    * @param _store - Unused.
    * @returns The body.
    */
-  wireBody(_store: ConfigStore): JsonObject {
+  toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
 
@@ -115,11 +115,11 @@ class Sample extends ConfigDocument {
   }
 }
 
-describe("ConfigDocument.changed", () => {
+describe("ConfigDocument.isUnsaved", () => {
   it("is false for a document as read", () => {
     const sample = Sample.of(NAMED);
 
-    const changed = sample.changed;
+    const changed = sample.isUnsaved;
 
     expect(changed).toBe(false);
   });
@@ -127,7 +127,7 @@ describe("ConfigDocument.changed", () => {
   it("is true once a document is edited", () => {
     const sample = Sample.of(NAMED);
 
-    const changed = sample.withName("b").changed;
+    const changed = sample.withName("b").isUnsaved;
 
     expect(changed).toBe(true);
   });
@@ -135,7 +135,7 @@ describe("ConfigDocument.changed", () => {
   it("is true for a new document", () => {
     const sample = Sample.create(NAMED);
 
-    const changed = sample.changed;
+    const changed = sample.isUnsaved;
 
     expect(changed).toBe(true);
   });
@@ -167,31 +167,31 @@ describe("ConfigDocument.writeMode", () => {
   });
 });
 
-describe("ConfigDocument.toFile", () => {
+describe("ConfigDocument.file", () => {
   it("gives the path and the body exactly as written", () => {
     const body = { $schema: POINTER, name: "a" };
 
-    const file = Sample.of({ path: PATH, body }).toFile();
+    const file = Sample.of({ path: PATH, body }).file;
 
     expect(file).toEqual({ path: PATH, body });
   });
 });
 
-describe("ConfigDocument.asRead", () => {
+describe("ConfigDocument.markRead", () => {
   it("marks an edited document as read", () => {
     const edited = Sample.of(NAMED).withName("b");
 
-    const read = edited.asRead();
+    const read = edited.markRead();
 
     expect(read.status).toBe("read");
   });
 });
 
-describe("ConfigDocument.problems", () => {
+describe("ConfigDocument.check", () => {
   it("finds nothing wrong once the editor's pointer is set aside", () => {
     const sample = Sample.of({ path: PATH, body: { $schema: POINTER, name: "a" } });
 
-    const problems = sample.problems({});
+    const problems = sample.check({});
 
     expect(problems).toEqual([]);
   });
@@ -199,7 +199,7 @@ describe("ConfigDocument.problems", () => {
   it("reports each refusal with its path, as an error in the file", () => {
     const sample = Sample.of({ path: PATH, body: { name: 7 } });
 
-    const problems = sample.problems({});
+    const problems = sample.check({});
 
     expect(problems).toEqual([
       {
@@ -214,17 +214,17 @@ describe("ConfigDocument.problems", () => {
   it("names the root for a refusal of the body itself", () => {
     const sample = Sample.of({ path: PATH, body: { name: "a", extra: true } });
 
-    const problems = sample.problems({});
+    const problems = sample.check({});
 
     expect(problems).toMatchObject([{ message: expect.stringMatching(/^\(root\) /) }]);
   });
 });
 
-describe("ConfigDocument.wireBody", () => {
+describe("ConfigDocument.toWireBody", () => {
   it("leaves out the editor's $schema pointer", () => {
     const sample = Sample.of({ path: PATH, body: { $schema: POINTER, name: "a" } });
 
-    const body = sample.wireBody(new MemoryStore());
+    const body = sample.toWireBody(new MemoryStore());
 
     expect(body).toEqual({ name: "a" });
   });

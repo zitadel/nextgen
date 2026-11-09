@@ -91,21 +91,21 @@ describe("PolicyTest.readCases", () => {
   });
 });
 
-describe("PolicyTest.asRead", () => {
+describe("PolicyTest.markRead", () => {
   it("marks a new test file as read", () => {
     const test = PolicyTest.create(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
 
-    const read = test.asRead();
+    const read = test.markRead();
 
     expect(read.status).toBe("read");
   });
 });
 
-describe("PolicyTest.problems", () => {
+describe("PolicyTest.check", () => {
   it("finds nothing wrong with a test file named after its operation", () => {
     const test = PolicyTest.of(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
 
-    const problems = test.problems({});
+    const problems = test.check({});
 
     expect(problems).toEqual([]);
   });
@@ -113,7 +113,7 @@ describe("PolicyTest.problems", () => {
   it("names the file a test file must have when it has another", () => {
     const test = PolicyTest.of(aFile("policies", "password.test.json", aPolicyTest()));
 
-    const problems = test.problems({});
+    const problems = test.check({});
 
     expect(problems).toMatchObject([
       {
@@ -127,13 +127,13 @@ describe("PolicyTest.problems", () => {
       aFile("policies", PASSWORD_POLICY_TEST_FILE, { operation: PASSWORD_POLICY }),
     );
 
-    const problems = test.problems({});
+    const problems = test.check({});
 
     expect(problems).toMatchObject([{ rule: "contract/policy" }]);
   });
 });
 
-describe("PolicyTest.wireBody", () => {
+describe("PolicyTest.toWireBody", () => {
   it("gives the cases without the $schema pointer", () => {
     const test = PolicyTest.of(
       aFile("policies", PASSWORD_POLICY_TEST_FILE, {
@@ -142,7 +142,7 @@ describe("PolicyTest.wireBody", () => {
       }),
     );
 
-    const body = test.wireBody(new MemoryStore());
+    const body = test.toWireBody(new MemoryStore());
 
     expect(body).toEqual(aPolicyTest());
   });

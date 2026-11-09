@@ -1,6 +1,6 @@
 import { describe, expect, vi } from "vitest";
 
-import type { Learned, StepContext, StepResult } from "@/lib/publish/pipeline";
+import type { StepContext, StepResult } from "@/lib/publish/pipeline";
 import { diffStep } from "@/lib/publish/steps/diff";
 import { DiskStore } from "@/lib/zitadel";
 import { aConfig } from "@tests/helpers/config";
@@ -206,42 +206,38 @@ describe("diffStep", () => {
     it("records that a schema changed since the live commit", async ({ dir }) => {
       const sha = await aLiveCommit(dir);
       await write(dir, { [SCHEMA]: '{ "type": "string" }\n' });
-      const learned: Learned = {};
 
-      await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }], { learned }));
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
 
-      expect(learned.schemasOrFlowsChanged).toBe(true);
+      expect(result?.learned?.schemasOrFlowsChanged).toBe(true);
     });
 
     it("records that no schema or flow changed when only branding did", async ({ dir }) => {
       const sha = await aLiveCommit(dir);
       await write(dir, { ".zitadel/branding/brand.json": "{}\n" });
-      const learned: Learned = {};
 
-      await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }], { learned }));
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
 
-      expect(learned.schemasOrFlowsChanged).toBe(false);
+      expect(result?.learned?.schemasOrFlowsChanged).toBe(false);
     });
 
     it("records nothing when the primary origins serve different releases", async ({ dir }) => {
       const sha = await aLiveCommit(dir);
-      const learned: Learned = {};
       const live = [
         { targets: [PRIMARY], sha, release: "rel_2" },
         { targets: [SECOND_PRIMARY], sha, release: "rel_1" },
       ];
 
-      await diffStep.run(aRunIn(dir, live, { learned }));
+      const result = await diffStep.run(aRunIn(dir, live));
 
-      expect(learned.schemasOrFlowsChanged).toBeUndefined();
+      expect(result?.learned?.schemasOrFlowsChanged).toBeUndefined();
     });
 
     it("records nothing when there is no diff to read", async ({ dir }) => {
-      const learned: Learned = {};
 
-      await diffStep.run(aRunIn(dir, [], { learned }));
+      const result = await diffStep.run(aRunIn(dir, []));
 
-      expect(learned.schemasOrFlowsChanged).toBeUndefined();
+      expect(result?.learned?.schemasOrFlowsChanged).toBeUndefined();
     });
   });
 

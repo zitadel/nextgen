@@ -10,7 +10,7 @@
  * guards), so a case that expects a refusal shows what would get through.
  *
  * Reading the test and policy files is the configuration library's
- * (`config.policies.testsFor`, `config.policies.for`); this module runs them.
+ * (`config.policies.selectTests`, `config.policies.selectPolicies`); this module runs them.
  *
  * **Dependency rule.** No upward imports (`commands/`, `release/`).
  */
@@ -21,12 +21,20 @@ import type {
   ReleaseService,
 } from "@/lib/backend";
 import { mapBounded } from "@/lib/map-bounded";
-import type { PolicyExpectation, PolicyTest } from "@/lib/zitadel";
+import type { PolicyCase, PolicyExpectation, PolicyOperation, PolicyTest } from "@/lib/zitadel";
 
 /**
- * Where a tested config came from: a policy file, a release's revision, or nowhere.
+ * Where a tested config came from: a policy file, a release's revision, or
+ * nowhere.
+ *
+ * @remarks
+ * The shape is the `--json` output's, so each source is told apart by the key
+ * it carries rather than by a `kind`.
  */
-export type PolicySource = { file: string } | { revision_id: string } | null;
+export type PolicySource =
+  | { readonly file: string }
+  | { readonly revision_id: string }
+  | null;
 
 /**
  * The policy a test file is evaluated against, by operation.
@@ -35,11 +43,12 @@ export type PolicyUnderTest = {
   /**
    * The rules evaluated.
    */
-  config: PolicyEvaluation["config"];
+  readonly config: PolicyEvaluation["config"];
+
   /**
    * Where the rules came from.
    */
-  source: PolicySource;
+  readonly source: PolicySource;
 };
 
 /**
@@ -49,11 +58,12 @@ export type ReleasePolicies = {
   /**
    * The policies the release pins, by operation.
    */
-  policies: Map<string, PolicyUnderTest>;
+  readonly policies: ReadonlyMap<string, PolicyUnderTest>;
+
   /**
    * Whether the release is revoked, so its policies serve no origin.
    */
-  revoked: boolean;
+  readonly revoked: boolean;
 };
 
 /**
@@ -78,12 +88,13 @@ export async function policiesFromRelease(
     return pointer.kind === "policy";
   });
   const revisions = await Promise.all(
-    pinned.map(async (pointer): Promise<[string, PolicyUnderTest]> => {
+    pinned.map(async (pointer): Promise<readonly [string, PolicyUnderTest]> => {
       const revision = await service.revision(pointer.revision_id);
-      return [
-        pointer.handle,
-        { config: revision.config, source: { revision_id: pointer.revision_id } },
-      ];
+      const policy: PolicyUnderTest = {
+        config: revision.config,
+        source: { revision_id: pointer.revision_id },
+      };
+      return [pointer.handle, policy];
     }),
   );
   return {
@@ -99,19 +110,22 @@ export type PolicyCaseResult = {
   /**
    * The case's name.
    */
-  name: string;
+  readonly name: string;
+
   /**
    * Whether the decision is what the case expects.
    */
-  passed: boolean;
+  readonly passed: boolean;
+
   /**
    * The decision the case expects.
    */
-  expected: PolicyExpectation;
+  readonly expected: PolicyExpectation;
+
   /**
    * The decision the server made.
    */
-  actual: PolicyDecision;
+  readonly actual: PolicyDecision;
 };
 
 /**
@@ -121,19 +135,22 @@ export type PolicySuiteResult = {
   /**
    * The operation the file tests.
    */
-  operation: string;
+  readonly operation: PolicyOperation;
+
   /**
    * The project-relative path of the test file.
    */
-  file: string;
+  readonly file: string;
+
   /**
    * Where the policy the cases ran against came from.
    */
-  policy: PolicySource;
+  readonly policy: PolicySource;
+
   /**
    * Each case's outcome, in the file's order.
    */
-  cases: PolicyCaseResult[];
+  readonly cases: readonly PolicyCaseResult[];
 };
 
 /**
@@ -154,23 +171,59 @@ export function caseHolds(expected: PolicyExpectation, actual: PolicyDecision): 
   if (expected.code !== undefined && expected.code !== actual.code) {
     return false;
   }
-  if (expected.violations !== undefined) {
-    const got = Object.keys(actual.violations ?? {}).sort();
-    const want = [...new Set(expected.violations)].sort();
-    return (
-      got.length === want.length &&
-      got.every((name, index) => {
-        return name === want[index];
-      })
-    );
+  if (expected.violations === undefined) {
+    return true;
   }
-  return true;
+  // Both are fresh arrays, so sorting them changes nothing anyone else holds.
+  const got = Object.keys(actual.violations ?? {}).sort();
+  const want = [...new Set(expected.violations)].sort();
+  if (got.length !== want.length) {
+    return false;
+  }
+  return got.every((name, index) => {
+    return name === want[index];
+  });
 }
 
 /**
  * How many evaluate requests a run keeps in flight at once.
  */
 const EVALUATE_CONCURRENCY = 8;
+
+/**
+ * One case to evaluate, and the test file it belongs to.
+ */
+type CaseRun = {
+  /**
+   * The test file's position among the files.
+   */
+  readonly suite: number;
+
+  /**
+   * The operation the file tests.
+   */
+  readonly operation: PolicyOperation;
+
+  /**
+   * The case.
+   */
+  readonly testCase: PolicyCase;
+};
+
+/**
+ * One case's outcome, and the test file it belongs to.
+ */
+type CaseOutcome = {
+  /**
+   * The test file's position among the files.
+   */
+  readonly suite: number;
+
+  /**
+   * The outcome.
+   */
+  readonly result: PolicyCaseResult;
+};
 
 /**
  * Evaluate every case of every test file against its operation's policy, or
@@ -188,21 +241,25 @@ export async function runPolicyTests(
   service: PolicyService,
   tests: readonly PolicyTest[],
   policies: ReadonlyMap<string, PolicyUnderTest>,
-): Promise<PolicySuiteResult[]> {
+): Promise<readonly PolicySuiteResult[]> {
   const runs = tests.flatMap((test, suite) => {
-    return test.readCases().map((testCase) => {
-      return { suite, operation: test.readOperation(), testCase };
+    const operation = test.readOperation();
+    return test.readCases().map((testCase): CaseRun => {
+      return { suite, operation, testCase };
     });
   });
   const outcomes = await mapBounded(
     runs,
     EVALUATE_CONCURRENCY,
-    async ({ suite, operation, testCase }) => {
+    async (run): Promise<CaseOutcome> => {
+      const testCase = run.testCase;
+      const config = policies.get(run.operation)?.config ?? {};
+      // A case without facts sends none: the key is dropped on the wire.
       const actual = await service.evaluate({
-        operation,
-        config: policies.get(operation)?.config ?? {},
+        operation: run.operation,
+        config,
         input: testCase.input,
-        ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
+        facts: testCase.facts,
       });
       const result: PolicyCaseResult = {
         name: testCase.name,
@@ -210,24 +267,36 @@ export async function runPolicyTests(
         expected: testCase.expect,
         actual,
       };
-      return { suite, result };
+      return { suite: run.suite, result };
     },
   );
-  return tests.map((test, suite) => {
+  return tests.map((test, suite): PolicySuiteResult => {
+    const cases = outcomes
+      .filter((outcome) => {
+        return outcome.suite === suite;
+      })
+      .map((outcome) => {
+        return outcome.result;
+      });
+    const operation = test.readOperation();
     return {
-      operation: test.readOperation(),
+      operation,
       file: test.path,
-      policy: policies.get(test.readOperation())?.source ?? null,
-      cases: outcomes
-        .filter((outcome) => {
-          return outcome.suite === suite;
-        })
-        .map(({ result }) => {
-          return result;
-        }),
+      policy: policies.get(operation)?.source ?? null,
+      cases,
     };
   });
 }
+
+/**
+ * A decision as {@link describeDecision} words it: whether it allows, and the
+ * code and rules of a refusal, each when known.
+ */
+type DescribedDecision = {
+  readonly allowed: boolean;
+  readonly code?: string | undefined;
+  readonly violations?: readonly string[] | undefined;
+};
 
 /**
  * A decision in words.
@@ -236,21 +305,21 @@ export async function runPolicyTests(
  * @returns `allowed`, or refused with its code and its rules, each when known,
  *   so a mismatch in either shows on the line.
  */
-function describeDecision(decision: {
-  allowed: boolean;
-  code?: string;
-  violations?: readonly string[];
-}): string {
+function describeDecision(decision: DescribedDecision): string {
   if (decision.allowed) {
     return "allowed";
   }
-  const rules = decision.violations?.length ? decision.violations.join(", ") : undefined;
+  const violations = decision.violations ?? [];
+  const rules = violations.length > 0 ? violations.join(", ") : undefined;
   const reason = [decision.code, rules]
     .filter((part) => {
       return part !== undefined;
     })
     .join(": ");
-  return reason === "" ? "refused" : `refused (${reason})`;
+  if (reason === "") {
+    return "refused";
+  }
+  return `refused (${reason})`;
 }
 
 /**
@@ -261,15 +330,36 @@ function describeDecision(decision: {
  * @returns The words for the heading.
  */
 function describePolicy(policy: PolicySource, release: string | undefined): string {
+  if (policy === null && release === undefined) {
+    return "no policy file, nothing enforced";
+  }
   if (policy === null) {
-    return release === undefined
-      ? "no policy file, nothing enforced"
-      : `release ${release} pins no policy, nothing enforced`;
+    return `release ${release} pins no policy, nothing enforced`;
   }
   if ("file" in policy) {
     return policy.file;
   }
   return `release ${release}, revision ${policy.revision_id}`;
+}
+
+/**
+ * One case's line.
+ *
+ * @param testCase - The case's outcome.
+ * @returns A tick and its name, or on a failure what was expected and what the
+ *   server decided.
+ */
+function describeCase(testCase: PolicyCaseResult): string {
+  if (testCase.passed) {
+    return `  ✓ ${testCase.name}`;
+  }
+  const expected = describeDecision(testCase.expected);
+  const actual = describeDecision({
+    allowed: testCase.actual.allowed,
+    code: testCase.actual.code,
+    violations: Object.keys(testCase.actual.violations ?? {}),
+  });
+  return `  ✗ ${testCase.name}: expected ${expected}, got ${actual}`;
 }
 
 /**
@@ -286,20 +376,8 @@ export function renderPolicyTestResults(
   release?: string,
 ): string {
   const lines = results.flatMap((result) => {
-    return [
-      `${result.operation}  (${describePolicy(result.policy, release)})`,
-      ...result.cases.map((testCase) => {
-        if (testCase.passed) {
-          return `  ✓ ${testCase.name}`;
-        }
-        const actual = describeDecision({
-          allowed: testCase.actual.allowed,
-          code: testCase.actual.code,
-          violations: Object.keys(testCase.actual.violations ?? {}),
-        });
-        return `  ✗ ${testCase.name}: expected ${describeDecision(testCase.expected)}, got ${actual}`;
-      }),
-    ];
+    const heading = `${result.operation}  (${describePolicy(result.policy, release)})`;
+    return [heading, ...result.cases.map(describeCase)];
   });
   const cases = results.flatMap((result) => {
     return result.cases;

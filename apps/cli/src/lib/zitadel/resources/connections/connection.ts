@@ -1,31 +1,35 @@
 import { basename } from "node:path";
 
 import {
-  type ClientIdVariable,
-  type ClientSecretVariable,
   type ConnectionEndpoints,
   type ConnectionSlug,
   credentialVariables,
+  type DisplayName,
   type IdpProvider,
+  type Issuer,
   isVariableReference,
   missingEndpoints,
   type Parsed,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
-  referencedVariable,
+  referencedClientIdVariable,
+  referencedClientSecretVariable,
 } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import {
   CHECKED_BLOCKS,
+  type ClaimField,
   type ClaimRead,
   type ClaimRow,
   CONNECTION_CONTRACT,
   CONNECTION_SCHEMA_REF,
+  type ConnectionPath,
   type ConnectionSetting,
-  CREDENTIAL_FIELDS,
   type CredentialNames,
+  type CredentialVariable,
+  type GivenSettings,
   type StoredSettings,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections/types";
@@ -36,13 +40,25 @@ import {
   type Edit,
 } from "@/lib/zitadel/resources/document";
 import { ConfigError, ConflictError } from "@/lib/zitadel/errors";
-import { propertyName } from "@/lib/zitadel/names";
+import { type ClaimName, claimName, type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import { CONFIG_DIRECTORIES, type JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
+import { CONFIG_DIRECTORIES, type JsonObject, type JsonValue } from "@/lib/zitadel/types";
+import {
+  isJsonArray,
+  isJsonObject,
+  objectAt,
+  stringAt,
+  stringsIn,
+  toJsonObject,
+} from "@/lib/zitadel/utils/json";
 import { didYouMean } from "@/lib/zitadel/utils/spelling";
+
+/**
+ * The blocks whose rows name a claim.
+ */
+type RowBlock = Extract<ClaimField, "claim_mapping" | "verified_claims">;
 
 /**
  * An identity-provider connection under `.zitadel/idps/`: who signs people in,
@@ -97,21 +113,21 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param schema - The user schema its sign-ins fill.
    * @param endpoints - Where the provider answers, when not at its own issuer.
    * @returns The connection, marked as created.
+   * @throws {@link ConfigError} When the provider's document is not JSON.
    */
   static forProvider(
     provider: IdpProvider,
     schema: UserSchema,
     endpoints?: ConnectionEndpoints,
   ): Connection {
-    const body = provider.connection({
+    const generated = provider.connection({
       schemaProperties: schema.propertyNames,
       schemaRef: CONNECTION_SCHEMA_REF,
       endpoints,
     });
-    return Connection.create({
-      path: `${CONFIG_DIRECTORIES.connections}/${provider.slug}.json`,
-      body,
-    });
+    const body = toJsonObject(generated, `the ${provider.slug} connection`);
+    const path: ConnectionPath = `${CONFIG_DIRECTORIES.connections}/${provider.slug}.json`;
+    return Connection.create({ path, body });
   }
 
   /**
@@ -119,7 +135,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The same connection, marked as read.
    */
-  asRead(): Connection<Body> {
+  markRead(): Connection<Body> {
     return new Connection(this.path, this.body, "read");
   }
 
@@ -143,47 +159,47 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   `connection/endpoints` and `sso/unknown-connection-field` findings, in
    *   that order; none when the connection is sound.
    */
-  problems(_context: ValidationContext): readonly Issue[] {
-    const refusals = this.contractIssues("contract/connection", idpConnectionConfigSchema);
-    const secret = objectAt(this.body, "oidc").client_secret;
-    const literalSecret = typeof secret === "string" && !isVariableReference(secret);
+  check(_context: ValidationContext): readonly Issue[] {
+    const refusals = this.checkContract("contract/connection", idpConnectionConfigSchema);
+    const secret = stringAt(objectAt(this.body, "oidc"), "client_secret");
+    const literalSecret = secret !== undefined && !isVariableReference(secret);
     const missing = refusals.length === 0 ? missingEndpoints(this.body.oidc) : [];
-    const secretIssue = this.issue(
+    const secretIssue = this.makeIssue(
       "connection/literal-secret",
       'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
     );
-    const endpointsIssue = this.issue(
+    const endpointsIssue = this.makeIssue(
       "connection/endpoints",
       `oidc names some endpoints but not ${missing.join(", ")}. Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and userinfo_endpoint unless id_token_mapping is true), or none to read them from the issuer's discovery document.`,
     );
     const secretIssues = literalSecret ? [secretIssue] : [];
     const endpointsIssues = missing.length > 0 ? [endpointsIssue] : [];
-    return [
-      ...refusals.filter((refusal) => {
-        return !(literalSecret && refusal.message.includes("client_secret"));
-      }),
-      ...secretIssues,
-      ...endpointsIssues,
-      ...CHECKED_BLOCKS.flatMap((block) => {
-        const allowed = Connection.allowedFields(block.path);
-        const value = block.path.reduce<unknown>((node, key) => {
-          return isJsonObject(node) ? node[key] : undefined;
-        }, this.body);
-        if (allowed.length === 0 || !isJsonObject(value)) {
-          return [];
+    const kept = refusals.filter((refusal) => {
+      return !(literalSecret && refusal.message.includes("client_secret"));
+    });
+    const unknownFields = CHECKED_BLOCKS.flatMap((block) => {
+      const allowed = Connection.readAllowedFields(block.path);
+      const value = block.path.reduce<JsonValue | undefined>((node, key) => {
+        if (!isJsonObject(node)) {
+          return undefined;
         }
-        return Object.keys(value)
-          .filter((key) => {
-            return !allowed.includes(key);
-          })
-          .map((key) => {
-            return this.issue(
-              "sso/unknown-connection-field",
-              `${JSON.stringify(key)} is not a field of ${block.where}, so it is ignored or refused.${didYouMean(key, allowed)} Fix the name, or remove it.`,
-            );
-          });
-      }),
-    ];
+        return node[key];
+      }, this.body);
+      if (allowed.length === 0 || !isJsonObject(value)) {
+        return [];
+      }
+      return Object.keys(value)
+        .filter((key) => {
+          return !allowed.includes(key);
+        })
+        .map((key) => {
+          return this.makeIssue(
+            "sso/unknown-connection-field",
+            `${JSON.stringify(key)} is not a field of ${block.where}, so it is ignored or refused.${didYouMean(key, allowed)} Fix the name, or remove it.`,
+          );
+        });
+    });
+    return [...kept, ...secretIssues, ...endpointsIssues, ...unknownFields];
   }
 
   /**
@@ -192,7 +208,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param _store - Unused: a connection holds no `$file` references.
    * @returns The body without the editor-only `$schema` pointer.
    */
-  wireBody(_store: ConfigStore): JsonObject {
+  toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
 
@@ -202,7 +218,17 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The slug, or `undefined` when it has none.
    */
   get slug(): string | undefined {
-    return typeof this.body.slug === "string" ? this.body.slug : undefined;
+    return stringAt(this.body, "slug");
+  }
+
+  /**
+   * The slug as a schema or flow compares it: without surrounding space.
+   *
+   * @returns The trimmed slug, or `""` when it has none.
+   */
+  get declaredSlug(): string {
+    const slug = this.slug ?? "";
+    return slug.trim();
   }
 
   /**
@@ -212,7 +238,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   missing or blank.
    */
   get name(): string {
-    const slug = this.slug?.trim() ?? "";
+    const slug = this.declaredSlug;
     if (slug === "") {
       return basename(this.path, ".json");
     }
@@ -239,7 +265,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   developer's own.
    */
   get template(): string | undefined {
-    return typeof this.body.template === "string" ? this.body.template : undefined;
+    return stringAt(this.body, "template");
   }
 
   /**
@@ -248,7 +274,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The name, or `undefined` when it has none.
    */
   get displayName(): string | undefined {
-    return typeof this.body.display_name === "string" ? this.body.display_name : undefined;
+    return stringAt(this.body, "display_name");
   }
 
   /**
@@ -257,8 +283,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The issuer, or `undefined` when `oidc.issuer` is not a string.
    */
   get issuer(): string | undefined {
-    const issuer = objectAt(this.body, "oidc").issuer;
-    return typeof issuer === "string" ? issuer : undefined;
+    return stringAt(objectAt(this.body, "oidc"), "issuer");
   }
 
   /**
@@ -268,8 +293,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   `oidc.client_id` is not a string.
    */
   get clientId(): string | undefined {
-    const value = objectAt(this.body, "oidc").client_id;
-    return typeof value === "string" ? value : undefined;
+    return stringAt(objectAt(this.body, "oidc"), "client_id");
   }
 
   /**
@@ -285,10 +309,17 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const slug = this.validSlug;
     const derived = slug === undefined ? undefined : credentialVariables(slug);
     const oidc = objectAt(this.body, "oidc");
-    return {
-      clientId: Connection.variableOf(oidc.client_id, derived?.clientId),
-      clientSecret: Connection.variableOf(oidc.client_secret, derived?.clientSecret),
-    };
+    const clientId = Connection.readVariable(
+      oidc.client_id,
+      derived?.clientId,
+      referencedClientIdVariable,
+    );
+    const clientSecret = Connection.readVariable(
+      oidc.client_secret,
+      derived?.clientSecret,
+      referencedClientSecretVariable,
+    );
+    return { clientId, clientSecret };
   }
 
   /**
@@ -296,13 +327,11 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The names, client id first; none when both are held as values.
    */
-  get variableNames(): readonly string[] {
+  get variableNames(): readonly CredentialVariable[] {
     const { clientId, clientSecret } = this.credentialNames;
-    return [clientId, clientSecret].filter(
-      (name): name is ClientIdVariable | ClientSecretVariable => {
-        return name !== undefined;
-      },
-    );
+    return [clientId, clientSecret].filter((name): name is CredentialVariable => {
+      return name !== undefined;
+    });
   }
 
   /**
@@ -322,7 +351,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   none when there is no mapping.
    */
   get mappings(): readonly ClaimRow[] {
-    return this.rows("claim_mapping");
+    return this.readRows("claim_mapping");
   }
 
   /**
@@ -332,7 +361,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   written; none when nothing is verified.
    */
   get verifications(): readonly ClaimRow[] {
-    return this.rows("verified_claims");
+    return this.readRows("verified_claims");
   }
 
   /**
@@ -354,16 +383,14 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   get mappingSummary(): string {
     const provider = this.providerName;
-    const mappings = this.mappings.map((item) => {
-      const { property, claim } = item;
-      return `  ${property} ← ${String(claim)}`;
+    const mappings = this.mappings.map((row) => {
+      return `  ${row.property} ← ${String(row.claim)}`;
     });
-    const verifications = this.verifications.map((item) => {
-      const { property, claim } = item;
-      if (claim === true) {
-        return `  ${property} is treated as verified.`;
+    const verifications = this.verifications.map((row) => {
+      if (row.claim === true) {
+        return `  ${row.property} is treated as verified.`;
       }
-      return `  ${property} is treated as verified only when ${provider} says so in the ${String(claim)} claim.`;
+      return `  ${row.property} is treated as verified only when ${provider} says so in the ${String(row.claim)} claim.`;
     });
     const verification =
       verifications.length === 0
@@ -387,13 +414,13 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const blocks = [
       { field: "claim_mapping", rows: this.mappings },
       { field: "verified_claims", rows: this.verifications },
-    ];
+    ] as const;
     return blocks.flatMap((block) => {
-      return block.rows.flatMap((row) => {
+      return block.rows.flatMap((row): readonly ClaimRead[] => {
         if (typeof row.claim !== "string") {
           return [];
         }
-        return [{ field: block.field, claim: row.claim }];
+        return [{ field: block.field, claim: claimName(row.claim) }];
       });
     });
   }
@@ -405,7 +432,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   get scopes(): readonly string[] | undefined {
     const scopes = objectAt(this.body, "oidc").scopes;
-    if (!Array.isArray(scopes)) {
+    if (!isJsonArray(scopes)) {
       return undefined;
     }
     return stringsIn(scopes);
@@ -416,9 +443,12 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The claim, or `undefined` when `subject_claim` names none.
    */
-  get subjectClaim(): string | undefined {
-    const subject = this.body.subject_claim;
-    return typeof subject === "string" ? subject : undefined;
+  get subjectClaim(): ClaimName | undefined {
+    const subject = stringAt(this.body, "subject_claim");
+    if (subject === undefined) {
+      return undefined;
+    }
+    return claimName(subject);
   }
 
   /**
@@ -429,24 +459,26 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   get variables(): readonly VariableUse[] {
     const oidc = objectAt(this.body, "oidc");
-    return CREDENTIAL_FIELDS.flatMap((field) => {
-      const value = oidc[field];
-      const variable = typeof value === "string" ? referencedVariable(value) : undefined;
-      if (variable === undefined) {
-        return [];
-      }
-      return [{ field, variable }];
-    });
+    const clientId = stringAt(oidc, "client_id");
+    const clientSecret = stringAt(oidc, "client_secret");
+    const idVariable = clientId === undefined ? undefined : referencedClientIdVariable(clientId);
+    const secretVariable =
+      clientSecret === undefined ? undefined : referencedClientSecretVariable(clientSecret);
+    const idUses: readonly VariableUse[] =
+      idVariable === undefined ? [] : [{ field: "client_id", variable: idVariable }];
+    const secretUses: readonly VariableUse[] =
+      secretVariable === undefined ? [] : [{ field: "client_secret", variable: secretVariable }];
+    return [...idUses, ...secretUses];
   }
 
   /**
    * Whether the connection's `slug` is this one, ignoring surrounding space.
    *
-   * @param slug - The slug.
+   * @param slug - The slug, as written or typed.
    * @returns Whether it declares it.
    */
   declares(slug: string): boolean {
-    return (this.slug ?? "").trim() === slug;
+    return this.declaredSlug === slug;
   }
 
   /**
@@ -455,14 +487,14 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param property - The property's name.
    * @returns Whether it is mapped.
    */
-  maps(property: string): boolean {
+  maps(property: PropertyName): boolean {
     return this.mappings.some((row) => {
       return row.property === property;
     });
   }
 
   /**
-   * The settings this file holds that a run reusing the connection takes
+   * Read the settings this file holds that a run reusing the connection takes
    * instead of asking for them, each held to the rules a typed answer is.
    *
    * @remarks
@@ -478,7 +510,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @throws {@link ConfigError} When a stored setting the run would use cannot
    *   be used, naming the file.
    */
-  storedSettings(given: StoredSettings): StoredSettings {
+  readStoredSettings(given: GivenSettings): StoredSettings {
     const issuer = this.issuer;
     if (issuer === undefined) {
       throw new ConflictError(
@@ -489,15 +521,19 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
         },
       );
     }
-    return {
-      displayName: this.usableSetting(
-        "a display name",
-        this.displayName,
-        given.displayName,
-        parseDisplayName,
-      ),
-      issuer: this.usableSetting("an issuer", issuer, given.issuer, parseIssuer),
-    };
+    const displayName: DisplayName | undefined = this.readUsableSetting(
+      "a display name",
+      this.displayName,
+      given.displayName,
+      parseDisplayName,
+    );
+    const storedIssuer: Issuer | undefined = this.readUsableSetting(
+      "an issuer",
+      issuer,
+      given.issuer,
+      parseIssuer,
+    );
+    return { displayName, issuer: storedIssuer };
   }
 
   /**
@@ -518,7 +554,8 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     if (issuer === undefined || issuer === "") {
       return { document: this, changed: false, skipped: [] };
     }
-    const body = { ...this.body, oidc: { ...objectAt(this.body, "oidc"), issuer } };
+    const oidc = { ...objectAt(this.body, "oidc"), issuer };
+    const body = { ...this.body, oidc };
     return {
       document: new Connection(this.path, body, this.editedStatus),
       changed: true,
@@ -527,14 +564,14 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
-   * The settings the developer gave that this connection, reused in place of
-   * a candidate, does not have, which reusing it does not apply.
+   * List the settings the developer gave that this connection, reused in
+   * place of a candidate, does not have, which reusing it does not apply.
    *
    * @param candidate - The connection the settings would have written.
    * @param given - The settings the developer gave.
    * @returns The settings not applied.
    */
-  unappliedSettings(
+  listUnappliedSettings(
     candidate: Connection,
     given: readonly ConnectionSetting[],
   ): readonly ConnectionSetting[] {
@@ -542,7 +579,9 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
       if (setting === "display name") {
         return this.displayName !== candidate.displayName;
       }
-      return (this.scopes ?? []).join(" ") !== (candidate.scopes ?? []).join(" ");
+      const ours = this.scopes ?? [];
+      const theirs = candidate.scopes ?? [];
+      return ours.join(" ") !== theirs.join(" ");
     });
   }
 
@@ -572,23 +611,23 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
-   * A setting the file holds, when a run reusing the connection uses it.
+   * Read a setting the file holds, when a run reusing the connection uses it.
    *
    * @typeParam T - What a typed answer parses to.
    * @param what - How a refusal names the setting.
    * @param stored - The setting as the file holds it.
    * @param given - The setting as the run was given it, which replaces the file's.
    * @param parse - The rules a typed answer is held to.
-   * @returns The stored setting, or `undefined` when the run was given one or
-   *   the file holds none.
+   * @returns The stored setting as parsed, or `undefined` when the run was
+   *   given one or the file holds none.
    * @throws {@link ConfigError} When the stored setting cannot be used.
    */
-  private usableSetting<T>(
+  private readUsableSetting<T>(
     what: string,
     stored: string | undefined,
     given: string | undefined,
     parse: (value: string) => Parsed<T>,
-  ): string | undefined {
+  ): T | undefined {
     if (given !== undefined || stored === undefined) {
       return undefined;
     }
@@ -599,35 +638,42 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
         details: { file: this.path, slug: this.name },
       });
     }
-    return stored;
+    return parsed.value;
   }
 
   /**
-   * The rows of a mapping block.
+   * Read the rows of a mapping block.
    *
    * @param block - `claim_mapping` or `verified_claims`.
    * @returns Each property and its claim, in the order written; none when the
    *   block is absent.
    */
-  private rows(block: "claim_mapping" | "verified_claims"): readonly ClaimRow[] {
-    return Object.entries(objectAt(this.body, block)).map((pair) => {
-      const [property, claim] = pair;
-      return { property: propertyName(property), claim };
+  private readRows(block: RowBlock): readonly ClaimRow[] {
+    return Object.entries(objectAt(this.body, block)).flatMap((entry): readonly ClaimRow[] => {
+      const claim = entry[1];
+      // A member that is absent is no row.
+      if (claim === undefined) {
+        return [];
+      }
+      return [{ property: propertyName(entry[0]), claim }];
     });
   }
 
   /**
-   * The variable a credential field reads from.
+   * Read the variable a credential field reads from.
    *
    * @typeParam V - The kind of variable the field names.
    * @param value - The field as written.
    * @param fallback - The variable an absent field reads from.
+   * @param referenced - The variable a `${{ NAME }}` reference names, branded
+   *   for the field.
    * @returns The variable it references, the fallback when the field is absent,
    *   or `undefined` when it holds a value.
    */
-  private static variableOf<V extends string>(
-    value: unknown,
+  private static readVariable<V extends CredentialVariable>(
+    value: JsonValue | undefined,
     fallback: V | undefined,
+    referenced: (value: string) => V | undefined,
   ): V | undefined {
     if (value === undefined) {
       return fallback;
@@ -635,20 +681,18 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     if (typeof value !== "string") {
       return undefined;
     }
-    // Whatever a client_id field references is a client id's variable, whatever
-    // it is called, which is what the brand records.
-    return referencedVariable(value) as V | undefined;
+    return referenced(value);
   }
 
   /**
-   * The field names the contract allows in one block, when it forbids any
-   * other.
+   * Read the field names the contract allows in one block, when it forbids
+   * any other.
    *
    * @param path - The block's path from the root, empty for the root.
    * @returns The allowed names, or none when the block takes anything.
    */
-  private static allowedFields(path: readonly string[]): readonly string[] {
-    const level = path.reduce<unknown>((node, key) => {
+  private static readAllowedFields(path: readonly string[]): readonly string[] {
+    const level = path.reduce<JsonValue | undefined>((node, key) => {
       if (!isJsonObject(node)) {
         return undefined;
       }

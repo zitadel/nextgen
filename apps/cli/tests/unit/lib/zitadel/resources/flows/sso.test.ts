@@ -4,15 +4,16 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { serverCanonicalFlow } from "@zitadel/api-mock";
-import { getDefaultLoginFlow, type SetupPreset, type SetupUseCase } from "@zitadel/config/defaults";
+import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { RefusedEditError } from "@/lib/zitadel";
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
-import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, listAt, objectAt } from "@/lib/zitadel/utils/json";
+import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
+import { isJsonArray, isJsonObject, listAt, objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import {
   actionsIn,
+  aShippedLoginFlow,
   BOTH_METHODS,
   PASSKEY_ONLY,
   PASSWORD_ONLY,
@@ -90,7 +91,7 @@ const LEGACY_NAMES: Readonly<Record<string, string>> = {
 /**
  * The shipped login flow, scaffolded for the minimal use case.
  */
-const SHIPPED = getDefaultLoginFlow({ useCase: "minimal" });
+const SHIPPED = aShippedLoginFlow({ useCase: "minimal" });
 
 /**
  * The shipped flow after Google was enabled for both methods.
@@ -116,14 +117,10 @@ const REGISTER_ONLY = {
  * The design's worked example, as the file holds it.
  *
  * @returns The flow.
- * @throws {@link Error} When the file does not hold an object.
+ * @throws {@link ConfigError} When the file does not hold an object.
  */
 function designedFlow(): JsonObject {
-  const parsed: unknown = JSON.parse(readFileSync(DESIGN_EXAMPLE, "utf8"));
-  if (!isJsonObject(parsed)) {
-    throw new Error(`${DESIGN_EXAMPLE} does not hold a flow`);
-  }
-  return parsed;
+  return toJsonObject(JSON.parse(readFileSync(DESIGN_EXAMPLE, "utf8")), DESIGN_EXAMPLE);
 }
 
 /**
@@ -164,8 +161,12 @@ function keySorted(object: JsonObject): JsonObject {
   return Object.fromEntries(
     Object.keys(object)
       .sort()
-      .map((key) => {
-        return [key, keySortedValue(object[key])];
+      .flatMap((key) => {
+        const value = object[key];
+        if (value === undefined) {
+          return [];
+        }
+        return [[key, keySortedValue(value)]];
       }),
   );
 }
@@ -176,8 +177,8 @@ function keySorted(object: JsonObject): JsonObject {
  * @param value - The value.
  * @returns The same value, keys sorted.
  */
-function keySortedValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
+function keySortedValue(value: JsonValue): JsonValue {
+  if (isJsonArray(value)) {
     return value.map(keySortedValue);
   }
   if (isJsonObject(value)) {
@@ -599,7 +600,7 @@ describe("SsoGenerator.withProvider", () => {
   });
 
   describe("with the passkey-first preset", () => {
-    const passkeyFirst = getDefaultLoginFlow({ useCase: "minimal", preset: "passkey-first" });
+    const passkeyFirst = aShippedLoginFlow({ useCase: "minimal", preset: "passkey-first" });
 
     it("sends the conflict step's sign-in back to the flow's own login entry", () => {
       const { document } = new SsoGenerator(passkeyFirst).withProvider(GOOGLE, BOTH_METHODS);
@@ -650,7 +651,7 @@ describe("SsoGenerator.withProvider", () => {
     it.each(EXPECTED_FIELDS)(
       "asks register-sso for what the %s use case registers",
       (useCase, expected) => {
-        const flow = getDefaultLoginFlow({ useCase });
+        const flow = aShippedLoginFlow({ useCase });
 
         const { document } = new SsoGenerator(flow).withProvider(GOOGLE, BOTH_METHODS);
 
@@ -659,7 +660,7 @@ describe("SsoGenerator.withProvider", () => {
     );
 
     it.each(USE_CASES)("asks register-sso for no credential in the %s use case", (useCase) => {
-      const flow = getDefaultLoginFlow({ useCase });
+      const flow = aShippedLoginFlow({ useCase });
 
       const { document } = new SsoGenerator(flow).withProvider(GOOGLE, BOTH_METHODS);
 
@@ -671,7 +672,7 @@ describe("SsoGenerator.withProvider", () => {
 
   describe("with a register step that asks for less than the schema", () => {
     it("asks register-sso for what the register step asks for", () => {
-      const flow = withStep(getDefaultLoginFlow({ useCase: "business" }), "register", (step) => {
+      const flow = withStep(aShippedLoginFlow({ useCase: "business" }), "register", (step) => {
         return { ...step, fields: ["email", "givenName"] };
       });
 
@@ -823,8 +824,9 @@ describe("SsoGenerator.withProvider", () => {
     { name: "password and passkey", methods: BOTH_METHODS },
     { name: "passkey only, so the conflict step has no fields", methods: PASSKEY_ONLY },
   ])("when the server rewrote the flow on apply, enabling $name", ({ methods }) => {
-    const rewritten = serverCanonicalFlow(
-      new SsoGenerator(SHIPPED).withProvider(GOOGLE, methods).document,
+    const rewritten = toJsonObject(
+      serverCanonicalFlow(new SsoGenerator(SHIPPED).withProvider(GOOGLE, methods).document),
+      "the flow the server rewrote",
     );
 
     it("reports no step as hand-edited", () => {
@@ -841,7 +843,10 @@ describe("SsoGenerator.withProvider", () => {
   });
 
   describe.each(PRESETS)("when the server rewrote the %s flow on apply", (preset) => {
-    const rewritten = serverCanonicalFlow(enabled(getDefaultLoginFlow({ preset }), "google"));
+    const rewritten = toJsonObject(
+      serverCanonicalFlow(enabled(aShippedLoginFlow({ preset }), "google")),
+      "the flow the server rewrote",
+    );
 
     it("reports no step as hand-edited", () => {
       const { skipped } = new SsoGenerator(rewritten).withProvider(ACME, BOTH_METHODS);
@@ -1185,7 +1190,7 @@ describe("SsoGenerator.withoutProvider", () => {
   });
 
   it.each(PRESETS)("takes the provider off the password step of the %s flow", (preset) => {
-    const flow = enabled(getDefaultLoginFlow({ preset }), "google");
+    const flow = enabled(aShippedLoginFlow({ preset }), "google");
 
     const { document } = new SsoGenerator(flow).withoutProvider("google");
 
@@ -1239,7 +1244,7 @@ describe("SsoGenerator.withoutProvider", () => {
 
 describe("SsoGenerator.editRefusal", () => {
   it.each([
-    { name: "the shipped flow", flow: getDefaultLoginFlow() },
+    { name: "the shipped flow", flow: aShippedLoginFlow() },
     {
       name: "a flow with only its terminal step",
       flow: { steps: [{ name: "done", complete: "show" }] },

@@ -1,7 +1,16 @@
-import { ForbiddenError } from "@/lib/backend";
+import { ForbiddenError, type VariableService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import type { StepContext } from "@/lib/publish/pipeline";
+import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
 import type { Connection } from "@/lib/zitadel";
+
+/**
+ * The kind of variable each publish freezes, with no fallback from one to the
+ * other (ADR 069).
+ */
+const VARIABLE_KIND = {
+  deploy: "primary",
+  preview: "preview",
+} as const satisfies Record<PipelineMode, Parameters<VariableService["heldByName"]>[0]>;
 
 /**
  * The checks a connection gets against the project before the release is built.
@@ -58,13 +67,31 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
  */
 async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, boolean> | undefined> {
   try {
-    return await ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
+    return await ctx.variables.heldByName(VARIABLE_KIND[ctx.mode]);
   } catch (error) {
     if (ctx.mode === "preview" && error instanceof ForbiddenError) {
       return undefined;
     }
     throw error;
   }
+}
+
+/**
+ * The `variable set` arguments that publish a variable as its field needs it.
+ *
+ * @remarks
+ * A preview freezes the preview kind alone, so the value it lacks is set for
+ * that kind.
+ *
+ * @param variable - The variable.
+ * @param secret - Whether the field needs a secret variable.
+ * @param mode - The publish the variable is for.
+ * @returns The arguments.
+ */
+function variableSetArgs(variable: string, secret: boolean, mode: PipelineMode): string {
+  const kindFlags = secret ? ["--secret"] : [];
+  const modeFlags = mode === "preview" ? ["--preview"] : [];
+  return ["variable", "set", variable, ...kindFlags, ...modeFlags].join(" ");
 }
 
 /**
@@ -93,23 +120,24 @@ function checkCredentialVariables(
   const secret = uses.find((use) => {
     return use.field === "client_secret";
   });
-  if (id !== undefined && secret !== undefined && id.variable === secret.variable) {
+  // The two are branded apart, so they are compared as the names they both are.
+  const idVariable: string | undefined = id?.variable;
+  const secretVariable: string | undefined = secret?.variable;
+  if (idVariable !== undefined && idVariable === secretVariable) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${file}: client_id and client_secret both name the variable ${id.variable}`,
+      `${file}: client_id and client_secret both name the variable ${idVariable}`,
       {
         hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-        details: { variable: id.variable, file },
+        details: { variable: idVariable, file },
       },
     );
   }
-  for (const { field, variable } of uses) {
+  for (const use of uses) {
+    const field = use.field;
+    const variable = use.variable;
     const wantsSecret = field === "client_secret";
-    // A preview freezes the preview kind alone, so the value it lacks is set
-    // for that kind.
-    const setCommand = ctx.suggest(
-      `variable set ${variable}${wantsSecret ? " --secret" : ""}${ctx.mode === "preview" ? " --preview" : ""}`,
-    );
+    const setCommand = ctx.suggest(variableSetArgs(variable, wantsSecret, ctx.mode));
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
       throw new ZitadelError(
@@ -123,13 +151,15 @@ function checkCredentialVariables(
       );
     }
     if (isSecret !== wantsSecret) {
+      const kind = isSecret ? "a secret" : "not a secret";
+      const hint = wantsSecret
+        ? "The client secret must be a secret variable: publish it with the command below."
+        : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.";
       throw new ZitadelError(
         "E_VALIDATION",
-        `${file}: ${field} names the variable ${variable}, which is ${isSecret ? "a secret" : "not a secret"}`,
+        `${file}: ${field} names the variable ${variable}, which is ${kind}`,
         {
-          hint: wantsSecret
-            ? "The client secret must be a secret variable: publish it with the command below."
-            : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+          hint,
           nextCommands: [setCommand],
           details: { variable, field, file, secret: isSecret },
         },

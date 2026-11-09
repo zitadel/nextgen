@@ -208,14 +208,14 @@ export function signInOf(answers: {
       return method !== startsWith;
     }),
   ];
-  const required = schema.requiredPaths;
+  const required: readonly string[] = schema.requiredPaths;
   return {
     starts_with: startsWith,
     methods: [
       ...order.filter((method) => {
         return schema.enabledMethods[method];
       }),
-      ...(schema.ssoEnabled ? ["sso"] : []),
+      ...(schema.isSsoEnabled ? ["sso"] : []),
     ],
     fields: schema.propertyNames.map((name) => {
       return { name, required: required.includes(name) };

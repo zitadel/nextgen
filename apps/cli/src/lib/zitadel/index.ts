@@ -12,7 +12,7 @@
  */
 export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
 export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
-export { Collection } from "@/lib/zitadel/resources/collection";
+export { Collection, PinnedCollection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
 export {
   CONNECTION_SCHEMA_REF,
@@ -27,7 +27,12 @@ export {
   type UnusedConnection,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections";
-export type { DocumentStatus, Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
+export type {
+  DocumentKind,
+  DocumentStatus,
+  Edit,
+  SkippedRegion,
+} from "@/lib/zitadel/resources/document";
 export {
   AmbiguousSchemaError,
   BrokenFilesError,
@@ -56,7 +61,16 @@ export {
   type Step,
   type Transition,
 } from "@/lib/zitadel/resources/flows";
-export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
+export type {
+  ClaimName,
+  EnvironmentVariable,
+  FlowName,
+  ObjectType,
+  PropertyName,
+  PropertyPath,
+  SchemaReference,
+  StepName,
+} from "@/lib/zitadel/names";
 export {
   PASSWORD_POLICY_OPERATION,
   PasswordPolicy,
@@ -93,6 +107,7 @@ export {
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
 export type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
+export { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
 export {
   CONFIG_DIRECTORIES,
   CONFIG_KINDS,
@@ -101,7 +116,10 @@ export {
   type ConfigurationBundle,
   type ConfigFiles,
   type ConfigKind,
+  type JsonArray,
   type JsonObject,
+  type JsonPrimitive,
+  type JsonValue,
   type Scaffold,
   type ScaffoldedConnection,
   type ScaffoldedProvider,

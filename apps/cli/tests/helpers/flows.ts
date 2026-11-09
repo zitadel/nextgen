@@ -1,7 +1,9 @@
+import { getDefaultLoginFlow } from "@zitadel/config/defaults";
+
 import { Flow } from "@/lib/zitadel";
 import type { EnabledMethods } from "@/lib/zitadel/resources/schemas/types";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, listAt, objectAt } from "@/lib/zitadel/utils/json";
+import { isJsonObject, listAt, objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { aFile } from "@tests/helpers/config";
 
 /**
@@ -17,6 +19,16 @@ export const FLOW_PATH = ".zitadel/flows/login.json";
  */
 export function aFlow(body: JsonObject): Flow {
   return Flow.of(aFile("flows", "login.json", body));
+}
+
+/**
+ * The login flow `@zitadel/config` ships, as a JSON body.
+ *
+ * @param options - The use case and preset to ship it for.
+ * @returns The flow.
+ */
+export function aShippedLoginFlow(options?: Parameters<typeof getDefaultLoginFlow>[0]): JsonObject {
+  return toJsonObject(getDefaultLoginFlow(options), "the shipped login flow");
 }
 
 /**

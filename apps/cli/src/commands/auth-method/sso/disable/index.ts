@@ -22,6 +22,16 @@ const NAME_PROVIDER_REFUSAL: Refusal = {
 };
 
 /**
+ * The flags that name the project a removal's `variable rm` commands reach.
+ */
+type SelectorFlags = {
+  readonly cwd?: string | undefined;
+  readonly env?: string | undefined;
+  readonly envFile?: string | undefined;
+  readonly server?: string | undefined;
+};
+
+/**
  * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
  * and from the login flows that run against it.
  *
@@ -50,15 +60,25 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }),
   };
 
-  protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
-    const target = await this.schemaTarget(flags);
+  /**
+   * Remove the provider from the schema and its login flows.
+   *
+   * @param input - The provider, the schema and the environment flags.
+   * @returns The result, with how to remove a connection nothing offers any more.
+   * @throws {@link ZitadelError} When no provider is named, the schema cannot be
+   *   chosen, or the change would leave no way to sign in and nobody agreed to it.
+   */
+  protected async execute(input: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
+    const flags = input.flags;
+    const target = await this.loadSchemaTarget(flags);
     const { config, schema } = target;
     const provider = flags.provider;
     if (provider === undefined) {
+      const offered = schema.providers.join(", ") || "none";
       throw refusalError(NAME_PROVIDER_REFUSAL, {
         example: IDP_PROVIDERS[0],
         schema: schema.name,
-        offered: schema.providers.join(", ") || "none",
+        offered,
       });
     }
     const retryArgs = [
@@ -97,24 +117,30 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.report(change);
+      const preview = change.changed ? `Would remove ${provider} from ${where}` : unchanged;
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: prose(change.changed ? `Would remove ${provider} from ${where}` : unchanged),
+        pretty: prose(preview),
       });
     }
     await this.write(target, change);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
-    const unused = change.changed ? change.after.connections.unused(provider) : undefined;
+    const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
     const actions = unused === undefined ? [] : this.removalActions(unused, flags);
+    const summary = change.changed ? `Removed ${provider} from ${where}` : unchanged;
+    const next =
+      actions.length > 0
+        ? { actions, commands: followUps.commands }
+        : { commands: followUps.commands };
 
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
-      next: { ...(actions.length > 0 ? { actions } : {}), commands: followUps.commands },
-      pretty: prose(change.changed ? `Removed ${provider} from ${where}` : unchanged),
+      next,
+      pretty: prose(summary),
     });
   }
 
@@ -132,10 +158,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
    * @param flags - The run's `--cwd` and environment flags.
    * @returns The actions, the file's deletion first.
    */
-  private removalActions(
-    unused: UnusedConnection,
-    flags: { cwd?: string; env?: string; envFile?: string; server?: string },
-  ): string[] {
+  private removalActions(unused: UnusedConnection, flags: SelectorFlags): readonly string[] {
     const deletion = `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`;
     if (unused.variables.length === 0) {
       return [deletion];

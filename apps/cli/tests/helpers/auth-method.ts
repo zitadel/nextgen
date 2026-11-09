@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { JsonObject } from "@/lib/zitadel";
+import type { JsonObject, JsonValue } from "@/lib/zitadel";
 import { type ConfigDocuments, configFiles } from "@tests/helpers/config";
 
 /**
@@ -67,7 +67,7 @@ export function schemaIdOf(name: string): string {
  * @param name - The schema's file name, without `.json`.
  * @returns The schema document.
  */
-export function aSchema(methods: unknown, name: string = DEFAULT_SCHEMA): JsonObject {
+export function aSchema(methods: JsonValue, name: string = DEFAULT_SCHEMA): JsonObject {
   return {
     $id: schemaIdOf(name),
     type: "object",
@@ -125,7 +125,7 @@ export function aFlowOffering(providers: readonly string[], schema: string = DEF
  * @param flow - The schema's login flow, if it has one.
  * @returns The documents.
  */
-export function aProject(methods: unknown, flow?: JsonObject): ConfigDocuments {
+export function aProject(methods: JsonValue, flow?: JsonObject): ConfigDocuments {
   if (flow === undefined) {
     return { schemas: { [`${DEFAULT_SCHEMA}.json`]: aSchema(methods) } };
   }

@@ -1,6 +1,7 @@
 import { CustomOidcProvider, type CustomOidcInput, DEFAULT_SCOPES } from "@zitadel/config/idp";
 
-import { type JsonObject, UserSchema, type ZitadelConfig } from "@/lib/zitadel";
+import { isJsonObject, type JsonObject, UserSchema, type ZitadelConfig } from "@/lib/zitadel";
+import { listAt } from "@/lib/zitadel/utils/json";
 import {
   aFile,
   aLoginFlow,
@@ -108,11 +109,11 @@ export function onlyFlowOf(config: ZitadelConfig): JsonObject {
  * @returns The flow document, with every other step as it was.
  */
 export function withStepChanged(flow: JsonObject, name: string, changes: JsonObject): JsonObject {
-  const steps: readonly unknown[] = Array.isArray(flow.steps) ? flow.steps : [];
+  const steps = listAt(flow, "steps");
   return {
     ...flow,
     steps: steps.map((step) => {
-      if (typeof step === "object" && step !== null && "name" in step && step.name === name) {
+      if (isJsonObject(step) && step.name === name) {
         return { ...step, ...changes };
       }
       return step;

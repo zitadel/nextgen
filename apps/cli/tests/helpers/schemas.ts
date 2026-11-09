@@ -82,7 +82,7 @@ export function aSchemaEdit(
   config: ZitadelConfig,
   change: (schema: UserSchema) => UserSchema,
 ): SchemaEdit {
-  const original = config.schemas.named();
+  const original = config.schemas.resolve();
   const edited = change(original);
   return { before: config, after: config.with(edited), original, edited };
 }

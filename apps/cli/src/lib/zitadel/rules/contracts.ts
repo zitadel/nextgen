@@ -3,7 +3,7 @@
  * for its kind, and what a file of that kind must never hold.
  *
  * @remarks
- * Each document says what is wrong with it through its own `problems`; this
+ * Each document says what is wrong with it through its own `check`; this
  * list only says which kinds are held, and in what order their findings are
  * reported. Which rules a kind breaks is the document's to say, so none of its
  * findings can be left out here. The same rules decide what {@link ZitadelConfig.load}
@@ -31,7 +31,7 @@ function documentRule(documents: (config: ZitadelConfig) => readonly ConfigDocum
   return {
     check: (config, context) => {
       const issues = documents(config).flatMap((document) => {
-        return document.problems(context);
+        return document.check(context);
       });
       const rules = new Set(
         issues.map((issue) => {

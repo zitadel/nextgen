@@ -29,7 +29,7 @@ import {
   onlyFlowOf,
   withStepChanged,
 } from "@tests/helpers/connections";
-import { issuer } from "@tests/helpers/idp-values";
+import { clientId, issuer } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -353,12 +353,12 @@ describe("Connections.enable", () => {
   });
 });
 
-describe("Connections.unused", () => {
+describe("Connections.findUnused", () => {
   describe("when nothing offers the provider any more", () => {
     it("is the connection, with the variables only it reads", () => {
-      const disabled = WITH_GOOGLE.connections.disable(WITH_GOOGLE.schemas.named(), "google").after;
+      const disabled = WITH_GOOGLE.connections.disable(WITH_GOOGLE.schemas.resolve(), "google").after;
 
-      const unused = disabled.connections.unused("google");
+      const unused = disabled.connections.findUnused("google");
 
       expect(unused).toEqual({
         connection: disabled.connections.find("google"),
@@ -379,7 +379,7 @@ describe("Connections.unused", () => {
         },
       });
 
-      const unused = config.connections.unused("google");
+      const unused = config.connections.findUnused("google");
 
       expect(unused?.variables).toEqual([]);
     });
@@ -387,7 +387,7 @@ describe("Connections.unused", () => {
 
   describe("when a schema or flow still offers the provider", () => {
     it("is nothing", () => {
-      const unused = WITH_GOOGLE.connections.unused("google");
+      const unused = WITH_GOOGLE.connections.findUnused("google");
 
       expect(unused).toBeUndefined();
     });
@@ -397,7 +397,7 @@ describe("Connections.unused", () => {
     it("is nothing", () => {
       const config = aConfig(CUSTOMERS_PROJECT);
 
-      const unused = config.connections.unused("google");
+      const unused = config.connections.findUnused("google");
 
       expect(unused).toBeUndefined();
     });
@@ -407,18 +407,18 @@ describe("Connections.unused", () => {
 describe("Connections.disable", () => {
   describe("when the schema and its flow offer the provider", () => {
     it("takes the provider out of the schema and every flow that offers it", () => {
-      const schema = WITH_GOOGLE.schemas.named();
+      const schema = WITH_GOOGLE.schemas.resolve();
 
       const change = WITH_GOOGLE.connections.disable(schema, "google");
 
       expect({
         providers: change.after.schemas.get(SCHEMA_FILE)?.providers,
-        offered: change.after.connections.offeredBy("google"),
+        offered: change.after.connections.findOfferingPaths("google"),
       }).toEqual({ providers: [], offered: [] });
     });
 
     it("keeps the connection file", () => {
-      const schema = WITH_GOOGLE.schemas.named();
+      const schema = WITH_GOOGLE.schemas.resolve();
 
       const change = WITH_GOOGLE.connections.disable(schema, "google");
 
@@ -426,7 +426,7 @@ describe("Connections.disable", () => {
     });
 
     it("says the steps the provider's sign-in used stay for the next provider", () => {
-      const schema = WITH_GOOGLE.schemas.named();
+      const schema = WITH_GOOGLE.schemas.resolve();
 
       const change = WITH_GOOGLE.connections.disable(schema, "google");
 
@@ -437,7 +437,7 @@ describe("Connections.disable", () => {
     });
 
     it("says the connection and its variables stay, so enabling it again asks for nothing", () => {
-      const schema = WITH_GOOGLE.schemas.named();
+      const schema = WITH_GOOGLE.schemas.resolve();
 
       const change = WITH_GOOGLE.connections.disable(schema, "google");
 
@@ -461,14 +461,14 @@ describe("Connections.disable", () => {
 
     it("refuses to remove it", () => {
       const error = thrownBy(() => {
-        return config.connections.disable(config.schemas.named(), "google");
+        return config.connections.disable(config.schemas.resolve(), "google");
       });
 
       expect(error).toBeInstanceOf(NoSignInLeftError);
     });
 
     it("removes it when forced", () => {
-      const change = config.connections.disable(config.schemas.named(), "google", { force: true });
+      const change = config.connections.disable(config.schemas.resolve(), "google", { force: true });
 
       expect(change.after.schemas.get(SCHEMA_FILE)?.providers).toEqual([]);
     });
@@ -501,7 +501,7 @@ describe("Connections.disable", () => {
       ],
     ])("%s", (_claim, config, fields) => {
       const error = thrownBy(() => {
-        return config.connections.disable(config.schemas.named(), "gogle");
+        return config.connections.disable(config.schemas.resolve(), "gogle");
       });
 
       expect(error).toBeInstanceOf(NotFoundError);
@@ -525,7 +525,7 @@ describe("Connections.disable", () => {
     ])("%s", (_claim, connections, provider) => {
       const config = aConfig({ ...CUSTOMERS_PROJECT, connections });
 
-      const change = config.connections.disable(config.schemas.named(), provider);
+      const change = config.connections.disable(config.schemas.resolve(), provider);
 
       expect(change.changed).toBe(false);
     });
@@ -545,7 +545,7 @@ describe("Connections.disable", () => {
       });
 
       const error = thrownBy(() => {
-        return config.connections.disable(config.schemas.named(), "google");
+        return config.connections.disable(config.schemas.resolve(), "google");
       });
 
       expect(error).toBeInstanceOf(RefusedEditError);
@@ -553,7 +553,7 @@ describe("Connections.disable", () => {
   });
 });
 
-describe("Connections.existing", () => {
+describe("Connections.resolveExisting", () => {
   describe("with a catalog candidate", () => {
     it.each([
       ["is nothing when the project has no connection to the provider", {}, undefined],
@@ -607,7 +607,7 @@ describe("Connections.existing", () => {
     ])("%s", (_claim, connections, path) => {
       const config = aConfig({ connections });
 
-      const existing = config.connections.existing(GOOGLE);
+      const existing = config.connections.resolveExisting(GOOGLE);
 
       expect(existing?.path).toBe(path);
     });
@@ -615,8 +615,8 @@ describe("Connections.existing", () => {
     it("reuses without complaint when the client id given is the one it holds", () => {
       const config = aConfig({ connections: { "google.json": aGoogleConnection() } });
 
-      const existing = config.connections.existing(GOOGLE, {
-        clientId: "111.apps.googleusercontent.com",
+      const existing = config.connections.resolveExisting(GOOGLE, {
+        clientId: clientId("111.apps.googleusercontent.com"),
       });
 
       expect(existing?.path).toBe(GOOGLE_FILE);
@@ -679,7 +679,7 @@ describe("Connections.existing", () => {
       const config = aConfig({ connections });
 
       const error = thrownBy(() => {
-        return config.connections.existing(GOOGLE);
+        return config.connections.resolveExisting(GOOGLE);
       });
 
       expect(error).toBeInstanceOf(ConflictError);
@@ -690,7 +690,7 @@ describe("Connections.existing", () => {
       [
         "refuses a client id other than the one the connection holds",
         aGoogleConnection(),
-        "999.apps.googleusercontent.com",
+        clientId("999.apps.googleusercontent.com"),
         `${GOOGLE_FILE} already uses client id 111.apps.googleusercontent.com, not 999.apps.googleusercontent.com`,
       ],
       [
@@ -699,11 +699,11 @@ describe("Connections.existing", () => {
         undefined,
         `${GOOGLE_FILE} is a Google connection with no usable slug`,
       ],
-    ])("%s", (_claim, google, clientId, message) => {
+    ])("%s", (_claim, google, given, message) => {
       const config = aConfig({ connections: { "google.json": google } });
 
       const error = thrownBy(() => {
-        return config.connections.existing(GOOGLE, { clientId });
+        return config.connections.resolveExisting(GOOGLE, { clientId: given });
       });
 
       expect(error).toBeInstanceOf(ConfigError);
@@ -722,7 +722,7 @@ describe("Connections.existing", () => {
 
       it("points the refusal at the file and the schemas and flows, not at a flag", () => {
         const error = thrownBy(() => {
-          return config.connections.existing(GOOGLE);
+          return config.connections.resolveExisting(GOOGLE);
         });
 
         expect(error).toBeInstanceOf(ConflictError);
@@ -733,7 +733,7 @@ describe("Connections.existing", () => {
 
       it("names no flag in the refusal's hint", () => {
         const error = thrownBy(() => {
-          return config.connections.existing(GOOGLE);
+          return config.connections.resolveExisting(GOOGLE);
         });
 
         expect(error).toBeInstanceOf(ConflictError);
@@ -776,7 +776,7 @@ describe("Connections.existing", () => {
     ])("%s", (_claim, connections, path) => {
       const config = aConfig({ connections });
 
-      const existing = config.connections.existing(ACME_SSO);
+      const existing = config.connections.resolveExisting(ACME_SSO);
 
       expect(existing?.path).toBe(path);
     });
@@ -788,7 +788,7 @@ describe("Connections.existing", () => {
         CUSTOMERS_SCHEMA,
       );
 
-      const existing = config.connections.existing(candidate);
+      const existing = config.connections.resolveExisting(candidate);
 
       expect(existing).toBeUndefined();
     });
@@ -800,7 +800,7 @@ describe("Connections.existing", () => {
         },
       });
 
-      const existing = config.connections.existing(ACME_SSO);
+      const existing = config.connections.resolveExisting(ACME_SSO);
 
       expect(existing?.credentialNames.clientSecret).toBe("ACME_SECRET");
     });
@@ -861,7 +861,7 @@ describe("Connections.existing", () => {
       );
 
       const error = thrownBy(() => {
-        return config.connections.existing(candidate);
+        return config.connections.resolveExisting(candidate);
       });
 
       expect(error).toBeInstanceOf(ConflictError);
@@ -876,7 +876,7 @@ describe("Connections.existing", () => {
       });
 
       const error = thrownBy(() => {
-        return config.connections.existing(ACME_SSO, { clientId: "another-id" });
+        return config.connections.resolveExisting(ACME_SSO, { clientId: clientId("another-id") });
       });
 
       expect(error).toBeInstanceOf(ConfigError);
@@ -894,7 +894,7 @@ describe("Connections.existing", () => {
         );
 
         const error = thrownBy(() => {
-          return config.connections.existing(candidate);
+          return config.connections.resolveExisting(candidate);
         });
 
         expect(error).toBeInstanceOf(ConflictError);
@@ -909,7 +909,7 @@ describe("Connections.existing", () => {
         });
 
         const error = thrownBy(() => {
-          return config.connections.existing(ACME_SSO);
+          return config.connections.resolveExisting(ACME_SSO);
         });
 
         expect(error).toBeInstanceOf(ConflictError);
@@ -921,7 +921,7 @@ describe("Connections.existing", () => {
   });
 });
 
-describe("Connections.named", () => {
+describe("Connections.resolveBySlug", () => {
   /**
    * The `acme-sso` connection as the file holds it.
    */
@@ -943,7 +943,7 @@ describe("Connections.named", () => {
   ])("%s", (_claim, slug, given, path) => {
     const config = aConfig({ connections: { "acme-sso.json": ACME_SSO_ON_FILE } });
 
-    const named = config.connections.named(slug, given);
+    const named = config.connections.resolveBySlug(slug, given);
 
     expect(named?.path).toBe(path);
   });
@@ -971,7 +971,7 @@ describe("Connections.named", () => {
     const config = aConfig({ connections });
 
     const error = thrownBy(() => {
-      return config.connections.named("acme-sso", given);
+      return config.connections.resolveBySlug("acme-sso", given);
     });
 
     expect(error).toBeInstanceOf(ConflictError);
@@ -983,7 +983,7 @@ describe("Connections.named", () => {
       const config = aConfig({ connections: { "acme-sso.json": ACME_SSO_ON_FILE } });
 
       const error = thrownBy(() => {
-        return config.connections.named("acme-sso", "https://sso.other.example");
+        return config.connections.resolveBySlug("acme-sso", "https://sso.other.example");
       });
 
       expect(error).toBeInstanceOf(ConflictError);
@@ -999,7 +999,7 @@ describe("Connections.named", () => {
   });
 });
 
-describe("Connections.sameIssuer", () => {
+describe("Connections.findSameIssuer", () => {
   describe("with a connection of the developer's own to the candidate's issuer", () => {
     it("names it", () => {
       const config = aConfig({
@@ -1015,7 +1015,7 @@ describe("Connections.sameIssuer", () => {
         },
       });
 
-      const paths = config.connections.sameIssuer(GOOGLE);
+      const paths = config.connections.findSameIssuer(GOOGLE);
 
       expect(paths).toEqual([`${IDPS}/google-work.json`]);
     });
@@ -1025,7 +1025,7 @@ describe("Connections.sameIssuer", () => {
     it("names nothing", () => {
       const config = aConfig({ connections: { "okta.json": { slug: "okta" } } });
 
-      const paths = config.connections.sameIssuer(GOOGLE);
+      const paths = config.connections.findSameIssuer(GOOGLE);
 
       expect(paths).toEqual([]);
     });

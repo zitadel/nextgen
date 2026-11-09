@@ -1,48 +1,83 @@
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
-import type { ConfigStore } from "@/lib/zitadel/storage/types";
+import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
+
+/**
+ * Every way a caller reports a notice: a warning for something to act on, info
+ * for something to know.
+ */
+export const NOTICE_SEVERITIES = ["warning", "info"] as const;
+
+/**
+ * How a caller reports a notice.
+ */
+export type NoticeSeverity = (typeof NOTICE_SEVERITIES)[number];
 
 /**
  * Something a caller should tell the person about a change: left alone,
  * kept, or still to do.
  */
-export type Notice = Readonly<{
+export type Notice = {
   /**
-   * How the caller should report it: a warning for something to act on, info
-   * for something to know.
+   * How the caller should report it.
    */
-  severity: "warning" | "info";
+  readonly severity: NoticeSeverity;
 
   /**
    * What to tell the person, as a sentence they can act on.
    */
-  message: string;
-}>;
+  readonly message: string;
+};
 
 /**
  * A plain-text file a change writes beside the documents, such as a branding
  * template.
  */
-type TextFile = Readonly<{
+type TextFile = {
   /**
    * The project-relative path.
    */
-  path: string;
+  readonly path: string;
 
   /**
    * What the file holds.
    */
-  text: string;
-}>;
+  readonly text: string;
+};
 
 /**
  * What saving does about a new file that is already on disk.
  */
-export type SaveOptions = Readonly<{
+export type SaveOptions = {
   /**
    * Replace it instead of refusing, as `--force` asks.
    */
-  overwrite?: boolean;
-}>;
+  readonly overwrite?: boolean;
+};
+
+/**
+ * What a {@link Change} is made of.
+ */
+export type ChangeInput = {
+  /**
+   * The configuration the edit was made on.
+   */
+  readonly before: ZitadelConfig;
+
+  /**
+   * The configuration as the edit leaves it.
+   */
+  readonly after: ZitadelConfig;
+
+  /**
+   * What to say about the change; nothing when left out.
+   */
+  readonly notices?: readonly Notice[];
+
+  /**
+   * The text files it writes beside the documents; none when left out.
+   */
+  readonly texts?: readonly TextFile[];
+};
 
 /**
  * One edit to the configuration: the configuration before and after, the
@@ -83,14 +118,7 @@ export class Change {
    * @param input - The configuration before and after, what to say about the
    *   change, and any text files it writes beside the documents.
    */
-  constructor(
-    input: Readonly<{
-      before: ZitadelConfig;
-      after: ZitadelConfig;
-      notices?: readonly Notice[];
-      texts?: readonly TextFile[];
-    }>,
-  ) {
+  constructor(input: ChangeInput) {
     this.before = input.before;
     this.after = input.after;
     this.notices = input.notices ?? [];
@@ -112,11 +140,10 @@ export class Change {
    * @returns Their project-relative paths, documents first.
    */
   get createdPaths(): readonly string[] {
-    return this.pathsWithTexts(
-      this.after.changedDocuments.filter((document) => {
-        return document.status === "created";
-      }),
-    );
+    const created = this.after.changedDocuments.filter((document) => {
+      return document.status === "created";
+    });
+    return this.pathsWithTexts(created);
   }
 
   /**
@@ -162,7 +189,7 @@ export class Change {
    * @remarks
    * New files go first, so one that is already on disk refuses the write
    * before any other file is touched; deletions go last, so a write that
-   * fails leaves every file that was there.
+   * fails leaves every file that was there. One file at a time, in that order.
    *
    * @param store - Where the configuration is kept.
    * @param options - Whether a new file may replace one already there.
@@ -172,14 +199,17 @@ export class Change {
    */
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
     const overwrite = options.overwrite === true;
+    // A copy, so sorting it changes nothing the configuration holds.
     const documents = [...this.after.changedDocuments].sort((a, b) => {
       return Number(b.status === "created") - Number(a.status === "created");
     });
     for (const document of documents) {
-      await store.write(document.toFile(), overwrite ? "replace" : document.writeMode);
+      const mode: WriteMode = overwrite ? "replace" : document.writeMode;
+      await store.write(document.file, mode);
     }
+    const textMode: WriteMode = overwrite ? "replace" : "create";
     for (const file of this.texts) {
-      await store.writeText(file.path, file.text, overwrite ? "replace" : "create");
+      await store.writeText(file.path, file.text, textMode);
     }
     for (const path of this.removedPaths) {
       await store.remove(path);
@@ -219,7 +249,7 @@ export class DocumentChange<T extends AnyDocument> extends Change {
    * @param input - What a {@link Change} is made of, and the document it is
    *   about.
    */
-  constructor(input: ConstructorParameters<typeof Change>[0] & Readonly<{ document: T }>) {
+  constructor(input: ChangeInput & { readonly document: T }) {
     super(input);
     this.document = input.document;
   }

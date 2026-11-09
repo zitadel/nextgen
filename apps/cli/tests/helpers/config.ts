@@ -8,6 +8,7 @@ import {
   type ConfigOptions,
   type JsonObject,
   MemoryStore,
+  type PolicyOperation,
   ZitadelConfig,
 } from "@/lib/zitadel";
 
@@ -248,7 +249,7 @@ export function aLoginFlow(options: LoginFlowOptions = {}): JsonObject {
 /**
  * The operation the policy builders are for.
  */
-export const PASSWORD_POLICY = "auth.factor.password.set";
+export const PASSWORD_POLICY: PolicyOperation = "auth.factor.password.set";
 
 /**
  * A password policy the server accepts, requiring twelve characters.

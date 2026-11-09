@@ -1411,7 +1411,7 @@ describe("lockoutStep", () => {
         }),
         client: aPlatform(),
       });
-      vi.spyOn(context.config.flows, "schemaOf").mockImplementation(refused);
+      vi.spyOn(context.config.flows, "findSchemaOf").mockImplementation(refused);
 
       await lockoutStep.run(context);
 

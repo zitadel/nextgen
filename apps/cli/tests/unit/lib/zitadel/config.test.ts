@@ -244,13 +244,13 @@ describe("ZitadelConfig.scaffold", () => {
     it("leaves SSO off the schema", () => {
       const { schema } = ZitadelConfig.empty().scaffold(MINIMAL);
 
-      expect(schema.ssoEnabled).toBe(false);
+      expect(schema.isSsoEnabled).toBe(false);
     });
 
     it("offers no provider on the flow", () => {
       const { flow } = ZitadelConfig.empty().scaffold(MINIMAL);
 
-      expect(flow.offers()).toBe(false);
+      expect(flow.offersSso).toBe(false);
     });
   });
 
@@ -264,7 +264,7 @@ describe("ZitadelConfig.scaffold", () => {
     it("asks for companyName on the register step", () => {
       const { flow } = ZitadelConfig.empty().scaffold({ ...MINIMAL, useCase: "business" });
 
-      expect(flow.step("register")?.fields).toEqual([
+      expect(flow.findStep("register")?.fields).toEqual([
         "email",
         "givenName",
         "familyName",
@@ -314,7 +314,7 @@ describe("ZitadelConfig.scaffold", () => {
     it("offers every provider on the identifier step, in the order chosen", () => {
       const { flow } = ZitadelConfig.empty().scaffold(WITH_PROVIDERS);
 
-      expect(flow.step("identifier")?.providers).toEqual(["google", "acme"]);
+      expect(flow.findStep("identifier")?.providers).toEqual(["google", "acme"]);
     });
 
     it("writes the client secret as a variable reference, never a value", () => {

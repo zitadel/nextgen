@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
 import type { DocumentFile } from "@/lib/zitadel/resources/document";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { ConfigDirectory, JsonObject } from "@/lib/zitadel/types";
 
 /**
  * The documents of one kind in a configuration, and the edits every kind
@@ -53,18 +53,18 @@ export class Collection<T extends AnyDocument> {
   }
 
   /**
-   * The documents of the collection that pass a test, as a collection of
+   * Keep the documents of the collection that pass a test, as a collection of
    * their own, so a refusal can name them by {@link paths}.
    *
    * @param test - Whether a document belongs.
    * @returns The collection of those documents, in the same configuration.
    */
-  where(test: (document: T) => boolean): Collection<T> {
+  filter(test: (document: T) => boolean): Collection<T> {
     return new Collection(this.config, this.all.filter(test));
   }
 
   /**
-   * The document at a path.
+   * Get the document at a path.
    *
    * @param path - The document's project-relative path.
    * @returns The document, or `undefined` when none of the kind is there.
@@ -76,7 +76,7 @@ export class Collection<T extends AnyDocument> {
   }
 
   /**
-   * The document a release pins by a handle.
+   * Find the document a release pins by a handle.
    *
    * @remarks
    * Matched by what the document holds, never by its file name: setup writes
@@ -85,7 +85,7 @@ export class Collection<T extends AnyDocument> {
    * @param handle - The handle.
    * @returns The first document that holds it, or `undefined` when none does.
    */
-  holding(handle: string): T | undefined {
+  findByHandle(handle: string): T | undefined {
     return this.all.find((document) => {
       return document.handle === handle;
     });
@@ -102,9 +102,11 @@ export class Collection<T extends AnyDocument> {
   }
 
   /**
-   * Remove the document at a path, which saving the change deletes. A path
-   * that holds no document of the kind changes nothing, so removing one
-   * twice is not an error.
+   * Remove the document at a path, which saving the change deletes.
+   *
+   * @remarks
+   * A path that holds no document of the kind changes nothing, so removing
+   * one twice is not an error.
    *
    * @param path - The document's project-relative path.
    * @returns The change.
@@ -116,10 +118,46 @@ export class Collection<T extends AnyDocument> {
     }
     return new Change({ before: this.config, after: this.config.without(document) });
   }
+}
+
+/**
+ * A collection of a kind a release pins by handle, which `pull` rebuilds on
+ * disk from the revisions a release pins.
+ *
+ * @typeParam T - The kind of document.
+ */
+export abstract class PinnedCollection<T extends AnyDocument> extends Collection<T> {
+  /**
+   * The directory a document of the kind goes in when no file holds its handle.
+   */
+  protected abstract readonly directory: ConfigDirectory;
 
   /**
-   * Place a revision a release pinned at a path, replacing whatever file is
-   * there.
+   * Make a new document of the kind.
+   *
+   * @param file - Its path and body.
+   * @returns The document.
+   */
+  protected abstract createDocument(file: DocumentFile): T;
+
+  /**
+   * Locate where a document a release pins by a handle goes: the file that
+   * holds the handle, or `<handle>.json` when none does.
+   *
+   * @param handle - The handle.
+   * @returns The project-relative path.
+   */
+  locate(handle: string): string {
+    const holder = this.findByHandle(handle);
+    if (holder !== undefined) {
+      return holder.path;
+    }
+    return `${this.directory}/${handle}.json`;
+  }
+
+  /**
+   * Place a revision a release pinned at {@link locate}, replacing whatever
+   * file is there.
    *
    * @remarks
    * The server never echoes the editor-only `$schema` pointer, so the one in
@@ -128,25 +166,19 @@ export class Collection<T extends AnyDocument> {
    * nothing. The revision is written whole, as a new document, so saving the
    * change over a file already there takes `overwrite`.
    *
-   * @param path - Where the revision goes.
+   * @param handle - The handle the release pins it by.
    * @param revision - The body as the server answered it.
-   * @param create - Makes a new document of the kind.
    * @returns The change.
    */
-  protected placeRevision(
-    path: string,
-    revision: JsonObject,
-    create: (file: DocumentFile) => T,
-  ): Change {
+  placeRevision(handle: string, revision: JsonObject): Change {
+    const path = this.locate(handle);
     const there = this.get(path);
     const pointer = there?.body.$schema;
-    const body =
-      typeof pointer === "string" && !("$schema" in revision)
-        ? { ...revision, $schema: pointer }
-        : revision;
+    const carried = typeof pointer === "string" && !("$schema" in revision);
+    const body = carried ? { ...revision, $schema: pointer } : revision;
     if (there !== undefined && isDeepStrictEqual(there.body, body)) {
       return new Change({ before: this.config, after: this.config });
     }
-    return this.put(create({ path, body }));
+    return this.put(this.createDocument({ path, body }));
   }
 }
