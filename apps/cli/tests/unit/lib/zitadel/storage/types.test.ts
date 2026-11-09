@@ -264,6 +264,65 @@ describe("ConfigStore.writeText", () => {
   });
 });
 
+describe("ConfigStore outside .zitadel/", () => {
+  describe.each(STORES)("with a %s", (_store, open) => {
+    const OUTSIDE = `${CONFIG_DIRECTORIES.schemas}/../../escaped.json`;
+
+    it.for([
+      [
+        "write",
+        (store: ConfigStore) => {
+          return store.write({ path: OUTSIDE, body: {} }, "create");
+        },
+      ],
+      [
+        "writeText",
+        (store: ConfigStore) => {
+          return store.writeText(OUTSIDE, MAIN, "create");
+        },
+      ],
+      [
+        "remove",
+        (store: ConfigStore) => {
+          return store.remove(OUTSIDE);
+        },
+      ],
+    ] as const)("refuses %s of a path outside it", async ([_call, act], { dir }) => {
+      const store = await open(dir);
+
+      const error = await rejectionOf(() => {
+        return act(store);
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({ message: `${OUTSIDE} points outside .zitadel/` });
+    });
+
+    it("refuses to hold a file written outside it", async ({ dir }) => {
+      const store = await open(dir);
+
+      await rejectionOf(() => {
+        return store.writeText("escaped.json", MAIN, "create");
+      });
+
+      expect(await store.exists("escaped.json")).toBe(false);
+    });
+
+    it("reports a path outside it as not writable, and one inside as writable", async ({ dir }) => {
+      const store = await open(dir);
+
+      const outside = thrownBy(() => {
+        store.assertWritable(OUTSIDE);
+      });
+      const inside = thrownBy(() => {
+        store.assertWritable(IDP_A);
+      });
+
+      expect([outside, inside]).toEqual([expect.any(ConfigError), undefined]);
+    });
+  });
+});
+
 describe("ConfigStore.inlineReferences", () => {
   describe.each(STORES)("with a %s", (_store, open) => {
     it.for([

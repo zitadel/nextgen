@@ -14,8 +14,10 @@ import {
 } from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
 import {
+  CONFIG_ROOT,
   findFileReferences,
   inlineFileReferences,
+  outsideConfig,
   outsideProject,
 } from "@/lib/zitadel/storage/references";
 import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
@@ -45,12 +47,6 @@ const WRITE_FLAG = {
  */
 export class DiskStore implements ConfigStore {
   /**
-   * The directory, relative to the project, that every file written or
-   * removed must stay inside.
-   */
-  private static readonly CONFIG_ROOT = ".zitadel";
-
-  /**
    * The project's root directory, which every path given to the store is
    * relative to.
    */
@@ -72,18 +68,20 @@ export class DiskStore implements ConfigStore {
    * @returns The files, in file-name order; none when the kind's directory is
    *   not there. A file that is not valid JSON, or holds something other than
    *   a JSON object, comes back as an {@link UnparsedFile} with the reason.
-   * @throws {@link ConfigError} When a file cannot be read; of several that
-   *   cannot, the first in path order.
+   * @throws {@link ConfigError} When the directory or a file cannot be read;
+   *   of several files that cannot, the first in path order.
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
     const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
-      // Only an absent directory means the project has none: a permission
-      // failure reported as "no files" would hide a file that is right there.
-      if (DiskStore.errnoOf(error) === "ENOENT") {
+      // Only an absent directory means the project has none, as for `exists`:
+      // a permission failure reported as "no files" would hide a file that is
+      // right there.
+      const code = DiskStore.errnoOf(error);
+      if (code === "ENOENT" || code === "ENOTDIR") {
         return [];
       }
-      throw error;
+      throw DiskStore.unreadable(directory, code);
     });
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
@@ -128,6 +126,17 @@ export class DiskStore implements ConfigStore {
         throw error;
       },
     );
+  }
+
+  /**
+   * Check that a file may be written or removed, without touching it.
+   *
+   * @param path - The project-relative path.
+   * @throws {@link ConfigError} When the path, or the real target behind a
+   *   symlink on the way, leaves `.zitadel/`.
+   */
+  assertWritable(path: string): void {
+    this.place(path);
   }
 
   /**
@@ -240,7 +249,7 @@ export class DiskStore implements ConfigStore {
    *   symlink on the way, leaves `.zitadel/`.
    */
   private place(path: string): Path {
-    const directory = this.root.resolve(DiskStore.CONFIG_ROOT);
+    const directory = this.root.resolve(CONFIG_ROOT);
     const target = this.root.resolve(path);
     const realDirectory = directory.resolveReal();
     const realTarget = target.resolveReal();
@@ -250,10 +259,7 @@ export class DiskStore implements ConfigStore {
       realTarget === undefined ||
       !realDirectory.contains(realTarget)
     ) {
-      throw new ConfigError(`${path} points outside ${DiskStore.CONFIG_ROOT}/`, {
-        hint: "Files are only written and removed inside .zitadel/.",
-        details: { file: path },
-      });
+      throw outsideConfig(path);
     }
     return target;
   }
@@ -303,14 +309,7 @@ export class DiskStore implements ConfigStore {
   private async readFileAt(path: string): Promise<StoredFile> {
     const text = await readFile(this.root.resolve(path).toString(), "utf8").catch(
       (error: unknown) => {
-        const code = DiskStore.errnoOf(error);
-        throw new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
-          hint: "Check that the file is readable, then run the command again.",
-          details: {
-            file: path,
-            ...(code === undefined ? {} : { code }),
-          },
-        });
+        throw DiskStore.unreadable(path, DiskStore.errnoOf(error));
       },
     );
     let body: unknown;
@@ -328,6 +327,27 @@ export class DiskStore implements ConfigStore {
       return { path, unparsed: "not a JSON object" };
     }
     return { path, body };
+  }
+
+  /**
+   * The failure for a file or directory that cannot be read.
+   *
+   * @remarks
+   * The errno is kept in `details.code`, so the CLI can tell a permission
+   * failure from the rest.
+   *
+   * @param path - The project-relative path.
+   * @param code - The errno of the failed operation, when it had one.
+   * @returns The error to throw.
+   */
+  private static unreadable(path: string, code: string | undefined): ConfigError {
+    return new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
+      hint: "Check that the file is readable, then run the command again.",
+      details: {
+        file: path,
+        ...(code === undefined ? {} : { code }),
+      },
+    });
   }
 
   /**

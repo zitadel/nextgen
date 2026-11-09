@@ -64,6 +64,18 @@ export interface ConfigStore {
   exists(path: string): Promise<boolean>;
 
   /**
+   * Check that a file may be written or removed, without touching it.
+   *
+   * @remarks
+   * Every write and removal enforces this itself; asking first lets a caller
+   * that writes several files refuse all of them before the first is written.
+   *
+   * @param path - The project-relative path.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   */
+  assertWritable(path: string): void;
+
+  /**
    * Write one file's body.
    *
    * @param file - The file to write.

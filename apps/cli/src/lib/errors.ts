@@ -132,6 +132,31 @@ const NETWORK_HINTS: Record<UnavailableReason, string> = {
 };
 
 /**
+ * The error code a configuration error is reported with.
+ *
+ * @remarks
+ * A file or directory the OS refused to read carries its errno in
+ * `details.code`; a permission failure is `E_AUTH`, as it is for any other
+ * file the CLI reads.
+ *
+ * @param error - The error.
+ * @returns The code it is reported with.
+ */
+function configErrorCode(error: ConfigError): ZitadelErrorCode {
+  const errno = error.details?.code;
+  if (errno === "EACCES" || errno === "EPERM") {
+    return "E_AUTH";
+  }
+  if (error instanceof ConfigConflictError) {
+    return "E_CONFLICT";
+  }
+  if (error instanceof ConfigNotFoundError) {
+    return "E_NOT_FOUND";
+  }
+  return "E_VALIDATION";
+}
+
+/**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
  * ordered most-specific-first (already-normalised, HTTP status, then
  * errno/filesystem, no response, Zod-like, generic `Error`, then a
@@ -142,22 +167,6 @@ const NETWORK_HINTS: Record<UnavailableReason, string> = {
  * output. The original error shape is preserved under `details` for
  * debugging without leaking it into the user-facing message.
  */
-/**
- * The exit code a configuration error carries.
- *
- * @param error - The error.
- * @returns Its code.
- */
-function configErrorCode(error: ConfigError): ZitadelErrorCode {
-  if (error instanceof ConfigConflictError) {
-    return "E_CONFLICT";
-  }
-  if (error instanceof ConfigNotFoundError) {
-    return "E_NOT_FOUND";
-  }
-  return "E_VALIDATION";
-}
-
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {
     return error;

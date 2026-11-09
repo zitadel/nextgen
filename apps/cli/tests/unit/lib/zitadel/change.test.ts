@@ -145,6 +145,34 @@ describe("Change.save", () => {
     expect(store.get(LOCKOUT)).toBeUndefined();
   });
 
+  it("writes nothing when one of the paths leads outside .zitadel/", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const creating = config.policies
+      .put(NEW_LOCKOUT)
+      .withText(`${CONFIG_DIRECTORIES.branding}/../../escaped.txt`, "x");
+
+    await creating.save(store).catch(() => {
+      return undefined;
+    });
+
+    expect(store.get(LOCKOUT)).toBeUndefined();
+  });
+
+  it("deletes nothing when one of the paths leads outside .zitadel/", async () => {
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const removing = config.policies
+      .remove(PASSWORD)
+      .withText(`${CONFIG_DIRECTORIES.branding}/../../escaped.txt`, "x");
+
+    await removing.save(store).catch(() => {
+      return undefined;
+    });
+
+    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy());
+  });
+
   it("keeps a document in createOnly from being replaced under overwrite", async () => {
     const store = aStore(HOLDING_SCHEMA);
     const config = await ZitadelConfig.loadUnchecked(store);

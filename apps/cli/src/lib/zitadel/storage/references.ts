@@ -173,3 +173,23 @@ export function outsideProject(ref: string): ConfigError {
       "a symlink on the way must resolve inside the project too.",
   });
 }
+
+/**
+ * The directory, relative to the project, that every file a store writes or
+ * removes must stay inside.
+ */
+export const CONFIG_ROOT = ".zitadel";
+
+/**
+ * The failure for a file to write or remove that leads outside `.zitadel/`,
+ * which every store refuses alike.
+ *
+ * @param path - The project-relative path as given.
+ * @returns The error to throw.
+ */
+export function outsideConfig(path: string): ConfigError {
+  return new ConfigError(`${path} points outside ${CONFIG_ROOT}/`, {
+    hint: "Files are only written and removed inside .zitadel/.",
+    details: { file: path },
+  });
+}

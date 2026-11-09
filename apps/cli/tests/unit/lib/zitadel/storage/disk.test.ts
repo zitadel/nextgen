@@ -83,6 +83,43 @@ describe("DiskStore.read", () => {
     });
   });
 
+  it.skipIf(AS_ROOT)("carries the errno of a file it may not read", async ({ dir }) => {
+    await write(dir, { [IDP]: "{}" });
+    await chmod(join(dir, IDP), 0o000);
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
+    });
+
+    expect(error).toMatchObject({
+      message: `${IDP} cannot be read (EACCES)`,
+      details: { file: IDP, code: "EACCES" },
+    });
+  });
+
+  it.skipIf(AS_ROOT)("carries the errno of a directory it may not read", async ({ dir }) => {
+    await write(dir, { [IDP]: "{}" });
+    await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o000);
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
+    });
+    await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o755);
+
+    expect(error).toMatchObject({
+      message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
+      details: { file: CONFIG_DIRECTORIES.connections, code: "EACCES" },
+    });
+  });
+
+  it("finds no files when the kind's directory is a regular file", async ({ dir }) => {
+    await write(dir, { [CONFIG_DIRECTORIES.connections]: "not a directory" });
+
+    const files = await new DiskStore(dir).read("connections");
+
+    expect(files).toEqual([]);
+  });
+
   it("hands a file that holds json other than an object on as unparsed", async ({ dir }) => {
     await write(dir, { [IDP]: "[1, 2]" });
 
@@ -200,6 +237,24 @@ describe("DiskStore.write outside .zitadel/", () => {
     });
 
     expect(error).toBeInstanceOf(ConfigError);
+  });
+});
+
+describe("DiskStore.assertWritable", () => {
+  it("refuses a path that climbs out of .zitadel/", ({ dir }) => {
+    const error = thrownBy(() => {
+      new DiskStore(dir).assertWritable(`${CONFIG_DIRECTORIES.schemas}/../../escaped.json`);
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+  });
+
+  it("accepts a path inside .zitadel/", ({ dir }) => {
+    const error = thrownBy(() => {
+      new DiskStore(dir).assertWritable(`${CONFIG_DIRECTORIES.schemas}/user.json`);
+    });
+
+    expect(error).toBeUndefined();
   });
 });
 

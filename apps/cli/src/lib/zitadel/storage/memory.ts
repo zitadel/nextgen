@@ -10,8 +10,10 @@ import {
 } from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
 import {
+  CONFIG_ROOT,
   findFileReferences,
   inlineFileReferences,
+  outsideConfig,
   outsideProject,
 } from "@/lib/zitadel/storage/references";
 import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
@@ -96,6 +98,18 @@ export class MemoryStore implements ConfigStore {
   }
 
   /**
+   * Check that a file may be written or removed, as a disk would.
+   *
+   * @param path - The project-relative path.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   */
+  assertWritable(path: string): void {
+    if (!ROOT.resolve(CONFIG_ROOT).contains(ROOT.resolve(path))) {
+      throw outsideConfig(path);
+    }
+  }
+
+  /**
    * Hold one configuration file's body.
    *
    * @param file - The file to write.
@@ -103,8 +117,10 @@ export class MemoryStore implements ConfigStore {
    * @returns Nothing, once it is held.
    * @throws {@link FileExistsError} When anything is already held at the path,
    *   under `create`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
+    this.assertWritable(file.path);
     if (mode === "create" && (await this.exists(file.path))) {
       throw new FileExistsError(file.path);
     }
@@ -116,8 +132,10 @@ export class MemoryStore implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once it is gone.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async remove(path: string): Promise<void> {
+    this.assertWritable(path);
     this.files.delete(path);
   }
 
@@ -130,8 +148,10 @@ export class MemoryStore implements ConfigStore {
    * @returns Nothing, once it is held.
    * @throws {@link FileExistsError} When anything is already held at the path,
    *   under `create`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
+    this.assertWritable(path);
     if (mode === "create" && (await this.exists(path))) {
       throw new FileExistsError(path);
     }

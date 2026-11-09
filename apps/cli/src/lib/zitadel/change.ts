@@ -257,6 +257,8 @@ export class Change {
    *   {@link Change.removedPaths} lists.
    * @throws {@link FileExistsError} When a new file is already on disk and
    *   may not be replaced.
+   * @throws {@link ConfigError} When any path to write or delete leads
+   *   outside `.zitadel/`; nothing is written or deleted then.
    */
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
     const overwrite = options.overwrite === true;
@@ -296,6 +298,14 @@ export class Change {
     const writes = [...documents, ...files, ...texts].sort((a, b) => {
       return Number(b.mode === "create") - Number(a.mode === "create");
     });
+    // Every path is checked to be inside `.zitadel/` before any is written or
+    // removed, so a path that escapes refuses with nothing touched.
+    for (const write of writes) {
+      store.assertWritable(write.path);
+    }
+    for (const path of this.removedPaths) {
+      store.assertWritable(path);
+    }
     // Every file to create is checked before any is written, so a taken path
     // refuses with nothing touched, not after the files before it.
     for (const write of writes) {
