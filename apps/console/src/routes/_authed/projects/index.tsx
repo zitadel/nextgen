@@ -28,7 +28,7 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
-import { byName, primaryHost } from "@/features/projects/model";
+import { primaryHost } from "@/features/projects/model";
 import { useProjectScope, useSelectProjectTarget } from "@/features/projects/project-scope";
 import { HomeColumn, Page } from "@/components/layout";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
@@ -58,11 +58,13 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
  * The list can hold every project of a deployment — a platform operator acts
  * on all of them — so a row tells projects apart the way the project switcher
  * does (D21): the project's generated mark, its name with its site's host
- * beneath, and its ID. Complete on its first page, the list reads by name;
- * a longer one keeps the server's order, by id, so `Load more` appends to the
- * rows shown rather than reshuffling them. The search is matched on the server
- * across every project the person can act on (`name_contains`), never against
- * the rows already loaded.
+ * beneath, and its ID. The list reads newest first at every length (D28): the
+ * server sorts it by creation time (`order=desc`), so a project made a minute
+ * ago heads the list instead of waiting behind `Load more`, which appends
+ * older rows beneath the ones shown. The rows are never sorted here: a page
+ * sorted among itself would put the next one out of place. The search is
+ * matched on the server across every project the person can act on
+ * (`name_contains`), never against the rows already loaded.
  *
  * The top bar shows no project switcher here: this list, with its search, is
  * the switcher's job done at full size, so the selected project is marked in it
@@ -84,6 +86,7 @@ export const Route = createFileRoute("/_authed/projects/")({
     // the calling credential's one home project (#1237).
     const page = await api.listMyProjects({
       limit: LIST_PAGE_SIZE,
+      order: NEWEST_FIRST,
       name_contains: deps.q,
       ...consoleSessionProject(),
     });
@@ -93,6 +96,13 @@ export const Route = createFileRoute("/_authed/projects/")({
 });
 
 type ProjectsSearch = { next?: string; q?: string };
+
+/**
+ * The list's order, by creation time rather than by id: an id says nothing
+ * about when a project was made (root ADR 047). The loader and `Load more`
+ * both send it, since a page token only continues the order it came from.
+ */
+const NEWEST_FIRST = "desc";
 
 /** The Name cell clamps at 280px and truncates, as the Users table's User cell does. */
 const NAME_CLAMP = "max-w-70";
@@ -118,9 +128,10 @@ function ProjectsScreen() {
       const page = await api.listMyProjects({
         limit: LIST_PAGE_SIZE,
         page_token: pageToken,
-        // The search the token was issued under: a page token answers one
-        // question, and asking another with it is not a narrower list but a
-        // meaningless one.
+        // The order and the search the token was issued under: a page token
+        // answers one question, and asking another with it is not a narrower
+        // list but a meaningless one, or a refused one.
+        order: NEWEST_FIRST,
         name_contains: loaded.q,
         ...consoleSessionProject(),
       });
@@ -128,11 +139,7 @@ function ProjectsScreen() {
     },
     "Could not load more projects.",
   );
-  // A page with no token after it is the whole list, so it can read by name;
-  // the server's order is by id, which reads as no order at all.
-  const projects = loaded.nextPageToken
-    ? [...loaded.projects, ...paging.extra]
-    : byName(loaded.projects);
+  const projects = [...loaded.projects, ...paging.extra];
 
   // Latched for the screen's lifetime: a cleared search drops `?q=` before the
   // full list is back, and the field must not unmount in between. A person
