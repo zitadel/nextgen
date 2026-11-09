@@ -637,6 +637,38 @@ describe("SchemaCheck", () => {
     expect(outcome.status).toBe("fail");
   });
 
+  it("fails for a key the user meta-schema refuses, as deploy does", async () => {
+    const cwd = await makeProject();
+    const file = join(cwd, ".zitadel/schemas/user.json");
+    const schema = JSON.parse(await readFile(file, "utf8"));
+    await writeFile(
+      file,
+      JSON.stringify({
+        ...schema,
+        properties: { ...schema.properties, firstName: { type: "string", minimumLength: 3 } },
+      }),
+    );
+
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining(
+        `${schema.objectType}: properties.firstName minimumLength is not an allowed key`,
+      ),
+    });
+  });
+
+  it("passes for a schema-url reference, which has no user meta-schema to meet", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/schemas/user.json"),
+      JSON.stringify({ kind: "schema-url", url: "https://schemas.example.com/user.json" }),
+    );
+
+    expect((await new SchemaCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fails on an x-auth-methods key that is no authentication method", async () => {
     const cwd = await makeProject();
     const file = join(cwd, ".zitadel/schemas/user.json");

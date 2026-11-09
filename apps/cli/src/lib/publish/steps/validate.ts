@@ -1,16 +1,13 @@
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
-import {
-  brandingConfigSchema,
-  flowConfigSchema,
-  schemaConfigSchema,
-} from "@zitadel/config/schemas";
+import { brandingConfigSchema, flowConfigSchema } from "@zitadel/config/schemas";
 
 import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "@/lib/branding";
 import { ZitadelError, errorMessage } from "@/lib/errors";
 import { tryCatch } from "@/lib/try-catch";
 import { flowEnvRefs } from "@/lib/flows";
 import { POLICIES_DIR, policyFileIssues } from "@/lib/policies";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { SCHEMAS_DIR, schemaFileFailures } from "@/lib/user-schema";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
@@ -48,7 +45,8 @@ export const validateStep: Step = {
 
 /**
  * Parse every schema, flow, policy and branding descriptor against the same Zod
- * the server enforces, before any writing step runs. Without this a malformed
+ * the server enforces, and every user schema against its meta-schema too
+ * (`schemaFileIssues`), before any writing step runs. Without this a malformed
  * schema, flow or branding only fails at `createRelease`, after the IdP-sync
  * step has already written — leaving a half-applied deploy. Errors across
  * every bundle kind aggregate into one `E_VALIDATION`. Branding is parsed from
@@ -57,16 +55,12 @@ export const validateStep: Step = {
  */
 function validateBundleShapes(ctx: StepContext): void {
   const failures: string[] = [];
-  ctx.bundle.schemas.forEach((schema, index) => {
-    const result = schemaConfigSchema.safeParse(schema);
-    if (!result.success) {
-      const handle =
-        typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
-      for (const issue of result.error.issues) {
-        failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
-      }
-    }
-  });
+  failures.push(...schemaFileFailures(ctx.bundle.schemas));
+  // Any refused key may be one a newer server declares and this CLI's
+  // meta-schema does not know yet, so the hint says what fixes that too.
+  const refusedKey = ctx.bundle.schemas.some((schema) =>
+    schemaFileIssues(schema).some((issue) => issue.key !== undefined),
+  );
   ctx.bundle.flow_definitions.forEach((flow, index) => {
     const result = flowConfigSchema.safeParse(flow);
     if (!result.success) {
@@ -125,7 +119,9 @@ function validateBundleShapes(ctx: StepContext): void {
     `Configuration validation failed (${failures.length} ${noun}):\n` +
       failures.map((failure) => `  - ${failure}`).join("\n"),
     {
-      hint: "These are the same rules the server enforces. Fix the files named above and rerun.",
+      hint:
+        "These are the same rules the server enforces. Fix the files named above and rerun." +
+        (refusedKey ? " A key a newer Zitadel server added needs a CLI as new as the server." : ""),
       details: { issues: failures },
     },
   );

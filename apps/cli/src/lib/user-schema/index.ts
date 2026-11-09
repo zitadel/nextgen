@@ -19,6 +19,8 @@
  * plus this module's {@link SCHEMAS_DIR} constant.
  */
 
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
+
 /**
  * Relative directory (from the project root) where local user-schema
  * files live. Owned here so callers (`commands/*`, `sync/syncers.ts`)
@@ -27,3 +29,18 @@
  * the filesystem. The counterpart of `lib/flows`' `FLOWS_DIR`.
  */
 export const SCHEMAS_DIR = ".zitadel/schemas";
+
+/**
+ * One line per rule a schema file breaks, as `schemaFileIssues` judges it,
+ * each led by the schema's `objectType` (or its place in the list) and the
+ * path of the object at fault, so `deploy` and `doctor` word a failure alike.
+ */
+export function schemaFileFailures(schemas: readonly Record<string, unknown>[]): string[] {
+  return schemas.flatMap((schema, index) => {
+    const handle =
+      typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
+    return schemaFileIssues(schema).map(
+      (issue) => `${handle}: ${issue.path || "(root)"} ${issue.message}`,
+    );
+  });
+}

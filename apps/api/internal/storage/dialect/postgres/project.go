@@ -60,10 +60,11 @@ const (
 	deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
 
-	// FOR UPDATE holds the project row until the transaction ends. A second
-	// removal of the project's last owner waits here, then reads the first
-	// one's result. A plain SELECT would not wait at READ COMMITTED.
-	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR UPDATE`
+	// FOR NO KEY UPDATE holds the project row until the transaction ends. A
+	// second caller waits here, then reads the first one's result. A plain SELECT
+	// would not wait at READ COMMITTED, and FOR UPDATE would also hold up every
+	// insert that references the project through a foreign key.
+	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR NO KEY UPDATE`
 )
 
 // DeleteProjectByID implements [service.ProjectStatements].

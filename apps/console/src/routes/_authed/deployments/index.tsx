@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { cn } from "@/lib/utils";
-import { listProjectDeployments, livePrimaryReleaseId } from "@/features/deployments/deployment";
+import { listProjectDeployments, livePrimaryDeployment } from "@/features/deployments/deployment";
 import {
   projectScopeDeps,
   requireProjectScope,
@@ -39,15 +39,15 @@ export const Route = createFileRoute("/_authed/deployments/")({
   // After Branding, as the design's sidebar places it.
   staticData: { scope: "project", nav: { label: "Deployments", order: 7, icon: Layers3 } },
   loaderDeps: projectScopeDeps,
-  // The live primary release is read on its own: the newest page is not
+  // The live primary deployment is read on its own: the newest page is not
   // guaranteed to hold the live primary row once previews outnumber it.
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [page, liveReleaseId] = await Promise.all([
+    const [page, live] = await Promise.all([
       listProjectDeployments(projectId),
-      livePrimaryReleaseId(projectId),
+      livePrimaryDeployment(projectId),
     ]);
-    return { ...page, liveReleaseId };
+    return { ...page, live };
   },
   component: DeploymentsScreen,
 });
@@ -63,8 +63,6 @@ function DeploymentsScreen() {
     "Could not load more deployments.",
   );
   const deployments = [...loaded.items, ...paging.extra];
-  // A superseded row of the live release has nothing to roll back to.
-  const liveReleaseId = loaded.liveReleaseId;
 
   return (
     <Page>
@@ -106,7 +104,7 @@ function DeploymentsScreen() {
                 <DeploymentRowItem
                   key={deployment.id}
                   deployment={deployment}
-                  liveReleaseId={liveReleaseId}
+                  live={loaded.live}
                   onChanged={() => router.invalidate()}
                 />
               ))

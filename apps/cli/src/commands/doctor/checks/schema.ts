@@ -1,19 +1,15 @@
 import { join } from "node:path";
 
-import { schemaConfigSchema } from "@zitadel/config/schemas";
-
 import { readJsonDir } from "@/lib/json-dir";
 import { unscopedCommand } from "@/lib/suggestion";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { SCHEMAS_DIR, schemaFileFailures } from "@/lib/user-schema";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**
- * Verifies local schema config files round-trip through the canonical
- * `schemaConfigSchema` from `@zitadel/config/schemas` — the same Zod the
- * release pipeline validates with, so doctor and `deploy` can never disagree
- * about a file. The union enforces the `kind` discriminator
- * (`user-schema` / `schema-url`) and the `metaSchema`/`x-auth-methods`/etc.
- * fields the platform requires.
+ * Verifies local schema config files with `schemaFileFailures`, the check
+ * the release pipeline runs, so doctor and `deploy` can never disagree about
+ * a file: the `kind` discriminator (`user-schema` / `schema-url`), the fields
+ * the platform requires, and the keys the user meta-schema allows.
  */
 export class SchemaCheck extends AbstractSanityCheck {
   readonly name = "schema";
@@ -43,16 +39,9 @@ export class SchemaCheck extends AbstractSanityCheck {
   }
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const schemas = await readJsonDir(join(ctx.cwd, SCHEMAS_DIR));
-    for (const schema of schemas) {
-      const result = schemaConfigSchema.safeParse(schema);
-      if (!result.success) {
-        throw new Error(
-          result.error.issues
-            .map((issue) => `${issue.path.join(".") || "/"} ${issue.message}`)
-            .join("; "),
-        );
-      }
+    const failures = schemaFileFailures(await readJsonDir(join(ctx.cwd, SCHEMAS_DIR)));
+    if (failures.length > 0) {
+      throw new Error(failures.join("; "));
     }
   }
 }
