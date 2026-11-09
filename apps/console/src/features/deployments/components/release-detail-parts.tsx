@@ -166,10 +166,14 @@ export function PointerGroupSection({ group }: { group: PointerGroup }) {
   );
 }
 
-/** A policy's settings above its document, as labelled rows. */
+/**
+ * A policy's settings above its document, as labelled rows. They sit in the
+ * pointer group's value column, so they stack on that column's width rather
+ * than the viewport's.
+ */
 function PolicySettingsRows({ settings }: { settings: PolicySetting[] }) {
   return (
-    <DetailRows>
+    <DetailRows container>
       {settings.map((setting) => (
         <DetailRow key={setting.label} label={setting.label}>
           <span className={DETAIL_VALUE}>{setting.value}</span>

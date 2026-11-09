@@ -1,5 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { Children, Fragment, isValidElement, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  Fragment,
+  isValidElement,
+  type ReactNode,
+  useContext,
+} from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { IdText } from "@/components/id-text";
@@ -142,9 +149,37 @@ export function DetailSection({
 }
 
 /**
+ * Whether the rows of the nearest {@link DetailRows} lay out on that list's
+ * own width rather than the viewport's.
+ */
+const RowsOnContainer = createContext(false);
+
+/** Row layout on the viewport: the rail from `sm`. */
+const ROW_VIEWPORT = {
+  row: "flex flex-col gap-1 sm:flex-row sm:gap-0",
+  center: "sm:items-center",
+  start: "sm:items-start",
+  rail: DETAIL_LABEL_RAIL,
+  control: "sm:min-h-6",
+};
+
+/**
+ * Row layout on the list's width (`@md/detail-rows`, 448px): for rows nested
+ * in a narrower column, where the viewport says nothing about the room left.
+ */
+const ROW_CONTAINER = {
+  row: "flex flex-col gap-1 @md/detail-rows:flex-row @md/detail-rows:gap-0",
+  center: "@md/detail-rows:items-center",
+  start: "@md/detail-rows:items-start",
+  rail: "@md/detail-rows:w-54.5",
+  control: "@md/detail-rows:min-h-6",
+};
+
+/**
  * A card row: the label (and a badge beside it) in the {@link DETAIL_LABEL_RAIL}
- * column, the value from its end, stacked under `sm`. A 20px line with 4px
- * above and below. `divider` gives it 12px above and below and closes it with
+ * column, the value from its end, stacked under `sm` (or, inside
+ * `<DetailRows container>`, below 448px of the list's own width). A 20px line
+ * with 4px above and below. `divider` gives it 12px above and below and closes it with
  * its own rule, for rows that carry a menu (Origins); otherwise rows sit in
  * {@link DetailRows}.
  */
@@ -167,19 +202,20 @@ export function DetailRow({
   as?: "div" | "li";
   children: ReactNode;
 }) {
+  const layout = useContext(RowsOnContainer) ? ROW_CONTAINER : ROW_VIEWPORT;
   return (
     <Tag
       className={cn(
-        "flex flex-col gap-1 sm:flex-row sm:gap-0",
-        align === "center" ? "sm:items-center" : "sm:items-start",
+        layout.row,
+        align === "center" ? layout.center : layout.start,
         divider ? "border-b border-border py-3" : "py-1",
       )}
     >
       <div
         className={cn(
           "flex shrink-0 items-center gap-2 text-sm leading-5 font-medium text-muted-foreground",
-          DETAIL_LABEL_RAIL,
-          align === "control" && "sm:min-h-6",
+          layout.rail,
+          align === "control" && layout.control,
         )}
       >
         {label}
@@ -201,8 +237,18 @@ const ROW_RULE = "-mt-px";
  * A card's list of rows ({@link DetailRow}, or a row of its own shape): 16px,
  * a rule, 16px between each, and no rule after the last. `as="ul"` makes it a
  * list: each row is wrapped in its `li`, and the rules are presentational.
+ * `container` lays its rows out on the list's own width, for rows nested
+ * inside another row's value (a policy's settings in a release).
  */
-export function DetailRows({ as = "div", children }: { as?: "div" | "ul"; children: ReactNode }) {
+export function DetailRows({
+  as = "div",
+  container = false,
+  children,
+}: {
+  as?: "div" | "ul";
+  container?: boolean;
+  children: ReactNode;
+}) {
   const rows = Children.toArray(children);
   const rule = (key: number) =>
     as === "ul" ? (
@@ -214,15 +260,17 @@ export function DetailRows({ as = "div", children }: { as?: "div" | "ul"; childr
     );
   const Tag = as;
   return (
-    <Tag className="flex flex-col gap-4">
-      {rows.map((row, index) => (
-        // `Children.toArray` has keyed every element row.
-        <Fragment key={isValidElement(row) && row.key !== null ? row.key : index}>
-          {index > 0 && rule(index)}
-          {as === "ul" ? <li>{row}</li> : row}
-        </Fragment>
-      ))}
-    </Tag>
+    <RowsOnContainer.Provider value={container}>
+      <Tag className={cn("flex flex-col gap-4", container && "@container/detail-rows")}>
+        {rows.map((row, index) => (
+          // `Children.toArray` has keyed every element row.
+          <Fragment key={isValidElement(row) && row.key !== null ? row.key : index}>
+            {index > 0 && rule(index)}
+            {as === "ul" ? <li>{row}</li> : row}
+          </Fragment>
+        ))}
+      </Tag>
+    </RowsOnContainer.Provider>
   );
 }
 

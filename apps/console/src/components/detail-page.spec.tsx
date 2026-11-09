@@ -91,3 +91,18 @@ describe("detail rows", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 });
+
+describe("detail rows on their own width", () => {
+  it("lays nested rows out on the list's width, not the viewport's", () => {
+    const { container } = render(
+      <DetailRows container>
+        <DetailRow label="Length">15 characters</DetailRow>
+      </DetailRows>,
+    );
+    const list = container.firstElementChild;
+    expect(list).toHaveClass("@container/detail-rows");
+    const row = list?.firstElementChild;
+    expect(row).toHaveClass("@md/detail-rows:flex-row");
+    expect(row).not.toHaveClass("sm:flex-row");
+  });
+});
