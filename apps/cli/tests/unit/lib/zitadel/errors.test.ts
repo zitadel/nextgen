@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFlowsError, NoSignInLeftError } from "@/lib/zitadel";
+import { googleSelection } from "@tests/helpers/idp-values";
+import {
+  BrokenFlowsError,
+  ConflictError,
+  ConnectionExistsError,
+  NoSignInLeftError,
+} from "@/lib/zitadel";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
@@ -228,5 +234,37 @@ describe("NoSignInLeftError", () => {
 
   it("names the schema, what it enabled and its alternatives in its details", () => {
     expect(error.details).toEqual({ file: SCHEMA_PATH, usable: ["password"], alternatives: ["passkey"] });
+  });
+});
+
+describe("ConnectionExistsError", () => {
+  it("is a conflict", () => {
+    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+
+    expect(error).toBeInstanceOf(ConflictError);
+  });
+
+  it("says the connection file is already there", () => {
+    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+
+    expect(error.message).toBe(".zitadel/idps/google.json already exists");
+  });
+
+  it("never offers to replace the file", () => {
+    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+
+    expect(error.hint).not.toContain("--force");
+  });
+
+  it("names the file in its details", () => {
+    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+
+    expect(error.details).toEqual({ file: ".zitadel/idps/google.json" });
+  });
+
+  it("keeps the provider as it was chosen", () => {
+    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+
+    expect(error.selection).toBe(googleSelection);
   });
 });

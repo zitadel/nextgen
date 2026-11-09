@@ -121,7 +121,7 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   `app.writeLocalSecret`. A `.zitadel/...` string in a spec is only ever a
   value the CLI reported back.
 - **No HTTP.** The platform is arranged in its own terms —
-  `platform.rejectsSchemaUploads()`, `platform.recovers()`,
+  `platform.rejectsASchema()`, `platform.recovers()`,
   `platform.capturesBrandingPublishes()`. msw stays in `helpers/platform.ts`.
 - **One assertion vocabulary**, from `tests/helpers/matchers.ts`: `toSucceed`,
   `toFail`, `toFailWith`, `toExitWith`, `toBeSkipped`, `toExplain`, `toHintAt`,

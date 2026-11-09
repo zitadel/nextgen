@@ -1,12 +1,27 @@
+import {
+  DEFAULT_FLOW_CONFIG_PATH,
+  DEFAULT_SCHEMA_CONFIG_PATH,
+  getDefaultHumanUserSchemaBody,
+  getDefaultLoginFlow,
+} from "@zitadel/config/defaults";
+import { providerOf } from "@zitadel/config/idp";
+
+import { Change } from "@/lib/zitadel/change";
 import { Branding } from "@/lib/zitadel/resources/branding/branding";
 import { Brandings } from "@/lib/zitadel/resources/branding/collection";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
-import { BrokenFilesError } from "@/lib/zitadel/errors";
+import {
+  BrokenFilesError,
+  ConfigError,
+  ConnectionExistsError,
+  FileExistsError,
+} from "@/lib/zitadel/errors";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import { Flows } from "@/lib/zitadel/resources/flows/collection";
 import { Policies } from "@/lib/zitadel/resources/policies/collection";
-import { Policy } from "@/lib/zitadel/resources/policies/policy";
+import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
+import type { Policy } from "@/lib/zitadel/resources/policies/policy";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 import { POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies/types";
 import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
@@ -17,7 +32,12 @@ import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { ConfigFiles } from "@/lib/zitadel/types";
+import type {
+  ConfigFiles,
+  Scaffold,
+  ScaffoldedProvider,
+  ScaffoldOptions,
+} from "@/lib/zitadel/types";
 
 /**
  * Any document of the configuration that a collection holds and a change
@@ -211,7 +231,7 @@ export class ZitadelConfig {
         .filter((file) => {
           return !file.path.endsWith(POLICY_TEST_SUFFIX);
         })
-        .map(Policy.of),
+        .map(Policies.read),
       policyTests: files.policies
         .filter((file) => {
           return file.path.endsWith(POLICY_TEST_SUFFIX);
@@ -252,6 +272,96 @@ export class ZitadelConfig {
         return rule.check(this, context);
       },
     );
+  }
+
+  /**
+   * Scaffold a new project's configuration on top of this one: the default
+   * user schema and login flow for a preset and use case, a connection for
+   * each chosen provider, and the password policy.
+   *
+   * @remarks
+   * Every file is refused before anything is built, so a conflict is found
+   * before the caller creates anything that depends on it. A connection is
+   * refused with or without `force`: the file is the developer's, holding a
+   * client id registered with the vendor and a slug other files may name, so
+   * it is never replaced. Each connection's claim mapping reads the template's
+   * properties, which enabling a provider does not change. A password policy
+   * kept by `force` is deployed as it is, so it must be a sound password
+   * policy.
+   *
+   * @typeParam P - The provider as the caller chose it, handed back with its
+   *   connection.
+   * @param options - What to scaffold, and whether files may be replaced.
+   * @returns The change that writes it, and its documents.
+   * @throws {@link ConnectionExistsError} When a chosen provider already has
+   *   a connection.
+   * @throws {@link FileExistsError} Without `force`, when the default schema,
+   *   flow or password policy file is already there.
+   * @throws {@link ConflictError} When a chosen provider's connection would
+   *   collide with another connection, by file name, slug or variables.
+   * @throws {@link ConfigError} When `force` keeps a password policy file
+   *   that is not a sound password policy.
+   */
+  scaffold<P extends ScaffoldedProvider>(options: ScaffoldOptions<P>): Scaffold<P> {
+    const template = UserSchema.create({
+      path: DEFAULT_SCHEMA_CONFIG_PATH,
+      body: getDefaultHumanUserSchemaBody({ preset: options.preset, useCase: options.useCase }),
+    });
+    const connections = options.sso.map((chosen) => {
+      const provider = providerOf(chosen.selection);
+      return { chosen, connection: Connection.forProvider(provider, template, chosen.endpoints) };
+    });
+    for (const scaffolded of connections) {
+      const connection = scaffolded.connection;
+      const existing =
+        this.connections.existing(connection) ?? this.connections.get(connection.path);
+      if (existing !== undefined) {
+        throw new ConnectionExistsError(existing.path, scaffolded.chosen.selection);
+      }
+    }
+    const defaults = [
+      this.schemas.get(DEFAULT_SCHEMA_CONFIG_PATH),
+      this.flows.get(DEFAULT_FLOW_CONFIG_PATH),
+      this.policies.get(PasswordPolicy.PATH),
+    ];
+    for (const taken of defaults) {
+      if (!options.force && taken !== undefined) {
+        throw new FileExistsError(taken.path);
+      }
+    }
+    const policy = this.scaffoldedPasswordPolicy(options);
+    const slugs = options.sso.map((chosen) => {
+      return providerOf(chosen.selection).slug;
+    });
+    // The edits are additive and idempotent, so folding them builds one schema
+    // that names every chosen provider.
+    const schema = slugs.reduce((document, slug) => {
+      return document.withProvider(slug).document;
+    }, template);
+    // The conflict step a provider needs can only offer what this schema
+    // enables, so the methods are read off the composed schema rather than
+    // inferred from the preset.
+    const login = Flow.create({
+      path: DEFAULT_FLOW_CONFIG_PATH,
+      body: getDefaultLoginFlow({ preset: options.preset, useCase: options.useCase }),
+    });
+    const flow = slugs.reduce((document, slug) => {
+      return document.withProvider(slug, schema.enabledMethods).document;
+    }, login);
+    const written = connections.map((scaffolded) => {
+      return scaffolded.connection;
+    });
+    const documents: readonly AnyDocument[] = [schema, flow, ...written, policy];
+    const after = documents.reduce((current: ZitadelConfig, document) => {
+      return current.with(document);
+    }, this);
+    return {
+      change: new Change({ before: this, after }),
+      schema,
+      flow,
+      connections,
+      policy,
+    };
   }
 
   /**
@@ -322,6 +432,32 @@ export class ZitadelConfig {
    */
   get removedDocuments(): readonly AnyDocument[] {
     return this.removed;
+  }
+
+  /**
+   * The password policy a scaffold leaves the project with: the one `force`
+   * keeps, with the minimum it was given, or a new one.
+   *
+   * @param options - Whether files may be replaced, and the minimum given.
+   * @returns The policy.
+   * @throws {@link ConfigError} When `force` keeps a password policy file that
+   *   is not a sound password policy.
+   */
+  private scaffoldedPasswordPolicy(options: ScaffoldOptions): PasswordPolicy {
+    const kept = this.policies.password;
+    if (!options.force) {
+      return PasswordPolicy.initial(options.passwordMinLength);
+    }
+    if (this.policies.get(PasswordPolicy.PATH) === undefined) {
+      return PasswordPolicy.initial(options.passwordMinLength);
+    }
+    if (kept === undefined || kept.problems({}).length > 0) {
+      throw new ConfigError(`${PasswordPolicy.PATH} is not a valid password policy`, {
+        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
+        details: { file: PasswordPolicy.PATH },
+      });
+    }
+    return kept.withMinLength(options.passwordMinLength).document;
   }
 
   /**

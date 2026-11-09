@@ -35,6 +35,7 @@ export {
   BrokenFlowsError,
   ConfigError,
   ConflictError,
+  ConnectionExistsError,
   FileExistsError,
   NoSignInLeftError,
   NotFoundError,
@@ -59,6 +60,7 @@ export {
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
 export {
   PASSWORD_POLICY_OPERATION,
+  PasswordPolicy,
   Policies,
   Policy,
   POLICY_FILE_SUFFIX,
@@ -99,5 +101,9 @@ export {
   type ConfigFiles,
   type ConfigKind,
   type JsonObject,
+  type Scaffold,
+  type ScaffoldedConnection,
+  type ScaffoldedProvider,
+  type ScaffoldOptions,
   RELEASE_POLICY_GLOBS,
 } from "@/lib/zitadel/types";

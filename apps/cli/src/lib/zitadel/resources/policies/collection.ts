@@ -2,6 +2,8 @@ import { basename } from "node:path";
 
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
+import type { DocumentFile } from "@/lib/zitadel/resources/document";
+import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
 import { Policy } from "@/lib/zitadel/resources/policies/policy";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 import type { PolicySelection } from "@/lib/zitadel/resources/policies/types";
@@ -31,12 +33,32 @@ export class Policies extends Collection<Policy> {
   }
 
   /**
+   * Read a policy file into the class that knows its operation: a
+   * {@link PasswordPolicy} for the password operation, a plain {@link Policy}
+   * for any other.
+   *
+   * @param file - The file.
+   * @returns The policy, marked as read.
+   */
+  static read(file: DocumentFile): Policy {
+    if (file.body.operation === PasswordPolicy.OPERATION) {
+      return PasswordPolicy.of(file);
+    }
+    return Policy.of(file);
+  }
+
+  /**
    * The password policy, which `setup` writes and keeps.
    *
-   * @returns The policy at its file, or `undefined` when there is none.
+   * @returns The policy for the password operation at its file, or
+   *   `undefined` when there is none.
    */
-  get password(): Policy | undefined {
-    return this.get(Policy.PASSWORD_PATH);
+  get password(): PasswordPolicy | undefined {
+    const policy = this.get(PasswordPolicy.PATH);
+    if (policy instanceof PasswordPolicy) {
+      return policy;
+    }
+    return undefined;
   }
 
   /**
