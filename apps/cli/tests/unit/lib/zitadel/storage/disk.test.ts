@@ -101,10 +101,14 @@ describe("DiskStore.read", () => {
     await write(dir, { [IDP]: "{}" });
     await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o000);
 
-    const error = await rejectionOf(() => {
-      return new DiskStore(dir).read("connections");
-    });
-    await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o755);
+    let error: unknown;
+    try {
+      error = await rejectionOf(() => {
+        return new DiskStore(dir).read("connections");
+      });
+    } finally {
+      await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o755);
+    }
 
     expect(error).toMatchObject({
       message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
