@@ -349,6 +349,23 @@ describe("deploy", () => {
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
       });
 
+      it("does not warn that the subject claim can change once the connection is deployed", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+        await app.editConnection("google", (connection) => {
+          connection.subject_claim = "email";
+        });
+        await app.deployData();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n") ?? "").not.toContain("subject_claim");
+      });
+
       it("writes no connection when the deploy never reaches the release", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", {

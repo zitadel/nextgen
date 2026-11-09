@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ConflictError } from "@/lib/backend/errors";
-import { type PreparedRelease, Publisher } from "@/lib/publish/publisher";
-import { fakeClient } from "@tests/helpers/fake-client";
-import { aDeployment, PROJECT_ID } from "@tests/helpers/records";
+import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
+import { shellCommand } from "@/lib/suggestion";
+import { DiskStore } from "@/lib/zitadel";
+import { aFile, anOidcConnection } from "@tests/helpers/config";
+import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
+import { test } from "@tests/helpers/fixtures";
+import {
+  aDeployment,
+  holdingVariables,
+  PROJECT_ID,
+  SECRET_VARIABLE,
+} from "@tests/helpers/records";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -28,6 +37,90 @@ const PREVIEW_URL = "https://pr-7.preview.acme.com";
  * Where every call of the publisher is scoped.
  */
 const SCOPE = { project_id: PROJECT_ID };
+
+/**
+ * A connection whose subject is the user's email, a claim they can change.
+ */
+const EMAIL_SUBJECT = anOidcConnection({ subject_claim: "email" });
+
+/**
+ * The project's variables, holding the secret the connection names.
+ */
+const ACME_SECRET_HELD = holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE });
+
+/**
+ * The warning that a connection's subject claim is one the user can change.
+ */
+const SUBJECT_WARNING = expect.stringContaining("subject_claim is");
+
+/**
+ * What a dry-run deploy of the project at `cwd` asks of `prepare`, under
+ * `--json`, without comparing against what is live.
+ *
+ * @param cwd - The project directory.
+ * @returns The request.
+ */
+function aDryRunOf(cwd: string): PrepareRequest {
+  return {
+    cwd,
+    env: {},
+    mode: "deploy",
+    dryRun: true,
+    compare: false,
+    json: true,
+    color: false,
+    suggest: (args) => {
+      return shellCommand(args);
+    },
+  };
+}
+
+/**
+ * Write the connection whose subject is the user's email into the project at
+ * `cwd`.
+ *
+ * @param cwd - The project directory.
+ * @returns Nothing once the file is written.
+ */
+async function aProjectWithAnEmailSubject(cwd: string): Promise<void> {
+  await new DiskStore(cwd).write(aFile("connections", "acme.json", EMAIL_SUBJECT), "create");
+}
+
+/**
+ * A publisher whose project holds the connection's secret and answers the
+ * connection listing with `queryIdps`.
+ *
+ * @param queryIdps - How the project's connections are listed.
+ * @returns The publisher.
+ */
+function aPublisherListing(queryIdps: ClientStubs["queryIdps"]): Publisher {
+  return new Publisher(fakeClient({ ...ACME_SECRET_HELD, queryIdps }), PROJECT_ID);
+}
+
+/**
+ * A connection listing that answers a connection with each of `slugs`.
+ *
+ * @param slugs - The slugs of the connections the project has.
+ * @returns The listing.
+ */
+function listing(...slugs: readonly string[]): ClientStubs["queryIdps"] {
+  return {
+    all: async () => {
+      return slugs.map((slug) => {
+        return { slug };
+      });
+    },
+  };
+}
+
+/**
+ * A connection listing the token may not read.
+ */
+const REFUSED_LISTING: ClientStubs["queryIdps"] = {
+  all: async () => {
+    throw new ForbiddenError("not allowed", { status: 403 });
+  },
+};
 
 describe("Publisher.landing", () => {
   it("answers the project's primary origins", async () => {
@@ -286,5 +379,28 @@ describe("Publisher.deployInitial", () => {
     await publisher.deployInitial({ prepared: PREPARED });
 
     expect(all).not.toHaveBeenCalled();
+  });
+});
+
+describe("Publisher.prepare", () => {
+  describe("with a connection whose subject claim the user can change", () => {
+    test("does not warn about a connection the project already has", async ({ dir }) => {
+      await aProjectWithAnEmailSubject(dir);
+
+      const prepared = await aPublisherListing(listing("acme")).prepare(aDryRunOf(dir));
+
+      expect(prepared.warnings).not.toContainEqual(SUBJECT_WARNING);
+    });
+
+    test.for([
+      { situation: "a connection the project does not have yet", queryIdps: listing("other") },
+      { situation: "a listing the token may not read", queryIdps: REFUSED_LISTING },
+    ])("still warns about $situation", async (row, { dir }) => {
+      await aProjectWithAnEmailSubject(dir);
+
+      const prepared = await aPublisherListing(row.queryIdps).prepare(aDryRunOf(dir));
+
+      expect(prepared.warnings).toContainEqual(SUBJECT_WARNING);
+    });
   });
 });

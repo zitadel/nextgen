@@ -4,6 +4,7 @@ import {
   type Deployment,
   DeploymentService,
   type DeployToPrimaryResult,
+  IdpService,
   type Origins,
   OriginService,
   type Release,
@@ -14,7 +15,7 @@ import {
   VariableService,
   type ZitadelClient,
 } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { isCancellation, ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { headSha, worktreeIsDirty } from "./git";
@@ -167,6 +168,7 @@ export class Publisher {
   private readonly origins: OriginService;
   private readonly schemas: SchemaService;
   private readonly users: UserService;
+  private readonly connections: IdpService;
 
   /**
    * Bind a publisher to one project.
@@ -181,6 +183,7 @@ export class Publisher {
     this.origins = new OriginService(client, projectId);
     this.schemas = new SchemaService(client, projectId);
     this.users = new UserService(client);
+    this.connections = new IdpService(client, projectId);
   }
 
   /**
@@ -195,14 +198,21 @@ export class Publisher {
   /**
    * Build the bundle and run the steps that check it.
    *
+   * @remarks
+   * The configuration is read knowing which connections the project already
+   * has, so a check that only matters before a connection's first deploy is
+   * left out for them; see {@link Publisher.fetchDeployedConnections} for what
+   * happens when that cannot be read.
+   *
    * @param request - The directory, the mode, and how to show what the steps say.
    * @returns The bundle, what the steps reported, and the commit it was built from.
    * @throws {@link ZitadelError} `E_VALIDATION` naming each file a step refuses.
    */
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
     const store = new DiskStore(request.cwd);
+    const deployed = await this.fetchDeployedConnections();
     // Each file's shape is the validate step's to check, with its own messages.
-    const config = await ZitadelConfig.loadUnchecked(store);
+    const config = await ZitadelConfig.loadUnchecked(store, { deployed });
     const built = config.bundle(store);
     const context: StepContext = {
       cwd: request.cwd,
@@ -326,6 +336,37 @@ export class Publisher {
       release,
       deployment,
     };
+  }
+
+  /**
+   * Fetch the slugs of the connections the project already has, so the advice
+   * that only holds before a connection's first deploy is left out for them.
+   *
+   * @remarks
+   * Best effort. When the listing cannot be read — a token that may not list
+   * connections, such as a preview's, a server that answers something other
+   * than the listing, or any other failure — the slugs are unknown, and the
+   * configuration gives that advice for every connection, as it does before a
+   * first deploy. Reading them never fails a publish: only the person stopping
+   * the command is passed on.
+   *
+   * @returns The slugs, or undefined when the listing could not be read.
+   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   */
+  private async fetchDeployedConnections(): Promise<ReadonlySet<string> | undefined> {
+    try {
+      const listed = await this.connections.list();
+      return new Set(
+        listed.map((connection) => {
+          return connection.slug;
+        }),
+      );
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return undefined;
+    }
   }
 
   /**
