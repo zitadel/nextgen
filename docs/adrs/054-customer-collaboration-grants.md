@@ -340,6 +340,12 @@ names the target user or team (by id or unique locator) and remains
 responsible for granting and revoking access. Invitations, approval
 handshakes, and a discoverable agency directory are later product surfaces.
 
+### Amendment (2026-11-04): invitations
+
+[ADR 086](086-invitations.md) adds invitations as their own resource. Pending
+invitation state lives there, not on `team_memberships` (§1), and project
+grants can be offered through an invitation link as well as created directly.
+
 ### 7. Project creation and claim name the target team
 
 The caller's current or personal team is a default, not an authorization

@@ -45,6 +45,16 @@ export async function worktreeIsDirty(cwd: string): Promise<boolean> {
 }
 
 /**
+ * Whether anything under `.zitadel/` is uncommitted, untracked files included:
+ * what a commit of the configuration would stage. {@link worktreeIsDirty} is
+ * wider, and says nothing about whether such a commit would have anything in it.
+ */
+export async function configIsDirty(cwd: string): Promise<boolean> {
+  const files = await Repository.answer(cwd, (repository) => repository.uncommittedFiles(), []);
+  return files.some((file) => file.path.startsWith(".zitadel/"));
+}
+
+/**
  * The coloured diff of `.zitadel/` against `sha`, or null when no diff can be
  * shown: git is missing, this is not a repo, or the commit is not in local
  * history (a shallow clone, say).

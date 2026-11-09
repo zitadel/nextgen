@@ -504,6 +504,47 @@ describe("deploy", () => {
           }),
         ]);
       });
+
+      it("suggests committing what it deployed, in the directory it deployed", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest(`git -C '${app.path}' add .zitadel`);
+      });
+
+      it("puts the deploy's own message in the commit it suggests", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy(["-m", "add a nickname"]);
+
+        expect(result).toSuggest("commit -m 'add a nickname' -- .zitadel");
+      });
+
+      it("suggests no commit when only files outside .zitadel are uncommitted", async () => {
+        const app = await aCommittedApp();
+        await app.editPackageJson((pkg) => {
+          pkg.dependencies.left = "1.0.0";
+        });
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git");
+      });
+
+      it("suggests no commit after deploying from a clean tree", async () => {
+        const app = await aCommittedApp();
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git commit");
+      });
     });
 
     describe("rendered for a terminal", () => {
