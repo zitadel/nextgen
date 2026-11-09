@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { CustomOidcProvider, idpProvider } from "@zitadel/config/idp";
 
-import { Connection, UserSchema } from "@/lib/zitadel";
+import { ConfigError, ConflictError, Connection, UserSchema } from "@/lib/zitadel";
 import type { Issue } from "@/lib/zitadel/rules/types";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import { displayName, issuer, slug } from "@tests/helpers/idp-values";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
  * The directory connections sit in.
@@ -300,5 +301,196 @@ describe("Connection.forProvider", () => {
     });
 
     expect(google.issuer).toBe("http://localhost:9100");
+  });
+});
+
+describe("Connection.unappliedSettings", () => {
+  const existing = connection("acme-sso.json", {
+    slug: "acme-sso",
+    display_name: "Acme SSO",
+    oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
+  });
+
+  describe("when the candidate differs in scopes", () => {
+    const candidate = connection("acme-sso.json", {
+      slug: "acme-sso",
+      display_name: "Acme SSO",
+      oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "groups"] },
+    });
+
+    it.each([
+      ["names them when they were given", ["scopes"], ["scopes"]],
+      ["says nothing when they were not given", [], []],
+    ] as const)("%s", (_claim, given, unapplied) => {
+      expect(existing.unappliedSettings(candidate, given)).toEqual(unapplied);
+    });
+  });
+
+  describe("when the candidate differs in display name", () => {
+    it("names the display name", () => {
+      const candidate = connection("acme-sso.json", {
+        slug: "acme-sso",
+        display_name: "New name",
+        oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
+      });
+
+      const unapplied = existing.unappliedSettings(candidate, ["display name", "scopes"]);
+
+      expect(unapplied).toEqual(["display name"]);
+    });
+  });
+
+  describe("when the candidate has what the file already has", () => {
+    it("names nothing", () => {
+      const unapplied = existing.unappliedSettings(existing, ["display name", "scopes"]);
+
+      expect(unapplied).toEqual([]);
+    });
+  });
+});
+
+describe("Connection.refuseDifferentClientId", () => {
+  describe("when the file holds another client id as a value", () => {
+    it("refuses with the stored and the given id", () => {
+      const acme = connection("acme.json", SOUND);
+
+      const refusal = (): void => {
+        acme.refuseDifferentClientId("other");
+      };
+
+      expect(refusal).toThrow(ConfigError);
+      expect(refusal).toThrow(`${IDPS}/acme.json already uses client id client, not other`);
+    });
+  });
+
+  describe("when the file references a variable", () => {
+    it("accepts any client id", () => {
+      const acme = connection("acme.json", {
+        ...SOUND,
+        oidc: { ...SOUND.oidc, client_id: "${{ ACME_CLIENT_ID }}" },
+      });
+
+      expect(() => {
+        acme.refuseDifferentClientId("other");
+      }).not.toThrow();
+    });
+  });
+});
+
+describe("Connection.storedSettings", () => {
+  it("is the display name and issuer the file holds", () => {
+    const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso" });
+
+    const stored = acme.storedSettings({});
+
+    expect(stored).toEqual({ displayName: "Acme", issuer: "https://sso.acme.example" });
+  });
+
+  describe("when the run was given a setting", () => {
+    it("leaves it out without reading the file's", () => {
+      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", display_name: "   " });
+
+      const stored = acme.storedSettings({ displayName: "Acme SSO" });
+
+      expect(stored).toEqual({ displayName: undefined, issuer: "https://sso.acme.example" });
+    });
+  });
+
+  describe("when the file does not hold a setting", () => {
+    it("leaves it out", () => {
+      const acme = connection("acme-sso.json", {
+        ...SOUND,
+        slug: "acme-sso",
+        display_name: undefined,
+      });
+
+      const stored = acme.storedSettings({});
+
+      expect(stored.displayName).toBeUndefined();
+    });
+  });
+
+  describe("when a stored setting cannot be used", () => {
+    it.each([
+      ["a display name", { display_name: "   " }],
+      ["an issuer", { oidc: { issuer: "not a url" } }],
+    ])("refuses %s a typed answer could not be, naming the file", (what, over) => {
+      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", ...over });
+
+      const error = thrownBy(() => {
+        return acme.storedSettings({});
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({
+        message: expect.stringContaining(
+          `${IDPS}/acme-sso.json holds ${what} that cannot be used: `,
+        ),
+        hint: "Fix it in that file, or choose another slug.",
+        details: { file: `${IDPS}/acme-sso.json`, slug: "acme-sso" },
+      });
+    });
+  });
+
+  describe("when the file has no issuer", () => {
+    it("refuses it as no OIDC connection, whatever issuer was given", () => {
+      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", oidc: {} });
+
+      const error = thrownBy(() => {
+        return acme.storedSettings({ issuer: "https://sso.acme.example" });
+      });
+
+      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({
+        message: `${IDPS}/acme-sso.json is already named acme-sso and is not an OIDC connection`,
+        hint: "Fix the file, or choose another slug, then run the command again.",
+      });
+    });
+  });
+});
+
+describe("Connection.mappingSummary", () => {
+  describe("with nothing verified", () => {
+    it("says so after the mappings", () => {
+      const acme = connection("acme.json", { ...SOUND, claim_mapping: { email: "email" } });
+
+      expect(acme.mappingSummary.split("\n").slice(1)).toEqual([
+        "  email ← email",
+        "Nothing is treated as verified.",
+        "Edit the mappings in that file if your provider returns other claims.",
+      ]);
+    });
+  });
+});
+
+describe("Connection.withEndpoints", () => {
+  it("points the connection at the issuer it is given, as the provider would write it", () => {
+    const google = Connection.forProvider(idpProvider("google"), schema);
+
+    const pointed = google.withEndpoints({ issuer: issuer("http://localhost:9100") });
+
+    expect(pointed.document.body).toEqual(
+      Connection.forProvider(idpProvider("google"), schema, {
+        issuer: issuer("http://localhost:9100"),
+      }).body,
+    );
+  });
+
+  it("keeps a new connection new, so saving it never replaces a file", () => {
+    const google = Connection.forProvider(idpProvider("google"), schema);
+
+    const pointed = google.withEndpoints({ issuer: issuer("http://localhost:9100") });
+
+    expect(pointed.document.status).toBe("created");
+  });
+
+  describe("without an issuer", () => {
+    it("leaves the connection as it is", () => {
+      const google = Connection.forProvider(idpProvider("google"), schema);
+
+      const pointed = google.withEndpoints({});
+
+      expect(pointed).toEqual({ document: google, changed: false, skipped: [] });
+    });
   });
 });

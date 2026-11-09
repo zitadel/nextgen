@@ -9,7 +9,6 @@ import {
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
 import {
-  type PasswordMinLength,
   POLICY_FILE_SUFFIX,
   type PolicyBody,
   type PolicyConfig,
@@ -25,13 +24,18 @@ import type { JsonObject } from "@/lib/zitadel/types";
  */
 export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
   /**
+   * What kind of document this is: an operation policy.
+   */
+  readonly kind = "policy";
+
+  /**
    * Hold a policy's body at its path.
    *
    * @param path - The project-relative path.
    * @param body - The body as written.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
+  protected constructor(path: string, body: Body, status: DocumentStatus) {
     super(path, body, status);
   }
 
@@ -74,8 +78,8 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @throws {@link BrokenFilesError} When the policy contract refuses the
    *   body; a policy with no {@link problems} never throws.
    */
-  get operation(): PolicyOperation {
-    return this.contract.operation;
+  readOperation(): PolicyOperation {
+    return this.parse().operation;
   }
 
   /**
@@ -85,8 +89,8 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @throws {@link BrokenFilesError} When the policy contract refuses the
    *   body; a policy with no {@link problems} never throws.
    */
-  get config(): PolicyConfig {
-    return this.contract.config;
+  readConfig(): PolicyConfig {
+    return this.parse().config;
   }
 
   /**
@@ -96,34 +100,6 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    */
   asRead(): Policy<Body> {
     return new Policy(this.path, this.body, "read");
-  }
-
-  /**
-   * The policy with the minimum password length `setup` was given.
-   *
-   * @remarks
-   * Its other settings stay as the project chose them.
-   *
-   * @param minLength - The minimum: a length, `null` for an explicit "none",
-   *   or `undefined` when none was given.
-   * @returns The same policy when none was given or the minimum is already
-   *   that one; otherwise the policy without `min_length` for "none", or with
-   *   the new length.
-   * @throws {@link BrokenFilesError} When the policy contract refuses the body.
-   */
-  withMinLength(minLength: PasswordMinLength | undefined): Policy {
-    if (minLength === undefined || (minLength ?? undefined) === this.config.min_length) {
-      return this;
-    }
-    const { min_length: _replaced, ...kept } = this.config;
-    if (minLength === null) {
-      return new Policy(this.path, { ...this.body, config: kept }, this.editedStatus);
-    }
-    return new Policy(
-      this.path,
-      { ...this.body, config: { ...kept, min_length: minLength } },
-      this.editedStatus,
-    );
   }
 
   /**
@@ -138,12 +114,12 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
     if (refusals.length > 0) {
       return refusals;
     }
-    const expected = Policy.fileName(this.operation);
+    const expected = Policy.fileName(this.readOperation());
     if (basename(this.path) !== expected) {
       return [
         this.issue(
           "contract/policy",
-          `holds the ${this.operation} policy, so it must be named ${expected}`,
+          `holds the ${this.readOperation()} policy, so it must be named ${expected}`,
         ),
       ];
     }
@@ -171,7 +147,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @throws {@link BrokenFilesError} When the policy contract refuses the
    *   body, naming each refusal.
    */
-  private get contract(): PolicyBody {
+  private parse(): PolicyBody {
     const result = policyConfigSchema.safeParse(this.contractBody);
     if (!result.success) {
       throw new BrokenFilesError(

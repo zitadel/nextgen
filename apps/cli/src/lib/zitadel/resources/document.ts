@@ -30,6 +30,53 @@ export type DocumentFile<Body extends JsonObject = JsonObject> = Readonly<{
 }>;
 
 /**
+ * A region an edit left alone because it was changed by hand.
+ */
+export type SkippedRegion = Readonly<{
+  /**
+   * The step that was left alone, such as `sso-conflict`.
+   */
+  step: string;
+
+  /**
+   * Where in the file, such as `steps.sso-conflict`.
+   */
+  region: string;
+
+  /**
+   * Why it was left alone.
+   */
+  reason: "hand-edited";
+}>;
+
+/**
+ * What an edit made of a document: every `with…` and `without…` returns one.
+ *
+ * @remarks
+ * An edit that changes nothing hands back the document it was given, so a
+ * rerun is a no-op; what it left alone is said either way.
+ *
+ * @typeParam Document - What was edited.
+ */
+export type Edit<Document> = Readonly<{
+  /**
+   * The document as the edit leaves it: a new one, or the same one when
+   * nothing changed.
+   */
+  document: Document;
+
+  /**
+   * False when the edit changed nothing.
+   */
+  changed: boolean;
+
+  /**
+   * The regions the edit left alone because they were changed by hand.
+   */
+  skipped: readonly SkippedRegion[];
+}>;
+
+/**
  * One configuration file, as the library holds it: its path, its body exactly
  * as written, and where it stands against the file on disk.
  *
@@ -40,9 +87,10 @@ export type DocumentFile<Body extends JsonObject = JsonObject> = Readonly<{
  *   new, and {@link asRead} marks it saved;
  * - {@link problems} says everything wrong with the file on its own;
  * - {@link wireBody} gives the body the server receives;
- * - an edit is a `with…` or `without…` method that returns a new document, or
- *   the same one when there is nothing to change, and throws
- *   {@link RefusedEditError} when it cannot be made.
+ * - it names its {@link kind}, which the configuration files it under;
+ * - an edit is a `with…` or `without…` method that returns an {@link Edit}
+ *   holding a new document, or the same one when there is nothing to change,
+ *   and throws {@link RefusedEditError} when it cannot be made.
  *
  * Immutable. The body is never changed in place, so a document read once can
  * be compared with what an edit made of it. The body is kept whole, including
@@ -50,6 +98,11 @@ export type DocumentFile<Body extends JsonObject = JsonObject> = Readonly<{
  * its author put there.
  */
 export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
+  /**
+   * Which kind of document this is, which the configuration files it under.
+   */
+  abstract readonly kind: string;
+
   /**
    * The project-relative path of the file the document is saved to.
    */
@@ -85,6 +138,18 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
    */
   get changed(): boolean {
     return this.status !== "read";
+  }
+
+  /**
+   * The name a release pins the document by.
+   *
+   * @remarks
+   * A kind a release pins by name overrides this; any other kind has none.
+   *
+   * @returns The handle, or `undefined` when the document has none.
+   */
+  get handle(): string | undefined {
+    return undefined;
   }
 
   /**
@@ -162,12 +227,12 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   }
 
   /**
-   * The body as its contract judges it, and as the server receives it when
-   * the kind has no references to inline.
+   * The body as its contract and every rule judges it, and as the server
+   * receives it when the kind has no references to inline.
    *
    * @returns The body without the editor-only `$schema` pointer.
    */
-  protected get contractBody(): JsonObject {
+  get contractBody(): JsonObject {
     const { $schema: _editorOnly, ...body } = this.body;
     return body;
   }

@@ -1,4 +1,4 @@
-import type { ZitadelConfig } from "@/lib/zitadel/config";
+import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 
 /**
@@ -103,13 +103,7 @@ export class Change {
    * @returns Their project-relative paths, documents first.
    */
   get changedPaths(): readonly string[] {
-    const documents = this.after.changedDocuments.map((document) => {
-      return document.path;
-    });
-    const texts = this.texts.map((file) => {
-      return file.path;
-    });
-    return [...documents, ...texts];
+    return this.pathsWithTexts(this.after.changedDocuments);
   }
 
   /**
@@ -118,17 +112,11 @@ export class Change {
    * @returns Their project-relative paths, documents first.
    */
   get createdPaths(): readonly string[] {
-    const documents = this.after.changedDocuments
-      .filter((document) => {
+    return this.pathsWithTexts(
+      this.after.changedDocuments.filter((document) => {
         return document.status === "created";
-      })
-      .map((document) => {
-        return document.path;
-      });
-    const texts = this.texts.map((file) => {
-      return file.path;
-    });
-    return [...documents, ...texts];
+      }),
+    );
   }
 
   /**
@@ -183,26 +171,66 @@ export class Change {
    *   may not be replaced.
    */
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
+    const overwrite = options.overwrite === true;
     const documents = [...this.after.changedDocuments].sort((a, b) => {
       return Number(b.status === "created") - Number(a.status === "created");
     });
     for (const document of documents) {
-      if (options.overwrite === true) {
-        await store.write(document.toFile(), "replace");
-      } else {
-        await store.write(document.toFile(), document.writeMode);
-      }
+      await store.write(document.toFile(), overwrite ? "replace" : document.writeMode);
     }
     for (const file of this.texts) {
-      if (options.overwrite === true) {
-        await store.writeText(file.path, file.text, "replace");
-      } else {
-        await store.writeText(file.path, file.text, "create");
-      }
+      await store.writeText(file.path, file.text, overwrite ? "replace" : "create");
     }
     for (const path of this.removedPaths) {
       await store.remove(path);
     }
     return this.changedPaths;
+  }
+
+  /**
+   * The paths of some of the documents the change writes, then of every text
+   * file it writes, which is always new.
+   *
+   * @param documents - The documents.
+   * @returns Their project-relative paths, documents first.
+   */
+  private pathsWithTexts(documents: readonly AnyDocument[]): readonly string[] {
+    return [...documents, ...this.texts].map((file) => {
+      return file.path;
+    });
+  }
+}
+
+/**
+ * A change made about one document, such as the connection
+ * `config.connections.enable` offers, which says what became of it.
+ *
+ * @typeParam T - The kind of document.
+ */
+export class DocumentChange<T extends AnyDocument> extends Change {
+  /**
+   * The document the change is about, as the change leaves it.
+   */
+  readonly document: T;
+
+  /**
+   * Describe an edit about one document.
+   *
+   * @param input - What a {@link Change} is made of, and the document it is
+   *   about.
+   */
+  constructor(input: ConstructorParameters<typeof Change>[0] & Readonly<{ document: T }>) {
+    super(input);
+    this.document = input.document;
+  }
+
+  /**
+   * Whether the change creates the document, rather than finding it already
+   * there.
+   *
+   * @returns True when saving the change writes the document's file anew.
+   */
+  get created(): boolean {
+    return this.createdPaths.includes(this.document.path);
   }
 }

@@ -69,7 +69,8 @@ export function findFileReferences(document: unknown): FoundReference[] {
       });
     }
     if (isJsonObject(node)) {
-      return Object.entries(node).flatMap(([key, value]) => {
+      return Object.entries(node).flatMap((pair) => {
+        const [key, value] = pair;
         return walk(value, [...location, key]);
       });
     }
@@ -127,7 +128,8 @@ export function inlineFileReferences(
     }
     if (isJsonObject(node)) {
       return Object.fromEntries(
-        Object.entries(node).flatMap(([key, value]): Array<[string, unknown]> => {
+        Object.entries(node).flatMap((pair): Array<[string, unknown]> => {
+          const [key, value] = pair;
           const inlined = inline(value);
           return inlined === omitted ? [] : [[key, inlined]];
         }),

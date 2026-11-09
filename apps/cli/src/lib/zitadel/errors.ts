@@ -1,4 +1,7 @@
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
+import type { ProviderSelection } from "@zitadel/config/idp";
+
+import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
  * What a configuration failure carries beyond its message.
@@ -88,9 +91,10 @@ export class BrokenFilesError extends ConfigError {
    * @param problems - Every broken file, and what is wrong with each.
    */
   constructor(problems: readonly FileProblem[]) {
+    const files = problems.length === 1 ? "file is" : "files are";
     super(
       [
-        `${problems.length} configuration ${problems.length === 1 ? "file is" : "files are"} not valid:`,
+        `${problems.length} configuration ${files} not valid:`,
         ...problems.map((entry) => {
           return `  - ${entry.path}: ${entry.problem}`;
         }),
@@ -133,6 +137,101 @@ export class NotFoundError extends ConfigError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "NotFoundError";
+}
+
+/**
+ * A user schema asked for by a name no schema has, or asked for in a
+ * configuration that has none.
+ */
+export class SchemaNotFoundError extends NotFoundError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "SchemaNotFoundError";
+
+  /**
+   * The name asked for, without a `.json` suffix, or `undefined` when none
+   * was.
+   */
+  readonly requested: string | undefined;
+
+  /**
+   * Every schema the configuration has; none when it has no schema at all.
+   */
+  readonly known: readonly UserSchema[];
+
+  /**
+   * Make the failure for this name.
+   *
+   * @param requested - The name asked for, if any.
+   * @param known - Every schema the configuration has.
+   */
+  constructor(requested: string | undefined, known: readonly UserSchema[]) {
+    const message =
+      requested === undefined || known.length === 0
+        ? "There is no user schema under .zitadel/schemas"
+        : `No user schema is named ${requested}`;
+    super(message, {
+      details: {
+        requested: requested ?? null,
+        known: known.map((schema) => {
+          return schema.name;
+        }),
+      },
+    });
+    this.requested = requested;
+    this.known = known;
+  }
+}
+
+/**
+ * A user schema asked for in a way more than one schema fits: by a name that
+ * is one schema's file name and another's `objectType`, or by no name where
+ * there are several.
+ *
+ * @remarks
+ * Refused rather than guessed, since editing the wrong schema is worse than
+ * asking which was meant.
+ */
+export class AmbiguousSchemaError extends ConfigError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "AmbiguousSchemaError";
+
+  /**
+   * The name asked for, without a `.json` suffix, or `undefined` when none
+   * was.
+   */
+  readonly requested: string | undefined;
+
+  /**
+   * Every schema that fits.
+   */
+  readonly candidates: readonly UserSchema[];
+
+  /**
+   * Make the failure for these schemas.
+   *
+   * @param requested - The name asked for, if any.
+   * @param candidates - Every schema that fits.
+   */
+  constructor(requested: string | undefined, candidates: readonly UserSchema[]) {
+    const message =
+      requested === undefined
+        ? "There is more than one user schema, and none was named"
+        : `More than one user schema is named ${requested}`;
+    super(message, {
+      details: {
+        requested: requested ?? null,
+        candidates: candidates.map((schema) => {
+          return schema.name;
+        }),
+      },
+    });
+    this.requested = requested;
+    this.candidates = candidates;
+  }
 }
 
 /**
@@ -250,6 +349,50 @@ export class FileExistsError extends ConflictError {
 }
 
 /**
+ * A provider a new project was to offer that already has a connection, which
+ * a scaffold never replaces.
+ *
+ * @remarks
+ * A connection may hold a client id someone registered with the vendor and a
+ * slug the schemas and flows already name, so the file is the developer's,
+ * with or without `force`. The provider is kept, so the caller can say how to
+ * enable it with the connection that is there.
+ */
+export class ConnectionExistsError extends ConflictError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "ConnectionExistsError";
+
+  /**
+   * The project-relative path of the connection already there.
+   */
+  readonly path: string;
+
+  /**
+   * The provider, as it was chosen.
+   */
+  readonly selection: ProviderSelection;
+
+  /**
+   * Make the failure for this connection.
+   *
+   * @param path - The project-relative path of the connection already there.
+   * @param selection - The provider, as it was chosen.
+   */
+  constructor(path: string, selection: ProviderSelection) {
+    super(`${path} already exists`, {
+      hint:
+        "A connection file is yours to keep, so it is never replaced or removed. " +
+        "Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
+      details: { file: path },
+    });
+    this.path = path;
+    this.selection = selection;
+  }
+}
+
+/**
  * What a {@link BrokenFlowsError} reports.
  */
 export type BrokenFlows = Readonly<{
@@ -301,18 +444,21 @@ export class BrokenFlowsError extends ConfigError {
    */
   constructor(input: BrokenFlows) {
     const uses = input.uses ?? [];
-    const unexplained = input.issues.filter(({ path, issue }) => {
+    const unexplained = input.issues.filter((item) => {
+      const { path, issue } = item;
       return !uses.some((use) => {
         return use.path === path && use.step === issue.step;
       });
     });
     const lines = [
-      ...uses.map(useLine),
-      ...unexplained.map(({ path, issue }) => {
+      ...uses.map(BrokenFlowsError.useLine),
+      ...unexplained.map((item) => {
+        const { path, issue } = item;
         return `${path}: ${issue.message}`;
       }),
     ];
-    const issues = input.issues.map(({ path, issue }) => {
+    const issues = input.issues.map((item) => {
+      const { path, issue } = item;
       if (issue.step === undefined) {
         return { path, rule: issue.rule, message: issue.message };
       }
@@ -343,36 +489,37 @@ export class BrokenFlowsError extends ConfigError {
       },
     );
   }
-}
 
-/**
- * How a step that uses a method being disabled is listed.
- *
- * @remarks
- * Only a step left with nothing says what starts on it and leads to it, since
- * it is the one to go.
- *
- * @param use - The step.
- * @returns Its line.
- */
-function useLine(use: FlowMethodUse): string {
-  const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
-  if (use.keeps.length > 0) {
-    return `${at}\n    Still has ${use.keeps.join(", ")}.`;
-  }
-  const purposes = use.entryFor.map((purpose) => {
-    return `purposes.${purpose}`;
-  });
-  const transitions = use.staying.map(({ step, transition, purpose }) => {
-    if (purpose === undefined) {
-      return `${step}.${transition}`;
+  /**
+   * How a step that uses a method being disabled is listed.
+   *
+   * @remarks
+   * Only a step left with nothing says what starts on it and leads to it, since
+   * it is the one to go.
+   *
+   * @param use - The step.
+   * @returns Its line.
+   */
+  private static useLine(use: FlowMethodUse): string {
+    const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
+    if (use.keeps.length > 0) {
+      return `${at}\n    Still has ${use.keeps.join(", ")}.`;
     }
-    return `${step}.${transition} (via purposes.${purpose})`;
-  });
-  const notes = [
-    "Left with no field or sign-in method.",
-    ...(purposes.length > 0 ? [`Entry step of ${purposes.join(", ")}.`] : []),
-    ...(transitions.length > 0 ? [`Targeted by ${transitions.join(", ")}.`] : []),
-  ];
-  return [at, notes.join(" ")].join("\n    ");
+    const purposes = use.entryFor.map((purpose) => {
+      return `purposes.${purpose}`;
+    });
+    const transitions = use.staying.map((item) => {
+      const { step, transition, purpose } = item;
+      if (purpose === undefined) {
+        return `${step}.${transition}`;
+      }
+      return `${step}.${transition} (via purposes.${purpose})`;
+    });
+    const entry = `Entry step of ${purposes.join(", ")}.`;
+    const targeted = `Targeted by ${transitions.join(", ")}.`;
+    const entryNotes = purposes.length > 0 ? [entry] : [];
+    const targetedNotes = transitions.length > 0 ? [targeted] : [];
+    const notes = ["Left with no field or sign-in method.", ...entryNotes, ...targetedNotes];
+    return [at, notes.join(" ")].join("\n    ");
+  }
 }

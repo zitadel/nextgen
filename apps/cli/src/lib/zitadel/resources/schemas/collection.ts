@@ -1,14 +1,20 @@
 import { Change, type Notice } from "@/lib/zitadel/change";
 import { Collection } from "@/lib/zitadel/resources/collection";
-import { NoSignInLeftError } from "@/lib/zitadel/errors";
-import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/resources/flows/checks";
-import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import { AmbiguousSchemaError, NoSignInLeftError, SchemaNotFoundError } from "@/lib/zitadel/errors";
+import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
+import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import {
   type ForceOptions,
   type SchemaEdit,
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
+import { CONFIG_DIRECTORIES, type JsonObject } from "@/lib/zitadel/types";
+
+/**
+ * What a name ends with to name a schema by its file alone.
+ */
+const FILE_SUFFIX = ".json";
 
 /**
  * The user schemas under `.zitadel/schemas/`, turning their own sign-in
@@ -33,7 +39,7 @@ export class Schemas extends Collection<UserSchema> {
    * @throws {@link BrokenFlowsError} When a flow would stop validating.
    */
   enable(schema: UserSchema, method: ToggleableMethod): Change {
-    const edited = schema.withMethod(method);
+    const edited = schema.withMethod(method).document;
     const edit = { before: this.config, after: this.config.with(edited), original: schema, edited };
     assertFlowsIntact(edit);
     return new Change({
@@ -57,7 +63,7 @@ export class Schemas extends Collection<UserSchema> {
    *   `force` is not set.
    */
   disable(schema: UserSchema, method: ToggleableMethod, options: ForceOptions = {}): Change {
-    const edited = schema.withoutMethod(method);
+    const edited = schema.withoutMethod(method).document;
     const edit = { before: this.config, after: this.config.with(edited), original: schema, edited };
     assertMethodUnused(edit, method);
     this.assertSignInLeft(edit, method, options.force === true);
@@ -97,6 +103,91 @@ export class Schemas extends Collection<UserSchema> {
   listing(slug: string): readonly UserSchema[] {
     return this.all.filter((schema) => {
       return schema.lists(slug);
+    });
+  }
+
+  /**
+   * The schema a name picks: its file name or its `objectType`, or the only
+   * schema when no name is given.
+   *
+   * @remarks
+   * A name that fits more than one schema is refused rather than guessed, and
+   * `<file>.json` names a schema by its file alone, which {@link nameFor}
+   * gives where the file name alone would not do.
+   *
+   * @param requested - The name, if any.
+   * @returns The schema.
+   * @throws {@link SchemaNotFoundError} When there is no schema at all, or
+   *   none has the name.
+   * @throws {@link AmbiguousSchemaError} When more than one schema fits, or
+   *   there are several and no name is given.
+   */
+  named(requested?: string): UserSchema {
+    if (this.all.length === 0) {
+      throw new SchemaNotFoundError(requested, this.all);
+    }
+    if (requested === undefined) {
+      const [only, ...rest] = this.all;
+      if (only === undefined || rest.length > 0) {
+        throw new AmbiguousSchemaError(undefined, this.all);
+      }
+      return only;
+    }
+    const byFile = requested.endsWith(FILE_SUFFIX);
+    const wanted = byFile ? requested.slice(0, -FILE_SUFFIX.length) : requested;
+    const matches = this.all.filter((schema) => {
+      return schema.name === wanted || (!byFile && schema.objectType === wanted);
+    });
+    const [match, ...others] = matches;
+    if (match === undefined) {
+      throw new SchemaNotFoundError(wanted, this.all);
+    }
+    if (others.length > 0) {
+      throw new AmbiguousSchemaError(wanted, matches);
+    }
+    return match;
+  }
+
+  /**
+   * The name {@link named} picks a schema by and no other: its file name, or
+   * `<file>.json` when that name is also another schema's `objectType`.
+   *
+   * @param schema - The schema.
+   * @returns The name.
+   */
+  nameFor(schema: UserSchema): string {
+    const shadowed = this.all.some((other) => {
+      return other.path !== schema.path && other.objectType === schema.name;
+    });
+    if (shadowed) {
+      return `${schema.name}${FILE_SUFFIX}`;
+    }
+    return schema.name;
+  }
+
+  /**
+   * Where a schema a release pins by a handle goes: the file that holds the
+   * handle, or `<handle>.json` when none does.
+   *
+   * @param handle - The schema's `objectType`.
+   * @returns The project-relative path.
+   */
+  pathFor(handle: string): string {
+    return this.holding(handle)?.path ?? `${CONFIG_DIRECTORIES.schemas}/${handle}.json`;
+  }
+
+  /**
+   * Place a schema revision a release pinned at {@link pathFor}, replacing
+   * the file there.
+   *
+   * @param handle - The schema's `objectType`.
+   * @param body - The revision as the server answered it.
+   * @returns The change; one that writes nothing when the file already holds
+   *   exactly this.
+   */
+  revision(handle: string, body: JsonObject): Change {
+    return this.placeRevision(this.pathFor(handle), body, (file) => {
+      return UserSchema.create(file);
     });
   }
 

@@ -3,93 +3,40 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 import { basename } from "node:path";
 
 import { flowConfigSchema } from "@zitadel/config/schemas";
-import { PURPOSE_FLIP_TARGETS } from "@zitadel/config/validate";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
 import {
-  addSsoToFlow,
-  flowEditRefusal,
-  generatedSsoSteps,
-  offersProvider,
-  providersRefusal,
-  removeSsoFromFlow,
-} from "@/lib/zitadel/resources/flows/sso";
-import { Step, type Transition } from "@/lib/zitadel/resources/flows/step";
-import type { SkippedRegion } from "@/lib/zitadel/resources/flows/types";
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+  type Edit,
+} from "@/lib/zitadel/resources/document";
+import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
+import { Step } from "@/lib/zitadel/resources/flows/step";
+import {
+  type IncomingTransition,
+  LOGIN_LEAVING_OUTCOMES,
+  type MethodUse,
+  PASSKEY_ACTION_KINDS,
+  PASSWORD_FIELD,
+  REGISTER_SSO_STEP,
+  SSO_CONFLICT_STEP,
+} from "@/lib/zitadel/resources/flows/types";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { EnabledMethods, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, objectAt } from "@/lib/zitadel/utils/json";
-
-/**
- * The field a step collects a password with.
- */
-export const PASSWORD_FIELD = "x-auth-methods#password";
-
-/**
- * The action kinds that offer or enrol a passkey.
- */
-const PASSKEY_ACTION_KINDS: ReadonlySet<string> = new Set(["passkey", "passkey_register"]);
-
-/**
- * Outcomes the engine answers by switching from login to register without a
- * `purpose` on the transition: the identifier one, plus `sso_user_not_found`.
- */
-const LOGIN_LEAVING_OUTCOMES: ReadonlySet<string> = new Set([
-  ...Object.keys(PURPOSE_FLIP_TARGETS.login ?? {}),
-  "sso_user_not_found",
-]);
-
-/**
- * A transition of another step that leads to a step.
- */
-export type IncomingTransition = Readonly<{
-  /**
-   * The step the transition belongs to.
-   */
-  step: string;
-  /**
-   * The outcome that fires it.
-   */
-  transition: string;
-  /**
-   * The purpose it follows, when it names only a purpose and so leads to that
-   * purpose's entry step.
-   */
-  purpose?: string;
-}>;
-
-/**
- * How one step uses a method, and what the step would be without it.
- */
-export type MethodUse = Readonly<{
-  /**
-   * The step.
-   */
-  step: string;
-  /**
-   * How it uses the method, as a message names it.
-   */
-  uses: string;
-  /**
-   * The fields and sign-in methods it keeps without the method.
-   */
-  keeps: readonly string[];
-  /**
-   * The purposes that start on it.
-   */
-  entryFor: readonly string[];
-  /**
-   * The transitions that lead to it.
-   */
-  targetedBy: readonly IncomingTransition[];
-}>;
+import { walk } from "@/lib/zitadel/utils/graph";
+import { isJsonObject, listAt, objectAt } from "@/lib/zitadel/utils/json";
 
 /**
  * A login flow under `.zitadel/flows/`: its steps and how they connect.
  */
 export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+  /**
+   * What kind of document this is: a login flow.
+   */
+  readonly kind = "flow";
+
   /**
    * Hold a flow's body at its path.
    *
@@ -164,6 +111,20 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   }
 
   /**
+   * The name a release pins the flow by: its `name`, which its file name
+   * need not match.
+   *
+   * @returns The name, or `undefined` when it is missing or empty.
+   */
+  override get handle(): string | undefined {
+    const name = this.body.name;
+    if (typeof name !== "string" || name === "") {
+      return undefined;
+    }
+    return name;
+  }
+
+  /**
    * Whether the flow can sign anyone in.
    *
    * @returns True when it is `active`, the only status that is served, and has
@@ -209,8 +170,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @returns Each step, in order; none when `steps` is not a list.
    */
   get steps(): readonly Step[] {
-    const steps: readonly unknown[] = Array.isArray(this.body.steps) ? this.body.steps : [];
-    return steps.filter(isJsonObject).map(Step.of);
+    return listAt(this.body, "steps").filter(isJsonObject).map(Step.of);
   }
 
   /**
@@ -227,10 +187,16 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   /**
    * The steps enabling a provider adds that the flow carries.
    *
+   * @remarks
+   * They cannot be told apart from a developer's own, so disabling keeps them
+   * and names them.
+   *
    * @returns Their names; none when the flow has none of them.
    */
   get generatedSsoSteps(): readonly string[] {
-    return generatedSsoSteps(this.body);
+    return [REGISTER_SSO_STEP, SSO_CONFLICT_STEP].filter((name) => {
+      return this.step(name) !== undefined;
+    });
   }
 
   /**
@@ -244,35 +210,32 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @returns The steps reached, in the flow's order; none without a login entry.
    */
   get loginJourney(): readonly Step[] {
-    const entry = objectAt(this.body, "purposes").login;
-    const staysInLogin = (transition: Transition): boolean => {
-      return (
-        !LOGIN_LEAVING_OUTCOMES.has(transition.outcome) &&
-        transition.target !== "" &&
-        transition.action === null &&
-        (transition.purpose === null || transition.purpose === "login")
-      );
-    };
-    const grow = (
-      reached: ReadonlySet<string>,
-      frontier: readonly string[],
-    ): ReadonlySet<string> => {
-      const fresh = [...new Set(frontier)].filter((name) => {
-        return !reached.has(name) && this.step(name) !== undefined;
-      });
-      if (fresh.length === 0) {
-        return reached;
-      }
-      const next = fresh.flatMap((name) => {
-        return (this.step(name)?.transitions ?? []).filter(staysInLogin).map((transition) => {
-          return transition.target;
-        });
-      });
-      return grow(new Set([...reached, ...fresh]), next);
-    };
-    const reached = grow(new Set(), typeof entry === "string" ? [entry] : []);
+    const login = objectAt(this.body, "purposes").login;
+    const entry = typeof login === "string" ? this.step(login) : undefined;
+    const reached = walk(
+      entry === undefined ? [] : [entry],
+      (step) => {
+        return step.transitions
+          .filter((transition) => {
+            return (
+              !LOGIN_LEAVING_OUTCOMES.has(transition.outcome) &&
+              transition.target !== "" &&
+              transition.action === null &&
+              (transition.purpose === null || transition.purpose === "login")
+            );
+          })
+          .flatMap((transition) => {
+            return this.step(transition.target) ?? [];
+          });
+      },
+      (step) => {
+        return step.name;
+      },
+    );
     return this.steps.filter((step) => {
-      return reached.has(step.name);
+      return reached.some((visited) => {
+        return visited.name === step.name;
+      });
     });
   }
 
@@ -331,10 +294,12 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
       },
     };
     return Object.entries(signsIn)
-      .filter(([, offers]) => {
+      .filter((pair) => {
+        const offers = pair[1];
         return journey.some(offers);
       })
-      .map(([method]) => {
+      .map((pair) => {
+        const method = pair[0];
         return method;
       });
   }
@@ -452,19 +417,12 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @returns Whether one does.
    */
   offers(slug?: string): boolean {
-    return offersProvider(this.body, slug);
-  }
-
-  /**
-   * The regions {@link withProvider} leaves alone because they were edited by
-   * hand.
-   *
-   * @param slug - The provider.
-   * @param methods - The methods the flow's schema enables.
-   * @returns The regions; none when the edit writes every one it needs.
-   */
-  regionsLeftAlone(slug: ConnectionSlug, methods: EnabledMethods): readonly SkippedRegion[] {
-    return addSsoToFlow(this.body, slug, methods).skipped;
+    return this.steps.some((step) => {
+      if (slug === undefined) {
+        return step.providers.length > 0;
+      }
+      return step.providers.includes(slug);
+    });
   }
 
   /**
@@ -478,7 +436,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    *   shape it writes, or no step marks where a completed sign-in ends.
    */
   assertProviderEditable(): void {
-    this.refuseUneditable(flowEditRefusal(this.body));
+    this.refuseUneditable(new SsoGenerator(this.body).editRefusal);
   }
 
   /**
@@ -486,22 +444,26 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * a provider round trip needs.
    *
    * @remarks
-   * Regions edited by hand are left as they are; {@link regionsLeftAlone}
-   * names them.
+   * Regions edited by hand are left as they are, and the edit names them.
    *
    * @param slug - The provider.
    * @param methods - The methods the flow's schema enables.
-   * @returns The edited flow, or this one when it already offers the provider.
+   * @returns The edit: the edited flow, or this one when it already offers the
+   *   provider, and the regions left alone.
    * @throws {@link RefusedEditError} When a region the edit writes is not the
    *   shape it writes.
    */
-  withProvider(slug: ConnectionSlug, methods: EnabledMethods): Flow<Body> {
+  withProvider(slug: ConnectionSlug, methods: EnabledMethods): Edit<Flow<Body>> {
     this.assertProviderEditable();
-    const edit = addSsoToFlow(this.body, slug, methods);
+    const edit = new SsoGenerator(this.body).withProvider(slug, methods);
     if (!edit.changed) {
-      return this;
+      return { document: this, changed: false, skipped: edit.skipped };
     }
-    return new Flow(this.path, { ...this.body, ...edit.body }, this.editedStatus);
+    return {
+      document: new Flow(this.path, { ...this.body, ...edit.document }, this.editedStatus),
+      changed: true,
+      skipped: edit.skipped,
+    };
   }
 
   /**
@@ -511,16 +473,21 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * Removing writes no route, so only the provider lists need to be readable.
    *
    * @param slug - The provider.
-   * @returns The edited flow, or this one when no step offers it.
+   * @returns The edit: the edited flow, or this one when no step offers it.
    * @throws {@link RefusedEditError} When the steps or their provider lists
    *   are not the shape the edit writes.
    */
-  withoutProvider(slug: string): Flow<Body> {
-    this.refuseUneditable(providersRefusal(this.body));
-    const edit = removeSsoFromFlow(this.body, slug);
+  withoutProvider(slug: string): Edit<Flow<Body>> {
+    const generator = new SsoGenerator(this.body);
+    this.refuseUneditable(generator.providersRefusal);
+    const edit = generator.withoutProvider(slug);
     if (!edit.changed) {
-      return this;
+      return { document: this, changed: false, skipped: edit.skipped };
     }
-    return new Flow(this.path, { ...this.body, ...edit.body }, this.editedStatus);
+    return {
+      document: new Flow(this.path, { ...this.body, ...edit.document }, this.editedStatus),
+      changed: true,
+      skipped: edit.skipped,
+    };
   }
 }

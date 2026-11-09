@@ -162,13 +162,16 @@ function issueOf<Fact>(
   fact: Fact,
   steps: readonly string[] | undefined,
 ): Issue {
+  const where = steps === undefined ? "" : stepsText(steps);
+  const stepsPart = steps === undefined ? {} : { steps };
+  const slugPart = spec.slug === undefined ? {} : { slug: spec.slug(fact) };
   return {
     severity: spec.severityOf?.(fact) ?? spec.severity,
     rule: spec.rule?.(fact) ?? spec.id,
     file: spec.file(fact),
-    ...(steps === undefined ? {} : { steps }),
-    ...(spec.slug === undefined ? {} : { slug: spec.slug(fact) }),
-    message: spec.says(fact, steps === undefined ? "" : stepsText(steps)),
+    ...stepsPart,
+    ...slugPart,
+    message: spec.says(fact, where),
   };
 }
 

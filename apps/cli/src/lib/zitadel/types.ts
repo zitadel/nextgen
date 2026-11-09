@@ -1,10 +1,21 @@
 /**
- * The types every part of `lib/zitadel` shares: a file, its body, and where
- * each kind of file lives.
+ * The types every part of `lib/zitadel` shares: a file, its body, where each
+ * kind of file lives, and what a new project is scaffolded from.
  */
 
-import type { SkippedRegion } from "@/lib/zitadel/resources/flows/types";
-import { POLICY_FILE_SUFFIX, POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies/types";
+import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
+import type { ConnectionEndpoints, ProviderSelection } from "@zitadel/config/idp";
+
+import type { Change } from "@/lib/zitadel/change";
+import type { Connection } from "@/lib/zitadel/resources/connections/connection";
+import type { Flow } from "@/lib/zitadel/resources/flows/flow";
+import type { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
+import {
+  type PasswordMinLength,
+  POLICY_FILE_SUFFIX,
+  POLICY_TEST_SUFFIX,
+} from "@/lib/zitadel/resources/policies/types";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
  * A parsed JSON object, as a configuration file holds at its root.
@@ -73,19 +84,153 @@ export type ConfigFile = Readonly<{
 export type ConfigFiles = Readonly<Record<ConfigKind, readonly ConfigFile[]>>;
 
 /**
- * What an edit made of a document.
+ * One provider a new project offers for signing in, as it was chosen.
  */
-export type EditResult = Readonly<{
+export type ScaffoldedProvider = Readonly<{
   /**
-   * The document's body after the edit.
+   * The provider: one from the catalog, or the developer's own.
    */
-  body: JsonObject;
+  selection: ProviderSelection;
+
   /**
-   * False when the edit changed nothing, which makes a rerun a no-op.
+   * Where the provider answers, when not at its own issuer.
    */
-  changed: boolean;
+  endpoints?: ConnectionEndpoints;
+}>;
+
+/**
+ * A chosen provider and the connection scaffolded for it.
+ *
+ * @typeParam P - The provider as the caller chose it.
+ */
+export type ScaffoldedConnection<P extends ScaffoldedProvider = ScaffoldedProvider> = Readonly<{
   /**
-   * The regions the edit left alone because they were changed by hand.
+   * The provider, as the caller handed it in.
    */
-  skipped: readonly SkippedRegion[];
+  chosen: P;
+
+  /**
+   * The connection written for it.
+   */
+  connection: Connection;
+}>;
+
+/**
+ * What a new project's configuration is scaffolded from.
+ *
+ * @typeParam P - The provider as the caller chose it, handed back with its
+ *   connection.
+ */
+export type ScaffoldOptions<P extends ScaffoldedProvider = ScaffoldedProvider> = Readonly<{
+  /**
+   * The sign-in preset: which method the login flow starts with.
+   */
+  preset: SetupPreset;
+
+  /**
+   * The use case: which fields the user schema asks for.
+   */
+  useCase: SetupUseCase;
+
+  /**
+   * The providers to offer, in the order they were chosen: each gets a
+   * connection, and the schema and flow name every one.
+   */
+  sso: readonly P[];
+
+  /**
+   * The minimum password length for the password policy: a number, `null`
+   * for an explicit none, or `undefined` when none was given.
+   *
+   * @remarks
+   * A new policy gets the recommended minimum when none was given, and an
+   * empty `config`, which enforces nothing, for none. A kept one keeps its
+   * `min_length` when none was given.
+   */
+  passwordMinLength?: PasswordMinLength | undefined;
+
+  /**
+   * Whether the default schema and flow may replace the files at their
+   * paths, and an existing password policy is kept instead of refused.
+   */
+  force: boolean;
+}>;
+
+/**
+ * A new project's configuration: the change that writes it, and the
+ * documents it writes.
+ *
+ * @typeParam P - The provider as the caller chose it.
+ */
+export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = Readonly<{
+  /**
+   * The edit that writes every file, to save with `overwrite` set as `force`
+   * was.
+   */
+  change: Change;
+
+  /**
+   * The default user schema, with every chosen provider enabled.
+   */
+  schema: UserSchema;
+
+  /**
+   * The default login flow, offering every chosen provider.
+   */
+  flow: Flow;
+
+  /**
+   * Each chosen provider with its connection, in the order chosen.
+   */
+  connections: readonly ScaffoldedConnection<P>[];
+
+  /**
+   * The password policy the project holds afterwards: new, or the one it
+   * kept, with the minimum it was given.
+   */
+  policy: PasswordPolicy;
+}>;
+
+/**
+ * The configuration as `POST /releases/build` takes it, grouped by kind.
+ *
+ * @remarks
+ * Loose on purpose: the files are untyped JSON until the deploy's checks have
+ * run, and the publisher narrows them to the API's bundle before they are sent.
+ */
+export type ConfigurationBundle = Readonly<{
+  /**
+   * Every user schema's wire body.
+   */
+  schemas: readonly JsonObject[];
+  /**
+   * Every login flow's wire body.
+   */
+  flow_definitions: readonly JsonObject[];
+  /**
+   * Every connection's wire body.
+   */
+  idps: readonly JsonObject[];
+  /**
+   * Every policy's wire body; absent when there are none.
+   */
+  policies?: readonly JsonObject[];
+  /**
+   * The branding descriptor's wire body; absent when there is none.
+   */
+  branding?: JsonObject;
+}>;
+
+/**
+ * A built bundle, and the number of resources it carries across every kind.
+ */
+export type BuiltBundle = Readonly<{
+  /**
+   * The bundle to send.
+   */
+  bundle: ConfigurationBundle;
+  /**
+   * How many resources it carries across every kind.
+   */
+  resourceCount: number;
 }>;

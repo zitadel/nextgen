@@ -1,36 +1,25 @@
 import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
+import { AuthMethodCommand } from "@/commands/auth-method/command";
 import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { optionArgs } from "@/lib/public-cli";
 import { projectCommand } from "@/lib/suggestion";
-import type { Change } from "@/lib/zitadel";
+import type { UnusedConnection } from "@/lib/zitadel";
 
-/** What a run that names no provider is refused for. */
+/**
+ * What a run that names no provider is refused for. The provider is always
+ * named, because removing every provider at once would be a different, larger
+ * change; the refusal lists the providers the schema offers, well-formed or
+ * not.
+ */
 const NAME_PROVIDER_REFUSAL: Refusal = {
   message: "Name the provider to remove",
   hint: "Pass --provider, e.g. --provider {example}. {schema} offers: {offered}.",
 };
-
-/**
- * The provider to remove. It is always named, because removing every provider
- * at once would be a different, larger change; the refusal lists the providers
- * the schema offers, well-formed or not.
- */
-export function providerToRemove(given: string | undefined, target: SchemaTarget): string {
-  if (given !== undefined) {
-    return given;
-  }
-  throw refusalError(NAME_PROVIDER_REFUSAL, {
-    example: IDP_PROVIDERS[0],
-    schema: target.schema.name,
-    offered: target.schema.providers.join(", ") || "none",
-  });
-}
 
 /**
  * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
@@ -64,7 +53,14 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
   protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
     const target = await this.schemaTarget(flags);
     const { config, schema } = target;
-    const provider = providerToRemove(flags.provider, target);
+    const provider = flags.provider;
+    if (provider === undefined) {
+      throw refusalError(NAME_PROVIDER_REFUSAL, {
+        example: IDP_PROVIDERS[0],
+        schema: schema.name,
+        offered: schema.providers.join(", ") || "none",
+      });
+    }
     const retryArgs = [
       "auth-method",
       "sso",
@@ -88,7 +84,6 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const where = change.changedPaths.includes(schema.path)
       ? schema.name
       : `the login flows of ${schema.name}`;
-    const unchanged = `${schema.name} does not offer ${provider}, so nothing changed`;
     const data = {
       schema: schema.name,
       file: schema.path,
@@ -98,6 +93,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       usable: [...edited.usableMethods],
       notices: change.notices,
     };
+    const unchanged = `${schema.name} does not offer ${provider}, so nothing changed`;
 
     if (this.dryRun) {
       this.report(change);
@@ -111,7 +107,8 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     await this.write(target, change);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
-    const actions = this.removalActions(change, provider, flags);
+    const unused = change.changed ? change.after.connections.unused(provider) : undefined;
+    const actions = unused === undefined ? [] : this.removalActions(unused, flags);
 
     return this.emit({
       status: "ok",
@@ -122,29 +119,25 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
   }
 
   /**
-   * How to remove the connection, once nothing offers its provider: the file
-   * before the next deploy, and its variables once that deploy is live. In the
-   * other order the live release would offer a provider whose credentials are
-   * gone, and the deploy would refuse a connection whose variables are
-   * missing. The `variable rm` commands carry the run's
+   * How to remove a connection nothing offers any more: the file before the
+   * next deploy, and its variables once that deploy is live.
+   *
+   * @remarks
+   * In the other order the live release would offer a provider whose
+   * credentials are gone, and the deploy would refuse a connection whose
+   * variables are missing. The `variable rm` commands carry the run's
    * `--env`/`--env-file`/`--server`, so they reach the project this run named.
+   *
+   * @param unused - The connection, and the variables only it reads.
+   * @param flags - The run's `--cwd` and environment flags.
+   * @returns The actions, the file's deletion first.
    */
   private removalActions(
-    change: Change,
-    provider: string,
+    unused: UnusedConnection,
     flags: { cwd?: string; env?: string; envFile?: string; server?: string },
   ): string[] {
-    const connection = change.after.connections.find(provider);
-    if (
-      !change.changed ||
-      connection === undefined ||
-      change.after.connections.offeredBy(provider).length > 0
-    ) {
-      return [];
-    }
-    const deletion = `To stop publishing the connection, delete ${connection.path} before the deploy below.`;
-    const variables = change.after.connections.unsharedVariables(connection);
-    if (variables.length === 0) {
+    const deletion = `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`;
+    if (unused.variables.length === 0) {
       return [deletion];
     }
     const selector = environmentSelectorSuffix({
@@ -153,7 +146,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       envName: flags.env,
       server: flags.server,
     });
-    const commands = variables.map((name) => {
+    const commands = unused.variables.map((name) => {
       return `\`${projectCommand(`variable rm ${name}`, selector, this.cliVersion)}\``;
     });
     return [

@@ -1018,13 +1018,14 @@ describe("setup command", () => {
     expect(res.stdout).toContain("--password-min-length 12");
   });
 
-  describe("when the default resources of a new app cannot be uploaded", () => {
-    const failingUpload = async () => {
+  describe("when the default configuration of a new app cannot be written", () => {
+    const failingWrite = async () => {
       const cwd = await makeNewAppDirectory();
       server.use(
-        http.post("*/schemas", () =>
-          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-        ),
+        http.post("*/projects", async () => {
+          await mkdir(join(cwd, ".zitadel"), { recursive: true });
+          await writeFile(join(cwd, ".zitadel/policies"), "");
+        }),
       );
       const res = await runCliForTest(
         [
@@ -1037,13 +1038,13 @@ describe("setup command", () => {
     };
 
     it("says the new app is gone again", async () => {
-      const json = await failingUpload();
+      const json = await failingWrite();
 
       expect(json.hint).toContain("so setup removed the new app again");
     });
 
     it("does not suggest --force, which the emptied directory does not need", async () => {
-      const json = await failingUpload();
+      const json = await failingWrite();
 
       expect(json.next_commands ?? []).toEqual([]);
     });

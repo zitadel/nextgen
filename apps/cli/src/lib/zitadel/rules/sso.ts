@@ -16,7 +16,6 @@ import type { Connection } from "@/lib/zitadel/resources/connections/connection"
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { Offer } from "@/lib/zitadel/resources/flows/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { FITS, STANDARD_SCOPES, standardClaim } from "@/lib/zitadel/rules/claims";
 import { closest, didYouMean } from "@/lib/zitadel/utils/spelling";
@@ -132,28 +131,6 @@ function readableProperties(entry: Standing): string[] {
 }
 
 /**
- * The claims a connection reads, by name: its mappings, then its
- * verifications, as long as the claim is written as a name.
- *
- * @param connection - The connection.
- * @returns Each claim and the block it is read in.
- */
-function claimReads(connection: Connection): Array<{ field: string; claim: string }> {
-  const blocks = [
-    { field: "claim_mapping", rows: connection.mappings },
-    { field: "verified_claims", rows: connection.verifications },
-  ];
-  return blocks.flatMap((block) => {
-    return block.rows.flatMap((row) => {
-      if (typeof row.claim !== "string") {
-        return [];
-      }
-      return [{ field: block.field, claim: row.claim }];
-    });
-  });
-}
-
-/**
  * The outcomes a step offering providers must route but does not. A provider
  * that never creates users never returns an unknown identity, so a step that
  * offers only such providers needs only `sso_authenticated`.
@@ -173,22 +150,19 @@ function unroutedOutcomes(config: ZitadelConfig, step: Step): string[] {
 }
 
 /**
- * The providers a schema lists without a connection file, as the connections
- * they most likely meant. A flow offering the meant provider is then not
- * reported again for the schema's typo.
+ * The providers a list names more than once, which offers their button twice.
  *
- * @param config - The configuration.
- * @param schema - The schema.
- * @returns The slugs the schema's typos meant.
+ * @param providers - The providers, as listed.
+ * @returns Each repeated provider once, in the order first repeated.
  */
-function meantBySchemaTypos(config: ZitadelConfig, schema: UserSchema): Array<string | undefined> {
-  return schema.providers
-    .filter((slug) => {
-      return config.connections.find(slug) === undefined;
-    })
-    .map((slug) => {
-      return closest(slug, knownSlugs(config));
-    });
+function repeatedProviders(providers: readonly string[]): readonly string[] {
+  return [
+    ...new Set(
+      providers.filter((provider, index) => {
+        return providers.indexOf(provider) !== index;
+      }),
+    ),
+  ];
 }
 
 /**
@@ -200,33 +174,6 @@ function meantBySchemaTypos(config: ZitadelConfig, schema: UserSchema): Array<st
 function knownSlugs(config: ZitadelConfig): string[] {
   return standing(config).map((entry) => {
     return entry.slug;
-  });
-}
-
-/**
- * An offer on a flow whose schema is known.
- */
-type PinnedOffer = Offer &
-  Readonly<{
-    /**
-     * The local schema the offer's flow runs against.
-     */
-    schema: UserSchema;
-  }>;
-
-/**
- * The offers on flows whose schema is a local file.
- *
- * @param config - The configuration.
- * @returns Each offer with its flow's schema.
- */
-function pinnedOffers(config: ZitadelConfig): PinnedOffer[] {
-  return config.flows.offers.flatMap((offer) => {
-    const schema = config.flows.schemaOf(offer.flow);
-    if (schema === undefined) {
-      return [];
-    }
-    return [{ ...offer, schema }];
   });
 }
 
@@ -290,7 +237,7 @@ export const SSO_RULES: readonly Rule[] = [
     severity: "error",
     each: (config) => {
       return config.schemas.all.flatMap((schema) => {
-        return schema.repeatedProviders.map((slug) => {
+        return repeatedProviders(schema.providers).map((slug) => {
           return { schema, slug };
         });
       });
@@ -312,7 +259,7 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       return config.flows.all.flatMap((flow) => {
         return flow.steps.flatMap((step) => {
-          return step.repeatedProviders.map((slug) => {
+          return repeatedProviders(step.providers).map((slug) => {
             return { flow, step, slug };
           });
         });
@@ -428,9 +375,19 @@ export const SSO_RULES: readonly Rule[] = [
   defineRule({
     id: "sso/provider-id",
     severity: "error",
+    // The providers the schema lists without a connection file, as the
+    // connections they most likely meant.
     each: (config) => {
-      return pinnedOffers(config).map((offer) => {
-        return { ...offer, meant: meantBySchemaTypos(config, offer.schema) };
+      const known = knownSlugs(config);
+      return config.flows.pinnedOffers.map((offer) => {
+        const meant = offer.schema.providers
+          .filter((slug) => {
+            return config.connections.find(slug) === undefined;
+          })
+          .map((slug) => {
+            return closest(slug, known);
+          });
+        return { ...offer, meant };
       });
     },
     // A slug the schema lists without a connection file is most likely a typo
@@ -529,7 +486,7 @@ export const SSO_RULES: readonly Rule[] = [
     id: "sso/empty-claim-mapping",
     severity: "error",
     each: (config) => {
-      return pinnedOffers(config).flatMap((offer) => {
+      return config.flows.pinnedOffers.flatMap((offer) => {
         const connection = offer.connection;
         // A provider that only signs people in fills no user, so what it maps
         // does not matter.
@@ -669,7 +626,7 @@ export const SSO_RULES: readonly Rule[] = [
         ) {
           return [];
         }
-        const missing = claimReads(entry.connection).flatMap((read) => {
+        const missing = entry.connection.claimReads.flatMap((read) => {
           const scope = standardClaim(read.claim)?.scope;
           if (scope === undefined || scopes.includes(scope)) {
             return [];
@@ -758,10 +715,9 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       return standing(config).flatMap((entry) => {
         const subject = entry.connection.subjectClaim;
-        return [
-          ...claimReads(entry.connection),
-          ...(subject === undefined ? [] : [{ field: "subject_claim", claim: subject }]),
-        ].map((read) => {
+        const subjectReads =
+          subject === undefined ? [] : [{ field: "subject_claim", claim: subject }];
+        return [...entry.connection.claimReads, ...subjectReads].map((read) => {
           return { connection: entry.connection, ...read };
         });
       });

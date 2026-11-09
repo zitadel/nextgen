@@ -16,7 +16,7 @@ import {
 } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { type ConfigurationBundle, DiskStore, toBundle, ZitadelConfig } from "@/lib/zitadel";
+import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { headSha, worktreeIsDirty } from "./git";
 import { type PipelineMode, runSteps, type StepContext, type StepReport } from "./pipeline";
 import { diffStep } from "./steps/diff";
@@ -145,7 +145,7 @@ export class Publisher {
     const store = new DiskStore(request.cwd);
     // Each file's shape is the validate step's to check, with its own messages.
     const config = await ZitadelConfig.loadUnchecked(store);
-    const built = toBundle(config, store);
+    const built = config.bundle(store);
     const context: StepContext = {
       cwd: request.cwd,
       deployments: this.deployments,

@@ -5,7 +5,6 @@ import {
   type ConfigStore,
   type ConfigurationBundle,
   MemoryStore,
-  toBundle,
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
@@ -78,5 +77,5 @@ function bundleOf(config: ZitadelConfig | undefined, store: ConfigStore): Config
   if (config === undefined) {
     return { schemas: [], flow_definitions: [], idps: [], policies: [] };
   }
-  return toBundle(config, store).bundle;
+  return config.bundle(store).bundle;
 }

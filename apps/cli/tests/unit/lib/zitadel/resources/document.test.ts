@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
 import { RefusedEditError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import { MemoryStore } from "@/lib/zitadel/storage";
@@ -23,6 +27,11 @@ const SAMPLE_CONTRACT = z.strictObject({ name: z.string() });
  * The smallest document there is, built on nothing but what the base gives.
  */
 class Sample extends ConfigDocument {
+  /**
+   * What kind of document this is: a sample.
+   */
+  readonly kind = "sample";
+
   /**
    * Hold a sample's body at its path.
    *
@@ -180,6 +189,14 @@ describe("ConfigDocument.wireBody", () => {
     const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
 
     expect(sample.wireBody(new MemoryStore())).toEqual({ name: "a" });
+  });
+});
+
+describe("ConfigDocument.contractBody", () => {
+  it("is the body without the editor's $schema pointer, which every rule judges", () => {
+    const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
+
+    expect(sample.contractBody).toEqual({ name: "a" });
   });
 });
 

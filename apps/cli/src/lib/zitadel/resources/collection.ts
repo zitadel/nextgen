@@ -1,5 +1,9 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
+import type { DocumentFile } from "@/lib/zitadel/resources/document";
+import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
  * The documents of one kind in a configuration, and the edits every kind
@@ -13,7 +17,7 @@ import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
  *
  * @typeParam T - The kind of document.
  */
-export abstract class Collection<T extends AnyDocument> {
+export class Collection<T extends AnyDocument> {
   /**
    * Every document of the kind, in the order the files were read and then
    * the order new ones were added.
@@ -38,6 +42,28 @@ export abstract class Collection<T extends AnyDocument> {
   }
 
   /**
+   * The project-relative paths of the documents, for a message to name them.
+   *
+   * @returns The paths, in the order of {@link all}.
+   */
+  get paths(): readonly string[] {
+    return this.all.map((document) => {
+      return document.path;
+    });
+  }
+
+  /**
+   * The documents of the collection that pass a test, as a collection of
+   * their own, so a refusal can name them by {@link paths}.
+   *
+   * @param test - Whether a document belongs.
+   * @returns The collection of those documents, in the same configuration.
+   */
+  where(test: (document: T) => boolean): Collection<T> {
+    return new Collection(this.config, this.all.filter(test));
+  }
+
+  /**
    * The document at a path.
    *
    * @param path - The document's project-relative path.
@@ -46,6 +72,22 @@ export abstract class Collection<T extends AnyDocument> {
   get(path: string): T | undefined {
     return this.all.find((document) => {
       return document.path === path;
+    });
+  }
+
+  /**
+   * The document a release pins by a handle.
+   *
+   * @remarks
+   * Matched by what the document holds, never by its file name: setup writes
+   * the human-user schema to `default-human-user.json`.
+   *
+   * @param handle - The handle.
+   * @returns The first document that holds it, or `undefined` when none does.
+   */
+  holding(handle: string): T | undefined {
+    return this.all.find((document) => {
+      return document.handle === handle;
     });
   }
 
@@ -73,5 +115,38 @@ export abstract class Collection<T extends AnyDocument> {
       return new Change({ before: this.config, after: this.config });
     }
     return new Change({ before: this.config, after: this.config.without(document) });
+  }
+
+  /**
+   * Place a revision a release pinned at a path, replacing whatever file is
+   * there.
+   *
+   * @remarks
+   * The server never echoes the editor-only `$schema` pointer, so the one in
+   * the file there is carried over unless the revision has its own. A file
+   * that already holds exactly this is left alone, so the change writes
+   * nothing. The revision is written whole, as a new document, so saving the
+   * change over a file already there takes `overwrite`.
+   *
+   * @param path - Where the revision goes.
+   * @param revision - The body as the server answered it.
+   * @param create - Makes a new document of the kind.
+   * @returns The change.
+   */
+  protected placeRevision(
+    path: string,
+    revision: JsonObject,
+    create: (file: DocumentFile) => T,
+  ): Change {
+    const there = this.get(path);
+    const pointer = there?.body.$schema;
+    const body =
+      typeof pointer === "string" && !("$schema" in revision)
+        ? { ...revision, $schema: pointer }
+        : revision;
+    if (there !== undefined && isDeepStrictEqual(there.body, body)) {
+      return new Change({ before: this.config, after: this.config });
+    }
+    return this.put(create({ path, body }));
   }
 }

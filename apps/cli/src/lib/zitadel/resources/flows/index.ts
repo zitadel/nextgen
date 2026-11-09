@@ -1,14 +1,15 @@
 /**
- * Login flows under `.zitadel/flows/`, their steps, the schema each runs
- * against, and the checks an edit is held to.
+ * Login flows under `.zitadel/flows/`, their steps, and the schema each runs
+ * against.
  */
-export type { FlowCheck, FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
 export { Flows } from "@/lib/zitadel/resources/flows/collection";
+export { Flow } from "@/lib/zitadel/resources/flows/flow";
+export type { Step } from "@/lib/zitadel/resources/flows/step";
 export {
-  Flow,
   PASSWORD_FIELD,
   type IncomingTransition,
   type MethodUse,
-} from "@/lib/zitadel/resources/flows/flow";
-export type { Step, Transition } from "@/lib/zitadel/resources/flows/step";
-export type { Offer, SignUpGap, SkippedRegion } from "@/lib/zitadel/resources/flows/types";
+  type Offer,
+  type SignUpGap,
+  type Transition,
+} from "@/lib/zitadel/resources/flows/types";
