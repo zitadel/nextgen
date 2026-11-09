@@ -8,6 +8,7 @@ import { mapBounded } from "@/lib/map-bounded";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import {
+  type Change,
   DiskStore,
   type Flows,
   isJsonObject,
@@ -141,10 +142,11 @@ type PulledResource = PinnedResource & {
 };
 
 /**
- * What became of one pinned resource.
+ * What became of one pinned resource: the file it goes in and the change that
+ * writes it, or why nothing is written.
  */
 type PullOutcome =
-  | { readonly kind: "pulled"; readonly resource: PulledResource }
+  | { readonly kind: "pulled"; readonly resource: PulledResource; readonly change: Change }
   | { readonly kind: "skipped"; readonly resource: PinnedResource };
 
 /**
@@ -216,17 +218,25 @@ export default class Pull extends EnvironmentCommand {
           return { kind: "skipped", resource };
         }
         const collection = PULLABLE[pointer.kind](config);
-        if (!this.dryRun) {
-          // The server's canonical form, written whole over the file that holds
-          // the handle, so what lands is exactly what the release pinned.
-          await collection.placeRevision(pointer.handle, body).save(store, { overwrite: true });
-        }
+        // Located here, before anything is written: a handle that has no
+        // single file refuses the pull while the working copy is untouched.
+        const change = collection.placeRevision(pointer.handle, body);
         return {
           kind: "pulled",
           resource: { ...resource, path: collection.locate(pointer.handle) },
+          change,
         };
       },
     );
+    if (!this.dryRun) {
+      for (const outcome of outcomes) {
+        if (outcome.kind === "pulled") {
+          // The server's canonical form, written whole over the file that holds
+          // the handle, so what lands is exactly what the release pinned.
+          await outcome.change.save(store, { overwrite: true });
+        }
+      }
+    }
     const pulled = outcomes.flatMap((outcome) => {
       if (outcome.kind !== "pulled") {
         return [];

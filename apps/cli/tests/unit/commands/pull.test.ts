@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -104,6 +105,62 @@ describe("pull", () => {
         data: { release_id: LIVE_RELEASE },
       });
     });
+  });
+});
+
+describe("pull of a release pinning a handle that has no file", () => {
+  /**
+   * Answers a release pinning a good schema and then one by an unsafe handle.
+   *
+   * @returns The handlers.
+   */
+  function pinningAGoodSchemaThenABadHandle() {
+    return [
+      http.get(`${PLATFORM_URL}/api/v1/releases/${RELEASE_ID}`, ({ request }) => {
+        return HttpResponse.json({
+          id: RELEASE_ID,
+          project_id: new URL(request.url).searchParams.get("project_id"),
+          content_hash: `sha256:${"0".repeat(64)}`,
+          metadata: {
+            message: null,
+            git_sha: null,
+            git_dirty: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            created_by: null,
+            created_by_type: "service",
+          },
+          revoked_at: null,
+          pointers: [
+            { kind: "schema", handle: "good", revision_id: "sch_good" },
+            { kind: "schema", handle: "../x", revision_id: "sch_bad" },
+          ],
+        });
+      }),
+      http.get(`${PLATFORM_URL}/api/v1/schemas/:id`, ({ params }) => {
+        return HttpResponse.json({ id: params.id, schema: { objectType: "human-user" } });
+      }),
+    ];
+  }
+
+  it.each([[[]], [["--dry-run"]]])("writes no file, with flags %j", async (flags) => {
+    const project = await aProjectWithTwoDeploys("zitadel-pull-");
+    dirs.push(project.cwd);
+    server.use(...pinningAGoodSchemaThenABadHandle());
+
+    const error = await rejectionOf(() => {
+      return Pull.run([
+        RELEASE_ID,
+        "--cwd",
+        project.cwd,
+        "--server",
+        PLATFORM_URL,
+        "--json",
+        ...flags,
+      ]);
+    });
+
+    expect(error).toMatchObject({ code: "EEXIT" });
+    expect(existsSync(join(project.cwd, ".zitadel/schemas/good.json"))).toBe(false);
   });
 });
 
