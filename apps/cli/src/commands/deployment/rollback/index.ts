@@ -115,8 +115,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         break;
     }
     const { target } = plan;
-    const changes = await originChanges(client, projectId, target.id);
+    const changes = await originChanges(client, deploymentService, projectId, target.id);
     const dropped = changes?.dropped ?? [];
+    const restored = changes?.restored ?? [];
 
     return this.emit(
       await this.confirmed({
@@ -126,7 +127,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
           dropped.length === 0
             ? ""
             : ` ${dropped.join(", ")} will refuse sign-in until the next deploy.`
-        }`,
+        }${restored.length === 0 ? "" : ` ${restored.join(", ")} will serve it again.`}`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.
         arguments: [target.id],
@@ -182,20 +183,26 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               `Rolled back to origins that leave out ${dropped.join(", ")}: they refuse sign-in until the next deploy.`,
             );
           }
-          const origins = deployment.origins.filter(
-            (origin) => !(changes?.unserved.includes(origin) ?? false),
-          );
+          if (restored.length > 0) {
+            reportWarning(
+              `Rolled back to origins that include ${restored.join(", ")}: they serve ${deployment.release_id} again.`,
+            );
+          }
           return {
             status: "ok",
             data: {
               deployment_id: deployment.id,
               release_id: deployment.release_id,
               rolled_back_to: deployment.metadata.rollback_to,
-              origins,
+              origins: deployment.origins,
               // Left out when the check failed: an empty list would claim it passed.
               ...(changes === undefined
                 ? {}
-                : { dropped_origins: changes.dropped, unserved_origins: changes.unserved }),
+                : {
+                    dropped_origins: changes.dropped,
+                    restored_origins: changes.restored,
+                    unserved_origins: changes.unserved,
+                  }),
               ...(pointers === undefined ? {} : { pointers }),
             },
             // Painted, because the pointers below are a table the CLI
@@ -204,7 +211,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             pretty: painted(
               [
                 escapeControlCharacters(
-                  `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+                  `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
                 ),
                 ...(pointerTable === undefined ? [] : ["", pointerTable]),
                 "",
@@ -221,34 +228,39 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
 /**
  * What a rollback to a deployment does to the project's origins, since it
  * restores the origins that deployment froze. `dropped` are listed but left
- * out, so they refuse; `unserved` are named but no longer listed. Undefined
- * when the check could not run.
+ * out, so they refuse; `restored` are listed, left out by the live deployment
+ * and served again; `unserved` are named but no longer listed. Undefined when
+ * the check could not run.
  */
 async function originChanges(
   client: ZitadelClient,
+  deployments: DeploymentService,
   projectId: string,
   deploymentId: string,
-): Promise<{ dropped: string[]; unserved: string[] } | undefined> {
+): Promise<{ dropped: string[]; restored: string[]; unserved: string[] } | undefined> {
   // Only a warning hangs on this, so a failed read says so and rolls back.
   const read = await Promise.all([
     client.getDeploymentById(deploymentId, { project_id: projectId }),
     client.getProject(projectId),
+    deployments.newestPrimary(),
   ]).catch((error: unknown) => {
     reportWarning(
-      `Could not check which origins rolling back to ${deploymentId} leaves out: ${toZitadelError(error).message}`,
+      `Could not check which origins rolling back to ${deploymentId} changes: ${toZitadelError(error).message}`,
     );
     return undefined;
   });
   if (read === undefined) {
     return undefined;
   }
-  const [deployment, project] = read;
+  const [deployment, project, live] = read;
   const frozen = deployment.targets.map((target) => target.origin);
   const listed = (project.origins ?? [])
     .filter((origin) => origin.kind === "primary")
     .map((origin) => origin.pattern);
+  const served = live?.origins ?? [];
   return {
     dropped: listed.filter((origin) => !frozen.includes(origin)),
+    restored: frozen.filter((origin) => listed.includes(origin) && !served.includes(origin)),
     unserved: frozen.filter((origin) => !listed.includes(origin)),
   };
 }

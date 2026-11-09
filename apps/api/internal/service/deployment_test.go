@@ -28,6 +28,12 @@ func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 	return svc, statements
 }
 
+// expectPrimaryLock expects a primary deploy to lock the project once. A
+// preview deploy expects none: it stays lock-free.
+func expectPrimaryLock(statements *servicemocks.MockAllStatements) {
+	statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(nil)
+}
+
 // newStrictDeploymentService leaves InsertEvent for the test to expect.
 func newStrictDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
 	t.Helper()
@@ -35,7 +41,6 @@ func newStrictDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
-	statements.EXPECT().LockProject(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	pool.EXPECT().
 		Transaction(gomock.Any(), gomock.Any()).
@@ -140,6 +145,7 @@ func servingDeployment(releaseID string) *domain.Deployment {
 
 func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
 	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
@@ -156,6 +162,7 @@ func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 
 func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
 	result, err := svc.Create(t.Context(), deploymentInput())
@@ -167,6 +174,7 @@ func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 // The insert gets what was read: that is the optimistic lock.
 func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	read := expectServing(statements, servingDeployment("rel_0"))
 	expectInsert(statements, read, emptyVariableSet())
 
@@ -180,6 +188,7 @@ func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 	t.Run("unguarded deploy writes on the retry", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(nil).Times(2)
 		expectServing(statements, nil)
 		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		read := expectServing(statements, servingDeployment("rel_0"))
@@ -192,6 +201,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 
 	t.Run("guarded deploy answers a conflict without retrying", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		before := servingDeployment("rel_0")
 		before.ID = "dep_before"
 		expectServing(statements, before)
@@ -212,6 +222,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 
 	t.Run("gives up with a conflict", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(nil).Times(3)
 		for range 3 {
 			expectServing(statements, nil)
 			statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
@@ -242,6 +253,7 @@ func variableSet(t *testing.T, name, value string) *domain.VariableSet {
 // origins, writes nothing and answers with that deployment.
 func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	serving := servingDeployment("rel_1")
 	expectServing(statements, serving)
 	expectDeploymentSet(statements, serving.ID, emptyVariableSet())
@@ -255,6 +267,7 @@ func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
 // The same release and origins with a different set is a new deployment.
 func TestDeploymentServiceCreateChangedSetWrites(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	serving := servingDeployment("rel_1")
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	live := variableSet(t, "GOOGLE_CLIENT_ID", "client")
@@ -274,6 +287,7 @@ func TestDeploymentServiceCreateChangedSetWrites(t *testing.T) {
 // A release that names a variable this kind does not hold writes nothing.
 func TestDeploymentServiceCreateMissingVariableWritesNothing(t *testing.T) {
 	svc, statements := newStrictDeploymentService(t)
+	expectPrimaryLock(statements)
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
 		ID: "rel_1",
 		Pointers: []domain.ReleasePointer{{
@@ -297,6 +311,7 @@ func TestDeploymentServiceCreateMissingVariableWritesNothing(t *testing.T) {
 // refuses the deploy.
 func TestDeploymentServiceCreateScansPolicyConfig(t *testing.T) {
 	svc, statements := newStrictDeploymentService(t)
+	expectPrimaryLock(statements)
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
 		ID: "rel_1",
 		Pointers: []domain.ReleasePointer{{
@@ -319,6 +334,7 @@ func TestDeploymentServiceCreateScansPolicyConfig(t *testing.T) {
 // primary deploy written, or it would expire with the preview.
 func TestDeploymentServiceCreatePrimaryOverPreviewWrites(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	serving := servingDeployment("rel_1")
 	serving.OriginKind = domain.DeploymentOriginKindPreview
 	expectInsert(statements, expectServing(statements, serving), emptyVariableSet())
@@ -355,6 +371,7 @@ func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
 func TestDeploymentServiceCreateGuard(t *testing.T) {
 	t.Run("matching", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		serving := servingDeployment("rel_0")
 		expectInsert(statements, expectServing(statements, serving), emptyVariableSet())
 
@@ -366,6 +383,7 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 
 	t.Run("mismatch carries what is served", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		serving := servingDeployment("rel_0")
 		expectServing(statements, serving)
 
@@ -379,6 +397,7 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 	// A stale guard is refused even when the deploy would change nothing.
 	t.Run("checked before the no-op", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		serving := servingDeployment("rel_1")
 		expectServing(statements, serving)
 		expectDeploymentSet(statements, serving.ID, emptyVariableSet())
@@ -391,6 +410,7 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 
 	t.Run("nothing deployed yet", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		expectServing(statements, nil)
 
 		input := deploymentInput()
@@ -409,6 +429,7 @@ var appPrimary = domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimar
 
 func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	expectProjectOrigins(statements, appPrimary)
 	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
@@ -485,6 +506,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 
 	t.Run("a missing project", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", To: domain.DeployToPrimary()})
 		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
@@ -503,6 +525,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 
 	t.Run("re-deploys the release to the origins it froze", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		serving := servingDeployment("rel_0")
 		previousSet := emptyVariableSet()
@@ -527,6 +550,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 
 	t.Run("unchanged answers the newest primary deployment", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		serving := servingDeployment("rel_1")
 		set := emptyVariableSet()
@@ -543,6 +567,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 	// restored set is not the one the newest deployment holds.
 	t.Run("links the restored set and does not freeze", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		serving := servingDeployment("rel_1")
 		previous := variableSet(t, "GOOGLE_CLIENT_ID", "old")
@@ -566,6 +591,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 
 	t.Run("the restored set already live writes nothing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		serving := servingDeployment("rel_1")
 		set := variableSet(t, "GOOGLE_CLIENT_ID", "old")
@@ -590,6 +616,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 
 	t.Run("a guard mismatch carries the newest primary deployment", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		serving := servingDeployment("rel_0")
 		expectRollbackServing(statements, serving, "dep_previous", emptyVariableSet())
@@ -603,6 +630,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 	// pinned revision does not change, so the rollback does not read it.
 	t.Run("a pinned document is not scanned", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		serving := servingDeployment("rel_0")
 		previousSet := emptyVariableSet()
@@ -640,6 +668,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 
 func TestDeploymentServiceCreateRefusesARevokedRelease(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	expectPrimaryLock(statements)
 	revokedAt := deployedAt.Add(-time.Hour)
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1", RevokedAt: &revokedAt}, nil)
 
@@ -650,6 +679,7 @@ func TestDeploymentServiceCreateRefusesARevokedRelease(t *testing.T) {
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(nil, new(database.NoRowFoundError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
@@ -660,6 +690,7 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	// project.
 	t.Run("project missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		expectServing(statements, nil)
 		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
 
@@ -667,8 +698,9 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
 	})
 
-	t.Run("invalid input never reaches storage", func(t *testing.T) {
-		svc, _ := newMockedDeploymentService(t)
+	t.Run("invalid input writes nothing", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectPrimaryLock(statements)
 		input := deploymentInput()
 		input.RollbackTo = new("dep_1")
 		_, err := svc.Create(t.Context(), input)

@@ -1406,8 +1406,10 @@ type Invoker interface {
 	// RollbackDeployment invokes rollbackDeployment operation.
 	//
 	// Rolls back to an earlier deployment by deploying its release again to the
-	// same origins, with the same variable values. A primary origin added since
-	// then serves nothing until the next deployment to `primary`.
+	// same origins, with the same variable values. A listed primary origin that
+	// deployment left out serves nothing until the next deployment to `primary`,
+	// and one it named serves its release again, even when the live deployment
+	// left it out.
 	// A release is a snapshot of the project's configuration. A deployment makes
 	// a release live on origins and freezes the project's variable values with
 	// it.
@@ -16366,8 +16368,10 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 // RollbackDeployment invokes rollbackDeployment operation.
 //
 // Rolls back to an earlier deployment by deploying its release again to the
-// same origins, with the same variable values. A primary origin added since
-// then serves nothing until the next deployment to `primary`.
+// same origins, with the same variable values. A listed primary origin that
+// deployment left out serves nothing until the next deployment to `primary`,
+// and one it named serves its release again, even when the live deployment
+// left it out.
 // A release is a snapshot of the project's configuration. A deployment makes
 // a release live on origins and freezes the project's variable values with
 // it.

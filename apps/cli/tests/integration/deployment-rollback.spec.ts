@@ -138,6 +138,49 @@ describe("deployment rollback", () => {
         expect(dropped_origins).toContain("https://c.example.com");
       });
 
+      it("reports a listed origin the restored deployment serves again", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const first = await app.deployData();
+        await app.removeOrigin("https://b.example.com");
+        await app.deployData();
+        await app.addPrimaryOrigin("https://b.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { restored_origins } = app.envelopeOf<{ restored_origins: string[] }>(result).data;
+        expect(restored_origins).toEqual(["https://b.example.com"]);
+      });
+
+      it("keeps an origin the project no longer lists among the deployment's origins", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const first = await app.deployData();
+        await app.removeOrigin("https://b.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const data = app.envelopeOf<{ origins: string[]; unserved_origins: string[] }>(result).data;
+        expect(data.origins).toContain("https://b.example.com");
+        expect(data.unserved_origins).toEqual(["https://b.example.com"]);
+      });
+
       it("takes no --origin, as every primary deployment is one history", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.example.com");

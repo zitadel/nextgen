@@ -168,6 +168,21 @@ export function droppedOrigins(deployment: Deployment, primaryOrigins: string[])
   return primaryOrigins.filter((origin) => !frozen.includes(origin));
 }
 
+/**
+ * The project's primary origins the live deployment leaves out that a rollback
+ * to the deployment serves again, since it restores the origins it froze.
+ */
+export function returningOrigins(
+  deployment: Deployment,
+  live: Deployment | undefined,
+  primaryOrigins: string[],
+): string[] {
+  const served = live?.targets.map((target) => target.origin) ?? [];
+  return deployment.targets
+    .map((target) => target.origin)
+    .filter((origin) => primaryOrigins.includes(origin) && !served.includes(origin));
+}
+
 export async function listRollbackTargets(projectId: string): Promise<RollbackTargets> {
   const [history, primaryOrigins] = await Promise.all([
     listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE }),

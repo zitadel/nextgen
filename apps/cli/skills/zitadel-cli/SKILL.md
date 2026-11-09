@@ -325,12 +325,14 @@ Each invocation prints one JSON object:
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
 - `deployment rollback` emits `data.release_id` (the release live again),
-  `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
-  revisions that release pins; the `schema` one is what new registrations use.
-  It restores the origins that deployment froze: `data.dropped_origins` are
-  listed origins it leaves out, which refuse sign-in until the next `deploy`,
-  and `data.unserved_origins` are origins it names that the project no longer
-  lists. Both are absent when that check failed, and a warning says so.
+  `data.origins` (the origins that deployment froze) and `data.pointers`, the
+  `{kind, handle, revision_id}` revisions that release pins; the `schema` one
+  is what new registrations use. It restores the origins that deployment froze:
+  `data.dropped_origins` are listed origins it leaves out, which refuse sign-in
+  until the next `deploy`; `data.restored_origins` are listed origins the live
+  deployment left out, which serve the release again; and
+  `data.unserved_origins` are origins it names that the project no longer
+  lists. All three are absent when that check failed, and a warning says so.
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.
