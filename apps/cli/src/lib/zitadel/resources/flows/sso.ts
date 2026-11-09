@@ -144,10 +144,16 @@ export class SsoGenerator {
             transitions: routed.transitions,
           };
         });
-        if (!routed.handEdited) {
+        if (routed.kept.length === 0) {
           return { steps, skipped: staged.skipped };
         }
-        return { steps, skipped: [...staged.skipped, SsoGenerator.handEdited(name)] };
+        const kept: SkippedRegion = {
+          step: name,
+          region: `steps.${name}`,
+          reason: "routes-kept",
+          routes: routed.kept,
+        };
+        return { steps, skipped: [...staged.skipped, kept] };
       },
       { steps: migrated, skipped: [] },
     );
@@ -378,17 +384,17 @@ export class SsoGenerator {
    * one is added at the end. The collision outcome is the generator's: one that
    * goes anywhere else is replaced in place. Any other outcome that already goes
    * somewhere else is the developer's, such as a sign-in routed through an extra
-   * step, so it stays and the step is reported as hand-edited.
+   * step, so it stays and is named among the routes kept.
    *
    * @param transitions - The step's transitions.
    * @param terminal - The step a completed sign-in ends at.
-   * @returns The transitions with the provider routes, and whether a route the
-   *   developer wrote was kept.
+   * @returns The transitions with the provider routes, and the outcomes whose
+   *   routes the developer wrote were kept.
    */
   private static withProviderRoutes(
     transitions: JsonObject,
     terminal: StepName,
-  ): { readonly transitions: JsonObject; readonly handEdited: boolean } {
+  ): { readonly transitions: JsonObject; readonly kept: readonly string[] } {
     const routes = SsoGenerator.providerRoutes(terminal);
     const kept: string[] = [];
     const added = PROVIDER_OUTCOMES.flatMap(
@@ -407,7 +413,7 @@ export class SsoGenerator {
     );
     return {
       transitions: { ...transitions, ...Object.fromEntries(added) },
-      handEdited: kept.length > 0,
+      kept,
     };
   }
 

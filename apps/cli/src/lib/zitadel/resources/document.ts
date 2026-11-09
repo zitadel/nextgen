@@ -104,24 +104,48 @@ export type DocumentContract<Schema extends ZodType> = {
 };
 
 /**
- * A region an edit left alone because it was changed by hand.
+ * A region an edit did not write as it would have, because it was changed by
+ * hand: left alone entirely (`hand-edited`), or edited with the routes the
+ * developer wrote kept as they are (`routes-kept`).
  */
-export type SkippedRegion = {
-  /**
-   * The step that was left alone, such as `sso-conflict`.
-   */
-  readonly step: string;
+export type SkippedRegion =
+  | {
+      /**
+       * The step that was left alone, such as `sso-conflict`.
+       */
+      readonly step: string;
 
-  /**
-   * Where in the file, such as `steps.sso-conflict`.
-   */
-  readonly region: `steps.${string}`;
+      /**
+       * Where in the file, such as `steps.sso-conflict`.
+       */
+      readonly region: `steps.${string}`;
 
-  /**
-   * Why it was left alone.
-   */
-  readonly reason: "hand-edited";
-};
+      /**
+       * Why it was left alone.
+       */
+      readonly reason: "hand-edited";
+    }
+  | {
+      /**
+       * The step that was edited, such as `identifier`.
+       */
+      readonly step: string;
+
+      /**
+       * Where in the file, such as `steps.identifier`.
+       */
+      readonly region: `steps.${string}`;
+
+      /**
+       * The step was edited, but routes the developer wrote were kept.
+       */
+      readonly reason: "routes-kept";
+
+      /**
+       * The outcomes whose routes were kept, such as `sso_authenticated`.
+       */
+      readonly routes: readonly string[];
+    };
 
 /**
  * What an edit made of a document: every `with…` and `without…` returns one.
