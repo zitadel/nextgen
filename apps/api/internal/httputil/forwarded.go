@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+// ProxyPrefix is the path prefix under which a scaffolded app's SDK proxy
+// forwards requests to this server, and the prefix it strips on the way. A
+// request that arrives through it carries the prefix in X-Forwarded-Prefix.
+const ProxyPrefix = "/__nextgen"
+
 // ForwardedOrigin returns the origin the client's request arrived at,
 // as "proto://host": the first X-Forwarded-Proto, else https when the
 // connection has TLS and http otherwise, and the first X-Forwarded-Host,
