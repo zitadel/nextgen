@@ -243,8 +243,8 @@ github.com/xyproto/randomstring v1.0.5/go.mod h1:rgmS5DeNXLivK7YprL0pY+lTuhNQW3i
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-github.com/zitadel/oidc/v3 v3.51.18-0.20261109052100-7ca3d453510e h1:bXnfUdJ4pGmTd4PGEv08qpCv6HKrz8wPXtWiMfYnrFc=
-github.com/zitadel/oidc/v3 v3.51.18-0.20261109052100-7ca3d453510e/go.mod h1:eTvmJ8tHNI1rAJR6w+geRMpXrKS9o4wtsWbH7vjwTi8=
+github.com/zitadel/oidc/v3 v3.51.18-0.20261109065440-6da543097051 h1:j+OL5zjdlX4MTmzW8D4O/1zrO8Qx7KWN0iNRe/5uUSU=
+github.com/zitadel/oidc/v3 v3.51.18-0.20261109065440-6da543097051/go.mod h1:eTvmJ8tHNI1rAJR6w+geRMpXrKS9o4wtsWbH7vjwTi8=
 github.com/zitadel/passwap v0.12.1 h1:QAMccBfdQ2b0hRKXJ/qY4/kdddXkXqlDNXeVwEr2318=
 github.com/zitadel/passwap v0.12.1/go.mod h1:atRozvPTTrwYUJdyxpxoxlIbI6Sr2O/ef/9URcn5EmY=
 github.com/zitadel/schema v1.3.2 h1:gfJvt7dOMfTmxzhscZ9KkapKo3Nei3B6cAxjav+lyjI=
