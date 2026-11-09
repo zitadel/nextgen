@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BrokenFilesError,
   BrokenFlowsError,
   CONFIG_DIRECTORIES,
   ConflictError,
@@ -275,6 +276,38 @@ describe("NoSignInLeftError", () => {
       usable: ["password"],
       alternatives: ["passkey"],
     });
+  });
+});
+
+describe("BrokenFilesError", () => {
+  it("counts a file once however many problems it has", () => {
+    const error = new BrokenFilesError([
+      { path: ".zitadel/idps/acme.json", problem: "protocol is missing" },
+      { path: ".zitadel/idps/acme.json", problem: "name is missing" },
+    ]);
+
+    expect(error.message.split("\n")[0]).toBe("1 configuration file is not valid:");
+  });
+
+  it("counts each file that has a problem", () => {
+    const error = new BrokenFilesError([
+      { path: ".zitadel/idps/acme.json", problem: "protocol is missing" },
+      { path: ".zitadel/idps/other.json", problem: "protocol is missing" },
+    ]);
+
+    expect(error.message.split("\n")[0]).toBe("2 configuration files are not valid:");
+  });
+
+  it("lists every problem, one to a line", () => {
+    const error = new BrokenFilesError([
+      { path: ".zitadel/idps/acme.json", problem: "protocol is missing" },
+      { path: ".zitadel/idps/acme.json", problem: "name is missing" },
+    ]);
+
+    expect(error.message.split("\n").slice(1)).toEqual([
+      "  - .zitadel/idps/acme.json: protocol is missing",
+      "  - .zitadel/idps/acme.json: name is missing",
+    ]);
   });
 });
 

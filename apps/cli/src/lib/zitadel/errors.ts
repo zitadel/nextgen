@@ -94,11 +94,16 @@ export class BrokenFilesError extends ConfigError {
    * @param problems - Every broken file, and what is wrong with each.
    */
   constructor(problems: readonly FileProblem[]) {
-    const files = problems.length === 1 ? "file is" : "files are";
+    const paths = new Set(
+      problems.map((entry) => {
+        return entry.path;
+      }),
+    );
+    const files = paths.size === 1 ? "file is" : "files are";
     const lines = problems.map((entry) => {
       return `  - ${entry.path}: ${entry.problem}`;
     });
-    super([`${problems.length} configuration ${files} not valid:`, ...lines].join("\n"), {
+    super([`${paths.size} configuration ${files} not valid:`, ...lines].join("\n"), {
       hint: "Fix the files named above, then run the command again; nothing was changed.",
       details: { problems },
     });
