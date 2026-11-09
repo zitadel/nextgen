@@ -62,6 +62,10 @@ func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest
 	if err := requireBuildKindScopes(ctx, req.Bundle); err != nil {
 		return nil, err
 	}
+	// TODO(#2793): drop once the release service stores OAuth settings.
+	if req.Bundle.OAuth.IsSet() {
+		return oauthSettingsUnsupportedBadRequest(ctx), nil
+	}
 
 	input, err := mapBuildReleaseRequest(projectID, req)
 	if err != nil {
@@ -98,6 +102,7 @@ func requireBuildKindScopes(ctx context.Context, bundle api.ConfigurationBundle)
 		{len(bundle.Idps) > 0, "idp.write", "idps"},
 		{len(bundle.Policies) > 0, "policy.write", "policies"},
 		{bundle.Branding.IsSet(), "branding.write", "branding"},
+		{bundle.OAuth.IsSet(), "oauth_settings.write", "oauth"},
 	}
 	for _, check := range checks {
 		if !check.needed {
@@ -210,6 +215,29 @@ func bundleValidationBadRequest(ctx context.Context, err *service.BundleValidati
 		}
 		resources = append(resources, item)
 	}
+	return buildReleaseBadRequest(resources)
+}
+
+// oauthSettingsUnsupportedBadRequest refuses a bundle that carries oauth while
+// the contract admits it ahead of the service that stores it. The entry names
+// the resource as a validation failure would, so the caller removes it from
+// the bundle and builds again.
+func oauthSettingsUnsupportedBadRequest(ctx context.Context) *api.BuildReleaseBadRequest {
+	err := domain.ErrReleaseInvalid(nil, nil).WithMessage(
+		"release: oauth is not supported by this server yet; remove it from the bundle")
+	errlog.Log(ctx, err)
+	return buildReleaseBadRequest([]api.BundleResourceError{{
+		Code:    api.ErrorCode(err.Code),
+		Message: err.Message,
+		Kind:    api.ReleasePointerKindOAuth,
+		Index:   0,
+		Handle:  api.NewOptString(domain.ReleaseOAuthHandle),
+	}})
+}
+
+// buildReleaseBadRequest wraps the refused resources in the rel.invalid
+// envelope the 400 of POST /releases/build carries.
+func buildReleaseBadRequest(resources []api.BundleResourceError) *api.BuildReleaseBadRequest {
 	return &api.BuildReleaseBadRequest{
 		Code:    api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code),
 		Message: domain.ErrReleaseInvalid(nil, nil).Message,
