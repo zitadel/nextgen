@@ -198,6 +198,11 @@ website's catch-all.
     properties when it makes or takes over the contact, and never again. The
     first touch wins, and HubSpot's own "Original Traffic Source" stays its
     tracking script's.
+  - Only for a sign-up: `ensure` keeps the source only while the person's
+    personal team, which Zitadel makes on their first session, is under an
+    hour old. Someone signing in again, including everyone who signed up
+    before this rule, gets no `signup_*`, since their page says nothing
+    about how they first came.
   - In Vercel: the add-on reports `signup_completed` from the browser when the
     sign-in widget finishes a flow whose last step created the user, with the
     page, the parameters and the referring host

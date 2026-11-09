@@ -52,6 +52,8 @@ the repo root.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.
+- `RELEASE_HOST_ONLY=1` (ci-turbo's journey) drops the other platforms'
+  server packages from that set, in the snapshot and in the check.
 - Keep Verdaccio's npmjs metadata cache (`maxage` in
   `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
   can ask for a nuxt released two hours earlier.

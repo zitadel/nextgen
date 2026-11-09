@@ -744,7 +744,7 @@ func ssoHiddenClaim(prop schemaReader, path AttributeKey, value any, fields []Fl
 	if !ok || !prop.HasProperties() {
 		// A shown field below a value that is no object: the claim does not
 		// have the shape the step collects.
-		if below || prop.s.Validate(value) != nil {
+		if below || prop.s.ValidateWithOpts(value, attributeValidation) != nil {
 			return nil, false
 		}
 		return value, true
@@ -759,7 +759,7 @@ func ssoHiddenClaim(prop schemaReader, path AttributeKey, value any, fields []Fl
 			kept[key] = v
 		}
 	}
-	if len(kept) == 0 || (!below && prop.s.Validate(kept) != nil) {
+	if len(kept) == 0 || (!below && prop.s.ValidateWithOpts(kept, attributeValidation) != nil) {
 		return nil, false
 	}
 	return kept, true
@@ -790,7 +790,7 @@ func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]boo
 	rejected = func(prop schemaReader, value any) bool {
 		object, ok := value.(map[string]any)
 		if !ok {
-			return deriveUnique(prop) != AttributeUniquenessUnspecified && prop.s.Validate(value) != nil
+			return deriveUnique(prop) != AttributeUniquenessUnspecified && prop.s.ValidateWithOpts(value, attributeValidation) != nil
 		}
 		for key, v := range object {
 			if sub, ok := prop.Property(key); ok && rejected(sub, v) {
@@ -1301,11 +1301,26 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 		return &FlowStepResult{State: pc.state, Step: step}, nil
 	}
 
-	if err := mergeCollected(pc.state, pc.in.Fields); err != nil {
-		return nil, fmt.Errorf("flow state machine: validate fields: %w", err)
-	}
+	return nil, collectStepFields(pc.state, resolved, pc.in.Fields)
+}
 
-	return nil, nil
+// collectStepFields folds a validated submission into CollectedData. A blank
+// optional field with a format is an unset attribute, not a value: a user write
+// refuses "" for it, possibly on a later step with no such field to correct. It
+// also clears what an earlier visit to the step collected for that field.
+func collectStepFields(state *FlowState, resolved FlowResolvedFields, values map[string]any) error {
+	kept := maps.Clone(values)
+	for _, field := range resolved.Fields {
+		if field.Required || field.Validation == nil || field.Validation.Format == "" || values[field.Name] != "" {
+			continue
+		}
+		delete(kept, field.Name)
+		maputil.DeleteNested(state.CollectedData.UserData, AttributeKey(field.Name).Nodes())
+	}
+	if err := mergeCollected(state, kept); err != nil {
+		return fmt.Errorf("flow state machine: validate fields: %w", err)
+	}
+	return nil
 }
 
 // renderStepError re-renders the current step with an error key set,

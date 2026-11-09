@@ -29,26 +29,109 @@ LOCAL.addAddress("0.0.0.0", "ipv4");
 LOCAL.addAddress("::1", "ipv6");
 LOCAL.addAddress("::", "ipv6");
 
-/** What `connect` reads once its overloads are resolved. */
+/**
+ * What `connect` reads once its overloads are resolved. A caller may leave any
+ * of these out or pass `null`, which `connect` treats as left out.
+ */
 type ConnectOptions = {
-  host?: string;
-  port?: number | string;
-  path?: string;
-  lookup?: net.LookupFunction;
+  readonly host?: string | null;
+  readonly port?: number | string | null;
+  readonly path?: string | null;
+  readonly lookup?: net.LookupFunction | null;
 };
 
 /** `[options, callback]`, as `net.connect` passes them on. */
 type NormalizedArgs = [ConnectOptions, unknown];
 
-/** `net.connect`'s own overload resolution, which `@types/node` leaves out. */
-const { _normalizeArgs: normalizeArgs } = net as unknown as {
-  _normalizeArgs(args: unknown[]): NormalizedArgs;
-};
+/**
+ * Whether a value is absent, or a string.
+ *
+ * @param value - The field read.
+ * @returns Whether it is `undefined`, `null` or a string.
+ */
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+/**
+ * Whether a value is the options `connect` reads, every field it reads either
+ * absent or of the kind `net.connect` documents.
+ *
+ * @param value - What sits first in the arguments.
+ * @returns Whether it can be read as {@link ConnectOptions}.
+ */
+function isConnectOptions(value: unknown): value is ConnectOptions {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const host = "host" in value ? value.host : undefined;
+  const port = "port" in value ? value.port : undefined;
+  const path = "path" in value ? value.path : undefined;
+  const lookup = "lookup" in value ? value.lookup : undefined;
+  return (
+    isOptionalString(host) &&
+    isOptionalString(path) &&
+    (isOptionalString(port) || typeof port === "number") &&
+    (lookup === undefined || lookup === null || typeof lookup === "function")
+  );
+}
+
+/**
+ * Whether a value is the `[options, callback]` pair `net.connect` hands on
+ * once it has resolved its overloads.
+ *
+ * @param value - The first argument `connect` was given.
+ * @returns Whether it is that pair.
+ */
+function isNormalizedArgs(value: unknown): value is NormalizedArgs {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+  const [options]: unknown[] = value;
+  return isConnectOptions(options);
+}
+
+/**
+ * `net.connect`'s own overload resolution, an internal `@types/node` leaves
+ * out, so it is looked up by name and what it answers is checked.
+ *
+ * @param args - The arguments as a caller passed them to `connect`.
+ * @returns The `[options, callback]` pair they resolve to.
+ */
+function normalizeArgs(args: unknown[]): NormalizedArgs {
+  const internal: unknown = Reflect.get(net, "_normalizeArgs");
+  if (typeof internal !== "function") {
+    throw new Error(
+      "net._normalizeArgs is gone, so tests/helpers/offline.ts cannot read connect's arguments.",
+    );
+  }
+  const normalized: unknown = Reflect.apply(internal, undefined, [args]);
+  if (!isNormalizedArgs(normalized)) {
+    throw new Error("net._normalizeArgs answered something other than [options, callback].");
+  }
+  return normalized;
+}
 
 /** The connections refused since the last check, shared by every file a worker runs. */
 type Offline = { readonly refused: string[] };
 
+/** Where the worker's {@link Offline} is kept, so every test file finds the same one. */
 const INSTALLED = Symbol.for("@zitadel/cli/tests/offline");
+
+/**
+ * Whether a value is the {@link Offline} an earlier test file installed.
+ *
+ * @param value - What the global holds under {@link INSTALLED}.
+ * @returns Whether it is that record.
+ */
+function isOffline(value: unknown): value is Offline {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "refused" in value &&
+    Array.isArray(value.refused)
+  );
+}
 
 const offline = installOnce();
 
@@ -72,13 +155,12 @@ function assertStayedLocal(): void {
  * outlives the module graph each test file gets.
  */
 function installOnce(): Offline {
-  const holder = globalThis as { [INSTALLED]?: Offline };
-  const installed = holder[INSTALLED];
-  if (installed !== undefined) {
+  const installed: unknown = Reflect.get(globalThis, INSTALLED);
+  if (isOffline(installed)) {
     return installed;
   }
   const state: Offline = { refused: [] };
-  holder[INSTALLED] = state;
+  Reflect.set(globalThis, INSTALLED, state);
 
   // The system resolver, as it was before any test replaced it.
   const resolver = dns.lookup;
@@ -112,14 +194,28 @@ function installOnce(): Offline {
       });
     };
 
-  net.Socket.prototype.connect = function (this: net.Socket, ...args: unknown[]) {
+  /**
+   * Hands the connection to the real `connect`, in the resolved form it takes
+   * internally, which `@types/node` does not declare.
+   *
+   * @param socket - The socket connecting.
+   * @param normalized - Its resolved arguments.
+   * @returns What `connect` returns: the socket itself.
+   */
+  const proceed = (socket: net.Socket, normalized: NormalizedArgs): net.Socket => {
+    const connected: unknown = Reflect.apply(connect, socket, [normalized]);
+    return connected instanceof net.Socket ? connected : socket;
+  };
+
+  net.Socket.prototype.connect = function (this: net.Socket, ...args: unknown[]): net.Socket {
     // `net.connect` hands its arguments on already resolved; anything else is
     // one of the public overloads.
-    const normalized = Array.isArray(args[0]) ? (args[0] as NormalizedArgs) : normalizeArgs(args);
+    const [first] = args;
+    const normalized = isNormalizedArgs(first) ? first : normalizeArgs(args);
     const [options] = normalized;
     // A pipe or a Unix socket is on this machine by construction.
     if (options.path) {
-      return Reflect.apply(connect, this, [normalized]) as net.Socket;
+      return proceed(this, normalized);
     }
     // `||`, as `connect` itself defaults it: an empty host is localhost too.
     const host = (options.host || "localhost").replace(/^\[(.*)\]$/, "$1");
@@ -138,8 +234,8 @@ function installOnce(): Offline {
     if (named) {
       normalized[0] = { ...options, lookup: answeringLocally(lookup, options.port) };
     }
-    return Reflect.apply(connect, this, [normalized]) as net.Socket;
-  } as typeof connect;
+    return proceed(this, normalized);
+  };
 
   return state;
 }
