@@ -10,9 +10,9 @@ import {
   type ConfigKind,
   type JsonObject,
   type StoredFile,
-  type UnparsedFile,
 } from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
+import { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
 import {
   CONFIG_ROOT,
   findFileReferences,
@@ -301,10 +301,6 @@ export class DiskStore implements ConfigStore {
   /**
    * Read and parse one file, where data enters the library.
    *
-   * @remarks
-   * Only the parser's position is kept: V8 quotes the source it choked on,
-   * and a connection file is where a pasted secret would be.
-   *
    * @param path - The project-relative path.
    * @returns The file; an {@link UnparsedFile} with the reason when it is not
    *   valid JSON, not a JSON object, or a directory.
@@ -320,23 +316,18 @@ export class DiskStore implements ConfigStore {
       // A directory named like a file cannot be parsed, but it hides nothing
       // else: it is reported as the broken entry it is.
       if (code === "EISDIR") {
-        return { path, unparsed: "is a directory" };
+        return UnparsedFile.directory(path);
       }
       throw DiskStore.unreadable(path, code);
     }
     let body: unknown;
     try {
       body = JSON.parse(text);
-    } catch (error) {
-      const position =
-        error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
-      return {
-        path,
-        unparsed: position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`,
-      };
+    } catch {
+      return UnparsedFile.invalidJson(path, text);
     }
     if (!isJsonValue(body) || !isJsonObject(body)) {
-      return { path, unparsed: "not a JSON object" };
+      return UnparsedFile.notAnObject(path);
     }
     return { path, body };
   }
