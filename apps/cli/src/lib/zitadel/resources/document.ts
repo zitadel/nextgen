@@ -89,6 +89,17 @@ export type DocumentContract<Schema extends ZodType> = {
   readonly schema: Schema;
 
   /**
+   * What the body as written breaks beyond the schema, each at its dotted path
+   * (empty for the root), for a rule that must see keys the schema strips.
+   *
+   * @param body - The body without its `$schema` pointer.
+   * @returns One refusal per problem; none when the body is sound.
+   */
+  readonly refuse?: (
+    body: unknown,
+  ) => readonly { readonly path: string; readonly message: string }[];
+
+  /**
    * Every finding a file the schema refuses is broken by.
    *
    * @remarks
@@ -296,12 +307,20 @@ export abstract class ConfigDocument<Value = unknown> {
         ],
       });
     }
-    const result = contract.schema.safeParse(withoutKey(file.body, "$schema"));
-    if (result.success) {
+    const body = withoutKey(file.body, "$schema");
+    const result = contract.schema.safeParse(body);
+    const refused = contract.refuse?.(body) ?? [];
+    if (result.success && refused.length === 0) {
       return make(result.data, file);
     }
-    const refusals = result.error.issues.map((refusal) => {
-      const where = refusal.path.join(".") || "(root)";
+    const parsed = result.success ? [] : result.error.issues;
+    const refusals = [
+      ...parsed.map((refusal) => {
+        return { path: refusal.path.join("."), message: refusal.message };
+      }),
+      ...refused,
+    ].map((refusal) => {
+      const where = refusal.path || "(root)";
       return ConfigDocument.makeFileIssue(file.path, contract.rule, `${where} ${refusal.message}`);
     });
     const issues = contract.explain?.(file, refusals) ?? refusals;

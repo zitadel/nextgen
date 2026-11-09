@@ -129,12 +129,7 @@ export type ReleaseRequest = {
 /**
  * What making a prepared bundle live on the primary origins takes.
  */
-export type DeployRequest = ReleaseRequest & {
-  /**
-   * The primary origins the deploy lands on, which decide the concurrency guard.
-   */
-  readonly landing: readonly string[];
-};
+export type DeployRequest = ReleaseRequest;
 
 /**
  * The release a deploy created, and what deploying it came to.
@@ -354,7 +349,6 @@ export class Publisher {
     const release = await this.createRelease(request);
     const publication = await this.deployments.deployToPrimary({
       releaseId: release.id,
-      landing: request.landing,
       message: request.message,
     });
     return {

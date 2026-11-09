@@ -405,7 +405,7 @@ describe("DeploymentService.deployToPrimary", () => {
     );
   }
 
-  it("guards on the deployment already serving an origin this deploy lands on", async () => {
+  it("guards on the newest primary deployment, as the server compares", async () => {
     const createDeployment = vi.fn(async () => primary("dep_2"));
     const deploymentService = new DeploymentService(
       fakeClient({
@@ -417,7 +417,6 @@ describe("DeploymentService.deployToPrimary", () => {
 
     await deploymentService.deployToPrimary({
       releaseId: "rel_2",
-      landing: ["https://app.acme.com"],
       message: "ship",
     });
 
@@ -441,7 +440,6 @@ describe("DeploymentService.deployToPrimary", () => {
 
     await deploymentService.deployToPrimary({
       releaseId: "rel_1",
-      landing: ["https://app.acme.com"],
     });
 
     expect(createDeployment).toHaveBeenCalledWith(
@@ -462,7 +460,6 @@ describe("DeploymentService.deployToPrimary", () => {
 
     await deploymentService.deployToPrimary({
       releaseId: "rel_2",
-      landing: ["https://app.acme.com"],
     });
 
     expect(createDeployment).toHaveBeenCalledWith(
@@ -474,9 +471,7 @@ describe("DeploymentService.deployToPrimary", () => {
   it("answers the deployment it wrote", async () => {
     const deploymentService = deployWith([], async () => primary("dep_1"));
 
-    await expect(
-      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
-    ).resolves.toMatchObject({
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toMatchObject({
       outcome: "deployed",
       deployment: { id: "dep_1" },
     });
@@ -487,9 +482,9 @@ describe("DeploymentService.deployToPrimary", () => {
       throw new ConflictError("revoked", { status: 409, body: { code: "rel.revoked" } });
     });
 
-    await expect(
-      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
-    ).resolves.toEqual({ outcome: "revoked" });
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toEqual({
+      outcome: "revoked",
+    });
   });
 
   it("reports a race, with the deployment that landed first", async () => {
@@ -503,9 +498,7 @@ describe("DeploymentService.deployToPrimary", () => {
       "proj_1",
     );
 
-    await expect(
-      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
-    ).resolves.toMatchObject({
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toMatchObject({
       outcome: "raced",
       current: { id: "dep_9" },
     });
@@ -516,9 +509,10 @@ describe("DeploymentService.deployToPrimary", () => {
       throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
     });
 
-    await expect(
-      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
-    ).resolves.toEqual({ outcome: "raced", current: undefined });
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toEqual({
+      outcome: "raced",
+      current: undefined,
+    });
   });
 
   it("still reports the race when the deployment that won it cannot be read", async () => {
@@ -540,9 +534,10 @@ describe("DeploymentService.deployToPrimary", () => {
 
     // The conflict is what the caller acts on; the winner's id is only the
     // report, so losing it must not replace the outcome with an error.
-    await expect(
-      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
-    ).resolves.toEqual({ outcome: "raced", current: undefined });
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toEqual({
+      outcome: "raced",
+      current: undefined,
+    });
   });
 
   it("raises any failure that is neither of those outcomes", async () => {
@@ -550,9 +545,7 @@ describe("DeploymentService.deployToPrimary", () => {
       throw new Error("boom");
     });
 
-    await expect(
-      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
-    ).rejects.toThrow("boom");
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).rejects.toThrow("boom");
   });
 });
 
@@ -691,7 +684,6 @@ describe("DeploymentService.deployToPrimary when the run is cancelled", () => {
     await expect(
       deploymentService.deployToPrimary({
         releaseId: "rel_1",
-        landing: ["https://app.acme.com"],
       }),
     ).rejects.toBeDefined();
   });
