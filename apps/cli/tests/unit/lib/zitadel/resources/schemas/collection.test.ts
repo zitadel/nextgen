@@ -768,6 +768,18 @@ describe("Schemas.nameUniquely", () => {
 
     expect(names).toEqual([name]);
   });
+
+  it("keeps the bare name of a schema whose objectType is its own file name", () => {
+    const config = aConfig({
+      schemas: { "customer.json": aUserSchema({ objectType: "customer" }) },
+    });
+
+    const names = config.schemas.all.map((schema) => {
+      return config.schemas.nameUniquely(schema);
+    });
+
+    expect(names).toEqual(["customer"]);
+  });
 });
 
 describe("Schemas.locate", () => {
