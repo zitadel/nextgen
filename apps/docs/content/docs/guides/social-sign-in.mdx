@@ -325,10 +325,11 @@ signed in through it, and can't change:
 - `oidc.issuer`
 - `subject_claim`
 
-`deploy` refuses an edit to one of them:
+`deploy` refuses an edit to one of them and names the field:
 
 ```text
-Error E_VALIDATION: .zitadel/idps/google.json: subject_claim of the connection "google" cannot be edited
+Error E_VALIDATION: release: invalid
+idp google: identity provider connection: the field is fixed for the life of the connection: subject_claim.
 ```
 
 Restore the stored value, or add a new connection file with its own slug.

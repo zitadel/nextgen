@@ -17,6 +17,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
+import { LogFilters, LogViewRows } from "@/features/events/components/logs-nav";
+
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
@@ -76,18 +78,23 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
+/** Logs, whose list replaces the project's on the screen and on an event's page. */
+const LOGS_PATH = "/events";
+
 /**
- * Which of the sidebar's three lists is showing, and the **route** decides:
+ * Which of the sidebar's lists is showing, and the **route** decides:
  * Projects is above every project, so it lists the account's screens;
- * `/settings` with anything beneath it lists Settings' pages (D29);
- * everything else lists the selected project's. Deriving it from the route
- * rather than from component state is what lets a settings URL survive a
- * refresh, and it keeps the shell consistent with ADR 0001's route-driven nav.
+ * `/settings` with anything beneath it lists Settings' pages (D29); `/events`
+ * with anything beneath it lists Logs' views and filters (D30); everything
+ * else lists the selected project's. Deriving it from the route rather than
+ * from component state is what lets a settings or logs URL survive a refresh,
+ * and it keeps the shell consistent with ADR 0001's route-driven nav.
  */
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
+  if (matchRoute({ to: LOGS_PATH, fuzzy: true })) return "logs";
   return atHome ? "account" : "portal";
 }
 
@@ -176,6 +183,7 @@ const NAV_LABEL: Record<NavView, string> = {
   portal: "Primary",
   account: "Account",
   settings: "Settings",
+  logs: "Logs",
 };
 
 /**
@@ -187,6 +195,10 @@ const NAV_LABEL: Record<NavView, string> = {
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked.
  *
+ * Logs is one screen's own list, under a heading that leads back to the
+ * project's: its rows are the list's views, not routes, and its filters
+ * follow them in a group of their own (D30). The events feature draws both.
+ *
  * Rows keep their height and a 2px gap in both sidebar states, so collapsing
  * moves nothing vertically.
  */
@@ -195,42 +207,58 @@ function NavList({ view }: { view: NavView }) {
   const matchRoute = useMatchRoute();
 
   return (
-    <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
-      <SidebarMenu className="gap-0.5">
-        {view === "settings" && <SettingsHeading />}
-        {items.map(({ to, nav: { icon: Icon, label: name } }) => (
-          <SidebarMenuItem key={name}>
-            <SidebarMenuButton
-              asChild
-              isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
-              tooltip={name}
-            >
-              <Link to={to} title={name}>
-                <Icon aria-hidden />
-                <span>{name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
+    <>
+      <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
+        <SidebarMenu className="gap-0.5">
+          {/* Projects is the account list's first screen. */}
+          {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
+          {/* `/` is where a project lands, whichever screen that is. */}
+          {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
+          {view === "logs" && <LogViewRows />}
+          {items.map(({ to, nav: { icon: Icon, label: name } }) => (
+            <SidebarMenuItem key={name}>
+              <SidebarMenuButton
+                asChild
+                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                tooltip={name}
+              >
+                <Link to={to} title={name}>
+                  <Icon aria-hidden />
+                  <span>{name}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroup>
+      {view === "logs" && <LogFilters />}
+    </>
   );
 }
 
 /**
- * Heads the Settings list, as Vercel's does: the list's name, and the way
- * back up to the account's list (D29). It is a row of the left nav, which is
- * how the console moves up (D13), and it opens Projects, the account list's
- * first screen. In the icon rail it is the chevron alone.
+ * Heads a list that a row of another list opened, as Vercel's does: the
+ * list's name, and the way back up to the list it came from (D29, D30). It is
+ * a row of the left nav, which is how the console moves up (D13). In the icon
+ * rail it is the chevron alone.
  */
-function SettingsHeading() {
+function ListHeading({
+  name,
+  to,
+  back,
+}: {
+  name: string;
+  to: "/projects" | "/";
+  /** Where the row leads, as a sentence ends: "Back to Projects". */
+  back: string;
+}) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild tooltip="Back to Projects" className="font-medium">
+      <SidebarMenuButton asChild tooltip={`Back to ${back}`} className="font-medium">
         {/* The name keeps the visible label and says where the row leads. */}
-        <Link to="/projects" aria-label="Settings: back to Projects">
+        <Link to={to} aria-label={`${name}: back to ${back}`}>
           <ChevronLeft aria-hidden />
-          <span>Settings</span>
+          <span>{name}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -247,8 +275,9 @@ function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      {/* Above every project the pill says so, and its list leads into one. */}
-      <ContextSwitcher userId={userId} allProjects={view !== "portal"} />
+      {/* Above every project the pill says so, and its list leads into one.
+          Logs is inside a project, like the project's own list. */}
+      <ContextSwitcher userId={userId} allProjects={view === "account" || view === "settings"} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import (
 	domain "github.com/zitadel/nextgen/internal/domain"
 	service "github.com/zitadel/nextgen/internal/service"
 	database "github.com/zitadel/nextgen/internal/storage/database"
+	events "github.com/zitadel/nextgen/internal/storage/events"
 	op "github.com/zitadel/oidc/v3/pkg/op"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -6818,6 +6819,45 @@ func (c *MockAllStatementsRevokeReleaseCall) Do(f func(context.Context, string, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsRevokeReleaseCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ScanEvents mocks base method.
+func (m *MockAllStatements) ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ScanEvents", ctx, within, match)
+	ret0, _ := ret[0].([]events.Scanned)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ScanEvents indicates an expected call of ScanEvents.
+func (mr *MockAllStatementsMockRecorder) ScanEvents(ctx, within, match any) *MockAllStatementsScanEventsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanEvents", reflect.TypeOf((*MockAllStatements)(nil).ScanEvents), ctx, within, match)
+	return &MockAllStatementsScanEventsCall{Call: call}
+}
+
+// MockAllStatementsScanEventsCall wrap *gomock.Call
+type MockAllStatementsScanEventsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsScanEventsCall) Return(arg0 []events.Scanned, arg1 error) *MockAllStatementsScanEventsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsScanEventsCall) Do(f func(context.Context, *database.ListOptions[domain.EventField], database.Filter[domain.EventField]) ([]events.Scanned, error)) *MockAllStatementsScanEventsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsScanEventsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EventField], database.Filter[domain.EventField]) ([]events.Scanned, error)) *MockAllStatementsScanEventsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -14574,6 +14614,45 @@ func (c *MockEventStatementsListEventsAfterCursorCall) Do(f func(context.Context
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockEventStatementsListEventsAfterCursorCall) DoAndReturn(f func(context.Context, string, time.Time, string, uint32) ([]*domain.Event, error)) *MockEventStatementsListEventsAfterCursorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ScanEvents mocks base method.
+func (m *MockEventStatements) ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ScanEvents", ctx, within, match)
+	ret0, _ := ret[0].([]events.Scanned)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ScanEvents indicates an expected call of ScanEvents.
+func (mr *MockEventStatementsMockRecorder) ScanEvents(ctx, within, match any) *MockEventStatementsScanEventsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanEvents", reflect.TypeOf((*MockEventStatements)(nil).ScanEvents), ctx, within, match)
+	return &MockEventStatementsScanEventsCall{Call: call}
+}
+
+// MockEventStatementsScanEventsCall wrap *gomock.Call
+type MockEventStatementsScanEventsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockEventStatementsScanEventsCall) Return(arg0 []events.Scanned, arg1 error) *MockEventStatementsScanEventsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockEventStatementsScanEventsCall) Do(f func(context.Context, *database.ListOptions[domain.EventField], database.Filter[domain.EventField]) ([]events.Scanned, error)) *MockEventStatementsScanEventsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockEventStatementsScanEventsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EventField], database.Filter[domain.EventField]) ([]events.Scanned, error)) *MockEventStatementsScanEventsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
