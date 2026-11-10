@@ -78,6 +78,63 @@ func TestEventToAPI_UserUpdated(t *testing.T) {
 	assert.Equal(t, []string{"givenName"}, v.Payload.AttributeKeys)
 }
 
+// The invitation payload structs must decode into their generated schemas,
+// required fields included.
+func TestEventToAPI_InvitationPayloads(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	for _, tc := range []struct {
+		eventType domain.EventType
+		payload   any
+		want      api.EventType
+	}{
+		{domain.EventTypeInvitationCreated, domain.InvitationCreatedPayload{
+			Type:                 "project_member",
+			ProjectMember:        &domain.InvitationProjectMemberPayload{Relation: "admin"},
+			JourneyID:            "journey_1",
+			ReplacesInvitationID: "inv_0",
+			ExpiresAt:            now.Add(72 * time.Hour),
+		}, api.InvitationCreatedEventEvent},
+		{domain.EventTypeInvitationAccepted, domain.InvitationAcceptedPayload{
+			Type:       "team_member",
+			TeamMember: &domain.InvitationTeamMemberPayload{TeamID: "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", Role: "member"},
+			JourneyID:  "journey_1",
+			UserID:     "user_1",
+		}, api.InvitationAcceptedEventEvent},
+		{domain.EventTypeInvitationRejected, domain.InvitationRejectedPayload{
+			JourneyID: "journey_1",
+			UserID:    "user_1",
+		}, api.InvitationRejectedEventEvent},
+		{domain.EventTypeInvitationCancelled, domain.InvitationCancelledPayload{
+			JourneyID:              "journey_1",
+			Reason:                 domain.InvitationCancelReasonReplaced,
+			ReplacedByInvitationID: "inv_2",
+		}, api.InvitationCancelledEventEvent},
+	} {
+		t.Run(string(tc.eventType), func(t *testing.T) {
+			t.Parallel()
+			payload, err := json.Marshal(tc.payload)
+			require.NoError(t, err)
+			entityType := "invitation"
+			entityID := "inv_1"
+			got, err := eventToAPI(&domain.Event{
+				ID:         "evt_inv",
+				ProjectID:  "proj_1",
+				EventType:  tc.eventType,
+				Category:   domain.EventCategoryAdmin,
+				OccurredAt: now,
+				CreatedAt:  now,
+				EntityType: &entityType,
+				EntityID:   &entityID,
+				ClientID:   "app_1",
+				Payload:    payload,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got.Type)
+		})
+	}
+}
+
 func TestEventToAPI_EmptyPayload(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

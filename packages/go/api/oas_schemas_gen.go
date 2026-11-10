@@ -25490,6 +25490,10 @@ type Event struct {
 	IdpCreatedEvent                 IdpCreatedEvent
 	IdpIdentityLinkCreatedEvent     IdpIdentityLinkCreatedEvent
 	IdpUpdatedEvent                 IdpUpdatedEvent
+	InvitationAcceptedEvent         InvitationAcceptedEvent
+	InvitationCancelledEvent        InvitationCancelledEvent
+	InvitationCreatedEvent          InvitationCreatedEvent
+	InvitationRejectedEvent         InvitationRejectedEvent
 	OriginAddedEvent                OriginAddedEvent
 	OriginRemovedEvent              OriginRemovedEvent
 	PolicyCreatedEvent              PolicyCreatedEvent
@@ -25541,6 +25545,10 @@ const (
 	IdpCreatedEventEvent                 EventType = "idp.created"
 	IdpIdentityLinkCreatedEventEvent     EventType = "idp.identity_link.created"
 	IdpUpdatedEventEvent                 EventType = "idp.updated"
+	InvitationAcceptedEventEvent         EventType = "invitation.accepted"
+	InvitationCancelledEventEvent        EventType = "invitation.cancelled"
+	InvitationCreatedEventEvent          EventType = "invitation.created"
+	InvitationRejectedEventEvent         EventType = "invitation.rejected"
 	OriginAddedEventEvent                EventType = "origin.added"
 	OriginRemovedEventEvent              EventType = "origin.removed"
 	PolicyCreatedEventEvent              EventType = "policy.created"
@@ -25636,6 +25644,18 @@ func (s Event) IsIdpIdentityLinkCreatedEvent() bool {
 
 // IsIdpUpdatedEvent reports whether Event is IdpUpdatedEvent.
 func (s Event) IsIdpUpdatedEvent() bool { return s.Type == IdpUpdatedEventEvent }
+
+// IsInvitationAcceptedEvent reports whether Event is InvitationAcceptedEvent.
+func (s Event) IsInvitationAcceptedEvent() bool { return s.Type == InvitationAcceptedEventEvent }
+
+// IsInvitationCancelledEvent reports whether Event is InvitationCancelledEvent.
+func (s Event) IsInvitationCancelledEvent() bool { return s.Type == InvitationCancelledEventEvent }
+
+// IsInvitationCreatedEvent reports whether Event is InvitationCreatedEvent.
+func (s Event) IsInvitationCreatedEvent() bool { return s.Type == InvitationCreatedEventEvent }
+
+// IsInvitationRejectedEvent reports whether Event is InvitationRejectedEvent.
+func (s Event) IsInvitationRejectedEvent() bool { return s.Type == InvitationRejectedEventEvent }
 
 // IsOriginAddedEvent reports whether Event is OriginAddedEvent.
 func (s Event) IsOriginAddedEvent() bool { return s.Type == OriginAddedEventEvent }
@@ -26144,6 +26164,90 @@ func (s Event) GetIdpUpdatedEvent() (v IdpUpdatedEvent, ok bool) {
 func NewIdpUpdatedEventEvent(v IdpUpdatedEvent) Event {
 	var s Event
 	s.SetIdpUpdatedEvent(v)
+	return s
+}
+
+// SetInvitationAcceptedEvent sets Event to InvitationAcceptedEvent.
+func (s *Event) SetInvitationAcceptedEvent(v InvitationAcceptedEvent) {
+	s.Type = InvitationAcceptedEventEvent
+	s.InvitationAcceptedEvent = v
+}
+
+// GetInvitationAcceptedEvent returns InvitationAcceptedEvent and true boolean if Event is InvitationAcceptedEvent.
+func (s Event) GetInvitationAcceptedEvent() (v InvitationAcceptedEvent, ok bool) {
+	if !s.IsInvitationAcceptedEvent() {
+		return v, false
+	}
+	return s.InvitationAcceptedEvent, true
+}
+
+// NewInvitationAcceptedEventEvent returns new Event from InvitationAcceptedEvent.
+func NewInvitationAcceptedEventEvent(v InvitationAcceptedEvent) Event {
+	var s Event
+	s.SetInvitationAcceptedEvent(v)
+	return s
+}
+
+// SetInvitationCancelledEvent sets Event to InvitationCancelledEvent.
+func (s *Event) SetInvitationCancelledEvent(v InvitationCancelledEvent) {
+	s.Type = InvitationCancelledEventEvent
+	s.InvitationCancelledEvent = v
+}
+
+// GetInvitationCancelledEvent returns InvitationCancelledEvent and true boolean if Event is InvitationCancelledEvent.
+func (s Event) GetInvitationCancelledEvent() (v InvitationCancelledEvent, ok bool) {
+	if !s.IsInvitationCancelledEvent() {
+		return v, false
+	}
+	return s.InvitationCancelledEvent, true
+}
+
+// NewInvitationCancelledEventEvent returns new Event from InvitationCancelledEvent.
+func NewInvitationCancelledEventEvent(v InvitationCancelledEvent) Event {
+	var s Event
+	s.SetInvitationCancelledEvent(v)
+	return s
+}
+
+// SetInvitationCreatedEvent sets Event to InvitationCreatedEvent.
+func (s *Event) SetInvitationCreatedEvent(v InvitationCreatedEvent) {
+	s.Type = InvitationCreatedEventEvent
+	s.InvitationCreatedEvent = v
+}
+
+// GetInvitationCreatedEvent returns InvitationCreatedEvent and true boolean if Event is InvitationCreatedEvent.
+func (s Event) GetInvitationCreatedEvent() (v InvitationCreatedEvent, ok bool) {
+	if !s.IsInvitationCreatedEvent() {
+		return v, false
+	}
+	return s.InvitationCreatedEvent, true
+}
+
+// NewInvitationCreatedEventEvent returns new Event from InvitationCreatedEvent.
+func NewInvitationCreatedEventEvent(v InvitationCreatedEvent) Event {
+	var s Event
+	s.SetInvitationCreatedEvent(v)
+	return s
+}
+
+// SetInvitationRejectedEvent sets Event to InvitationRejectedEvent.
+func (s *Event) SetInvitationRejectedEvent(v InvitationRejectedEvent) {
+	s.Type = InvitationRejectedEventEvent
+	s.InvitationRejectedEvent = v
+}
+
+// GetInvitationRejectedEvent returns InvitationRejectedEvent and true boolean if Event is InvitationRejectedEvent.
+func (s Event) GetInvitationRejectedEvent() (v InvitationRejectedEvent, ok bool) {
+	if !s.IsInvitationRejectedEvent() {
+		return v, false
+	}
+	return s.InvitationRejectedEvent, true
+}
+
+// NewInvitationRejectedEventEvent returns new Event from InvitationRejectedEvent.
+func NewInvitationRejectedEventEvent(v InvitationRejectedEvent) Event {
+	var s Event
+	s.SetInvitationRejectedEvent(v)
 	return s
 }
 
@@ -46201,6 +46305,1652 @@ func (*Invitation) acceptInvitationRes() {}
 func (*Invitation) getInvitationRes()    {}
 func (*Invitation) rejectInvitationRes() {}
 
+// Merged schema.
+// Ref: #
+type InvitationAcceptedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationAcceptedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationAcceptedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationAcceptedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  InvitationAcceptedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationAcceptedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationAcceptedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationAcceptedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationAcceptedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationAcceptedEvent) GetCategory() InvitationAcceptedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationAcceptedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationAcceptedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationAcceptedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationAcceptedEvent) GetActorType() OptNilInvitationAcceptedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationAcceptedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationAcceptedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationAcceptedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationAcceptedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationAcceptedEvent) GetDelegationType() OptInvitationAcceptedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationAcceptedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationAcceptedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationAcceptedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationAcceptedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationAcceptedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationAcceptedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationAcceptedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationAcceptedEvent) GetPayload() InvitationAcceptedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationAcceptedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationAcceptedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationAcceptedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationAcceptedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationAcceptedEvent) SetCategory(val InvitationAcceptedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationAcceptedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationAcceptedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationAcceptedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationAcceptedEvent) SetActorType(val OptNilInvitationAcceptedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationAcceptedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationAcceptedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationAcceptedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationAcceptedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationAcceptedEvent) SetDelegationType(val OptInvitationAcceptedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationAcceptedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationAcceptedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationAcceptedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationAcceptedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationAcceptedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationAcceptedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationAcceptedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationAcceptedEvent) SetPayload(val InvitationAcceptedPayload) {
+	s.Payload = val
+}
+
+type InvitationAcceptedEventActorType string
+
+const (
+	InvitationAcceptedEventActorTypeHuman   InvitationAcceptedEventActorType = "human"
+	InvitationAcceptedEventActorTypeService InvitationAcceptedEventActorType = "service"
+	InvitationAcceptedEventActorTypeSystem  InvitationAcceptedEventActorType = "system"
+	InvitationAcceptedEventActorTypeAgent   InvitationAcceptedEventActorType = "agent"
+)
+
+// AllValues returns all InvitationAcceptedEventActorType values.
+func (InvitationAcceptedEventActorType) AllValues() []InvitationAcceptedEventActorType {
+	return []InvitationAcceptedEventActorType{
+		InvitationAcceptedEventActorTypeHuman,
+		InvitationAcceptedEventActorTypeService,
+		InvitationAcceptedEventActorTypeSystem,
+		InvitationAcceptedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationAcceptedEventActorTypeService:
+		return []byte(s), nil
+	case InvitationAcceptedEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationAcceptedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedEventActorType(data) {
+	case InvitationAcceptedEventActorTypeHuman:
+		*s = InvitationAcceptedEventActorTypeHuman
+		return nil
+	case InvitationAcceptedEventActorTypeService:
+		*s = InvitationAcceptedEventActorTypeService
+		return nil
+	case InvitationAcceptedEventActorTypeSystem:
+		*s = InvitationAcceptedEventActorTypeSystem
+		return nil
+	case InvitationAcceptedEventActorTypeAgent:
+		*s = InvitationAcceptedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationAcceptedEventCategory string
+
+const (
+	InvitationAcceptedEventCategoryRequest InvitationAcceptedEventCategory = "request"
+	InvitationAcceptedEventCategoryAuth    InvitationAcceptedEventCategory = "auth"
+	InvitationAcceptedEventCategorySession InvitationAcceptedEventCategory = "session"
+	InvitationAcceptedEventCategoryAdmin   InvitationAcceptedEventCategory = "admin"
+	InvitationAcceptedEventCategoryEntity  InvitationAcceptedEventCategory = "entity"
+	InvitationAcceptedEventCategorySignal  InvitationAcceptedEventCategory = "signal"
+)
+
+// AllValues returns all InvitationAcceptedEventCategory values.
+func (InvitationAcceptedEventCategory) AllValues() []InvitationAcceptedEventCategory {
+	return []InvitationAcceptedEventCategory{
+		InvitationAcceptedEventCategoryRequest,
+		InvitationAcceptedEventCategoryAuth,
+		InvitationAcceptedEventCategorySession,
+		InvitationAcceptedEventCategoryAdmin,
+		InvitationAcceptedEventCategoryEntity,
+		InvitationAcceptedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategorySession:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedEventCategory(data) {
+	case InvitationAcceptedEventCategoryRequest:
+		*s = InvitationAcceptedEventCategoryRequest
+		return nil
+	case InvitationAcceptedEventCategoryAuth:
+		*s = InvitationAcceptedEventCategoryAuth
+		return nil
+	case InvitationAcceptedEventCategorySession:
+		*s = InvitationAcceptedEventCategorySession
+		return nil
+	case InvitationAcceptedEventCategoryAdmin:
+		*s = InvitationAcceptedEventCategoryAdmin
+		return nil
+	case InvitationAcceptedEventCategoryEntity:
+		*s = InvitationAcceptedEventCategoryEntity
+		return nil
+	case InvitationAcceptedEventCategorySignal:
+		*s = InvitationAcceptedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationAcceptedEventDelegationType string
+
+const (
+	InvitationAcceptedEventDelegationTypeDirect    InvitationAcceptedEventDelegationType = "direct"
+	InvitationAcceptedEventDelegationTypeDelegated InvitationAcceptedEventDelegationType = "delegated"
+	InvitationAcceptedEventDelegationTypePatShared InvitationAcceptedEventDelegationType = "pat_shared"
+	InvitationAcceptedEventDelegationTypeExchanged InvitationAcceptedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationAcceptedEventDelegationType values.
+func (InvitationAcceptedEventDelegationType) AllValues() []InvitationAcceptedEventDelegationType {
+	return []InvitationAcceptedEventDelegationType{
+		InvitationAcceptedEventDelegationTypeDirect,
+		InvitationAcceptedEventDelegationTypeDelegated,
+		InvitationAcceptedEventDelegationTypePatShared,
+		InvitationAcceptedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationAcceptedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationAcceptedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationAcceptedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedEventDelegationType(data) {
+	case InvitationAcceptedEventDelegationTypeDirect:
+		*s = InvitationAcceptedEventDelegationTypeDirect
+		return nil
+	case InvitationAcceptedEventDelegationTypeDelegated:
+		*s = InvitationAcceptedEventDelegationTypeDelegated
+		return nil
+	case InvitationAcceptedEventDelegationTypePatShared:
+		*s = InvitationAcceptedEventDelegationTypePatShared
+		return nil
+	case InvitationAcceptedEventDelegationTypeExchanged:
+		*s = InvitationAcceptedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.accepted`. The invitation ID is the event's
+// `entity_id`, and `user_id` is the user who redeemed the link. The role or
+// membership the acceptance granted is recorded by its own event, such as
+// `authz.granted`, which shares this event's `request_id`.
+// Ref: #
+type InvitationAcceptedPayload struct {
+	Type          InvitationAcceptedPayloadType     `json:"type"`
+	ProjectMember OptInvitationProjectMemberPayload `json:"project_member"`
+	TeamMember    OptInvitationTeamMemberPayload    `json:"team_member"`
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	UserID    string `json:"user_id"`
+}
+
+// GetType returns the value of Type.
+func (s *InvitationAcceptedPayload) GetType() InvitationAcceptedPayloadType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationAcceptedPayload) GetProjectMember() OptInvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationAcceptedPayload) GetTeamMember() OptInvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationAcceptedPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationAcceptedPayload) GetUserID() string {
+	return s.UserID
+}
+
+// SetType sets the value of Type.
+func (s *InvitationAcceptedPayload) SetType(val InvitationAcceptedPayloadType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationAcceptedPayload) SetProjectMember(val OptInvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationAcceptedPayload) SetTeamMember(val OptInvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationAcceptedPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationAcceptedPayload) SetUserID(val string) {
+	s.UserID = val
+}
+
+type InvitationAcceptedPayloadType string
+
+const (
+	InvitationAcceptedPayloadTypeProjectMember InvitationAcceptedPayloadType = "project_member"
+	InvitationAcceptedPayloadTypeTeamMember    InvitationAcceptedPayloadType = "team_member"
+)
+
+// AllValues returns all InvitationAcceptedPayloadType values.
+func (InvitationAcceptedPayloadType) AllValues() []InvitationAcceptedPayloadType {
+	return []InvitationAcceptedPayloadType{
+		InvitationAcceptedPayloadTypeProjectMember,
+		InvitationAcceptedPayloadTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedPayloadTypeProjectMember:
+		return []byte(s), nil
+	case InvitationAcceptedPayloadTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedPayloadType(data) {
+	case InvitationAcceptedPayloadTypeProjectMember:
+		*s = InvitationAcceptedPayloadTypeProjectMember
+		return nil
+	case InvitationAcceptedPayloadTypeTeamMember:
+		*s = InvitationAcceptedPayloadTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCancelledEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationCancelledEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationCancelledEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationCancelledEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                 `json:"delegation_id"`
+	Grantor        OptString                                 `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString               `json:"flow_id"`
+	Metadata OptEventMetadata           `json:"metadata"`
+	Payload  InvitationCancelledPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationCancelledEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationCancelledEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationCancelledEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationCancelledEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationCancelledEvent) GetCategory() InvitationCancelledEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationCancelledEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationCancelledEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationCancelledEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationCancelledEvent) GetActorType() OptNilInvitationCancelledEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationCancelledEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationCancelledEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationCancelledEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationCancelledEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationCancelledEvent) GetDelegationType() OptInvitationCancelledEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationCancelledEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationCancelledEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationCancelledEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationCancelledEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationCancelledEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationCancelledEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationCancelledEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationCancelledEvent) GetPayload() InvitationCancelledPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationCancelledEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationCancelledEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationCancelledEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationCancelledEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationCancelledEvent) SetCategory(val InvitationCancelledEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationCancelledEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationCancelledEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationCancelledEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationCancelledEvent) SetActorType(val OptNilInvitationCancelledEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationCancelledEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationCancelledEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationCancelledEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationCancelledEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationCancelledEvent) SetDelegationType(val OptInvitationCancelledEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationCancelledEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationCancelledEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationCancelledEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationCancelledEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationCancelledEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationCancelledEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationCancelledEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationCancelledEvent) SetPayload(val InvitationCancelledPayload) {
+	s.Payload = val
+}
+
+type InvitationCancelledEventActorType string
+
+const (
+	InvitationCancelledEventActorTypeHuman   InvitationCancelledEventActorType = "human"
+	InvitationCancelledEventActorTypeService InvitationCancelledEventActorType = "service"
+	InvitationCancelledEventActorTypeSystem  InvitationCancelledEventActorType = "system"
+	InvitationCancelledEventActorTypeAgent   InvitationCancelledEventActorType = "agent"
+)
+
+// AllValues returns all InvitationCancelledEventActorType values.
+func (InvitationCancelledEventActorType) AllValues() []InvitationCancelledEventActorType {
+	return []InvitationCancelledEventActorType{
+		InvitationCancelledEventActorTypeHuman,
+		InvitationCancelledEventActorTypeService,
+		InvitationCancelledEventActorTypeSystem,
+		InvitationCancelledEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationCancelledEventActorTypeService:
+		return []byte(s), nil
+	case InvitationCancelledEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationCancelledEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationCancelledEventActorType(data) {
+	case InvitationCancelledEventActorTypeHuman:
+		*s = InvitationCancelledEventActorTypeHuman
+		return nil
+	case InvitationCancelledEventActorTypeService:
+		*s = InvitationCancelledEventActorTypeService
+		return nil
+	case InvitationCancelledEventActorTypeSystem:
+		*s = InvitationCancelledEventActorTypeSystem
+		return nil
+	case InvitationCancelledEventActorTypeAgent:
+		*s = InvitationCancelledEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationCancelledEventCategory string
+
+const (
+	InvitationCancelledEventCategoryRequest InvitationCancelledEventCategory = "request"
+	InvitationCancelledEventCategoryAuth    InvitationCancelledEventCategory = "auth"
+	InvitationCancelledEventCategorySession InvitationCancelledEventCategory = "session"
+	InvitationCancelledEventCategoryAdmin   InvitationCancelledEventCategory = "admin"
+	InvitationCancelledEventCategoryEntity  InvitationCancelledEventCategory = "entity"
+	InvitationCancelledEventCategorySignal  InvitationCancelledEventCategory = "signal"
+)
+
+// AllValues returns all InvitationCancelledEventCategory values.
+func (InvitationCancelledEventCategory) AllValues() []InvitationCancelledEventCategory {
+	return []InvitationCancelledEventCategory{
+		InvitationCancelledEventCategoryRequest,
+		InvitationCancelledEventCategoryAuth,
+		InvitationCancelledEventCategorySession,
+		InvitationCancelledEventCategoryAdmin,
+		InvitationCancelledEventCategoryEntity,
+		InvitationCancelledEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationCancelledEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationCancelledEventCategorySession:
+		return []byte(s), nil
+	case InvitationCancelledEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationCancelledEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationCancelledEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationCancelledEventCategory(data) {
+	case InvitationCancelledEventCategoryRequest:
+		*s = InvitationCancelledEventCategoryRequest
+		return nil
+	case InvitationCancelledEventCategoryAuth:
+		*s = InvitationCancelledEventCategoryAuth
+		return nil
+	case InvitationCancelledEventCategorySession:
+		*s = InvitationCancelledEventCategorySession
+		return nil
+	case InvitationCancelledEventCategoryAdmin:
+		*s = InvitationCancelledEventCategoryAdmin
+		return nil
+	case InvitationCancelledEventCategoryEntity:
+		*s = InvitationCancelledEventCategoryEntity
+		return nil
+	case InvitationCancelledEventCategorySignal:
+		*s = InvitationCancelledEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationCancelledEventDelegationType string
+
+const (
+	InvitationCancelledEventDelegationTypeDirect    InvitationCancelledEventDelegationType = "direct"
+	InvitationCancelledEventDelegationTypeDelegated InvitationCancelledEventDelegationType = "delegated"
+	InvitationCancelledEventDelegationTypePatShared InvitationCancelledEventDelegationType = "pat_shared"
+	InvitationCancelledEventDelegationTypeExchanged InvitationCancelledEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationCancelledEventDelegationType values.
+func (InvitationCancelledEventDelegationType) AllValues() []InvitationCancelledEventDelegationType {
+	return []InvitationCancelledEventDelegationType{
+		InvitationCancelledEventDelegationTypeDirect,
+		InvitationCancelledEventDelegationTypeDelegated,
+		InvitationCancelledEventDelegationTypePatShared,
+		InvitationCancelledEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationCancelledEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationCancelledEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationCancelledEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationCancelledEventDelegationType(data) {
+	case InvitationCancelledEventDelegationTypeDirect:
+		*s = InvitationCancelledEventDelegationTypeDirect
+		return nil
+	case InvitationCancelledEventDelegationTypeDelegated:
+		*s = InvitationCancelledEventDelegationTypeDelegated
+		return nil
+	case InvitationCancelledEventDelegationTypePatShared:
+		*s = InvitationCancelledEventDelegationTypePatShared
+		return nil
+	case InvitationCancelledEventDelegationTypeExchanged:
+		*s = InvitationCancelledEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.cancelled`. The invitation ID is the event's
+// `entity_id`. `reason` is `cancelled` when an administrator cancelled it,
+// and `replaced` when a replacement cancelled it; the replacement is then
+// `replaced_by_invitation_id`.
+// Ref: #
+type InvitationCancelledPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID              string                           `json:"journey_id"`
+	Reason                 InvitationCancelledPayloadReason `json:"reason"`
+	ReplacedByInvitationID OptString                        `json:"replaced_by_invitation_id"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCancelledPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReason returns the value of Reason.
+func (s *InvitationCancelledPayload) GetReason() InvitationCancelledPayloadReason {
+	return s.Reason
+}
+
+// GetReplacedByInvitationID returns the value of ReplacedByInvitationID.
+func (s *InvitationCancelledPayload) GetReplacedByInvitationID() OptString {
+	return s.ReplacedByInvitationID
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCancelledPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *InvitationCancelledPayload) SetReason(val InvitationCancelledPayloadReason) {
+	s.Reason = val
+}
+
+// SetReplacedByInvitationID sets the value of ReplacedByInvitationID.
+func (s *InvitationCancelledPayload) SetReplacedByInvitationID(val OptString) {
+	s.ReplacedByInvitationID = val
+}
+
+type InvitationCancelledPayloadReason string
+
+const (
+	InvitationCancelledPayloadReasonCancelled InvitationCancelledPayloadReason = "cancelled"
+	InvitationCancelledPayloadReasonReplaced  InvitationCancelledPayloadReason = "replaced"
+)
+
+// AllValues returns all InvitationCancelledPayloadReason values.
+func (InvitationCancelledPayloadReason) AllValues() []InvitationCancelledPayloadReason {
+	return []InvitationCancelledPayloadReason{
+		InvitationCancelledPayloadReasonCancelled,
+		InvitationCancelledPayloadReasonReplaced,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledPayloadReasonCancelled:
+		return []byte(s), nil
+	case InvitationCancelledPayloadReasonReplaced:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledPayloadReason) UnmarshalText(data []byte) error {
+	switch InvitationCancelledPayloadReason(data) {
+	case InvitationCancelledPayloadReasonCancelled:
+		*s = InvitationCancelledPayloadReasonCancelled
+		return nil
+	case InvitationCancelledPayloadReasonReplaced:
+		*s = InvitationCancelledPayloadReasonReplaced
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                               `json:"delegation_id"`
+	Grantor        OptString                               `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString             `json:"flow_id"`
+	Metadata OptEventMetadata         `json:"metadata"`
+	Payload  InvitationCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationCreatedEvent) GetCategory() InvitationCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationCreatedEvent) GetActorType() OptNilInvitationCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationCreatedEvent) GetDelegationType() OptInvitationCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationCreatedEvent) GetPayload() InvitationCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationCreatedEvent) SetCategory(val InvitationCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationCreatedEvent) SetActorType(val OptNilInvitationCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationCreatedEvent) SetDelegationType(val OptInvitationCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationCreatedEvent) SetPayload(val InvitationCreatedPayload) {
+	s.Payload = val
+}
+
+type InvitationCreatedEventActorType string
+
+const (
+	InvitationCreatedEventActorTypeHuman   InvitationCreatedEventActorType = "human"
+	InvitationCreatedEventActorTypeService InvitationCreatedEventActorType = "service"
+	InvitationCreatedEventActorTypeSystem  InvitationCreatedEventActorType = "system"
+	InvitationCreatedEventActorTypeAgent   InvitationCreatedEventActorType = "agent"
+)
+
+// AllValues returns all InvitationCreatedEventActorType values.
+func (InvitationCreatedEventActorType) AllValues() []InvitationCreatedEventActorType {
+	return []InvitationCreatedEventActorType{
+		InvitationCreatedEventActorTypeHuman,
+		InvitationCreatedEventActorTypeService,
+		InvitationCreatedEventActorTypeSystem,
+		InvitationCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationCreatedEventActorTypeService:
+		return []byte(s), nil
+	case InvitationCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedEventActorType(data) {
+	case InvitationCreatedEventActorTypeHuman:
+		*s = InvitationCreatedEventActorTypeHuman
+		return nil
+	case InvitationCreatedEventActorTypeService:
+		*s = InvitationCreatedEventActorTypeService
+		return nil
+	case InvitationCreatedEventActorTypeSystem:
+		*s = InvitationCreatedEventActorTypeSystem
+		return nil
+	case InvitationCreatedEventActorTypeAgent:
+		*s = InvitationCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationCreatedEventCategory string
+
+const (
+	InvitationCreatedEventCategoryRequest InvitationCreatedEventCategory = "request"
+	InvitationCreatedEventCategoryAuth    InvitationCreatedEventCategory = "auth"
+	InvitationCreatedEventCategorySession InvitationCreatedEventCategory = "session"
+	InvitationCreatedEventCategoryAdmin   InvitationCreatedEventCategory = "admin"
+	InvitationCreatedEventCategoryEntity  InvitationCreatedEventCategory = "entity"
+	InvitationCreatedEventCategorySignal  InvitationCreatedEventCategory = "signal"
+)
+
+// AllValues returns all InvitationCreatedEventCategory values.
+func (InvitationCreatedEventCategory) AllValues() []InvitationCreatedEventCategory {
+	return []InvitationCreatedEventCategory{
+		InvitationCreatedEventCategoryRequest,
+		InvitationCreatedEventCategoryAuth,
+		InvitationCreatedEventCategorySession,
+		InvitationCreatedEventCategoryAdmin,
+		InvitationCreatedEventCategoryEntity,
+		InvitationCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationCreatedEventCategorySession:
+		return []byte(s), nil
+	case InvitationCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationCreatedEventCategory(data) {
+	case InvitationCreatedEventCategoryRequest:
+		*s = InvitationCreatedEventCategoryRequest
+		return nil
+	case InvitationCreatedEventCategoryAuth:
+		*s = InvitationCreatedEventCategoryAuth
+		return nil
+	case InvitationCreatedEventCategorySession:
+		*s = InvitationCreatedEventCategorySession
+		return nil
+	case InvitationCreatedEventCategoryAdmin:
+		*s = InvitationCreatedEventCategoryAdmin
+		return nil
+	case InvitationCreatedEventCategoryEntity:
+		*s = InvitationCreatedEventCategoryEntity
+		return nil
+	case InvitationCreatedEventCategorySignal:
+		*s = InvitationCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationCreatedEventDelegationType string
+
+const (
+	InvitationCreatedEventDelegationTypeDirect    InvitationCreatedEventDelegationType = "direct"
+	InvitationCreatedEventDelegationTypeDelegated InvitationCreatedEventDelegationType = "delegated"
+	InvitationCreatedEventDelegationTypePatShared InvitationCreatedEventDelegationType = "pat_shared"
+	InvitationCreatedEventDelegationTypeExchanged InvitationCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationCreatedEventDelegationType values.
+func (InvitationCreatedEventDelegationType) AllValues() []InvitationCreatedEventDelegationType {
+	return []InvitationCreatedEventDelegationType{
+		InvitationCreatedEventDelegationTypeDirect,
+		InvitationCreatedEventDelegationTypeDelegated,
+		InvitationCreatedEventDelegationTypePatShared,
+		InvitationCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedEventDelegationType(data) {
+	case InvitationCreatedEventDelegationTypeDirect:
+		*s = InvitationCreatedEventDelegationTypeDirect
+		return nil
+	case InvitationCreatedEventDelegationTypeDelegated:
+		*s = InvitationCreatedEventDelegationTypeDelegated
+		return nil
+	case InvitationCreatedEventDelegationTypePatShared:
+		*s = InvitationCreatedEventDelegationTypePatShared
+		return nil
+	case InvitationCreatedEventDelegationTypeExchanged:
+		*s = InvitationCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.created`. The invitation ID is the event's
+// `entity_id`. `type` names the kind of invitation, and the object of the
+// same name says what its link grants. The metadata entered at creation and
+// the link's token never appear.
+// Ref: #
+type InvitationCreatedPayload struct {
+	Type          InvitationCreatedPayloadType      `json:"type"`
+	ProjectMember OptInvitationProjectMemberPayload `json:"project_member"`
+	TeamMember    OptInvitationTeamMemberPayload    `json:"team_member"`
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	// The invitation this one replaces, when it was created as a replacement.
+	ReplacesInvitationID OptString `json:"replaces_invitation_id"`
+	ExpiresAt            time.Time `json:"expires_at"`
+}
+
+// GetType returns the value of Type.
+func (s *InvitationCreatedPayload) GetType() InvitationCreatedPayloadType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationCreatedPayload) GetProjectMember() OptInvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationCreatedPayload) GetTeamMember() OptInvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCreatedPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReplacesInvitationID returns the value of ReplacesInvitationID.
+func (s *InvitationCreatedPayload) GetReplacesInvitationID() OptString {
+	return s.ReplacesInvitationID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationCreatedPayload) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetType sets the value of Type.
+func (s *InvitationCreatedPayload) SetType(val InvitationCreatedPayloadType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationCreatedPayload) SetProjectMember(val OptInvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationCreatedPayload) SetTeamMember(val OptInvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCreatedPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReplacesInvitationID sets the value of ReplacesInvitationID.
+func (s *InvitationCreatedPayload) SetReplacesInvitationID(val OptString) {
+	s.ReplacesInvitationID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationCreatedPayload) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+type InvitationCreatedPayloadType string
+
+const (
+	InvitationCreatedPayloadTypeProjectMember InvitationCreatedPayloadType = "project_member"
+	InvitationCreatedPayloadTypeTeamMember    InvitationCreatedPayloadType = "team_member"
+)
+
+// AllValues returns all InvitationCreatedPayloadType values.
+func (InvitationCreatedPayloadType) AllValues() []InvitationCreatedPayloadType {
+	return []InvitationCreatedPayloadType{
+		InvitationCreatedPayloadTypeProjectMember,
+		InvitationCreatedPayloadTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedPayloadTypeProjectMember:
+		return []byte(s), nil
+	case InvitationCreatedPayloadTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedPayloadType(data) {
+	case InvitationCreatedPayloadTypeProjectMember:
+		*s = InvitationCreatedPayloadTypeProjectMember
+		return nil
+	case InvitationCreatedPayloadTypeTeamMember:
+		*s = InvitationCreatedPayloadTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type InvitationID string
 
 // Merged schema.
@@ -46977,6 +48727,482 @@ func (s *InvitationProjectMemberType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationRejectedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationRejectedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationRejectedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationRejectedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  InvitationRejectedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationRejectedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationRejectedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationRejectedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationRejectedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationRejectedEvent) GetCategory() InvitationRejectedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationRejectedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationRejectedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationRejectedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationRejectedEvent) GetActorType() OptNilInvitationRejectedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationRejectedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationRejectedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationRejectedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationRejectedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationRejectedEvent) GetDelegationType() OptInvitationRejectedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationRejectedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationRejectedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationRejectedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationRejectedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationRejectedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationRejectedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationRejectedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationRejectedEvent) GetPayload() InvitationRejectedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationRejectedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationRejectedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationRejectedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationRejectedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationRejectedEvent) SetCategory(val InvitationRejectedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationRejectedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationRejectedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationRejectedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationRejectedEvent) SetActorType(val OptNilInvitationRejectedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationRejectedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationRejectedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationRejectedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationRejectedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationRejectedEvent) SetDelegationType(val OptInvitationRejectedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationRejectedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationRejectedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationRejectedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationRejectedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationRejectedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationRejectedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationRejectedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationRejectedEvent) SetPayload(val InvitationRejectedPayload) {
+	s.Payload = val
+}
+
+type InvitationRejectedEventActorType string
+
+const (
+	InvitationRejectedEventActorTypeHuman   InvitationRejectedEventActorType = "human"
+	InvitationRejectedEventActorTypeService InvitationRejectedEventActorType = "service"
+	InvitationRejectedEventActorTypeSystem  InvitationRejectedEventActorType = "system"
+	InvitationRejectedEventActorTypeAgent   InvitationRejectedEventActorType = "agent"
+)
+
+// AllValues returns all InvitationRejectedEventActorType values.
+func (InvitationRejectedEventActorType) AllValues() []InvitationRejectedEventActorType {
+	return []InvitationRejectedEventActorType{
+		InvitationRejectedEventActorTypeHuman,
+		InvitationRejectedEventActorTypeService,
+		InvitationRejectedEventActorTypeSystem,
+		InvitationRejectedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationRejectedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationRejectedEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationRejectedEventActorTypeService:
+		return []byte(s), nil
+	case InvitationRejectedEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationRejectedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationRejectedEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationRejectedEventActorType(data) {
+	case InvitationRejectedEventActorTypeHuman:
+		*s = InvitationRejectedEventActorTypeHuman
+		return nil
+	case InvitationRejectedEventActorTypeService:
+		*s = InvitationRejectedEventActorTypeService
+		return nil
+	case InvitationRejectedEventActorTypeSystem:
+		*s = InvitationRejectedEventActorTypeSystem
+		return nil
+	case InvitationRejectedEventActorTypeAgent:
+		*s = InvitationRejectedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationRejectedEventCategory string
+
+const (
+	InvitationRejectedEventCategoryRequest InvitationRejectedEventCategory = "request"
+	InvitationRejectedEventCategoryAuth    InvitationRejectedEventCategory = "auth"
+	InvitationRejectedEventCategorySession InvitationRejectedEventCategory = "session"
+	InvitationRejectedEventCategoryAdmin   InvitationRejectedEventCategory = "admin"
+	InvitationRejectedEventCategoryEntity  InvitationRejectedEventCategory = "entity"
+	InvitationRejectedEventCategorySignal  InvitationRejectedEventCategory = "signal"
+)
+
+// AllValues returns all InvitationRejectedEventCategory values.
+func (InvitationRejectedEventCategory) AllValues() []InvitationRejectedEventCategory {
+	return []InvitationRejectedEventCategory{
+		InvitationRejectedEventCategoryRequest,
+		InvitationRejectedEventCategoryAuth,
+		InvitationRejectedEventCategorySession,
+		InvitationRejectedEventCategoryAdmin,
+		InvitationRejectedEventCategoryEntity,
+		InvitationRejectedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationRejectedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationRejectedEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationRejectedEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationRejectedEventCategorySession:
+		return []byte(s), nil
+	case InvitationRejectedEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationRejectedEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationRejectedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationRejectedEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationRejectedEventCategory(data) {
+	case InvitationRejectedEventCategoryRequest:
+		*s = InvitationRejectedEventCategoryRequest
+		return nil
+	case InvitationRejectedEventCategoryAuth:
+		*s = InvitationRejectedEventCategoryAuth
+		return nil
+	case InvitationRejectedEventCategorySession:
+		*s = InvitationRejectedEventCategorySession
+		return nil
+	case InvitationRejectedEventCategoryAdmin:
+		*s = InvitationRejectedEventCategoryAdmin
+		return nil
+	case InvitationRejectedEventCategoryEntity:
+		*s = InvitationRejectedEventCategoryEntity
+		return nil
+	case InvitationRejectedEventCategorySignal:
+		*s = InvitationRejectedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationRejectedEventDelegationType string
+
+const (
+	InvitationRejectedEventDelegationTypeDirect    InvitationRejectedEventDelegationType = "direct"
+	InvitationRejectedEventDelegationTypeDelegated InvitationRejectedEventDelegationType = "delegated"
+	InvitationRejectedEventDelegationTypePatShared InvitationRejectedEventDelegationType = "pat_shared"
+	InvitationRejectedEventDelegationTypeExchanged InvitationRejectedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationRejectedEventDelegationType values.
+func (InvitationRejectedEventDelegationType) AllValues() []InvitationRejectedEventDelegationType {
+	return []InvitationRejectedEventDelegationType{
+		InvitationRejectedEventDelegationTypeDirect,
+		InvitationRejectedEventDelegationTypeDelegated,
+		InvitationRejectedEventDelegationTypePatShared,
+		InvitationRejectedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationRejectedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationRejectedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationRejectedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationRejectedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationRejectedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationRejectedEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationRejectedEventDelegationType(data) {
+	case InvitationRejectedEventDelegationTypeDirect:
+		*s = InvitationRejectedEventDelegationTypeDirect
+		return nil
+	case InvitationRejectedEventDelegationTypeDelegated:
+		*s = InvitationRejectedEventDelegationTypeDelegated
+		return nil
+	case InvitationRejectedEventDelegationTypePatShared:
+		*s = InvitationRejectedEventDelegationTypePatShared
+		return nil
+	case InvitationRejectedEventDelegationTypeExchanged:
+		*s = InvitationRejectedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.rejected`. The invitation ID is the event's
+// `entity_id`, and `user_id` is the user who declined it.
+// Ref: #
+type InvitationRejectedPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	UserID    string `json:"user_id"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationRejectedPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationRejectedPayload) GetUserID() string {
+	return s.UserID
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationRejectedPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationRejectedPayload) SetUserID(val string) {
+	s.UserID = val
 }
 
 // Lifecycle status of the invitation. `expired` is derived on read from
@@ -60985,6 +63211,144 @@ func (o OptInvSelfAcceptDetails) Or(d InvSelfAcceptDetails) InvSelfAcceptDetails
 	return d
 }
 
+// NewOptInvitationAcceptedEventDelegationType returns new OptInvitationAcceptedEventDelegationType with value set to v.
+func NewOptInvitationAcceptedEventDelegationType(v InvitationAcceptedEventDelegationType) OptInvitationAcceptedEventDelegationType {
+	return OptInvitationAcceptedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationAcceptedEventDelegationType is optional InvitationAcceptedEventDelegationType.
+type OptInvitationAcceptedEventDelegationType struct {
+	Value InvitationAcceptedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationAcceptedEventDelegationType was set.
+func (o OptInvitationAcceptedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationAcceptedEventDelegationType) Reset() {
+	var v InvitationAcceptedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationAcceptedEventDelegationType) SetTo(v InvitationAcceptedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationAcceptedEventDelegationType) Get() (v InvitationAcceptedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationAcceptedEventDelegationType) Or(d InvitationAcceptedEventDelegationType) InvitationAcceptedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationCancelledEventDelegationType returns new OptInvitationCancelledEventDelegationType with value set to v.
+func NewOptInvitationCancelledEventDelegationType(v InvitationCancelledEventDelegationType) OptInvitationCancelledEventDelegationType {
+	return OptInvitationCancelledEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationCancelledEventDelegationType is optional InvitationCancelledEventDelegationType.
+type OptInvitationCancelledEventDelegationType struct {
+	Value InvitationCancelledEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationCancelledEventDelegationType was set.
+func (o OptInvitationCancelledEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationCancelledEventDelegationType) Reset() {
+	var v InvitationCancelledEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationCancelledEventDelegationType) SetTo(v InvitationCancelledEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationCancelledEventDelegationType) Get() (v InvitationCancelledEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationCancelledEventDelegationType) Or(d InvitationCancelledEventDelegationType) InvitationCancelledEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationCreatedEventDelegationType returns new OptInvitationCreatedEventDelegationType with value set to v.
+func NewOptInvitationCreatedEventDelegationType(v InvitationCreatedEventDelegationType) OptInvitationCreatedEventDelegationType {
+	return OptInvitationCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationCreatedEventDelegationType is optional InvitationCreatedEventDelegationType.
+type OptInvitationCreatedEventDelegationType struct {
+	Value InvitationCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationCreatedEventDelegationType was set.
+func (o OptInvitationCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationCreatedEventDelegationType) Reset() {
+	var v InvitationCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationCreatedEventDelegationType) SetTo(v InvitationCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationCreatedEventDelegationType) Get() (v InvitationCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationCreatedEventDelegationType) Or(d InvitationCreatedEventDelegationType) InvitationCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvitationID returns new OptInvitationID with value set to v.
 func NewOptInvitationID(v InvitationID) OptInvitationID {
 	return OptInvitationID{
@@ -61077,6 +63441,98 @@ func (o OptInvitationMetadata) Or(d InvitationMetadata) InvitationMetadata {
 	return d
 }
 
+// NewOptInvitationProjectMemberPayload returns new OptInvitationProjectMemberPayload with value set to v.
+func NewOptInvitationProjectMemberPayload(v InvitationProjectMemberPayload) OptInvitationProjectMemberPayload {
+	return OptInvitationProjectMemberPayload{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationProjectMemberPayload is optional InvitationProjectMemberPayload.
+type OptInvitationProjectMemberPayload struct {
+	Value InvitationProjectMemberPayload
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationProjectMemberPayload was set.
+func (o OptInvitationProjectMemberPayload) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationProjectMemberPayload) Reset() {
+	var v InvitationProjectMemberPayload
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationProjectMemberPayload) SetTo(v InvitationProjectMemberPayload) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationProjectMemberPayload) Get() (v InvitationProjectMemberPayload, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationProjectMemberPayload) Or(d InvitationProjectMemberPayload) InvitationProjectMemberPayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationRejectedEventDelegationType returns new OptInvitationRejectedEventDelegationType with value set to v.
+func NewOptInvitationRejectedEventDelegationType(v InvitationRejectedEventDelegationType) OptInvitationRejectedEventDelegationType {
+	return OptInvitationRejectedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationRejectedEventDelegationType is optional InvitationRejectedEventDelegationType.
+type OptInvitationRejectedEventDelegationType struct {
+	Value InvitationRejectedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationRejectedEventDelegationType was set.
+func (o OptInvitationRejectedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationRejectedEventDelegationType) Reset() {
+	var v InvitationRejectedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationRejectedEventDelegationType) SetTo(v InvitationRejectedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationRejectedEventDelegationType) Get() (v InvitationRejectedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationRejectedEventDelegationType) Or(d InvitationRejectedEventDelegationType) InvitationRejectedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvitationStatus returns new OptInvitationStatus with value set to v.
 func NewOptInvitationStatus(v InvitationStatus) OptInvitationStatus {
 	return OptInvitationStatus{
@@ -61117,6 +63573,52 @@ func (o OptInvitationStatus) Get() (v InvitationStatus, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvitationStatus) Or(d InvitationStatus) InvitationStatus {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationTeamMemberPayload returns new OptInvitationTeamMemberPayload with value set to v.
+func NewOptInvitationTeamMemberPayload(v InvitationTeamMemberPayload) OptInvitationTeamMemberPayload {
+	return OptInvitationTeamMemberPayload{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationTeamMemberPayload is optional InvitationTeamMemberPayload.
+type OptInvitationTeamMemberPayload struct {
+	Value InvitationTeamMemberPayload
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationTeamMemberPayload was set.
+func (o OptInvitationTeamMemberPayload) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationTeamMemberPayload) Reset() {
+	var v InvitationTeamMemberPayload
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationTeamMemberPayload) SetTo(v InvitationTeamMemberPayload) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationTeamMemberPayload) Get() (v InvitationTeamMemberPayload, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationTeamMemberPayload) Or(d InvitationTeamMemberPayload) InvitationTeamMemberPayload {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -63301,6 +65803,195 @@ func (o OptNilIdpUpdatedEventActorType) Or(d IdpUpdatedEventActorType) IdpUpdate
 	return d
 }
 
+// NewOptNilInvitationAcceptedEventActorType returns new OptNilInvitationAcceptedEventActorType with value set to v.
+func NewOptNilInvitationAcceptedEventActorType(v InvitationAcceptedEventActorType) OptNilInvitationAcceptedEventActorType {
+	return OptNilInvitationAcceptedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationAcceptedEventActorType is optional nullable InvitationAcceptedEventActorType.
+type OptNilInvitationAcceptedEventActorType struct {
+	Value InvitationAcceptedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationAcceptedEventActorType was set.
+func (o OptNilInvitationAcceptedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationAcceptedEventActorType) Reset() {
+	var v InvitationAcceptedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationAcceptedEventActorType) SetTo(v InvitationAcceptedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationAcceptedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationAcceptedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationAcceptedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationAcceptedEventActorType) Get() (v InvitationAcceptedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationAcceptedEventActorType) Or(d InvitationAcceptedEventActorType) InvitationAcceptedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationCancelledEventActorType returns new OptNilInvitationCancelledEventActorType with value set to v.
+func NewOptNilInvitationCancelledEventActorType(v InvitationCancelledEventActorType) OptNilInvitationCancelledEventActorType {
+	return OptNilInvitationCancelledEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationCancelledEventActorType is optional nullable InvitationCancelledEventActorType.
+type OptNilInvitationCancelledEventActorType struct {
+	Value InvitationCancelledEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationCancelledEventActorType was set.
+func (o OptNilInvitationCancelledEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationCancelledEventActorType) Reset() {
+	var v InvitationCancelledEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationCancelledEventActorType) SetTo(v InvitationCancelledEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationCancelledEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationCancelledEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationCancelledEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationCancelledEventActorType) Get() (v InvitationCancelledEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationCancelledEventActorType) Or(d InvitationCancelledEventActorType) InvitationCancelledEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationCreatedEventActorType returns new OptNilInvitationCreatedEventActorType with value set to v.
+func NewOptNilInvitationCreatedEventActorType(v InvitationCreatedEventActorType) OptNilInvitationCreatedEventActorType {
+	return OptNilInvitationCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationCreatedEventActorType is optional nullable InvitationCreatedEventActorType.
+type OptNilInvitationCreatedEventActorType struct {
+	Value InvitationCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationCreatedEventActorType was set.
+func (o OptNilInvitationCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationCreatedEventActorType) Reset() {
+	var v InvitationCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationCreatedEventActorType) SetTo(v InvitationCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationCreatedEventActorType) Get() (v InvitationCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationCreatedEventActorType) Or(d InvitationCreatedEventActorType) InvitationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilInvitationLookupProjectMemberResponseCreatedByType returns new OptNilInvitationLookupProjectMemberResponseCreatedByType with value set to v.
 func NewOptNilInvitationLookupProjectMemberResponseCreatedByType(v InvitationLookupProjectMemberResponseCreatedByType) OptNilInvitationLookupProjectMemberResponseCreatedByType {
 	return OptNilInvitationLookupProjectMemberResponseCreatedByType{
@@ -63547,6 +66238,69 @@ func (o OptNilInvitationProjectMemberCreatedByType) Get() (v InvitationProjectMe
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilInvitationProjectMemberCreatedByType) Or(d InvitationProjectMemberCreatedByType) InvitationProjectMemberCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationRejectedEventActorType returns new OptNilInvitationRejectedEventActorType with value set to v.
+func NewOptNilInvitationRejectedEventActorType(v InvitationRejectedEventActorType) OptNilInvitationRejectedEventActorType {
+	return OptNilInvitationRejectedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationRejectedEventActorType is optional nullable InvitationRejectedEventActorType.
+type OptNilInvitationRejectedEventActorType struct {
+	Value InvitationRejectedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationRejectedEventActorType was set.
+func (o OptNilInvitationRejectedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationRejectedEventActorType) Reset() {
+	var v InvitationRejectedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationRejectedEventActorType) SetTo(v InvitationRejectedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationRejectedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationRejectedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationRejectedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationRejectedEventActorType) Get() (v InvitationRejectedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationRejectedEventActorType) Or(d InvitationRejectedEventActorType) InvitationRejectedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -102754,6 +105508,10 @@ func (*WebhookDelivered) flowdefUpdatedRes()             {}
 func (*WebhookDelivered) idpCreatedRes()                 {}
 func (*WebhookDelivered) idpIdentityLinkCreatedRes()     {}
 func (*WebhookDelivered) idpUpdatedRes()                 {}
+func (*WebhookDelivered) invitationAcceptedRes()         {}
+func (*WebhookDelivered) invitationCancelledRes()        {}
+func (*WebhookDelivered) invitationCreatedRes()          {}
+func (*WebhookDelivered) invitationRejectedRes()         {}
 func (*WebhookDelivered) originAddedRes()                {}
 func (*WebhookDelivered) originRemovedRes()              {}
 func (*WebhookDelivered) policyCreatedRes()              {}
@@ -102814,6 +105572,10 @@ func (*WebhookNotDelivered) flowdefUpdatedRes()             {}
 func (*WebhookNotDelivered) idpCreatedRes()                 {}
 func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()     {}
 func (*WebhookNotDelivered) idpUpdatedRes()                 {}
+func (*WebhookNotDelivered) invitationAcceptedRes()         {}
+func (*WebhookNotDelivered) invitationCancelledRes()        {}
+func (*WebhookNotDelivered) invitationCreatedRes()          {}
+func (*WebhookNotDelivered) invitationRejectedRes()         {}
 func (*WebhookNotDelivered) originAddedRes()                {}
 func (*WebhookNotDelivered) originRemovedRes()              {}
 func (*WebhookNotDelivered) policyCreatedRes()              {}

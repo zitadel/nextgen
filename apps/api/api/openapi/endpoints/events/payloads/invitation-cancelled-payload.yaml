@@ -1,0 +1,21 @@
+title: InvitationCancelledPayload
+type: object
+description: |
+  Payload for `invitation.cancelled`. The invitation ID is the event's
+  `entity_id`. `reason` is `cancelled` when an administrator cancelled it,
+  and `replaced` when a replacement cancelled it; the replacement is then
+  `replaced_by_invitation_id`.
+required:
+  - journey_id
+  - reason
+properties:
+  journey_id:
+    type: string
+    description: Shared by an invitation and every invitation that replaces it.
+  reason:
+    type: string
+    enum:
+      - cancelled
+      - replaced
+  replaced_by_invitation_id:
+    type: string

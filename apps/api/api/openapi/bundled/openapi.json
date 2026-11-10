@@ -11251,6 +11251,122 @@
         }
       }
     },
+    "invitation.accepted": {
+      "post": {
+        "operationId": "invitationAccepted",
+        "summary": "invitation.accepted",
+        "description": "An invitation was accepted. The role or membership it granted has its\nown event in the same request.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-accepted-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.cancelled": {
+      "post": {
+        "operationId": "invitationCancelled",
+        "summary": "invitation.cancelled",
+        "description": "A pending invitation was cancelled by an administrator, or by a\nreplacement.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-cancelled-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.created": {
+      "post": {
+        "operationId": "invitationCreated",
+        "summary": "invitation.created",
+        "description": "An invitation was created, new or as the replacement of another. Whoever\nredeems its link gets what the invitation grants.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.rejected": {
+      "post": {
+        "operationId": "invitationRejected",
+        "summary": "invitation.rejected",
+        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-rejected-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "origin.added": {
       "post": {
         "operationId": "originAdded",
@@ -22545,6 +22661,218 @@
           }
         ]
       },
+      "invitation-accepted-payload": {
+        "title": "InvitationAcceptedPayload",
+        "type": "object",
+        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. The role or\nmembership the acceptance granted is recorded by its own event, such as\n`authz.granted`, which shares this event's `request_id`.\n",
+        "required": [
+          "type",
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "project_member",
+              "team_member"
+            ]
+          },
+          "project_member": {
+            "$ref": "#/components/schemas/invitation-project-member-payload"
+          },
+          "team_member": {
+            "$ref": "#/components/schemas/invitation-team-member-payload"
+          },
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-accepted-event": {
+        "title": "InvitationAcceptedEvent",
+        "description": "An event of type invitation.accepted, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.accepted"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-accepted-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-cancelled-payload": {
+        "title": "InvitationCancelledPayload",
+        "type": "object",
+        "description": "Payload for `invitation.cancelled`. The invitation ID is the event's\n`entity_id`. `reason` is `cancelled` when an administrator cancelled it,\nand `replaced` when a replacement cancelled it; the replacement is then\n`replaced_by_invitation_id`.\n",
+        "required": [
+          "journey_id",
+          "reason"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "cancelled",
+              "replaced"
+            ]
+          },
+          "replaced_by_invitation_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-cancelled-event": {
+        "title": "InvitationCancelledEvent",
+        "description": "An event of type invitation.cancelled, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.cancelled"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-cancelled-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-payload": {
+        "title": "InvitationCreatedPayload",
+        "type": "object",
+        "description": "Payload for `invitation.created`. The invitation ID is the event's\n`entity_id`. `type` names the kind of invitation, and the object of the\nsame name says what its link grants. The metadata entered at creation and\nthe link's token never appear.\n",
+        "required": [
+          "type",
+          "journey_id",
+          "expires_at"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "project_member",
+              "team_member"
+            ]
+          },
+          "project_member": {
+            "$ref": "#/components/schemas/invitation-project-member-payload"
+          },
+          "team_member": {
+            "$ref": "#/components/schemas/invitation-team-member-payload"
+          },
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "replaces_invitation_id": {
+            "type": "string",
+            "description": "The invitation this one replaces, when it was created as a replacement."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "invitation-created-event": {
+        "title": "InvitationCreatedEvent",
+        "description": "An event of type invitation.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-created-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-rejected-payload": {
+        "title": "InvitationRejectedPayload",
+        "type": "object",
+        "description": "Payload for `invitation.rejected`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who declined it.\n",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-rejected-event": {
+        "title": "InvitationRejectedEvent",
+        "description": "An event of type invitation.rejected, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.rejected"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-rejected-payload"
+              }
+            }
+          }
+        ]
+      },
       "origin-payload": {
         "title": "OriginPayload",
         "type": "object",
@@ -23469,6 +23797,18 @@
             "$ref": "#/components/schemas/idp-updated-event"
           },
           {
+            "$ref": "#/components/schemas/invitation-accepted-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-rejected-event"
+          },
+          {
             "$ref": "#/components/schemas/origin-added-event"
           },
           {
@@ -23562,6 +23902,10 @@
             "idp.created": "#/components/schemas/idp-created-event",
             "idp.identity_link.created": "#/components/schemas/idp-identity_link-created-event",
             "idp.updated": "#/components/schemas/idp-updated-event",
+            "invitation.accepted": "#/components/schemas/invitation-accepted-event",
+            "invitation.cancelled": "#/components/schemas/invitation-cancelled-event",
+            "invitation.created": "#/components/schemas/invitation-created-event",
+            "invitation.rejected": "#/components/schemas/invitation-rejected-event",
             "origin.added": "#/components/schemas/origin-added-event",
             "origin.removed": "#/components/schemas/origin-removed-event",
             "policy.created": "#/components/schemas/policy-created-event",
