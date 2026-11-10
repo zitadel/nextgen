@@ -106,3 +106,23 @@ func TestListOptions(t *testing.T) {
 	_, err = user.ListOptions(&database.ListOptions[domain.UserField]{Pagination: database.Page[domain.UserField]{OrderBy: user.SearchOrder()}}, false)
 	require.Error(t, err, "the search fields name columns only a search read has")
 }
+
+// A search read returns a user once per attribute matched. Hydration loads
+// the user once and every row gets it.
+func TestGroupByProject_RepeatedUser(t *testing.T) {
+	t.Parallel()
+
+	first := &domain.User{ProjectID: "p", ID: "u1", MatchedText: "ann"}
+	again := &domain.User{ProjectID: "p", ID: "u1", MatchedText: "ann@example.com"}
+	other := &domain.User{ProjectID: "p", ID: "u2"}
+
+	groups := user.GroupByProject([]*domain.User{first, again, other})
+	require.Len(t, groups, 1)
+	assert.Equal(t, []string{"u1", "u2"}, groups[0].IDs, "one id per user for the hydrating read")
+	assert.Same(t, first, groups[0].ByID["u1"])
+
+	first.Attributes = domain.Attributes{{Key: "email", Value: "ann@example.com"}}
+	user.FillRepeats(groups)
+	assert.Equal(t, first.Attributes, again.Attributes)
+	assert.Equal(t, "ann@example.com", again.MatchedText, "each row keeps the text it matched on")
+}

@@ -1706,6 +1706,46 @@ describe("users screen", () => {
     );
   });
 
+  it("searches for a number someone typed into the URL", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=12345`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "12345" }],
+      }),
+    );
+  });
+
+  it("keeps the list and the field when a search fails, and says so", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    recordQueries((body) =>
+      body.filter
+        ? HttpResponse.json({ message: "The search is unavailable." }, { status: 503 })
+        : HttpResponse.json({
+            users: [
+              {
+                id: "user_all",
+                schema: "sch_business",
+                identifier: "user_all@acme.com",
+                attributes: { email: "user_all@acme.com" },
+              },
+            ],
+          }),
+    );
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+
+    expect(await screen.findByText("The search is unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(screen.getByText("user_all@acme.com")).toBeInTheDocument();
+  });
+
   it("still shows the pending state on a slow first load", async () => {
     serveLineage();
     recordQueries(async () => {
