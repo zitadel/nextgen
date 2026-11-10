@@ -882,6 +882,23 @@ describe("SocialSignInPrompt", () => {
       ]);
     });
 
+    it("keeps a provider ticked after Go back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce(["google"]);
+      vi.mocked(select).mockResolvedValueOnce("back");
+      vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
+      vi.mocked(password).mockResolvedValueOnce("s3cret");
+
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.sso).toEqual([
+        {
+          selection: googleSelection,
+          credentials: { clientId: "1234-abc.apps.googleusercontent.com", secret: "s3cret" },
+          endpoints: undefined,
+        },
+      ]);
+    });
+
     it("shows the exact redirect URI to register, on the port answered earlier", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
       vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
