@@ -184,6 +184,9 @@ type Invoker interface {
 	// `Origin`, such as a backend, a native app or the CLI, and the console's
 	// login preview of a project that does not list the console's origin. A
 	// preview URL serves only itself.
+	// `primary` records the project's current primary origins. One added later
+	// serves nothing until the next deployment to `primary`; one removed stops
+	// being served at once.
 	// A deployment to `primary` changes nothing when the project's newest
 	// primary deployment has the same release and frozen values and covers
 	// exactly the current primary origins. The call then answers `200` with that
@@ -1071,7 +1074,8 @@ type Invoker interface {
 	// Lists the projects the signed-in user can act on: those they hold an active
 	// grant on, either directly or through a team they are a member of. For a
 	// platform operator, someone who runs the deployment, that is every project of
-	// the deployment. Ordered by project ID and paged with an opaque cursor.
+	// the deployment. Ordered by project ID unless `order` asks for creation
+	// time, and paged with an opaque cursor.
 	// This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
 	// one
 	// project the calling credential is bound to. Here the session is the caller
@@ -1422,9 +1426,11 @@ type Invoker interface {
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
 	// RollbackDeployment invokes rollbackDeployment operation.
 	//
-	// Rolls back to an earlier deployment by deploying its release again to
-	// every current primary origin, with the variable values that deployment
-	// froze.
+	// Rolls back to an earlier deployment by deploying its release again to the
+	// same origins, with the same variable values. A listed primary origin that
+	// deployment left out serves nothing until the next deployment to `primary`,
+	// and one it named serves its release again, even when the live deployment
+	// left it out.
 	// A release is a snapshot of the project's configuration. A deployment makes
 	// a release live on origins and freezes the project's variable values with
 	// it.
@@ -1443,9 +1449,7 @@ type Invoker interface {
 	// would change, it answers `200` with the newest primary deployment.
 	// If the request is refused:
 	// - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-	// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
-	// error also appears when the project has no primary origin. Add one with
-	// `zitadel origin add`.
+	// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
 	// - `404 dep.not_found`: no deployment of the project has that ID, or that
 	// deployment recorded no variables to restore, so it cannot be a rollback
 	// target. List them with `listDeployments` and pick another.
@@ -2578,6 +2582,9 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // `Origin`, such as a backend, a native app or the CLI, and the console's
 // login preview of a project that does not list the console's origin. A
 // preview URL serves only itself.
+// `primary` records the project's current primary origins. One added later
+// serves nothing until the next deployment to `primary`; one removed stops
+// being served at once.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins. The call then answers `200` with that
@@ -12117,7 +12124,8 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 // Lists the projects the signed-in user can act on: those they hold an active
 // grant on, either directly or through a team they are a member of. For a
 // platform operator, someone who runs the deployment, that is every project of
-// the deployment. Ordered by project ID and paged with an opaque cursor.
+// the deployment. Ordered by project ID unless `order` asks for creation
+// time, and paged with an opaque cursor.
 // This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
 // one
 // project the calling credential is bound to. Here the session is the caller
@@ -12230,6 +12238,23 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.NameContains.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "order" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "order",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Order.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
@@ -16606,9 +16631,11 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 
 // RollbackDeployment invokes rollbackDeployment operation.
 //
-// Rolls back to an earlier deployment by deploying its release again to
-// every current primary origin, with the variable values that deployment
-// froze.
+// Rolls back to an earlier deployment by deploying its release again to the
+// same origins, with the same variable values. A listed primary origin that
+// deployment left out serves nothing until the next deployment to `primary`,
+// and one it named serves its release again, even when the live deployment
+// left it out.
 // A release is a snapshot of the project's configuration. A deployment makes
 // a release live on origins and freezes the project's variable values with
 // it.
@@ -16627,9 +16654,7 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 // would change, it answers `200` with the newest primary deployment.
 // If the request is refused:
 // - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
-// error also appears when the project has no primary origin. Add one with
-// `zitadel origin add`.
+// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
 // - `404 dep.not_found`: no deployment of the project has that ID, or that
 // deployment recorded no variables to restore, so it cannot be a rollback
 // target. List them with `listDeployments` and pick another.

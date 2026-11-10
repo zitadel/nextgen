@@ -12,7 +12,8 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { Cmd } from "@/lib/cmd";
-import { ZitadelError } from "@/lib/errors";
+import { confirmationHint, ZitadelError } from "@/lib/errors";
+import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { readZitadelSecret } from "@/lib/project";
@@ -94,6 +95,16 @@ export function missingPrimaryOrigin(input: {
   };
 }
 
+/**
+ * What a deploy that would leave existing users unable to sign in asks.
+ */
+const LOCKOUT_QUESTION = "Deploy anyway? The users above will not be able to sign in.";
+
+/**
+ * The action a lockout refusal names: "Cannot … without --force".
+ */
+const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
+
 const NEEDS_MESSAGE_REFUSAL: Refusal = {
   message: "A deploy needs a message in non-interactive mode",
   hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
@@ -129,7 +140,7 @@ function commitConfig(deployed: string, message: string | undefined): string {
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
  */
-export default class Deploy extends EnvironmentCommand {
+export default class Deploy extends Destructive(EnvironmentCommand) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.configuration;
@@ -137,8 +148,16 @@ export default class Deploy extends EnvironmentCommand {
   static override examples = [
     "<%= config.bin %> deploy -m 'add phone_number to human-user'",
     "<%= config.bin %> deploy --dry-run",
+    "<%= config.bin %> deploy -m 'move users to the new schema' --force",
   ];
   static override flags = {
+    // `--force` is per command, not global (ADR 064 §10): here it permits a
+    // release that leaves existing users unable to sign in.
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+    }),
     message: Flags.custom<string>({
       parse: reads(MESSAGE),
     })({
@@ -167,7 +186,9 @@ export default class Deploy extends EnvironmentCommand {
     // so a project with none fails before the IdP step writes part of a
     // change. A dry run never reaches the deploy, so it is exempt.
     const publisher = new Publisher(client, projectId);
-    const landing = this.dryRun ? [] : await this.primaryOrigins(publisher, projectId, environment);
+    if (!this.dryRun) {
+      await this.requirePrimaryOrigin(publisher, projectId, environment);
+    }
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -185,6 +206,9 @@ export default class Deploy extends EnvironmentCommand {
     }
     for (const notice of prepared.notices) {
       process.stdout.write(notice);
+    }
+    if (!(await this.confirmLockouts(prepared.lockouts))) {
+      return this.emit({ status: "skipped", reason: "deploy-cancelled" });
     }
     const { resourceCount } = prepared;
     this.recordTelemetry({ resources: resourceCount });
@@ -216,7 +240,6 @@ export default class Deploy extends EnvironmentCommand {
     const { release, publication } = await publisher.deploy({
       prepared,
       message,
-      landing,
     });
     switch (publication.outcome) {
       case "revoked":
@@ -282,18 +305,62 @@ export default class Deploy extends EnvironmentCommand {
   }
 
   /**
-   * The primary origins this deploy lands on, refusing a project with none and
-   * naming the step that gives it one.
+   * Report the existing users the release leaves unable to sign in, and go
+   * ahead only with consent.
+   *
+   * @remarks
+   * A person is asked; `--force` answers for them, and with nobody to ask and
+   * no `--force` the deploy is refused. A dry run asks nobody, as it writes
+   * nothing, but it still refuses where the real run would refuse without
+   * asking, so a preview never passes a deploy that then fails; its re-run
+   * keeps `--dry-run`.
+   *
+   * @param lockouts - What the lockout check found.
+   * @returns Whether the deploy goes ahead.
+   * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
+   *   be asked and `--force` was not given.
    */
-  private async primaryOrigins(
+  private async confirmLockouts(lockouts: readonly string[]): Promise<boolean> {
+    if (lockouts.length === 0) {
+      return true;
+    }
+    for (const lockout of lockouts) {
+      reportWarning(lockout);
+    }
+    if (!this.dryRun) {
+      const consent = await this.consent({
+        verb: "deploy",
+        name: LOCKOUT_ACTION,
+        message: LOCKOUT_QUESTION,
+      });
+      return consent !== undefined;
+    }
+    if (this.nonInteractive && !this.force) {
+      throw new ZitadelError(
+        "E_CONFIRMATION_REQUIRED",
+        `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
+        {
+          hint: confirmationHint(LOCKOUT_QUESTION),
+          details: { question: LOCKOUT_QUESTION },
+          nextCommands: [this.suggest("deploy --dry-run --force")],
+        },
+      );
+    }
+    return true;
+  }
+
+  /**
+   * Refuses a project with no primary origin, naming the step that gives it
+   * one.
+   */
+  private async requirePrimaryOrigin(
     publisher: Publisher,
     projectId: string,
     environment: Connection["environment"],
-  ): Promise<readonly string[]> {
-    const origins = await publisher.landing();
-    const landing = origins.primary;
-    if (landing.length > 0) {
-      return landing;
+  ): Promise<void> {
+    const origins = await publisher.fetchLanding();
+    if (origins.primary.length > 0) {
+      return;
     }
     const setupProject = await readZitadelSecret(this.cwd).then(
       (secret) => {

@@ -20863,8 +20863,9 @@ func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 // is a snapshot of the project's configuration, and a deployment freezes the
 // project's variable values with it. Deploying and rolling back each append
 // one, so the history is the audit trail.
-// All primary origins serve the project's newest primary deployment. An origin
-// added after it serves nothing until the next deployment to `primary`. A
+// A primary origin serves the project's newest primary deployment if that
+// deployment names it, so one added later serves nothing until the next
+// deployment to `primary`. Requests with no origin get the same deployment. A
 // preview URL serves the newest deployment to it while its preview is live.
 // Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
@@ -21912,9 +21913,10 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 }
 
 // Whether the deployment serves its release now.
-// - `live`: at least one of its targets serves it now.
-// - `inactive`: none does, because a later deployment replaced it or its
-// previews expired or were removed.
+// - `live`: the project's newest primary deployment, or a preview deployment
+// that one of its preview URLs still serves.
+// - `inactive`: a later deployment replaced it, or its previews expired or
+// were removed.
 // Ref: #
 type DeploymentStatus string
 
@@ -25076,9 +25078,12 @@ type Field struct {
 	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
-	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-	// `select` from a closed `enum`. For other formats (for example uuid) the
-	// type is `text` and `validation.format` carries the rule.
+	// `date`, `date_time` come from `format`; `checkbox` from JSON
+	// `type: boolean`; `select` from a closed `enum`. For other formats (for
+	// example uuid) the type is `text` and `validation.format` carries the
+	// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+	// submitted, which a `datetime-local` input neither shows nor produces on
+	// its own.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -25205,9 +25210,12 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 
 // The input kind the client should render. Encodes the formats and
 // JSON types that map to a familiar HTML input: `email`, `url`,
-// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-// `select` from a closed `enum`. For other formats (for example uuid) the
-// type is `text` and `validation.format` carries the rule.
+// `date`, `date_time` come from `format`; `checkbox` from JSON
+// `type: boolean`; `select` from a closed `enum`. For other formats (for
+// example uuid) the type is `text` and `validation.format` carries the
+// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+// submitted, which a `datetime-local` input neither shows nor produces on
+// its own.
 type FieldType string
 
 const (
@@ -25218,6 +25226,7 @@ const (
 	FieldTypeNumber   FieldType = "number"
 	FieldTypeURL      FieldType = "url"
 	FieldTypeDate     FieldType = "date"
+	FieldTypeDateTime FieldType = "date_time"
 	FieldTypeHidden   FieldType = "hidden"
 	FieldTypeCheckbox FieldType = "checkbox"
 	FieldTypeSelect   FieldType = "select"
@@ -25233,6 +25242,7 @@ func (FieldType) AllValues() []FieldType {
 		FieldTypeNumber,
 		FieldTypeURL,
 		FieldTypeDate,
+		FieldTypeDateTime,
 		FieldTypeHidden,
 		FieldTypeCheckbox,
 		FieldTypeSelect,
@@ -25255,6 +25265,8 @@ func (s FieldType) MarshalText() ([]byte, error) {
 	case FieldTypeURL:
 		return []byte(s), nil
 	case FieldTypeDate:
+		return []byte(s), nil
+	case FieldTypeDateTime:
 		return []byte(s), nil
 	case FieldTypeHidden:
 		return []byte(s), nil
@@ -25290,6 +25302,9 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 		return nil
 	case FieldTypeDate:
 		*s = FieldTypeDate
+		return nil
+	case FieldTypeDateTime:
+		*s = FieldTypeDateTime
 		return nil
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
@@ -64040,6 +64055,52 @@ func (o OptSessionProofToken) Or(d SessionProofToken) SessionProofToken {
 	return d
 }
 
+// NewOptSortDirection returns new OptSortDirection with value set to v.
+func NewOptSortDirection(v SortDirection) OptSortDirection {
+	return OptSortDirection{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSortDirection is optional SortDirection.
+type OptSortDirection struct {
+	Value SortDirection
+	Set   bool
+}
+
+// IsSet returns true if OptSortDirection was set.
+func (o OptSortDirection) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSortDirection) Reset() {
+	var v SortDirection
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSortDirection) SetTo(v SortDirection) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSortDirection) Get() (v SortDirection, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSortDirection) Or(d SortDirection) SortDirection {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -82035,25 +82096,24 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
-	Type                 RollbackDeploymentErrorResponseType // switch on this field
-	AuthCsrfInvalid      AuthCsrfInvalid
-	AuthUnauthorized     AuthUnauthorized
-	DepConflict          DepConflict
-	DepInvalid           DepInvalid
-	DepNotFound          DepNotFound
-	DepPermissionDenied  DepPermissionDenied
-	DepVariablesMissing  DepVariablesMissing
-	EnvProjectNotFound   EnvProjectNotFound
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	NotImplemented       NotImplemented
-	ProjNotFound         ProjNotFound
-	ProjOriginNotAllowed ProjOriginNotAllowed
-	RelNotFound          RelNotFound
-	RelRevoked           RelRevoked
-	ReqInvalid           ReqInvalid
-	Unavailable          Unavailable
-	VarDocumentTooDeep   VarDocumentTooDeep
+	Type                RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	DepVariablesMissing DepVariablesMissing
+	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+	VarDocumentTooDeep  VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -82061,24 +82121,23 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	DepVariablesMissingRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.variables_missing"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "proj.not_found"
-	ProjOriginNotAllowedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "proj.origin_not_allowed"
-	RelNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
-	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
-	VarDocumentTooDeepRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.document_too_deep"
+	AuthCsrfInvalidRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_missing"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
+	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -82139,11 +82198,6 @@ func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
 func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
-}
-
-// IsProjOriginNotAllowed reports whether RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
-	return s.Type == ProjOriginNotAllowedRollbackDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
@@ -82420,27 +82474,6 @@ func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok b
 func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetProjNotFound(v)
-	return s
-}
-
-// SetProjOriginNotAllowed sets RollbackDeploymentErrorResponse to ProjOriginNotAllowed.
-func (s *RollbackDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
-	s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
-	s.ProjOriginNotAllowed = v
-}
-
-// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
-	if !s.IsProjOriginNotAllowed() {
-		return v, false
-	}
-	return s.ProjOriginNotAllowed, true
-}
-
-// NewProjOriginNotAllowedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjOriginNotAllowed.
-func NewProjOriginNotAllowedRollbackDeploymentErrorResponse(v ProjOriginNotAllowed) RollbackDeploymentErrorResponse {
-	var s RollbackDeploymentErrorResponse
-	s.SetProjOriginNotAllowed(v)
 	return s
 }
 
@@ -93692,9 +93725,13 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // The meta-schema that one property of a user schema is validated against.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
-// are accepted without being listed below. `writeOnly: true` is reserved for a
+// are accepted without being listed below. Any other key is refused, unless it
+// is one of the annotations listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
+// `format` is enforced on user writes for the standard JSON Schema names, such
+// as `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as
+// `phone`, is only an annotation; use `pattern` to enforce one.
 // Ref: #
 type UserProperty struct {
 	// The scope in which this property's value must be unique, if applicable. `unspecified` enforces no

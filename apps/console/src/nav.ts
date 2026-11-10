@@ -16,10 +16,11 @@ export type NavIcon = ComponentType<{
 
 /**
  * Which sidebar an entry belongs to. The shell renders one of two navs from the
- * same route tree, so an entry has to say which: without it every Settings
- * screen would also appear in the portal's primary list.
+ * same route tree, so an entry has to say which: `portal` is the selected
+ * project's screens, `account` the ones above every project (Projects, the
+ * person's settings, what an add-on adds beside them).
  */
-export type NavView = "portal" | "settings";
+export type NavView = "portal" | "account";
 
 export interface NavMeta {
   /** Sidebar label. */

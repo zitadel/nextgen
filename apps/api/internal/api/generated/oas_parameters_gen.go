@@ -8887,6 +8887,13 @@ type ListMyProjectsParams struct {
 	// returns: a token continues the list it came from. An empty value
 	// lists every project, as leaving it out does.
 	NameContains OptString `json:",omitempty,omitzero"`
+	// Sorts the list by `created_at` and then `id`: `desc` lists the newest
+	// project first, `asc` the oldest first. Leave it out to list by
+	// project ID, which says nothing about when a project was created. Send
+	// the same value with every `page_token` the list returns: a token
+	// continues the list it came from, and under another order it is
+	// refused with `400`.
+	Order OptSortDirection `json:",omitempty,omitzero"`
 	// The project the caller signs its users in to. The cookie's session is used
 	// only when it belongs to this project; a session of any other project answers
 	// `403` with `sess.project_mismatch`.
@@ -8926,6 +8933,15 @@ func unpackListMyProjectsParams(packed middleware.Parameters) (params ListMyProj
 		}
 		if v, ok := packed[key]; ok {
 			params.NameContains = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "order",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Order = v.(OptSortDirection)
 		}
 	}
 	{
@@ -9095,6 +9111,62 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "name_contains",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: order.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "order",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotOrderVal SortDirection
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotOrderVal = SortDirection(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Order.SetTo(paramsDotOrderVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Order.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "order",
 			In:   "query",
 			Err:  err,
 		}

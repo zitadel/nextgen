@@ -1621,6 +1621,9 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
+      ajv:
+        specifier: 'catalog:'
+        version: 8.20.0
       culori:
         specifier: 'catalog:'
         version: 4.0.2
@@ -1643,9 +1646,6 @@ importers:
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
-      ajv:
-        specifier: 'catalog:'
-        version: 8.20.0
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))

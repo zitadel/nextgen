@@ -733,6 +733,13 @@ type ListMyProjectsParams struct {
 	// returns: a token continues the list it came from. An empty value
 	// lists every project, as leaving it out does.
 	NameContains OptString `json:",omitempty,omitzero"`
+	// Sorts the list by `created_at` and then `id`: `desc` lists the newest
+	// project first, `asc` the oldest first. Leave it out to list by
+	// project ID, which says nothing about when a project was created. Send
+	// the same value with every `page_token` the list returns: a token
+	// continues the list it came from, and under another order it is
+	// refused with `400`.
+	Order OptSortDirection `json:",omitempty,omitzero"`
 	// The project the caller signs its users in to. The cookie's session is used
 	// only when it belongs to this project; a session of any other project answers
 	// `403` with `sess.project_mismatch`.

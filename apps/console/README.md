@@ -47,8 +47,8 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Usage** (`/usage`), the project's usage this UTC month, which the hosted
   cloud's add-on prices (`usagePrices`, Console ADR 0006).
 - **Project settings** (`/project`).
-- **Settings** (`/settings/profile`), your profile, in the Settings view the
-  account menu opens.
+- **Settings** (`/settings/profile`), your profile, in the account sidebar,
+  beside Projects.
 
 The sidebar is one level, in the order and with the icons of the design's
 "01 / Nav Level 1".
