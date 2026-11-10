@@ -189,8 +189,8 @@ export class SocialSignInPrompt implements SetupPrompt {
    * A multi-select rather than one choice: a project may offer several at
    * once, and the schema and flow already carry `sso_providers` as a list.
    * Space ticks a provider and Enter continues, so Enter on an empty list is
-   * not a silent skip: it asks whether to go on without SSO, with "Go back"
-   * selected, and only "Continue without SSO" returns none.
+   * not a silent skip: it asks whether to go on without SSO, where No goes back
+   * to the list, and only a Yes returns none.
    */
   private async chooseProviders(ask: Asker): Promise<readonly ProviderName[]> {
     for (;;) {
@@ -217,17 +217,13 @@ export class SocialSignInPrompt implements SetupPrompt {
       if (chosen.length > 0) {
         return chosen;
       }
-      const decision = await ask({
-        kind: "select",
+      const continueWithout = await ask({
+        kind: "yes-no",
         name: "continue without SSO",
         message: "Would you like to continue without setting up SSO?",
-        initialValue: "back",
-        options: [
-          { value: "back", label: "Go back" },
-          { value: "skip", label: "Continue without SSO" },
-        ],
+        initialValue: false,
       });
-      if (decision === "skip") {
+      if (continueWithout) {
         return [];
       }
     }

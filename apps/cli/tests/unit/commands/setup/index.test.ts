@@ -2818,9 +2818,9 @@ describe("Setup.run", () => {
         .mockResolvedValueOnce("next")
         .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE)
         .mockResolvedValueOnce(DEFAULT_SETUP_PRESET)
-        .mockResolvedValueOnce(15)
-        .mockResolvedValueOnce("skip");
+        .mockResolvedValueOnce(15);
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
     }
 
     /**

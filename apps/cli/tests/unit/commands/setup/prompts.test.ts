@@ -784,28 +784,28 @@ describe("SocialSignInPrompt", () => {
   describe("when no provider is wanted", () => {
     it("leaves the answers alone", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
-      vi.mocked(select).mockResolvedValueOnce("skip");
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(answers.sso).toEqual([]);
     });
 
-    it("asks before going on without SSO, with Go back selected", async () => {
+    it("asks before going on without SSO, where No goes back", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
-      vi.mocked(select).mockResolvedValueOnce("skip");
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
         message: "Would you like to continue without setting up SSO?",
-        initialValue: "back",
+        initialValue: false,
       });
     });
 
     it("asks for the providers again when Go back is chosen", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      vi.mocked(select).mockResolvedValueOnce("back").mockResolvedValueOnce("skip");
+      vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -817,7 +817,7 @@ describe("SocialSignInPrompt", () => {
       ["password", password],
     ])("asks no %s question", async (_kind, prompt) => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
-      vi.mocked(select).mockResolvedValueOnce("skip");
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -827,7 +827,7 @@ describe("SocialSignInPrompt", () => {
 
   it("offers every catalog provider and a custom one, with no option meaning none", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
-    vi.mocked(select).mockResolvedValueOnce("skip");
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -840,7 +840,7 @@ describe("SocialSignInPrompt", () => {
 
   it("says that Space selects a provider and Enter continues", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
-    vi.mocked(select).mockResolvedValueOnce("skip");
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -851,7 +851,7 @@ describe("SocialSignInPrompt", () => {
 
   it("says what each provider requires", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
-    vi.mocked(select).mockResolvedValueOnce("skip");
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -884,7 +884,7 @@ describe("SocialSignInPrompt", () => {
 
     it("keeps a provider ticked after Go back", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce(["google"]);
-      vi.mocked(select).mockResolvedValueOnce("back");
+      vi.mocked(confirm).mockResolvedValueOnce(false);
       vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
       vi.mocked(password).mockResolvedValueOnce("s3cret");
 
@@ -1029,7 +1029,7 @@ describe("SocialSignInPrompt", () => {
   describe("with a custom provider", () => {
     it("is offered beside the catalog, saying what it will ask for", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
-      vi.mocked(select).mockResolvedValueOnce("skip");
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 

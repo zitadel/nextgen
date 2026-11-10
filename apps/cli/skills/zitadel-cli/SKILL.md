@@ -492,7 +492,7 @@ Ask about:
   whether the installed CLI takes one, and which settings it needs, and ask for
   those too. In an interactive `setup`, Space ticks a provider and Enter
   continues; pressing Enter with none ticked asks whether to continue without
-  setting up SSO, with "Go back" selected, so nothing is skipped by accident.
+  setting up SSO, where No goes back to the list, so nothing is skipped by accident.
   A non-interactive run names the providers with `--sso` instead.
 - **Profile fields** — which attributes sign-up collects. The starting field
   set depends on the use-case you pick (see *Presets and use-cases* below) —
