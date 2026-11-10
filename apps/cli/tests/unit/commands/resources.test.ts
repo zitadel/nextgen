@@ -2652,4 +2652,18 @@ describe("the id of a resource whose id has a format", () => {
       hint: `Find one with \`zitadel ${topic} list\`.`,
     });
   });
+
+  it.each(TOPICS)("%s gives every verb that takes an id the list hint", async (topic) => {
+    const positionals = Object.entries(COMMANDS).flatMap(([id, command]) => {
+      const arg = command.args?.id;
+      return id.startsWith(`${topic}:`) && arg !== undefined ? [arg] : [];
+    });
+
+    expect(positionals.length).toBeGreaterThan(0);
+    for (const arg of positionals) {
+      await expect(parseArg(arg, "nope", "id")).rejects.toMatchObject({
+        hint: `Find one with \`zitadel ${topic} list\`.`,
+      });
+    }
+  });
 });

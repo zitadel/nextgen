@@ -358,7 +358,8 @@ Each invocation prints one JSON object:
   `release revoke` and the `users`, `sessions` and `release` commands that take
   an id refuse a value that is not that kind of id (surrounding whitespace is
   trimmed) before they ask or call the server, saying what one looks like and
-  suggesting the list command.
+  suggesting the list command. `claim --challenge-id` refuses a malformed
+  challenge id the same way.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.

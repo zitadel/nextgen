@@ -57,6 +57,20 @@ describe("deployment create", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("suggests listing releases when given a deployment id", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+          "--json",
+        ]);
+
+        expect(result).toSuggest("release list");
+      });
+
       it("makes an existing release live on every primary origin", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.acme.com");
