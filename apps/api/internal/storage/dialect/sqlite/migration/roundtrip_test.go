@@ -51,6 +51,7 @@ var known = migrationtest.Known{
 	13: {"column user_passwords.changed_at"},
 	14: {"column user_passwords.updated_at"},
 	19: {"column projects.preview_origins"},
+	26: {"column user_attributes.team_id"},
 }
 
 // snapshot reads the schema from the catalog pragmas rather than from the

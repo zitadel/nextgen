@@ -117,6 +117,7 @@ export {
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  slugFromDisplayName,
   validated,
   type ClientId,
   type ClientIdVariable,

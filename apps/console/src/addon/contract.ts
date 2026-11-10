@@ -36,7 +36,7 @@ export interface ConsoleAddon {
  * screen's is (Console ADR 0001): a build without the add-on has neither.
  */
 export interface AddonScreen {
-  /** The router-relative path: `/settings/billing`. One beneath `/settings` renders with the account sidebar. */
+  /** The router-relative path: `/settings/billing`. One beneath `/settings` renders with the Settings sidebar. */
   path: `/${string}`;
   /** Its entry in the sidebar its view names. */
   nav: AddonNav;
@@ -68,9 +68,12 @@ export interface AddonScreenProps<Data> {
 /** A sidebar entry, as the console's `staticData.nav` holds one. */
 export interface AddonNav {
   label: string;
-  /** `account` lists it in the account sidebar, between Projects and Settings; `portal` beside the project's screens. */
-  view: "portal" | "account";
-  /** Its place in that sidebar; the console's own entries start at 1, and the account sidebar's Settings is 9. */
+  /**
+   * `settings` lists it under Settings, after Profile; `account` above every
+   * project, between Projects and Settings; `portal` beside the project's screens.
+   */
+  view: "portal" | "account" | "settings";
+  /** Its place in that list; the console's own entries start at 1, and the account list's Settings is 9. */
   order: number;
   /** A Lucide icon, or a component of the same shape. */
   icon: ComponentType<{ size?: number | string; className?: string; "aria-hidden"?: boolean }>;

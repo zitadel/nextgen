@@ -124,12 +124,12 @@ func MergeAttributesPatch(current, patch map[string]any) map[string]any {
 	return merged
 }
 
-// RegistryTeamScopes resolves the registry team scope of each attribute, index
+// UniqueTeamScopes resolves the unique team scope of each attribute, index
 // aligned with attrs: project-unique values are project-wide (""), team-unique
 // values keep their already-stored scope when preserved knows the key and fall
 // back to fallback otherwise. Entries for non-unique attributes stay "" and go
 // unused. Pass a nil preserved map when nothing is stored yet (create).
-func (attrs CreateAttributes) RegistryTeamScopes(preserved map[AttributeKey]string, fallback string) []string {
+func (attrs CreateAttributes) UniqueTeamScopes(preserved map[AttributeKey]string, fallback string) []string {
 	scopes := make([]string, len(attrs))
 	for i, a := range attrs {
 		if a.UniqueScope != AttributeUniquenessTeam {
@@ -172,7 +172,7 @@ func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness)
 }
 
 // UniqueValueHash is the one comparison function behind attribute uniqueness:
-// the unique-attributes registry stores it and identifier resolution looks it
+// the unique index stores it and identifier resolution looks it
 // up, so both always agree on what counts as the same value (ADR 058 §4a).
 // String values are Unicode case-folded before hashing — Alice@Example.com
 // and alice@example.com are one unique value — while the attribute itself

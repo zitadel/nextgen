@@ -23,11 +23,8 @@ const (
 	createUserHeaderStmt = `INSERT INTO users (project_id, schema_url, id, lifecycle_owner_team_id, status)
 VALUES (@p1, @p2, @p3, @p4, @p5)`
 
-	createUserAttributeStmt = `INSERT INTO user_attributes (project_id, team_id, user_id, key, value)
-VALUES (@p1, @p2, @p3, @p4, PARSE_JSON(@p5))`
-
-	createUserUniqueAttrStmt = `INSERT INTO user_unique_attributes (project_id, user_id, team_id, key, value_hash)
-VALUES (@p1, @p2, @p3, @p4, @p5)`
+	createUserAttributeStmt = `INSERT INTO user_attributes (project_id, user_id, key, value, unique_team_id, value_hash)
+VALUES (@p1, @p2, @p3, PARSE_JSON(@p4), @p5, @p6)`
 
 	createUserMembershipStmt = `INSERT INTO team_memberships (project_id, team_id, user_id, status)
 VALUES (@p1, @p2, @p3, @p4)`
@@ -69,9 +66,7 @@ WHERE project_id = @p1 AND id IN UNNEST(@p2)`
 	patchUserHeaderStmt = `UPDATE users SET updated_at = CURRENT_TIMESTAMP(), schema_url = @p1
 WHERE project_id = @p2 AND id = @p3 AND updated_at = @p4`
 
-	selectUserUniqueAttrScopesStmt = `SELECT key, team_id FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
-
-	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
+	selectUserUniqueAttrScopesStmt = `SELECT key, unique_team_id FROM user_attributes WHERE project_id = @p1 AND user_id = @p2 AND value_hash IS NOT NULL`
 
 	deleteUserAttributesStmt = `DELETE FROM user_attributes WHERE project_id = @p1 AND user_id = @p2`
 
@@ -117,8 +112,8 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			return err
 		}
 
-		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes,
-			user.Attributes.RegistryTeamScopes(nil, teamScope)); err != nil {
+		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, user.Attributes,
+			user.Attributes.UniqueTeamScopes(nil, teamScope)); err != nil {
 			return err
 		}
 
@@ -139,26 +134,22 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	})
 }
 
-// insertUserAttributes writes one attribute row per entry, plus a registry
-// row for each unique-scoped value. registryTeams is index-aligned with attrs
-// (see [domain.CreateAttributes.RegistryTeamScopes]).
-func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, attrTeamID string, attrs domain.CreateAttributes, registryTeams []string) error {
+// insertUserAttributes writes one attribute row per entry, with the team
+// scope and value hash set for a unique-scoped value. uniqueTeams is
+// index-aligned with attrs (see [domain.CreateAttributes.UniqueTeamScopes]).
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID string, attrs domain.CreateAttributes, uniqueTeams []string) error {
 	for i, a := range attrs {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
+		team, hash := spanner.NullString{}, []byte(nil)
+		if a.UniqueScope != domain.AttributeUniquenessUnspecified {
+			sum := a.ValueHash
+			team, hash = spanner.NullString{StringVal: uniqueTeams[i], Valid: true}, append([]byte(nil), sum[:]...)
+		}
 		if _, err := tx.Update(ctx, buildStatement(createUserAttributeStmt,
-			projectID, attrTeamID, userID, a.Key, string(raw),
-		).statement()); err != nil {
-			return err
-		}
-		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-			continue
-		}
-		sum := a.ValueHash
-		if _, err := tx.Update(ctx, buildStatement(createUserUniqueAttrStmt,
-			projectID, userID, registryTeams[i], a.Key, append([]byte(nil), sum[:]...),
+			projectID, userID, a.Key, string(raw), team, hash,
 		).statement()); err != nil {
 			return err
 		}
@@ -192,7 +183,7 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 		return nil, nil
 	}
 	var compiler statementCompiler
-	compiler.WriteString("SELECT key FROM user_unique_attributes WHERE project_id = ")
+	compiler.WriteString("SELECT key FROM user_attributes WHERE project_id = ")
 	compiler.WriteArg(projectID)
 	compiler.WriteString(" AND user_id <> ")
 	compiler.WriteArg(userID)
@@ -201,7 +192,7 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 		if i > 0 {
 			compiler.WriteString(" OR ")
 		}
-		compiler.WriteString("(team_id = ")
+		compiler.WriteString("(unique_team_id = ")
 		compiler.WriteArg(claim.TeamID)
 		compiler.WriteString(" AND key = ")
 		compiler.WriteArg(claim.Key)
@@ -228,14 +219,14 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 }
 
 // PatchUser implements [service.UserStatements] as a full rewrite of the
-// user's attribute and registry rows; a registry insert colliding with
-// another user's claim still surfaces as a UniqueError.
+// user's attribute rows; a unique value colliding with another user's claim
+// still surfaces as a UniqueError.
 func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
 	}
-	if len(user.RegistryTeamScopes) != len(user.Attributes) {
-		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	if len(user.UniqueTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one unique team scope per attribute")
 	}
 	return withTransaction(ctx, us.db, func(ctx context.Context, tx queryExecutor) error {
 		n, err := tx.Update(ctx, buildStatement(patchUserHeaderStmt,
@@ -247,14 +238,11 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if n == 0 {
 			return wrapError(spanner.ErrRowNotFound)
 		}
-		if _, err := tx.Update(ctx, buildStatement(deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
-			return err
-		}
 		if _, err := tx.Update(ctx, buildStatement(deleteUserAttributesStmt, user.ProjectID, user.UserID).statement()); err != nil {
 			return err
 		}
-		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
-			user.RegistryTeamScopes)
+		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.Attributes,
+			user.UniqueTeamScopes)
 	})
 }
 
@@ -305,12 +293,12 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 				if err != nil {
 					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
 				}
-				compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
+				compiler.WriteString("users.id IN (SELECT ua.user_id FROM user_attributes ua WHERE ua.project_id = users.project_id AND ua.key = ")
 				compiler.WriteArg(a.Key)
 				compiler.WriteString(" AND ua.value_hash = ")
 				compiler.WriteArg(hash[:])
 				if opts.UniqueTeamID != nil {
-					compiler.WriteString(" AND ua.team_id = ")
+					compiler.WriteString(" AND ua.unique_team_id = ")
 					compiler.WriteArg(*opts.UniqueTeamID)
 				}
 				compiler.WriteString(")")

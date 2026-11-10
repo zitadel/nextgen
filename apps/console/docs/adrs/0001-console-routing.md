@@ -219,6 +219,12 @@ the sidebar.
 > (`staticData.nav.view: "account"`), which Projects heads; every other route
 > shows the selected project's. The Settings view's own header is gone.
 
+> **Amendment (2026-11-09, design decision D29):** the route picks between
+> three lists. Projects shows the account's (`view: "account"`): Projects and
+> one Settings row, the `/settings` route's own entry. `/settings` with
+> anything beneath it shows Settings' (`view: "settings"`), under a heading
+> row that leads back to Projects.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;

@@ -10,6 +10,20 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
+func encodeAcceptInvitationRequest(
+	req *InvitationTokenRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeAddOriginRequest(
 	req *ProjectOrigin,
 	r *http.Request,
@@ -54,6 +68,20 @@ func encodeBuildReleaseRequest(
 
 func encodeCompleteClaimRequest(
 	req *CompleteClaimRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateApplicationRequest(
+	req *CreateApplicationRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -152,6 +180,20 @@ func encodeCreateGrantRequest(
 
 func encodeCreateIdpRequest(
 	req *CreateIdpRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateInvitationRequest(
+	req CreateInvitationRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -304,6 +346,20 @@ func encodeIssueChallengeRequest(
 	return nil
 }
 
+func encodeLookupInvitationRequest(
+	req *InvitationTokenRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodePatchMyUserRequest(
 	req *PatchMyUserRequest,
 	r *http.Request,
@@ -432,6 +488,20 @@ func encodeQueryTeamsRequest(
 
 func encodeQueryUsersRequest(
 	req *QueryUsersRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeRejectInvitationRequest(
+	req *InvitationTokenRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
