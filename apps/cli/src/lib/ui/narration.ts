@@ -67,8 +67,8 @@ export class Narration {
   }
 
   private draw(level: LogLevel, text: string): void {
-    const body = text.replace(/^\n+/, "");
-    if (body.trim() === "" || (level === "debug" && !this.debug)) {
+    const body = text;
+    if (level === "debug" && !this.debug) {
       return;
     }
     if (this.chain.chained) {

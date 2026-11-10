@@ -67,6 +67,12 @@ describe("Chain", () => {
     expect(printed()).toBe("   and this is why\n");
   });
 
+  it("writes a blank line as a gap, with no mark", () => {
+    scripted().narrate("i", "");
+
+    expect(printed()).toBe("\n");
+  });
+
   // Narration used to reach clack whenever the chain was not plain-and-watched,
   // so a run nobody was watching put a `│` on stdout — clack draws the gutter
   // whether or not anything opened it.

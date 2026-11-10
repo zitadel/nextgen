@@ -57,20 +57,12 @@ describe("Narration", () => {
     );
   });
 
-  it("says nothing for a line that is only whitespace", () => {
+  it("draws a blank line as it was written, so a note keeps its spacing", () => {
     const { chain } = drawn();
 
-    log.info("   ");
+    log.info("");
 
-    expect(chain.lines).toEqual([]);
-  });
-
-  it("drops the blank lines a command padded its message with", () => {
-    const { chain } = drawn();
-
-    log.info("\n\nLooking for a project");
-
-    expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} Looking for a project`]);
+    expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} `]);
   });
 
   it("keeps debug detail back unless it was asked for", () => {
