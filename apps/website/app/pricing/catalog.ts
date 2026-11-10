@@ -71,11 +71,20 @@ export type Catalog = {
   licensed: Licensed[];
   self_hosted: {
     unit: string;
-    free: { license: string; support: string };
+    /**
+     * What every production installation pays before add-ons. Its `includes`, and those of
+     * `hubs` and `enterprise`, are what differs from the cloud, as the cards list it.
+     */
+    base: {
+      label: string;
+      amount: number;
+      interval: string;
+      per: string;
+      billed: string;
+      includes: string[];
+    };
     /** `per`: what an add-on's base fee is charged for, such as a production installation. */
     hubs: { license: string; per: string; metering: string; includes: string[] };
-    /** Support tickets, billed apart from the hubs. */
-    support: { label: string; amount: number; interval: string; per: string; note?: string };
     enterprise: { includes: string[] };
   };
 };

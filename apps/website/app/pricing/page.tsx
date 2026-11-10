@@ -18,8 +18,8 @@ import { hubStatus, works } from "./status";
 // Built from the repository (catalog.ts), so a deploy brings the prices the
 // cloud bills from; nothing is read per visit. The page is the offer's three
 // steps, as most pricing pages show theirs: Free, Add-ons and Enterprise, side
-// by side, under a switch between the cloud and self-hosting, which changes
-// the cards and nothing about the steps. Below them come the add-ons as one
+// by side, under a switch between the cloud and self-hosting, which adds what
+// differs on your own servers and changes nothing else. Below them come the add-ons as one
 // price list, a calculator, the comparison of every feature, folded until
 // asked for, and the questions, which hold every explanation. What doesn't
 // work yet carries Choose a version's status (status.ts), and an add-on still
@@ -67,7 +67,7 @@ export default function PricingPage() {
           </div>
 
           <div className="mt-8">
-            <PlanCards plans={planCards(catalog)} />
+            <PlanCards cards={planCards(catalog)} />
           </div>
           <p className="mt-6 text-center text-text-muted text-xs leading-5">
             Prices in {catalog.currency.toUpperCase()}, before taxes, from general availability.{" "}
@@ -82,7 +82,7 @@ export default function PricingPage() {
             <h2 id="estimate" className={H2}>
               What you'd pay
             </h2>
-            <Calculator inputs={estimateInputs(catalog)} />
+            <Calculator inputs={estimateInputs(catalog)} base={catalog.self_hosted.base} />
           </section>
 
           <section aria-labelledby="compare" className="mt-20 md:mt-28">

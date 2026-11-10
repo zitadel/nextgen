@@ -11,7 +11,7 @@ import {
   sentence,
 } from "./catalog";
 import { StatusTag } from "./compare-table";
-import { CLOUD_ONLY, Features, H2, LINK, SELF_HOSTED_ONLY } from "./parts";
+import { CLOUD_ONLY, Feature, Features, H2, LINK, SELF_HOSTED_ONLY } from "./parts";
 import { hubStatus, meterStatus, works } from "./status";
 
 const CELLS =
@@ -23,8 +23,8 @@ const NAME = "font-heading text-text-primary text-xl leading-tight";
 /**
  * Everything that can go on top of Free, as one price list with one row shape:
  * the add-ons that work today, what each of them includes, the capacity and
- * support lines, then what's coming, which shows no price until it is Coming
- * next.
+ * support lines (for self-hosting, its base instead), then what's coming,
+ * which shows no price until it is Coming next.
  */
 export function AddOns({ catalog }: { catalog: Catalog }) {
   const working = catalog.hubs.filter((hub) => works(hubStatus(hub)));
@@ -32,7 +32,7 @@ export function AddOns({ catalog }: { catalog: Catalog }) {
   const listed = catalog.licensed.filter(
     (line) => line.plans.includes("pro") && line.amount !== null,
   );
-  const { support } = catalog.self_hosted;
+  const { base } = catalog.self_hosted;
   return (
     <section aria-labelledby="add-ons" className="mt-20 scroll-mt-24 md:mt-28">
       <h2 id="add-ons" className={H2}>
@@ -51,8 +51,8 @@ export function AddOns({ catalog }: { catalog: Catalog }) {
           </div>
         </div>
 
-        <Group>Scale and support, with any add-on</Group>
         <div className={CLOUD_ONLY}>
+          <Group>Scale and support, with any add-on</Group>
           {listed.map((line) => (
             <div key={line.id} className={ROW}>
               <h3 className={NAME}>{line.label}</h3>
@@ -67,15 +67,20 @@ export function AddOns({ catalog }: { catalog: Catalog }) {
           ))}
         </div>
         <div className={SELF_HOSTED_ONLY}>
+          <Group>For every self-hosted installation</Group>
           <div className={ROW}>
-            <h3 className={NAME}>{support.label}</h3>
-            <p className="text-sm text-text-secondary leading-6">
-              {support.note ? sentence(support.note) : ""}
-            </p>
-            <Price
-              amount={dollars(support.amount)}
-              per={`/ ${support.interval} per ${support.per}`}
-            />
+            <h3 className={NAME}>{base.label}</h3>
+            <ul className="flex flex-col gap-2 text-sm text-text-secondary leading-6">
+              {base.includes.map((item) => (
+                <Feature key={item} text={item} />
+              ))}
+            </ul>
+            <div>
+              <Price amount={dollars(base.amount)} per={`/ ${base.interval}`} />
+              <p className="mt-1 text-text-muted text-xs leading-5">
+                per {base.per}, billed {base.billed}
+              </p>
+            </div>
           </div>
         </div>
 

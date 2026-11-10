@@ -65,7 +65,7 @@ describe("the cloud's price list", () => {
     expect(catalog.hub_includes.length).toBeGreaterThan(0);
     expect(enterprise.support).not.toBe("");
     expect(catalog.self_hosted.hubs.includes.length).toBeGreaterThan(0);
-    expect(catalog.self_hosted.support.amount).toBeGreaterThan(0);
+    expect(catalog.self_hosted.base.amount).toBeGreaterThan(0);
     expect(enterprise.compliance.length).toBeGreaterThan(0);
   });
 

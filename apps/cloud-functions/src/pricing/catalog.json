@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-09.3",
+  "version": "2026-11-09.6",
   "status": "proposal",
   "currency": "usd",
   "decided": [
@@ -39,7 +39,7 @@
     "roadmap": "An add-on turned on now gains its missing features as they ship, at the same price.",
     "capacity": "API requests are never billed. Each project has a rate limit; owners add capacity in steps, which raise every project's limit.",
     "bot_checks": "The built-in bot challenge is free on every account. With any add-on, sign-ins and sign-ups can also be checked with your own CAPTCHA keys (Turnstile, hCaptcha or reCAPTCHA) or a verdict your edge forwards (Vercel BotID, Cloudflare). Such a check counts only when it passes and lets a request through, once per decision: failed checks and refused requests never count, so an attack can't grow the bill.",
-    "self_hosted": "Self-hosted works like the cloud. All of Zitadel is open source under the AGPL, and everything the cloud includes free is free to run. Our builds turn add-ons on with a commercial license, at the cloud's base fees and meters for each production installation; the installation counts its own usage and reports it monthly. Support tickets are a line of their own. You may build and change Zitadel yourself under the AGPL, without warranty, support or an SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
+    "self_hosted": "Self-hosted Zitadel has the same features, add-ons and prices as the cloud. Each production installation needs the self-hosted base, billed yearly: a commercial license with warranty, our builds with security fixes, and 12 support tickets a year, answered the next business day. Add-ons cost what they cost in the cloud, for each production installation; the installation counts its own usage and reports it monthly. Air-gapped installations settle their usage once a year, in an Enterprise contract. Zitadel is also open source: without the base you can run it under the AGPL 3.0 license, without warranty or support."
   },
   "plans": {
     "free": {
@@ -454,18 +454,25 @@
   "self_hosted": {
     "unit": "installation: a server and its database serving real end users",
     "metered": true,
-    "free": { "license": "AGPL-3.0-only", "features": "everything Pay as you go includes before an add-on", "support": "community" },
+    "free": { "license": "AGPL-3.0-only", "features": "everything the cloud includes free", "support": "community" },
+    "base": {
+      "label": "Self-hosted",
+      "amount": 200,
+      "interval": "month",
+      "per": "production installation",
+      "billed": "yearly",
+      "includes": ["A commercial license, with warranty", "Our builds, with security fixes", "12 support tickets a year, answered the next business day"]
+    },
     "hubs": {
       "license": "commercial",
       "prices": "as the cloud's add-ons",
       "per": "production installation",
       "metering": "the installation's own usage counts, reported monthly",
-      "includes": ["The cloud's add-ons, base fees and meters, for each production installation", "A commercial license, with warranty, for our unmodified builds of the add-ons you turn on"]
+      "includes": ["Priced per production installation", "Your installation counts its usage and reports it monthly"]
     },
-    "support": { "label": "Support tickets", "amount": 2000, "interval": "year", "per": "production installation", "note": "Next business day as a target, 12 tickets a year" },
     "enterprise": {
       "tiers": "as plans.enterprise",
-      "includes": ["Air-gapped installations, with an annual true-up", "Contractual response times", "A technical account manager", "Security fixes backported to your version", "Compliance evidence", "Custom terms and indemnification"]
+      "includes": ["Air-gapped installations, with usage settled once a year", "Security fixes backported to your version"]
     }
   },
   "core": {

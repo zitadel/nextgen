@@ -1,9 +1,12 @@
 import { StatusTag } from "./compare-table";
+import { flexFor } from "./deployment";
 import { type FeatureStatus, featureStatus, works } from "./status";
 
+export { CLOUD_ONLY, flexFor, SELF_HOSTED_ID, SELF_HOSTED_ONLY } from "./deployment";
+
 // What the pricing page's sections share: its heading and button styles, the
-// check and plus marks, a feature line, and the classes that show a block for
-// one deployment only.
+// check and plus marks, a feature line, and deployment.ts' classes that show a
+// block for one deployment only.
 
 export const H2 =
   "font-heading text-3xl text-text-primary leading-tight tracking-[-0.02em] md:text-4xl";
@@ -13,19 +16,19 @@ export const PRIMARY = `${BUTTON} bg-text-primary text-background hover:opacity-
 export const SECONDARY = `${BUTTON} border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]`;
 export const LINK = "text-text-primary underline underline-offset-4";
 
-/** The id of the switch's Self-hosted radio, which the classes below select on. */
-export const SELF_HOSTED_ID = "deploy-self-hosted";
-/**
- * A block for one deployment only. The switch is two radios inside the page's
- * `group/deploy`, so the choice needs no script and the page stays prerendered.
- */
-export const CLOUD_ONLY = "group-has-[#deploy-self-hosted:checked]/deploy:hidden";
-export const SELF_HOSTED_ONLY = "hidden group-has-[#deploy-self-hosted:checked]/deploy:block";
-
 /** A feature with a check, greyed out with its tag while it doesn't work yet. */
-export function Feature({ text, status = "available" }: { text: string; status?: FeatureStatus }) {
+export function Feature({
+  text,
+  status = "available",
+  only,
+}: {
+  text: string;
+  status?: FeatureStatus;
+  /** Shown for one deployment only. */
+  only?: "cloud" | "self_hosted";
+}) {
   return (
-    <li className="flex gap-3">
+    <li className={`${flexFor(only)} gap-3`}>
       <span className={works(status) ? undefined : "opacity-55"}>
         <Check />
       </span>

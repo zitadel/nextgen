@@ -698,6 +698,19 @@
         "free": {
           "type": "object"
         },
+        "base": {
+          "type": "object",
+          "required": ["label", "amount", "interval", "per", "billed", "includes"],
+          "properties": {
+            "label": { "type": "string" },
+            "amount": { "$ref": "#/$defs/money" },
+            "interval": { "enum": ["month", "year"] },
+            "per": { "type": "string" },
+            "billed": { "enum": ["monthly", "yearly"] },
+            "includes": { "type": "array", "items": { "type": "string" } }
+          },
+          "description": "What every self-hosted production installation pays before add-ons: the commercial license, our builds and support tickets"
+        },
         "hubs": {
           "type": "object",
           "required": [
