@@ -63,8 +63,7 @@ export function cliSample(
 
   if (topic === "variable") {
     return (
-      variableCommand(verb, positionals, request) ??
-      apiSample(operation, path, request, { body: "input" })
+      variableCommand(verb, positionals, request) ?? apiSample(operation, path, request, "input")
     );
   }
 
@@ -77,38 +76,34 @@ export function cliSample(
   return `${context}\n${line([`${cli} ${command}`, ...positionals], flags)}`;
 }
 
-// `zitadel api <operationId>`: the path parameters are its arguments, but a
-// trailing `project_id`, which the CLI fills in itself; each query parameter
-// and top-level body field is a `--field`, typed by the operation's schema, and
-// an object, a list or `null` is JSON after `:=`. A body whose keys are the
-// caller's own, such as a variables map, is piped in as JSON instead
-// (`body: "input"`, `--input -`): a key named `kind` or `project_id` as a
-// `--field` is a query parameter, and a bare number or boolean would reach the
-// API as a string. `printf` writes it, as `echo` reads a backslash in the JSON
-// as an escape in some shells.
+/**
+ * `zitadel api <operationId>`: the path parameters are its arguments, except a
+ * trailing `project_id`, which the CLI fills in; each query parameter and, for
+ * `bodyAs: "fields"`, each top-level body field is a `--field`, typed by the
+ * operation's schema. A body with keys of its own, such as a variables map,
+ * goes in as `bodyAs: "input"`: JSON on stdin, because a key named `kind` as a
+ * `--field` is a query parameter and a bare number reaches the API as a string.
+ * `printf` writes it, as `echo` reads a backslash in the JSON as an escape.
+ */
 function apiSample(
   operation: OperationObject,
   path: string,
   request: RequestData,
-  options: { body: "fields" | "input" } = { body: "fields" },
+  bodyAs: "fields" | "input" = "fields",
 ): string {
   const names = pathParameterNames(path);
   const positionals = names
     .filter((name, index) => name !== "project_id" || index < names.length - 1)
     .map((name) => word(request.path[name]?.value ?? ""));
   const body = record(request.body);
-  const piped = options.body === "input" && Object.keys(body).length > 0;
+  const piped = bodyAs === "input" && Object.keys(body).length > 0;
   const fields = [
     ...(piped ? ["--input -"] : []),
     ...Object.entries(request.query)
       .filter(([name]) => name !== "project_id")
       .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
-    ...(options.body === "fields"
-      ? Object.entries(body).map(([name, value]) => field(name, value))
-      : []),
+    ...(bodyAs === "fields" ? Object.entries(body).map(([name, value]) => field(name, value)) : []),
   ];
-  // An operation that needs no credential runs anywhere, unless the CLI is
-  // to fill in its project.
   const project =
     authentication(operation) === "secret" ||
     names.includes("project_id") ||
@@ -146,19 +141,19 @@ function listFlags(request: RequestData): string[] {
 }
 
 /**
- * Whether `variable <verb>` does what the request does for its `kind`. It
- * reads one kind when it is given `--preview` or none, so a `get` that names
- * no kind (both) and a `list` or a write or removal for `primary` alone differ
- * from it. `resolve` takes an origin, not the deployment id the path names.
+ * Whether `variable <verb>` does what the request does for its `kind`. The
+ * commands act on both kinds, or on the preview value with `--preview`, so a
+ * `get` must name a kind and the rest must not ask for `primary` alone.
+ * `resolve` takes an origin, not the deployment id the path names.
  */
 function variableRunsAs(verb: string | undefined, kind: string | undefined): boolean {
   switch (verb) {
     case "get":
-      return kind !== undefined;
+      return kind === "primary" || kind === "preview";
     case "list":
     case "set":
     case "rm":
-      return kind !== "primary";
+      return kind === undefined || kind === "preview";
     default:
       return false;
   }
