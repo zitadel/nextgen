@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  BrokenFile,
-  BrokenFilesError,
-  CONFIG_DIRECTORIES,
-  MemoryStore,
-  PolicyTest,
-} from "@/lib/zitadel";
+import { BrokenFile, BrokenFilesError, CONFIG_DIRECTORIES, PolicyTest } from "@/lib/zitadel";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { aFile, PASSWORD_POLICY } from "@tests/helpers/config";
 import { aPolicyTest, PASSWORD_POLICY_TEST_FILE, TOO_SHORT_CASE } from "@tests/helpers/policies";
 import { thrownBy } from "@tests/helpers/thrown-value";
