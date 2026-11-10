@@ -13,7 +13,7 @@ require (
 	github.com/go-faker/faker/v4 v4.7.0
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
-	github.com/go-jose/go-jose/v4 v4.1.6
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/go-webauthn/webauthn v0.17.3
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-sql-spanner v1.25.1
@@ -34,7 +34,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.43.0
 	github.com/veqryn/slog-context v0.9.0
 	github.com/veqryn/slog-context/otel v0.9.0
-	github.com/zitadel/oidc/v3 v3.51.18-0.20261110040704-a1cb9f34c7b9
+	github.com/zitadel/oidc/v3 v3.52.0
 	github.com/zitadel/passwap v0.12.1
 	github.com/zitadel/sloggcp v0.6.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.0
@@ -60,7 +60,7 @@ require (
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
 	golang.org/x/tools v0.51.0
