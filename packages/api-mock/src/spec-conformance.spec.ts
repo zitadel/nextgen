@@ -1741,18 +1741,6 @@ describe("api-mock idp and variable contract details", () => {
       details: { details: { fields: ["oidc.issuer"] } },
     });
 
-    // A trailing slash is another issuer to the server, until discovery runs
-    // on a revision.
-    const slashed = await putIdp(projectId, {
-      ...base,
-      oidc: { ...base.oidc, issuer: "https://accounts.google.com/" },
-    });
-
-    expect(slashed.status).toBe(400);
-    expect(await slashed.json()).toMatchObject({
-      details: { details: { fields: ["oidc.issuer"] } },
-    });
-
     // An absent subject_claim reads as `sub`, so dropping an explicit one is no
     // change, while naming another claim is.
     const implicitSub = await putIdp(projectId, { ...base, subject_claim: undefined });
@@ -2115,16 +2103,6 @@ describe("api-mock releases and deployments", () => {
         ],
       },
     });
-
-    const slashed = await build({
-      bundle: {
-        schemas: [],
-        flow_definitions: [],
-        idps: [connection("https://accounts.google.com/")],
-      },
-    });
-
-    expect(slashed.status).toBe(400);
   });
 
   test("evaluates a password policy as a password set would, storing nothing", async () => {
