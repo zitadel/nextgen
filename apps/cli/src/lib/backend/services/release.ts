@@ -5,7 +5,6 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
-  RevokeRelease409,
   RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
 import { z } from "zod";
@@ -32,43 +31,13 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 /** The kind of resource a release pins a revision of. */
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
-/** An origin that still serves a release, with the deployment that pins the release there. */
-export type ServedOrigin = RevokeRelease409DetailsOriginsItem;
-
 /**
  * What revoking a release came to: revoked, or refused because origins still
  * serve it, each one named with the deployment that pins the release there.
  */
 export type RevokeOutcome =
   | Readonly<{ outcome: "revoked"; release: Release }>
-  | Readonly<{ outcome: "in-use"; origins: readonly ServedOrigin[] }>;
-
-/**
- * The body of a `rel.in_use` refusal, as the API contract writes it: the
- * origins that still serve the release sit directly under `details`.
- */
-const ServedOriginsBody = z.object({
-  details: z.object({
-    origins: z.array(
-      z.object({
-        origin: z.string(),
-        deployment_id: z.string(),
-      }),
-    ),
-  }),
-}) satisfies z.ZodType<Pick<RevokeRelease409, "details">>;
-
-/**
- * The origins a `rel.in_use` refusal names. The body is parsed rather than
- * trusted: a body that does not hold the expected shape names none.
- *
- * @param body - The parsed error body the server answered with.
- * @returns The origins it names, empty when it names none.
- */
-function servedOriginsOf(body: unknown): readonly ServedOrigin[] {
-  const parsed = ServedOriginsBody.safeParse(body);
-  return parsed.success ? parsed.data.details.origins : [];
-}
+  | Readonly<{ outcome: "in-use"; origins: readonly RevokeRelease409DetailsOriginsItem[] }>;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -154,9 +123,24 @@ export class ReleaseService extends ApiService {
       return { outcome: "revoked", release };
     } catch (error) {
       if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
-        const origins = servedOriginsOf(error.body);
-        if (origins.length > 0) {
-          return { outcome: "in-use", origins };
+        // The body is parsed rather than trusted: one that does not hold the
+        // origins the contract promises is rethrown as the conflict it is.
+        const refusal = z
+          .object({
+            details: z.object({
+              origins: z
+                .array(
+                  z.object({
+                    origin: z.string(),
+                    deployment_id: z.string(),
+                  }),
+                )
+                .min(1),
+            }),
+          })
+          .safeParse(error.body);
+        if (refusal.success) {
+          return { outcome: "in-use", origins: refusal.data.details.origins };
         }
       }
       throw error;

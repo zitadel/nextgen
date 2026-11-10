@@ -17,6 +17,22 @@ async function aRelease(app: ScaffoldedApp): Promise<string> {
   return app.envelopeOf<{ release_id: string }>(result).data.release_id;
 }
 
+/** Try to revoke the release a primary origin serves, which the server refuses. */
+async function aRefusedRevoke() {
+  const app = await aSetUpApp();
+  await app.addPrimaryOrigin();
+  const served = await app.deployData();
+  const result = await app.run([
+    "release",
+    "revoke",
+    served.release_id ?? "",
+    "--force",
+    "--non-interactive",
+    "--json",
+  ]);
+  return { app, result, served };
+}
+
 describe("release revoke", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -177,55 +193,25 @@ describe("release revoke", () => {
       });
 
       it("names the origin that still serves the release, and the deployment that pins it", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const served = await app.deployData();
-
-        const result = await app.run([
-          "release",
-          "revoke",
-          served.release_id ?? "",
-          "--force",
-          "--non-interactive",
-          "--json",
-        ]);
+        const { result } = await aRefusedRevoke();
 
         expect(result.stdout + result.stderr).toContain("https://app.example.com (deployment ");
       });
 
       it("lists each serving origin and its deployment in the --json details", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const served = await app.deployData();
+        const { app, result, served } = await aRefusedRevoke();
 
-        const result = await app.run([
-          "release",
-          "revoke",
-          served.release_id ?? "",
-          "--force",
-          "--non-interactive",
-          "--json",
-        ]);
-
-        expect(app.servingOriginsOf(result)).toContainEqual({
-          origin: "https://app.example.com",
-          deployment_id: served.deployment_id,
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: {
+            origins: expect.arrayContaining([
+              { origin: "https://app.example.com", deployment_id: served.deployment_id },
+            ]),
+          },
         });
       });
 
       it("suggests rolling back or deploying another release before revoking again", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const served = await app.deployData();
-
-        const result = await app.run([
-          "release",
-          "revoke",
-          served.release_id ?? "",
-          "--force",
-          "--non-interactive",
-          "--json",
-        ]);
+        const { app, result } = await aRefusedRevoke();
 
         expect(result).toSuggestExactly(app.againAsRun("deploy"));
         expect(result).toSuggestExactly(app.againAsRun("deployment rollback"));

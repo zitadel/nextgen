@@ -302,13 +302,6 @@ const ProjectSecret = z.looseObject({
   preview_secret: z.string(),
 });
 
-/** The origins a refused `release revoke` names, at the envelope's root. */
-const RevokeRefusal = z.looseObject({
-  details: z.looseObject({
-    origins: z.array(z.object({ origin: z.string(), deployment_id: z.string() })),
-  }),
-});
-
 /** The recovery a failed `doctor` run offers, at the envelope's root. */
 const DoctorRecovery = z.looseObject({
   details: z
@@ -818,17 +811,6 @@ export class ScaffoldedApp {
   suggestedArgsOf(result: CliResult): string[][] {
     const { details } = DoctorRecovery.parse(this.envelopeOf(result));
     return details?.suggested_args ?? [];
-  }
-
-  /**
-   * The origins a `release revoke --json` run was refused for, each with the
-   * deployment that pins the release there.
-   *
-   * @param result - The refused `release revoke --json` run.
-   * @returns Each serving origin and its deployment id.
-   */
-  servingOriginsOf(result: CliResult): { origin: string; deployment_id: string }[] {
-    return RevokeRefusal.parse(this.envelopeOf(result)).details.origins;
   }
 
   /** Leaves this directory with the record of a local server that is not running. */
