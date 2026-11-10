@@ -19,8 +19,8 @@ CREATE INDEX idx_events_project_request
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE INDEX idx_events_project_session
-    ON events (project_id, session_id, created_at DESC, id DESC)
+CREATE INDEX idx_events_project_session_category
+    ON events (project_id, session_id, category, created_at DESC, id DESC)
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -35,7 +35,7 @@ DROP INDEX IF EXISTS idx_events_project_flow
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_events_project_session
+DROP INDEX IF EXISTS idx_events_project_session_category
 -- +goose StatementEnd
 
 -- +goose StatementBegin

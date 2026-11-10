@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
@@ -329,6 +330,207 @@ func TestEventStatements_ListEach(t *testing.T) {
 			assert.Equal(t, oldestFirst, eventIDs(page.Items))
 			assert.Empty(t, page.NextCursor)
 		})
+	})
+}
+
+// A bounded scan reads one index range in order, to its limit, and says of
+// each row whether it satisfies what the range does not hold. A row that
+// carries no value for a matched column does not match it.
+func TestEventStatements_Scan(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		alice := "user_alice"
+		for i, seed := range []struct {
+			category domain.EventCategory
+			actor    *string
+			client   string
+		}{
+			{category: domain.EventCategoryAuth, actor: &alice, client: "app_1"},
+			{category: domain.EventCategoryRequest, actor: &alice, client: "app_1"},
+			{category: domain.EventCategoryAuth, client: "app_1"},
+			{category: domain.EventCategoryAuth, actor: &alice, client: "app_2"},
+			{category: domain.EventCategoryAuth, actor: &alice, client: "app_1"},
+		} {
+			event := sampleEvent(projectID, "evt-00"+string(rune('1'+i)))
+			event.Category, event.ActorID, event.ClientID = seed.category, seed.actor, seed.client
+			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
+		}
+
+		type row struct {
+			id      string
+			matched bool
+		}
+		read := func(t *testing.T, opts *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) []row {
+			t.Helper()
+			scanned, err := d.stmts.ScanEvents(t.Context(), opts, match)
+			require.NoError(t, err)
+			rows := make([]row, len(scanned))
+			for i, s := range scanned {
+				assert.False(t, s.CreatedAt.IsZero())
+				rows[i] = row{id: s.ID, matched: s.Matched}
+			}
+			return rows
+		}
+		auth := func(limit uint32) *database.ListOptions[domain.EventField] {
+			opts := events.ListOptions(projectID, limit)
+			opts.Pagination.OrderBy = events.CreatedAtDesc()
+			opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCategory), string(domain.EventCategoryAuth)))
+			return opts
+		}
+		match := database.And(
+			database.Equal(database.Col(domain.EventFieldActorID), alice),
+			database.Equal(database.Col(domain.EventFieldClientID), "app_1"),
+		)
+
+		t.Run("every row of the range, with whether it matched", func(t *testing.T) {
+			assert.Equal(t, []row{
+				{"evt-005", true},
+				{"evt-004", false}, // another application
+				{"evt-003", false}, // no actor
+				{"evt-001", true},
+			}, read(t, auth(10), match))
+		})
+		t.Run("no further than the limit", func(t *testing.T) {
+			assert.Equal(t, []row{{"evt-005", true}, {"evt-004", false}}, read(t, auth(2), match))
+		})
+		t.Run("behind the cursor", func(t *testing.T) {
+			first, err := d.stmts.ScanEvents(t.Context(), auth(2), match)
+			require.NoError(t, err)
+			opts := auth(10)
+			order := opts.Pagination.OrderBy
+			last := &domain.Event{ID: first[1].ID, CreatedAt: first[1].CreatedAt}
+			opts.Pagination.Cursor = pagination.New(order, events.Schema.ValuesFrom(last, order.Columns)).Marshal()
+			assert.Equal(t, []row{{"evt-003", false}, {"evt-001", true}}, read(t, opts, match))
+		})
+		t.Run("oldest first", func(t *testing.T) {
+			opts := auth(2)
+			opts.Pagination.OrderBy = events.CreatedAtAsc()
+			assert.Equal(t, []row{{"evt-001", true}, {"evt-003", false}}, read(t, opts, match))
+		})
+		t.Run("nothing to match matches every row", func(t *testing.T) {
+			assert.Equal(t, []row{{"evt-005", true}, {"evt-004", true}}, read(t, auth(2), nil))
+		})
+	})
+}
+
+// A list whose filter no index holds whole is read a budget at a time
+// (events.ScanEach). Followed to its end, it must be the list one ordered
+// read under the whole filter would serve: every match once, in order,
+// wherever the budgets ran out and however many pages came back short.
+func TestEventStatements_ScanEach(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		// Twenty events over three categories. The application alternates in
+		// runs of three, so most budgets hold a match; the fingerprint is on
+		// two events only, so most budgets hold none.
+		categories := []domain.EventCategory{domain.EventCategoryAuth, domain.EventCategoryRequest, domain.EventCategoryEntity}
+		var all []*domain.Event
+		for i := range 20 {
+			event := sampleEvent(projectID, "evt-"+string(rune('a'+i)))
+			event.Category = categories[(i*7)%len(categories)]
+			event.ClientID = []string{"app_1", "app_2"}[(i/3)%2]
+			if i%8 == 4 {
+				event.Fingerprint = "fp_rare"
+			}
+			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
+			all = append(all, event)
+		}
+		fetch := func(ctx context.Context, ids []string) ([]*domain.Event, error) {
+			byID := make([]database.Filter[domain.EventField], len(ids))
+			for i, id := range ids {
+				byID[i] = database.Equal(database.Col(domain.EventFieldID), id)
+			}
+			found, err := d.stmts.ListEvents(ctx, &database.ListOptions[domain.EventField]{
+				Filter: database.And(database.Equal(database.Col(domain.EventFieldProjectID), projectID), database.Or(byID...)),
+			})
+			if err != nil {
+				return nil, err
+			}
+			return found.Items, nil
+		}
+		application := database.Equal(database.Col(domain.EventFieldClientID), "app_1")
+		fingerprint := database.Equal(database.Col(domain.EventFieldFingerprint), "fp_rare")
+		inTwoCategories := func(e *domain.Event) bool { return e.Category != domain.EventCategoryRequest }
+
+		for name, tc := range map[string]struct {
+			values []string
+			match  database.Filter[domain.EventField]
+			wanted func(*domain.Event) bool
+			// Whether some page must come back short of its limit.
+			short bool
+		}{
+			"a common value, over the project's events": {
+				match:  application,
+				wanted: func(e *domain.Event) bool { return e.ClientID == "app_1" },
+				short:  true,
+			},
+			"a common value, over two categories, merged": {
+				values: []string{"auth", "entity"},
+				match:  application,
+				wanted: func(e *domain.Event) bool { return e.ClientID == "app_1" && inTwoCategories(e) },
+			},
+			"a rare value, over the project's events": {
+				match:  fingerprint,
+				wanted: func(e *domain.Event) bool { return e.Fingerprint == "fp_rare" },
+				short:  true,
+			},
+			"a rare value, over two categories, merged": {
+				values: []string{"auth", "entity"},
+				match:  fingerprint,
+				wanted: func(e *domain.Event) bool { return e.Fingerprint == "fp_rare" && inTwoCategories(e) },
+				short:  true,
+			},
+		} {
+			for _, order := range []database.OrderBy[domain.EventField]{events.CreatedAtDesc(), events.CreatedAtAsc()} {
+				direction := "newest first"
+				if order.Direction == database.OrderAsc {
+					direction = "oldest first"
+				}
+				t.Run(name+", "+direction, func(t *testing.T) {
+					var want []string
+					for _, event := range all {
+						if tc.wanted(event) {
+							want = append(want, event.ID)
+						}
+					}
+					if order.Direction == database.OrderDesc {
+						slices.Reverse(want)
+					}
+
+					var got []string
+					var cursor []byte
+					short := 0
+					for pages := 0; ; pages++ {
+						require.Less(t, pages, len(all)+1, "the list must end")
+						opts := events.ListOptions(projectID, 2)
+						opts.Pagination.OrderBy = order
+						opts.Pagination.Cursor = cursor
+						page, err := events.ScanEach(t.Context(), d.stmts.ScanEvents, fetch, opts, domain.EventFieldCategory, tc.values, tc.match, 3)
+						require.NoError(t, err)
+						require.LessOrEqual(t, len(page.Items), 2)
+						for _, item := range page.Items {
+							assert.True(t, tc.wanted(item), "the whole event, loaded by id: %s", item.ID)
+						}
+						got = append(got, eventIDs(page.Items)...)
+						if len(page.NextCursor) == 0 {
+							break
+						}
+						if len(page.Items) < 2 {
+							short++
+						}
+						cursor = page.NextCursor
+					}
+					assert.Equal(t, want, got)
+					if tc.short {
+						assert.Positive(t, short, "a budget of three ran out before a page of two was full")
+					}
+				})
+			}
+		}
 	})
 }
 

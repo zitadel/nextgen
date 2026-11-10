@@ -43,6 +43,7 @@ import {
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatTimestamp } from "@/lib/date";
+import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,9 +58,11 @@ import { cn } from "@/lib/utils";
  * Which events are listed is chosen in the sidebar, whose list Logs replaces
  * with its own (`LogViewRows`, `LogFilters`): the view (audit events, the
  * default; API requests; both), then the filters. They live in the URL: they
- * are server-side, so they belong to the request the loader makes. Every one
- * is served by an index on the server, and `parseLogsSearch` gives way where
- * two would not combine, so no URL reads further than the page it shows.
+ * are server-side, so they belong to the request the loader makes. Any of
+ * them combine: the server bounds every read, and a combination no single
+ * index holds is matched over a fixed number of events a request. Such a page
+ * can come back short, or empty, and still have more behind it. The list then
+ * says that not every event was read, and its button reads **Keep looking**.
  *
  * The search above the table takes one id or one event type and sets the
  * filter it names (`EventSearch`). A row's menu narrows the list by a value
@@ -95,6 +98,9 @@ const NOTHING: Record<LogView, string> = {
   all: "This project has no events.",
 };
 
+/** Above the button, while a page came back short of its size with more behind it. */
+const NOT_ALL_READ = "Not every event has been read yet for these filters.";
+
 function LogsScreen() {
   const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
@@ -102,6 +108,9 @@ function LogsScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
+  // How many rows the newest page held, and of which load: a page that lands
+  // after the list was read again says nothing about the one on screen.
+  const [newest, setNewest] = useState({ of: loaded, rows: loaded.items.length });
   const paging = useLoadMore(
     loaded,
     (pageToken) =>
@@ -110,8 +119,13 @@ function LogsScreen() {
         pageToken,
       }),
     "Could not load more events.",
+    (page) => setNewest({ of: loaded, rows: page.items.length }),
   );
   const events = [...loaded.items, ...paging.extra];
+  // A page short of its size that still has a token: the server stopped at
+  // its bound, not at the end of the events (root ADR 048).
+  const newestRows = newest.of === loaded ? newest.rows : loaded.items.length;
+  const stoppedShort = paging.hasMore && newestRows < LIST_PAGE_SIZE;
 
   async function refresh() {
     setRefreshing(true);
@@ -166,9 +180,12 @@ function LogsScreen() {
           <TableBody>
             {events.length === 0 ? (
               <ResourceEmptyRow colSpan={5}>
-                {isNarrowed(loaded.search)
-                  ? "No events match these filters."
-                  : NOTHING[loaded.search.view]}
+                {/* Nothing yet is not nothing: more events are still unread. */}
+                {stoppedShort
+                  ? "No events have matched so far."
+                  : isNarrowed(loaded.search)
+                    ? "No events match these filters."
+                    : NOTHING[loaded.search.view]}
               </ResourceEmptyRow>
             ) : (
               events.map((event) => <EventRow key={event.id} event={event} search={search} />)
@@ -177,7 +194,11 @@ function LogsScreen() {
         </Table>
       </div>
 
-      <LoadMore paging={paging} />
+      <LoadMore
+        paging={paging}
+        label={stoppedShort ? "Keep looking" : undefined}
+        note={stoppedShort ? NOT_ALL_READ : undefined}
+      />
     </Page>
   );
 }

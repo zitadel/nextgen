@@ -5,8 +5,7 @@
 -- the project's retained events, newest first, until it had a page. The
 -- console's Logs screen reads the list by category and follows one request,
 -- session or login flow, so those four reads get an index each (ADR 048,
--- amendment of 2026-11-10). Every other filter the API accepts is still
--- unindexed.
+-- amendment of 2026-11-10).
 --
 -- events takes a row per API request, so every index here is a write on that
 -- path. The request, session and flow indexes leave out the rows that carry
@@ -32,10 +31,14 @@ CREATE INDEX CONCURRENTLY idx_events_project_request
     ON zitadel_nextgen.events (project_id, request_id, created_at, id)
     WHERE request_id IS NOT NULL;
 
--- The events of one session.
-DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_session;
-CREATE INDEX CONCURRENTLY idx_events_project_session
-    ON zitadel_nextgen.events (project_id, session_id, created_at, id)
+-- The events of one session, by category. A session's events are mostly the
+-- API requests made in it, so the category comes before the time: its audit
+-- events are then a range of their own, not what is left after walking past
+-- every request. A read across categories reads each one and merges them
+-- (events.ListEach).
+DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_session_category;
+CREATE INDEX CONCURRENTLY idx_events_project_session_category
+    ON zitadel_nextgen.events (project_id, session_id, category, created_at, id)
     WHERE session_id IS NOT NULL;
 
 -- The events of one login flow.
@@ -46,6 +49,6 @@ CREATE INDEX CONCURRENTLY idx_events_project_flow
 
 -- +goose Down
 DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_flow;
-DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_session;
+DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_session_category;
 DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_request;
 DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_category;

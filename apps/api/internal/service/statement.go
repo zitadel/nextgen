@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/authz/compiler"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
 type StatementPool interface {
@@ -904,6 +905,11 @@ type EventStatements interface {
 	InsertEvent(ctx context.Context, event *domain.Event) error
 	GetEventByID(ctx context.Context, projectID, id string) (*domain.Event, error)
 	ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
+	// ScanEvents reads the rows of one index range, within, in its order and
+	// no further than its limit, and says of each whether it satisfies match
+	// (events.ScanEach): how a filter no index holds is tried over a bounded
+	// number of rows.
+	ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error)
 	// DeleteEventsOlderThan removes events with created_at before cutoff across
 	// all projects (retention job; includes orphaned project_id rows).
 	DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)

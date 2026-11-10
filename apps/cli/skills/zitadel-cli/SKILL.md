@@ -302,6 +302,10 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
+- A filtered `events list` page can hold fewer items than `--limit`, or none,
+  and still carry `next_page_token`: the server matches some filters over a
+  bounded number of events per request. Follow the token, or pass `--all`,
+  before you report that nothing matched.
 - `deploy` emits `data.content_hash` (the release digest), `data.origins`
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what

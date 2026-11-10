@@ -21,7 +21,8 @@
 > **Amendment (2026-11-10):** `events` gains seven indexes, for the list by
 > category, type, actor and resource and for following one request, session or
 > login flow, and a list over several categories or types is read one value at
-> a time. See
+> a time. A filter no index holds is matched over a bounded number of events a
+> request. See
 > [the amendment](#amendment-2026-11-10-indexes-for-the-reads-the-console-makes).
 >
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
@@ -655,14 +656,16 @@ audit events), a page of 25, warm:
 | `(project_id, category, created_at, id)` | the list by one category |
 | `(project_id, event_type, created_at, id)` | the list by one type |
 | `(project_id, actor_id, category, created_at, id)` | what one actor did, in one category |
-| `(project_id, entity_id, created_at, id)` | what happened to one resource |
+| `(project_id, entity_id, category, created_at, id)` | what happened to one resource, in one category |
+| `(project_id, session_id, category, created_at, id)` | the events of one session, in one category |
 | `(project_id, request_id, created_at, id)` | the events of one HTTP request |
-| `(project_id, session_id, created_at, id)` | the events of one session |
 | `(project_id, flow_id, created_at, id)` | the events of one login flow |
 
-- The actor index has the category before the time. An actor's events are
-  mostly its API requests, so with the time first its audit events would be
-  what is left after walking past every request.
+- The actor, resource and session indexes have the category before the time.
+  Each of them can hold as many events as the project, most of one category:
+  an actor's and a session's API requests, a user's sign-ins. With the time
+  first, the events of any other category would be what is left after walking
+  past those.
 - Every index ends in `(created_at, id)`, so the `created_at` bounds narrow
   any of these ranges.
 - On Postgres and SQLite the indexes on a nullable id leave out the rows that
@@ -674,20 +677,22 @@ audit events), a page of 25, warm:
   `IS NOT NULL`, and declares keys `DESC` for a descending read. These were
   not measured: no local Spanner shows a plan.
 
-**How a list is read.** `EventService.List` plans each list onto the index
-that serves it in order (`readEach`):
+**How a list is read.** `EventService.List` puts each list onto the index
+that holds the most of its filter (`planEventRead`):
 
-- A request, a session, a login flow and a resource are one read each, of
-  their own index. With nothing else asked, that is the range and it stops at
-  the page. Whatever else is asked is matched row by row over it.
-- Several categories, or several types, are read one value at a time and
-  merged in the page's order (`events.ListEach`). With the category index in
-  place, one statement over five categories still walked the `created_at`
-  index (176 ms in the measurement above): no single range holds several
-  values in time order. The page token stays the list's own, the last row's
-  `(created_at, id)`.
-- One actor is read one category at a time, over every category when none is
-  named, since its index is by category.
+- Of the ids asked for, one reads: a request, else a login flow, else a
+  session, else a resource, else an actor. A request and a login flow are one
+  range each. A session, a resource and an actor are a range per category,
+  the ones named or every one, merged in the page's order
+  (`events.ListEach`).
+- With no id, several types or several categories are a range each, merged
+  the same way. With the category index in place, one statement over five
+  categories still walked the `created_at` index (176 ms in the measurement
+  above): no single range holds several values in time order. The page token
+  stays the list's own, the last row's `(created_at, id)`.
+- Everything else asked for is matched, as below: the other ids, a type
+  beside an id, a category beside a type, and the application, fingerprint,
+  resource type and team, which no index holds.
 
 **Cost.** `events` takes a row per API request, and every index is a write on
 that path. On the measured data the table is 1,344 MB with 398 MB of indexes
@@ -696,39 +701,55 @@ since few rows carry either). A bulk insert of 200,000 request rows took 1.3
 to 1.8 s with the one index, 2.2 to 2.6 s with the first four and 3.7 to
 6.5 s with all seven.
 
-**One range, read no further than the page.** An index for each filter is
-not enough: a filter beside an indexed id is matched row by row over that
-id's events, and a session or a resource can hold as many as the project. So
-the console sends only what is one range of one index: a request, a login
-flow, a session, a resource or a type on its own, an actor with or without
-categories, categories alone, or nothing, each with or without the time
-bounds (`servedSearch` in the console's events model).
+The session and resource indexes gained the category after this was measured.
+
+**A budget for what no index holds.** An index for each filter is not enough.
+In one WHERE, a filter beside an indexed id is matched row by row over that
+id's events, and a session or a resource can hold as many as the project; the
+planner may also pick the other filter's index and walk further still. So
+what a read's index does not hold is never part of its WHERE:
+
+- `ScanEvents` reads the index range in order, at most `eventScanBudget`
+  (1,000) rows, and returns each row's `(created_at, id)` and whether it
+  matched, a `CASE` in the select list. The database has nothing to choose
+  another index by, so what a statement costs is fixed by construction.
+- `events.ScanEach` merges the ranges and the page's events are loaded by id.
+- When a budget runs out before the page is full, the page holds what matched
+  so far, possibly nothing, and `next_page_token` is the last row read rather
+  than the last row returned. With several ranges the page ends at the first
+  cut in its order, since a range cut short may hold rows that belong before
+  what the others read behind it. A client follows the token until a response
+  has none: the API reference says so, the console's button reads
+  `Keep looking`, and the CLI names the next page under an empty one.
 
 Measured through the API on Postgres 18 with 2,700,000 events, where one
 session, one resource and one actor hold 300,000 events each and the few
-events a narrower filter asks for are older than all of them. Every request
-the Logs screen can build was sent, first page and next, and Postgres logged
-each statement's plan:
+events a narrower filter asks for are older than all of them. Every
+combination of the console's filters was sent, 960 requests, with Postgres
+logging each statement's plan:
 
-| | Requests | Most rows one statement read | Slowest statement |
-| --- | --- | --- | --- |
-| Before, any filters together | 960 | 300,012, to return 12 | 82 ms |
-| Now, one range each | 76 | 34, to return 26 | 0.28 ms |
+| | Most rows one statement read | Slowest statement |
+| --- | --- | --- |
+| Every filter in one WHERE | 300,012, to return 12 | 82 ms |
+| A budget | 1,000 | 0.53 ms |
 
-Before, 116 of 1,015 calls read past their page: a session or a resource
-beside a category, an actor or one another. Now a request is at most six
-statements (one actor over every category), each reading its page and at
-most 31 buffers. The 34 is the requests' view, where Postgres chose the
-time index and skipped the few audit events between; on a project whose
-newest 300,000 events are all audit events it chose the category index. That
-choice is the planner's, from table-wide statistics, and is the one read
-here that is not a pure range by construction.
+- With every filter in one WHERE, 116 of 1,015 calls read past their page.
+  With the budget none of 1,164 read past it, each on the index its range
+  names, with nothing sorted. A request is at most six ranges.
+- 911 of the 960 have an answer of at most 500 events. Each was followed to
+  its end and returned exactly the events one unbounded read under the whole
+  filter finds, in order: 9,185 calls, the slowest 6.8 ms.
+- The longest took 301 calls, 362 ms in all: a type that no event of one
+  resource has, matched over that resource's 300,000 events. That is what a
+  budget costs. A rare match deep in a large range takes many calls, each
+  cheap, where one statement took one call that could be arbitrarily slow.
+- For the requests' view Postgres chose the time index and skipped the few
+  audit events between (33 rows read for 26). On a project whose newest
+  300,000 events are all audit events it chose the category index. That
+  choice is the planner's, from table-wide statistics, and is the one read
+  here that is not a range by construction.
 
-**What is still unindexed.** `GET /events` also filters by `client_id`,
-`fingerprint`, `entity_type` and `team_id`, and each of those, without one of
-the filters above beside it, still reads the project's retained events. So do
-the combinations no single index holds: a type beside a category or an actor,
-and a request, a session, a login flow or a resource beside a category, an
-actor, a type or one another. The console sends none of them: a filter joins
-Logs with its index. Whether the API keeps them, indexes them or refuses them
-is open.
+**What would turn a matched filter into a range.** An index that ends in
+`(created_at, id)`, and its place in `planEventRead`. The server does not
+know which category an event type belongs to; if it did, a type beside an id
+would read that id's one range of the type's category rather than six.

@@ -15,23 +15,22 @@ DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_type;
 CREATE INDEX CONCURRENTLY idx_events_project_type
     ON zitadel_nextgen.events (project_id, event_type, created_at, id);
 
--- What one actor did, by category. An actor's events are mostly its API
--- requests, so the category comes before the time: its audit events are then a
--- range of their own, not what is left after walking past every request. A
--- read across categories reads each one and merges them (events.ListEach).
+-- What one actor did, by category, for the reason the session's index holds
+-- the category (000040): an actor's events are mostly its API requests.
 DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_actor_category;
 CREATE INDEX CONCURRENTLY idx_events_project_actor_category
     ON zitadel_nextgen.events (project_id, actor_id, category, created_at, id)
     WHERE actor_id IS NOT NULL;
 
--- What happened to one resource. An API request names none, so this leaves
--- most rows out.
-DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_entity;
-CREATE INDEX CONCURRENTLY idx_events_project_entity
-    ON zitadel_nextgen.events (project_id, entity_id, created_at, id)
+-- What happened to one resource, by category: a user's sign-ins are a range
+-- apart from the changes made to that user. An API request names no resource,
+-- so this leaves most rows out.
+DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_entity_category;
+CREATE INDEX CONCURRENTLY idx_events_project_entity_category
+    ON zitadel_nextgen.events (project_id, entity_id, category, created_at, id)
     WHERE entity_id IS NOT NULL;
 
 -- +goose Down
-DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_entity;
+DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_entity_category;
 DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_actor_category;
 DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_events_project_type;
