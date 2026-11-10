@@ -69,6 +69,10 @@ describe("slugFromDisplayName", () => {
     }
   });
 
+  it("does not end on a dash when the length cut lands just after one", () => {
+    expect(slugFromDisplayName(`${"a".repeat(63)} b`)).toBe("a".repeat(63));
+  });
+
   it.each(["Google", "Custom"])("suggests nothing for the reserved name %j", (name) => {
     expect(slugFromDisplayName(name, RESERVED_SLUGS)).toBe("");
   });
