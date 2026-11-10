@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFile, Branding, CONFIG_DIRECTORIES, MemoryStore } from "@/lib/zitadel";
+import { BrokenFile, Branding, CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { aBranding, aFile, aStore } from "@tests/helpers/config";
 
 /**
@@ -113,6 +114,69 @@ describe("Branding.read", () => {
           rule: "contract/branding",
           message: '(root) Unrecognized key: "hero_urll"',
         },
+      ],
+    });
+  });
+
+  it("reports a refused value once, under the contract, at its own field", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        {
+          severity: "error",
+          rule: "contract/branding",
+          file: PATH,
+          message: "typography.font_url must be a valid absolute https URL without credentials",
+        },
+      ],
+    });
+  });
+
+  it("keeps the refusals of other fields beside it", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          layout: "sideways",
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        { message: expect.stringMatching(/^layout /) },
+        { message: "typography.font_url must be a valid absolute https URL without credentials" },
+      ],
+    });
+  });
+
+  it("keeps it beside an unknown key", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          hero_urll: "https://cdn.example.com/hero.png",
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        { message: "typography.font_url must be a valid absolute https URL without credentials" },
+        { message: '(root) Unrecognized key: "hero_urll"' },
       ],
     });
   });

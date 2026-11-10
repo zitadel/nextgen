@@ -103,6 +103,18 @@ func TestNewOIDCClient(t *testing.T) {
 			wantCause: oidc.ErrIssuerInvalid,
 		},
 		{
+			// A stored issuer in the form the provider does not publish never
+			// passes discovery, so a connection in that form links nobody.
+			name: "a discovery issuer that differs by a trailing slash is rejected",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"issuer":"http://` + r.Host + `/"}`))
+			},
+			conn:      func(issuer string) OIDCConnection { return OIDCConnection{Issuer: issuer} },
+			wantErr:   domain.ErrIDPDiscoveryFailed(nil),
+			wantCause: oidc.ErrIssuerInvalid,
+		},
+		{
 			name: "a document missing a needed endpoint is rejected",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				issuer := "http://" + r.Host

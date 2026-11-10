@@ -20,6 +20,7 @@
     "name": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
+      "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
       "examples": [
         "standard-login",
         "combined-auth"
@@ -369,6 +370,7 @@
           "type": "string",
           "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
           "pattern": "^[a-z][a-z0-9_-]*$",
+          "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits, _ and -",
           "examples": [
             "login"
           ]
@@ -433,6 +435,7 @@
           "items": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
             "maxLength": 64
           },
           "default": [],

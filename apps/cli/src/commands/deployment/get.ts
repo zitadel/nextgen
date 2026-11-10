@@ -1,14 +1,29 @@
+import { Args } from "@oclif/core";
+import { z } from "zod";
+
 import { DeploymentService } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { GetDeploymentByIdParams } from "@/lib/backend/schemas";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { variableCell } from "@/lib/variables";
 import { painted } from "@/lib/oclif/rendering";
+
+/**
+ * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
+ * refused before anything is asked or called, and says what one looks like.
+ */
+const DEPLOYMENT_ID: Refused<string> = {
+  schema: z.string().trim().pipe(GetDeploymentByIdParams.shape.deployment_id),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Find one with `zitadel deployment list`.",
+    next: ["deployment list"],
+    details: {
+      argument: "{input}",
+    },
+  },
+};
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
@@ -20,7 +35,10 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
   static override group = CommandGroups.configuration;
   static override examples = ["<%= config.bin %> deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"];
   static override args = {
-    deployment_id: nonBlankArg({ required: true, description: "The deployment to read." }),
+    deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
+      required: true,
+      description: "The deployment to read.",
+    }),
   };
 
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {

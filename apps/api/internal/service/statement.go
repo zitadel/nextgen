@@ -484,8 +484,8 @@ type AuthAttemptStatements interface {
 	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 
-// UniqueAttributeClaim is a value of a unique attribute as the
-// unique-attributes registry stores it: under a team scope ("" for
+// UniqueAttributeClaim is a value of a unique attribute as
+// user_attributes stores it for the unique index: under a team scope ("" for
 // project-wide), by key and value hash.
 type UniqueAttributeClaim struct {
 	TeamID    string
@@ -500,13 +500,13 @@ type UserQueryOptions struct {
 	AttributeKeys []string
 	// Attributes, when non-empty, restricts to users matching all key/value pairs.
 	Attributes []domain.Attribute
-	// UniqueAttributesOnly restricts Attributes matching to values recorded
-	// in the unique-attributes registry. Identifier lookups set it so an
+	// UniqueAttributesOnly restricts Attributes matching to values stored
+	// as unique claims. Identifier lookups set it so an
 	// equal value in a non-unique property of another user (for example a
 	// notification address) cannot make the lookup ambiguous.
 	UniqueAttributesOnly bool
-	// UniqueTeamID, with UniqueAttributesOnly, restricts the registry match
-	// to rows of one team scope; "" means project-scoped rows only. Nil
+	// UniqueTeamID, with UniqueAttributesOnly, restricts the unique match
+	// to claims of one team scope; "" means project-scoped rows only. Nil
 	// matches rows of every scope.
 	UniqueTeamID *string
 	// MembershipTeamID, when set, requires an active team membership.
@@ -542,18 +542,18 @@ type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
 	// PatchUser reconciles the stored user to the given post-merge state:
-	// header (schema_url, updated_at), attribute rows, and unique-attribute
-	// registry rows are all rewritten. It writes nothing and returns a
+	// header (schema_url, updated_at), and attribute rows with their unique
+	// claims are all rewritten. It writes nothing and returns a
 	// NoRowFoundError when the row's updated_at no longer matches
 	// [domain.PatchUser.ExpectedUpdatedAt] (concurrent write) or the user is
 	// gone.
 	PatchUser(ctx context.Context, user *domain.PatchUser) error
-	// GetUserUniqueAttributeScopes reads the stored registry team scope per
+	// GetUserUniqueAttributeScopes reads the stored unique team scope per
 	// attribute key, so a patch keeps the scope an existing claim was created
 	// under. An unknown user reads as an empty map, not an error.
 	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
 	// GetTakenUniqueAttributeKeys returns the keys of the claims whose value a
-	// user other than userID holds in the unique-attributes registry, in no
+	// user other than userID holds as a unique claim, in no
 	// particular order.
 	GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []UniqueAttributeClaim) ([]domain.AttributeKey, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
