@@ -1,0 +1,96 @@
+title: ApplicationClient
+description: |
+  One OAuth client of the application: one way it talks to Zitadel, such as
+  its web backend. Its `redirect_uris` and `grant_types` are its OAuth
+  settings. OpenID Connect is OAuth plus the `openid` scope, so one shape
+  serves both.
+type: object
+required:
+  - slug
+  - type
+  - grant_types
+additionalProperties: false
+properties:
+  slug:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9_-]*$
+    maxLength: 64
+    description: |
+      Stable identifier of the client, unique among the application's clients
+      and fixed for the client's life. A revision matches each client to the
+      stored one by its slug, which is how a client keeps its `client_id`.
+      Other documents refer to it as `<application>/<client>`.
+    examples:
+      - web
+  name:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: Shown to the user in place of the application's name. Optional.
+  client_id:
+    type: string
+    pattern: ^[A-Za-z0-9_.~@-]+$
+    x-zitadel-pattern-message: "must be letters, digits, or _ . ~ @ -"
+    minLength: 1
+    maxLength: 255
+    description: |
+      The `client_id` the client presents. Leave it out and the server
+      generates one the first time the client is written and fills it into
+      the stored document. Set it to keep an id the client already has: one
+      a Zitadel v4 issued (`<id>@<project>`), or one the CLI generated before
+      any deploy. Once set, the id never changes: a later revision may leave it
+      out, but may not provide a different one. No two clients in the project
+      share an id, and an id is never reused once a client has held it. A
+      new client may not supply an id that starts with `client_` or `dcr_`:
+      those prefixes mark ids the server generates. A server-generated id
+      sent back unchanged in a revision is accepted.
+    examples:
+      - 289374592837459283@shop
+  type:
+    type: string
+    enum:
+      - confidential
+    description: |
+      A `confidential` client runs where a secret can be kept, such as a web
+      app's backend, and authenticates with one at the token endpoint. Public
+      clients, which hold no secret, are not available yet.
+  grant_types:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - authorization_code
+        - refresh_token
+    description: |
+      The grant types the client may use, named as in RFC 7591.
+      `authorization_code` signs a user in and needs `redirect_uris`.
+      `refresh_token` lets the client renew its access tokens without a new
+      sign-in; a refresh token is issued on sign-in, so it is only valid
+      together with `authorization_code`.
+  redirect_uris:
+    type: array
+    uniqueItems: true
+    minItems: 1
+    maxItems: 50
+    items:
+      type: string
+      minLength: 1
+      maxLength: 2048
+    description: |
+      Where the authorization endpoint may send the user back. Required with
+      `authorization_code`; omit it otherwise, an empty list is refused. Each
+      is an `https` URL, or an `http` URL on a loopback host for local
+      development: `localhost`, a name under `.localhost`, or a loopback IP
+      such as `127.0.0.1` or `[::1]`. A URI is written as the client will
+      send it, with a lowercase host and no fragment, since it is matched
+      exactly; a loopback URI matches on any port (RFC 8252 §7.3).
+    examples:
+      - - https://shop.example.com/callback
+  first_party:
+    type: boolean
+    description: |
+      A first-party client belongs to the project's own product and skips
+      consent unless the request asks for it. An application registered
+      through the API is third-party unless this says otherwise.
