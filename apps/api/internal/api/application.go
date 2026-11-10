@@ -38,11 +38,9 @@ func (h *Handler) CreateApplication(ctx context.Context, req *api.CreateApplicat
 		resp.ClientSecrets = append(resp.ClientSecrets, api.ApplicationClientSecret{Client: secret.Slug, ClientID: secret.ClientID, Secret: secret.Secret})
 	}
 	if result.Created {
-		created := api.CreateApplicationCreated(resp)
-		return &created, nil
+		return new(api.CreateApplicationCreated(resp)), nil
 	}
-	revised := api.CreateApplicationOK(resp)
-	return &revised, nil
+	return new(api.CreateApplicationOK(resp)), nil
 }
 
 func (h *Handler) GetApplicationById(ctx context.Context, params api.GetApplicationByIdParams) (api.GetApplicationByIdRes, error) {

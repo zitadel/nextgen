@@ -42,10 +42,14 @@ post:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/idempotency-key.yaml
       description: |
-        Optional retry key. Accepted but not used yet: a retry with the same
-        key is handled like any other request. A retry after a lost response
-        finds the clients already stored, so it creates another revision and
-        returns no secret.
+        Optional. Once honored, a retry with the same key and body returns
+        the first request's status and a new secret for each client the first
+        request created, and writes no revision.
+
+        Not honored yet: sending the same request again, for example after
+        its response was lost, creates another revision and returns no
+        secret, because the clients the first request created are already
+        stored.
   requestBody:
     required: true
     content:

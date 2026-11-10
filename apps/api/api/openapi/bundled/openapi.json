@@ -6868,7 +6868,7 @@
           },
           {
             "$ref": "#/components/parameters/idempotency-key",
-            "description": "Optional retry key. Accepted but not used yet: a retry with the same\nkey is handled like any other request. A retry after a lost response\nfinds the clients already stored, so it creates another revision and\nreturns no secret.\n"
+            "description": "Optional. Once honored, a retry with the same key and body returns\nthe first request's status and a new secret for each client the first\nrequest created, and writes no revision.\n\nNot honored yet: sending the same request again, for example after\nits response was lost, creates another revision and returns no\nsecret, because the clients the first request created are already\nstored.\n"
           }
         ],
         "requestBody": {

@@ -148,33 +148,36 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrApplicationClientIDTaken())
 	})
 
-	t.Run("a revision whose new client_id another client holds is client_id_taken", func(t *testing.T) {
-		t.Parallel()
-		f := newApplicationFixture(t)
-		f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
-		f.expectLockedRead(storedShop())
-		f.tx.EXPECT().ReviseApplication(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(database.NewUniqueError("application_clients", "application_clients_client_id", nil))
-		f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-admin").
-			Return(&domain.ApplicationClient{ApplicationID: "app_other", ClientID: "shop-admin"}, nil)
+	// A revision's UniqueError is told apart by whether another client holds
+	// the new client's client_id.
+	for name, tc := range map[string]struct {
+		holder *domain.ApplicationClient
+		lookup error
+		want   error
+	}{
+		"a revision whose new client_id another client holds is client_id_taken": {
+			holder: &domain.ApplicationClient{ApplicationID: "app_other", ClientID: "shop-admin"},
+			want:   domain.ErrApplicationClientIDTaken(),
+		},
+		"a revision whose new client_id is free raced another revision": {
+			lookup: database.NewNoRowFoundError(nil),
+			want:   domain.ErrApplicationRevisionConflict(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
+			f.expectLockedRead(storedShop())
+			f.tx.EXPECT().ReviseApplication(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(database.NewUniqueError("", "", nil))
+			f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-admin").
+				Return(tc.holder, tc.lookup)
 
-		_, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
-		assert.ErrorIs(t, err, domain.ErrApplicationClientIDTaken())
-	})
-
-	t.Run("a revision on the same instant is a conflict", func(t *testing.T) {
-		t.Parallel()
-		f := newApplicationFixture(t)
-		f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
-		f.expectLockedRead(storedShop())
-		f.tx.EXPECT().ReviseApplication(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(database.NewUniqueError("application_revisions", "application_revisions_created_at", nil))
-		f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-admin").
-			Return(nil, database.NewNoRowFoundError(nil))
-
-		_, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
-		assert.ErrorIs(t, err, domain.ErrApplicationRevisionConflict())
-	})
+			_, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
+			assert.ErrorIs(t, err, tc.want)
+		})
+	}
 
 	t.Run("an event the store refuses fails the create and returns no secret", func(t *testing.T) {
 		t.Parallel()

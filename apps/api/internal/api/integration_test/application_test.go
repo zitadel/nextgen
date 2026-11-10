@@ -45,7 +45,7 @@ func TestCreateApplication(t *testing.T) {
 	t.Run("the same slug revises and only the new client gets a secret", func(t *testing.T) {
 		assert.Equal(t, created.ID, revised.ID)
 		assert.NotEqual(t, created.RevisionID, revised.RevisionID)
-		assert.True(t, created.CreatedAt.Equal(revised.CreatedAt), "created_at is the application's, not the revision's")
+		assert.True(t, created.CreatedAt.Equal(revised.CreatedAt), "created_at comes from the application, not from the revision")
 		require.Len(t, revised.ClientSecrets, 1)
 		assert.Equal(t, "admin", revised.ClientSecrets[0].Client)
 		assert.Equal(t, "shop-admin", revised.ClientSecrets[0].ClientID)
