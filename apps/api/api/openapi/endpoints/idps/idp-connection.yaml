@@ -34,6 +34,7 @@ properties:
   slug:
     type: string
     pattern: '^[a-z0-9][a-z0-9_-]*$'
+    x-zitadel-pattern-message: "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -"
     maxLength: 64
     description: "Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers`) reference it. Unique within the project."
     examples:
@@ -61,6 +62,7 @@ properties:
     additionalProperties:
       type: string
       pattern: '^[^$]'
+      x-zitadel-pattern-message: "must not be empty or start with $"
     description: "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
   verified_claims:
     type: object
@@ -99,10 +101,12 @@ properties:
       issuer:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
       jwks_uri:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints.
       id_token_mapping:
         type: boolean
@@ -111,14 +115,17 @@ properties:
       authorization_endpoint:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: For a provider that exposes no .well-known document. Set together with the other endpoints.
       token_endpoint:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: For a provider that exposes no .well-known document. Set together with the other endpoints.
       userinfo_endpoint:
         type: string
         pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
         description: For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set.
       client_id:
         type: string
@@ -128,6 +135,7 @@ properties:
       client_secret:
         type: string
         pattern: '^\$\{\{ *[A-Za-z0-9_]+ *\}\}$'
+        x-zitadel-pattern-message: "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself"
         description: "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The server resolves it against the environment serving the request."
       token_endpoint_auth_method:
         type: string

@@ -39,4 +39,7 @@ const projects = journeys.flatMap((journey) =>
   ),
 );
 
-export default { test: { maxWorkers: parallel, projects } };
+/** Unit tests mirror their source file and need no container, so they always run. */
+const unit = { test: { name: "unit", include: ["src/**/*.test.ts"] } };
+
+export default { test: { maxWorkers: parallel, projects: [unit, ...projects] } };

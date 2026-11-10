@@ -26,6 +26,10 @@ export const duration = (ms: number | null | undefined): string =>
 export const timestamp = (iso: string): string =>
   `<time class="ts" datetime="${escapeHtml(iso)}" data-iso="${escapeHtml(iso)}">${escapeHtml(iso)}</time>`;
 
+/** A short time: whole seconds from a second up, milliseconds below, so a fast command is not shown as 0s. */
+export const took = (ms: number | null | undefined): string =>
+  ms == null ? "" : ms >= 1000 ? duration(ms) : `${ms}\u00a0ms`;
+
 const BADGES: Readonly<Record<Status, readonly [string, string]>> = {
   pass: ["ok", "Pass"],
   fail: ["no", "Fail"],
@@ -57,12 +61,24 @@ export function commandBlock(entry: CommandEntry): string {
           ? "exit ≠ 0"
           : "no result";
   const tone = entry.err ? "err" : known ? "ok" : "unk";
-  return `<div class="cmd ${tone}"><div class="c"><code>${command}</code><span class="exit ${tone}">${escapeHtml(code)}</span></div><pre class="o">${escapeHtml(shown)}</pre></div>`;
+  const ran =
+    entry.ran == null
+      ? ""
+      : `<span class="took" title="how long the command ran">ran ${took(entry.ran)}</span>`;
+  const thought =
+    entry.thought == null
+      ? ""
+      : `<span class="took think" title="model time before issuing the command">model ${took(entry.thought)}</span>`;
+  return `<div class="cmd ${tone}"><div class="c"><code>${command}</code>${thought}${ran}<span class="exit ${tone}">${escapeHtml(code)}</span></div><pre class="o">${escapeHtml(shown)}</pre></div>`;
 }
 
 /** A file the agent changed with its own editing tools. */
 export function fileBlock(entry: FileEntry): string {
-  return `<div class="cmd file"><div class="c"><code>${escapeHtml(entry.tool)} ${escapeHtml(entry.path)}</code></div></div>`;
+  const thought =
+    entry.thought == null
+      ? ""
+      : `<span class="took think" title="model time before the edit">model ${took(entry.thought)}</span>`;
+  return `<div class="cmd file"><div class="c"><code>${escapeHtml(entry.tool)} ${escapeHtml(entry.path)}</code>${thought}</div></div>`;
 }
 
 export function bubble(
