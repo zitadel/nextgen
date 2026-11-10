@@ -11,7 +11,7 @@ import { cliSample } from "../lib/cli-sample.ts";
  */
 
 interface Call {
-  kind?: "primary" | "preview";
+  kind?: "primary" | "preview" | "";
   body?: unknown;
 }
 
@@ -29,7 +29,7 @@ function sample(
   } as unknown as OperationObject;
   const request = {
     path: Object.fromEntries(Object.entries(pathValues).map(([name, value]) => [name, { value }])),
-    query: kind ? { kind: { values: [kind] } } : {},
+    query: kind === undefined ? {} : { kind: { values: [kind] } },
     header: {},
     cookie: {},
     body,
@@ -77,6 +77,7 @@ const commands: [string, () => string, string][] = [
   ["a get of the primary value", () => get({ kind: "primary" }), "variable get A"],
   ["a get of the preview value", () => get({ kind: "preview" }), "variable get A --preview"],
   ["an unfiltered list", () => list({}), "variable list"],
+  ["a list with a blank kind", () => list({ kind: "" }), "variable list"],
   ["a list of the preview values", () => list({ kind: "preview" }), "variable list --preview"],
   ["a removal without a kind", () => rm({}), "variable rm A"],
   ["a removal of the preview value", () => rm({ kind: "preview" }), "variable rm A --preview"],
@@ -101,6 +102,7 @@ const calls: [string, () => string, string][] = [
   ["a primary-only write", () => set({ kind: "primary", body: { A: "1" } }), "api updateVariables"],
   ["a primary-only removal", () => rm({ kind: "primary" }), "api deleteVariable A"],
   ["a get that names no kind", () => get({}), "api getVariable A"],
+  ["a get with a blank kind", () => get({ kind: "" }), "api getVariable A"],
   ["a primary-only list", () => list({ kind: "primary" }), "api getVariables"],
   [
     "a body that sets several variables",
@@ -121,6 +123,7 @@ for (const [what, run, expected] of calls) {
     const text = run();
     expect(text).toContain(`npx @zitadel/cli@latest ${expected}`);
     expect(text).not.toContain("npx @zitadel/cli@latest variable ");
+    expect(text).not.toMatch(/-F kind=($| )/);
   });
 }
 

@@ -98,7 +98,9 @@ function apiSample(
     ...(piped ? ["--input -"] : []),
     ...Object.entries(request.query)
       .filter(([name]) => name !== "project_id")
-      .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
+      .flatMap(([name, { values }]) =>
+        values.filter((value) => value !== "").map((value) => field(name, value)),
+      ),
     ...(bodyAs === "fields" ? Object.entries(body).map(([name, value]) => field(name, value)) : []),
   ];
   // An operation that needs no credential runs anywhere, unless the CLI is
@@ -165,7 +167,7 @@ function variableCommand(
   positionals: string[],
   request: RequestData,
 ): string | undefined {
-  const kind = request.query.kind?.values[0];
+  const kind = request.query.kind?.values[0] || undefined;
   if (!variableRunsAs(verb, kind)) {
     return undefined;
   }
