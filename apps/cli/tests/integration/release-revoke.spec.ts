@@ -245,6 +245,34 @@ describe("release revoke", () => {
         });
       });
 
+      describe("on a release a preview and a primary origin both serve", () => {
+        const PREVIEW_URL = "https://x-acme.vercel.app";
+
+        /** A release deployed to the primary origin, then previewed unchanged. */
+        async function aReleaseServedByBoth(app: ScaffoldedApp): Promise<string> {
+          await app.addPrimaryOrigin();
+          await app.addOrigin("https://*-acme.vercel.app", "preview");
+          const served = await app.deployData();
+          const previewed = await app.previewData(PREVIEW_URL);
+          expect(previewed.release_id, "the preview should reuse the deployed release").toBe(
+            served.release_id,
+          );
+          return served.release_id ?? "";
+        }
+
+        it.each([`preview rm ${PREVIEW_URL}`, "deploy", "deployment rollback"])(
+          "suggests %s",
+          async (command) => {
+            const app = await aSetUpApp();
+            const releaseId = await aReleaseServedByBoth(app);
+
+            const result = await app.run(["release", "revoke", releaseId, "--force", "--json"]);
+
+            expect(result).toSuggest(command);
+          },
+        );
+      });
+
       describe("without --force when no one can be asked", () => {
         it("is refused", async () => {
           const app = await aSetUpApp();
