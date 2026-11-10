@@ -194,7 +194,8 @@ export interface ConfigStore {
    * is not there, so removing it is not refused.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   *   a directory.
    */
   assertRemovable(path: string): void;
 
@@ -216,6 +217,8 @@ export interface ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   *   a directory.
    */
   remove(path: string): Promise<void>;
 
