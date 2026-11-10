@@ -293,7 +293,7 @@ should move with it. #2451 has both working (open question 2, answered).
 
 | #1283 or #1425 says | The prototypes | Kind |
 | --- | --- | --- |
-| Every client belongs to one application | A client that registers itself sits at the project until its first request names an API; a client ID metadata document has no record | Filled by ADR 082 §9 (#2864): a self-registering client joins the application of its first `resource`, and its party is its own, never the application's |
+| Every client belongs to one application | A client that registers itself sits at the project until its first request names an API; a client ID metadata document has no record | Filled by ADR 082 §9 (#2864): a self-registering client is a record of its own that references the application and the API of its first `resource`; the application's document never lists it, so a deploy cannot remove it, and its party is its own, never the application's |
 | Users and teams get access to the application | Authorize checks the client, the redirect URI, the grant type and the scopes, never the user's access to the application | Missing. Adding it later refuses users who could sign in before |
 | The client is the principal when acting as itself | A token's `sub` is always a user; `main` has no `client` principal type | Not built |
 | Applications can be owned by teams; each customer authorizes a shared partner on its own (scenarios 2, 3) | No owner on the document; a consent is per user, client and API | Missing. A customer's authorization is a grant, not a consent |
@@ -616,11 +616,13 @@ first iteration. Schema claims wait as well (#2803).
    resolve the newest one (ADR 081 §10). #2451 reads applications at their
    newest revision, with no deployment; #2794 seals one in the flow.
 9. **Revocation.** Without introspection an access token outlives a revoked
-   consent by up to five minutes. The identity model lets an API name the
-   clients that may introspect its tokens (RFC 7662), which closes that gap
-   for the APIs that ask; ADR 082 §2 still has no introspection endpoint.
-   Whether signing out of the console ends the CLI's sign-in is undecided.
-   Revoking a consent scans a project's tokens until an index exists.
+   consent by up to five minutes. ADR 082 §2 and §5 (#2864) close that gap
+   for the APIs that ask: an API names the clients that may introspect its
+   tokens (RFC 7662), and the server answers from the JWT and the consent
+   and revocation state, with no token store, from step 5. An API that only
+   checks the JWT keeps the gap. Whether signing out of the console ends
+   the CLI's sign-in is undecided. Revoking a consent scans a project's
+   tokens until an index exists.
 10. **Deployment shape.** A `public_base` with a path is refused, since the
     metadata sits at the host's root. The cloud routes only the server's own
     paths to it, so the well-known paths, `/oauth/` and `/mcp` need rules.
@@ -699,6 +701,12 @@ OpenID Connect comes later. This is the epic's first scope:
    ends only its own session until
    RP-initiated logout returns; the docs say so, and how to ask for
    `prompt=login` (challenge 14).
+6. Until consent ships, the server refuses an authorization request from a
+   third-party client, and any request with `prompt=consent`, with
+   `unauthorized_client` and a description that names consent (ADR 082's
+   step 2, #2864). A registered application's clients are third party by
+   default, so a partner integration waits for consent; a declared
+   application's are first party and connect now.
 
 **A customer's MCP server** is a protected API its app hosts, once protected
 APIs and registration are back in scope:
@@ -728,7 +736,7 @@ What blocks the later paths today:
 
 Each of these is owned by an ADR or an issue, not by this note; the note
 proposes an answer and names where it belongs. The last column is the state
-on 2026-11-09.
+on 2026-11-10.
 
 | | Decision | Belongs in | Proposal | State |
 | --- | --- | --- | --- | --- |
@@ -791,7 +799,7 @@ to 7 are this note's proposal for what follows.
 
 ## Open questions
 
-Each names where it was raised, as of 2026-11-09. Questions 2 and 3 are
+Each names where it was raised, as of 2026-11-10. Questions 2 and 3 are
 answered; the rest have no answer yet.
 
 1. #2785 takes #2452 as a reference only. Is #2451 one too, and which of its
