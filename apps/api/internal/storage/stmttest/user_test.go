@@ -15,6 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
 func ensureUserTestProject(t testing.TB, stmts service.AllStatements) (projectID, schemaURL string) {
@@ -377,6 +378,136 @@ func TestUserStatements_ListUsersBySchemaRevision(t *testing.T) {
 			assert.Equal(t, []string{"user_rev_consumer_v1_a", "user_rev_consumer_v1_b", "user_rev_consumer_v2"},
 				list(t, database.StringContainsFold(objectType, "CONSUMER")))
 		})
+	})
+}
+
+// The identifier predicate reads the attribute as it was written, on all three
+// storage encodings of an attribute value.
+func TestUserStatements_ListUsers_IdentifierFilter(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		for _, spec := range []struct{ id, email, name string }{
+			{"user_identifier_alex", "Alex@Example.com", "sam"},
+			{"user_identifier_sam", "sam@example.com", "alex"},
+			{"user_identifier_pct", "100%_off@example.com", "pct"},
+			// Go's JSON encoder writes & as \u0026, so a match on the stored
+			// encoding would miss it.
+			{"user_identifier_amp", "a&b@example.com", "amp"},
+			{"user_identifier_back", `back\slash@example.com`, "back"},
+			{"user_identifier_uml", "Ünal@example.com", "uml"},
+		} {
+			user := newTestUser(t, projectID, schemaURL, spec.id, spec.email, spec.name)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+		}
+
+		list := func(t *testing.T, cursor []byte, limit uint32, filter database.Filter[domain.UserField]) *database.ListResult[*domain.User] {
+			t.Helper()
+			result, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
+				Filter: database.And(database.Equal(database.Col(domain.UserFieldProjectID), projectID), filter),
+				Pagination: database.Page[domain.UserField]{
+					Limit:  limit,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.UserField]{
+						Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+						Direction: database.OrderAsc,
+					},
+				},
+			}, service.UserQueryOptions{})
+			require.NoError(t, err)
+			return result
+		}
+		ids := func(t *testing.T, filter database.Filter[domain.UserField]) []string {
+			t.Helper()
+			return userIDs(list(t, nil, 0, filter).Items)
+		}
+		t.Run("ContainsIgnoresCase", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_alex"}, ids(t, v2user.IdentifierContains("email", "ALEX@")))
+		})
+		t.Run("ContainsReadsOnlyTheNamedProperty", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_sam"}, ids(t, v2user.IdentifierContains("email", "sam")))
+			assert.Equal(t, []string{"user_identifier_alex"}, ids(t, v2user.IdentifierContains("name", "sam")))
+		})
+		t.Run("ContainsTakesWildcardsLiterally", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_pct"}, ids(t, v2user.IdentifierContains("email", "%_")))
+			assert.Empty(t, ids(t, v2user.IdentifierContains("email", "a%b")))
+		})
+		t.Run("ContainsTakesABackslashLiterally", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_back"}, ids(t, v2user.IdentifierContains("email", `k\s`)))
+			assert.Empty(t, ids(t, v2user.IdentifierContains("email", `k\\s`)))
+		})
+		// Whether contains folds Ü is the database's LOWER and differs by
+		// dialect, so only the exact text is pinned.
+		t.Run("NonASCIIMatchesAsWritten", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_uml"}, ids(t, v2user.IdentifierContains("email", "Ünal")))
+		})
+		t.Run("ContainsMatchesTheValueNotItsEncoding", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_amp"}, ids(t, v2user.IdentifierContains("email", "a&b")))
+			assert.Empty(t, ids(t, v2user.IdentifierContains("email", "u0026")))
+			// The quotes of a JSON string are not part of the value.
+			assert.Empty(t, ids(t, v2user.IdentifierContains("email", `"sam`)))
+		})
+		t.Run("ComposesWithASchemaScope", func(t *testing.T) {
+			assert.Equal(t, []string{"user_identifier_alex"}, ids(t, database.And(
+				database.Equal(database.Col(domain.UserFieldSchemaURL), schemaURL),
+				v2user.IdentifierContains("email", "alex"),
+			)))
+			assert.Empty(t, ids(t, database.And(
+				database.Equal(database.Col(domain.UserFieldSchemaURL), "https://example.com/schemas/other"),
+				v2user.IdentifierContains("email", "alex"),
+			)))
+		})
+		t.Run("PagesThroughEveryMatch", func(t *testing.T) {
+			filter := v2user.IdentifierContains("email", "@example.com")
+			var got []string
+			var cursor []byte
+			for range 10 {
+				page := list(t, cursor, 1, filter)
+				got = append(got, userIDs(page.Items)...)
+				cursor = page.NextCursor
+				if len(cursor) == 0 {
+					break
+				}
+			}
+			assert.Equal(t, []string{"user_identifier_alex", "user_identifier_amp", "user_identifier_back", "user_identifier_pct", "user_identifier_sam", "user_identifier_uml"}, got)
+		})
+	})
+}
+
+// A non-string identifier never matches on any dialect, whatever
+// text its JSON would read as: only a string holding the same characters matches.
+func TestUserStatements_ListUsers_IdentifierFilterSkipsNonStrings(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		for _, spec := range []struct {
+			id    string
+			value any
+		}{
+			{"user_badge_number", 42},
+			{"user_badge_true", true},
+			{"user_badge_string", "42"},
+		} {
+			user := newTestUser(t, projectID, schemaURL, spec.id, spec.id+"@example.com", spec.id)
+			badge, err := domain.NewCreateAttribute("badge", spec.value, domain.AttributeUniquenessProject)
+			require.NoError(t, err)
+			user.Attributes = append(user.Attributes, *badge)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+		}
+
+		ids := func(t *testing.T, filter database.Filter[domain.UserField]) []string {
+			t.Helper()
+			result, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
+				Filter: database.And(database.Equal(database.Col(domain.UserFieldProjectID), projectID), filter),
+			}, service.UserQueryOptions{})
+			require.NoError(t, err)
+			return userIDs(result.Items)
+		}
+		assert.Equal(t, []string{"user_badge_string"}, ids(t, v2user.IdentifierContains("badge", "42")))
+		// SQLite's json_extract reads true as 1, the others as true.
+		for _, text := range []string{"true", "1"} {
+			assert.Empty(t, ids(t, v2user.IdentifierContains("badge", text)), text)
+		}
 	})
 }
 

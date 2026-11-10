@@ -1,8 +1,8 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { delay, http, HttpResponse } from "msw";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -28,7 +28,7 @@ async function renderUsers(path = scopedPath("/users")) {
 }
 
 /** Records every `POST /users/query` body, so the expansion sent can be asserted. */
-function recordQueries(response: (body: Record<string, unknown>) => Response) {
+function recordQueries(response: (body: Record<string, unknown>) => Response | Promise<Response>) {
   const bodies: Record<string, unknown>[] = [];
   server.use(
     http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -1301,6 +1301,9 @@ describe("users screen", () => {
           schemas: params.get("object_type") === "business" ? [newer, older] : [],
         });
       }),
+      // A search a later term replaced keeps reading, and on a busy runner can land
+      // in the next test. Its answer is discarded either way.
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
     );
   }
 
@@ -1534,6 +1537,264 @@ describe("users screen", () => {
     await screen.findByRole("table");
     expect(screen.getByRole("combobox", { name: "Filter by schema" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
+  });
+
+  it("searches by identifier on the server, keeps the term in the URL, and pages with it", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      attributes: { email: `${id}@acme.com` },
+    });
+    const bodies = recordQueries((body) =>
+      HttpResponse.json(
+        body.filter && !body.page_token
+          ? { users: [user("user_match")], next_page_token: "next" }
+          : { users: [user(body.page_token ? "user_more" : "user_all")] },
+      ),
+    );
+    const router = await renderUsers(scopedPath("/users"));
+
+    await userEvent.type(
+      await screen.findByRole("searchbox", { name: "Search by identifier" }),
+      " alex ",
+    );
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "alex" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "contains", value: "alex" }],
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /load more/i }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        page_token: "next",
+        filter: [{ field: "identifier", operation: "contains", value: "alex" }],
+      }),
+    );
+  });
+
+  it("keeps the search field mounted and focused through a slow search", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      identifier: `${id}@acme.com`,
+      attributes: { email: `${id}@acme.com` },
+    });
+    // Past the router's pending delay, which a fast response never reaches.
+    const bodies = recordQueries(async (body) => {
+      if (body.filter) await delay(1600);
+      return HttpResponse.json({ users: [user(body.filter ? "user_match" : "user_all")] });
+    });
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+    await waitFor(() => expect(bodies.at(-1)).toHaveProperty("filter"));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+
+    // The same element, still focused, and what follows the pause is kept.
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveFocus();
+    await userEvent.keyboard("x");
+    expect(field).toHaveValue("alexx");
+
+    await screen.findByText("user_match@acme.com");
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveFocus();
+    // The search for what followed the pause, answered and drawn, so nothing it
+    // reads is still in flight when the next test starts.
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "contains", value: "alexx" }],
+      }),
+    );
+    await waitFor(
+      () => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"),
+      {
+        timeout: 4000,
+      },
+    );
+  }, 15000);
+
+  it("reads a new term once, and again after the list is invalidated", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&q=first`);
+    await screen.findByText("No users match this search.");
+    const field = screen.getByRole("searchbox", { name: "Search by identifier" });
+
+    await userEvent.clear(field);
+    await userEvent.type(field, "second");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ q: "second" }),
+    );
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "contains", value: "second" }],
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    const reads = (value: string) =>
+      bodies.filter(
+        (body) => (body.filter as { value: string }[] | undefined)?.[0]?.value === value,
+      ).length;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(reads("second")).toBe(1);
+
+    await act(() => router.invalidate());
+    await waitFor(() => expect(reads("second")).toBe(2));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(reads("second")).toBe(2);
+  });
+
+  it("reads only the rows for a new term, keeping the older revisions filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    let schemaReads = 0;
+    const countSchemaReads = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname.startsWith("/api/v1/schemas")) schemaReads += 1;
+    };
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+    await screen.findByText("No users match this filter.");
+    server.events.on("request:start", countSchemaReads);
+    onTestFinished(() => server.events.removeListener("request:start", countSchemaReads));
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search by identifier" }), "ada");
+
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [
+            { field: "identifier", operation: "contains", value: "ada" },
+            { field: "schema_object_type", operation: "equals", value: "business" },
+            { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          ],
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    expect(schemaReads).toBe(0);
+  });
+
+  it.each([
+    ["not text", "q=true"],
+    ["only spaces", "q=%20%20"],
+  ])("sends no identifier filter for a term that is %s", async (_name, query) => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&${query}`);
+
+    await waitFor(() => expect(bodies.length).toBeGreaterThan(0));
+    expect(bodies[0]).not.toHaveProperty("filter.0.field", "identifier");
+  });
+
+  it("trims a padded term from the URL before it searches", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=%20alex%20`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "contains", value: "alex" }],
+      }),
+    );
+  });
+
+  it("still shows the pending state on a slow first load", async () => {
+    serveLineage();
+    recordQueries(async () => {
+      await delay(1600);
+      return HttpResponse.json({ users: [] });
+    });
+    await renderUsers(scopedPath("/users"));
+
+    expect(await screen.findByText("Loading…", undefined, { timeout: 1500 })).toBeInTheDocument();
+    expect(
+      await screen.findByText("No users yet.", undefined, { timeout: 3000 }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the answer to the latest term when an earlier search answers last", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      identifier: `${id}@acme.com`,
+      attributes: { email: `${id}@acme.com` },
+    });
+    recordQueries(async (body) => {
+      const value = (body.filter as { value: string }[] | undefined)?.[0]?.value;
+      if (value === "first") await delay(1200);
+      return HttpResponse.json({ users: [user(value ? `user_${value}` : "user_all")] });
+    });
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "first");
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    await userEvent.clear(field);
+    await userEvent.type(field, "second");
+
+    expect(
+      await screen.findByText("user_second@acme.com", undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    // Past the moment the earlier search answers.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+    expect(screen.getByText("user_second@acme.com")).toBeInTheDocument();
+    expect(screen.queryByText("user_first@acme.com")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("offers no search on a project with no users, and keeps it once a search empties the list", async () => {
+    serveLineage();
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(scopedPath("/users"));
+
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("sends the search together with the schema filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=alex&schema=business`);
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "identifier", operation: "contains", value: "alex" },
+        { field: "schema_object_type", operation: "equals", value: "business" },
+      ],
+    });
+  });
+
+  it("clears a search with no matches from inside the table, apart from an empty project", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&q=nobody`);
+
+    expect(await screen.findByText("No users match this search.")).toBeInTheDocument();
+    expect(screen.queryByText("No users yet.")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    const field = screen.getByRole("searchbox", { name: "Search by identifier" });
+    expect(field).toHaveFocus();
+    await waitFor(() => expect(router.state.resolvedLocation?.search).not.toHaveProperty("q"));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    // The term the row was for is gone, and the field stays where focus went.
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveValue("");
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
   });
 
   it("names an object type the URL carries that no schema has", async () => {

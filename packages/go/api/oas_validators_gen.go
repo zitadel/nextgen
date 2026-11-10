@@ -17771,6 +17771,8 @@ func (s UserFilterField) Validate() error {
 		return nil
 	case "id":
 		return nil
+	case "identifier":
+		return nil
 	case "schema":
 		return nil
 	case "schema_object_type":

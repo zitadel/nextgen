@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -153,12 +155,16 @@ func compareFilter[F ~uint8](op string, col database.Column[F], value any) (data
 	}
 }
 
-// stringFilterValue asserts the filter's value is a string, naming the field
-// in the error detail.
+// stringFilterValue asserts the filter's value is a string a database can
+// compare, naming the field in the error detail. Postgres refuses a NUL byte or
+// invalid UTF-8 in a text parameter, and no stored value can hold either.
 func stringFilterValue(f Filter) (string, error) {
 	value, ok := f.Value.(string)
 	if !ok {
 		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must be a string", f.Field))
+	}
+	if strings.ContainsRune(value, 0) || !utf8.ValidString(value) {
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must be valid text without NUL bytes", f.Field))
 	}
 	return value, nil
 }

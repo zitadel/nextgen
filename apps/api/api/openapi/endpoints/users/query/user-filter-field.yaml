@@ -5,6 +5,11 @@ description: |
   The field to filter users by, one of:
   - `created_at`: RFC3339 timestamp
   - `id`: user ID
+  - `identifier`: the value returned as the user's `identifier`: the property
+    designated by `x-identifier` in the revision of the schema the user is on.
+    `contains`, a case-insensitive substring match, is the only operation. The
+    value may not be empty, and only string values match. No index backs it, so
+    narrow a search with other filters on a large project.
   - `schema`: the schema the user's attributes satisfy, matched against the
     value the user carries as `schema`. Each revision of a schema has its own
     URL, so `equals` selects the users on one revision and `not_equals` the
@@ -30,8 +35,8 @@ description: |
   team may deprovision the user. A user can belong to many teams while owning
   their own lifecycle, so the two disagree often and neither implies the other.
 
-  `team_id` and `schema_object_type` are filterable but not sortable, so
-  neither is a valid sort field.
+  `identifier`, `team_id` and `schema_object_type` are filterable but not
+  sortable, so none is a valid sort field.
 
   Filtering on `team_id` requires `team_membership.read` in addition to
   `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
@@ -41,6 +46,7 @@ description: |
 enum:
   - created_at
   - id
+  - identifier
   - schema
   - schema_object_type
   - status

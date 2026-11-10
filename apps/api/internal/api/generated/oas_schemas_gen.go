@@ -98531,6 +98531,11 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // The field to filter users by, one of:
 // - `created_at`: RFC3339 timestamp
 // - `id`: user ID
+// - `identifier`: the value returned as the user's `identifier`: the property
+// designated by `x-identifier` in the revision of the schema the user is on.
+// `contains`, a case-insensitive substring match, is the only operation. The
+// value may not be empty, and only string values match. No index backs it, so
+// narrow a search with other filters on a large project.
 // - `schema`: the schema the user's attributes satisfy, matched against the
 // value the user carries as `schema`. Each revision of a schema has its own
 // URL, so `equals` selects the users on one revision and `not_equals` the
@@ -98554,8 +98559,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // `GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which
 // team may deprovision the user. A user can belong to many teams while owning
 // their own lifecycle, so the two disagree often and neither implies the other.
-// `team_id` and `schema_object_type` are filterable but not sortable, so
-// neither is a valid sort field.
+// `identifier`, `team_id` and `schema_object_type` are filterable but not
+// sortable, so none is a valid sort field.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 // A console session, which carries no scopes, may filter on it when it may read
@@ -98567,6 +98572,7 @@ type UserFilterField string
 const (
 	UserFilterFieldCreatedAt            UserFilterField = "created_at"
 	UserFilterFieldID                   UserFilterField = "id"
+	UserFilterFieldIdentifier           UserFilterField = "identifier"
 	UserFilterFieldSchema               UserFilterField = "schema"
 	UserFilterFieldSchemaObjectType     UserFilterField = "schema_object_type"
 	UserFilterFieldStatus               UserFilterField = "status"
@@ -98579,6 +98585,7 @@ func (UserFilterField) AllValues() []UserFilterField {
 	return []UserFilterField{
 		UserFilterFieldCreatedAt,
 		UserFilterFieldID,
+		UserFilterFieldIdentifier,
 		UserFilterFieldSchema,
 		UserFilterFieldSchemaObjectType,
 		UserFilterFieldStatus,
@@ -98593,6 +98600,8 @@ func (s UserFilterField) MarshalText() ([]byte, error) {
 	case UserFilterFieldCreatedAt:
 		return []byte(s), nil
 	case UserFilterFieldID:
+		return []byte(s), nil
+	case UserFilterFieldIdentifier:
 		return []byte(s), nil
 	case UserFilterFieldSchema:
 		return []byte(s), nil
@@ -98617,6 +98626,9 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case UserFilterFieldID:
 		*s = UserFilterFieldID
+		return nil
+	case UserFilterFieldIdentifier:
+		*s = UserFilterFieldIdentifier
 		return nil
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema

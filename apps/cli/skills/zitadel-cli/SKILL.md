@@ -277,6 +277,14 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find a user by their identifier, the value a user carries as `identifier`:
+`users list --filter identifier=contains:<part> --json` matches part of it. Name
+the operation: `contains` is the only one. The property comes from the
+revision the user is on, so a user who signs in through a flow on a newer
+revision that designates another property does not match on that property. Only
+string identifiers match, not a number or a boolean. Case folds through the
+database, so non-ASCII letters may not fold, depending on the database. Other attributes are not filterable.
+
 To find the users still on an older revision of a schema, filter on the
 schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter

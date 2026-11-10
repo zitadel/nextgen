@@ -15,7 +15,10 @@ import (
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
-var userSchema = v2user.NewSchema("zitadel_nextgen.users", "zitadel_nextgen.json_schemas")
+var userSchema = v2user.NewSchema(v2user.SchemaSQL{
+	TablePrefix:     "zitadel_nextgen.",
+	AttributeString: "CASE WHEN jsonb_typeof(a.value) = 'string' THEN a.value #>> '{}' END",
+})
 
 const (
 	teamMembershipsTable = "zitadel_nextgen.team_memberships"
