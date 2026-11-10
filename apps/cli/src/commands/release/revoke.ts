@@ -8,6 +8,8 @@ import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Destructive } from "@/lib/oclif/destructive";
 import { prose } from "@/lib/oclif/rendering";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
 
 /**
  * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
@@ -22,6 +24,18 @@ const RELEASE_ID: Refused<string> = {
     details: {
       argument: "{input}",
     },
+  },
+};
+
+/** How a release an origin still serves is refused: each origin, and the deployment that pins it. */
+const IN_USE_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "{release} is still served by {served}",
+  hint: "Deploy another release there, or roll the deployment back, then revoke it.",
+  next: [DEPLOY_ARGS, "deployment rollback"],
+  details: {
+    release_id: "{release}",
+    origins: "{origins}",
   },
 };
 
@@ -71,7 +85,24 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         },
         apply: async (consent, { client, projectId }) => {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
-          const release = await releaseService.revoke(args.releaseId);
+          const revoked = await releaseService.revoke(args.releaseId);
+          if (revoked.outcome === "in-use") {
+            const served = revoked.origins.map((one) => {
+              return `${one.origin} (${one.deployment_id})`;
+            });
+            throw refusalError(
+              IN_USE_REFUSAL,
+              {
+                release: args.releaseId,
+                served: served.length > 0 ? served.join(", ") : "an origin",
+                origins: revoked.origins,
+              },
+              (command) => {
+                return this.suggest(command);
+              },
+            );
+          }
+          const { release } = revoked;
           return {
             status: "ok",
             data: {

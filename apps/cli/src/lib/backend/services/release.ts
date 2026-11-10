@@ -5,6 +5,7 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
+  RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
@@ -27,6 +28,24 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 
 /** The kind of resource a release pins a revision of. */
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+
+/** An origin that still serves a release, and the deployment that pins it there. */
+export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
+
+/**
+ * What revoking a release came to: `revoked`, or `in-use` when origins still
+ * serve it; `origins` names each one and the deployment that pins it.
+ */
+export type RevokeResult = Readonly<
+  | {
+      outcome: "revoked";
+      release: Release;
+    }
+  | {
+      outcome: "in-use";
+      origins: readonly ServingOrigin[];
+    }
+>;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -99,11 +118,53 @@ export class ReleaseService extends ApiService {
    * Revoke a release so its content is never served again. Idempotent.
    *
    * @param releaseId - The release to revoke.
-   * @returns The release, now revoked.
+   * @returns The release, now revoked, or the origins that still serve it.
+   * @throws BackendError for any failure other than an origin serving it.
    */
-  async revoke(releaseId: string): Promise<Release> {
-    return this.client.revokeRelease(releaseId, {
-      project_id: this.projectId,
-    });
+  async revoke(releaseId: string): Promise<RevokeResult> {
+    try {
+      const release = await this.client.revokeRelease(releaseId, {
+        project_id: this.projectId,
+      });
+      return {
+        outcome: "revoked",
+        release,
+      };
+    } catch (error) {
+      if (!(error instanceof ConflictError) || error.serverCode !== "rel.in_use") {
+        throw error;
+      }
+      return {
+        outcome: "in-use",
+        origins: servingOrigins(error.body),
+      };
+    }
   }
+}
+
+/**
+ * The origins a `rel.in_use` refusal names. The server nests them in the
+ * envelope's `details.details`, the contract in `details`, so both are read.
+ */
+function servingOrigins(body: unknown): ServingOrigin[] {
+  let node: unknown = body;
+  for (let depth = 0; depth < 3 && isObject(node); depth += 1) {
+    const { origins } = node;
+    if (Array.isArray(origins)) {
+      return origins.filter((item): item is ServingOrigin => {
+        return (
+          isObject(item) &&
+          typeof item.origin === "string" &&
+          typeof item.deployment_id === "string"
+        );
+      });
+    }
+    node = node.details;
+  }
+  return [];
+}
+
+/** Whether a value is a non-null object. */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

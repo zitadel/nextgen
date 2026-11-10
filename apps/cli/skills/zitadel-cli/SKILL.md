@@ -414,6 +414,9 @@ Each invocation prints one JSON object:
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.
+- `release revoke` on a release an origin still serves fails `E_CONFLICT`
+  naming each origin and the deployment that pins it (`details.origins`, each
+  `{origin, deployment_id}`), and suggests `deploy` or `deployment rollback`.
 - `deploy --dry-run` and `deploy` emit `data.diff`, the git diff the terminal
   shows, against the live release's commit (`diff.against`): `diff.files` holds
   one `{path, status, previous_path?, patch}` per changed file (`status` is

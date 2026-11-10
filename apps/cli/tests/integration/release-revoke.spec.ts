@@ -176,6 +176,43 @@ describe("release revoke", () => {
         expect(result).toFailWith("E_CONFLICT");
       });
 
+      it("names the origin that serves the release and the deployment that pins it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const served = await app.deployData();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toExplain(`https://app.example.com (${served.deployment_id ?? ""})`);
+      });
+
+      it.each(["deploy", "deployment rollback"])(
+        "suggests %s for a release an origin still serves",
+        async (command) => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const served = await app.deployData();
+
+          const result = await app.run([
+            "release",
+            "revoke",
+            served.release_id ?? "",
+            "--force",
+            "--non-interactive",
+            "--json",
+          ]);
+
+          expect(result).toSuggest(command);
+        },
+      );
+
       describe("without --force when no one can be asked", () => {
         it("is refused", async () => {
           const app = await aSetUpApp();
