@@ -431,7 +431,9 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		return nil
 	}
 
-	for _, group := range v2user.GroupByProject(users) {
+	groups := v2user.GroupByProject(users)
+	defer v2user.FillRepeats(groups)
+	for _, group := range groups {
 		if err := us.hydrateUserGroup(ctx, group, opts); err != nil {
 			return err
 		}

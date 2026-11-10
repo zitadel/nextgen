@@ -464,7 +464,12 @@ func TestUserStatements_ListUsers_Search(t *testing.T) {
 			require.NotEmpty(t, result.Items[0].Attributes, "a search read hydrates like any other")
 		})
 		t.Run("ReturnsAUserOncePerArm", func(t *testing.T) {
-			assert.Equal(t, []string{"user_search_ann", "user_search_ann"}, ids(t, "ann", arm("email"), arm("name")))
+			result := search(t, nil, 0, "ann", arm("email"), arm("name"))
+			require.Equal(t, []string{"user_search_ann", "user_search_ann"}, userIDs(result.Items))
+			// Each row is the whole user, whichever attribute matched.
+			for _, row := range result.Items {
+				assertUserAttributes(t, row, map[string]any{"email": "ann@example.com", "name": "Ann"})
+			}
 		})
 		t.Run("NarrowsAnArmToItsUsers", func(t *testing.T) {
 			on := func(url string) service.UserSearchArm {

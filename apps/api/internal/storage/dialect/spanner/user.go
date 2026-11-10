@@ -510,6 +510,7 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 	// Grouped once and reused: GroupByProject clears Attributes, so a second
 	// pass would wipe the ones this call just hydrated.
 	groups := v2user.GroupByProject(users)
+	defer v2user.FillRepeats(groups)
 
 	for _, group := range groups {
 		stmt := buildStatement(userAttributesByIDsQuery, group.ProjectID, group.IDs).statement()
