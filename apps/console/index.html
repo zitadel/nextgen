@@ -25,19 +25,21 @@
       // Apply the stored/system theme before paint to avoid a flash of the
       // wrong theme. Kept in sync afterwards by src/theme.ts.
       (() => {
+        var resolved = "dark";
         try {
-          var pref = localStorage.getItem("zl-console-theme") || "system";
-          var resolved =
-            pref === "system"
-              ? window.matchMedia("(prefers-color-scheme: light)").matches
+          var pref = localStorage.getItem("zl-console-theme");
+          resolved =
+            pref === "light" || pref === "dark"
+              ? pref
+              : window.matchMedia("(prefers-color-scheme: light)").matches
                 ? "light"
-                : "dark"
-              : pref;
-          document.documentElement.setAttribute("data-theme", resolved);
-          document.querySelector('meta[name="color-scheme"]').content = resolved;
+                : "dark";
         } catch (e) {
-          document.documentElement.setAttribute("data-theme", "dark");
+          // No storage or no matchMedia: the dark theme, declared as such.
         }
+        document.documentElement.setAttribute("data-theme", resolved);
+        var scheme = document.querySelector('meta[name="color-scheme"]');
+        if (scheme) scheme.content = resolved;
       })();
     </script>
   </head>
