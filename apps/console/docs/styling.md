@@ -207,7 +207,9 @@ Two values here look like something they are not: the head label is
 `foreground`, not the `muted-foreground` it resembles at a
 glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
-the design even though its box measures correctly.
+the design even though its box measures correctly. The account menu's
+external-link glyph is the exception: the design draws it at stroke 1, in the
+item's own text colour.
 
 ## Resource detail layout — one shell for every detail screen
 

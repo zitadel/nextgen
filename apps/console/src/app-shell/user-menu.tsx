@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
+import { ChevronRight, ExternalLink, type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -11,8 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { UserAvatar, avatarSeed, avatarVars } from "@/components/user-avatar";
+import { DOCS_URL } from "@/lib/docs";
 import { type ThemePreference, useTheme } from "@/theme";
 
 /** Route prefix of Settings, whose pages the sidebar lists in place of the account's. */
@@ -27,6 +28,9 @@ export interface ShellUser {
 
 /** The separators sit flush against the rows, so the default `-mx-1 my-1` comes off. */
 const MENU_SEPARATOR = "mx-0 my-0";
+
+/** A group of rows between separators, inset like the menu's own `p-1`. */
+const MENU_GROUP = "p-1";
 
 /** The footer's second line: the email under a name. */
 const FOOTER_SECOND_LINE = "truncate text-xs font-light text-muted-foreground";
@@ -167,25 +171,27 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
 }
 
 /**
- * The account dropdown, opening to the right of the sidebar's footer row.
+ * The account dropdown, opening to the right of the sidebar's footer row. On
+ * a phone the sidebar is a sheet with no room beside it, so the menu opens
+ * over the row instead, as shadcn's sidebar account menu does.
  *
  * It follows Vercel's: the person heads it and opens their profile
- * (Settings); then Theme and Log out.
- * Nothing else repeats a Settings page. `Documentation` and `Feedback` are
- * parked: neither has a destination yet, and a row that does nothing reads as
- * broken.
+ * (Settings); then Theme, Documentation and Log out.
+ * Nothing else repeats a Settings page. `Feedback` is parked: it has no
+ * destination yet, and a row that does nothing reads as broken.
  */
 function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const { name, second } = accountName(user);
+  const { isMobile } = useSidebar();
 
   return (
     <DropdownMenuContent
-      side="right"
+      side={isMobile ? "bottom" : "right"}
       align="end"
       sideOffset={8}
       className="w-64 border-foreground/10 p-0"
     >
-      <div className="p-1">
+      <div className={MENU_GROUP}>
         <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
           <Link to="/settings/profile">
             <span className="max-w-full truncate text-sm font-medium">{name}</span>
@@ -200,7 +206,17 @@ function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?:
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
       <ThemeRow />
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
-      <div className="p-1">
+      <div className={MENU_GROUP}>
+        <DropdownMenuItem asChild className="h-8">
+          <a href={DOCS_URL} target="_blank" rel="noreferrer">
+            Documentation
+            {/* Stroke 1 in the label's colour, as styling.md records. */}
+            <ExternalLink className="ml-auto text-current" strokeWidth={1} aria-hidden />
+          </a>
+        </DropdownMenuItem>
+      </div>
+      <DropdownMenuSeparator className={MENU_SEPARATOR} />
+      <div className={MENU_GROUP}>
         <DropdownMenuItem onSelect={() => onSignOut?.()} disabled={!onSignOut} className="h-8">
           {/* The design spells it `Logout`, the noun; the action is the verb. */}
           Log out

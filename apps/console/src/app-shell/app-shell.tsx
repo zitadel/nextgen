@@ -150,8 +150,6 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Documentation is parked: it needs a published URL for the docs
-              site to point at, and a row that does nothing reads as broken. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
