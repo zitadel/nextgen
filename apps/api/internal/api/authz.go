@@ -213,6 +213,14 @@ var grantAccess = resourceAccess{
 	denied:    domain.ErrGrantPermissionDenied,
 }
 
+// invitationAccess gates invitation admin ops. Invitations are not in
+// resource_scope_index; every op takes project_id from the query (same as grants).
+var invitationAccess = resourceAccess{
+	readMiss:  domain.ErrInvitationNotFound,
+	writeMiss: domain.ErrInvitationNotFound,
+	denied:    domain.ErrInvitationPermissionDenied,
+}
+
 var projectAccess = resourceAccess{
 	kind:      domain.ResourceKindProject,
 	readMiss:  domain.ErrProjectNotFound,

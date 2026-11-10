@@ -29,9 +29,9 @@ type SecurityHandler interface {
 	// browser request is refused with `403` and code `auth.csrf_invalid`. Every
 	// such request must also send the session's token from `GET /sessions/me/csrf`
 	// in the `X-Zitadel-CSRF` header, or it answers the same `403`. The only
-	// exceptions are the `POST …/query` reads, which need no token. Safe methods
-	// (`GET`) are not checked. A request a project secret authenticates is not
-	// affected.
+	// exceptions are the `POST …/query` reads and `POST /invitations/lookup`,
+	// which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret authenticates is not affected.
 	HandleSessionCookie(ctx context.Context, operationName OperationName, t SessionCookie) (context.Context, error)
 }
 
@@ -61,6 +61,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	BuildReleaseOperation: []string{
 		"release.write",
 	},
+	CancelInvitationOperation: []string{
+		"project.write",
+	},
 	CreateApplicationOperation: []string{
 		"application.write",
 	},
@@ -84,6 +87,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateIdpOperation: []string{
 		"idp.write",
+	},
+	CreateInvitationOperation: []string{
+		"project.write",
 	},
 	CreateReleaseOperation: []string{
 		"release.write",
@@ -155,6 +161,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetInvitationOperation: []string{
+		"project.write",
+	},
 	GetPolicyOperation: []string{
 		"policy.read",
 	},
@@ -211,6 +220,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
+	},
+	ListInvitationsOperation: []string{
+		"project.write",
 	},
 	ListPoliciesOperation: []string{
 		"policy.read",
@@ -320,10 +332,13 @@ func GetOAuth2ScopesForOAuth2(operation string) []string {
 
 // operationRolesSessionCookie is a private map storing roles per operation.
 var operationRolesSessionCookie = map[string][]string{
+	AcceptInvitationOperation:      []string{},
 	AddOriginOperation:             []string{},
+	CancelInvitationOperation:      []string{},
 	CompleteClaimOperation:         []string{},
 	CreateDeploymentOperation:      []string{},
 	CreateGrantOperation:           []string{},
+	CreateInvitationOperation:      []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},
 	DeleteGrantOperation:           []string{},
@@ -335,6 +350,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
 	GetIdpRevisionByIdOperation:    []string{},
+	GetInvitationOperation:         []string{},
 	GetMyPasswordStateOperation:    []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
@@ -354,6 +370,7 @@ var operationRolesSessionCookie = map[string][]string{
 	ListBrandingOperation:          []string{},
 	ListDeploymentsOperation:       []string{},
 	ListFlowDefinitionsOperation:   []string{},
+	ListInvitationsOperation:       []string{},
 	ListMyIdentityLinksOperation:   []string{},
 	ListMyPasskeysOperation:        []string{},
 	ListMyProjectsOperation:        []string{},
@@ -366,6 +383,7 @@ var operationRolesSessionCookie = map[string][]string{
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
 	ListUserTeamsOperation:         []string{},
+	LookupInvitationOperation:      []string{},
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
 	PatchUserByIDOperation:         []string{},
@@ -373,6 +391,7 @@ var operationRolesSessionCookie = map[string][]string{
 	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
+	RejectInvitationOperation:      []string{},
 	RemoveOriginOperation:          []string{},
 	RevokeMySessionOperation:       []string{},
 	RevokeReleaseOperation:         []string{},
