@@ -7,8 +7,9 @@ post:
 
     Send the plaintext token from the invitation link fragment. Every unknown
     or finished token answers the same opaque `404`. Authenticate with a
-    platform-project user session cookie (`sessionCookie`). The call is
-    rate-limited.
+    platform-project user session cookie (`sessionCookie`). Lookup is a read:
+    same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
+    reject still do). The call is rate-limited.
   tags:
     - Invitations
   security:

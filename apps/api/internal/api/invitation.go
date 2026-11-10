@@ -64,9 +64,8 @@ func (h *Handler) CancelInvitation(ctx context.Context, params api.CancelInvitat
 	}
 	switch invitationStubPhase {
 	case 1:
+		// Miss and finished share the public not_found (opaque cancel).
 		return nil, domain.ErrInvitationNotFound()
-	case 2:
-		return nil, domain.ErrInvitationNotPending()
 	default:
 		return nil, domain.ErrNotImplemented()
 	}
@@ -86,14 +85,13 @@ func (h *Handler) AcceptInvitation(ctx context.Context, req *api.InvitationToken
 	_ = req
 	switch invitationStubPhase {
 	case 1:
+		// Unknown and finished tokens share the public not_found.
 		return nil, domain.ErrInvitationNotFound()
 	case 2:
-		return nil, domain.ErrInvitationNotPending()
-	case 3:
 		return nil, domain.ErrInvitationSelfAccept()
-	case 4:
+	case 3:
 		return nil, domain.ErrInvitationProjectUnclaimed()
-	case 5:
+	case 4:
 		return nil, domain.ErrInvitationPlatformRequired()
 	default:
 		return nil, domain.ErrNotImplemented()
@@ -105,8 +103,6 @@ func (h *Handler) RejectInvitation(ctx context.Context, req *api.InvitationToken
 	switch invitationStubPhase {
 	case 1:
 		return nil, domain.ErrInvitationNotFound()
-	case 2:
-		return nil, domain.ErrInvitationNotPending()
 	default:
 		return nil, domain.ErrNotImplemented()
 	}
@@ -116,7 +112,11 @@ func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrInvitationInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	case domain.ErrInvitationNotFound().Code, domain.ErrInvitationNotPending().Code:
+	case domain.ErrInvitationNotPending().Code:
+		// Finished invitations must not leak status on the wire; same public
+		// body as a miss (ADR 086 opaque token / cancel answers).
+		return errorResponseWithStatusCode(http.StatusNotFound, domain.ErrInvitationNotFound())
+	case domain.ErrInvitationNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrInvitationPermissionDenied().Code, domain.ErrInvitationSelfAccept().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

@@ -906,13 +906,14 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 
 // handleCancelInvitationRequest handles cancelInvitation operation.
 //
-// Cancels a pending invitation and clears its metadata. The row stays with
-// status `cancelled`; its link can no longer be redeemed.
-// Only a `pending` invitation can be cancelled. A finished invitation answers
-// the same as a miss. Authenticate with a project secret (`oauth2`) or a
-// console session cookie (`sessionCookie`). Cancelling needs the same project
-// `admin` check as `createGrant` (`POST /grants`). Cookie requests follow that
-// scheme's CSRF rules.
+// Deletes a pending invitation. Its link can no longer be redeemed. Only a
+// `pending` invitation can be cancelled; a finished invitation answers the
+// same opaque `404` as a miss. Expired invitations keep their row until a
+// later cleanup job removes them.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Cancelling needs the same project `admin` check as
+// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+// rules.
 //
 // DELETE /invitations/{id}
 func (s *Server) handleCancelInvitationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -3337,7 +3338,8 @@ func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http
 // and `role`, and answers `501` `not_implemented` until team invitations
 // ship. Optional `metadata.name` labels who the link is for. Optional
 // `replaces_invitation_id` replaces that invitation: the new row keeps the
-// original's `journey_id`, and a pending original becomes `cancelled`.
+// original's `journey_id`, and a pending original is deleted in the same
+// transaction.
 // The `link` appears only in this response. Share it out of band; whoever
 // opens it and is signed in can redeem the role. It expires in 72 hours.
 // Refused for an unclaimed project, on a server without a platform project,
@@ -17243,8 +17245,9 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 // project, role, inviter and expiry.
 // Send the plaintext token from the invitation link fragment. Every unknown
 // or finished token answers the same opaque `404`. Authenticate with a
-// platform-project user session cookie (`sessionCookie`). The call is
-// rate-limited.
+// platform-project user session cookie (`sessionCookie`). Lookup is a read:
+// same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
+// reject still do). The call is rate-limited.
 //
 // POST /invitations/lookup
 func (s *Server) handleLookupInvitationRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

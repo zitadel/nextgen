@@ -29,9 +29,9 @@ type SecurityHandler interface {
 	// browser request is refused with `403` and code `auth.csrf_invalid`. Every
 	// such request must also send the session's token from `GET /sessions/me/csrf`
 	// in the `X-Zitadel-CSRF` header, or it answers the same `403`. The only
-	// exceptions are the `POST …/query` reads, which need no token. Safe methods
-	// (`GET`) are not checked. A request a project secret authenticates is not
-	// affected.
+	// exceptions are the `POST …/query` reads and `POST /invitations/lookup`,
+	// which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret authenticates is not affected.
 	HandleSessionCookie(ctx context.Context, operationName OperationName, t SessionCookie) (context.Context, error)
 }
 

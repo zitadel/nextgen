@@ -49,14 +49,15 @@ delete:
   operationId: cancelInvitation
   summary: Cancel an invitation
   description: |
-    Cancels a pending invitation and clears its metadata. The row stays with
-    status `cancelled`; its link can no longer be redeemed.
+    Deletes a pending invitation. Its link can no longer be redeemed. Only a
+    `pending` invitation can be cancelled; a finished invitation answers the
+    same opaque `404` as a miss. Expired invitations keep their row until a
+    later cleanup job removes them.
 
-    Only a `pending` invitation can be cancelled. A finished invitation answers
-    the same as a miss. Authenticate with a project secret (`oauth2`) or a
-    console session cookie (`sessionCookie`). Cancelling needs the same project
-    `admin` check as `createGrant` (`POST /grants`). Cookie requests follow that
-    scheme's CSRF rules.
+    Authenticate with a project secret (`oauth2`) or a console session cookie
+    (`sessionCookie`). Cancelling needs the same project `admin` check as
+    `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+    rules.
   tags:
     - Invitations
   security:
@@ -68,7 +69,7 @@ delete:
     - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '204':
-      description: The invitation was cancelled.
+      description: The invitation was deleted.
     '401':
       description: Missing or invalid credentials.
       content:

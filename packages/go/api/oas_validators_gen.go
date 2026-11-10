@@ -9887,8 +9887,6 @@ func (s InvitationStatus) Validate() error {
 		return nil
 	case "rejected":
 		return nil
-	case "cancelled":
-		return nil
 	case "expired":
 		return nil
 	default:

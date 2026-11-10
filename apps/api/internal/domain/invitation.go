@@ -22,6 +22,9 @@ func ErrInvitationProjectUnclaimed() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("project_unclaimed"), "claim the project before inviting into it", nil, nil)
 }
 
+// ErrInvitationNotPending is the internal finished-state signal. The HTTP
+// layer maps it to ErrInvitationNotFound so cancel and token endpoints keep an
+// opaque 404 (ADR 086).
 func ErrInvitationNotPending() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("not_pending"), "the invitation is no longer pending", nil, nil)
 }

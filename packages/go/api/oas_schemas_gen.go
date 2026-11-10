@@ -27,7 +27,6 @@ type AcceptInvitationErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
 	InvNotFound         InvNotFound
-	InvNotPending       InvNotPending
 	InvPlatformRequired InvPlatformRequired
 	InvProjectUnclaimed InvProjectUnclaimed
 	InvSelfAccept       InvSelfAccept
@@ -45,7 +44,6 @@ const (
 	AuthUnauthorizedAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "auth.unauthorized"
 	InternalAcceptInvitationErrorResponse            AcceptInvitationErrorResponseType = "internal"
 	InvNotFoundAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "inv.not_found"
-	InvNotPendingAcceptInvitationErrorResponse       AcceptInvitationErrorResponseType = "inv.not_pending"
 	InvPlatformRequiredAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.platform_required"
 	InvProjectUnclaimedAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.project_unclaimed"
 	InvSelfAcceptAcceptInvitationErrorResponse       AcceptInvitationErrorResponseType = "inv.self_accept"
@@ -72,11 +70,6 @@ func (s AcceptInvitationErrorResponse) IsInternal() bool {
 // IsInvNotFound reports whether AcceptInvitationErrorResponse is InvNotFound.
 func (s AcceptInvitationErrorResponse) IsInvNotFound() bool {
 	return s.Type == InvNotFoundAcceptInvitationErrorResponse
-}
-
-// IsInvNotPending reports whether AcceptInvitationErrorResponse is InvNotPending.
-func (s AcceptInvitationErrorResponse) IsInvNotPending() bool {
-	return s.Type == InvNotPendingAcceptInvitationErrorResponse
 }
 
 // IsInvPlatformRequired reports whether AcceptInvitationErrorResponse is InvPlatformRequired.
@@ -190,27 +183,6 @@ func (s AcceptInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool)
 func NewInvNotFoundAcceptInvitationErrorResponse(v InvNotFound) AcceptInvitationErrorResponse {
 	var s AcceptInvitationErrorResponse
 	s.SetInvNotFound(v)
-	return s
-}
-
-// SetInvNotPending sets AcceptInvitationErrorResponse to InvNotPending.
-func (s *AcceptInvitationErrorResponse) SetInvNotPending(v InvNotPending) {
-	s.Type = InvNotPendingAcceptInvitationErrorResponse
-	s.InvNotPending = v
-}
-
-// GetInvNotPending returns InvNotPending and true boolean if AcceptInvitationErrorResponse is InvNotPending.
-func (s AcceptInvitationErrorResponse) GetInvNotPending() (v InvNotPending, ok bool) {
-	if !s.IsInvNotPending() {
-		return v, false
-	}
-	return s.InvNotPending, true
-}
-
-// NewInvNotPendingAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvNotPending.
-func NewInvNotPendingAcceptInvitationErrorResponse(v InvNotPending) AcceptInvitationErrorResponse {
-	var s AcceptInvitationErrorResponse
-	s.SetInvNotPending(v)
 	return s
 }
 
@@ -11118,7 +11090,6 @@ type CancelInvitationErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
 	InvNotFound         InvNotFound
-	InvNotPending       InvNotPending
 	InvPermissionDenied InvPermissionDenied
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
@@ -11134,7 +11105,6 @@ const (
 	AuthUnauthorizedCancelInvitationErrorResponse    CancelInvitationErrorResponseType = "auth.unauthorized"
 	InternalCancelInvitationErrorResponse            CancelInvitationErrorResponseType = "internal"
 	InvNotFoundCancelInvitationErrorResponse         CancelInvitationErrorResponseType = "inv.not_found"
-	InvNotPendingCancelInvitationErrorResponse       CancelInvitationErrorResponseType = "inv.not_pending"
 	InvPermissionDeniedCancelInvitationErrorResponse CancelInvitationErrorResponseType = "inv.permission_denied"
 	NotImplementedCancelInvitationErrorResponse      CancelInvitationErrorResponseType = "not_implemented"
 	ReqInvalidCancelInvitationErrorResponse          CancelInvitationErrorResponseType = "req.invalid"
@@ -11159,11 +11129,6 @@ func (s CancelInvitationErrorResponse) IsInternal() bool {
 // IsInvNotFound reports whether CancelInvitationErrorResponse is InvNotFound.
 func (s CancelInvitationErrorResponse) IsInvNotFound() bool {
 	return s.Type == InvNotFoundCancelInvitationErrorResponse
-}
-
-// IsInvNotPending reports whether CancelInvitationErrorResponse is InvNotPending.
-func (s CancelInvitationErrorResponse) IsInvNotPending() bool {
-	return s.Type == InvNotPendingCancelInvitationErrorResponse
 }
 
 // IsInvPermissionDenied reports whether CancelInvitationErrorResponse is InvPermissionDenied.
@@ -11267,27 +11232,6 @@ func (s CancelInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool)
 func NewInvNotFoundCancelInvitationErrorResponse(v InvNotFound) CancelInvitationErrorResponse {
 	var s CancelInvitationErrorResponse
 	s.SetInvNotFound(v)
-	return s
-}
-
-// SetInvNotPending sets CancelInvitationErrorResponse to InvNotPending.
-func (s *CancelInvitationErrorResponse) SetInvNotPending(v InvNotPending) {
-	s.Type = InvNotPendingCancelInvitationErrorResponse
-	s.InvNotPending = v
-}
-
-// GetInvNotPending returns InvNotPending and true boolean if CancelInvitationErrorResponse is InvNotPending.
-func (s CancelInvitationErrorResponse) GetInvNotPending() (v InvNotPending, ok bool) {
-	if !s.IsInvNotPending() {
-		return v, false
-	}
-	return s.InvNotPending, true
-}
-
-// NewInvNotPendingCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from InvNotPending.
-func NewInvNotPendingCancelInvitationErrorResponse(v InvNotPending) CancelInvitationErrorResponse {
-	var s CancelInvitationErrorResponse
-	s.SetInvNotPending(v)
 	return s
 }
 
@@ -18145,8 +18089,8 @@ type CreateInvitationProjectMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original becomes `cancelled` in
-	// the same transaction. Use the `id` that `createInvitation`
+	// the original's `journey_id`, and a pending original is deleted in the
+	// same transaction. Use the `id` that `createInvitation`
 	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                          `json:"replaces_invitation_id"`
 	Type                 CreateInvitationProjectMemberRequestType `json:"type"`
@@ -18232,8 +18176,8 @@ func (s *CreateInvitationProjectMemberRequestType) UnmarshalText(data []byte) er
 type CreateInvitationProjectMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept, decline or
-	// cancel.
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18637,8 +18581,8 @@ type CreateInvitationTeamMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original becomes `cancelled` in
-	// the same transaction. Use the `id` that `createInvitation`
+	// the original's `journey_id`, and a pending original is deleted in the
+	// same transaction. Use the `id` that `createInvitation`
 	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                       `json:"replaces_invitation_id"`
 	Type                 CreateInvitationTeamMemberRequestType `json:"type"`
@@ -18724,8 +18668,8 @@ func (s *CreateInvitationTeamMemberRequestType) UnmarshalText(data []byte) error
 type CreateInvitationTeamMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept, decline or
-	// cancel.
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -45920,59 +45864,6 @@ func (s *InvNotFoundDetails) init() InvNotFoundDetails {
 
 // Merged schema.
 // Ref: #
-type InvNotPending struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptInvNotPendingDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *InvNotPending) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *InvNotPending) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *InvNotPending) GetDetails() OptInvNotPendingDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *InvNotPending) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *InvNotPending) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *InvNotPending) SetDetails(val OptInvNotPendingDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type InvNotPendingDetails map[string]jx.Raw
-
-func (s *InvNotPendingDetails) init() InvNotPendingDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type InvPendingLimit struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -46757,7 +46648,8 @@ func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) erro
 
 // What the administrator entered at creation, so other administrators know who
 // the link is for. It is only displayed, never matched. Null once the
-// invitation is accepted, declined or cancelled.
+// invitation is accepted or declined. Cancel and replace of a pending
+// invitation delete the row, so the metadata goes with it.
 // Ref: #
 type InvitationMetadata struct {
 	// A display name for who the invitation is intended for.
@@ -46779,8 +46671,8 @@ func (s *InvitationMetadata) SetName(val string) {
 type InvitationProjectMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept, decline or
-	// cancel.
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -47088,16 +46980,16 @@ func (s *InvitationProjectMemberType) UnmarshalText(data []byte) error {
 }
 
 // Lifecycle status of the invitation. `expired` is derived on read from
-// `expires_at`; every other non-`pending` status is final.
+// `expires_at`; `accepted` and `rejected` are final. Cancel and replace of a
+// pending invitation delete the row rather than leaving a cancelled status.
 // Ref: #
 type InvitationStatus string
 
 const (
-	InvitationStatusPending   InvitationStatus = "pending"
-	InvitationStatusAccepted  InvitationStatus = "accepted"
-	InvitationStatusRejected  InvitationStatus = "rejected"
-	InvitationStatusCancelled InvitationStatus = "cancelled"
-	InvitationStatusExpired   InvitationStatus = "expired"
+	InvitationStatusPending  InvitationStatus = "pending"
+	InvitationStatusAccepted InvitationStatus = "accepted"
+	InvitationStatusRejected InvitationStatus = "rejected"
+	InvitationStatusExpired  InvitationStatus = "expired"
 )
 
 // AllValues returns all InvitationStatus values.
@@ -47106,7 +46998,6 @@ func (InvitationStatus) AllValues() []InvitationStatus {
 		InvitationStatusPending,
 		InvitationStatusAccepted,
 		InvitationStatusRejected,
-		InvitationStatusCancelled,
 		InvitationStatusExpired,
 	}
 }
@@ -47119,8 +47010,6 @@ func (s InvitationStatus) MarshalText() ([]byte, error) {
 	case InvitationStatusAccepted:
 		return []byte(s), nil
 	case InvitationStatusRejected:
-		return []byte(s), nil
-	case InvitationStatusCancelled:
 		return []byte(s), nil
 	case InvitationStatusExpired:
 		return []byte(s), nil
@@ -47141,9 +47030,6 @@ func (s *InvitationStatus) UnmarshalText(data []byte) error {
 	case InvitationStatusRejected:
 		*s = InvitationStatusRejected
 		return nil
-	case InvitationStatusCancelled:
-		*s = InvitationStatusCancelled
-		return nil
 	case InvitationStatusExpired:
 		*s = InvitationStatusExpired
 		return nil
@@ -47157,8 +47043,8 @@ func (s *InvitationStatus) UnmarshalText(data []byte) error {
 type InvitationTeamMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept, decline or
-	// cancel.
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -60863,52 +60749,6 @@ func (o OptInvNotFoundDetails) Get() (v InvNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvNotFoundDetails) Or(d InvNotFoundDetails) InvNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInvNotPendingDetails returns new OptInvNotPendingDetails with value set to v.
-func NewOptInvNotPendingDetails(v InvNotPendingDetails) OptInvNotPendingDetails {
-	return OptInvNotPendingDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInvNotPendingDetails is optional InvNotPendingDetails.
-type OptInvNotPendingDetails struct {
-	Value InvNotPendingDetails
-	Set   bool
-}
-
-// IsSet returns true if OptInvNotPendingDetails was set.
-func (o OptInvNotPendingDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInvNotPendingDetails) Reset() {
-	var v InvNotPendingDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInvNotPendingDetails) SetTo(v InvNotPendingDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInvNotPendingDetails) Get() (v InvNotPendingDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInvNotPendingDetails) Or(d InvNotPendingDetails) InvNotPendingDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -83429,7 +83269,6 @@ type RejectInvitationErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
 	InvNotFound      InvNotFound
-	InvNotPending    InvNotPending
 	NotImplemented   NotImplemented
 	ReqInvalid       ReqInvalid
 	Unavailable      Unavailable
@@ -83444,7 +83283,6 @@ const (
 	AuthUnauthorizedRejectInvitationErrorResponse RejectInvitationErrorResponseType = "auth.unauthorized"
 	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
 	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
-	InvNotPendingRejectInvitationErrorResponse    RejectInvitationErrorResponseType = "inv.not_pending"
 	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
 	ReqInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "req.invalid"
 	UnavailableRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "unavailable"
@@ -83468,11 +83306,6 @@ func (s RejectInvitationErrorResponse) IsInternal() bool {
 // IsInvNotFound reports whether RejectInvitationErrorResponse is InvNotFound.
 func (s RejectInvitationErrorResponse) IsInvNotFound() bool {
 	return s.Type == InvNotFoundRejectInvitationErrorResponse
-}
-
-// IsInvNotPending reports whether RejectInvitationErrorResponse is InvNotPending.
-func (s RejectInvitationErrorResponse) IsInvNotPending() bool {
-	return s.Type == InvNotPendingRejectInvitationErrorResponse
 }
 
 // IsNotImplemented reports whether RejectInvitationErrorResponse is NotImplemented.
@@ -83571,27 +83404,6 @@ func (s RejectInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool)
 func NewInvNotFoundRejectInvitationErrorResponse(v InvNotFound) RejectInvitationErrorResponse {
 	var s RejectInvitationErrorResponse
 	s.SetInvNotFound(v)
-	return s
-}
-
-// SetInvNotPending sets RejectInvitationErrorResponse to InvNotPending.
-func (s *RejectInvitationErrorResponse) SetInvNotPending(v InvNotPending) {
-	s.Type = InvNotPendingRejectInvitationErrorResponse
-	s.InvNotPending = v
-}
-
-// GetInvNotPending returns InvNotPending and true boolean if RejectInvitationErrorResponse is InvNotPending.
-func (s RejectInvitationErrorResponse) GetInvNotPending() (v InvNotPending, ok bool) {
-	if !s.IsInvNotPending() {
-		return v, false
-	}
-	return s.InvNotPending, true
-}
-
-// NewInvNotPendingRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from InvNotPending.
-func NewInvNotPendingRejectInvitationErrorResponse(v InvNotPending) RejectInvitationErrorResponse {
-	var s RejectInvitationErrorResponse
-	s.SetInvNotPending(v)
 	return s
 }
 

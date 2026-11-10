@@ -8,7 +8,6 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/inv-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/inv-not_pending.yaml'
         - $ref: '../../../components/schemas/errors/inv-platform_required.yaml'
         - $ref: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
         - $ref: '../../../components/schemas/errors/inv-self_accept.yaml'
@@ -22,7 +21,6 @@ content:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           inv.not_found: '../../../components/schemas/errors/inv-not_found.yaml'
-          inv.not_pending: '../../../components/schemas/errors/inv-not_pending.yaml'
           inv.platform_required: '../../../components/schemas/errors/inv-platform_required.yaml'
           inv.project_unclaimed: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
           inv.self_accept: '../../../components/schemas/errors/inv-self_accept.yaml'
@@ -38,8 +36,6 @@ content:
         $ref: '../../../components/examples/errors/internal.yaml'
       inv.not_found:
         $ref: '../../../components/examples/errors/inv-not_found.yaml'
-      inv.not_pending:
-        $ref: '../../../components/examples/errors/inv-not_pending.yaml'
       inv.platform_required:
         $ref: '../../../components/examples/errors/inv-platform_required.yaml'
       inv.project_unclaimed:

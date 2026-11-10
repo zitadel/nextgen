@@ -8630,7 +8630,7 @@
       "post": {
         "operationId": "createInvitation",
         "summary": "Create an invitation",
-        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original becomes `cancelled`.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original is deleted in the same\ntransaction.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -8655,6 +8655,43 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-invitation-request"
+              },
+              "examples": {
+                "project_member": {
+                  "summary": "Invite a project viewer",
+                  "value": {
+                    "type": "project_member",
+                    "project_member": {
+                      "relation": "viewer"
+                    },
+                    "metadata": {
+                      "name": "John Doe"
+                    }
+                  }
+                },
+                "replace_project_member": {
+                  "summary": "Replace a pending invitation and keep its journey",
+                  "value": {
+                    "type": "project_member",
+                    "project_member": {
+                      "relation": "editor"
+                    },
+                    "metadata": {
+                      "name": "John Doe"
+                    },
+                    "replaces_invitation_id": "inv_01JCQK5R7T9V1X3Z5B7D9F1H3J"
+                  }
+                },
+                "team_member": {
+                  "summary": "Invite a team member (answers 501 until implemented)",
+                  "value": {
+                    "type": "team_member",
+                    "team_member": {
+                      "team_id": "team_01JCQK5R7T9V1X3Z5B7D9F1H3J",
+                      "role": "member"
+                    }
+                  }
+                }
               }
             }
           }
@@ -8846,7 +8883,7 @@
       "post": {
         "operationId": "lookupInvitation",
         "summary": "Look up an invitation by token",
-        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). The call is\nrate-limited.\n",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do). The call is rate-limited.\n",
         "tags": [
           "Invitations"
         ],
@@ -9187,7 +9224,7 @@
       "delete": {
         "operationId": "cancelInvitation",
         "summary": "Cancel an invitation",
-        "description": "Cancels a pending invitation and clears its metadata. The row stays with\nstatus `cancelled`; its link can no longer be redeemed.\n\nOnly a `pending` invitation can be cancelled. A finished invitation answers\nthe same as a miss. Authenticate with a project secret (`oauth2`) or a\nconsole session cookie (`sessionCookie`). Cancelling needs the same project\n`admin` check as `createGrant` (`POST /grants`). Cookie requests follow that\nscheme's CSRF rules.\n",
+        "description": "Deletes a pending invitation. Its link can no longer be redeemed. Only a\n`pending` invitation can be cancelled; a finished invitation answers the\nsame opaque `404` as a miss. Expired invitations keep their row until a\nlater cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9211,7 +9248,7 @@
         ],
         "responses": {
           "204": {
-            "description": "The invitation was cancelled."
+            "description": "The invitation was deleted."
           },
           "401": {
             "description": "Missing or invalid credentials.",
@@ -12004,7 +12041,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "__Host-zitadel_session",
-        "description": "The session cookie issued at session creation or superseding handoff exchange.\n\nA browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain\nhttp to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it\nas `zitadel_session` instead, without `Secure` or the prefix, so that Safari\nkeeps it, and accepts that name there too; `__Host-zitadel_session` takes\nprecedence. A program sends `__Host-zitadel_session` over any transport.\n\nA missing or invalid cookie yields `401` with code `auth.unauthorized` and the message\n`Missing or invalid session token.`\n\nCross-site request forgery (CSRF) protection: a state-changing request that\nthis cookie authenticates must come from the same origin. A cross-site\nbrowser request is refused with `403` and code `auth.csrf_invalid`. Every\nsuch request must also send the session's token from `GET /sessions/me/csrf`\nin the `X-Zitadel-CSRF` header, or it answers the same `403`. The only\nexceptions are the `POST …/query` reads, which need no token. Safe methods\n(`GET`) are not checked. A request a project secret authenticates is not\naffected.\n"
+        "description": "The session cookie issued at session creation or superseding handoff exchange.\n\nA browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain\nhttp to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it\nas `zitadel_session` instead, without `Secure` or the prefix, so that Safari\nkeeps it, and accepts that name there too; `__Host-zitadel_session` takes\nprecedence. A program sends `__Host-zitadel_session` over any transport.\n\nA missing or invalid cookie yields `401` with code `auth.unauthorized` and the message\n`Missing or invalid session token.`\n\nCross-site request forgery (CSRF) protection: a state-changing request that\nthis cookie authenticates must come from the same origin. A cross-site\nbrowser request is refused with `403` and code `auth.csrf_invalid`. Every\nsuch request must also send the session's token from `GET /sessions/me/csrf`\nin the `X-Zitadel-CSRF` header, or it answers the same `403`. The only\nexceptions are the `POST …/query` reads and `POST /invitations/lookup`,\nwhich need no token. Safe methods (`GET`) are not checked. A request a\nproject secret authenticates is not affected.\n"
       }
     },
     "schemas": {
@@ -20819,10 +20856,9 @@
           "pending",
           "accepted",
           "rejected",
-          "cancelled",
           "expired"
         ],
-        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; every other non-`pending` status is final.\n"
+        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace of a\npending invitation delete the row rather than leaving a cancelled status.\n"
       },
       "inv-not_found": {
         "description": "Invitation not found\n\nError code: inv.not_found\n",
@@ -20873,7 +20909,7 @@
       },
       "invitation-metadata": {
         "title": "InvitationMetadata",
-        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted, declined or cancelled.\n",
+        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel and replace of a pending\ninvitation delete the row, so the metadata goes with it.\n",
         "type": "object",
         "required": [
           "name"
@@ -20927,7 +20963,7 @@
             "$ref": "#/components/schemas/project-id"
           },
           "metadata": {
-            "description": "Who the administrator said the link is for. Null after accept, decline or\ncancel.\n",
+            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace of a pending invitation delete the row.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/invitation-metadata"
@@ -21149,7 +21185,7 @@
             "$ref": "#/components/schemas/invitation-metadata"
           },
           "replaces_invitation_id": {
-            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id`, and a pending original becomes `cancelled` in\nthe same transaction. Use the `id` that `createInvitation`\n(`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.\n",
+            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id`, and a pending original is deleted in the\nsame transaction. Use the `id` that `createInvitation`\n(`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.\n",
             "$ref": "#/components/schemas/invitation-id"
           }
         }
@@ -21501,26 +21537,6 @@
             "team_member": "#/components/schemas/invitation-lookup-team-member-response"
           }
         }
-      },
-      "inv-not_pending": {
-        "description": "The invitation is no longer pending\n\nError code: inv.not_pending\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "inv.not_pending"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
       },
       "inv-self_accept": {
         "description": "The inviter cannot accept their own invitation\n\nError code: inv.self_accept\n",
@@ -25363,13 +25379,6 @@
         "value": {
           "code": "inv.project_unclaimed",
           "message": "claim the project before inviting into it"
-        }
-      },
-      "inv-not_pending": {
-        "summary": "inv.not_pending",
-        "value": {
-          "code": "inv.not_pending",
-          "message": "the invitation is no longer pending"
         }
       },
       "inv-self_accept": {
@@ -33572,9 +33581,6 @@
                   "$ref": "#/components/schemas/inv-not_found"
                 },
                 {
-                  "$ref": "#/components/schemas/inv-not_pending"
-                },
-                {
                   "$ref": "#/components/schemas/inv-platform_required"
                 },
                 {
@@ -33600,7 +33606,6 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
-                  "inv.not_pending": "#/components/schemas/inv-not_pending",
                   "inv.platform_required": "#/components/schemas/inv-platform_required",
                   "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
                   "inv.self_accept": "#/components/schemas/inv-self_accept",
@@ -33622,9 +33627,6 @@
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
-              },
-              "inv.not_pending": {
-                "$ref": "#/components/examples/inv-not_pending"
               },
               "inv.platform_required": {
                 "$ref": "#/components/examples/inv-platform_required"
@@ -33667,9 +33669,6 @@
                   "$ref": "#/components/schemas/inv-not_found"
                 },
                 {
-                  "$ref": "#/components/schemas/inv-not_pending"
-                },
-                {
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
@@ -33686,7 +33685,6 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
-                  "inv.not_pending": "#/components/schemas/inv-not_pending",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
@@ -33705,9 +33703,6 @@
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
-              },
-              "inv.not_pending": {
-                "$ref": "#/components/examples/inv-not_pending"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
@@ -33808,9 +33803,6 @@
                   "$ref": "#/components/schemas/inv-not_found"
                 },
                 {
-                  "$ref": "#/components/schemas/inv-not_pending"
-                },
-                {
                   "$ref": "#/components/schemas/inv-permission_denied"
                 },
                 {
@@ -33830,7 +33822,6 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
-                  "inv.not_pending": "#/components/schemas/inv-not_pending",
                   "inv.permission_denied": "#/components/schemas/inv-permission_denied",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -33850,9 +33841,6 @@
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
-              },
-              "inv.not_pending": {
-                "$ref": "#/components/examples/inv-not_pending"
               },
               "inv.permission_denied": {
                 "$ref": "#/components/examples/inv-permission_denied"

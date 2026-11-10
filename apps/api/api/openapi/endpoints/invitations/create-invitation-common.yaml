@@ -8,7 +8,7 @@ properties:
   replaces_invitation_id:
     description: |
       When set, this create replaces that invitation: the new invitation keeps
-      the original's `journey_id`, and a pending original becomes `cancelled` in
-      the same transaction. Use the `id` that `createInvitation`
+      the original's `journey_id`, and a pending original is deleted in the
+      same transaction. Use the `id` that `createInvitation`
       (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
     $ref: ../../components/schemas/invitation-id.yaml

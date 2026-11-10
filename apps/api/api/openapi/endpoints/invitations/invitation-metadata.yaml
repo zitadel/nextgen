@@ -2,7 +2,8 @@ title: InvitationMetadata
 description: |
   What the administrator entered at creation, so other administrators know who
   the link is for. It is only displayed, never matched. Null once the
-  invitation is accepted, declined or cancelled.
+  invitation is accepted or declined. Cancel and replace of a pending
+  invitation delete the row, so the metadata goes with it.
 type: object
 required:
   - name

@@ -10,7 +10,8 @@ post:
     and `role`, and answers `501` `not_implemented` until team invitations
     ship. Optional `metadata.name` labels who the link is for. Optional
     `replaces_invitation_id` replaces that invitation: the new row keeps the
-    original's `journey_id`, and a pending original becomes `cancelled`.
+    original's `journey_id`, and a pending original is deleted in the same
+    transaction.
 
     The `link` appears only in this response. Share it out of band; whoever
     opens it and is signed in can redeem the role. It expires in 72 hours.
@@ -35,6 +36,31 @@ post:
       application/json:
         schema:
           $ref: create-invitation-request.yaml
+        examples:
+          project_member:
+            summary: Invite a project viewer
+            value:
+              type: project_member
+              project_member:
+                relation: viewer
+              metadata:
+                name: John Doe
+          replace_project_member:
+            summary: Replace a pending invitation and keep its journey
+            value:
+              type: project_member
+              project_member:
+                relation: editor
+              metadata:
+                name: John Doe
+              replaces_invitation_id: inv_01JCQK5R7T9V1X3Z5B7D9F1H3J
+          team_member:
+            summary: Invite a team member (answers 501 until implemented)
+            value:
+              type: team_member
+              team_member:
+                team_id: team_01JCQK5R7T9V1X3Z5B7D9F1H3J
+                role: member
   responses:
     '201':
       description: The invitation was created, with its one-shot link.

@@ -17,8 +17,8 @@ properties:
     $ref: ../../components/schemas/project-id.yaml
   metadata:
     description: |
-      Who the administrator said the link is for. Null after accept, decline or
-      cancel.
+      Who the administrator said the link is for. Null after accept or decline.
+      Cancel and replace of a pending invitation delete the row.
     oneOf:
       - $ref: invitation-metadata.yaml
       - type: 'null'
