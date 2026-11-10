@@ -1,15 +1,15 @@
+import { basename } from "node:path";
+
 import {
   DeploymentService,
   OriginService,
   createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
 
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { IDPS_DIR } from "@/lib/idp/connections";
+import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { issuerFromPort, type Orca } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
@@ -71,6 +71,9 @@ export async function moveDevPort(opts: {
   const issuer = issuerFromPort(devPort);
   const secret = await readZitadelSecret(cwd);
   const moving = previousIssuer !== issuer;
+  // Read before anything changes, so a configuration that cannot be read
+  // stops the move rather than leaving it half made.
+  const ssoProviders = moving ? await connectionSlugs(cwd) : [];
 
   const client = createZitadelClient({
     userAgent: userAgent(),
@@ -159,7 +162,7 @@ export async function moveDevPort(opts: {
     previousIssuer,
     issuer,
     result,
-    ssoProviders: moving ? await connectionSlugs(cwd) : [],
+    ssoProviders,
     ...(staleOrigin === undefined ? {} : { staleOrigin }),
     ...(refused === undefined ? {} : { refused }),
     ...served,
@@ -200,15 +203,37 @@ async function serveNewOrigin(
   }
 }
 
-/** The slugs of the connection files under `.zitadel/idps/`. */
-async function connectionSlugs(cwd: string): Promise<string[]> {
-  try {
-    const entries = await readdir(join(cwd, IDPS_DIR));
-    return entries
-      .filter((name) => name.endsWith(".json"))
-      .map((name) => name.slice(0, -".json".length))
-      .sort();
-  } catch {
-    return [];
-  }
+/**
+ * The names of the project's connections, whose redirect URIs name the dev
+ * port.
+ *
+ * @remarks
+ * A connection file its contract refuses is still a provider whose redirect
+ * URI names the port, so it is listed by its file name beside the valid ones.
+ *
+ * @param cwd - The project root.
+ * @returns Each connection's name, in path order.
+ * @throws The error the configuration could not be read with.
+ */
+async function connectionSlugs(cwd: string): Promise<readonly string[]> {
+  const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), ["connections"]);
+  const named = [
+    ...config.connections.all.map((connection) => {
+      return { path: connection.path, name: connection.slug };
+    }),
+    ...config.broken
+      .filter((file) => {
+        return file.kind === "connection";
+      })
+      .map((file) => {
+        return { path: file.path, name: basename(file.path, ".json") };
+      }),
+  ];
+  return named
+    .sort((left, right) => {
+      return left.path.localeCompare(right.path);
+    })
+    .map((connection) => {
+      return connection.name;
+    });
 }

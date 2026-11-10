@@ -1,6 +1,6 @@
 import { box } from "consola/utils";
 
-import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
+import { exactZitadelPins } from "@/lib/zitadel-pins";
 import { BOX_STYLE, wrapForBox } from "./box";
 import { command } from "./style";
 import { escapeControlCharacters } from "./terminal-text";

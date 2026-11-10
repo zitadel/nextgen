@@ -1,5 +1,6 @@
 import { ListDeploymentsResponse } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { expect } from "vitest";
+import { z } from "zod";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
 import { parseJson, stripAnsi } from "./run-cli";
@@ -12,15 +13,40 @@ interface CliResult {
   readonly stderr: string;
 }
 
-interface Envelope {
-  status?: string;
-  code?: string;
-  message?: string;
-  hint?: string;
-  command?: string;
-  next_commands?: string[];
-  data?: { next_commands?: string[] };
+/**
+ * A field of an envelope these matchers read, or nothing when it is absent or
+ * of another kind, so one odd field leaves the rest of the envelope readable.
+ *
+ * @param schema - What the field holds when it is there.
+ * @returns The field's schema, reading anything else as absent.
+ */
+function field<T extends z.ZodType>(schema: T) {
+  return schema.optional().catch(undefined);
 }
+
+/** The commands an envelope suggests running next. */
+const NextCommands = field(z.array(z.string()));
+
+/**
+ * The parts of a `--json` envelope these matchers read. Anything else it
+ * carries is kept but not looked at.
+ */
+const EnvelopeSchema = z.looseObject({
+  status: field(z.string()),
+  code: field(z.string()),
+  message: field(z.string()),
+  hint: field(z.string()),
+  command: field(z.string()),
+  next_commands: NextCommands,
+  data: field(
+    z.looseObject({
+      next_commands: NextCommands,
+    }),
+  ),
+});
+
+/** A `--json` envelope, as far as these matchers read it. */
+type Envelope = Readonly<z.infer<typeof EnvelopeSchema>>;
 
 /**
  * The deployment record as the contract declares it, read from the generated
@@ -65,9 +91,17 @@ function suggestionsIn(envelope: Envelope): string[] {
   return envelope.next_commands ?? envelope.data?.next_commands ?? [];
 }
 
+/**
+ * The envelope a run printed, or an empty one when stdout is not a JSON
+ * object.
+ *
+ * @param result - The finished run.
+ * @returns What the matchers read of its envelope.
+ */
 function envelopeOf(result: CliResult): Envelope {
   try {
-    return parseJson(result.stdout) as Envelope;
+    const parsed = EnvelopeSchema.safeParse(parseJson(result.stdout));
+    return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }
@@ -354,8 +388,11 @@ expect.extend({
 });
 
 declare module "vitest" {
-  // biome-ignore lint/suspicious/noExplicitAny: must match vitest's own `Matchers<T = any>` type parameter exactly for declaration merging (TS2428).
-  interface Matchers<T = any> {
+  /**
+   * The CLI's own matchers, merged into vitest's. The type parameter's default
+   * is vitest's to declare, so it is left off here.
+   */
+  interface Matchers<T> {
     /** Exit 0 and an envelope that is not an error. */
     toSucceed(): T;
     /** Exit 0 and `status: "skipped"` — the command found nothing to do. */

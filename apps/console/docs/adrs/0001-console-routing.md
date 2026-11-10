@@ -213,6 +213,18 @@ the sidebar.
 > logo and the project switcher's `All projects`, and the shell draws it
 > without the sidebar. The sidebar holds the selected project's screens only.
 
+> **Amendment (2026-11-09, design decision D27):** the shell draws one frame
+> for every screen, and the route picks which of two lists the sidebar shows.
+> Projects and `/settings` are above every project and show the account's
+> (`staticData.nav.view: "account"`), which Projects heads; every other route
+> shows the selected project's. The Settings view's own header is gone.
+
+> **Amendment (2026-11-09, design decision D29):** the route picks between
+> three lists. Projects shows the account's (`view: "account"`): Projects and
+> one Settings row, the `/settings` route's own entry. `/settings` with
+> anything beneath it shows Settings' (`view: "settings"`), under a heading
+> row that leads back to Projects.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;

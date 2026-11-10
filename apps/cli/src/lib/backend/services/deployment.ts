@@ -11,11 +11,9 @@ import { ConflictError } from "@/lib/backend/errors";
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
 
-/** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
+/** What {@link DeploymentService.deployToPrimary} makes live. */
 export type DeployToPrimaryRequest = Readonly<{
   releaseId: string;
-  /** The primary origins the deploy lands on, which decide the concurrency guard. */
-  landing: readonly string[];
   message?: string;
 }>;
 
@@ -426,20 +424,16 @@ export class DeploymentService extends ApiService {
   /**
    * Make a release live on the primary origins, guarded against a deploy that
    * raced in: another deploy landing between reading what is live and writing.
-   * The guard is the newest deployment to any origin this deploy lands on, so a live preview, which never targets a primary, is never it. On
-   * a project's first deploy nothing is live, so no guard is sent.
+   * The guard is the project's newest primary deployment, as the server
+   * compares, so a live preview is never it. On a project's first deploy
+   * nothing is live, so no guard is sent.
    *
-   * @param request - The release, the origins it lands on and a message.
+   * @param request - The release and a message.
    * @returns Whether it deployed, lost a race, or met a revoked release.
    * @throws BackendError for any failure that is not one of those two outcomes.
    */
   async deployToPrimary(request: DeployToPrimaryRequest): Promise<DeployToPrimaryResult> {
-    const live = await this.live();
-    const observed = live.find((deployment) => {
-      return deployment.origins.some((origin) => {
-        return request.landing.includes(origin);
-      });
-    });
+    const observed = await this.newestPrimary();
     try {
       const deployment = await this.create({
         release_id: request.releaseId,
@@ -505,7 +499,6 @@ export class DeploymentService extends ApiService {
     }
     return this.deployToPrimary({
       releaseId: newest.release_id,
-      landing: [...newest.origins, origin],
       message,
     });
   }
