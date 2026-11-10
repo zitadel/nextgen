@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { Box } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
-import { MetaRule, MetaValue } from "./detail-meta";
 import { DetailHeader, DetailRow, DetailRows } from "./detail-page";
 import { Page } from "./layout";
 
@@ -12,13 +11,10 @@ function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
       <DetailHeader
         icon={Box}
         title="Engineering"
-        meta={
-          <>
-            <MetaValue label="Team ID" value="team_01" copyable />
-            <MetaRule />
-            <MetaValue label="Created" value="Jul 12, 2026" />
-          </>
-        }
+        meta={[
+          { label: "Team ID", value: "team_01", copyable: true },
+          { label: "Created", value: "Jul 12, 2026" },
+        ]}
         {...props}
       />
     </Page>,
@@ -32,11 +28,13 @@ describe("detail header", () => {
     expect(screen.getAllByRole("heading")).toHaveLength(1);
   });
 
-  it("carries the identifying values in the header card", () => {
+  it("lists the identifying values under the title, the id copyable", () => {
     renderHeader();
-    expect(screen.getByText("team_01")).toBeInTheDocument();
+    const terms = screen.getAllByRole("term").map((term) => term.textContent);
+    expect(terms).toEqual(["Team ID", "Created"]);
     expect(screen.getByText("Jul 12, 2026")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Team ID" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy Created" })).not.toBeInTheDocument();
   });
 
   it("renders the status beside the title and the subtitle beneath it", () => {
@@ -50,20 +48,21 @@ describe("detail header", () => {
     expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
   });
 
+  it("draws no icon tile for a screen without one", () => {
+    const { container } = render(<DetailHeader title="Default login" meta={[]} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
   it("keeps the icon out of the accessibility tree", () => {
-    const { container } = render(
-      <DetailHeader icon={Box} title="Engineering" meta={<MetaValue label="ID" value="x" />} />,
-    );
+    const { container } = render(<DetailHeader icon={Box} title="Engineering" meta={[]} />);
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
-});
 
-describe("detail header action", () => {
-  it("renders the action after the header card", () => {
+  it("puts the action after the title", () => {
     renderHeader({ action: <button type="button">Actions</button> });
     const action = screen.getByRole("button", { name: "Actions" });
-    const copy = screen.getByRole("button", { name: "Copy Team ID" });
-    expect(copy.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(title.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

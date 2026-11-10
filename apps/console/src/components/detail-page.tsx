@@ -12,10 +12,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { IdText } from "@/components/id-text";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
-import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
-import { MetaCard } from "./detail-meta";
 import { SECTION_HEADING, PAGE_TITLE } from "./typography";
 
 /**
@@ -27,12 +25,12 @@ import { SECTION_HEADING, PAGE_TITLE } from "./typography";
  * Its measurements live in "Resource detail layout" in `docs/styling.md`,
  * which a change to a value here updates too.
  *
- * The user-schema screen heads the same body with {@link DetailTitle}: the
- * title over one line of identity, with no icon tile or meta card.
+ * Every one is headed by {@link DetailHeader}: the title, then one line of
+ * identity values.
  */
 
-/** The 24px gap between the header row and the first body element. */
-export const DETAIL_BODY = "mt-6";
+/** The 36px gap between the header's identity line and the first body element. */
+export const DETAIL_BODY = "mt-9";
 
 /**
  * The 16px between a detail body's parts: the tab row and the first card, and
@@ -43,9 +41,9 @@ export const DETAIL_STACK = "flex flex-col gap-4";
 /** A detail screen's title: the 24/24 display face. */
 export const DETAIL_TITLE = PAGE_TITLE;
 
-/** The icon tile a detail title leads with. */
+/** The icon tile a detail title leads with: 24px, the title's line, a 16px glyph. */
 export const ICON_PLATE =
-  "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
+  "bg-muted text-foreground flex size-6 shrink-0 items-center justify-center rounded-sm";
 
 /** A card's or tab row's small action: 12px text, a 14px glyph. */
 export const CARD_ACTION_BUTTON = "gap-1 px-2.5 text-xs [&_svg]:size-3.5!";
@@ -274,58 +272,22 @@ export function DetailRows({
   );
 }
 
-/**
- * A detail screen's header as the design draws the user-schema screen: the
- * title over one line of identity, the resource's id (copyable) and its created
- * date, with no icon tile and no meta card. The line stacks under `sm`, where
- * the id alone fills it, and the rule between the two values exists only in the
- * row layout.
- */
-export function DetailTitle({
-  title,
-  idLabel,
-  id,
-  createdAt,
-}: {
-  title: string;
-  /** The id's label, e.g. `Schema ID`; the copy button's name follows it. */
-  idLabel: string;
-  id: string;
-  createdAt?: string;
-}) {
-  return (
-    <header className="flex flex-col gap-2 px-2">
-      <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
-      <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-1">
-          <span className="whitespace-nowrap">{idLabel}</span>
-          <span className="flex min-w-0 items-center gap-1">
-            {/* One line, cut in the middle: a URI id must not widen the page. */}
-            <IdText id={id} title={id} className="text-foreground" />
-            <CopyButton value={id} label={`Copy ${idLabel}`} size="inline" />
-          </span>
-        </span>
-        {createdAt && (
-          <>
-            <span aria-hidden className="bg-border mx-4.5 hidden h-4 w-px shrink-0 sm:block" />
-            <span className="flex shrink-0 items-center gap-1">
-              <span>Created</span>
-              <span>{formatDate(createdAt)}</span>
-            </span>
-          </>
-        )}
-      </div>
-    </header>
-  );
+/** One value on a detail header's identity line. */
+export interface DetailMetaItem {
+  label: string;
+  value: string;
+  /**
+   * Shown in the foreground with a copy button, and cut in the middle rather
+   * than widening the page: an id, or anything else a person copies.
+   */
+  copyable?: boolean;
 }
 
 /**
- * A detail screen's header row: the title lockup on the left, the meta card
- * and an optional action (a row menu) on the right.
- *
- * It wraps rather than overflows — the meta card's width is set by the id, so
- * when the title and the card do not fit on one line the card drops below
- * instead of pushing off the page edge.
+ * A detail screen's header: the title row (an optional icon tile, the title,
+ * a status beside it, an action at the row's end), then one 12/16 identity
+ * line, each value after its muted label and ruled off from the next. The
+ * line stacks under `sm`, where the rules go.
  */
 export function DetailHeader({
   icon: Icon,
@@ -335,60 +297,66 @@ export function DetailHeader({
   meta,
   action,
 }: {
-  icon: LucideIcon;
+  /** The glyph of the screen's sidebar entry, for a resource or a release. */
+  icon?: LucideIcon;
   title: string;
   /** Beside the title, e.g. a `StatusBadge`. */
   status?: ReactNode;
   /** A second identity line under the title, e.g. a user's identifier. */
   subtitle?: string;
-  /** The `MetaValue`s for the header card. */
-  meta: ReactNode;
-  /** After the meta card, e.g. the resource's actions menu. */
+  meta: DetailMetaItem[];
+  /** At the title row's end, e.g. the resource's actions menu. */
   action?: ReactNode;
 }) {
-  const lockup = (
-    <div className="flex min-h-9 min-w-0 items-center gap-3">
-      <span className={ICON_PLATE}>
-        <Icon className="size-4" strokeWidth={1.5} aria-hidden />
-      </span>
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
-              flex item's minimum width, so a title with no break point (a
-              user's email address) wraps on a phone instead of widening the
-              page past the viewport. */}
-          <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
-          {status}
-        </div>
-        {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
-      </div>
-    </div>
-  );
-
-  if (action) {
-    // Below `lg` the action stays on the title's row, and the meta card takes
-    // the full width under both rather than sharing a row with the menu, which
-    // would leave a long id too little room. From `lg` the card and the action
-    // travel together and wrap under the title as the plain header's card
-    // does. `contents` lets the grid place the pair's children below `lg`.
-    return (
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 px-2 lg:flex lg:flex-wrap lg:justify-between">
-        {lockup}
-        <div className="contents lg:flex lg:items-start lg:gap-4">
-          <MetaCard className="col-span-2 row-start-2">{meta}</MetaCard>
-          <div className="col-start-2 row-start-1">{action}</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    // Top-aligned, not centred against the meta card: the 36px icon tile is the
-    // title row (`PAGE_TITLE_ROW`), so the title lands on the same line as
-    // every list's and settings screen's.
-    <div className="flex flex-col gap-4 px-2 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
-      {lockup}
-      <MetaCard>{meta}</MetaCard>
-    </div>
+    <header className="flex items-start justify-between gap-4 px-2">
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 items-start gap-2">
+            {Icon && (
+              <span className={ICON_PLATE}>
+                <Icon className="size-4" strokeWidth={1.5} aria-hidden />
+              </span>
+            )}
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
+                  flex item's minimum width, so a title with no break point (a
+                  user's email address) wraps on a phone instead of widening
+                  the page past the viewport. */}
+              <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
+              {status}
+            </div>
+          </div>
+          {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
+        </div>
+        <dl className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-0">
+          {meta.map((item, index) => (
+            <div key={item.label} className="flex min-w-0 items-center">
+              {index > 0 && <span aria-hidden className={META_RULE} />}
+              <dt className="shrink-0 whitespace-nowrap">{item.label}</dt>
+              {/* `gap-0.5`: the copy glyph sits 2px inside its 16px button, so
+                  it lands 4px after the id. */}
+              <dd className="ml-1 flex min-w-0 items-center gap-0.5">
+                {item.copyable ? (
+                  <>
+                    {/* One line, cut in the middle: a URI id must not widen the page. */}
+                    <IdText id={item.value} title={item.value} className="text-foreground" />
+                    <CopyButton value={item.value} label={`Copy ${item.label}`} size="inline" />
+                  </>
+                ) : (
+                  <span className="whitespace-nowrap">{item.value}</span>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      {/* Beside the title and the identity line together, so it never pushes
+          the line down. */}
+      {action && <div className="shrink-0">{action}</div>}
+    </header>
   );
 }
+
+/** The rule between two identity values: 1px by 16px, 8px either side, from `sm`. */
+const META_RULE = "bg-border mx-2 hidden h-4 w-px shrink-0 sm:block";

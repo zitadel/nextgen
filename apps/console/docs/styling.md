@@ -228,10 +228,6 @@ row and cards 16px apart (`DETAIL_STACK`).
   `FIELD_GROUP_LABEL_RAIL` in a responsive `FieldGroup`) so the control starts
   there too. A status list the design right-aligns (a schema's sign-in
   methods) keeps its own row inside `DetailRows`.
-- User schemas head the same body with `DetailTitle` instead of
-  `DetailHeader`: the title over one 12/16 line with the id, its copy button
-  and the created date, no icon tile and no header card. The line stacks under
-  `sm`.
 
 Settings (Profile) is a different composition: a bare title over one card of
 labelled rows, in a centred column `--zl-container-settings` wide. Compose
@@ -241,19 +237,19 @@ heading with no header gutter, then `SettingsCard`
 block, 16px between rows. No icon tile and no header card: a settings screen is
 not a resource with an id.
 
-`DetailHeader` carries the icon tile (`ICON_PLATE`) and the header card
-(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
-copyable, and the created date, and an optional `action` (a release's menu)
-after the card. The identity-line header carries the same two values in one
-line instead.
+`DetailHeader` is the title row (an icon tile on resource and release
+screens, the title, a status beside it) over one identity line: the `meta`
+items, each value after its muted label, the id `copyable` and cut in the
+middle, a rule between items. The line stacks under `sm`. An `action` (a
+release's menu) sits at the right, beside the title and the line together.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
 | Page          | `Page` — 16px gutter, 20px top at `lg`, as every screen |
 | Header gutter | 24px — the page gutter plus 8px                        |
-| Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
-| Header card   | 20px inset, 14px block, values centred on the rule     |
-| Body          | 24px under the header row; 16px between its parts      |
+| Title row     | 24px icon tile (`ICON_PLATE`), 8px to a 24/24 display-face title, status 8px after |
+| Identity line | 16px under the title row; 12/16, value 4px after its label, a 1px by 16px rule with 8px either side |
+| Body          | 36px under the identity line; 16px between its parts   |
 | Body card     | 24px inset, 20px block, 16px from title to rule to content; the 1px stroke is drawn inside the edge (`Card`'s inset outline), as the design draws it |
 | Labelled row  | 218px label rail from `sm`, stacked below; 20px line, 4px block; 16px either side of a zero-height rule between rows |
 

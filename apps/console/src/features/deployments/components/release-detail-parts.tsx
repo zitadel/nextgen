@@ -1,4 +1,4 @@
-import { Ellipsis, GitCommitHorizontal } from "lucide-react";
+import { EllipsisVertical, GitCommitHorizontal } from "lucide-react";
 import { useState } from "react";
 import { DeploySheet } from "@/features/deployments/components/deploy-sheet";
 import { DETAIL_VALUE, DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
@@ -58,8 +58,8 @@ export function ReleaseActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon-sm" aria-label={`Actions for ${release.id}`}>
-            <Ellipsis aria-hidden />
+          <Button variant="outline" size="icon" aria-label={`Actions for ${release.id}`}>
+            <EllipsisVertical aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">

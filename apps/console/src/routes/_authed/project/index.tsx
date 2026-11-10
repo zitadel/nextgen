@@ -3,7 +3,6 @@ import { Boxes, Settings } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import {
@@ -111,13 +110,10 @@ function ProjectDetail() {
       <DetailHeader
         icon={Boxes}
         title={project.name}
-        meta={
-          <>
-            <MetaValue label="Project ID" value={project.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(project.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Project ID", value: project.id, copyable: true },
+          { label: "Created", value: formatDate(project.created_at) },
+        ]}
       />
 
       <Tabs

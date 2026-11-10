@@ -6,10 +6,11 @@ import {
   DETAIL_STACK,
   DetailRows,
   DetailSection,
-  DetailTitle,
+  DetailHeader,
 } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
+import { formatDate } from "@/lib/date";
 import { SchemaFieldsPanel } from "@/features/schemas/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
@@ -68,7 +69,7 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
  * schema's. The picker's `Latest` and `In use` badges say where the shown
  * revision stands.
  *
- * The header is `DetailTitle`, the title over one line of identity, as the
+ * The header is `DetailHeader`, the title over one line of identity, as the
  * design draws this screen. Each tab is a `DetailSection`; the Fields card
  * carries the revision picker as its action.
  */
@@ -88,7 +89,13 @@ function SchemaDetail() {
     <Page>
       {/* The design draws `Expires at` beside the id; nothing on the schema
           resource backs it, so the created date stands in. */}
-      <DetailTitle title={name} idLabel="Schema ID" id={schemaId} createdAt={createdAt} />
+      <DetailHeader
+        title={name}
+        meta={[
+          { label: "Schema ID", value: schemaId, copyable: true },
+          ...(createdAt ? [{ label: "Created", value: formatDate(createdAt) }] : []),
+        ]}
+      />
 
       <Tabs defaultValue="fields" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="Schema detail sections">

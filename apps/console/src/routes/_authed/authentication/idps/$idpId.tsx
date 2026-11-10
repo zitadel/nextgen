@@ -1,9 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Shield } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import {
   DETAIL_BODY,
   DETAIL_VALUE,
@@ -64,15 +62,11 @@ function IdpDetail() {
   return (
     <Page>
       <DetailHeader
-        icon={Shield}
         title={idp.definition.display_name}
-        meta={
-          <>
-            <MetaValue label="Connection ID" value={idp.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(idp.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Connection ID", value: idp.id, copyable: true },
+          { label: "Created", value: formatDate(idp.created_at) },
+        ]}
       />
 
       <DetailSection title="Provider details" className={DETAIL_BODY}>

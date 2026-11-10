@@ -2,7 +2,6 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { User } from "lucide-react";
 import { useState } from "react";
 import { DeleteUserDialog } from "@/features/users/components/delete-user-dialog";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import {
   DETAIL_BODY,
   DETAIL_CARD,
@@ -79,17 +78,12 @@ function UserDetail() {
         title={name}
         status={metadata.status && <StatusBadge status={metadata.status} />}
         subtitle={secondary}
-        meta={
-          <>
-            <MetaValue label="User ID" value={userId} copyable />
-            {metadata.createdAt && (
-              <>
-                <MetaRule />
-                <MetaValue label="Created" value={formatDate(metadata.createdAt)} />
-              </>
-            )}
-          </>
-        }
+        meta={[
+          { label: "User ID", value: userId, copyable: true },
+          ...(metadata.createdAt
+            ? [{ label: "Created", value: formatDate(metadata.createdAt) }]
+            : []),
+        ]}
       />
 
       <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} ${DETAIL_STACK}`}>

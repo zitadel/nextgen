@@ -1,7 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
@@ -51,13 +50,10 @@ function TeamDetail() {
         icon={Box}
         title={team.name}
         status={<StatusBadge status={team.status} />}
-        meta={
-          <>
-            <MetaValue label="Team ID" value={team.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(team.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Team ID", value: team.id, copyable: true },
+          { label: "Created", value: formatDate(team.created_at) },
+        ]}
       />
 
       <Tabs defaultValue="overview" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
