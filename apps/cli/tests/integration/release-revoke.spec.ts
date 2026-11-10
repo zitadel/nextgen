@@ -70,6 +70,14 @@ describe("release revoke", () => {
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
 
+    it("holds its invariants in every rendering of a refusal naming a hostile origin", async () => {
+      const app = await aSetUpApp();
+      const args = ["release", "revoke", await aRelease(app), "--force"];
+      platform.refusesRevokeNamingAHostileOrigin();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("refuses a deployment id, which is not a release id, without asking", async () => {
         const app = await aSetUpApp();

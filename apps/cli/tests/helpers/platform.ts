@@ -167,6 +167,14 @@ export interface PlatformMock {
   revokesAHostileReleaseId(): string;
 
   /**
+   * Answers a release revoke with `409 rel.in_use` naming an origin that holds
+   * a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
+
+  /**
    * Answers a user query with a page cursor holding a terminal escape
    * sequence, which the footer and the next-page command both name.
    *
@@ -461,6 +469,23 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return id;
+    },
+
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
     },
 
     pagesWithAHostileCursor() {

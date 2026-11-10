@@ -164,6 +164,26 @@ describe("ReleaseService.revoke", () => {
     });
   });
 
+  it("rethrows a rel.in_use refusal whose origins list is empty", async ({ server }) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/releases/rel_1/revoke`, () => {
+        return HttpResponse.json(
+          {
+            code: "rel.in_use",
+            message: "release: still served by an origin",
+            details: { origins: [] },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+
+    await expect(revoking("rel_1")).rejects.toMatchObject({
+      name: "ConflictError",
+      serverCode: "rel.in_use",
+    });
+  });
+
   it("rethrows any other conflict rather than answering in-use", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/releases/rel_1/revoke`, () => {

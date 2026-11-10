@@ -63,7 +63,7 @@ const RELEASE_IN_USE_BODY = z.object({
  */
 export type RevokeOutcome =
   | Readonly<{ outcome: "revoked"; release: Release }>
-  | Readonly<{ outcome: "in-use"; origins: readonly z.infer<typeof IN_USE_ORIGINS>[number][] }>;
+  | Readonly<{ outcome: "in-use"; origins: Readonly<z.infer<typeof IN_USE_ORIGINS>> }>;
 
 /**
  * The releases of one project: reading one, building one from a configuration
