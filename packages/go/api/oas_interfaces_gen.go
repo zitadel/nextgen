@@ -81,6 +81,10 @@ type CompleteClaimRes interface {
 	completeClaimRes()
 }
 
+type CreateApplicationRes interface {
+	createApplicationRes()
+}
+
 type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
@@ -183,6 +187,10 @@ type FlowdefDeletedRes interface {
 
 type FlowdefUpdatedRes interface {
 	flowdefUpdatedRes()
+}
+
+type GetApplicationByIdRes interface {
+	getApplicationByIdRes()
 }
 
 type GetAuthAttemptRes interface {

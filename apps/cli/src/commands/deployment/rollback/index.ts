@@ -1,16 +1,11 @@
-import { Flags } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { z } from "zod";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { reads, type Refused } from "@/lib/oclif/flags";
+import { reads, type Refused, taken } from "@/lib/oclif/flags";
+import { RollbackDeploymentParams } from "@/lib/backend/schemas";
 import {
   DeploymentService,
   ReleaseService,
@@ -34,6 +29,22 @@ const NOTHING_EARLIER_REFUSAL: Refusal = {
   message: "There is no earlier deployment to roll back to",
   hint: "Name a deployment to re-apply, or check `zitadel deployment list`.",
   next: ["deployment list"],
+};
+
+/**
+ * The deployment `deployment rollback` re-applies. The schema is the API spec's own, so a value that is not one is
+ * refused before anything is asked or called, and says what one looks like.
+ */
+const DEPLOYMENT_ID: Refused<string> = {
+  schema: z.string().trim().pipe(RollbackDeploymentParams.shape.deployment_id),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Find one with `zitadel deployment list`, or omit it to undo the last deploy.",
+    next: ["deployment list"],
+    details: {
+      argument: "{input}",
+    },
+  },
 };
 
 /**
@@ -77,7 +88,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     "<%= config.bin %> deployment rollback --force",
   ];
   static override args = {
-    deployment_id: nonBlankArg({
+    deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
       required: false,
       description: "The deployment to re-apply. Omit to undo the last deploy.",
     }),

@@ -57,6 +57,9 @@ the dialect generator is the only mint path, not that create always overwrites.
 | flow definition | `flowdef` |
 | IdP connection | `idp` |
 | IdP connection revision | `idprev` |
+| application (error codes use `application.*`, not the prefix) | `app` |
+| application revision | `apprev` |
+| application client row | `client` |
 | IdP identity link (`idp_identity_links`, storage-only) | `idplink` |
 | policy (ADR 066) | `pol` |
 | policy revision | `polrev` |
@@ -121,6 +124,7 @@ the forbid; handlers enforce it where ogen cannot (e.g. create-user).
 | SSO provider `id` in flow definitions | Config key, not a storage PK |
 | Middleware `req_*` | Correlation only; local `RequestIDGenerator` |
 | Secrets (`sk_*`, handoff, session token material) | Cryptographic secrets, not row PKs |
+| Application client `client_id` | A column of the client row, not its primary key. It holds the value the document supplied or, when the document supplied none, a copy of the row's minted `client_*` primary key. Unique per project. The API, the OAuth endpoints and error details identify a client by `client_id` or slug; the primary key stays inside storage. `client_` and `dcr_` are reserved for server-generated values |
 
 > Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a schema's resource `id` is dialect-minted; a declared `$id` stays a document property.
 
