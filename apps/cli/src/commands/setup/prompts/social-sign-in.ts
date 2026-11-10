@@ -20,6 +20,7 @@ import {
   type ProviderSelection,
   providerOf,
   selectionName,
+  slugFromDisplayName,
   validated,
 } from "@zitadel/config/idp";
 
@@ -49,18 +50,21 @@ export async function askCustomSettings(
   given: CustomFlagValues,
   ask: Questions,
 ): Promise<Required<CustomFlagValues>> {
+  // The display name comes first so the slug can be suggested from it: "Acme
+  // SSO" offers "acme-sso", which the developer accepts or edits.
+  const displayName = await ask.text({
+    name: "display name",
+    message: "What name should the sign-in button show? For example Acme SSO.",
+    parse: parseDisplayName,
+    given: given.displayName,
+  });
   const slug = await ask.text({
     name: "connection name",
     message:
       "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
     parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
     given: given.slug,
-  });
-  const displayName = await ask.text({
-    name: "display name",
-    message: "What name should the sign-in button show? For example Acme SSO.",
-    parse: parseDisplayName,
-    given: given.displayName,
+    initialValue: slugFromDisplayName(displayName, RESERVED_SLUGS),
   });
   const issuer = await ask.text({
     name: "issuer",
@@ -185,28 +189,43 @@ export class SocialSignInPrompt implements SetupPrompt {
    *
    * A multi-select rather than one choice: a project may offer several at
    * once, and the schema and flow already carry `sso_providers` as a list.
-   * `required: false` is what makes "none" an answer -- an explicit "not now"
-   * option cannot coexist with ticking a provider beside it.
+   * Space ticks a provider and Enter continues, so Enter on an empty list is
+   * not a silent skip: it asks whether to go on without SSO, where No goes back
+   * to the list, and only a Yes returns none.
    */
   private async chooseProviders(ask: Questions): Promise<readonly ProviderName[]> {
-    return ask.multiselect({
-      name: "external sign-in providers",
-      message: "Which external sign-in providers would you like to add? Press Enter to skip.",
+    for (;;) {
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
-      required: false,
-      options: [
-        ...IDP_PROVIDERS.map((provider) => ({
-          value: provider as ProviderName,
-          label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
-        })),
-        {
-          value: CUSTOM_PROVIDER as ProviderName,
-          label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
-        },
-      ],
-    });
+      const chosen: readonly ProviderName[] = await ask.multiselect({
+        name: "external sign-in providers",
+        message:
+          "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
+        required: false,
+        options: [
+          ...IDP_PROVIDERS.map((provider) => ({
+            value: provider as ProviderName,
+            label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
+          })),
+          {
+            value: CUSTOM_PROVIDER as ProviderName,
+            label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
+          },
+        ],
+      });
+      if (chosen.length > 0) {
+        return chosen;
+      }
+      const continueWithout = await ask.yesNo({
+        name: "continue without SSO",
+        message: "Would you like to continue without setting up SSO?",
+        initialValue: false,
+      });
+      if (continueWithout) {
+        return [];
+      }
+    }
   }
 
   /**

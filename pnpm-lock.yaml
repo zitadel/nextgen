@@ -251,6 +251,9 @@ catalogs:
     '@redocly/openapi-core':
       specifier: 2.31.5
       version: 2.31.5
+    '@sindresorhus/slugify':
+      specifier: ^4.0.1
+      version: 4.0.1
     '@storybook/addon-a11y':
       specifier: ^10.6.2
       version: 10.6.5
@@ -556,7 +559,7 @@ catalogs:
       version: 5.31.1
     yaml:
       specifier: ^2.9.0
-      version: 2.9.1
+      version: 2.9.0
     zod:
       specifier: ^4.6.6
       version: 4.6.7
@@ -1618,6 +1621,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@sindresorhus/slugify':
+        specifier: 'catalog:'
+        version: 4.0.1
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
@@ -8029,6 +8035,14 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@sindresorhus/slugify@4.0.1':
+    resolution: {integrity: sha512-DsuqdYRMBj9zcLBQ6m0KrkrWi8PuxXcPlO7CEjrhCOZWt8JPEMCuD3LD3FOgET/sHqgOE++xvkZI0HONqFyaug==}
+    engines: {node: '>=22'}
+
+  '@sindresorhus/transliterate@3.0.0':
+    resolution: {integrity: sha512-mqOUtMxpY419WtwwYw1EX865Oh+QWpa37yhGLXNmVc6d91wsBYLG51TgSePqrdnCSnTJn2AygX+35StK86tNOA==}
+    engines: {node: '>=22'}
 
   '@smithy/core@3.24.5':
     resolution: {integrity: sha512-Kt8phUg45M15EjhYAbZ+fFikYneijLu9Liugz8ZsYz2i8j0hzGv27LWKpEHYRfvj+LyCOSijpcR/2i8RouV+cA==}
@@ -23832,6 +23846,13 @@ snapshots:
   '@sindresorhus/is@8.1.0': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
+
+  '@sindresorhus/slugify@4.0.1':
+    dependencies:
+      '@sindresorhus/transliterate': 3.0.0
+      escape-string-regexp: 5.0.0
+
+  '@sindresorhus/transliterate@3.0.0': {}
 
   '@smithy/core@3.24.5':
     dependencies:

@@ -2927,6 +2927,7 @@ describe("Setup.run", () => {
         .mockResolvedValueOnce(DEFAULT_SETUP_PRESET)
         .mockResolvedValueOnce(15);
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
     }
 
     it("closes the chain on what the run did, not on the box's own title", async ({ dir }) => {
@@ -2974,6 +2975,7 @@ describe("Setup.run", () => {
         .mockResolvedValueOnce(DEFAULT_SETUP_PRESET)
         .mockResolvedValueOnce(15);
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
     }
 
     /**
