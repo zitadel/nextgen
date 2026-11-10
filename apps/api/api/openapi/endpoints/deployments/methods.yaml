@@ -16,7 +16,19 @@ post:
     Name the release by exactly one of `release_id` or `content_hash`. Take the
     release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
     `listReleases` (`GET /releases`) returns. The release must already exist in the project.
-    `targets` is `primary`, which means every primary origin, or preview URLs.
+    `targets` is `primary`, which means every primary origin, or a list of
+    preview URLs. `["primary"]`, which clients released before this shape
+    send, still deploys to every primary origin until 1.0.0; its answer
+    carries a `Deprecation` header (RFC 9745) and a `Link` to these docs.
+
+    The project's newest primary deployment also serves every request with no
+    `Origin`, such as a backend, a native app or the CLI, and the console's
+    login preview of a project that does not list the console's origin. A
+    preview URL serves only itself.
+
+    `primary` records the project's current primary origins. One added later
+    serves nothing until the next deployment to `primary`; one removed stops
+    being served at once.
 
     A deployment to `primary` changes nothing when the project's newest
     primary deployment has the same release and frozen values and covers
@@ -26,8 +38,8 @@ post:
 
     If the request is refused, fix the cause and send it again:
     - `400 dep.invalid`: the request names both or neither of `release_id` and
-      `content_hash`, names a primary origin exactly, mixes `primary` with
-      preview URLs, sends `primary` for a project with no primary origin, sends
+      `content_hash`, names a primary origin among the preview URLs, sends
+      `primary` for a project with no primary origin, sends
       `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct
       the request.
     - `400 dep.variables_missing`: a variable the release references has no
@@ -65,8 +77,7 @@ post:
               deploying.
             value:
               release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-              targets:
-                - primary
+              targets: primary
               message: add phone_number to human-user
               expected_deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
           preview:
@@ -166,7 +177,7 @@ post:
                 Primary origins are deployed as a whole: send `primary`.
               value:
                 code: dep.invalid
-                message: deploy primary origins with the primary keyword
+                message: deploy to primary origins with the primary target
             variablesMissing:
               summary: The release references variables with no preview value
               description: |
@@ -268,10 +279,12 @@ get:
     origin alone.
 
     With `live=true`, the list is what is served now, newest first. It holds
-    the project's newest primary deployment, narrowed to origins that are
-    still primary, and the newest deployment to each live preview URL,
-    narrowed to the URLs it still serves. Combined with `origin`, it is the
-    one deployment that origin serves, or empty.
+    the project's newest primary deployment with every origin it names, an
+    origin the project no longer lists included: that deployment also serves
+    requests with no `Origin`, so it stays live. It also holds the newest
+    deployment to each live preview URL, narrowed to the URLs it still
+    serves. Combined with `origin`, it is the one deployment that origin
+    serves, or empty, as it is for an origin the project no longer lists.
 
     The `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),
     `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.

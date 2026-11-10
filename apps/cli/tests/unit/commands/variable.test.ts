@@ -1176,7 +1176,7 @@ describe("variable rm", () => {
       hint: string;
       next_commands: string[];
     };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands.join(" ")).toContain("--force");
     expect(json.hint).toContain("from the project");
   });

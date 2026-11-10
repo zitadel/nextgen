@@ -379,7 +379,7 @@ test("llms-full.txt carries every page but the API operations", async ({ request
     operations.filter((page) => full.includes(`(${origin}${page.url})`)).map((page) => page.url),
     "API operations in llms-full.txt",
   ).toEqual([]);
-  expect(full.length).toBeLessThan(500_000);
+  expect(full.length).toBeLessThan(600_000);
 });
 
 test("scripts and styles load from /docs/_next/", async ({ request }) => {

@@ -19,12 +19,11 @@ type RuntimeResolution struct {
 	// Origin is the normalized request Origin the gate admitted, "" when the
 	// request carried none.
 	Origin string
-	// Target is the project origin pattern that admitted Origin, "" when
-	// admission was open (empty allowlist, loopback or an origin of the
-	// deployment's console) rather than a stored pattern.
+	// Target is the project origin pattern that admitted Origin, "" when the
+	// request is served the newest primary deployment.
 	Target string
 	// Source is "origin" when a deployment to the exact origin answered, or
-	// empty when resolution refused before a target was found.
+	// "default" when the newest primary deployment did.
 	Source     string
 	Deployment *domain.Deployment
 	Release    *domain.Release
@@ -55,7 +54,9 @@ func (res *RuntimeResolution) logAttrs() []any {
 type RuntimeResolver struct {
 	v2Pool   *DB
 	releases ReleaseService
-	// ownOrigins are the origins the deployment's console runs on, normalized.
+	// ownOrigins are the deployment's console hosts, normalized. A project
+	// that does not list one is served the newest primary deployment when
+	// opening a flow.
 	ownOrigins []string
 	now        func() time.Time
 }
@@ -75,9 +76,10 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...strin
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
-// admits, the target is the newest deployment to that exact origin, and the
-// release is that deployment's release unless it is revoked. There is no
-// project default target and no release pin in this path.
+// admits, the target is the deployment the live view says that origin serves,
+// and the release is that deployment's release unless it is revoked. A request
+// with no origin, and one from a console host the project does not list, is
+// served the newest primary deployment.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
 		slog.String("project_id", projectID),
@@ -98,12 +100,15 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 		}
 		return nil, err
 	}
-	if resolution == nil {
-		logger.Info("runtime resolution deferred", slog.String("reason", "open_admission_no_deployment"))
-		return nil, nil
-	}
 	logger.Info("runtime resolved", resolution.logAttrs()...)
 	return resolution, nil
+}
+
+// ResolvePrimary serves the project's newest primary deployment, whatever
+// origin the caller sent. Management calls that act on the project's live
+// rules use it.
+func (r *RuntimeResolver) ResolvePrimary(ctx context.Context, projectID string) (*RuntimeResolution, error) {
+	return r.Resolve(ctx, projectID, "")
 }
 
 func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
@@ -115,76 +120,91 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to read the project")
 	}
-	resolution := &RuntimeResolution{Project: project}
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return r.resolutionForDefault(ctx, project, "")
+	}
 
 	matched, err := r.gateOpening(ctx, project, origin)
 	if err != nil {
 		return nil, err
 	}
-	if matched == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil).WithMessage("nothing is deployed to this origin")
+	// The console's own origin, where the project lists none, is served the
+	// default; every other admitted origin its own target.
+	if matched.pattern == "" && r.isOwnOrigin(matched.origin) {
+		return r.resolutionForDefault(ctx, project, matched.origin)
 	}
 
-	resolution.Origin = matched.origin
-	resolution.Target = matched.pattern
-	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
+	dep, err := r.deploymentOf(ctx, projectID, matched)
 	if err != nil {
 		return nil, err
 	}
-	if dep == nil {
-		// TODO(#1616): open admission with nothing deployed keeps the
-		// newest-revision path instead of rel.not_deployed.
-		if matched.open {
-			return nil, nil
-		}
-		return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
-			WithMessage("nothing is deployed to " + matched.origin)
+	if dep != nil {
+		return r.finish(ctx, project, matched.origin, matched.pattern, "origin", dep)
 	}
+	message := "nothing is deployed to " + matched.origin + "; run zitadel deploy"
+	if matched.pattern == "" {
+		// A loopback origin the project does not list: no deployment can name
+		// it until it is a primary origin.
+		message = "nothing is deployed to " + matched.origin + "; add it with zitadel origin add " +
+			matched.origin + " --kind primary, then run zitadel deploy"
+	}
+	return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
+		WithMessage(message)
+}
 
-	resolution.Source = "origin"
-	resolution.Deployment = dep
+// resolutionForDefault serves the project's newest primary deployment.
+func (r *RuntimeResolver) resolutionForDefault(ctx context.Context, project *domain.Project, requestOrigin string) (*RuntimeResolution, error) {
+	dep, err := newestPrimary(ctx, r.v2Pool.Statements(), project.ID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the newest primary deployment")
+	}
+	if dep == nil {
+		return nil, domain.ErrReleaseNoDefault()
+	}
+	return r.finish(ctx, project, requestOrigin, "", "default", dep)
+}
 
-	release, err := r.releases.Get(ctx, projectID, dep.ReleaseID)
+func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, origin, target, source string, dep *domain.Deployment) (*RuntimeResolution, error) {
+	release, err := r.releases.Get(ctx, project.ID, dep.ReleaseID)
 	if err != nil {
 		return nil, err
 	}
 	if release.Revoked() {
 		return nil, domain.ErrReleaseRevoked()
 	}
-	resolution.Release = release
-	return resolution, nil
+	return &RuntimeResolution{
+		Project:    project,
+		Origin:     origin,
+		Target:     target,
+		Source:     source,
+		Deployment: dep,
+		Release:    release,
+	}, nil
 }
 
-func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
-	stmts := r.v2Pool.Statements()
-	serving, err := stmts.GetNewestPerOrigin(ctx, projectID, []string{origin})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
-	}
-	newest := domain.NewestOriginDeployment(serving)
-	if newest == nil {
-		return nil, nil
-	}
-	dep, err := stmts.GetDeploymentByID(ctx, projectID, newest.DeploymentID)
+// deploymentOf is the deployment an admitted origin serves, nil for none, as
+// the live view picks it: a listed primary origin runs the newest primary
+// deployment when that names it, a preview URL its live preview deployment.
+// A deployment freezes its origins, so one added later waits for the next
+// deploy.
+func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
+	dep, err := r.v2Pool.Statements().GetLiveDeployment(ctx, projectID, matched.origin, r.now())
 	if err != nil {
 		if isNoRowFound(err) {
 			return nil, nil
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's deployment")
 	}
 	return dep, nil
 }
 
 // matchedOrigin is an origin the gate admitted: the normalized request
-// origin, the project origin pattern that matched it (empty when open),
-// whether it was admitted by a preview row rather than a primary pattern,
-// and whether admission was open (empty allowlist, loopback or an origin of
-// the deployment's console).
+// origin and the project origin pattern that matched it, empty when the
+// project lists none.
 type matchedOrigin struct {
 	origin  string
 	pattern string
-	preview bool
-	open    bool
 }
 
 // gateOpening is Gate for the request that opens an attempt, which also
@@ -196,22 +216,35 @@ type matchedOrigin struct {
 // show a project's first step but never sign anyone in.
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
-	if err == nil || len(r.ownOrigins) == 0 {
-		return matched, err
+	if err == nil {
+		return matched, nil
 	}
-	if !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) && !errors.Is(err, domain.ErrProjectPreviewNotLive(nil)) {
+	if !r.isOwnOrigin(origin) || !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) {
 		return nil, err
 	}
-	if normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin)); normErr == nil && slices.Contains(r.ownOrigins, normalized) {
-		return &matchedOrigin{origin: normalized, open: true}, nil
+	normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin))
+	if normErr != nil {
+		return nil, err
 	}
-	return nil, err
+	return &matchedOrigin{origin: normalized}, nil
+}
+
+func (r *RuntimeResolver) isOwnOrigin(origin string) bool {
+	if len(r.ownOrigins) == 0 {
+		return false
+	}
+	normalized, err := domain.NormalizeOrigin(strings.TrimSpace(origin))
+	if err != nil {
+		return false
+	}
+	return slices.Contains(r.ownOrigins, normalized)
 }
 
 // Gate decides whether a request from origin may be served at all. An absent
 // origin is not a browser and passes with no match. An empty origin list
-// admits every origin. A loopback origin is always admitted. A preview
-// pattern admits nothing by itself: the preview row for the exact URL does.
+// admits nothing. A loopback origin is always admitted, with the pattern that
+// lists it if any. A preview pattern admits nothing else by itself: the
+// preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -222,10 +255,13 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin}).
 			WithMessage(origin + " is not an origin of this project")
 	}
-	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) {
-		return &matchedOrigin{origin: normalized, open: true}, nil
-	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)
+	if domain.IsLoopbackOrigin(normalized) {
+		if ok {
+			return &matchedOrigin{origin: normalized, pattern: entry.Pattern}, nil
+		}
+		return &matchedOrigin{origin: normalized}, nil
+	}
 	if !ok {
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": normalized}).
 			WithMessage(normalized + " is not an origin of this project")
@@ -245,14 +281,12 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectPreviewNotLive(map[string]string{"origin": normalized}).
 			WithMessage("no live preview for " + normalized + "; run zitadel preview on this branch")
 	}
-	return &matchedOrigin{origin: normalized, pattern: entry.Pattern, preview: true}, nil
+	return &matchedOrigin{origin: normalized, pattern: entry.Pattern}, nil
 }
 
 type runtimeResolutionKey struct{}
 
-// WithRuntimeResolution attaches the release that serves the request, so the
-// flow definition and branding resolve from what it pins rather than from
-// the newest revision.
+// WithRuntimeResolution attaches the release that serves the request.
 func WithRuntimeResolution(ctx context.Context, resolution *RuntimeResolution) context.Context {
 	if resolution == nil {
 		return ctx
@@ -267,37 +301,12 @@ func RuntimeResolutionFromContext(ctx context.Context) *RuntimeResolution {
 	return resolution
 }
 
-// ReleaseFromContext is the release the request resolved to, nil when there
-// is none.
-func ReleaseFromContext(ctx context.Context) *domain.Release {
+// runtimePins is what the request's release pins of one kind, by handle. A
+// request with no release is not deployed.
+func runtimePins(ctx context.Context, kind domain.ReleasePointerKind) (domain.ReleasePins, error) {
 	resolution := RuntimeResolutionFromContext(ctx)
-	if resolution == nil {
-		return nil
+	if resolution == nil || resolution.Release == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	return resolution.Release
-}
-
-// PinnedRevisions is handle → revision id for one release pointer kind.
-type PinnedRevisions map[string]string
-
-// ReleasePinsFlow reports whether the request's release pins at least one
-// flow definition. Schema, branding, identity providers and policies follow
-// that switch: they read the pinned revisions only then, and the newest
-// otherwise.
-func ReleasePinsFlow(ctx context.Context) bool {
-	return len(PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)) > 0
-}
-
-// PinsFor returns the revision ids a release pins for one kind, keyed by handle.
-func PinsFor(release *domain.Release, kind domain.ReleasePointerKind) PinnedRevisions {
-	pinned := make(PinnedRevisions)
-	if release == nil {
-		return pinned
-	}
-	for _, pointer := range release.Pointers {
-		if pointer.Kind == kind {
-			pinned[pointer.Handle] = pointer.RevisionID
-		}
-	}
-	return pinned
+	return resolution.Release.Pins(kind), nil
 }

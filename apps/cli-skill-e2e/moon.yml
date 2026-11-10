@@ -1,0 +1,29 @@
+id: "cli-skill-e2e"
+language: "typescript"
+layer: "tool"
+stack: "frontend"
+
+workspace:
+  inheritedTasks:
+    # An agent eval, not a build or a test suite: it needs Docker and a Claude
+    # credential, so it runs on request (`eval`) and never in `moon ci`.
+    exclude:
+      - "build"
+      - "test"
+
+tasks:
+  # Run the journeys. Pick what runs with EVAL_SCENARIOS, EVAL_JOURNEYS and
+  # EVAL_REPEATS (see README.md).
+  eval:
+    command: "corepack pnpm run eval"
+    options:
+      cache: false
+      runInCI: false
+      outputStyle: "stream"
+
+  # Rebuild the report pages from the results already in out/.
+  report:
+    command: "corepack pnpm run report"
+    options:
+      cache: false
+      runInCI: false

@@ -59,8 +59,9 @@ post:
         Attributes that fail the user schema answer `req.invalid`, the same
         way a malformed body does: `details.details.fields` lists the dotted
         path of every failing field from the request body, such as
-        `attributes.country` or `attributes.address.zip`. Only the field
-        names are reported, never the rejected values.
+        `attributes.country` or `attributes.address.zip`, and a failure inside
+        an array item by the item's index, such as `attributes.phones.0.fax`.
+        Only the field names are reported, never the rejected values.
       content:
         application/json:
           schema:

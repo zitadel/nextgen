@@ -11,6 +11,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useAsync } from "@/hooks/use-async";
 import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
 import { useProjectSearch } from "@/features/projects/my-projects";
@@ -22,10 +23,14 @@ import type { NavIcon } from "@/nav";
 import { type NavItem, useNavItems } from "./use-nav-items";
 
 /**
- * Console search: the top bar's trigger and the "Go to" palette it opens (⌘K /
+ * Console search: the sidebar's trigger and the "Go to" palette it opens (⌘K /
  * Ctrl K anywhere). It moves you somewhere — a page, a team, a project, your
  * settings. Searching *inside* a list stays in that list's own toolbar; this
  * is navigation, not a results page.
+ *
+ * The trigger heads the sidebar's list rather than sitting in the top bar
+ * (D27): in the bar it stacked on a list's own search, two fields a row apart.
+ * A row of the sidebar's menu: a field at full width, its glyph in the rail.
  *
  * Groups, top to bottom: pages in the selected project, teams (matched on the
  * server, so a project with many is searched in full), projects (matched on
@@ -36,17 +41,24 @@ import { type NavItem, useNavItems } from "./use-nav-items";
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label="Search"
-      aria-keyshortcuts="Meta+K Control+K"
-      className={TRIGGER}
-    >
-      <Search className="size-4 shrink-0" aria-hidden />
-      <span className="truncate">Search…</span>
-      <Kbd className="ml-auto">{IS_MAC ? "⌘K" : "Ctrl K"}</Kbd>
-    </button>
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        variant="outline"
+        tooltip="Search"
+        onClick={onOpen}
+        aria-label="Search"
+        aria-keyshortcuts="Meta+K Control+K"
+        // A field, not a row: the card's fill and muted text, which hovering
+        // keeps, where a row would take the accent.
+        className="bg-card pr-1.5 text-muted-foreground hover:bg-card hover:text-muted-foreground"
+      >
+        <Search aria-hidden />
+        <span className="truncate">Search…</span>
+        <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">
+          {IS_MAC ? "⌘K" : "Ctrl K"}
+        </Kbd>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
@@ -112,7 +124,7 @@ export function SearchDialog({
   // answer stays until the next lands, so the group never empties mid-typing.
   const projects = useProjectSearch(open ? query : "", PROJECT_RESULTS);
   const pages = useNavItems();
-  const yours = useNavItems("settings");
+  const account = useNavItems("account");
 
   // A fresh palette each time it opens.
   useEffect(() => {
@@ -167,9 +179,9 @@ export function SearchDialog({
       },
       { heading: "Teams", results: teamResults },
       { heading: "Projects", results: projectResults },
-      { heading: "You", results: navResults(yours) },
+      { heading: "Account", results: navResults(account) },
     ].filter((group) => group.results.length > 0);
-  }, [pages, yours, teams, projects, projectName, q, navigate, onOpenChange]);
+  }, [pages, account, teams, projects, projectName, q, navigate, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -243,10 +255,6 @@ function Kbd({ children, className }: { children: ReactNode; className?: string 
 }
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-
-/** The bar's search field: 32px, up to 300px wide, a button that looks like an input. */
-const TRIGGER =
-  "flex h-8 w-full max-w-75 min-w-45 items-center gap-2 rounded-md border border-input bg-card pr-1.5 pl-2.5 text-left text-sm text-muted-foreground transition-colors outline-none hover:border-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 /** 560px, 70px from the top rather than centred, so results grow downward. */
 const PALETTE =

@@ -16,6 +16,7 @@ import {
   ProjectPolicies,
 } from "@/features/project-settings/components/project-policies";
 import { ProjectVariables } from "@/features/project-settings/components/project-variables";
+import { readDeployedPasswordPolicy } from "@/features/project-settings/api";
 import { RenameCard } from "@/components/rename-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { describeError } from "@/lib/api-error";
@@ -74,17 +75,16 @@ export const Route = createFileRoute("/_authed/project/")({
       // No kind: every name with its value per kind, which is what the table
       // shows side by side.
       api.getVariables({ project_id: projectId }),
-      // The password policy as its newest revision; a project that never
-      // published one answers an empty list. Read-only, so a failed read
-      // costs the card its row, not the page its editable sections.
-      api
-        .listPolicies({ project_id: projectId, operation: "auth.factor.password.set", limit: 1 })
-        .then(
-          (page): PasswordPolicyRead => ({ config: page.policies[0]?.config }),
-          (cause): PasswordPolicyRead => ({
-            error: describeError(cause, "The password policy could not be read."),
-          }),
-        ),
+      // The password policy the primary origins enforce, which is the one
+      // their release pins rather than the newest published revision.
+      // Read-only, so a failed read costs the card its row, not the page its
+      // editable sections.
+      readDeployedPasswordPolicy(projectId).then(
+        (read): PasswordPolicyRead => read ?? { deployed: false },
+        (cause): PasswordPolicyRead => ({
+          error: describeError(cause, "The password policy could not be read."),
+        }),
+      ),
     ]);
     return {
       project,

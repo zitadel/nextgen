@@ -131,7 +131,7 @@ describe("resources", () => {
 
           const result = await app.run([topic, verb, id, "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it.each(DESTRUCTIVE)("says to pass --force for %s %s", async (topic, verb, id) => {

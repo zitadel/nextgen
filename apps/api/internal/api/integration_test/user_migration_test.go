@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -18,6 +19,8 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/events"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -368,12 +371,15 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 			}
 		}`, helpers.BuiltinSchemaBaseURL, migrationObjectType, helpers.MustMarshal(t, required), properties))
 	}
-	initialSchema := revision(t, []string{"email"}, `"color": {"type": "string"}`)
+	initialSchema := revision(t, []string{"email"}, `
+		"color": {"type": "string"},
+		"givenName": {"type": "string"}`)
 
 	// One definition offers every method. It names the schema by objectType,
-	// so flows run against its newest revision.
+	// so flows run against the revision the release pins.
 	definition := ssoLoginFlowDefinition(migrationObjectType)
 	definition.Name = "migration-login"
+	definition.Steps[0].Fields = []string{"email", "givenName"}
 	definition.Steps[0].Actions = append(definition.Steps[0].Actions,
 		api.StepAction{Name: "passkey", Kind: api.StepActionKindPasskey})
 	definition.Steps[0].Transitions.Value["passkey"] = api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")}
@@ -464,6 +470,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	require.NoError(t, err, "the identity link is still there")
 	assert.Equal(t, linkBefore, linkAfter)
 
+	deployPrimary(t, f.project.ID)
 	t.Run("signs in with the password", func(t *testing.T) {
 		attemptID := newAttempt(t, f.client, f.project)
 		identified := verifyAttemptProof(t, f.client, attemptID, api.ChallengeMethodIdentifier, identifierProof(email))
@@ -522,5 +529,197 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 		userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
 		require.True(t, ok)
 		assert.Equal(t, userID, userFactor.UserID, "the link resolves to the migrated user")
+	})
+}
+
+// TestPatchUserDryRun proves dry_run answers what the real request answers and
+// leaves no trace: the stored user, its updated_at and the project's user events
+// are what they were.
+func TestPatchUserDryRun(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	revision := func(rev int, properties map[string]any, required ...string) string {
+		return harness.CreateUserSchema(t, project, helpers.MustMarshal(t, map[string]any{
+			"$id":            fmt.Sprintf("https://dry-run.example.com/schemas/member-v%d.json", rev),
+			"$schema":        "https://json-schema.org/draft/2020-12/schema",
+			"title":          "member",
+			"metaSchema":     helpers.BuiltinSchemaBaseURL + "/user-schema.json",
+			"kind":           "user-schema",
+			"objectType":     "member",
+			"type":           "object",
+			"x-auth-methods": map[string]any{"passkey": map[string]any{"enabled": true}},
+			"required":       required,
+			"properties":     properties,
+		}))
+	}
+	properties := map[string]any{
+		"email": map[string]any{"type": "string", "x-unique": "project"},
+	}
+	v1 := revision(1, properties, "email")
+	v2Properties := maps.Clone(properties)
+	v2Properties["phones"] = map[string]any{
+		"type":  "array",
+		"items": map[string]any{"type": "object", "required": []string{"fax"}},
+	}
+	v2Properties["country"] = map[string]any{"type": "string"}
+	v2 := revision(2, v2Properties, "email", "country")
+
+	createUser := func(t *testing.T, email string) *domain.User {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  v1,
+			Attributes: map[string]any{"email": email},
+		})
+		require.NoError(t, err)
+		return user
+	}
+	userEvents := func(t *testing.T, userID string) []domain.EventType {
+		t.Helper()
+		opts := events.ListOptions(project.ID, 100)
+		opts.Filter = database.And(opts.Filter,
+			database.Equal(database.Col(domain.EventFieldEntityType), "user"),
+			database.Equal(database.Col(domain.EventFieldEntityID), userID),
+		)
+		page, err := harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), opts)
+		require.NoError(t, err)
+		types := make([]domain.EventType, 0, len(page.Items))
+		for _, event := range page.Items {
+			types = append(types, event.EventType)
+		}
+		return types
+	}
+	read := func(t *testing.T, id api.UserID) *api.User {
+		t.Helper()
+		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: id})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
+		return got.(*api.User)
+	}
+	send := func(t *testing.T, id api.UserID, dryRun bool, body map[string]any) api.PatchUserByIDRes {
+		t.Helper()
+		if dryRun {
+			body = maps.Clone(body)
+			body["dry_run"] = true
+		}
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id})
+		require.NoError(t, err)
+		return resp
+	}
+	// sameAsTheRealRequest sends body as a dry run and asserts it left no
+	// trace, then sends it for real and returns both answers.
+	sameAsTheRealRequest := func(t *testing.T, id api.UserID, body map[string]any) (dry, real api.PatchUserByIDRes) {
+		t.Helper()
+		before, eventsBefore := read(t, id), userEvents(t, string(id))
+		dry = send(t, id, true, body)
+		assert.Equal(t, helpers.MustMarshal(t, before), helpers.MustMarshal(t, read(t, id)), "a dry run changes nothing")
+		assert.Equal(t, eventsBefore, userEvents(t, string(id)), "a dry run emits no event")
+		return dry, send(t, id, false, body)
+	}
+
+	t.Run("a valid patch answers the user the real patch leaves", func(t *testing.T) {
+		t.Parallel()
+		user := createUser(t, "valid@example.com")
+		id := api.UserID(user.ID)
+
+		dry, real := sameAsTheRealRequest(t, id, map[string]any{
+			"schema":     v2,
+			"attributes": map[string]any{"country": "CH"},
+		})
+
+		require.IsType(t, &api.User{}, dry, helpers.MustMarshal(t, dry))
+		require.IsType(t, &api.User{}, real, helpers.MustMarshal(t, real))
+		wantUser, gotUser := *real.(*api.User), *dry.(*api.User)
+		assert.Equal(t, wantUser.Schema, gotUser.Schema)
+		assert.JSONEq(t, helpers.MustMarshal(t, wantUser.Attributes), helpers.MustMarshal(t, gotUser.Attributes))
+		assert.Contains(t, userEvents(t, user.ID), domain.EventTypeUserUpdated, "the real patch does emit")
+	})
+
+	t.Run("an invalid patch answers the real refusal", func(t *testing.T) {
+		t.Parallel()
+		id := api.UserID(createUser(t, "invalid@example.com").ID)
+
+		dry, real := sameAsTheRealRequest(t, id, map[string]any{
+			"schema": v2,
+			"attributes": map[string]any{
+				"phones": []any{map[string]any{"fax": "1"}, map[string]any{}},
+			},
+		})
+
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, dry, helpers.MustMarshal(t, dry))
+		assert.JSONEq(t, helpers.MustMarshal(t, real), helpers.MustMarshal(t, dry))
+		assert.Contains(t, helpers.MustMarshal(t, dry), "attributes.country")
+		assert.Contains(t, helpers.MustMarshal(t, dry), "attributes.phones.1.fax")
+	})
+
+	t.Run("a value another user holds answers the real conflict", func(t *testing.T) {
+		t.Parallel()
+		createUser(t, "holder@example.com")
+		id := api.UserID(createUser(t, "taker@example.com").ID)
+
+		dry, real := sameAsTheRealRequest(t, id, map[string]any{
+			"attributes": map[string]any{"email": "holder@example.com"},
+		})
+
+		// Compared by code and details: the real answer's parent is the write's
+		// own database error, which a dry run never meets.
+		require.IsType(t, &api.PatchUserByIDConflict{}, dry, helpers.MustMarshal(t, dry))
+		require.IsType(t, &api.PatchUserByIDConflict{}, real, helpers.MustMarshal(t, real))
+		dryConflict, realConflict := dry.(*api.PatchUserByIDConflict), real.(*api.PatchUserByIDConflict)
+		assert.Equal(t, realConflict.Code, dryConflict.Code)
+		assert.JSONEq(t, string(realConflict.Details.Value["details"]), string(dryConflict.Details.Value["details"]))
+		assert.Contains(t, string(dryConflict.Details.Value["details"]), "attributes.email")
+	})
+
+	t.Run("an unknown user answers the real 404", func(t *testing.T) {
+		t.Parallel()
+		resp := send(t, api.UserID("user_doesnotexist"), true, map[string]any{"attributes": map[string]any{"email": "a@example.com"}})
+		require.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	// dry_run is a body field because a server refuses a field it does not
+	// know: one from before dry_run answers 400 instead of applying the patch.
+	// This holds that property for whatever field comes next.
+	t.Run("a body field this server does not know is refused, not ignored", func(t *testing.T) {
+		t.Parallel()
+		id := api.UserID(createUser(t, "unknown@example.com").ID)
+		before := read(t, id)
+
+		// Sent raw: the generated client refuses the field before sending it.
+		status, body := cookieRequest(t, nil, http.MethodPatch, "/users/"+string(id),
+			`{"attributes": {"email": "changed@example.com"}, "not_a_field": true}`,
+			map[string]string{"Authorization": "Bearer " + harness.ProjectSecret(t, project)})
+
+		assert.Equal(t, http.StatusBadRequest, status, body)
+		assert.Contains(t, body, `"code":"`+domain.ErrRequestInvalid().Code+`"`)
+		assert.Equal(t, helpers.MustMarshal(t, before), helpers.MustMarshal(t, read(t, id)), "nothing changed")
+	})
+
+	t.Run("it takes the permission the real patch takes", func(t *testing.T) {
+		t.Parallel()
+		id := api.UserID(createUser(t, "guarded@example.com").ID)
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		outsider, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, outsider, other)
+
+		body := map[string]any{"attributes": map[string]any{"email": "guarded2@example.com"}}
+		dryBody := maps.Clone(body)
+		dryBody["dry_run"] = true
+		dry, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, dryBody), api.PatchUserByIDParams{UserID: id})
+		require.NoError(t, err)
+		real, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id})
+		require.NoError(t, err)
+		_, allowed := dry.(*api.User)
+		assert.False(t, allowed, helpers.MustMarshal(t, dry))
+		assert.IsType(t, real, dry)
 	})
 }

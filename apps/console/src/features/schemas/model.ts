@@ -547,7 +547,7 @@ export function schemaDesignation(
   return undefined;
 }
 
-function readProperties(schema: UserSchema): Record<string, Record<string, unknown>> {
+export function readProperties(schema: UserSchema): Record<string, Record<string, unknown>> {
   const properties = schema.properties;
   if (!properties || typeof properties !== "object") return {};
   return properties as Record<string, Record<string, unknown>>;

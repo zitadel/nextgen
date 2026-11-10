@@ -80,6 +80,9 @@ import {
 } from "@/lib/oclif/crud";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
+/** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
+const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
+
 /**
  * The platform connection every resource verb calls through: the typed
  * client bound to the resolved server, plus the project the credential
@@ -99,7 +102,7 @@ export const create = <B, C>(
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
-  shape: WriteShape = {},
+  shape: WriteShape & Pick<UpdateSpec<Platform, B, U>, "check"> = {},
 ): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
@@ -348,7 +351,12 @@ export const RESOURCES = {
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
-    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
+    // dry_run is the global --dry-run's, never a body field of its own.
+    update: update(USER_UPDATE_BODY, ({ client }, id, body) => client.patchUserByID(id, body), {
+      // A server from before dry_run refuses the field rather than applying
+      // the patch, so a dry run needs no check of the server first.
+      check: ({ client }, id, body) => client.patchUserByID(id, { ...body, dry_run: true }),
+    }),
     delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),
 

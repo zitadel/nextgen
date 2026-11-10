@@ -71,7 +71,7 @@ export function unscopedCommand(args: string, cliVersion?: string): SuggestedCom
  * carry whatever selector the command needs: they are the arguments as run.
  */
 export function portableSuggestions(
-  argLists: readonly string[][],
+  argLists: readonly (readonly string[])[],
   cliVersion: string,
   /** Arguments the caller fills in (`<what changed>`): quoted in the command, not portable words. */
   placeholders: readonly string[] = [],

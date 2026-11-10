@@ -49,7 +49,7 @@ import {
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
-    nav: { label: "Settings", order: 1, icon: Settings, view: "settings" },
+    nav: { label: "Settings", order: 9, icon: Settings, view: "account" },
   },
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), and a failed

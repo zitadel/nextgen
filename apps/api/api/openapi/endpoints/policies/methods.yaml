@@ -55,8 +55,8 @@ post:
   summary: Publish a policy
   description: |
     Publishes the project's policy for an operation as a new immutable
-    revision, creating the policy on its first publish. The newest revision
-    applies the next time the operation runs. Nothing already stored is
+    revision, creating the policy on its first publish. A revision applies
+    once a deployed release pins it. Nothing already stored is
     re-evaluated, so a stricter password policy applies the next time a
     password is set.
 

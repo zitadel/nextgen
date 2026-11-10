@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Boxes, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, validateNextSearch } from "@/auth/session";
 import { useNavItems, useRequestedNavItem } from "@/app-shell/use-nav-items";
 import { NewProjectCard } from "@/features/projects/components/new-project-card";
+import { NewProjectSheet } from "@/features/projects/components/new-project-sheet";
 import { ProjectLifecycle } from "@/features/projects/components/project-lifecycle";
 import { ProjectMark } from "@/components/project-mark";
 import { SearchField } from "@/components/search-field";
@@ -12,6 +14,7 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -19,35 +22,37 @@ import {
   ResourceIdCell,
   ResourceMenuHead,
   ResourceRow,
+  ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
-import { byName, primaryHost } from "@/features/projects/model";
-import { useProjectScope, useSelectProjectTarget } from "@/features/projects/project-scope";
-import { HomeColumn, Page } from "@/components/layout";
+import { primaryHost } from "@/features/projects/model";
+import { useSelectProjectTarget } from "@/features/projects/project-scope";
+import { Page } from "@/components/layout";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
 /**
  * Projects overview — every project the person can act on.
  *
  * The console's home: the logo and the project switcher's `All projects` open
- * it, and it draws no sidebar (`AppShell`'s `HomeShell`), since the sidebar is
- * one project's screens. It is where the console lands when there are several
+ * it, and it heads the account sidebar, the list of what sits above every
+ * project (D27). It is where the console lands when there are several
  * projects and none is selected yet (`routes/_authed/index.tsx`), and where
  * the `_authed` guard sends a screen that needs a project while none is
  * selected, passing it as `?next=`. The page is then the way to that screen —
  * `Continue to Teams` (D22) — and a row goes on there with the project
  * selected.
  *
- * A project is created from the app it connects, so the page hands over the
- * CLI's `setup` command beside the list rather than a button, and, below the
- * list, how a project goes from that command to production
- * (`ProjectLifecycle`). On the way to a screen the guide stays out of the way
- * of the choice being asked for.
+ * It is a list screen like every other: the title row with its search and its
+ * action, then the table. A project is created from the app it connects, so
+ * `New project` opens a drawer with the CLI's `setup` command and how a
+ * project goes from that command to production, not a form. With no project
+ * yet there is nothing to list, so the page is that command and that guide
+ * (`NewProjectCard`, `ProjectLifecycle`).
  *
  * A row opens the project — selects it and goes to its first screen — rather
  * than a detail page: the project's own page is `Settings` in the
@@ -56,17 +61,17 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
  * The list can hold every project of a deployment — a platform operator acts
  * on all of them — so a row tells projects apart the way the project switcher
  * does (D21): the project's generated mark, its name with its site's host
- * beneath, and its ID. Complete on its first page, the list reads by name;
- * a longer one keeps the server's order, by id, so `Load more` appends to the
- * rows shown rather than reshuffling them. The search is matched on the server
- * across every project the person can act on (`name_contains`), never against
- * the rows already loaded.
- *
- * The top bar shows no project switcher here: this list, with its search, is
- * the switcher's job done at full size, so the selected project is marked in it
- * (`Current`) rather than named above it.
+ * beneath, and its ID. The list reads newest first at every length (D28): the
+ * server sorts it by creation time (`order=desc`), so a project made a minute
+ * ago heads the list instead of waiting behind `Load more`, which appends
+ * older rows beneath the ones shown. The rows are never sorted here: a page
+ * sorted among itself would put the next one out of place. The search is
+ * matched on the server across every project the person can act on
+ * (`name_contains`), never against the rows already loaded.
  */
 export const Route = createFileRoute("/_authed/projects/")({
+  // First in the account sidebar; no `scope`, since it is above every project.
+  staticData: { nav: { label: "Projects", view: "account", order: 1, icon: Boxes } },
   // `next` is sanitized like the login screen's: only a router-relative path
   // is followed. The search lives in the URL like a filter tab: it belongs to
   // the request the loader makes, so a searched list survives a reload, and
@@ -82,6 +87,7 @@ export const Route = createFileRoute("/_authed/projects/")({
     // the calling credential's one home project (#1237).
     const page = await api.listMyProjects({
       limit: LIST_PAGE_SIZE,
+      order: NEWEST_FIRST,
       name_contains: deps.q,
       ...consoleSessionProject(),
     });
@@ -92,13 +98,19 @@ export const Route = createFileRoute("/_authed/projects/")({
 
 type ProjectsSearch = { next?: string; q?: string };
 
+/**
+ * The list's order, by creation time rather than by id: an id says nothing
+ * about when a project was made (root ADR 047). The loader and `Load more`
+ * both send it, since a page token only continues the order it came from.
+ */
+const NEWEST_FIRST = "desc";
+
 /** The Name cell clamps at 280px and truncates, as the Users table's User cell does. */
 const NAME_CLAMP = "max-w-70";
 
 function ProjectsScreen() {
   const loaded = Route.useLoaderData();
   const navigate = useNavigate({ from: Route.fullPath });
-  const selected = useProjectScope();
   const selectTarget = useSelectProjectTarget();
   // Opened on the way to a screen that needs a project (`?next=`), the page
   // names that screen (D22).
@@ -116,9 +128,10 @@ function ProjectsScreen() {
       const page = await api.listMyProjects({
         limit: LIST_PAGE_SIZE,
         page_token: pageToken,
-        // The search the token was issued under: a page token answers one
-        // question, and asking another with it is not a narrower list but a
-        // meaningless one.
+        // The order and the search the token was issued under: a page token
+        // answers one question, and asking another with it is not a narrower
+        // list but a meaningless one, or a refused one.
+        order: NEWEST_FIRST,
         name_contains: loaded.q,
         ...consoleSessionProject(),
       });
@@ -126,11 +139,7 @@ function ProjectsScreen() {
     },
     "Could not load more projects.",
   );
-  // A page with no token after it is the whole list, so it can read by name;
-  // the server's order is by id, which reads as no order at all.
-  const projects = loaded.nextPageToken
-    ? [...loaded.projects, ...paging.extra]
-    : byName(loaded.projects);
+  const projects = [...loaded.projects, ...paging.extra];
 
   // Latched for the screen's lifetime: a cleared search drops `?q=` before the
   // full list is back, and the field must not unmount in between. A person
@@ -138,120 +147,118 @@ function ProjectsScreen() {
   const [searchable, setSearchable] = useState(false);
   if (!searchable && (projects.length > 0 || search.q)) setSearchable(true);
 
+  // Nothing to list and nothing searched for: the person has no project yet.
+  const none = projects.length === 0 && !loaded.q;
+
   return (
     <Page>
-      <HomeColumn>
-        <header className="flex flex-col gap-2 pt-2 lg:pt-6">
-          <h1 className="font-serif text-3xl leading-9 tracking-tight text-foreground">
-            {requested ? `Continue to ${requested.nav.label}` : "Projects"}
-          </h1>
-          {/* Until a project is selected the project's screens ask for one
-              first, so the page says what choosing one is for, or, on the way
-              to one of them, that choosing goes on there. */}
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            {requested
-              ? "Choose a project to continue."
-              : projects.length > 0 && !selected
-                ? "Select a project to manage its teams, users and login flows."
-                : "Every project you can act on. Open one to manage its teams, users and login flows."}
-          </p>
-        </header>
+      {/* On the way to a screen that needs a project, the title names it
+          (D22): choosing a project goes on there. */}
+      <ResourceTitle
+        filter={
+          searchable && (
+            <SearchField
+              query={search.q ?? ""}
+              onSearch={onSearch}
+              label="Search projects"
+              className="w-full sm:w-64"
+            />
+          )
+        }
+        action={
+          // The first project's command is the page itself, below.
+          !none && (
+            <NewProjectSheet>
+              {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                  `px-2.5`. */}
+              <Button className="shrink-0 gap-1.5 px-2.5!">
+                <Plus aria-hidden />
+                New project
+              </Button>
+            </NewProjectSheet>
+          )
+        }
+      >
+        {requested ? `Continue to ${requested.nav.label}` : "Projects"}
+      </ResourceTitle>
 
-        <div className="mt-6 grid items-start gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="flex min-w-0 flex-col gap-4">
-            {searchable && (
-              <SearchField
-                query={search.q ?? ""}
-                onSearch={onSearch}
-                label="Search projects"
-                className="w-full max-w-90"
-              />
-            )}
-            {/* As the Users table: the Name cell clamps, the ID takes the
-                slack and truncates first, and the date and row menu keep their
-                own width. */}
-            <div className={RESOURCE_TABLE_WRAP}>
-              <Table className="text-xs">
-                <TableHeader>
-                  <ResourceHeaderRow>
-                    <ResourceHeadCell>Name</ResourceHeadCell>
-                    <ResourceHeadCell>ID</ResourceHeadCell>
-                    <ResourceHeadCell>Created</ResourceHeadCell>
-                    <ResourceMenuHead className="w-15" />
-                  </ResourceHeaderRow>
-                </TableHeader>
-                <TableBody>
-                  {projects.length === 0 ? (
-                    <ResourceEmptyRow colSpan={4}>
-                      {loaded.q ? `No projects match “${loaded.q}”.` : "No projects yet."}
-                    </ResourceEmptyRow>
-                  ) : (
-                    projects.map((project) => {
-                      const host = primaryHost(project.origins);
-                      return (
-                        // The whole row opens the project: selects it and lands on its
-                        // first screen, or on the screen `?next=` names — the same
-                        // target as the switcher's row. The name is a real link so the
-                        // row is reachable by keyboard and the target shows in the
-                        // status bar; the row handler is the pointer affordance on top
-                        // of it, and `opensRow` keeps it out of the link's way.
-                        <ResourceRow
-                          key={project.id}
-                          className="group"
-                          aria-current={project.id === selected ? "true" : undefined}
-                          onOpen={() => void navigate(selectTarget(project.id))}
-                        >
-                          {/* The mark and the host are the project switcher's: what
-                                tells two projects of one name apart (D20's pattern of
-                                a second line under the name). */}
-                          <TableCell className={`${RESOURCE_CELL} ${NAME_CLAMP} text-sm`}>
-                            <span className="flex min-w-0 items-center gap-2.5">
-                              <ProjectMark projectId={project.id} className="size-6" />
-                              <span className="min-w-0">
-                                {/* The bar has no project pill here, so the list
-                                      says which project the other screens open (D21). */}
-                                <span className="flex min-w-0 items-center gap-1.5">
-                                  <Link
-                                    {...selectTarget(project.id)}
-                                    className="text-foreground min-w-0 truncate font-medium underline-offset-2 hover:underline"
-                                  >
-                                    {project.name}
-                                  </Link>
-                                  {project.id === selected && (
-                                    <Badge variant="secondary">Current</Badge>
-                                  )}
-                                </span>
-                                {host && (
-                                  <span className="text-muted-foreground block truncate text-xs">
-                                    {host}
-                                  </span>
-                                )}
-                              </span>
-                            </span>
-                          </TableCell>
-                          <ResourceIdCell id={project.id} name={project.name} />
-                          <TableCell className={RESOURCE_CELL_MUTED}>
-                            {formatDate(project.created_at)}
-                          </TableCell>
-                          <TableCell className={`${RESOURCE_CELL} text-right`}>
-                            <RowActions projectId={project.id} name={project.name} />
-                          </TableCell>
-                        </ResourceRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <LoadMore paging={paging} />
+      {none ? (
+        <div className={`${RESOURCE_TABLE_TOP} flex flex-col gap-10`}>
+          <div className="max-w-xl">
+            <NewProjectCard />
           </div>
-          <aside className="lg:sticky lg:top-20">
-            <NewProjectCard first={projects.length === 0 && !loaded.q} />
-          </aside>
+          <ProjectLifecycle className="border-t border-border pt-10" />
         </div>
-
-        {!requested && <ProjectLifecycle className="mt-14 border-t border-border pt-10 lg:mt-20" />}
-      </HomeColumn>
+      ) : (
+        <>
+          {/* As the Users table: the Name cell clamps, the ID takes the slack
+              and truncates first, and the date and row menu keep their own
+              width. */}
+          <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+            <Table className="text-xs">
+              <TableHeader>
+                <ResourceHeaderRow>
+                  <ResourceHeadCell>Name</ResourceHeadCell>
+                  <ResourceHeadCell>ID</ResourceHeadCell>
+                  <ResourceHeadCell>Created</ResourceHeadCell>
+                  <ResourceMenuHead className="w-15" />
+                </ResourceHeaderRow>
+              </TableHeader>
+              <TableBody>
+                {projects.length === 0 ? (
+                  <ResourceEmptyRow colSpan={4}>No projects match “{loaded.q}”.</ResourceEmptyRow>
+                ) : (
+                  projects.map((project) => {
+                    const host = primaryHost(project.origins);
+                    return (
+                      // The whole row opens the project: selects it and lands on its
+                      // first screen, or on the screen `?next=` names — the same
+                      // target as the switcher's row. The name is a real link so the
+                      // row is reachable by keyboard and the target shows in the
+                      // status bar; the row handler is the pointer affordance on top
+                      // of it, and `opensRow` keeps it out of the link's way.
+                      <ResourceRow
+                        key={project.id}
+                        onOpen={() => void navigate(selectTarget(project.id))}
+                      >
+                        {/* The mark and the host are the project switcher's: what
+                            tells two projects of one name apart (D20's pattern of
+                            a second line under the name). */}
+                        <TableCell className={`${RESOURCE_CELL} ${NAME_CLAMP} text-sm`}>
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <ProjectMark projectId={project.id} className="size-6" />
+                            <span className="min-w-0">
+                              <Link
+                                {...selectTarget(project.id)}
+                                className="text-foreground block truncate font-medium underline-offset-2 hover:underline"
+                              >
+                                {project.name}
+                              </Link>
+                              {host && (
+                                <span className="text-muted-foreground block truncate text-xs">
+                                  {host}
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                        </TableCell>
+                        <ResourceIdCell id={project.id} name={project.name} />
+                        <TableCell className={RESOURCE_CELL_MUTED}>
+                          {formatDate(project.created_at)}
+                        </TableCell>
+                        <TableCell className={`${RESOURCE_CELL} text-right`}>
+                          <RowActions projectId={project.id} name={project.name} />
+                        </TableCell>
+                      </ResourceRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <LoadMore paging={paging} />
+        </>
+      )}
     </Page>
   );
 }

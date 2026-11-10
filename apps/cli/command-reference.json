@@ -107,6 +107,7 @@
     "E_NOT_FOUND": 4,
     "E_PORT_IN_USE": 5,
     "E_VALIDATION": 3,
+    "E_CONFIRMATION_REQUIRED": 3,
     "E_CREDENTIAL_MISSING": 3,
     "E_NOT_IMPLEMENTED": 2,
     "E_CANCELLED": 130
@@ -1922,6 +1923,12 @@
       "args": [],
       "flags": [
         {
+          "name": "force",
+          "char": "f",
+          "description": "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "message",
           "char": "m",
           "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
@@ -1945,6 +1952,9 @@
         },
         {
           "command": "deploy --dry-run"
+        },
+        {
+          "command": "deploy -m 'move users to the new schema' --force"
         }
       ]
     },
@@ -2738,7 +2748,7 @@
     {
       "id": "policies test",
       "group": "Configuration and releases",
-      "description": "Run the test cases in .zitadel/policies/ against the policies.",
+      "description": "Run the test cases in .zitadel/policies/ against the policies.\n\nA policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.\n\nThe server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.",
       "args": [
         {
           "name": "operation",

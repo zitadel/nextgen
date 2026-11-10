@@ -71,6 +71,11 @@ const PLATFORM_PROJECT_ID = "proj_platform";
 // pins the console's default project to `proj_platform` — which would leave
 // DEV_USER, seeded in the project this script bootstraps, unable to sign in.
 process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
+// The browser opens the console on the Vite dev server, so the server counts it
+// as one of its console origins: a project that does not list it, the platform
+// project included, serves it the newest primary deployment, and its own Origin
+// reaches the server as is, for passkeys and SSO return targets alike.
+process.env.NEXTGEN_SERVER_CONSOLE_ORIGINS ??= consoleOrigin;
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -591,8 +596,8 @@ async function seedReleases(): Promise<string | null> {
     await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
     await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
     await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
-    await post("/deployments", { release_id: first.id, targets: ["primary"] });
-    await post("/deployments", { release_id: second.id, targets: ["primary"] });
+    await post("/deployments", { release_id: first.id, targets: "primary" });
+    await post("/deployments", { release_id: second.id, targets: "primary" });
     await post("/deployments", {
       release_id: first.id,
       targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],

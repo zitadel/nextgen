@@ -75,16 +75,27 @@ export type DryRun = Readonly<{
   /** What the subject line ends with: "from the project", "on the project (secret)". */
   clause?: string;
   body?: Json;
+  /** What the server answered when asked to check the write; absent when it was not asked. */
+  checked?: Json;
   context?: CredentialContext;
 }>;
 
-export const dryRunResult = ({ verb, topic, id, clause, body, context }: DryRun): CommandResult => {
+export const dryRunResult = ({
+  verb,
+  topic,
+  id,
+  clause,
+  body,
+  checked,
+  context,
+}: DryRun): CommandResult => {
   // A body that came from a file may legitimately hold a credential; a preview
   // of it must not put that value on screen or into a CI log. Only the
   // credentials are masked: the rest is what would be sent, so the preview can
   // be checked, and `--dry-run --json` is the template generator a document to
   // send later comes from (ADR 071 §8).
   const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
+  const result = checked === undefined ? undefined : (redactCredentials(checked, context) as Json);
   const subject = [topic, id, clause].filter(Boolean).join(" ");
   // The document keeps the spelling JSON spells a control character with, as
   // the cells of a table are spelled where they are read: the line around it
@@ -94,9 +105,17 @@ export const dryRunResult = ({ verb, topic, id, clause, body, context }: DryRun)
   // to spell, so the two do not fight over it.
   const printed =
     shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
+  const verdict = result === undefined ? "" : "\nThe server would accept this. Nothing changed.";
   return {
     status: "ok",
-    data: { dry_run: true, verb, topic, id, body: shown },
-    pretty: prose(`Dry run: would ${verb} ${subject}${printed}`),
+    data: {
+      dry_run: true,
+      verb,
+      topic,
+      id,
+      body: shown,
+      ...(result === undefined ? {} : { result }),
+    },
+    pretty: prose(`Dry run: would ${verb} ${subject}${printed}${verdict}`),
   };
 };

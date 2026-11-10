@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { GitCommitHorizontal } from "lucide-react";
 import { useMemo } from "react";
 import { api } from "@/api/zitadel";
-import { DETAIL_CARD } from "@/components/detail-page";
+import { CARD_ACTION_BUTTON, DETAIL_CARD } from "@/components/detail-page";
 import { IdText } from "@/components/id-text";
 import { FormError } from "@/components/form-error";
 import { SchemaFields, type SchemaFieldsLayout } from "@/features/schemas/components/schema-fields";
@@ -14,7 +14,14 @@ import { FieldGroup } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
 import { useSchemaForm } from "@/features/schemas/use-schema-form";
 import { useSubmit } from "@/hooks/use-submit";
-import { type UserSchema, schemaDisplayName, schemaFields } from "@/features/schemas/model";
+import { RevisionBadges } from "@/features/schemas/components/revision-select";
+import {
+  type SchemaRevision,
+  type UserSchema,
+  schemaDisplayName,
+  schemaFields,
+} from "@/features/schemas/model";
+import { UserRevisionSheet } from "@/features/users/components/user-revision-sheet";
 import {
   attributesPatch,
   draftFromAttributes,
@@ -59,7 +66,9 @@ export function UserProfileCard({
   userId,
   schema,
   schemaId,
+  ownRevisionId,
   latestSchemaId,
+  revisions,
   attributes,
   onSaved,
 }: {
@@ -68,6 +77,10 @@ export function UserProfileCard({
   schemaId: string | undefined;
   /** The newest revision of the user's schema, which its name opens; absent when unknown. */
   latestSchemaId?: string;
+  /** The revision the user is on, by the id the schema's history lists it under. */
+  ownRevisionId: string | undefined;
+  /** The schema's history, which a move picks from. */
+  revisions: SchemaRevision[];
   attributes: Record<string, unknown>;
   onSaved: () => Promise<void>;
 }) {
@@ -94,6 +107,11 @@ export function UserProfileCard({
     [root, form.draft],
   );
   const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
+  // Being on an older revision is normal during a rollout, not an error, so this
+  // says what is available rather than ranking the user's revision. The newest may
+  // not be the one a release serves, which is why it never reads "outdated".
+  const newerRevision =
+    latestSchemaId !== undefined && ownRevisionId !== undefined && latestSchemaId !== ownRevisionId;
 
   return (
     <Card className={DETAIL_CARD}>
@@ -137,7 +155,32 @@ export function UserProfileCard({
                 </Badge>
               </Link>
             </Button>
+            {newerRevision && <Badge variant="warning">New revision available</Badge>}
+            {ownRevisionId && (
+              <RevisionBadges revisions={revisions} latestId={latestSchemaId} id={ownRevisionId} />
+            )}
           </div>
+        )}
+        {schema && ownRevisionId && revisions.length > 1 && (
+          <UserRevisionSheet
+            userId={userId}
+            attributes={attributes}
+            currentId={ownRevisionId}
+            currentSchema={schema}
+            latestId={latestSchemaId}
+            revisions={revisions}
+            discardsEdits={dirty}
+            onUpdated={onSaved}
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className={`${CARD_ACTION_BUTTON} ml-auto`}
+            >
+              {newerRevision ? "Review update" : "Change revision"}
+            </Button>
+          </UserRevisionSheet>
         )}
       </div>
       <Separator className={PANEL_RULE} />

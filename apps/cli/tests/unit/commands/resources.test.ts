@@ -818,12 +818,97 @@ describe("users get / create / update / delete", () => {
     expect(bodies.at(-1)).toEqual({ attributes: { givenName: "Ada" } });
   });
 
+  it("asks the server on a dry run of a user update, and only then", async ({ server }) => {
+    const cwd = await makeProject();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+    const update = ["users", "update", "user_1", "--set", "attributes.givenName=Ada"];
+
+    const res = await run(cwd, [...update, "--dry-run"]);
+    await run(cwd, update);
+
+    expect(res.exitCode).toBe(0);
+    // A real update sends no dry_run at all: a server from before the field
+    // refuses any body that names it, false included.
+    expect(bodies).toEqual([
+      { attributes: { givenName: "Ada" }, dry_run: true },
+      { attributes: { givenName: "Ada" } },
+    ]);
+    const json = parseJson(res.stdout) as { data: Record<string, unknown> };
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      id: "user_1",
+      body: { attributes: { givenName: "Ada" } },
+      result: { id: "user_1" },
+    });
+  });
+
+  it("leaves dry_run to --dry-run, never to the body flags", async ({ server }) => {
+    const cwd = await makeProject();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    await run(cwd, [
+      "users",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--set",
+      "dry_run:=true",
+    ]);
+
+    expect(bodies.filter((body) => (body as { dry_run?: unknown }).dry_run !== undefined)).toEqual(
+      [],
+    );
+  });
+
+  it("answers a refused dry run with one error envelope naming the fields", async ({ server }) => {
+    const cwd = await makeProject();
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () =>
+        HttpResponse.json(
+          {
+            code: "req.invalid",
+            message: "invalid request",
+            details: { details: { fields: ["attributes.phones.0.fax"] } },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const res = await run(cwd, [
+      "users",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--dry-run",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; details: unknown };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(JSON.stringify(json.details)).toContain("attributes.phones.0.fax");
+  });
+
   it("requires --force to delete non-interactively", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, ["users", "delete", "user_1"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands[0]).toContain("users delete user_1 --force");
   });
 

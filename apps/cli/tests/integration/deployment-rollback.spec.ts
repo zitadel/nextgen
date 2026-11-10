@@ -100,7 +100,7 @@ describe("deployment rollback", () => {
         expect(rollbacks.last?.expected_deployment_id).toBe(undone.deployment_id);
       });
 
-      it("refuses re-applying a deployment to an origin since removed as a validation error", async () => {
+      it("re-applies a deployment to an origin since removed", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");
         await app.addPrimaryOrigin("https://b.example.com");
@@ -116,7 +116,69 @@ describe("deployment rollback", () => {
           "--json",
         ]);
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toSucceed();
+      });
+
+      it("reports a listed origin the restored deployment leaves out", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        const first = await app.deployData();
+        await app.addPrimaryOrigin("https://c.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { dropped_origins } = app.envelopeOf<{ dropped_origins: string[] }>(result).data;
+        expect(dropped_origins).toContain("https://c.example.com");
+      });
+
+      it("reports a listed origin the restored deployment serves again", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const first = await app.deployData();
+        await app.removeOrigin("https://b.example.com");
+        await app.deployData();
+        await app.addPrimaryOrigin("https://b.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { restored_origins } = app.envelopeOf<{ restored_origins: string[] }>(result).data;
+        expect(restored_origins).toEqual(["https://b.example.com"]);
+      });
+
+      it("keeps an origin the project no longer lists among the deployment's origins", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const first = await app.deployData();
+        await app.removeOrigin("https://b.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const data = app.envelopeOf<{ origins: string[]; unserved_origins: string[] }>(result).data;
+        expect(data.origins).toContain("https://b.example.com");
+        expect(data.unserved_origins).toEqual(["https://b.example.com"]);
       });
 
       it("takes no --origin, as every primary deployment is one history", async () => {
@@ -214,7 +276,7 @@ describe("deployment rollback", () => {
             "--json",
           ]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

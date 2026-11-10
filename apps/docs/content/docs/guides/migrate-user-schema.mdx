@@ -1,6 +1,6 @@
 ---
 title: Migrate users between schema revisions
-description: Move existing users to a new user schema revision through the API.
+description: Move existing users to a new user schema revision through the API or the console.
 ---
 
 A user schema defines the attributes of your users and how they sign in. It is
@@ -118,6 +118,13 @@ older or newer. A schema with another `objectType` is refused with
 Check that it worked: `zitadel users get <user_id>` shows the new revision as
 the user's `schema`, with the merged attributes.
 
+To move one user by hand, open them in the console. Their page says when a newer
+revision is available, and **Review update** (**Change revision** on the newest)
+asks the server for a dry run of the move to the revision you pick, and then asks
+you only for what the server refused. It sends the same request, so the same
+validation applies. The answer holds for that moment: if the server refuses the
+real request, it names what to correct and nothing changes.
+
 ### Examples
 
 Each request moves a user from revision 1 of their schema to revision 2, for
@@ -186,12 +193,41 @@ by its path in the request body, without the rejected values:
 ```
 
 An attribute you didn't send is named too when the merged result fails on it,
-as when the target requires `country` and the user has none. Fix those
-attributes and send the request again.
+as when the target requires `country` and the user has none. A failure inside
+an array item names the item by its index, as in `attributes.phones.0.fax`.
+Fix those attributes and send the request again.
 
 A value that another user already holds under a uniqueness rule answers
 `409 user.already_exists`, with the attributes in the same
 `details.details.fields` list.
+
+### Check a migration before you send it
+
+Add `--dry-run` to ask the server whether the request would succeed:
+
+```sh
+npx @zitadel/cli@latest users update <user_id> \
+  --schema <target revision id> \
+  --attributes country=CH \
+  --dry-run --json
+```
+
+This sends the same request to `PATCH /users/{user_id}` with `"dry_run": true` in the body,
+and it needs the same permission. A refused request gets the same answer as a
+real one. A valid request answers `200` with the user as the migration would
+leave them, in `data.result` from the CLI.
+
+A dry run changes nothing and emits no `user.updated` event. Zitadel still
+records the call itself as a `request.api` event, as it does for every API call.
+
+A dry run answers for the moment you send it. It refuses a unique value that
+another user holds at that moment. It can't reserve a value that is free, so
+another user can take it first, and the real request then answers
+`409 user.already_exists`. Handle that answer even after a successful dry run.
+
+A server from before `dry_run` refuses a request that names it with
+`400 req.invalid` and changes nothing. Upgrade the server to check migrations
+this way.
 
 ### What a migration keeps
 

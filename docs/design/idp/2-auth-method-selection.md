@@ -45,9 +45,8 @@ generated from it) is a slug list. Revisions stored with the earlier
 
 The engine resolves the slugs on every render, inside the step builder, so a
 start, a submit and a step read all emit the same providers. Each slug is read
-at the connection's newest revision. A slug with no connection in the project
-is dropped from the rendered step and logged with the step name; the other
-slugs still render. A connection without `template` renders `template: ""`
+at the revision the request's release pins, and a slug it does not pin is an
+internal error. A connection without `template` renders `template: ""`
 until the wire field becomes optional.
 
 ## Principle: Capability vs. Usage

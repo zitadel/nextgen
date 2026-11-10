@@ -165,3 +165,17 @@ func TestReleaseContentHashSeparatesFields(t *testing.T) {
 
 	assert.NotEqual(t, domain.ReleaseContentHash(left), domain.ReleaseContentHash(right))
 }
+
+func TestReleasePins(t *testing.T) {
+	release := &domain.Release{Pointers: []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: "sch_1"},
+		{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flowdef_1"},
+		{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "register", RevisionID: "flowdef_2"},
+	}}
+
+	assert.Equal(t, domain.ReleasePins{
+		"login":    {Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flowdef_1"},
+		"register": {Kind: domain.ReleasePointerKindFlowDefinition, Handle: "register", RevisionID: "flowdef_2"},
+	}, release.Pins(domain.ReleasePointerKindFlowDefinition))
+	assert.Empty(t, release.Pins(domain.ReleasePointerKindBranding))
+}
