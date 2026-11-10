@@ -9,12 +9,10 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/inv-invalid.yaml'
         - $ref: '../../components/schemas/errors/inv-not_found.yaml'
-        - $ref: '../../components/schemas/errors/inv-not_pending.yaml'
         - $ref: '../../components/schemas/errors/inv-pending_limit.yaml'
         - $ref: '../../components/schemas/errors/inv-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/inv-platform_required.yaml'
         - $ref: '../../components/schemas/errors/inv-project_unclaimed.yaml'
-        - $ref: '../../components/schemas/errors/inv-self_accept.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/unavailable.yaml'
@@ -26,12 +24,10 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           inv.invalid: '../../components/schemas/errors/inv-invalid.yaml'
           inv.not_found: '../../components/schemas/errors/inv-not_found.yaml'
-          inv.not_pending: '../../components/schemas/errors/inv-not_pending.yaml'
           inv.pending_limit: '../../components/schemas/errors/inv-pending_limit.yaml'
           inv.permission_denied: '../../components/schemas/errors/inv-permission_denied.yaml'
           inv.platform_required: '../../components/schemas/errors/inv-platform_required.yaml'
           inv.project_unclaimed: '../../components/schemas/errors/inv-project_unclaimed.yaml'
-          inv.self_accept: '../../components/schemas/errors/inv-self_accept.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
@@ -46,8 +42,6 @@ content:
         $ref: '../../components/examples/errors/inv-invalid.yaml'
       inv.not_found:
         $ref: '../../components/examples/errors/inv-not_found.yaml'
-      inv.not_pending:
-        $ref: '../../components/examples/errors/inv-not_pending.yaml'
       inv.pending_limit:
         $ref: '../../components/examples/errors/inv-pending_limit.yaml'
       inv.permission_denied:
@@ -56,8 +50,6 @@ content:
         $ref: '../../components/examples/errors/inv-platform_required.yaml'
       inv.project_unclaimed:
         $ref: '../../components/examples/errors/inv-project_unclaimed.yaml'
-      inv.self_accept:
-        $ref: '../../components/examples/errors/inv-self_accept.yaml'
       not_implemented:
         $ref: '../../components/examples/errors/not_implemented.yaml'
       req.invalid:

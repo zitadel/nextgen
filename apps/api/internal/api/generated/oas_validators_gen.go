@@ -4188,28 +4188,6 @@ func (s *CreateInvitationProjectMemberRequest) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.ProjectMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "project_member",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Metadata.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -4245,26 +4223,25 @@ func (s *CreateInvitationProjectMemberRequest) Validate() error {
 			Error: err,
 		})
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *CreateInvitationProjectMemberRequestProjectMember) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Relation.Validate(); err != nil {
+		if err := s.Type.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "relation",
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.ProjectMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_member",
 			Error: err,
 		})
 	}
@@ -4272,19 +4249,6 @@ func (s *CreateInvitationProjectMemberRequestProjectMember) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s CreateInvitationProjectMemberRequestProjectMemberRelation) Validate() error {
-	switch s {
-	case "viewer":
-		return nil
-	case "editor":
-		return nil
-	case "admin":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s CreateInvitationProjectMemberRequestType) Validate() error {
@@ -4321,28 +4285,6 @@ func (s *CreateInvitationProjectMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.ProjectMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "project_member",
 			Error: err,
 		})
 	}
@@ -4416,6 +4358,28 @@ func (s *CreateInvitationProjectMemberResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.ProjectMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_member",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -4431,42 +4395,6 @@ func (s CreateInvitationProjectMemberResponseCreatedByType) Validate() error {
 	case "system":
 		return nil
 	case "agent":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s *CreateInvitationProjectMemberResponseProjectMember) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Relation.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "relation",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s CreateInvitationProjectMemberResponseProjectMemberRelation) Validate() error {
-	switch s {
-	case "viewer":
-		return nil
-	case "editor":
-		return nil
-	case "admin":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -4523,28 +4451,6 @@ func (s *CreateInvitationTeamMemberRequest) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.TeamMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "team_member",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Metadata.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -4580,37 +4486,25 @@ func (s *CreateInvitationTeamMemberRequest) Validate() error {
 			Error: err,
 		})
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *CreateInvitationTeamMemberRequestTeamMember) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.TeamID.Validate(); err != nil {
+		if err := s.Type.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "team_id",
+			Name:  "type",
 			Error: err,
 		})
 	}
 	if err := func() error {
-		if err := s.Role.Validate(); err != nil {
+		if err := s.TeamMember.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "role",
+			Name:  "team_member",
 			Error: err,
 		})
 	}
@@ -4618,15 +4512,6 @@ func (s *CreateInvitationTeamMemberRequestTeamMember) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s CreateInvitationTeamMemberRequestTeamMemberRole) Validate() error {
-	switch s {
-	case "member":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s CreateInvitationTeamMemberRequestType) Validate() error {
@@ -4663,28 +4548,6 @@ func (s *CreateInvitationTeamMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.TeamMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "team_member",
 			Error: err,
 		})
 	}
@@ -4758,6 +4621,28 @@ func (s *CreateInvitationTeamMemberResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.TeamMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_member",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -4773,49 +4658,6 @@ func (s CreateInvitationTeamMemberResponseCreatedByType) Validate() error {
 	case "system":
 		return nil
 	case "agent":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s *CreateInvitationTeamMemberResponseTeamMember) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.TeamID.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "team_id",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.Role.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "role",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s CreateInvitationTeamMemberResponseTeamMemberRole) Validate() error {
-	switch s {
-	case "member":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -9196,28 +9038,6 @@ func (s *InvitationLookupProjectMemberResponse) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.ProjectMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "project_member",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.CreatedByType.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -9246,6 +9066,28 @@ func (s *InvitationLookupProjectMemberResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.ProjectMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_member",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -9261,42 +9103,6 @@ func (s InvitationLookupProjectMemberResponseCreatedByType) Validate() error {
 	case "system":
 		return nil
 	case "agent":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s *InvitationLookupProjectMemberResponseProjectMember) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Relation.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "relation",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s InvitationLookupProjectMemberResponseProjectMemberRelation) Validate() error {
-	switch s {
-	case "viewer":
-		return nil
-	case "editor":
-		return nil
-	case "admin":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -9347,28 +9153,6 @@ func (s *InvitationLookupTeamMemberResponse) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.TeamMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "team_member",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.CreatedByType.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -9397,6 +9181,28 @@ func (s *InvitationLookupTeamMemberResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.TeamMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_member",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -9412,49 +9218,6 @@ func (s InvitationLookupTeamMemberResponseCreatedByType) Validate() error {
 	case "system":
 		return nil
 	case "agent":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s *InvitationLookupTeamMemberResponseTeamMember) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.TeamID.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "team_id",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.Role.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "role",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s InvitationLookupTeamMemberResponseTeamMemberRole) Validate() error {
-	switch s {
-	case "member":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -9534,28 +9297,6 @@ func (s *InvitationProjectMember) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.ProjectMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "project_member",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Metadata.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -9625,6 +9366,28 @@ func (s *InvitationProjectMember) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.ProjectMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_member",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -9646,7 +9409,7 @@ func (s InvitationProjectMemberCreatedByType) Validate() error {
 	}
 }
 
-func (s *InvitationProjectMemberProjectMember) Validate() error {
+func (s *InvitationProjectMemberPayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -9669,7 +9432,7 @@ func (s *InvitationProjectMemberProjectMember) Validate() error {
 	return nil
 }
 
-func (s InvitationProjectMemberProjectMemberRelation) Validate() error {
+func (s InvitationProjectMemberPayloadRelation) Validate() error {
 	switch s {
 	case "viewer":
 		return nil
@@ -9737,28 +9500,6 @@ func (s *InvitationTeamMember) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if err := s.TeamMember.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "team_member",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Metadata.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -9828,6 +9569,28 @@ func (s *InvitationTeamMember) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.TeamMember.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_member",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -9849,7 +9612,7 @@ func (s InvitationTeamMemberCreatedByType) Validate() error {
 	}
 }
 
-func (s *InvitationTeamMemberTeamMember) Validate() error {
+func (s *InvitationTeamMemberPayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -9883,7 +9646,7 @@ func (s *InvitationTeamMemberTeamMember) Validate() error {
 	return nil
 }
 
-func (s InvitationTeamMemberTeamMemberRole) Validate() error {
+func (s InvitationTeamMemberPayloadRole) Validate() error {
 	switch s {
 	case "member":
 		return nil

@@ -7,11 +7,8 @@ content:
         - $ref: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/inv-invalid.yaml'
         - $ref: '../../../components/schemas/errors/inv-not_found.yaml'
         - $ref: '../../../components/schemas/errors/inv-not_pending.yaml'
-        - $ref: '../../../components/schemas/errors/inv-pending_limit.yaml'
-        - $ref: '../../../components/schemas/errors/inv-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/inv-platform_required.yaml'
         - $ref: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
         - $ref: '../../../components/schemas/errors/inv-self_accept.yaml'
@@ -24,11 +21,8 @@ content:
           auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          inv.invalid: '../../../components/schemas/errors/inv-invalid.yaml'
           inv.not_found: '../../../components/schemas/errors/inv-not_found.yaml'
           inv.not_pending: '../../../components/schemas/errors/inv-not_pending.yaml'
-          inv.pending_limit: '../../../components/schemas/errors/inv-pending_limit.yaml'
-          inv.permission_denied: '../../../components/schemas/errors/inv-permission_denied.yaml'
           inv.platform_required: '../../../components/schemas/errors/inv-platform_required.yaml'
           inv.project_unclaimed: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
           inv.self_accept: '../../../components/schemas/errors/inv-self_accept.yaml'
@@ -42,16 +36,10 @@ content:
         $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
-      inv.invalid:
-        $ref: '../../../components/examples/errors/inv-invalid.yaml'
       inv.not_found:
         $ref: '../../../components/examples/errors/inv-not_found.yaml'
       inv.not_pending:
         $ref: '../../../components/examples/errors/inv-not_pending.yaml'
-      inv.pending_limit:
-        $ref: '../../../components/examples/errors/inv-pending_limit.yaml'
-      inv.permission_denied:
-        $ref: '../../../components/examples/errors/inv-permission_denied.yaml'
       inv.platform_required:
         $ref: '../../../components/examples/errors/inv-platform_required.yaml'
       inv.project_unclaimed:

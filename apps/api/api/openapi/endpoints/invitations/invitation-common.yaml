@@ -1,0 +1,65 @@
+title: InvitationCommon
+description: |
+  Fields every invitation carries. Each type adds its own `type` const and the
+  nested object named after that type.
+type: object
+required:
+  - id
+  - project_id
+  - status
+  - created_at
+  - expires_at
+  - journey_id
+properties:
+  id:
+    $ref: ../../components/schemas/invitation-id.yaml
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  metadata:
+    description: |
+      Who the administrator said the link is for. Null after accept, decline or
+      cancel.
+    oneOf:
+      - $ref: invitation-metadata.yaml
+      - type: 'null'
+  status:
+    $ref: invitation-status.yaml
+  created_by:
+    description: |
+      The user who created the invitation. Null when a project secret created
+      it (`created_by_type` is then `service`).
+    oneOf:
+      - type: string
+        example: user_01JC9X3N5Q7S9U1W3Y5A7C9E1G
+      - type: 'null'
+  created_by_type:
+    $ref: invitation-created-by-type.yaml
+  created_at:
+    type: string
+    format: date-time
+    description: When the invitation was created.
+    example: '2026-11-04T10:00:00Z'
+  expires_at:
+    type: string
+    format: date-time
+    description: When the invitation expires (72 hours after create).
+    example: '2026-11-07T10:00:00Z'
+  journey_id:
+    type: string
+    minLength: 1
+    description: |
+      Correlates this invitation with its replacements. A replacement keeps the
+      original's `journey_id`. It is a random correlation id, not a resource id.
+    example: q7Z0bX2rT1aM4cV8nL5wYg
+  accepted_by:
+    description: The user who redeemed the link. Null until accepted.
+    oneOf:
+      - type: string
+        example: user_01JD4F2H6K8M0P2R4T6V8X0Z2B
+      - type: 'null'
+  accepted_at:
+    description: When the invitation was accepted. Null until accepted.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'

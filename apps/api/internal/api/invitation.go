@@ -8,48 +8,11 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// stubInvitationError selects which invitation error the contract stubs return.
-// It stays on the default so runtime answers 501; the switch keeps every
-// invitation code in the OpenAPI error set for gen_openapi_errors until the
-// invitation service lands (#2852 / #2853).
-var stubInvitationError = stubInvNotImplemented
-
-type stubInvitationErrorKind int
-
-const (
-	stubInvNotImplemented stubInvitationErrorKind = iota
-	stubInvInvalid
-	stubInvNotFound
-	stubInvPermissionDenied
-	stubInvProjectUnclaimed
-	stubInvNotPending
-	stubInvSelfAccept
-	stubInvPendingLimit
-	stubInvPlatformRequired
-)
-
-func invitationContractErrors() error {
-	switch stubInvitationError {
-	case stubInvInvalid:
-		return domain.ErrInvitationInvalid()
-	case stubInvNotFound:
-		return domain.ErrInvitationNotFound()
-	case stubInvPermissionDenied:
-		return domain.ErrInvitationPermissionDenied()
-	case stubInvProjectUnclaimed:
-		return domain.ErrInvitationProjectUnclaimed()
-	case stubInvNotPending:
-		return domain.ErrInvitationNotPending()
-	case stubInvSelfAccept:
-		return domain.ErrInvitationSelfAccept()
-	case stubInvPendingLimit:
-		return domain.ErrInvitationPendingLimit()
-	case stubInvPlatformRequired:
-		return domain.ErrInvitationPlatformRequired()
-	default:
-		return domain.ErrNotImplemented()
-	}
-}
+// invitationStubPhase stays 0 so contract stubs answer not_implemented at
+// runtime. Non-zero cases exist only so gen_openapi_errors records the codes
+// each operation can return once #2852 / #2853 land. Keep each switch limited
+// to that operation's reachable set — do not share one fan-out across ops.
+var invitationStubPhase int
 
 func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitationRequest, params api.CreateInvitationParams) (api.CreateInvitationRes, error) {
 	// Same project.admin check as createGrant (opDelete).
@@ -59,43 +22,94 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 	if req.IsCreateInvitationTeamMemberRequest() {
 		return nil, domain.ErrNotImplemented()
 	}
-	return nil, invitationContractErrors()
+	switch invitationStubPhase {
+	case 1:
+		return nil, domain.ErrInvitationInvalid()
+	case 2:
+		return nil, domain.ErrInvitationProjectUnclaimed()
+	case 3:
+		return nil, domain.ErrInvitationPendingLimit()
+	case 4:
+		return nil, domain.ErrInvitationPlatformRequired()
+	case 5:
+		return nil, domain.ErrInvitationNotFound() // replace target miss
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
 }
 
 func (h *Handler) ListInvitations(ctx context.Context, params api.ListInvitationsParams) (api.ListInvitationsRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), invitationAccess, opDelete); err != nil {
 		return nil, err
 	}
-	return nil, invitationContractErrors()
+	// Authz already contributes inv.not_found / inv.permission_denied.
+	return nil, domain.ErrNotImplemented()
 }
 
 func (h *Handler) GetInvitation(ctx context.Context, params api.GetInvitationParams) (api.GetInvitationRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), invitationAccess, opDelete); err != nil {
 		return nil, err
 	}
-	return nil, invitationContractErrors()
+	switch invitationStubPhase {
+	case 1:
+		return nil, domain.ErrInvitationNotFound()
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
 }
 
 func (h *Handler) CancelInvitation(ctx context.Context, params api.CancelInvitationParams) (api.CancelInvitationRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), invitationAccess, opDelete); err != nil {
 		return nil, err
 	}
-	return nil, invitationContractErrors()
+	switch invitationStubPhase {
+	case 1:
+		return nil, domain.ErrInvitationNotFound()
+	case 2:
+		return nil, domain.ErrInvitationNotPending()
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
 }
 
 func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.LookupInvitationRes, error) {
 	_ = req
-	return nil, invitationContractErrors()
+	switch invitationStubPhase {
+	case 1:
+		return nil, domain.ErrInvitationNotFound()
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
 }
 
 func (h *Handler) AcceptInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.AcceptInvitationRes, error) {
 	_ = req
-	return nil, invitationContractErrors()
+	switch invitationStubPhase {
+	case 1:
+		return nil, domain.ErrInvitationNotFound()
+	case 2:
+		return nil, domain.ErrInvitationNotPending()
+	case 3:
+		return nil, domain.ErrInvitationSelfAccept()
+	case 4:
+		return nil, domain.ErrInvitationProjectUnclaimed()
+	case 5:
+		return nil, domain.ErrInvitationPlatformRequired()
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
 }
 
 func (h *Handler) RejectInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.RejectInvitationRes, error) {
 	_ = req
-	return nil, invitationContractErrors()
+	switch invitationStubPhase {
+	case 1:
+		return nil, domain.ErrInvitationNotFound()
+	case 2:
+		return nil, domain.ErrInvitationNotPending()
+	default:
+		return nil, domain.ErrNotImplemented()
+	}
 }
 
 func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {

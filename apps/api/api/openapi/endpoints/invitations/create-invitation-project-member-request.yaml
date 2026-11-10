@@ -1,33 +1,15 @@
 title: CreateProjectMemberInvitationRequest
 description: Creates a project-member invitation, or replaces an existing one.
-type: object
-required:
-  - type
-  - project_member
-properties:
-  type:
-    type: string
-    enum:
-      - project_member
-  project_member:
-    type: object
+allOf:
+  - $ref: create-invitation-common.yaml
+  - type: object
     required:
-      - relation
+      - type
+      - project_member
     properties:
-      relation:
+      type:
         type: string
         enum:
-          - viewer
-          - editor
-          - admin
-        description: The project role the accepter receives, as in `POST /grants`.
-  metadata:
-    description: Optional label for who the link is for. Displayed only; never matched.
-    $ref: invitation-metadata.yaml
-  replaces_invitation_id:
-    description: |
-      When set, this create replaces that invitation: the new invitation keeps
-      the original's `journey_id`, and a pending original becomes `cancelled` in
-      the same transaction. Use the `id` that `createInvitation`
-      (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
-    $ref: ../../components/schemas/invitation-id.yaml
+          - project_member
+      project_member:
+        $ref: invitation-project-member-payload.yaml
