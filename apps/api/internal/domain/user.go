@@ -239,12 +239,12 @@ type PatchUser struct {
 	ExpectedUpdatedAt time.Time
 	// Attributes is the complete desired attribute set after the merge.
 	Attributes CreateAttributes
-	// RegistryTeamScopes is the resolved team scope of each registry row,
+	// UniqueTeamScopes is the resolved team scope of each unique claim,
 	// index-aligned with Attributes: existing claims keep their stored scope,
 	// new team-unique claims fall back to the lifecycle owner team, else ""
-	// (see [CreateAttributes.RegistryTeamScopes]). Resolved here once so the
+	// (see [CreateAttributes.UniqueTeamScopes]). Resolved here once so the
 	// dialects stay pure writers.
-	RegistryTeamScopes []string
+	UniqueTeamScopes []string
 }
 
 // PatchUserParams are the inputs to [NewPatchUser].
@@ -259,13 +259,13 @@ type PatchUserParams struct {
 	// AttributesPatch is merged into the current attributes per
 	// [MergeAttributesPatch]; nil values delete.
 	AttributesPatch map[string]any
-	// StoredRegistryScopes is the stored registry team scope per key (from
+	// StoredUniqueTeamScopes is the stored unique team scope per key (from
 	// [service.UserStatements].GetUserUniqueAttributeScopes), so existing
 	// claims keep the scope create gave them. Reading it outside the write
-	// transaction is safe: every registry mutation moves the user's
+	// transaction is safe: every unique claim change moves the user's
 	// updated_at, so the patch statement's guard catches interleaved changes
 	// and the caller re-merges from a fresh read.
-	StoredRegistryScopes map[AttributeKey]string
+	StoredUniqueTeamScopes map[AttributeKey]string
 }
 
 // NewPatchUser merges the patch into the user's current attributes and
@@ -289,7 +289,7 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 		return nil, err
 	}
 
-	// Fallback scope for team-unique claims not yet in the registry:
+	// Fallback scope for team-unique claims not yet stored:
 	// lifecycle owner team, else "" (project-wide). Existing claims keep
 	// their stored team scope, because create may have scoped them to an
 	// initial membership team this patch knows nothing about (see
@@ -300,12 +300,12 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 	}
 
 	return &PatchUser{
-		ProjectID:          params.Current.ProjectID,
-		UserID:             params.Current.ID,
-		SchemaURL:          params.SchemaURL,
-		ExpectedUpdatedAt:  params.Current.Metadata.UpdatedAt,
-		Attributes:         patchAttrs,
-		RegistryTeamScopes: patchAttrs.RegistryTeamScopes(params.StoredRegistryScopes, teamScope),
+		ProjectID:         params.Current.ProjectID,
+		UserID:            params.Current.ID,
+		SchemaURL:         params.SchemaURL,
+		ExpectedUpdatedAt: params.Current.Metadata.UpdatedAt,
+		Attributes:        patchAttrs,
+		UniqueTeamScopes:  patchAttrs.UniqueTeamScopes(params.StoredUniqueTeamScopes, teamScope),
 	}, nil
 }
 

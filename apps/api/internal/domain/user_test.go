@@ -386,7 +386,7 @@ func TestNewPatchUser(t *testing.T) {
 			t.Helper()
 			for i, a := range got.Attributes {
 				if a.Key == "nickname" {
-					return got.RegistryTeamScopes[i]
+					return got.UniqueTeamScopes[i]
 				}
 			}
 			t.Fatal("nickname missing from the patch")

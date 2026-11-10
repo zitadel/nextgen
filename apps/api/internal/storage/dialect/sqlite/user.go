@@ -102,7 +102,7 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		}
 
 		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, user.Attributes,
-			user.Attributes.RegistryTeamScopes(nil, teamScope)); err != nil {
+			user.Attributes.UniqueTeamScopes(nil, teamScope)); err != nil {
 			return err
 		}
 
@@ -125,9 +125,9 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 }
 
 // insertUserAttributes writes one attribute row per entry, with the team
-// scope and value hash set for a unique-scoped value. registryTeams is
-// index-aligned with attrs (see [domain.CreateAttributes.RegistryTeamScopes]).
-func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID string, attrs domain.CreateAttributes, registryTeams []string) error {
+// scope and value hash set for a unique-scoped value. uniqueTeams is
+// index-aligned with attrs (see [domain.CreateAttributes.UniqueTeamScopes]).
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID string, attrs domain.CreateAttributes, uniqueTeams []string) error {
 	for i, a := range attrs {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
@@ -136,7 +136,7 @@ func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, user
 		var team, hash any
 		if a.UniqueScope != domain.AttributeUniquenessUnspecified {
 			sum := a.ValueHash
-			team, hash = registryTeams[i], sum[:]
+			team, hash = uniqueTeams[i], sum[:]
 		}
 		if _, err := tx.Exec(ctx, createUserAttributeStmt,
 			projectID, userID, string(a.Key), string(raw), team, hash,
@@ -214,8 +214,8 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
 	}
-	if len(user.RegistryTeamScopes) != len(user.Attributes) {
-		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	if len(user.UniqueTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one unique team scope per attribute")
 	}
 	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
 		n, err := execAffected(ctx, tx, patchUserHeaderStmt,
@@ -231,7 +231,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 			return wrapError(err)
 		}
 		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.Attributes,
-			user.RegistryTeamScopes)
+			user.UniqueTeamScopes)
 	})
 }
 

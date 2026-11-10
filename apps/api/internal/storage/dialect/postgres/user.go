@@ -250,8 +250,8 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
 	}
-	if len(user.RegistryTeamScopes) != len(user.Attributes) {
-		return fmt.Errorf("user patch requires one registry team scope per attribute")
+	if len(user.UniqueTeamScopes) != len(user.Attributes) {
+		return fmt.Errorf("user patch requires one unique team scope per attribute")
 	}
 	keys, values, hashes, _, err := userAttributeArrays(user.Attributes)
 	if err != nil {
@@ -273,7 +273,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		}
 		if _, err := tx.Exec(ctx, patchUserAttributesSQL,
 			user.ProjectID, user.UserID,
-			keys, values, hashes, user.RegistryTeamScopes,
+			keys, values, hashes, user.UniqueTeamScopes,
 		); err != nil {
 			return wrapError(err)
 		}

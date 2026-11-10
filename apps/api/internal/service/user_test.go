@@ -678,7 +678,7 @@ const takenAttributesSchema = `{
 }`
 
 // newTakenAttributesFixture wires a user service whose write collides on a
-// unique value. holders answers the registry probe per attribute key with the
+// unique value. holders answers the unique claim probe per attribute key with the
 // id of the user holding it; a key it does not name is free. A non-nil
 // lookupErr fails the probe instead.
 func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]string, lookupErr error) (service.UserService, *servicemocks.MockAllStatements) {
@@ -716,7 +716,7 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 				return nil, lookupErr
 			}
 			// Each unique attribute of the write is one claim under its
-			// registry team scope.
+			// unique team scope.
 			var taken []domain.AttributeKey
 			for _, c := range claims {
 				if c.Key == "username" {

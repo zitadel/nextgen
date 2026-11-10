@@ -468,7 +468,7 @@ func getUserByID(t *testing.T, stmts service.AllStatements, projectID, userID st
 }
 
 // patchStateOf builds the post-merge state a patch writes, guarded by the
-// given user's current updated_at, with registry scopes resolved from the
+// given user's current updated_at, with unique team scopes resolved from the
 // stored rows the same way the service does.
 func patchStateOf(t *testing.T, stmts service.AllStatements, user *domain.User, attrs ...domain.CreateAttribute) *domain.PatchUser {
 	t.Helper()
@@ -480,12 +480,12 @@ func patchStateOf(t *testing.T, stmts service.AllStatements, user *domain.User, 
 	stored, err := stmts.GetUserUniqueAttributeScopes(t.Context(), user.ProjectID, user.ID)
 	require.NoError(t, err)
 	return &domain.PatchUser{
-		ProjectID:          user.ProjectID,
-		UserID:             user.ID,
-		SchemaURL:          user.SchemaURL,
-		ExpectedUpdatedAt:  user.Metadata.UpdatedAt,
-		Attributes:         attrs,
-		RegistryTeamScopes: domain.CreateAttributes(attrs).RegistryTeamScopes(stored, teamScope),
+		ProjectID:         user.ProjectID,
+		UserID:            user.ID,
+		SchemaURL:         user.SchemaURL,
+		ExpectedUpdatedAt: user.Metadata.UpdatedAt,
+		Attributes:        attrs,
+		UniqueTeamScopes:  domain.CreateAttributes(attrs).UniqueTeamScopes(stored, teamScope),
 	}
 }
 
@@ -692,7 +692,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 				Attributes: domain.CreateAttributes{
 					mustAttr("email", "missing@example.com", domain.AttributeUniquenessProject),
 				},
-				RegistryTeamScopes: []string{""},
+				UniqueTeamScopes: []string{""},
 			})
 			var noRow *database.NoRowFoundError
 			require.ErrorAs(t, err, &noRow)
@@ -763,7 +763,7 @@ func TestUserStatements_UniqueAttributes_CaseInsensitive(t *testing.T) {
 // A team-scoped claim on the same value is legal next to a project-scoped one
 // (the unique index includes unique_team_id), so a lookup for a
 // project-scoped owner must not see it.
-func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
+func TestUserStatements_GetUser_UniqueTeamIDFiltersUniqueClaims(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 
