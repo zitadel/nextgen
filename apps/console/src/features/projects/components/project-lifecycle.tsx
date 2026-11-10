@@ -66,16 +66,23 @@ const STAGES: Stage[] = [
 ];
 
 /**
- * How projects work, under the Projects list: the stages from an app's
- * folder to production, then where each part of a project is changed.
+ * How projects work: the stages from an app's folder to production, then
+ * where each part of a project is changed. Under the first-project card while
+ * Projects is empty, and in the New project drawer after that (D27).
  *
  * Guidance, not navigation: nothing here is a control. The commands are the
  * CLI's, since that is where a project is created and changed (D0b); the
  * console's stage is marked as the one the reader is at.
+ *
+ * It lays itself out by its own width, not the window's (a container query):
+ * one row of stages across a page, one column in the drawer.
  */
 export function ProjectLifecycle({ className }: { className?: string }) {
   return (
-    <section aria-labelledby="lifecycle-title" className={cn("flex flex-col gap-8", className)}>
+    <section
+      aria-labelledby="lifecycle-title"
+      className={cn("@container/lifecycle flex flex-col gap-8", className)}
+    >
       <header className="flex max-w-2xl flex-col gap-2">
         <p className={EYEBROW}>How projects work</p>
         <h2
@@ -90,13 +97,13 @@ export function ProjectLifecycle({ className }: { className?: string }) {
         </p>
       </header>
 
-      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-0">
+      <ol className="grid gap-3 @xl/lifecycle:grid-cols-2 @5xl/lifecycle:grid-cols-5 @5xl/lifecycle:gap-0">
         {STAGES.map((stage, index) => (
           <StageItem key={stage.title} stage={stage} step={index + 1} />
         ))}
       </ol>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 @3xl/lifecycle:grid-cols-2">
         <Ownership icon={FolderGit2} title="Changed in your repository">
           User schemas, login flows and policies live in <InlineCode>.zitadel/</InlineCode> beside
           your code. Review them like code, and ship them with <InlineCode>deploy</InlineCode>.
@@ -129,9 +136,9 @@ const HERE_BADGE =
   "bg-[color:color-mix(in_oklch,var(--zl-gradient-lavender-start)_60%,transparent)] text-[color:var(--zl-gradient-purple-start)] dark:bg-[color:var(--zl-gradient-purple-start)] dark:text-[color:var(--zl-gradient-lavender-start)]";
 
 /**
- * One stage: its node on the track, then its card. At `lg` the stages sit on
- * one row and the node carries a rule to the next one, so the row reads as a
- * track; stacked, the rule goes and each card stands alone.
+ * One stage: its node on the track, then its card. Given the width, the
+ * stages sit on one row and the node carries a rule to the next one, so the
+ * row reads as a track; stacked, the rule goes and each card stands alone.
  */
 function StageItem({ stage, step }: { stage: Stage; step: number }) {
   const icon = <stage.icon strokeWidth={1.5} className="size-4 text-foreground" />;
@@ -151,7 +158,7 @@ function StageItem({ stage, step }: { stage: Stage; step: number }) {
   );
 
   return (
-    <li className="group flex flex-col gap-3 lg:pr-3 lg:last:pr-0">
+    <li className="group flex flex-col gap-3 @5xl/lifecycle:pr-3 @5xl/lifecycle:last:pr-0">
       <div className="flex items-center gap-3" aria-hidden>
         {stage.here ? (
           <GradientFrame className="size-9 shrink-0">
@@ -165,7 +172,7 @@ function StageItem({ stage, step }: { stage: Stage; step: number }) {
           </span>
         )}
         <span className={EYEBROW}>{String(step).padStart(2, "0")}</span>
-        <span className="hidden h-px flex-1 bg-gradient-to-r from-border to-transparent group-last:hidden! lg:block" />
+        <span className="hidden h-px flex-1 bg-gradient-to-r from-border to-transparent group-last:hidden! @5xl/lifecycle:block" />
       </div>
       {stage.here ? (
         <GradientFrame className="flex flex-1">
