@@ -2,13 +2,7 @@
 -- Drops the hash partitioning of users and user_attributes and folds the
 -- user_unique_attributes registry into user_attributes. Partitioning forced a
 -- separate registry: Postgres refuses a unique index on a partitioned table
--- that leaves out a partition column. Measured with 100k users in one project,
--- Postgres 18 and SQLite 3.51:
---
---   unique attribute lookup, correlated EXISTS, no index:     0.1 ms / > 100 s
---   registry-first join + lookup index:                       0.03 ms / < 0.1 ms
---   delete one user, no user-led index:                       4.1 ms / 7 ms
---   delete one user + user-led index:                         0.2 ms / 1 ms
+-- that leaves out a partition column.
 --
 -- One transaction: the copy locks the tables, which is acceptable while the
 -- server runs only in preview with few users.

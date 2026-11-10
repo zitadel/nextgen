@@ -1,9 +1,9 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- Folds the user_unique_attributes registry into user_attributes. See the
--- postgres peer (000039_fold_user_unique_attributes.sql) for the reasons and
--- the measurements. The foreign key from tokens to users already has a managed
--- backing index on (project_id, user_id), which serves the cascade.
+-- postgres peer (000039_fold_user_unique_attributes.sql) for the reasons.
+-- The foreign key from tokens to users already has a managed backing index on
+-- (project_id, user_id), which serves the cascade.
 
 -- +goose StatementBegin
 ALTER TABLE user_attributes ADD COLUMN unique_team_id STRING(MAX)

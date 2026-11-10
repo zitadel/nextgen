@@ -1,9 +1,8 @@
 -- +goose Up
 -- Folds the user_unique_attributes registry into user_attributes. See the
--- postgres peer (000039_fold_user_unique_attributes.sql) for the reasons and
--- the measurements. Unlike the peer, no CHECK ties value_hash to
--- unique_team_id: SQLite cannot drop a column a CHECK names, so the Down
--- would have to rebuild the table.
+-- postgres peer (000039_fold_user_unique_attributes.sql) for the reasons.
+-- Unlike the peer, no CHECK ties value_hash to unique_team_id: SQLite cannot
+-- drop a column a CHECK names, so the Down would have to rebuild the table.
 
 -- +goose StatementBegin
 ALTER TABLE user_attributes ADD COLUMN unique_team_id TEXT;
