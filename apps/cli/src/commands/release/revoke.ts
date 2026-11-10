@@ -1,16 +1,29 @@
-import { Flags } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
+import { z } from "zod";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { ReleaseService } from "@/lib/backend";
+import { RevokeReleaseParams } from "@/lib/backend/schemas";
+import { type Refused, taken } from "@/lib/oclif/flags";
 import { Destructive } from "@/lib/oclif/destructive";
 import { prose } from "@/lib/oclif/rendering";
+
+/**
+ * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
+ * refused before anything is asked or called, and says what one looks like.
+ */
+const RELEASE_ID: Refused<string> = {
+  schema: z.string().trim().pipe(RevokeReleaseParams.shape.release_id),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Find one with `zitadel release list`.",
+    next: ["release list"],
+    details: {
+      argument: "{input}",
+    },
+  },
+};
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
@@ -27,7 +40,10 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force",
   ];
   static override args = {
-    release_id: nonBlankArg({ required: true, description: "The release to revoke." }),
+    release_id: Args.custom<string>({ parse: taken(RELEASE_ID) })({
+      required: true,
+      description: "The release to revoke.",
+    }),
   };
   static override flags = {
     force: Flags.boolean({
