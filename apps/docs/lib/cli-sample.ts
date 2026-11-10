@@ -156,6 +156,9 @@ function listFlags(request: RequestData): string[] {
 //   primary-only list has none either.
 // - A write or a removal without `--preview` also changes the preview value
 //   (a secret write clears it), so `kind=primary` has none for those.
+// - `variable set --preview` refuses a plain value for a name whose primary
+//   value is a secret, which the API accepts and the generator cannot know, so
+//   a plain preview write has none; a secret preview write is exact.
 // - A body that sets several variables is one atomic request, and a `null`
 //   removes a name that may not exist, which `variable rm` refuses, so only a
 //   body that sets one variable is a command.
@@ -193,6 +196,9 @@ function variables(
   const [name, value] = entries[0] ?? ["NAME", ""];
   const { secret, value: scalar } = record(value);
   if (secret === true && typeof scalar !== "string") {
+    return undefined;
+  }
+  if (kind === "preview" && secret !== true) {
     return undefined;
   }
   const type = typeof (scalar ?? value);

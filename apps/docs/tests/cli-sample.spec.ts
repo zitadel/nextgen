@@ -43,14 +43,18 @@ const commands: [string, () => string, string][] = [
     "variable set A",
   ],
   [
-    "a single set of the preview value",
-    () => sample("variable set", "updateVariables", { kind: "preview", body: { A: "1" } }),
-    "variable set A --preview",
+    "a secret set of the preview value",
+    () =>
+      sample("variable set", "updateVariables", {
+        kind: "preview",
+        body: { A: { secret: true, value: "x" } },
+      }),
+    "variable set A --secret --preview",
   ],
   [
     "a typed set",
-    () => sample("variable set", "updateVariables", { kind: "preview", body: { N: 3 } }),
-    "variable set N --as number --preview",
+    () => sample("variable set", "updateVariables", { body: { N: 3 } }),
+    "variable set N --as number",
   ],
   [
     "a secret set",
@@ -96,6 +100,11 @@ for (const [what, run, expected] of commands) {
 }
 
 const calls: [string, () => string, string][] = [
+  [
+    "a plain write of the preview value",
+    () => sample("variable set", "updateVariables", { kind: "preview", body: { A: "1" } }),
+    "api updateVariables",
+  ],
   [
     "a primary-only write",
     () => sample("variable set", "updateVariables", { kind: "primary", body: { A: "1" } }),
