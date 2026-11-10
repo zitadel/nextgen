@@ -19,6 +19,7 @@ import {
   type ConfigKind,
   type ScaffoldOptions,
   type StoredFile,
+  UnparsedFile,
   UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
@@ -197,7 +198,7 @@ function pathsOf(documents: readonly { path: string }[]): readonly string[] {
  * @returns The store.
  */
 function aStoreWithUnparsed(path: string): MemoryStore {
-  return new MemoryStore([{ path, unparsed: "invalid JSON at position 2" }]);
+  return new MemoryStore([UnparsedFile.invalidJson(path, "{ not json")]);
 }
 
 describe("ZitadelConfig.of", () => {
@@ -370,7 +371,7 @@ describe("ZitadelConfig.loadUnchecked", () => {
     const config = await ZitadelConfig.loadUnchecked(store);
 
     expect(config.broken).toMatchObject([
-      { path, kind, issues: [{ message: "cannot be parsed: invalid JSON at position 2" }] },
+      { path, kind, issues: [{ message: "cannot be parsed: invalid JSON at line 1, column 3" }] },
     ]);
   });
 
@@ -387,7 +388,7 @@ describe("ZitadelConfig.loadUnchecked", () => {
         issues: [
           {
             rule: "contract/connection",
-            message: "cannot be parsed: invalid JSON at position 2",
+            message: "cannot be parsed: invalid JSON at line 1, column 3",
           },
         ],
       },

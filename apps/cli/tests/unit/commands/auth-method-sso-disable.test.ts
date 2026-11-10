@@ -695,7 +695,7 @@ describe("auth-method sso disable", () => {
           status: "error",
           code: "E_VALIDATION",
           message:
-            "1 configuration file is not valid:\n  - .zitadel/idps/acme.json: cannot be parsed: invalid JSON at position 1",
+            "1 configuration file is not valid:\n  - .zitadel/idps/acme.json: cannot be parsed: invalid JSON at line 1, column 2",
         });
       });
 

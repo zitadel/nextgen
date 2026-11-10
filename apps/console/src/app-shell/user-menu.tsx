@@ -15,7 +15,7 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { UserAvatar, avatarSeed, avatarVars } from "@/components/user-avatar";
 import { type ThemePreference, useTheme } from "@/theme";
 
-/** Route prefix that puts the shell into its Settings view. */
+/** Route prefix of Settings, whose pages the sidebar lists in place of the account's. */
 export const SETTINGS_PATH = "/settings";
 
 /** The signed-in identity as the shell renders it (user-ref vocabulary). */
@@ -48,8 +48,7 @@ const THEME_SEGMENT =
 
 /**
  * Theme, as a segmented control on one row — System, Light, Dark, drawn as icons. It lives
- * here rather than in the top bar so the bar holds context and search only,
- * and so the Settings view, which has no top bar, can change it too.
+ * here rather than in the top bar so the bar holds context and search only.
  *
  * The segments are the menu's radio items (`DropdownMenuRadioGroup`, so
  * Radix owns `menuitemradio` and its checked state), not loose buttons: a menu
@@ -161,41 +160,14 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
-        <AccountMenuContent user={user} onSignOut={onSignOut} side="right" />
+        <AccountMenuContent user={user} onSignOut={onSignOut} />
       </DropdownMenu>
     </SidebarMenuItem>
   );
 }
 
 /**
- * The account entry of a screen without a sidebar (the projects home): the
- * avatar alone, at the right end of the top bar, opening the same dropdown
- * beneath it.
- */
-export function UserMenuButton({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const { name } = accountName(user);
-  const avatar = useAvatarHost(user);
-
-  return (
-    <DropdownMenu onOpenChange={avatar.onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Account: ${name}`}
-          title={name}
-          className="avatar-host flex size-8 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          {...avatar.host}
-        >
-          {avatar.image}
-        </button>
-      </DropdownMenuTrigger>
-      <AccountMenuContent user={user} onSignOut={onSignOut} side="bottom" />
-    </DropdownMenu>
-  );
-}
-
-/**
- * The account dropdown, wherever it opens from.
+ * The account dropdown, opening to the right of the sidebar's footer row.
  *
  * It follows Vercel's: the person heads it and opens their profile
  * (Settings); then Theme and Log out.
@@ -203,21 +175,12 @@ export function UserMenuButton({ user, onSignOut }: { user?: ShellUser; onSignOu
  * parked: neither has a destination yet, and a row that does nothing reads as
  * broken.
  */
-function AccountMenuContent({
-  user,
-  onSignOut,
-  side,
-}: {
-  user?: ShellUser;
-  onSignOut?: () => void;
-  /** Beside the sidebar's footer row, or beneath the top bar's avatar. */
-  side: "right" | "bottom";
-}) {
+function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const { name, second } = accountName(user);
 
   return (
     <DropdownMenuContent
-      side={side}
+      side="right"
       align="end"
       sideOffset={8}
       className="w-64 border-foreground/10 p-0"

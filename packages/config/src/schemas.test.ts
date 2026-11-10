@@ -21,6 +21,14 @@ import {
 describe("brandingConfigSchema", () => {
   const base = { layout: "split", liquid_template: { $file: "./login.liquid" } };
 
+  /** What the descriptor is refused for, each as `path message`, as a person reads it. */
+  const refusalsOf = (descriptor: object): string[] => {
+    const result = brandingConfigSchema.safeParse(descriptor);
+    return (result.error?.issues ?? []).map((issue) => {
+      return `${issue.path.join(".") || "(root)"} ${issue.message}`;
+    });
+  };
+
   it("accepts the template inline or as a $file reference, and rejects the old key", () => {
     const parses = (descriptor: object): boolean =>
       brandingConfigSchema.safeParse(descriptor).success;
@@ -106,84 +114,229 @@ describe("brandingConfigSchema", () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
-  it("rejects a palette colour that could close its CSS declaration", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { light: { palette: { primary: "red; } :host { display: none" } } },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("theme.light.palette.primary");
-  });
+  describe("says each refusal once, at its own field, in the words of the spec", () => {
+    const COLOUR =
+      "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch()";
+    const COLOUR_FUNCTIONS =
+      "must be hex (#4F46E5), a CSS colour name, or one of the colour functions rgb(), rgba(), hsl(), hsla(), hwb(), lab(), lch(), oklab(), oklch(), color() or color-mix()";
+    const FONT_STACK =
+      'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural")';
+    const IMAGE_URL =
+      "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)";
+    const STYLESHEET_URL = "must be a valid absolute https URL without credentials";
+    const NEEDS_FAMILY =
+      "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in";
+    const FONT_STACK_NO_COMMA =
+      'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural") with no comma inside the quotes';
+    const INTER = "Inter";
 
-  it("rejects a non-string palette value", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { light: { palette: { primary: 123 } } },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("expected string");
-  });
-
-  it("rejects a colour that fetches a URL", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { dark: { palette: { background: "url(https://evil.example/beacon.png)" } } },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a font stack that could close its CSS declaration", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      typography: { font_family: "Inter; } :host { display: none" },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("typography.font_family");
-  });
-
-  it("rejects an http theme-side logo", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      theme: { dark: { logo_url: "http://cdn.example.com/on-dark.svg" } },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("theme.dark.logo_url");
-  });
-
-  it("rejects an http font_url — a stylesheet has no loopback carve-out", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toContain("typography.font_url");
-  });
-
-  it("words the http font_url error as the server does, without the loopback carve-out", () => {
-    const result = brandingConfigSchema.safeParse({
-      ...base,
-      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
-    });
-    const messages = result.error?.issues.map((issue) => issue.message) ?? [];
-    expect(messages).toContain("typography.font_url must be an absolute https URL.");
-    expect(messages.join("\n")).not.toContain("loopback");
-  });
-
-  it("rejects a URL carrying credentials", () => {
-    for (const [field, doc] of [
-      ["logo_url", { ...base, logo_url: "https://user:pass@cdn.example.com/logo.svg" }],
+    it.each([
       [
-        "typography.font_url",
-        {
-          ...base,
-          typography: { font_family: "Inter", font_url: "https://user:pass@fonts.example.com/c" },
-        },
+        "a palette colour that could close its CSS declaration",
+        { theme: { light: { palette: { primary: "red; } :host { display: none" } } } },
+        [`theme.light.palette.primary ${COLOUR}`],
       ],
-    ] as const) {
-      const result = brandingConfigSchema.safeParse(doc);
-      expect(result.success, `${field} accepted credentials`).toBe(false);
-      expect(JSON.stringify(result.error?.issues)).toContain("credentials");
-    }
+      [
+        "a colour that fetches a URL",
+        { theme: { dark: { palette: { background: "url(https://evil.example/beacon.png)" } } } },
+        [`theme.dark.palette.background ${COLOUR}`],
+      ],
+      [
+        "a colour function the server does not allow, which the spec's pattern admits",
+        { theme: { light: { palette: { primary: "var(--brand)" } } } },
+        [`theme.light.palette.primary ${COLOUR_FUNCTIONS}`],
+      ],
+      [
+        "an unknown function, which the spec's pattern admits",
+        { theme: { dark: { palette: { primary: "local(red)" } } } },
+        [`theme.dark.palette.primary ${COLOUR_FUNCTIONS}`],
+      ],
+      [
+        "a font stack that could close its CSS declaration",
+        { typography: { font_family: "Inter; } :host { display: none" } },
+        [`typography.font_family ${FONT_STACK}`],
+      ],
+      [
+        "an empty font family",
+        { typography: { font_family: "" } },
+        [`typography.font_family ${FONT_STACK}`],
+      ],
+      [
+        "an http theme-side logo",
+        { theme: { dark: { logo_url: "http://cdn.example.com/on-dark.svg" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a theme-side logo with leading space",
+        { theme: { light: { logo_url: " https://cdn.example.com/logo.png" } } },
+        [`theme.light.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a theme-side logo with no host",
+        { theme: { dark: { logo_url: "https:///cdn.example.com/logo.png" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "an empty theme-side logo, which the API cannot decode",
+        { theme: { dark: { logo_url: "" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "an empty logo and hero, which the API cannot decode",
+        { logo_url: "", hero_url: "" },
+        [`logo_url ${IMAGE_URL}`, `hero_url ${IMAGE_URL}`],
+      ],
+      [
+        "a logo carrying credentials",
+        { logo_url: "https://user:pass@cdn.example.com/logo.svg" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "an http font_url, which has no loopback carve-out",
+        { typography: { font_family: INTER, font_url: "http://localhost:3000/font.css" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url with no host",
+        { typography: { font_family: INTER, font_url: "https:///fonts.example.com/css2" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url that is no URL",
+        { typography: { font_family: INTER, font_url: "not a url" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "an empty font_url, which the API cannot decode",
+        { typography: { font_url: "" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url carrying credentials",
+        { typography: { font_family: INTER, font_url: "https://user:pass@fonts.example.com/c" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a font_url over the length limit",
+        { typography: { font_family: INTER, font_url: `https://f.example/${"a".repeat(2100)}` } },
+        ["typography.font_url Too big: expected string to have <=2048 characters"],
+      ],
+      [
+        "a logo with a tab in its path, which the server's URL parser refuses",
+        { logo_url: "https://cdn.example.com/a\tb.png" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a hero with a newline in its path",
+        { hero_url: "https://cdn.example.com/a\nb.png" },
+        [`hero_url ${IMAGE_URL}`],
+      ],
+      [
+        "a theme logo with a control character in its query",
+        { theme: { dark: { logo_url: "https://cdn.example.com/a?x=\u0001" } } },
+        [`theme.dark.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a font_url with a control character in its path",
+        { typography: { font_family: INTER, font_url: "https://f.example/a\tb.css" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a logo with a malformed escape in its host, which the server's URL parser refuses",
+        { logo_url: "https://%zz/logo.svg" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a logo with a malformed escape in its path",
+        { logo_url: "https://cdn.example.com/%zz" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a theme logo with a well-formed escape that spells a letter in its host",
+        { theme: { light: { logo_url: "https://%41.example.com/logo.svg" } } },
+        [`theme.light.logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a font_url with a malformed escape in its host",
+        { typography: { font_family: INTER, font_url: "https://%zz/c.css" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a logo with a well-formed escape in its path",
+        { logo_url: "https://cdn.example.com/a%20b.png" },
+        [],
+      ],
+      [
+        "a font stack with a comma inside a quoted name, which the server splits on",
+        { typography: { font_family: '"Acme, Inc", sans-serif' } },
+        [`typography.font_family ${FONT_STACK_NO_COMMA}`],
+      ],
+      [
+        "a font stack with a quoted name and no comma inside it",
+        { typography: { font_family: '"Acme Inc", sans-serif' } },
+        [],
+      ],
+      [
+        "a logo with a space in its host",
+        { logo_url: "https://cdn example.com/logo.png" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a logo with a backslash in its host",
+        { logo_url: "https://cdn\\example.com/logo.png" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a font_url with a space in its host",
+        { typography: { font_family: INTER, font_url: "https://f example.com/c.css" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a colour function that is long as well as not allowed, said once",
+        { theme: { light: { palette: { primary: `var(${"a".repeat(130)})` } } } },
+        ["theme.light.palette.primary Too big: expected string to have <=128 characters"],
+      ],
+      [
+        "a font_url without a font family",
+        { typography: { font_url: "https://fonts.example.com/css2" } },
+        [NEEDS_FAMILY],
+      ],
+      [
+        "a font_url without a font family beside a mistake of type in another typography field",
+        { typography: { scale: "big", font_url: "https://fonts.example.com/css2" } },
+        ["typography.scale Invalid input: expected number, received string", NEEDS_FAMILY],
+      ],
+      [
+        "a font_url that is refused and has no font family",
+        { typography: { font_url: "http://x.example/f" } },
+        [`typography.font_url ${STYLESHEET_URL}`, NEEDS_FAMILY],
+      ],
+      [
+        "an unknown key beside a palette colour",
+        {
+          name: "Acme",
+          theme: { light: { palette: { primary: "var(--brand)" } } },
+        },
+        ['(root) Unrecognized key: "name"', `theme.light.palette.primary ${COLOUR_FUNCTIONS}`],
+      ],
+      [
+        "a mistake of type beside a refused URL and a missing family",
+        { layout: "sideways", typography: { font_url: "http://x.example/f" } },
+        [
+          'layout Invalid option: expected one of "centered"|"split"',
+          `typography.font_url ${STYLESHEET_URL}`,
+          NEEDS_FAMILY,
+        ],
+      ],
+    ])("%s", (_name, extra, expected) => {
+      expect(refusalsOf({ ...base, ...extra }).sort()).toEqual([...expected].sort());
+    });
+
+    it("refuses a non-string palette value", () => {
+      expect(refusalsOf({ ...base, theme: { light: { palette: { primary: 123 } } } })).toEqual([
+        expect.stringContaining("expected string"),
+      ]);
+    });
   });
 
   it("accepts the appearance blocks", () => {
