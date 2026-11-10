@@ -36,6 +36,10 @@ const RELEASE_IN_USE_REFUSAL: Refusal = {
   message: "Release {release_id} is still served by {served}.",
   hint: "Deploy another release with `zitadel deploy`, or roll back with `zitadel deployment rollback`, then revoke this release again.",
   next: ["deploy", "deployment rollback"],
+  details: {
+    release_id: "{release_id}",
+    origins: "{origins}",
+  },
 };
 
 /**
@@ -87,11 +91,17 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
           const outcome = await releaseService.revoke(args.releaseId);
           if (outcome.outcome === "in-use") {
             const served = outcome.origins
-              .map((one) => `${one.origin} (deployment ${one.deploymentId})`)
+              .map((one) => {
+                return `${one.origin} (deployment ${one.deployment_id})`;
+              })
               .join(", ");
             throw refusalError(
               RELEASE_IN_USE_REFUSAL,
-              { release_id: args.releaseId, served },
+              {
+                release_id: args.releaseId,
+                served,
+                origins: outcome.origins,
+              },
               (next) => {
                 return this.suggest(next);
               },

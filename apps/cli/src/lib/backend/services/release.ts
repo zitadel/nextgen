@@ -5,6 +5,8 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
+  RevokeRelease409,
+  RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
 import { z } from "zod";
 
@@ -31,10 +33,7 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
 /** An origin that still serves a release, with the deployment that pins the release there. */
-export type ServedOrigin = Readonly<{
-  origin: string;
-  deploymentId: string;
-}>;
+export type ServedOrigin = RevokeRelease409DetailsOriginsItem;
 
 /**
  * What revoking a release came to: revoked, or refused because origins still
@@ -44,25 +43,20 @@ export type RevokeOutcome =
   | Readonly<{ outcome: "revoked"; release: Release }>
   | Readonly<{ outcome: "in-use"; origins: readonly ServedOrigin[] }>;
 
-/** The origins a `rel.in_use` refusal carries, each with the deployment that pins the release there. */
-const ServedOriginsDetails = z.object({
-  origins: z.array(
-    z.object({
-      origin: z.string(),
-      deployment_id: z.string(),
-    }),
-  ),
-});
-
 /**
- * The body of a `rel.in_use` refusal. The server nests the details it writes
- * one level deeper than the payload itself, so the payload is accepted at either
- * depth: the serialiser's wrapper is not part of the contract, and a reader that
- * insisted on it would go silent the day it goes away.
+ * The body of a `rel.in_use` refusal, as the API contract writes it: the
+ * origins that still serve the release sit directly under `details`.
  */
 const ServedOriginsBody = z.object({
-  details: z.union([ServedOriginsDetails, z.object({ details: ServedOriginsDetails })]),
-});
+  details: z.object({
+    origins: z.array(
+      z.object({
+        origin: z.string(),
+        deployment_id: z.string(),
+      }),
+    ),
+  }),
+}) satisfies z.ZodType<Pick<RevokeRelease409, "details">>;
 
 /**
  * The origins a `rel.in_use` refusal names. The body is parsed rather than
@@ -71,17 +65,9 @@ const ServedOriginsBody = z.object({
  * @param body - The parsed error body the server answered with.
  * @returns The origins it names, empty when it names none.
  */
-function servedOriginsOf(body: unknown): ServedOrigin[] {
+function servedOriginsOf(body: unknown): readonly ServedOrigin[] {
   const parsed = ServedOriginsBody.safeParse(body);
-  if (!parsed.success) {
-    return [];
-  }
-  const { details } = parsed.data;
-  const payload = "origins" in details ? details : details.details;
-  return payload.origins.map(({ origin, deployment_id }) => ({
-    origin,
-    deploymentId: deployment_id,
-  }));
+  return parsed.success ? parsed.data.details.origins : [];
 }
 
 /**
@@ -156,7 +142,9 @@ export class ReleaseService extends ApiService {
    *
    * @param releaseId - The release to revoke.
    * @returns `revoked` with the release, or `in-use` with each origin that still
-   * serves it and the deployment that pins it there. Any other failure is thrown.
+   * serves it and the deployment that pins it there.
+   * @throws ConflictError for any other conflict, and any other failure as the
+   * client raised it, including a `rel.in_use` refusal that names no origin.
    */
   async revoke(releaseId: string): Promise<RevokeOutcome> {
     try {

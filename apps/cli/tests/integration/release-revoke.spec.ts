@@ -193,6 +193,26 @@ describe("release revoke", () => {
         expect(result.stdout + result.stderr).toContain("https://app.example.com (deployment ");
       });
 
+      it("lists each serving origin and its deployment in the --json details", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const served = await app.deployData();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.servingOriginsOf(result)).toContainEqual({
+          origin: "https://app.example.com",
+          deployment_id: served.deployment_id,
+        });
+      });
+
       it("suggests rolling back or deploying another release before revoking again", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -207,8 +227,8 @@ describe("release revoke", () => {
           "--json",
         ]);
 
-        expect(result).toSuggest("deployment rollback");
-        expect(result).toSuggest("deploy");
+        expect(result).toSuggestExactly(app.againAsRun("deploy"));
+        expect(result).toSuggestExactly(app.againAsRun("deployment rollback"));
       });
 
       describe("without --force when no one can be asked", () => {
