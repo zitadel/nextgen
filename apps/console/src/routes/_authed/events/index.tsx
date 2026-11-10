@@ -1,17 +1,16 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Logs, RefreshCw } from "lucide-react";
+import { ListFilter, Logs, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { FilterSelect, FilterValue } from "@/components/filter-select";
 import { IdText } from "@/components/id-text";
 import { Page } from "@/components/layout";
 import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_HEADER,
   RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -21,25 +20,24 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { SelectItem } from "@/components/ui/select";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listProjectEvents } from "@/features/events/api";
+import { EventSearch } from "@/features/events/components/event-search";
 import {
-  AUDIT_CATEGORIES,
-  type AuditCategory,
   eventFilterValues,
   eventSubject,
+  filterCount,
   isNarrowed,
-  LOG_VIEWS,
   type LogEvent,
   type LogsSearch,
   type LogView,
   narrowedBy,
   parseLogsSearch,
-  VALUE_FILTERS,
+  rangeStart,
   VIEW_LABEL,
 } from "@/features/events/model";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
@@ -56,20 +54,21 @@ import { cn } from "@/lib/utils";
  * A row names the event's type, what it was about, who caused it and when it
  * happened, to the second. A row opens the event.
  *
- * The tabs choose which events are listed. **Audit events**, the default, are
- * the sign-ins and changes; **API requests** are one event per call, which
- * every screen that is opened adds to, so they have a tab of their own;
- * **All** reads both. The filters narrow that further, and live in the URL
- * like the tab: they are server-side, so they belong to the request the
- * loader makes. **Category** is chosen on the title row. The rest match one
- * value an event carries (its request, session or login flow) and are set
- * from an event: a row's menu here, or the links on the event's page. Once
- * set, each shows on the title row and clears there. Every filter here is one
- * an index serves on the server (`VALUE_FILTERS`): a filter that reads every
- * event of the project is not offered.
+ * Which events are listed is chosen in the sidebar, whose list Logs replaces
+ * with its own (`LogViewRows`, `LogFilters`): the view (audit events, the
+ * default; API requests; both), then the filters. They live in the URL: they
+ * are server-side, so they belong to the request the loader makes. Every one
+ * is served by an index on the server, and `parseLogsSearch` gives way where
+ * two would not combine, so no URL reads every event of the project.
+ *
+ * The search above the table takes one id or one event type and sets the
+ * filter it names (`EventSearch`). A row's menu narrows the list by a value
+ * the row carries. While the sidebar is an icon rail, on a phone or collapsed,
+ * a button beside the search names the view and opens it.
  *
  * The list is a snapshot of the moment it loaded: **Refresh** reads it again
- * from the newest event.
+ * from the newest event. The time range is counted back from that moment, and
+ * `Load more` keeps it, so a page never slides past rows the range dropped.
  */
 export const Route = createFileRoute("/_authed/events/")({
   // After Authentication, before Settings: the last of the project's
@@ -78,10 +77,13 @@ export const Route = createFileRoute("/_authed/events/")({
   validateSearch: parseLogsSearch,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const page = await listProjectEvents(requireProjectScope(deps.project), deps);
-    // The filters the page answers: `Load more` continues these, not the
-    // ones a newer navigation is on its way to.
-    return { ...page, search: deps };
+    const createdAfter = rangeStart(deps.since, new Date());
+    const page = await listProjectEvents(requireProjectScope(deps.project), deps, {
+      createdAfter,
+    });
+    // The filters and the range's start the page answers: `Load more`
+    // continues these, not the ones a newer navigation is on its way to.
+    return { ...page, search: deps, createdAfter };
   },
   component: LogsScreen,
 });
@@ -97,13 +99,16 @@ function LogsScreen() {
   const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
   const paging = useLoadMore(
     loaded,
-    (pageToken) => listProjectEvents(projectId, loaded.search, pageToken),
+    (pageToken) =>
+      listProjectEvents(projectId, loaded.search, {
+        createdAfter: loaded.createdAfter,
+        pageToken,
+      }),
     "Could not load more events.",
   );
   const events = [...loaded.items, ...paging.extra];
@@ -117,126 +122,90 @@ function LogsScreen() {
     }
   }
 
-  /** Lays `next` over the filters the URL holds. */
-  function narrow(next: Partial<LogsSearch>) {
-    void navigate({ search: (prev) => ({ ...prev, ...next }) });
-  }
-
   return (
     <Page>
-      {/* The tabs filter one list rather than switch between panels, as on
-          Teams: the table is the tab's panel and renders under whichever tab
-          is selected. `gap-4` is the 16px from the tabs to the table. */}
-      <Tabs
-        value={search.view}
-        onValueChange={(view) => narrow({ view: view as LogView })}
-        className="gap-4"
-      >
-        {/* 8px from the title row to the tabs on desktop, 24px on mobile, as
-            on Teams. */}
-        <div className="flex flex-col gap-6 lg:gap-2">
-          <ResourceTitle
-            filter={
-              <>
-                {VALUE_FILTERS.map(({ key, label, name }) => {
-                  const value = search[key];
-                  return (
-                    value && (
-                      <FilterValue
-                        key={key}
-                        label={label}
-                        name={name}
-                        value={value}
-                        onClear={() => narrow({ [key]: undefined })}
-                      />
-                    )
-                  );
-                })}
-                {/* The requests are one category themselves. */}
-                {search.view !== "requests" && (
-                  <FilterSelect
-                    label="Category"
-                    name="category"
-                    value={search.category}
-                    // The API's own value, capitalised.
-                    display={<span className="truncate capitalize">{search.category}</span>}
-                    onChange={(category) =>
-                      narrow({ category: category as AuditCategory | undefined })
-                    }
-                  >
-                    {AUDIT_CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category} className="capitalize">
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </FilterSelect>
-                )}
-              </>
-            }
-            action={
-              // `px-2.5!`: `Button`'s `has-[>svg]:px-3` out-specifies a plain
-              // `px-2.5`.
-              <Button
-                variant="secondary"
-                className="shrink-0 gap-1.5 px-2.5!"
-                onClick={() => void refresh()}
-                loading={refreshing}
-              >
-                <RefreshCw aria-hidden />
-                Refresh
-              </Button>
-            }
+      <ResourceTitle
+        filter={
+          <>
+            <SidebarFilters search={search} />
+            <EventSearch current={search} />
+          </>
+        }
+        action={
+          // `px-2.5!`: `Button`'s `has-[>svg]:px-3` out-specifies a plain
+          // `px-2.5`.
+          <Button
+            variant="secondary"
+            className="shrink-0 gap-1.5 px-2.5!"
+            onClick={() => void refresh()}
+            loading={refreshing}
           >
-            Logs
-          </ResourceTitle>
+            <RefreshCw aria-hidden />
+            Refresh
+          </Button>
+        }
+      >
+        Logs
+      </ResourceTitle>
 
-          <div className={RESOURCE_HEADER}>
-            <TabsList aria-label="Choose which events to list">
-              {LOG_VIEWS.map((view) => (
-                // `flex-none`: the triggers hug their labels; the shared
-                // component stretches them to share the list evenly.
-                <TabsTrigger key={view} value={view} className="flex-none">
-                  {VIEW_LABEL[view]}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </div>
+      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+        {/* An event type runs to thirty characters, and the time must show
+            its seconds, which tell the events of one request apart. The
+            table keeps the width both need and scrolls in its card below
+            it; a quarter of that width is a timestamp with its inset. */}
+        <Table className={cn(RESOURCE_TABLE_FIXED, "min-w-[58rem]")}>
+          <TableHeader>
+            <ResourceHeaderRow>
+              <ResourceHeadCell className="w-[26%]">Event</ResourceHeadCell>
+              <ResourceHeadCell className="w-[28%]">Details</ResourceHeadCell>
+              <ResourceHeadCell className="w-[16%]">Actor</ResourceHeadCell>
+              <ResourceHeadCell className="w-[24%]">Time</ResourceHeadCell>
+              <ResourceMenuHead className="w-[6%] px-2" />
+            </ResourceHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {events.length === 0 ? (
+              <ResourceEmptyRow colSpan={5}>
+                {isNarrowed(loaded.search)
+                  ? "No events match these filters."
+                  : NOTHING[loaded.search.view]}
+              </ResourceEmptyRow>
+            ) : (
+              events.map((event) => <EventRow key={event.id} event={event} search={search} />)
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-        <TabsContent value={search.view}>
-          <div className={RESOURCE_TABLE_WRAP}>
-            {/* An event type runs to thirty characters, and the time must show
-                its seconds, which tell the events of one request apart. The
-                table keeps the width both need and scrolls in its card below
-                it; a quarter of that width is a timestamp with its inset. */}
-            <Table className={cn(RESOURCE_TABLE_FIXED, "min-w-[58rem]")}>
-              <TableHeader>
-                <ResourceHeaderRow>
-                  <ResourceHeadCell className="w-[26%]">Event</ResourceHeadCell>
-                  <ResourceHeadCell className="w-[28%]">Details</ResourceHeadCell>
-                  <ResourceHeadCell className="w-[16%]">Actor</ResourceHeadCell>
-                  <ResourceHeadCell className="w-[24%]">Time</ResourceHeadCell>
-                  <ResourceMenuHead className="w-[6%] px-2" />
-                </ResourceHeaderRow>
-              </TableHeader>
-              <TableBody>
-                {events.length === 0 ? (
-                  <ResourceEmptyRow colSpan={5}>
-                    {isNarrowed(loaded.search)
-                      ? "No events match these filters."
-                      : NOTHING[loaded.search.view]}
-                  </ResourceEmptyRow>
-                ) : (
-                  events.map((event) => <EventRow key={event.id} event={event} search={search} />)
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <LoadMore paging={paging} />
-        </TabsContent>
-      </Tabs>
+      <LoadMore paging={paging} />
     </Page>
+  );
+}
+
+/**
+ * The way to the views and filters while the sidebar is an icon rail, on a
+ * phone or collapsed: the rail has no room for a field, and without its
+ * labels it does not say which view is on. The button names the view and how
+ * many filters narrow it, and opens the sidebar, where both are changed.
+ * Beside an open sidebar it would repeat it, so it is not drawn.
+ */
+function SidebarFilters({ search }: { search: LogsSearch }) {
+  const { isMobile, state, setOpen, setOpenMobile } = useSidebar();
+  if (!isMobile && state === "expanded") return null;
+  const count = filterCount(search);
+  const filters = count === 1 ? "1 filter" : `${count} filters`;
+
+  return (
+    <Button
+      variant="outline"
+      className="shrink-0 gap-1.5 px-2.5!"
+      aria-label={`Views and filters: ${VIEW_LABEL[search.view]}${count > 0 ? `, ${filters}` : ""}`}
+      onClick={() => (isMobile ? setOpenMobile(true) : setOpen(true))}
+    >
+      <ListFilter aria-hidden />
+      {VIEW_LABEL[search.view]}
+      {count > 0 && <Badge variant="secondary">{count}</Badge>}
+    </Button>
   );
 }
 
