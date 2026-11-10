@@ -309,6 +309,42 @@ The build parses everything the function needs to start (the master key,
 its id, the serving URL, the admin document), so a variable that is missing
 or garbled fails the build and the serving deployment stays.
 
+### 4. Firewall rules
+
+The edge's rate limits ([ADR 078](../adrs/078-abuse-prevention-in-layers.md)
+§2) are project state, not part of a deployment: custom rules of the
+project's Vercel Firewall, each counting per address in a fixed window of
+60 s. `vercel firewall rules list --project cloud --scope zitadel` shows them.
+
+| Rule | Matches | Limit per address |
+|---|---|---|
+| `server-per-address` | every path the server answers: `/api/*`, its own root paths and, until 1.0.0, the API's root paths | 3000 |
+| `credential-free-operations` | `createProject` and `getClaimWindow`, with and without the API's prefix | 30 |
+| `cloud-account-ensure` | `POST /cloud/api/account/ensure`, which can start workflow runs | 20 |
+| `telemetry-proxy` | `/telemetry/mixpanel/*` | 300 |
+
+- **Log first.** Published on 2026-11-10 with the exceed action `log`, which
+  blocks nothing. A rule enforces once a week of traffic shows nobody
+  legitimate near its limit, a customer's relay or a CI runner's shared
+  address in particular:
+
+  ```sh
+  vercel firewall traffic list --action log --dimension rule --dimension ip --project cloud --scope zitadel
+  vercel firewall rules update <rule> --rate-limit-action rate_limit --project cloud --scope zitadel
+  vercel firewall diff --project cloud --scope zitadel
+  vercel firewall publish --project cloud --scope zitadel
+  ```
+
+- **A change is a draft until published.** `rules add`, `update` and `remove`
+  stage it; `publish` makes every staged change live at once, `discard` drops
+  them.
+- **The server's root paths are listed in the rule.** A resource added to
+  `vercel.json`'s rule for the API's root paths belongs in
+  `server-per-address` too; paths under `/api/` need nothing.
+- **No challenge on API paths:** the CLI and the SDKs cannot answer one.
+  Attack Mode (`vercel firewall attack-mode`) is an incident switch for
+  browser paths only.
+
 ## Deploying
 
 - **Production:** every push to `main`. The `server` build migrates the

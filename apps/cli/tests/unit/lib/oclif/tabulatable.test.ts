@@ -417,6 +417,26 @@ describe("emitList", () => {
     });
   });
 
+  it("names the next page under an empty page too, since more may follow it", async () => {
+    const result = await asTerminal(() =>
+      draw().drawList(
+        { plain: false },
+        {
+          ...view,
+          rows: [],
+          items: [],
+          empty: "No things on this page.",
+          page: { token: "p2", command: "thing list", flags: [] },
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      data: { items: [], next_page_token: "p2" },
+      pretty: { text: "No things on this page.\nMore available: --page-token p2 (or --all)" },
+    });
+  });
+
   it("joins a cursor that starts with a dash to its option, so it stays one option", async () => {
     const result = await asTerminal(() =>
       draw().drawList(

@@ -2,7 +2,7 @@
 
 How the turbo task graph is laid out and the rules for changing it. Read this
 before editing a `turbo.json` or a workspace dependency. Turborepo is the only
-task runner ([ADR 087](../../adrs/087-turborepo-task-runner.md)): CI runs it
+task runner ([ADR 088](../../adrs/088-turborepo-task-runner.md)): CI runs it
 (ci.yml's `full-pr`, see [Commands](#commands)), Vercel builds the hosted
 cloud with it, and contributors run it with `turbo run` or through the root
 scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).

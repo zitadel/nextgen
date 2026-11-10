@@ -44,6 +44,7 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`).
 - **Branding** (`/branding`).
 - **Authentication** (`/authentication`).
+- **Logs** (`/events`, `/events/$eventId`): the project's events.
 - **Project settings** (`/project`).
 - **Profile** (`/settings/profile`), your profile, under Settings in the
   account sidebar.

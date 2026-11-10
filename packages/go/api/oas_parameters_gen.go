@@ -1121,6 +1121,13 @@ type RollbackDeploymentParams struct {
 	DeploymentID DeploymentID
 }
 
+// SearchParams is parameters of search operation.
+type SearchParams struct {
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to address the credential's own project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
 // SetUserPasswordParams is parameters of setUserPassword operation.
 type SetUserPasswordParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
