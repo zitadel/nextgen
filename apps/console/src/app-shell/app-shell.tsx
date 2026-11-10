@@ -1,4 +1,5 @@
 import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
+import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
 import {
@@ -33,8 +34,8 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  *
  * Every screen is drawn in this one frame (D27). What changes with where the
  * person is is the sidebar's list and what the project pill says
- * (`useShellView`), never the frame, so going from a project to Projects or to
- * Settings moves nothing but the list.
+ * (`useShellView`), never the frame, so going from a project to Projects, and
+ * from there into Settings, moves nothing but the list.
  */
 export function AppShell({
   children,
@@ -76,18 +77,18 @@ export function AppShell({
 const HOME_ROUTE = "/_authed/projects/";
 
 /**
- * Which of the sidebar's two lists is showing, and the **route** decides:
- * Projects and `/settings` with anything beneath it are above every project,
- * so they list the account's screens; everything else lists the selected
- * project's. Deriving it from the route rather than from component state is
- * what lets a settings URL survive a refresh, and it keeps the shell
- * consistent with ADR 0001's route-driven nav.
+ * Which of the sidebar's three lists is showing, and the **route** decides:
+ * Projects is above every project, so it lists the account's screens;
+ * `/settings` with anything beneath it lists Settings' pages (D29);
+ * everything else lists the selected project's. Deriving it from the route
+ * rather than from component state is what lets a settings URL survive a
+ * refresh, and it keeps the shell consistent with ADR 0001's route-driven nav.
  */
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
-  const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
-  return atHome || inSettings ? "account" : "portal";
+  if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
+  return atHome ? "account" : "portal";
 }
 
 /** Home is Projects, the list of every project, from any screen. */
@@ -119,7 +120,7 @@ const HEADER_BUTTON = "size-7! text-sidebar-foreground";
 
 /**
  * The sidebar: the brand header, search, the list `view` names, and the
- * account in the footer. Both lists collapse to the same 48px icon rail.
+ * account in the footer. Every list collapses to the same 48px icon rail.
  */
 function AppSidebar({
   view,
@@ -144,7 +145,7 @@ function AppSidebar({
             <SearchTrigger onOpen={onSearch} />
           </SidebarMenu>
         </SidebarGroup>
-        <NavList view={view} label={view === "account" ? "Account" : "Primary"} />
+        <NavList view={view} />
       </SidebarContent>
 
       <SidebarFooter>
@@ -170,24 +171,33 @@ function BrandHeader() {
   );
 }
 
+/** What assistive tech calls each list. */
+const NAV_LABEL: Record<NavView, string> = {
+  portal: "Primary",
+  account: "Account",
+  settings: "Settings",
+};
+
 /**
- * Both sidebars' nav: one flat list of the view's routes (`staticData.nav`,
+ * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
  * Console ADR 0001). Portal is the project's screens. Account is what sits
  * above every project: Projects, the home, then what an add-on lists, then
- * the person's own settings, their profile alone while accounts are not
- * surfaced (Console ADR 0005 §3). A row stays marked on the screens beneath
- * it, so a resource's detail keeps its list marked.
+ * Settings. Settings is that row's own list, under a heading that leads back:
+ * the person's profile, alone while accounts are not surfaced (Console ADR
+ * 0005 §3), then what an add-on lists. A row stays marked on the screens
+ * beneath it, so a resource's detail keeps its list marked.
  *
  * Rows keep their height and a 2px gap in both sidebar states, so collapsing
  * moves nothing vertically.
  */
-function NavList({ view, label }: { view: NavView; label: string }) {
+function NavList({ view }: { view: NavView }) {
   const items = useNavItems(view);
   const matchRoute = useMatchRoute();
 
   return (
-    <SidebarGroup role="navigation" aria-label={label} className="pt-2 pb-0">
+    <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
       <SidebarMenu className="gap-0.5">
+        {view === "settings" && <SettingsHeading />}
         {items.map(({ to, nav: { icon: Icon, label: name } }) => (
           <SidebarMenuItem key={name}>
             <SidebarMenuButton
@@ -208,6 +218,26 @@ function NavList({ view, label }: { view: NavView; label: string }) {
 }
 
 /**
+ * Heads the Settings list, as Vercel's does: the list's name, and the way
+ * back up to the account's list (D29). It is a row of the left nav, which is
+ * how the console moves up (D13), and it opens Projects, the account list's
+ * first screen. In the icon rail it is the chevron alone.
+ */
+function SettingsHeading() {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild tooltip="Back to Projects" className="font-medium">
+        {/* The name keeps the visible label and says where the row leads. */}
+        <Link to="/projects" aria-label="Settings: back to Projects">
+          <ChevronLeft aria-hidden />
+          <span>Settings</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+/**
  * The top bar: the project switcher, and the team switcher on a team's page.
  * 56px and ruled underneath, level with the sidebar's brand header. Search and
  * the collapse toggle live in the sidebar and the theme in the account menu,
@@ -217,7 +247,8 @@ function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      <ContextSwitcher userId={userId} allProjects={view === "account"} />
+      {/* Above every project the pill says so, and its list leads into one. */}
+      <ContextSwitcher userId={userId} allProjects={view !== "portal"} />
     </div>
   );
 }

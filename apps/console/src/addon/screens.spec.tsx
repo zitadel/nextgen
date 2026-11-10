@@ -21,7 +21,7 @@ beforeEach(() => {
   fetchSession.mockResolvedValue(makeTestSession());
 });
 
-// An add-on with one account screen and one signed-out screen, in place of
+// An add-on with one Settings page and one signed-out screen, in place of
 // the empty one this build compiles in. Module state is per spec file, so the
 // screens it mounts stay in this file's router.
 vi.mock("@/addon", () => ({
@@ -29,7 +29,7 @@ vi.mock("@/addon", () => ({
     screens: [
       {
         path: "/settings/invoices",
-        nav: { label: "Invoices", view: "account", order: 2, icon: Receipt },
+        nav: { label: "Invoices", view: "settings", order: 2, icon: Receipt },
         load: async () => ({ count: 3 }),
         Screen: ({ data }: AddonScreenProps<{ count: number }>) => <h1>{data.count} invoices</h1>,
       },
@@ -59,10 +59,10 @@ describe("an add-on's screens", () => {
 
   it("list themselves in the view their entry names, after the console's own", async () => {
     await renderAt("/settings/invoices");
-    const nav = await screen.findByRole("navigation", { name: "Account" });
+    const nav = await screen.findByRole("navigation", { name: "Settings" });
     const links = within(nav).getAllByRole("link");
-    // Between the console's own: Projects first, the person's settings last.
-    expect(links.map((link) => link.textContent)).toEqual(["Projects", "Invoices", "Settings"]);
+    // Under the list's heading, after the console's own page, the profile.
+    expect(links.map((link) => link.textContent)).toEqual(["Settings", "Profile", "Invoices"]);
   });
 });
 

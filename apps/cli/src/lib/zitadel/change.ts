@@ -364,7 +364,7 @@ export class Change {
       store.assertWritable(write.path);
     }
     for (const path of this.removedPaths) {
-      store.assertWritable(path);
+      store.assertRemovable(path);
     }
     // Every file to create is checked before any is written, so a taken path
     // refuses with nothing touched, not after the files before it.

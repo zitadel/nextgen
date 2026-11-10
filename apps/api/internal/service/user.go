@@ -251,7 +251,7 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 		user := action.CreateUser
 		emitUserCreateFailedBestEffort(ctx, s.v2Pool.Statements(), user.ProjectID, unique)
 		conflictingKeys, lookupErr := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
-			user.ProjectID, user.ID, user.Attributes, user.Attributes.RegistryTeamScopes(nil, user.AttributeTeamScope()))
+			user.ProjectID, user.ID, user.Attributes, user.Attributes.UniqueTeamScopes(nil, user.AttributeTeamScope()))
 		if lookupErr != nil || len(conflictingKeys) == 0 {
 			return nil, err
 		}
@@ -738,7 +738,7 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *d
 		}
 		patch := action.patch
 		conflictingKeys, lookupErr := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
-			patch.ProjectID, patch.UserID, patch.Attributes, patch.RegistryTeamScopes)
+			patch.ProjectID, patch.UserID, patch.Attributes, patch.UniqueTeamScopes)
 		if lookupErr != nil || len(conflictingKeys) == 0 {
 			return nil, err
 		}
@@ -761,7 +761,7 @@ func (s *userService) dryRunPatchUser(ctx context.Context, input PatchUserInput)
 	}
 	patch := action.patch
 	taken, err := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
-		patch.ProjectID, patch.UserID, patch.Attributes, patch.RegistryTeamScopes)
+		patch.ProjectID, patch.UserID, patch.Attributes, patch.UniqueTeamScopes)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to look up unique attributes in the database")
 	}
@@ -1025,7 +1025,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
 
-	// Read outside the transaction like the user itself: registry mutations
+	// Read outside the transaction like the user itself: unique claim changes
 	// always move the user's updated_at, so the patch statement's guard
 	// catches interleaved changes and the retry re-reads both.
 	storedScopes, err := o.pool.Statements().GetUserUniqueAttributeScopes(ctx, o.ProjectID, o.UserID)
@@ -1063,11 +1063,11 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 	o.schemaJSON = targetSchema.Schema
 	o.current = user
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
-		Current:              user,
-		SchemaURL:            targetSchema.URL,
-		Schema:               targetSchema.Schema,
-		AttributesPatch:      o.Attributes,
-		StoredRegistryScopes: storedScopes,
+		Current:                user,
+		SchemaURL:              targetSchema.URL,
+		Schema:                 targetSchema.Schema,
+		AttributesPatch:        o.Attributes,
+		StoredUniqueTeamScopes: storedScopes,
 	})
 	return err
 }

@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "@/nav";
 import { type NavItem, useNavItems } from "./use-nav-items";
+import { SETTINGS_PATH } from "./user-menu";
 
 /**
  * Console search: the sidebar's trigger and the "Go to" palette it opens (⌘K /
@@ -46,8 +47,8 @@ import { type NavItem, useNavItems } from "./use-nav-items";
  * finds in it (root ADR 087), which is users, teams and configuration (user
  * schemas, login flows, identity providers), each matched and ranked on the
  * server, an id pasted into the field included; projects, matched on the
- * server across every project the person can act on; and you (the Settings
- * sidebar's pages).
+ * server across every project the person can act on; and the account
+ * (Projects, then Settings' pages, which "Settings" finds too).
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
@@ -141,6 +142,7 @@ export function SearchDialog({
   const projects = useProjectSearch(open ? query : "", PROJECT_RESULTS);
   const pages = useNavItems();
   const account = useNavItems("account");
+  const settings = useNavItems("settings");
 
   // A fresh palette each time it opens.
   useEffect(() => {
@@ -157,14 +159,16 @@ export function SearchDialog({
       go();
     };
 
-    // Every page of a sidebar, in its order.
-    const navResults = (items: NavItem[]): Result[] =>
+    // Every page of a sidebar list, in its order. A list that has a name
+    // marks its pages with it, and the name finds them all.
+    const navResults = (items: NavItem[], list?: string): Result[] =>
       items
-        .filter((item) => matches(item.nav.label))
+        .filter((item) => matches(item.nav.label) || (!!list && matches(list)))
         .map((item) => ({
           id: `page:${item.to}`,
           icon: item.nav.icon,
           label: item.nav.label,
+          context: list,
           go: close(() => void navigate({ to: item.to })),
         }));
 
@@ -235,9 +239,28 @@ export function SearchDialog({
         ],
       },
       { heading: "Projects", results: projectResults },
-      { heading: "Account", results: navResults(account) },
+      {
+        heading: "Account",
+        // The Settings row is a list, not a page: its pages stand in for it.
+        results: [
+          ...navResults(account.filter((item) => item.to !== SETTINGS_PATH)),
+          ...navResults(settings, "Settings"),
+        ],
+      },
     ].filter((group) => group.results.length > 0);
-  }, [pages, account, users, others, projects, projectName, q, query, navigate, onOpenChange]);
+  }, [
+    pages,
+    account,
+    settings,
+    users,
+    others,
+    projects,
+    projectName,
+    q,
+    query,
+    navigate,
+    onOpenChange,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

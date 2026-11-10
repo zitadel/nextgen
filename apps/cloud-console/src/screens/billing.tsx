@@ -43,7 +43,7 @@ import { screen } from "./screen";
  */
 export const billingScreen = screen({
   path: "/settings/billing",
-  nav: { label: "Billing", view: "account", order: 2, icon: CreditCard },
+  nav: { label: "Billing", view: "settings", order: 2, icon: CreditCard },
   load: () => whenLive(cloudGet<BillingOverview>("/billing")),
   Screen: BillingScreen,
 });
