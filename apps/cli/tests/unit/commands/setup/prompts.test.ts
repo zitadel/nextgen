@@ -784,10 +784,32 @@ describe("SocialSignInPrompt", () => {
   describe("when no provider is wanted", () => {
     it("leaves the answers alone", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(select).mockResolvedValueOnce("skip");
 
       const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(answers.sso).toEqual([]);
+    });
+
+    it("asks before going on without SSO, with Go back selected", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(select).mockResolvedValueOnce("skip");
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+        message: "Continue without SSO?",
+        initialValue: "back",
+      });
+    });
+
+    it("asks for the providers again when Go back is chosen", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      vi.mocked(select).mockResolvedValueOnce("back").mockResolvedValueOnce("skip");
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(multiselect)).toHaveBeenCalledTimes(2);
     });
 
     it.each([
@@ -795,6 +817,7 @@ describe("SocialSignInPrompt", () => {
       ["password", password],
     ])("asks no %s question", async (_kind, prompt) => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(select).mockResolvedValueOnce("skip");
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -804,6 +827,7 @@ describe("SocialSignInPrompt", () => {
 
   it("offers every catalog provider and a custom one, with no option meaning none", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(select).mockResolvedValueOnce("skip");
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -814,18 +838,20 @@ describe("SocialSignInPrompt", () => {
     ).toEqual([...IDP_PROVIDERS, "custom"]);
   });
 
-  it("says the providers are optional and that Enter skips them", async () => {
+  it("says that Space selects a provider and Enter continues", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(select).mockResolvedValueOnce("skip");
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
     expect(vi.mocked(multiselect).mock.calls[0]?.[0].message).toBe(
-      "Which external sign-in providers would you like to add? Press Enter to skip.",
+      "Which external sign-in providers would you like to add? Space to select · Enter to continue.",
     );
   });
 
   it("says what each provider requires", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(select).mockResolvedValueOnce("skip");
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -986,6 +1012,7 @@ describe("SocialSignInPrompt", () => {
   describe("with a custom provider", () => {
     it("is offered beside the catalog, saying what it will ask for", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(select).mockResolvedValueOnce("skip");
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
