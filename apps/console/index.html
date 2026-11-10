@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zitadel Console</title>
+    <!-- Which scheme the page is drawn in, for what the browser paints before
+         and around it. The script below narrows it to the theme in use, and
+         src/theme.ts adds the theme's `theme-color` once the tokens load. -->
+    <meta name="color-scheme" content="dark light" />
     <!-- A copy of the website's set, in public/favicons, so every deployment has
          them. Vite puts the deployment's base in front of these paths when it
          builds. -->
@@ -30,6 +34,7 @@
                 : "dark"
               : pref;
           document.documentElement.setAttribute("data-theme", resolved);
+          document.querySelector('meta[name="color-scheme"]').content = resolved;
         } catch (e) {
           document.documentElement.setAttribute("data-theme", "dark");
         }
