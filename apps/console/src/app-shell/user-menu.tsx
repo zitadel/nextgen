@@ -15,7 +15,7 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { UserAvatar, avatarSeed, avatarVars } from "@/components/user-avatar";
 import { type ThemePreference, useTheme } from "@/theme";
 
-/** Route prefix of the person's settings, which show the account sidebar. */
+/** Route prefix of Settings, whose pages the sidebar lists in place of the account's. */
 export const SETTINGS_PATH = "/settings";
 
 /** The signed-in identity as the shell renders it (user-ref vocabulary). */

@@ -326,6 +326,6 @@ func TestNewCreateAttribute_UniqueHashIsNormalized(t *testing.T) {
 	b, err := NewCreateAttribute("email", "alice@example.com", AttributeUniquenessProject)
 	require.NoError(t, err)
 
-	assert.Equal(t, a.ValueHash, b.ValueHash, "the registry sees one value")
+	assert.Equal(t, a.ValueHash, b.ValueHash, "the unique index sees one value")
 	assert.Equal(t, "Alice@Example.com", a.Value, "the stored value keeps its casing")
 }

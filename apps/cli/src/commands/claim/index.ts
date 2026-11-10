@@ -95,7 +95,7 @@ const TIMEOUT: Refused<number> = {
  * asked or sent.
  */
 const CHALLENGE_ID: Refused<string> = {
-  schema: z.string().regex(getClaimStatusQueryChallengeIdRegExp),
+  schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),
   refusal: {
     message:
       "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",

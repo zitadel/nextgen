@@ -34,13 +34,123 @@ export const MISSING_REFERENCES = ["throw", "omit"] as const;
 export type MissingReference = (typeof MISSING_REFERENCES)[number];
 
 /**
+ * The part of `node:fs` a store uses, so the same store can run over a disk
+ * or over memory.
+ *
+ * @remarks
+ * Narrow on purpose: `node:fs` and an in-memory filesystem both satisfy it,
+ * and nothing else about either is visible to the store. A read may answer
+ * with a string or a buffer, and a directory listing with its names, as `memfs`
+ * types them; the store turns each into text.
+ */
+export interface FileSystem {
+  /**
+   * The calls that wait.
+   */
+  readonly promises: {
+    /**
+     * Read a file as text.
+     *
+     * @param path - The absolute path.
+     * @param encoding - The text encoding.
+     * @returns Its text.
+     */
+    readFile(path: string, encoding: "utf8"): Promise<string | Buffer>;
+
+    /**
+     * List the names in a directory.
+     *
+     * @param path - The absolute path.
+     * @returns The names.
+     */
+    readdir(path: string): Promise<readonly unknown[]>;
+
+    /**
+     * Check that a path can be reached.
+     *
+     * @param path - The absolute path.
+     * @returns Nothing, when it can.
+     */
+    access(path: string): Promise<void>;
+
+    /**
+     * Make a directory and the ones above it that are missing.
+     *
+     * @param path - The absolute path.
+     * @param options - Make the missing ones too.
+     * @returns Nothing of use.
+     */
+    mkdir(path: string, options: { readonly recursive: true }): Promise<unknown>;
+
+    /**
+     * Write a file's text.
+     *
+     * @param path - The absolute path.
+     * @param data - What it holds.
+     * @param options - The open flag, such as `wx` to refuse an existing file.
+     * @returns Nothing, once it is written.
+     */
+    writeFile(path: string, data: string, options: { readonly flag: string }): Promise<void>;
+
+    /**
+     * Remove a file, or a symlink itself, never what it points at.
+     *
+     * @param path - The absolute path.
+     * @returns Nothing, once it is gone.
+     */
+    unlink(path: string): Promise<void>;
+  };
+
+  /**
+   * Read a file as text, waiting for nothing.
+   *
+   * @param path - The absolute path.
+   * @param encoding - The text encoding.
+   * @returns Its text.
+   */
+  readFileSync(path: string, encoding: "utf8"): string | Buffer;
+
+  /**
+   * Check whether a path exists.
+   *
+   * @param path - The absolute path.
+   * @returns Whether it does.
+   */
+  existsSync(path: string): boolean;
+
+  /**
+   * Describe a path without following a symlink.
+   *
+   * @param path - The absolute path.
+   * @returns Whether it is a symlink, and whether it is a directory.
+   */
+  lstatSync(path: string): { isSymbolicLink(): boolean; isDirectory(): boolean };
+
+  /**
+   * Describe a path, following a symlink.
+   *
+   * @param path - The absolute path.
+   * @returns Whether it is a directory.
+   */
+  statSync(path: string): { isDirectory(): boolean };
+
+  /**
+   * Resolve a path with every symlink on it.
+   *
+   * @param path - The absolute path.
+   * @returns The real path.
+   */
+  realpathSync(path: string): string | Buffer;
+}
+
+/**
  * Where the configuration is kept.
  *
  * @remarks
  * The library never touches a disk itself: the caller hands it a store, and a
  * test hands it one that holds the files in memory. An `interface`, not a
- * `type`, and the one in the library: it is a behavioural contract two
- * classes `implement`, not a shape of data.
+ * `type`, and the one in the library: it is a behavioural contract, not a
+ * shape of data. {@link Store} implements it, over a disk or over memory.
  */
 export interface ConfigStore {
   /**
@@ -64,16 +174,30 @@ export interface ConfigStore {
   exists(path: string): Promise<boolean>;
 
   /**
-   * Check that a file may be written or removed, without touching it.
+   * Check that a file may be written, without touching it.
    *
    * @remarks
-   * Every write and removal enforces this itself; asking first lets a caller
-   * that writes several files refuse all of them before the first is written.
+   * Every write enforces this itself; asking first lets a caller that writes
+   * several files refuse all of them before the first is written.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   *   directory it needs is a file.
    */
   assertWritable(path: string): void;
+
+  /**
+   * Check that a file may be removed, without touching it.
+   *
+   * @remarks
+   * Every removal enforces this itself. A file with a regular file on the way
+   * is not there, so removing it is not refused.
+   *
+   * @param path - The project-relative path.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   *   a directory.
+   */
+  assertRemovable(path: string): void;
 
   /**
    * Write one file's body.
@@ -83,6 +207,8 @@ export interface ConfigStore {
    * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   *   directory it needs is a file.
    */
   write(file: ConfigFile, mode: WriteMode): Promise<void>;
 
@@ -91,6 +217,8 @@ export interface ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   *   a directory.
    */
   remove(path: string): Promise<void>;
 
@@ -103,6 +231,8 @@ export interface ConfigStore {
    * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   *   directory it needs is a file.
    */
   writeText(path: string, text: string, mode: WriteMode): Promise<void>;
 

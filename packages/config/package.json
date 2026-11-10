@@ -111,6 +111,7 @@
     "prepack": "publint --strict"
   },
   "dependencies": {
+    "@sindresorhus/slugify": "catalog:",
     "@zitadel/api": "workspace:*",
     "ajv": "catalog:",
     "culori": "catalog:",

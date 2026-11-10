@@ -14,6 +14,7 @@ import {
   aPasswordPolicy,
   aStore,
   aUserSchema,
+  bodyAt,
   type ConfigDocuments,
 } from "@tests/helpers/config";
 
@@ -274,7 +275,7 @@ describe("Collection.placeRevision", () => {
         })
         .save(store);
 
-      expect(store.get(HUMAN_USER)?.$schema).toBe("https://example.test/schema.json");
+      expect(bodyAt(store, HUMAN_USER)?.$schema).toBe("https://example.test/schema.json");
     });
 
     it("writes nothing when the file already holds exactly the revision", () => {

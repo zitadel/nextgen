@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings } from "lucide-react";
+import { CircleUser } from "lucide-react";
 import { DETAIL_CARD, DETAIL_TITLE } from "@/components/detail-page";
 import { Page, SettingsColumn } from "@/components/layout";
 import { SettingsCard, SettingsSection } from "@/components/settings-card";
@@ -33,7 +33,7 @@ import {
 } from "@/features/users/components/own-profile-form";
 
 /**
- * Account settings → Settings: the person's own profile, generated from their
+ * Settings → Profile: the person's own profile, generated from their
  * own user schema as Add user is (`schemaFields`): a row per property, nothing
  * named in code. The schema's
  * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
@@ -49,7 +49,7 @@ import {
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
-    nav: { label: "Settings", order: 9, icon: Settings, view: "account" },
+    nav: { label: "Profile", view: "settings", order: 1, icon: CircleUser },
   },
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), and a failed
@@ -117,7 +117,7 @@ function ProfileScreen() {
         {/* No header gutter: the settings design aligns the title with the card,
             where a resource detail insets its title lockup by 8px. */}
         <div className={PAGE_TITLE_ROW}>
-          <h1 className={DETAIL_TITLE}>Settings</h1>
+          <h1 className={DETAIL_TITLE}>Profile</h1>
         </div>
         {/* Says whose settings these are: the nav label alone does not. */}
         <SettingsSection

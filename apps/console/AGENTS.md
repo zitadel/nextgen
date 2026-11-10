@@ -63,9 +63,10 @@ between files are the sign the component is missing.
   project the console signs into, not the one being managed.
 - The sidebar lists a project's screens, with or without a selection: without
   one, a screen asks for a project first (Projects with `?next=`, D22).
-- Projects (the home) and `/settings` are above every project: there the
-  sidebar lists the account's screens instead (`nav.view: "account"`, D27).
-- Screens outside every project (billing, operators) go in the account list,
+- Projects (the home) and `/settings` are above every project: Projects lists
+  the account's screens (`nav.view: "account"`, D27), `/settings` its own pages
+  (`nav.view: "settings"`, D29).
+- Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.

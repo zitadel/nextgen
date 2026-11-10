@@ -263,6 +263,26 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("refuses a release id before asking to confirm it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+
+        const result = await app.run(["deployment", "rollback", first.release_id ?? "", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("suggests listing deployments when given a release id", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+
+        const result = await app.run(["deployment", "rollback", first.release_id ?? "", "--json"]);
+
+        expect(result).toSuggest("deployment list");
+      });
+
       describe("without --force when no one can be asked", () => {
         it("is refused", async () => {
           const app = await aSetUpApp();

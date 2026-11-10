@@ -192,7 +192,7 @@ padded input through validation (`pattern`/`format`) instead of silently
 mutating it.
 
 This is a single comparison function shared by the uniqueness constraint,
-the unique-attributes registry hash, and every identifier resolution
+the unique-attribute value hash, and every identifier resolution
 lookup. It cannot be split: normalizing only lookups lets two casings of
 one address register as distinct "unique" values and then makes every
 lookup ambiguous; normalizing only writes leaves sign-ins failing on
