@@ -1702,6 +1702,7 @@ describe("user detail", () => {
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("idp_google")).toBeInTheDocument();
     expect(panel.queryByRole("link")).not.toBeInTheDocument();
+    expect(panel.queryByText(/is not supported yet/)).not.toBeInTheDocument();
   });
 
   it("says when no identity provider is linked, without reading the connections", async () => {

@@ -54,7 +54,7 @@ function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
               <Separator />
             </li>
           )}
-          <li className={`${ROW} flex-wrap`}>
+          <li className={row.note ? `${ROW} flex-wrap` : ROW}>
             <span className={ROW_LABEL}>{row.label}</span>
             <span className={ROW_VALUE}>{row.value}</span>
             {row.note && (
@@ -93,15 +93,18 @@ function identityLinkRows(
   links: UserIdentityLink[] | undefined,
   idps: IdpConnection[] | null,
 ): AuthenticationRow[] {
-  if (!links?.length) {
+  if (!links) {
+    return [
+      { key: "identity-providers", label: "Identity providers", value: "Could not be loaded" },
+    ];
+  }
+  if (links.length === 0) {
     return [
       {
         key: "identity-providers",
         label: "Identity providers",
-        value: links ? "None linked" : "Could not be loaded",
-        note: links
-          ? "No identity providers are linked to this user. Linking a provider to an existing account is not supported yet."
-          : undefined,
+        value: "None linked",
+        note: "Linking a provider to an existing account is not supported yet.",
       },
     ];
   }
