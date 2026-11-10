@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
  * default; API requests; both), then the filters. They live in the URL: they
  * are server-side, so they belong to the request the loader makes. Every one
  * is served by an index on the server, and `parseLogsSearch` gives way where
- * two would not combine, so no URL reads every event of the project.
+ * two would not combine, so no URL reads further than the page it shows.
  *
  * The search above the table takes one id or one event type and sets the
  * filter it names (`EventSearch`). A row's menu narrows the list by a value
