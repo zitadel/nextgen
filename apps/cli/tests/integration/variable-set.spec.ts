@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { onTerminalReadingAFile } from "@tests/helpers/terminal";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, anUndeployedEnvironment } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -165,6 +165,63 @@ describe("variable set", () => {
         const result = await app.setVariable("FOO", "bar");
 
         expect(app.envelopeOf<{ name: string }>(result).data.name).toBe("FOO");
+      });
+
+      it("says the value applies after the next deploy", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariable("FOO", "bar");
+
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join("\n")).toContain("applies after the next `deploy`");
+      });
+
+      it("suggests the deploy that applies it", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariable("FOO", "bar");
+
+        expect(result).toSuggest("deploy -m '<what changed>'");
+      });
+
+      it("points a preview write to a preview, not the primary deploy", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "set", "FOO", "bar", "--preview", "--json"]);
+
+        expect(result).toSuggest("preview --origin '<preview-url>' -m '<what changed>'");
+        expect(result).not.toSuggest("deploy");
+      });
+
+      it("does not suggest a preview that the environment would skip", async () => {
+        const app = await anUndeployedEnvironment();
+
+        const result = await app.run([
+          "variable",
+          "set",
+          "FOO",
+          "bar",
+          "--preview",
+          "--env",
+          "staging",
+          "--json",
+        ]);
+
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join("\n")).toContain("Run it in the preview or development");
+        expect(result).not.toSuggest("preview");
+      });
+
+      it("does not suggest a preview that a CI build naming no environment would skip", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "set", "FOO", "bar", "--preview", "--json"], {
+          CI: "true",
+        });
+
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join("\n")).toContain("Name the environment with `--env preview`");
+        expect(result).not.toSuggest("preview");
       });
 
       it("refuses a value on the command line for a secret", async () => {
