@@ -73,7 +73,7 @@ describe("BaseCommand errors", () => {
 
     await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port", { hint: "Use 1 to 65535." }));
 
-    expect(cmd.stderr).toEqual(["Error E_VALIDATION: Bad port\nUse 1 to 65535."]);
+    expect(cmd.stderr).toEqual(["Error: Bad port (E_VALIDATION)\nUse 1 to 65535."]);
   });
 
   // A failure is what a script wrapping the CLI reads on stderr, at a terminal
@@ -97,7 +97,7 @@ describe("BaseCommand errors", () => {
 
     expect(cmd.stderr.join("\n")).not.toContain("\u001b");
     expect(cmd.stderr).toEqual([
-      "Error E_VALIDATION: More than one deployment is live\nLive origins: https://a.example\\x1b[2Jwiped.",
+      "Error: More than one deployment is live (E_VALIDATION)\nLive origins: https://a.example\\x1b[2Jwiped.",
     ]);
   });
 
@@ -150,7 +150,7 @@ describe("the one block every failure is shown as", () => {
 
     await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
 
-    expect(cmd.stderr).toEqual(["Error E_NOT_FOUND: Variable not found"]);
+    expect(cmd.stderr).toEqual(["Error: Variable not found (E_NOT_FOUND)"]);
   });
 
   it("leaves the thrown message alone in the envelope", async () => {
@@ -170,7 +170,7 @@ describe("the one block every failure is shown as", () => {
       ),
     );
 
-    expect(cmd.stderr[0]?.split("\n")[0]).toBe("Error E_VALIDATION: Missing required flag kind");
+    expect(cmd.stderr[0]?.split("\n")[0]).toBe("Error: Missing required flag kind (E_VALIDATION)");
   });
 
   // The label is the one every ending introduces a command under, whether the
@@ -186,7 +186,7 @@ describe("the one block every failure is shown as", () => {
     );
 
     expect(cmd.stderr[0]).toBe(
-      "Error E_VALIDATION: Missing required flag kind\n\nNext:\n  $ npx @zitadel/cli@test errors-test --help",
+      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test errors-test --help",
     );
   });
 

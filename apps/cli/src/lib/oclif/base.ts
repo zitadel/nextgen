@@ -1043,7 +1043,7 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // as every other suggestion, rather than under oclif's "See more help with".
   const commands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
   return {
-    title: `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(spellOutCommands(sentence, meta.cliVersion).replace(/\.$/, ""))}`,
+    title: `Error: ${escapeControlCharacters(spellOutCommands(sentence, meta.cliVersion).replace(/\.$/, ""))} (${error.code})`,
     sections: [],
     lines: error.hint
       ? [escapeControlCharacters(spellOutCommands(error.hint, meta.cliVersion))]
