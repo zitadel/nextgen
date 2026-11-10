@@ -22,6 +22,15 @@ export function formatDateTime(value: string): string {
   return format(value, { ...DATE, hour: "2-digit", minute: "2-digit" });
 }
 
+/**
+ * `2026-04-28T15:32:07Z` → `28 Apr 2026, 15:32:07` in the viewer's locale and
+ * time zone — {@link formatDateTime} to the second, for a log, where the
+ * entries of one minute are told apart by it. The same fallback.
+ */
+export function formatTimestamp(value: string): string {
+  return format(value, { ...DATE, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
 const DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
 function format(value: string, options: Intl.DateTimeFormatOptions): string {

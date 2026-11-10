@@ -19,6 +19,20 @@ const (
 	EventCategorySignal  EventCategory = "signal"
 )
 
+// EventCategories lists every category an event is stored under. A read that
+// is split by category (events.ListEach) and names none reads each of these,
+// so a category added above joins this list.
+func EventCategories() []EventCategory {
+	return []EventCategory{
+		EventCategoryRequest,
+		EventCategoryAuth,
+		EventCategorySession,
+		EventCategoryAdmin,
+		EventCategoryEntity,
+		EventCategorySignal,
+	}
+}
+
 // EventActorType is who triggered the event.
 type EventActorType string
 

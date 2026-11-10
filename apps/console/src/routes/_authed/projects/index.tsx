@@ -8,8 +8,9 @@ import { useNavItems, useRequestedNavItem } from "@/app-shell/use-nav-items";
 import { NewProjectCard } from "@/features/projects/components/new-project-card";
 import { NewProjectSheet } from "@/features/projects/components/new-project-sheet";
 import { ProjectLifecycle } from "@/features/projects/components/project-lifecycle";
+import { ProjectPicker } from "@/features/projects/components/project-picker";
+import { ProjectSearch } from "@/features/projects/components/project-search";
 import { ProjectMark } from "@/components/project-mark";
-import { SearchField } from "@/components/search-field";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -43,12 +44,14 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
  * project (D27). It is where the console lands when there are several
  * projects and none is selected yet (`routes/_authed/index.tsx`), and where
  * the `_authed` guard sends a screen that needs a project while none is
- * selected, passing it as `?next=`. The page is then the way to that screen —
- * `Continue to Teams` (D22) — and a row goes on there with the project
- * selected.
+ * selected, passing it as `?next=`. The page is then the way to that screen,
+ * `Continue to Teams` (D22), and draws the choice alone rather than the list
+ * (`ProjectPicker`, D31): the same projects, search and paging, and choosing
+ * one goes on there with the project selected.
  *
- * It is a list screen like every other: the title row with its search and its
- * action, then the table. A project is created from the app it connects, so
+ * Opened for itself it is a list screen like every other: the title row with
+ * its search and its action, then the table. A project is created from the
+ * app it connects, so
  * `New project` opens a drawer with the CLI's `setup` command and how a
  * project goes from that command to production, not a form. With no project
  * yet there is nothing to list, so the page is that command and that guide
@@ -150,19 +153,31 @@ function ProjectsScreen() {
   // Nothing to list and nothing searched for: the person has no project yet.
   const none = projects.length === 0 && !loaded.q;
 
+  // On the way to a screen that needs a project, the page is the choice of
+  // one and nothing else (D31). With no project yet there is none to choose,
+  // so the page below is the way to a first one, still named for the screen.
+  if (requested && !none) {
+    return (
+      <Page>
+        <ProjectPicker
+          label={requested.nav.label}
+          icon={requested.nav.icon}
+          projects={projects}
+          query={search.q ?? ""}
+          searched={loaded.q}
+          onSearch={onSearch}
+          paging={paging}
+        />
+      </Page>
+    );
+  }
+
   return (
     <Page>
-      {/* On the way to a screen that needs a project, the title names it
-          (D22): choosing a project goes on there. */}
       <ResourceTitle
         filter={
           searchable && (
-            <SearchField
-              query={search.q ?? ""}
-              onSearch={onSearch}
-              label="Search projects"
-              className="w-full sm:w-64"
-            />
+            <ProjectSearch query={search.q ?? ""} onSearch={onSearch} className="sm:w-64" />
           )
         }
         action={
