@@ -46754,9 +46754,10 @@ func (s *InvitationAcceptedEventDelegationType) UnmarshalText(data []byte) error
 
 // Payload for `invitation.accepted`. The invitation ID is the event's
 // `entity_id`, and `user_id` is the user who redeemed the link. Discriminate
-// on `type`; the object named after it says what the invitation granted. The
-// role or membership itself is recorded by its own event, such as
-// `authz.granted`, which shares this event's `request_id`.
+// on `type`; the object named after it says what the invitation granted. When
+// accepting changes the user's roles or memberships, each change has its own
+// event, such as `authz.granted`, with this event's `request_id`. A user who
+// already held the role gets no such event.
 // Ref: #
 // InvitationAcceptedPayload represents sum type.
 type InvitationAcceptedPayload struct {

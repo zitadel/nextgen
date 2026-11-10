@@ -218,8 +218,9 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"invitation.created": {description: "An invitation was created, new or as the replacement of another. " +
 		"Whoever redeems its link gets what the invitation grants.", status: statusContracted},
-	"invitation.accepted": {description: "An invitation was accepted. The role or membership it granted " +
-		"has its own event in the same request.", status: statusContracted},
+	"invitation.accepted": {description: "An invitation was accepted. When accepting grants a role or " +
+		"membership the user did not hold yet, that change has its own event in the same request.",
+		status: statusContracted},
 	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
 		"or by a replacement.", status: statusContracted},

@@ -207,7 +207,7 @@ carries the invitation's metadata or its token.
 | `event_type` | Payload | Producer |
 |--------------|---------|----------|
 | `invitation.created` | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` | InvitationService create, and the new row of a replace ([#2852](https://github.com/zitadel/nextgen/issues/2852)) |
-| `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
+| `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events when it writes any (none when the user already held the grant) ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
 | `invitation.rejected` | `journey_id`, `user_id` (secondary) | InvitationService decline ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
 | `invitation.cancelled` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` | InvitationService cancel, and the old row of a replace ([#2852](https://github.com/zitadel/nextgen/issues/2852)) |
 

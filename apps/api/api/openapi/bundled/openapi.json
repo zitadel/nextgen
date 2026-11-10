@@ -11255,7 +11255,7 @@
       "post": {
         "operationId": "invitationAccepted",
         "summary": "invitation.accepted",
-        "description": "An invitation was accepted. The role or membership it granted has its\nown event in the same request.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was accepted. When accepting grants a role or membership\nthe user did not hold yet, that change has its own event in the same\nrequest.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -22735,7 +22735,7 @@
       },
       "invitation-accepted-payload": {
         "title": "InvitationAcceptedPayload",
-        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. The\nrole or membership itself is recorded by its own event, such as\n`authz.granted`, which shares this event's `request_id`.\n",
+        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. When\naccepting changes the user's roles or memberships, each change has its own\nevent, such as `authz.granted`, with this event's `request_id`. A user who\nalready held the role gets no such event.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/invitation-accepted-project-member-payload"
