@@ -291,6 +291,11 @@ export const brandingConfigSchema = z.strictObject({
     })
     .refine(
       (value) => {
+        // `when: () => true` runs this even when the value is not an object,
+        // such as `null`, which the object check has already refused.
+        if (typeof value !== "object" || value === null) {
+          return true;
+        }
         return (
           value.font_url === undefined || value.font_url === "" || value.font_family !== undefined
         );
