@@ -59,9 +59,7 @@ export function cliSample(
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
-  if (topic === "variable") {
-    return variables(verb, positionals, request) ?? apiSample(operation, path, request);
-  }
+  if (topic === "variables") return variables(verb, positionals, request);
 
   const flags: string[] = [];
   if (verb === "list") {
@@ -124,59 +122,28 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-// The variable commands act on the project the directory was set up for.
-// `set` takes no value on the command line here: it prompts for it, or reads
-// it from stdin, so a credential stays out of the shell's history. A body sets
-// many variables at once, so it is a command for each, and the `null` that
-// removes one is a `variable rm`.
-function variables(
-  verb: string | undefined,
-  positionals: string[],
-  request: RequestData,
-): string | undefined {
-  // `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` all take.
-  // `kind=primary` is the command without one: `get` and `list` read the
-  // primary values then. The CLI has no primary-only flag, and a write or a
-  // removal without `--preview` also changes the preview value (a secret write
-  // clears it), so those have no CLI sample, and the API sample stands in.
-  const kind = request.query.kind?.values[0];
-  const preview = kind === "preview" ? ["--preview"] : [];
-
-  if (kind === "primary" && (verb === "set" || verb === "rm")) {
-    return undefined;
-  }
-
-  // `resolve` reads the live deployment's frozen variables for an origin
-  // (`--origin`, optional); it takes no positional, so the deployment id the
-  // operation's path names is not an argument.
-  if (verb === "resolve") {
-    return `${context}\n${line([`${cli} variable resolve`], [])}`;
-  }
-
+// The variables commands name their owner, and the project is the one they
+// take (apps/cli/src/lib/oclif/owner-command.ts). `set` takes no value on the
+// command line: it prompts for it, or reads it from stdin, so a credential
+// stays out of the shell's history. A body sets many variables at once, so
+// it is a command for each, and the `null` that removes one is a delete.
+function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
+  const owner = "--project-level";
   if (verb !== "set") {
-    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
+    return `${context}\n${line([`${cli} variables ${verb}`, ...positionals], [owner])}`;
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
-  // `variable set` refuses `--secret --as number` and `--as boolean`, so a secret
-  // that is not a string has no CLI sample either.
-  if (
-    entries.some(
-      ([, value]) => record(value).secret === true && typeof record(value).value !== "string",
-    )
-  ) {
-    return undefined;
-  }
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
-    if (value === null) return line([`${cli} variable rm`, word(name)], preview);
+    if (value === null) return line([`${cli} variables delete`, word(name)], [owner]);
     const { secret, value: scalar } = record(value);
     const type = typeof (scalar ?? value);
     return line(
-      [`${cli} variable set`, word(name)],
+      [`${cli} variables set`, word(name)],
       [
+        owner,
         ...(secret === true ? ["--secret"] : []),
         ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
-        ...preview,
       ],
     );
   });
