@@ -2169,9 +2169,21 @@ describe("the query resources' filters", () => {
     );
     // Every query's enum holds `starts_with`, but only a field an index answers
     // it for takes it, so a resource without such a field offers it nowhere.
-    offered.add("starts_with");
+    const expected = Object.values(operations).filter(
+      (operation) => operation !== "starts_with" || offered.has(operation),
+    );
 
-    expect([...offered].sort()).toEqual(Object.values(operations).sort());
+    expect([...offered].sort()).toEqual(expected.sort());
+  });
+
+  it("offer starts_with on the fields an index answers it for, and no other", () => {
+    const fields = Object.entries(RESOURCES).flatMap(([topic, resource]) =>
+      (resource.list?.filters ?? [])
+        .filter((filter) => (filter.operations as readonly string[]).includes("starts_with"))
+        .map((filter) => `${topic}.${filter.field}`),
+    );
+
+    expect(fields).toEqual(["users.identifier"]);
   });
 });
 
