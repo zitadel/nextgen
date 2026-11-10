@@ -275,7 +275,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"deployment.write",
 	},
 	SearchOperation: []string{
-		"project.read",
+		"project.write",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
