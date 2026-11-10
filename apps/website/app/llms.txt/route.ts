@@ -1,4 +1,4 @@
-import { applyCommand, commands, folderCommand, planCommand, skillsCommand } from "../commands";
+import { commands, deployCommand, dryRunCommand, folderCommand, skillsCommand } from "../commands";
 import { sessions } from "../showcase/sessions";
 
 // The host's llms.txt (llmstxt.org): what the preview is, the commands, what
@@ -22,11 +22,11 @@ Run it locally with the published CLI (Node.js 24 or newer), in a new folder for
 ${[folderCommand, ...commands].join("\n")}
 \`\`\`
 
-\`start\` runs Zitadel on the machine and signs in to its console; users, passwords and sessions live there, not in the app. \`setup\` writes these files into the app, and \`npm run dev\` serves the login:
+\`start\` runs Zitadel on the machine; users, passwords and sessions live there, not in the app. \`setup\` writes these files into the app, and \`npm run dev\` serves the login:
 
 ${files}
 
-To change the user model or the login flow, edit those files, then publish the change: \`${planCommand}\` shows what changes, \`${applyCommand}\` makes it live. To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet, and restyle its card, fields and buttons with \`::part()\`.
+To change the user model or the login flow, edit those files, then publish the change: \`${dryRunCommand}\` shows what changes, \`${deployCommand} -m "<why this release changes>"\` makes it live (a non-interactive run needs \`-m\` unless a clean git commit supplies the message). To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet, and restyle its card, fields and buttons with \`::part()\`.
 
 Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
