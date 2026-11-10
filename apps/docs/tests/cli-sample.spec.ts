@@ -36,53 +36,58 @@ function sample(
 
 const name = { path: "/variables/{name}", pathValues: { name: "A" } };
 
-const commands: [string, string, string][] = [
+const commands: [string, () => string, string][] = [
   [
     "a single set without a kind",
-    sample("variable set", "updateVariables", { body: { A: "1" } }),
+    () => sample("variable set", "updateVariables", { body: { A: "1" } }),
     "variable set A",
   ],
   [
     "a single set of the preview value",
-    sample("variable set", "updateVariables", { kind: "preview", body: { A: "1" } }),
+    () => sample("variable set", "updateVariables", { kind: "preview", body: { A: "1" } }),
     "variable set A --preview",
   ],
   [
     "a typed set",
-    sample("variable set", "updateVariables", { kind: "preview", body: { N: 3 } }),
+    () => sample("variable set", "updateVariables", { kind: "preview", body: { N: 3 } }),
     "variable set N --as number --preview",
   ],
   [
     "a secret set",
-    sample("variable set", "updateVariables", { body: { A: { secret: true, value: "x" } } }),
+    () => sample("variable set", "updateVariables", { body: { A: { secret: true, value: "x" } } }),
     "variable set A --secret",
   ],
   [
     "a get of the primary value",
-    sample("variable get", "getVariable", { ...name, kind: "primary" }),
+    () => sample("variable get", "getVariable", { ...name, kind: "primary" }),
     "variable get A",
   ],
   [
     "a get of the preview value",
-    sample("variable get", "getVariable", { ...name, kind: "preview" }),
+    () => sample("variable get", "getVariable", { ...name, kind: "preview" }),
     "variable get A --preview",
   ],
-  ["an unfiltered list", sample("variable list", "getVariables", {}), "variable list"],
+  ["an unfiltered list", () => sample("variable list", "getVariables", {}), "variable list"],
   [
     "a list of the preview values",
-    sample("variable list", "getVariables", { kind: "preview" }),
+    () => sample("variable list", "getVariables", { kind: "preview" }),
     "variable list --preview",
   ],
-  ["a removal without a kind", sample("variable rm", "deleteVariable", name), "variable rm A"],
+  [
+    "a removal without a kind",
+    () => sample("variable rm", "deleteVariable", name),
+    "variable rm A",
+  ],
   [
     "a removal of the preview value",
-    sample("variable rm", "deleteVariable", { ...name, kind: "preview" }),
+    () => sample("variable rm", "deleteVariable", { ...name, kind: "preview" }),
     "variable rm A --preview",
   ],
 ];
 
-for (const [what, sampleText, expected] of commands) {
+for (const [what, run, expected] of commands) {
   test(`${what} is the variable command`, () => {
+    const sampleText = run();
     expect(sampleText).toContain(`npx @zitadel/cli@latest ${expected}`);
     expect(sampleText).not.toContain("npx @zitadel/cli@latest api");
     expect(sampleText).not.toContain("variables ");
@@ -90,50 +95,56 @@ for (const [what, sampleText, expected] of commands) {
   });
 }
 
-const calls: [string, string, string][] = [
+const calls: [string, () => string, string][] = [
   [
     "a primary-only write",
-    sample("variable set", "updateVariables", { kind: "primary", body: { A: "1" } }),
+    () => sample("variable set", "updateVariables", { kind: "primary", body: { A: "1" } }),
     "api updateVariables",
   ],
   [
     "a primary-only removal",
-    sample("variable rm", "deleteVariable", { ...name, kind: "primary" }),
+    () => sample("variable rm", "deleteVariable", { ...name, kind: "primary" }),
     "api deleteVariable A",
   ],
-  ["a get that names no kind", sample("variable get", "getVariable", name), "api getVariable A"],
+  [
+    "a get that names no kind",
+    () => sample("variable get", "getVariable", name),
+    "api getVariable A",
+  ],
   [
     "a primary-only list",
-    sample("variable list", "getVariables", { kind: "primary" }),
+    () => sample("variable list", "getVariables", { kind: "primary" }),
     "api getVariables",
   ],
   [
     "a body that sets several variables",
-    sample("variable set", "updateVariables", { body: { A: "1", B: "2" } }),
+    () => sample("variable set", "updateVariables", { body: { A: "1", B: "2" } }),
     "api updateVariables",
   ],
   [
     "a body that removes a variable",
-    sample("variable set", "updateVariables", { body: { A: null } }),
+    () => sample("variable set", "updateVariables", { body: { A: null } }),
     "api updateVariables",
   ],
   [
     "a secret that is not a string",
-    sample("variable set", "updateVariables", { body: { A: { secret: true, value: 3 } } }),
+    () => sample("variable set", "updateVariables", { body: { A: { secret: true, value: 3 } } }),
     "api updateVariables",
   ],
   [
     "a deployment's variables",
-    sample("variable resolve", "getDeploymentVariables", {
-      path: "/deployments/{deployment_id}/variables",
-      pathValues: { deployment_id: "dep_1" },
-    }),
+    () =>
+      sample("variable resolve", "getDeploymentVariables", {
+        path: "/deployments/{deployment_id}/variables",
+        pathValues: { deployment_id: "dep_1" },
+      }),
     "api getDeploymentVariables dep_1",
   ],
 ];
 
-for (const [what, sampleText, expected] of calls) {
+for (const [what, run, expected] of calls) {
   test(`${what} is the zitadel api call`, () => {
+    const sampleText = run();
     expect(sampleText).toContain(`npx @zitadel/cli@latest ${expected}`);
     expect(sampleText).not.toContain("npx @zitadel/cli@latest variable ");
   });

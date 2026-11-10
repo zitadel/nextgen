@@ -201,7 +201,9 @@ CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
   restores it ([turborepo.md](../../docs/design/build/turborepo.md)).
 - `tests/` is a contract suite written against a URL, so the same specs check
   the local build and any deployment. A deployment run needs
-  `VERCEL_AUTOMATION_BYPASS_SECRET`.
+  `VERCEL_AUTOMATION_BYPASS_SECRET`. `tests/cli-sample.spec.ts` is the one spec
+  that calls the code (`lib/cli-sample.ts`) and no URL, so it runs the same
+  anywhere.
 - `pnpm check:cloud` runs the docs, console and schemas deployment suites, as
   [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml)
   does for every deployment
