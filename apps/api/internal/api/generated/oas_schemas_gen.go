@@ -87266,6 +87266,10 @@ type RevokeReleaseConflictDetailsOriginsItem struct {
 	Origin Origin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
+	// Whether the origin serves the release as a primary origin or as
+	// a preview. A deploy or a rollback frees a primary origin;
+	// removing the preview frees a preview.
+	Kind DeploymentKind `json:"kind"`
 }
 
 // GetOrigin returns the value of Origin.
@@ -87278,6 +87282,11 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 	return s.DeploymentID
 }
 
+// GetKind returns the value of Kind.
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetKind() DeploymentKind {
+	return s.Kind
+}
+
 // SetOrigin sets the value of Origin.
 func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 	s.Origin = val
@@ -87286,6 +87295,11 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 // SetDeploymentID sets the value of DeploymentID.
 func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val DeploymentID) {
 	s.DeploymentID = val
+}
+
+// SetKind sets the value of Kind.
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetKind(val DeploymentKind) {
+	s.Kind = val
 }
 
 // RevokeReleaseErrorResponse represents sum type.
