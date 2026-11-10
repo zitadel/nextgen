@@ -1725,7 +1725,9 @@ describe("user detail", () => {
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
-    expect(panel.queryByText(/does not link it/)).not.toBeInTheDocument();
+    expect(
+      panel.queryByText(/Linking a provider to an existing account is not supported yet/),
+    ).not.toBeInTheDocument();
     // The passkey row is unaffected.
     expect(panel.getByText(/^Verified /)).toBeInTheDocument();
   });
