@@ -4,6 +4,7 @@ import { z } from "zod";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { ReleaseService } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import type { ServingOrigin } from "@/lib/backend/services/release";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Refused, taken } from "@/lib/oclif/flags";
@@ -142,7 +143,7 @@ function freeing(origins: readonly ServingOrigin[]): { steps: string; next: stri
     steps,
     next: [
       ...previews.map((one) => {
-        return `preview rm ${one.origin}`;
+        return Cmd.of(["preview", "rm", one.origin]).toString();
       }),
       ...(primary ? [DEPLOY_ARGS, "deployment rollback"] : []),
     ],

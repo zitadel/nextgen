@@ -167,6 +167,14 @@ export interface PlatformMock {
   revokesAHostileReleaseId(): string;
 
   /**
+   * Refuses a release revoke as `rel.in_use` for a preview origin holding a
+   * shell substitution, and answers the project read with it as a preview.
+   *
+   * @returns The origin it will answer with.
+   */
+  servesTheReleaseOnAHostilePreview(): string;
+
+  /**
    * Answers a user query with a page cursor holding a terminal escape
    * sequence, which the footer and the next-page command both name.
    *
@@ -461,6 +469,31 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return id;
+    },
+
+    servesTheReleaseOnAHostilePreview() {
+      const origin = "https://$(id).acme.vercel.app";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1" }] },
+            },
+            { status: 409 },
+          );
+        }),
+        http.get("*/projects/:id", ({ params }) =>
+          HttpResponse.json({
+            id: String(params.id),
+            name: "hostile",
+            lifecycle: "active",
+            origins: [{ pattern: origin, kind: "preview" }],
+          }),
+        ),
+      );
+      return origin;
     },
 
     pagesWithAHostileCursor() {

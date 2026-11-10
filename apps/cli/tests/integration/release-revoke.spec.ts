@@ -243,6 +243,21 @@ describe("release revoke", () => {
 
           expect(result).not.toSuggest("deployment rollback");
         });
+
+        it("quotes the preview it suggests removing as one shell word", async () => {
+          const app = await aSetUpApp();
+          const origin = platform.servesTheReleaseOnAHostilePreview();
+
+          const result = await app.run([
+            "release",
+            "revoke",
+            "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
+            "--force",
+            "--json",
+          ]);
+
+          expect(result).toSuggest(`preview rm '${origin}'`);
+        });
       });
 
       describe("on a release a preview and a primary origin both serve", () => {
