@@ -1,12 +1,8 @@
 import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import type { StepContext } from "@/lib/publish/pipeline";
 import { shellCommand } from "@/lib/suggestion";
-import {
-  type ConfigStore,
-  type ConfigurationBundle,
-  MemoryStore,
-  ZitadelConfig,
-} from "@/lib/zitadel";
+import { type ConfigStore, type ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import { PROJECT_ID } from "@tests/helpers/records";
 
