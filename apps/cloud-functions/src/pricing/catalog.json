@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-09.1",
+  "version": "2026-11-09.3",
   "status": "proposal",
   "currency": "usd",
   "decided": [
@@ -33,13 +33,13 @@
     "user_meters": "Monthly active users are never billed, and requiring MFA never counts a user. The Consumer Identity add-on counts social users: a user who signs in through an external identity provider set up on a project and not linked to a team, once a month. Password, passkey, magic-link and OTP sign-ins never count. An identity provider linked to a team is an SSO connection, counted by Multi-Tenancy, never twice.",
     "tiers": "Two tiers: Pay as you go and Enterprise. Pay as you go starts free with no card, with every core feature and a free amount on most meters; add-ons go on top. Billing keeps two plan ids for it: free while no add-on is on, pro once one is.",
     "allowance": "Every meter Pay as you go offers before an add-on has a free amount. Turning on the meter's add-on raises it to the add-on's included amount; past that, the price applies.",
-    "invoice": "base fees of the add-ons turned on + usage past the add-ons' included amounts + extra capacity and support; nothing is billed while no add-on is on",
+    "invoice": "Your bill is the base fees of the add-ons you turned on, plus usage past what they include, plus any extra capacity or support you added. While no add-on is on, nothing is billed.",
     "caps": "Separately from the free amounts, owners can set a monthly budget with alerts at 50, 80 and 100 percent of it. A budget only notifies: it never stops sign-ins or switches security enforcement off.",
     "preview": "While Zitadel's next version is in preview, nothing is billed. An add-on's prices apply once it reaches general availability, and accounts that joined during the preview keep them for 12 months after that.",
     "roadmap": "An add-on turned on now gains its missing features as they ship, at the same price.",
     "capacity": "API requests are never billed. Each project has a rate limit; owners add capacity in steps, which raise every project's limit.",
     "bot_checks": "The built-in bot challenge is free on every account. With any add-on, sign-ins and sign-ups can also be checked with your own CAPTCHA keys (Turnstile, hCaptcha or reCAPTCHA) or a verdict your edge forwards (Vercel BotID, Cloudflare). Such a check counts only when it passes and lets a request through, once per decision: failed checks and refused requests never count, so an attack can't grow the bill.",
-    "self_hosted": "Self-hosted works like the cloud. All of Zitadel is open source under the AGPL, and everything Pay as you go includes before an add-on is free to run. Our builds turn add-ons on with a commercial license, at the cloud's base fees and meters for each production installation; the installation counts its own usage and reports it monthly. Support tickets are a line of their own. You may build and change Zitadel yourself under the AGPL, without warranty, support or an SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
+    "self_hosted": "Self-hosted works like the cloud. All of Zitadel is open source under the AGPL, and everything the cloud includes free is free to run. Our builds turn add-ons on with a commercial license, at the cloud's base fees and meters for each production installation; the installation counts its own usage and reports it monthly. Support tickets are a line of their own. You may build and change Zitadel yourself under the AGPL, without warranty, support or an SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
   },
   "plans": {
     "free": {
@@ -65,7 +65,7 @@
       "event_retention_days": 30,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
-      "support": "tickets any time, answered the next business day; priority support and SLA: a 1-hour response for outages and a 99.95% uptime SLA with service credits",
+      "support": "tickets any time, answered the next business day",
       "sla": { "target_percent": 99.9, "credits": false },
       "regions": { "scope": "project", "selection": "all_available" }
     },
@@ -84,7 +84,7 @@
       "event_retention_days": 90,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
-      "support": "24x7, with response times from 1 hour down to 30 minutes, and a technical account manager",
+      "support": "24x7 support, with response times from 1 hour down to 30 minutes, and a technical account manager",
       "sla": { "target_percent": 99.95, "credits": true, "note": "99.95 included; 99.99 is an upgrade requiring a second region" },
       "regions": { "scope": "project", "selection": "all_available" }
     }

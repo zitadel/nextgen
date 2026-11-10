@@ -118,6 +118,10 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - `/pricing` shows the cloud's price list, which `app/pricing/catalog.ts`
   reads from `apps/cloud-functions/src/pricing/catalog.json` when the site
   builds; never type a price into the page.
+- The offer is three steps, Free, Add-ons and Enterprise: the cards
+  (`app/pricing/plans.ts`) and the comparison's columns keep that order.
+- Self-hosting is the same steps under the switch, never a section of its
+  own; show a block for one deployment with `parts.tsx`' classes, no script.
 - Enterprise is quoted, never listed: its cards say Custom and link
   `links.contact`, and its column says Custom wherever a price would stand.
 - Give a new meter or line a group in `app/pricing/compare.ts`;
@@ -128,6 +132,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   `app/pricing/status.ts`; `status.spec.ts` fails on a feature with none.
 - Price only an add-on that works today, at least in part; one still to come
   goes under What's coming with no price until it is Coming next.
+- Give the calculator a question for a meter in `app/pricing/estimate-inputs.ts`,
+  never a price; `estimate.spec.ts` fails on a sellable meter with none.
 - A field the page reads gets a type in `catalog.ts`; the specs run the
   page's formatting over the real file, so a reshaped catalog fails there.
 

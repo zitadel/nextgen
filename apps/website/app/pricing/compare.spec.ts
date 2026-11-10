@@ -27,8 +27,8 @@ describe("the comparison of the cloud's price list", () => {
   const groups = compareGroups(catalog);
   const rows = groups.flatMap((group) => group.rows);
 
-  it("shows two tiers: Pay as you go and Enterprise", () => {
-    expect(TIERS).toEqual(["payg", "enterprise"]);
+  it("shows the cards' three columns: Free, Add-ons and Enterprise", () => {
+    expect(TIERS).toEqual(["free", "addons", "enterprise"]);
   });
 
   it("places every meter, licensed line and hub in a group, once, but an unpriced add-on's meters", () => {
@@ -55,7 +55,7 @@ describe("the comparison of the cloud's price list", () => {
     }
   });
 
-  it("gives every add-on that works today its own group with its base fee and meters, leaving its features to its card", () => {
+  it("gives every add-on that works today its own group with its base fee and meters, leaving its features to the add-on list", () => {
     for (const hub of catalog.hubs.filter((entry) => works(hubStatus(entry)))) {
       const group = groups.find((entry) => entry.id === `hub-${hub.id}`);
       expect(group, hub.id).toBeDefined();
@@ -78,21 +78,12 @@ describe("the comparison of the cloud's price list", () => {
     }
   });
 
-  it("names the lowest listed add-on that works today as the price on top of Pay as you go", () => {
+  it("names the lowest listed add-on that works today as where add-ons start", () => {
     expect(lowestHub(catalog)).toBe("$100");
   });
 });
 
 describe("meterCell", () => {
-  const consumer: Hub = {
-    id: "consumer",
-    label: "Consumer Identity",
-    line: "",
-    base: { amount: 100, interval: "month" },
-    pricing: "listed",
-    plans: ["pro", "enterprise"],
-    features: [],
-  };
   const social: Meter = {
     id: "social_users",
     label: "Social users",
@@ -105,16 +96,17 @@ describe("meterCell", () => {
     price: { model: "per_unit", unit_amount: 0.004 },
   };
 
-  it("leads with the free amount, then what the hub includes and costs past it", () => {
-    expect(meterCell(social, "payg", consumer)).toEqual({
+  it("says what is free, then what the add-on includes and costs past it", () => {
+    expect(meterCell(social, "free")).toEqual({ kind: "text", text: "10K users / month" });
+    expect(meterCell(social, "addons")).toEqual({
       kind: "text",
-      text: "10K users / month free",
-      notes: ["With the add-on: 100K users / month, then $0.004 per user"],
+      text: "100K users / month included",
+      notes: ["Then $0.004 per user"],
     });
-    expect(meterCell(social, "enterprise", consumer)).toEqual({ kind: "text", text: "Custom" });
+    expect(meterCell(social, "enterprise")).toEqual({ kind: "text", text: "Custom" });
   });
 
-  it("counts configured things without a month, and says the hub includes them when nothing is free", () => {
+  it("counts configured things without a month, and offers nothing under Free when nothing is free", () => {
     const sso: Meter = {
       ...social,
       id: "sso_connections",
@@ -124,14 +116,15 @@ describe("meterCell", () => {
       free_allowance: 0,
       price: { model: "per_unit", unit_amount: 75 },
     };
-    expect(meterCell(sso, "payg")).toEqual({
+    expect(meterCell(sso, "free")).toEqual({ kind: "no" });
+    expect(meterCell(sso, "addons")).toEqual({
       kind: "text",
-      text: "2 connections with the add-on",
+      text: "2 connections included",
       notes: ["Then $75 per connection"],
     });
   });
 
-  it("says a meter of no add-on in particular is included, leaving when to its group", () => {
+  it("keeps a meter only an add-on offers out of Free", () => {
     const checks: Meter = {
       ...social,
       id: "verified_bot_checks",
@@ -142,7 +135,8 @@ describe("meterCell", () => {
       hub: null,
       price: { model: "per_unit", unit_amount: 0.0005, display: "$0.50 per 1,000 checks" },
     };
-    expect(meterCell(checks, "payg")).toEqual({
+    expect(meterCell(checks, "free")).toEqual({ kind: "no" });
+    expect(meterCell(checks, "addons")).toEqual({
       kind: "text",
       text: "10K checks / month included",
       notes: ["Then $0.50 per 1,000 checks"],
@@ -150,7 +144,7 @@ describe("meterCell", () => {
   });
 
   it("names the features a meter counts that don't work yet", () => {
-    expect(meterCell(social, "enterprise", consumer, ["SAML SSO per team"])).toEqual({
+    expect(meterCell(social, "enterprise", ["SAML SSO per team"])).toEqual({
       kind: "text",
       text: "Custom",
       notes: ["Not yet: SAML SSO per team"],
@@ -169,8 +163,9 @@ describe("hub cells", () => {
     features: ["Social login at scale"],
   };
 
-  it("lists the base fee on Pay as you go and folds it into Enterprise's commitment", () => {
-    expect(hubBaseCell(hub, "payg")).toEqual({ kind: "text", text: "$100 / month" });
+  it("lists the base fee under Add-ons and folds it into Enterprise's commitment", () => {
+    expect(hubBaseCell(hub, "free")).toEqual({ kind: "no" });
+    expect(hubBaseCell(hub, "addons")).toEqual({ kind: "text", text: "$100 / month" });
     expect(words(hubBaseCell(hub, "enterprise"))).toBe("In the commitment");
   });
 
@@ -181,13 +176,14 @@ describe("hub cells", () => {
       pricing: "quoted",
       plans: ["enterprise"],
     };
-    expect(hubBaseCell(compliance, "payg")).toEqual({ kind: "no" });
+    expect(hubBaseCell(compliance, "addons")).toEqual({ kind: "no" });
     expect(words(hubBaseCell(compliance, "enterprise"))).toBe("Custom quote");
   });
 
   it("prices an add-on still to come only once it is Coming next", () => {
     const later: Hub = { ...hub, id: "agentic", features: ["Consent for agents"] };
-    expect(words(comingCell(later, "payg"))).toBe(NOT_PRICED);
+    expect(comingCell(later, "free")).toEqual({ kind: "no" });
+    expect(words(comingCell(later, "addons"))).toBe(NOT_PRICED);
     expect(words(comingCell(later, "enterprise"))).toBe("In the commitment");
   });
 });
@@ -204,10 +200,11 @@ describe("lineCell", () => {
     tag: "capacity",
   };
 
-  it("prices Pay as you go, and says Included where Enterprise has it", () => {
-    expect(lineCell(step, "payg")).toEqual({ kind: "text", text: "$700 a month per step" });
+  it("prices a line under Add-ons, and says Included where Enterprise has it", () => {
+    expect(lineCell(step, "free")).toEqual({ kind: "no" });
+    expect(lineCell(step, "addons")).toEqual({ kind: "text", text: "$700 a month per step" });
     expect(lineCell(step, "enterprise")).toEqual({ kind: "text", text: "Included" });
-    expect(lineCell({ ...step, plans: ["enterprise"], included_in: [] }, "payg")).toEqual({
+    expect(lineCell({ ...step, plans: ["enterprise"], included_in: [] }, "addons")).toEqual({
       kind: "no",
     });
     expect(lineCell({ ...step, plans: ["enterprise"], included_in: [] }, "enterprise")).toEqual({
@@ -222,7 +219,7 @@ describe("what every account includes and what any hub adds", () => {
   const groups = compareGroups(catalog);
   const rows = groups.flatMap((group) => group.rows);
 
-  it("includes every core resource, sign-in method and protection in Pay as you go", () => {
+  it("includes every core resource, sign-in method and protection in Free", () => {
     for (const feature of [
       ...catalog.core.resources,
       ...catalog.core.platform,
@@ -231,7 +228,7 @@ describe("what every account includes and what any hub adds", () => {
     ]) {
       const row = rows.find((entry) => entry.label === feature);
       expect(row, feature).toBeDefined();
-      expect(row?.cells.payg.kind, feature).not.toBe("no");
+      expect(row?.cells.free.kind, feature).not.toBe("no");
     }
     const mau = rows.find((row) => row.source === "monthly_active_users");
     for (const tier of TIERS) expect(words(mau!.cells[tier])).toBe("Never billed");
@@ -251,16 +248,18 @@ describe("what every account includes and what any hub adds", () => {
         continue;
       }
       const row = shared.find((entry) => entry.label === label)!;
-      for (const tier of TIERS) expect(row.cells[tier], label).toEqual({ kind: "yes" });
+      expect(row.cells.free, label).toEqual({ kind: "no" });
+      expect(row.cells.addons, label).toEqual({ kind: "yes" });
+      expect(row.cells.enterprise, label).toEqual({ kind: "yes" });
     }
   });
 
   it("meters service tokens, authorization checks and log destinations for any add-on", () => {
     const usage = groups.find((group) => group.id === "usage")!.rows;
-    const cell = (id: string) => words(usage.find((row) => row.source === id)!.cells.payg);
-    expect(cell("m2m_tokens")).toBe(
-      "1M tokens / month free With any add-on: 10M tokens / month, then $10 per million tokens",
-    );
+    const row = (id: string) => usage.find((entry) => entry.source === id)!;
+    const cell = (id: string) => words(row(id).cells.addons);
+    expect(words(row("m2m_tokens").cells.free)).toBe("1M tokens / month");
+    expect(cell("m2m_tokens")).toBe("10M tokens / month included Then $10 per million tokens");
     expect(cell("siem_sinks")).toBe(
       "$100 per destination 1 destination included with Security Analytics",
     );
@@ -270,7 +269,8 @@ describe("what every account includes and what any hub adds", () => {
   it("lists compliance under Enterprise only", () => {
     for (const label of catalog.plans.enterprise.compliance) {
       const row = rows.find((entry) => entry.label === label)!;
-      expect(row.cells.payg.kind, label).toBe("no");
+      expect(row.cells.free.kind, label).toBe("no");
+      expect(row.cells.addons.kind, label).toBe("no");
       expect(words(row.cells.enterprise), label).toBe("Included");
     }
   });
@@ -282,11 +282,10 @@ describe("what every account includes and what any hub adds", () => {
 
   it("never bills API requests, only limits them, and sells capacity in steps", () => {
     const requests = rows.find((entry) => entry.label === "API requests")!;
-    expect(words(requests.cells.payg)).toBe(
-      "Never billed Up to 50 a second per project, 500 with any add-on",
-    );
+    expect(words(requests.cells.free)).toBe("Never billed Up to 50 a second per project");
+    expect(words(requests.cells.addons)).toBe("Never billed Up to 500 a second per project");
     expect(words(requests.cells.enterprise)).toBe("Custom");
-    expect(words(rows.find((entry) => entry.source === "extra_capacity")!.cells.payg)).toBe(
+    expect(words(rows.find((entry) => entry.source === "extra_capacity")!.cells.addons)).toBe(
       "$700 a month per step",
     );
     const region = rows.find((entry) => entry.label === "Region, chosen per project")!;
@@ -300,15 +299,26 @@ describe("what every account includes and what any hub adds", () => {
     expect(releases?.detail).toMatch(/schemas.*flows.*branding/);
   });
 
-  it("quotes Enterprise agreements without offering custom terms on Pay as you go", () => {
+  it("quotes Enterprise agreements without offering custom terms with an add-on", () => {
     const agreements = rows.find((entry) => entry.source === "addendum")!;
-    expect(agreements.cells.payg.kind).toBe("no");
+    expect(agreements.cells.addons.kind).toBe("no");
     expect(words(agreements.cells.enterprise)).toBe("Custom");
   });
 
-  it("does not advertise Pay as you go's availability target as a contractual SLA", () => {
+  it("keeps priority support out of what any add-on includes, and says what its price buys", () => {
+    const support = rows.find((entry) => entry.label === "Support")!;
+    expect(words(support.cells.free)).toBe("Community");
+    expect(words(support.cells.addons)).toBe("Tickets any time, answered the next business day");
+    const priority = rows.find((entry) => entry.source === "support_priority")!;
+    expect(words(priority.cells.addons)).toBe(
+      "$999 a month A 1-hour response for outages and a 99.95% uptime SLA with service credits.",
+    );
+  });
+
+  it("does not advertise the add-ons' availability target as a contractual SLA", () => {
     const row = rows.find((entry) => entry.label === "Uptime commitment")!;
-    expect(words(row.cells.payg)).toBe("99.9% target With any add-on No service credits");
+    expect(row.cells.free).toEqual({ kind: "no" });
+    expect(words(row.cells.addons)).toBe("99.9% target No service credits");
     expect(words(row.cells.enterprise)).toBe("99.95% SLA With service credits");
   });
 });

@@ -4,7 +4,8 @@ import { type Cell, type Group, type Row, type TierId, TIERS } from "./compare";
 import { type FeatureStatus, statusTag } from "./status";
 
 const TIER_NAMES: Record<TierId, string> = {
-  payg: "Pay as you go",
+  free: "Free",
+  addons: "Add-ons",
   enterprise: "Enterprise",
 };
 
@@ -25,11 +26,11 @@ export function CompareTable({
     // Relative, so the cells' sr-only labels, which are absolute, scroll
     // with the table rather than widening the page.
     <div className="relative mt-8 max-md:overflow-x-auto">
-      <table className="w-full min-w-[40rem] table-fixed border-collapse text-sm">
+      <table className="w-full min-w-[46rem] table-fixed border-collapse text-sm">
         <colgroup>
-          <col className="w-[28%] md:w-[34%]" />
+          <col className="w-[28%]" />
           {TIERS.map((plan) => (
-            <col key={plan} className="w-[33%]" />
+            <col key={plan} className="w-[24%]" />
           ))}
         </colgroup>
         <thead>

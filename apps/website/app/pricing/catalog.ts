@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { count, dollars } from "./format";
+
+export { count, dollars };
+
 // The pricing page's data: the cloud's proposed price list, read from the
 // repository when the site builds. apps/cloud-functions bills from the same
 // file (src/pricing/catalog.ts), so a changed price changes it in one place;
@@ -68,7 +72,8 @@ export type Catalog = {
   self_hosted: {
     unit: string;
     free: { license: string; support: string };
-    hubs: { license: string; metering: string; includes: string[] };
+    /** `per`: what an add-on's base fee is charged for, such as a production installation. */
+    hubs: { license: string; per: string; metering: string; includes: string[] };
     /** Support tickets, billed apart from the hubs. */
     support: { label: string; amount: number; interval: string; per: string; note?: string };
     enterprise: { includes: string[] };
@@ -165,22 +170,8 @@ export function readCatalog(
   ) as Catalog;
 }
 
-const COUNT = new Intl.NumberFormat("en-US");
 const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact" });
 const REGIONS = new Intl.DisplayNames(["en"], { type: "region" });
-
-/** A dollar amount as the page writes it: `$100`, `$36,000`, `$0.10`, `$0.015`. */
-export function dollars(amount: number): string {
-  return `$${amount.toLocaleString("en-US", {
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 6,
-  })}`;
-}
-
-/** A count as the page writes it: `1,000,000`. */
-export function count(value: number): string {
-  return COUNT.format(value);
-}
 
 /** A number of days: `1 day`, `30 days`. */
 export function days(value: number): string {

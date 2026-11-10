@@ -13,6 +13,7 @@ import {
   type Meter,
   meterPrice,
   regionList,
+  sentence,
 } from "./catalog";
 import {
   type FeatureStatus,
@@ -24,19 +25,19 @@ import {
   works,
 } from "./status";
 
-// The comparison under the cards: Pay as you go and Enterprise side by side.
-// The core rows come first, then the production basics any add-on brings and the usage any
-// add-on meters, then a group per add-on that works today with its base fee and its meters;
-// its features are on its card. An add-on still to come
-// gets one row under What's coming, without a price. A feature that doesn't fully work yet
-// carries its status (status.ts) beside its label. Pay as you go's column says what
-// is free and what an add-on adds; Enterprise's says Custom wherever a price would
-// stand, because Enterprise is quoted, never listed. The catalog keeps two
-// plan ids for Pay as you go (`free` before an add-on, `pro` with one); the page
-// shows one tier.
+// The comparison under the cards, in the cards' three columns: Free, Add-ons
+// and Enterprise. The core rows come first, then the production basics any
+// add-on brings and the usage any add-on meters, then a group per add-on that
+// works today with its base fee and its meters; its features are in the
+// add-on list. An add-on still to come gets one row under What's coming,
+// without a price. A feature that doesn't fully work yet carries its status
+// (status.ts) beside its label. Free's column says what costs nothing,
+// Add-ons' what an add-on includes and costs past that; Enterprise's says
+// Custom wherever a price would stand, because Enterprise is quoted, never
+// listed. Free and Add-ons are the catalog's plan ids `free` and `pro`.
 
-export type TierId = "payg" | "enterprise";
-export const TIERS: TierId[] = ["payg", "enterprise"];
+export type TierId = "free" | "addons" | "enterprise";
+export const TIERS: TierId[] = ["free", "addons", "enterprise"];
 
 /** What one tier's column says on a row. */
 export type Cell =
@@ -78,8 +79,13 @@ function text(value: string, notes: string[] = []): Cell {
   return notes.length > 0 ? { kind: "text", text: value, notes } : { kind: "text", text: value };
 }
 
-function both(cell: Cell): Record<TierId, Cell> {
-  return { payg: cell, enterprise: cell };
+function every(cell: Cell): Record<TierId, Cell> {
+  return { free: cell, addons: cell, enterprise: cell };
+}
+
+/** A row nothing free offers: its cell with an add-on and on Enterprise. */
+function paid(addons: Cell, enterprise: Cell = addons): Record<TierId, Cell> {
+  return { free: NO, addons, enterprise };
 }
 
 /** A row's status, set only while it doesn't fully work. */
@@ -87,9 +93,9 @@ function tagged(status: FeatureStatus): Pick<Row, "status"> {
   return status === "available" ? {} : { status };
 }
 
-/** A feature row: its cell on both tiers, tagged with its status. */
-function featureRow(label: string, cell: Cell): Row {
-  return { label, cells: both(cell), ...tagged(featureStatus(label)) };
+/** A feature row: its cells, tagged with its status. */
+function featureRow(label: string, cells: Record<TierId, Cell>): Row {
+  return { label, cells, ...tagged(featureStatus(label)) };
 }
 
 function subgroup(title: string, rows: Row[]): Row[] {
@@ -97,28 +103,25 @@ function subgroup(title: string, rows: Row[]): Row[] {
 }
 
 /**
- * A meter's Pay as you go cell: the free amount, then what its add-on includes
- * and costs past it. Enterprise's says Custom.
+ * A meter's cell: the free amount under Free, what an add-on includes and
+ * costs past it under Add-ons, Custom under Enterprise. The row's group says
+ * which add-on.
  */
-export function meterCell(meter: Meter, tier: TierId, hub?: Hub, later: string[] = []): Cell {
+export function meterCell(meter: Meter, tier: TierId, later: string[] = []): Cell {
   const gaps = later.length > 0 ? [`Not yet: ${later.join(", ")}`] : [];
   if (tier === "enterprise") return text("Custom", gaps);
+  if (tier === "free") {
+    return meter.free_allowance ? text(included(meter, meter.free_allowance)) : NO;
+  }
   const [price = "", ...more] = meterPrice(meter);
-  const withHub = hub ? "With the add-on" : "With any add-on";
-  if (meter.free_allowance) {
-    const paid = meter.allowance
-      ? `${withHub}: ${included(meter, meter.allowance)}, then ${price}`
-      : `${withHub}: ${price}`;
-    return text(`${included(meter, meter.free_allowance)} free`, [paid, ...more, ...gaps]);
-  }
   if (meter.allowance) {
-    // A meter of no add-on in particular sits under With any add-on, which says when it applies.
-    return text(
-      `${included(meter, meter.allowance)} ${meter.hub ? "with the add-on" : "included"}`,
-      [`Then ${price}`, ...more, ...gaps],
-    );
+    return text(`${included(meter, meter.allowance)} included`, [
+      `Then ${price}`,
+      ...more,
+      ...gaps,
+    ]);
   }
-  return text(price, [withHub, ...more, ...gaps]);
+  return text(price, [...more, ...gaps]);
 }
 
 /** What an add-on still to come says where a price would stand. */
@@ -129,39 +132,32 @@ export function comingCell(hub: Hub, tier: TierId): Cell {
   if (tier === "enterprise") {
     return text(hub.pricing === "quoted" ? "Custom quote" : "In the commitment");
   }
-  if (!hub.plans.includes("pro")) return NO;
+  if (tier === "free" || !hub.plans.includes("pro")) return NO;
   if (hubStatus(hub) === "next" && hub.base.amount !== null) {
     return text(`Planned: ${hubPrice(hub)} / ${hub.base.interval}`);
   }
   return text(NOT_PRICED);
 }
 
-/** A line billed on top: its price on Pay as you go, Included where Enterprise has it. */
+/** A line billed on top: its price with an add-on, Included where Enterprise has it. */
 export function lineCell(line: Licensed, tier: TierId): Cell {
   if (tier === "enterprise") {
     if (line.included_in?.includes("enterprise")) return INCLUDED;
     return line.plans.includes("enterprise") ? CUSTOM : NO;
   }
-  return line.plans.includes("pro") ? text(licensedPrice(line)) : NO;
+  if (tier === "free" || !line.plans.includes("pro")) return NO;
+  // A listed line says what its price buys.
+  return text(licensedPrice(line), line.note && line.amount !== null ? [sentence(line.note)] : []);
 }
 
-/** A row with one more note under its Pay as you go cell. */
+/** A row with one more note under its Add-ons cell. */
 function noted(row: Row, note: string): Row {
-  const { payg } = row.cells;
-  if (payg.kind !== "text") return row;
-  return { ...row, cells: { ...row.cells, payg: text(payg.text, [...(payg.notes ?? []), note]) } };
-}
-
-/** A row without a note its group's title already says, such as Coming soon. */
-function without(row: Row, note: string): Row {
-  const drop = (cell: Cell): Cell =>
-    cell.kind === "text" && cell.notes
-      ? text(
-          cell.text,
-          cell.notes.filter((entry) => entry !== note),
-        )
-      : cell;
-  return { ...row, cells: { payg: drop(row.cells.payg), enterprise: drop(row.cells.enterprise) } };
+  const { addons } = row.cells;
+  if (addons.kind !== "text") return row;
+  return {
+    ...row,
+    cells: { ...row.cells, addons: text(addons.text, [...(addons.notes ?? []), note]) },
+  };
 }
 
 /** The hub's base fee row. */
@@ -169,7 +165,7 @@ export function hubBaseCell(hub: Hub, tier: TierId): Cell {
   if (tier === "enterprise") {
     return text(hub.pricing === "quoted" ? "Custom quote" : "In the commitment");
   }
-  if (!hub.plans.includes("pro")) return NO;
+  if (tier === "free" || !hub.plans.includes("pro")) return NO;
   return text(`${hubPrice(hub)} / ${hub.base.interval}`);
 }
 
@@ -193,18 +189,19 @@ export function compareGroups(catalog: Catalog): Group[] {
     placed.add(id);
     return found;
   }
+  const byTier = (cell: (tier: TierId) => Cell): Record<TierId, Cell> => ({
+    free: cell("free"),
+    addons: cell("addons"),
+    enterprise: cell("enterprise"),
+  });
   const meterRow = (id: string, label?: string): Row => {
     const found = meter(id);
-    const hub = found.hub ? hubs.get(found.hub) : undefined;
     const status = meterStatus(found, catalog);
     // A meter that partly works names the features it counts that don't yet.
     const later = status === "partial" ? notYet(found) : [];
     const row: Row = {
       label: label ?? found.label,
-      cells: {
-        payg: meterCell(found, "payg", hub, later),
-        enterprise: meterCell(found, "enterprise", hub, later),
-      },
+      cells: byTier((tier) => meterCell(found, tier, later)),
       source: id,
       ...tagged(status),
     };
@@ -222,11 +219,11 @@ export function compareGroups(catalog: Catalog): Group[] {
     const found = line(id);
     return {
       label: label ?? found.label,
-      cells: { payg: lineCell(found, "payg"), enterprise: lineCell(found, "enterprise") },
+      cells: byTier((tier) => lineCell(found, tier)),
       source: id,
     };
   };
-  // An add-on's features are on its card; here are only what it costs.
+  // An add-on's features are in the add-on list; here are only what it costs.
   const hubGroup = (hub: Hub): Group => ({
     id: `hub-${hub.id}`,
     title: `${hub.label} add-on`,
@@ -234,7 +231,7 @@ export function compareGroups(catalog: Catalog): Group[] {
       {
         label: "Base fee",
         source: hub.id,
-        cells: { payg: hubBaseCell(hub, "payg"), enterprise: hubBaseCell(hub, "enterprise") },
+        cells: byTier((tier) => hubBaseCell(hub, tier)),
       },
       ...hubMeters(catalog, hub.id).map((entry) => meterRow(entry.id)),
     ],
@@ -246,7 +243,7 @@ export function compareGroups(catalog: Catalog): Group[] {
       label: `${hub.label} add-on`,
       detail: hub.line,
       source: hub.id,
-      cells: { payg: comingCell(hub, "payg"), enterprise: comingCell(hub, "enterprise") },
+      cells: byTier((tier) => comingCell(hub, tier)),
       ...tagged(hubStatus(hub)),
     };
   };
@@ -254,39 +251,39 @@ export function compareGroups(catalog: Catalog): Group[] {
   const coming = catalog.hubs.filter((hub) => !works(hubStatus(hub)));
 
   const mau = meter("monthly_active_users");
-  const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
-  const freeRps = free.limits.requests_per_second_per_project;
+  const perSecond = (plan: typeof free | typeof pro) =>
+    `Up to ${plan.limits.requests_per_second_per_project} a second per project`;
   // The usage every add-on meters. A basic one of them counts shows as its meter's row, once.
   const usage = ["email_messages", "sms_messages", "verified_bot_checks", "custom_domains"];
   const platform = ["m2m_tokens", "authz_checks", "siem_sinks"];
   const metered = new Set(usage.flatMap((id) => METER_FEATURES[id] ?? []));
-  const proRps = pro.limits.requests_per_second_per_project;
 
   const groups: Group[] = [
     {
       id: "core",
       title: "Included in every account",
       rows: [
-        { label: "Monthly active users", source: mau.id, cells: both(text("Never billed")) },
-        ...catalog.core.resources.map((label) => featureRow(label, text("Unlimited"))),
+        { label: "Monthly active users", source: mau.id, cells: every(text("Never billed")) },
+        ...catalog.core.resources.map((label) => featureRow(label, every(text("Unlimited")))),
         ...catalog.core.platform.map((label) => ({
-          ...featureRow(label, YES),
+          ...featureRow(label, every(YES)),
           ...(PLATFORM_DETAILS[label] ? { detail: PLATFORM_DETAILS[label] } : {}),
         })),
         {
           label: "Region, chosen per project",
           cells: {
-            payg: text(regionList(free.regions.selection)),
+            free: text(regionList(free.regions.selection)),
+            addons: text(regionList(pro.regions.selection)),
             enterprise: text(regionList(enterprise.regions.selection)),
           },
         },
         ...subgroup(
           "Sign-in",
-          catalog.core.authentication.map((label) => featureRow(label, YES)),
+          catalog.core.authentication.map((label) => featureRow(label, every(YES))),
         ),
         ...subgroup(
           "Protection",
-          catalog.core.security.map((label) => featureRow(label, YES)),
+          catalog.core.security.map((label) => featureRow(label, every(YES))),
         ),
       ],
     },
@@ -296,17 +293,17 @@ export function compareGroups(catalog: Catalog): Group[] {
       rows: [
         ...catalog.hub_includes
           .filter((label) => !metered.has(label))
-          .map((label) => featureRow(label, YES)),
+          .map((label) => featureRow(label, paid(YES))),
         {
           label: "Dev inbox or your own email provider",
-          cells: both(YES),
+          cells: every(YES),
         },
       ],
     },
     {
       id: "usage",
       title: "Usage, with any add-on",
-      rows: [...usage, ...platform].map((id) => without(meterRow(id), "With any add-on")),
+      rows: [...usage, ...platform].map((id) => meterRow(id)),
     },
     ...working.map(hubGroup),
     {
@@ -316,9 +313,8 @@ export function compareGroups(catalog: Catalog): Group[] {
         {
           label: "API requests",
           cells: {
-            payg: text("Never billed", [
-              `Up to ${freeRps} a second per project, ${proRps} with any add-on`,
-            ]),
+            free: text("Never billed", [perSecond(free)]),
+            addons: text("Never billed", [perSecond(pro)]),
             enterprise: CUSTOM,
           },
         },
@@ -333,16 +329,15 @@ export function compareGroups(catalog: Catalog): Group[] {
         {
           label: "Audit log retention",
           cells: {
-            payg: text(days(free.event_retention_days), [
-              `${days(pro.event_retention_days)} with any add-on`,
-            ]),
+            free: text(days(free.event_retention_days)),
+            addons: text(days(pro.event_retention_days)),
             enterprise: text(days(enterprise.event_retention_days)),
           },
         },
         // Compliance is part of Enterprise, never an add-on of its own.
         ...enterprise.compliance.map((label) => ({
           label,
-          cells: { payg: NO, enterprise: INCLUDED },
+          cells: paid(NO, INCLUDED),
           ...tagged(featureStatus(label)),
         })),
       ],
@@ -354,10 +349,8 @@ export function compareGroups(catalog: Catalog): Group[] {
         {
           label: "Support",
           cells: {
-            payg: text(capitalize(free.support), [
-              `With any add-on: ${proSupport}`,
-              ...proSupportMore.map(capitalize),
-            ]),
+            free: text(capitalize(free.support)),
+            addons: text(capitalize(pro.support)),
             enterprise: text(capitalize(enterprise.support)),
           },
         },
@@ -367,8 +360,9 @@ export function compareGroups(catalog: Catalog): Group[] {
         {
           label: "Uptime commitment",
           cells: {
-            payg: pro.sla
-              ? text(`${pro.sla.target_percent}% target`, ["With any add-on", "No service credits"])
+            free: free.sla ? text(`${free.sla.target_percent}% target`) : NO,
+            addons: pro.sla
+              ? text(`${pro.sla.target_percent}% target`, ["No service credits"])
               : NO,
             enterprise: enterprise.sla
               ? text(`${enterprise.sla.target_percent}% SLA`, ["With service credits"])
