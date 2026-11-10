@@ -117,36 +117,51 @@ func TestBrandingURLPatternsNeverAcceptWhatTheServerRefuses(t *testing.T) {
 		field string
 		body  func(value string) []byte
 	}{
-		{"branding.yaml", "logo_url", asBodyField("logo_url")},
-		{"branding.yaml", "hero_url", asBodyField("hero_url")},
+		{"branding.yaml", "logo_url", brandingURLBodyField("logo_url")},
+		{"branding.yaml", "hero_url", brandingURLBodyField("hero_url")},
 		{"branding-theme-side.yaml", "logo_url", func(value string) []byte {
-			return mustJSON(map[string]any{"theme": map[string]any{"light": map[string]any{"logo_url": value}}})
+			return marshalBrandingURLBody(map[string]any{"theme": map[string]any{"light": map[string]any{"logo_url": value}}})
 		}},
 		{"branding-typography.yaml", "font_url", func(value string) []byte {
-			return mustJSON(map[string]any{"typography": map[string]any{"font_url": value}})
+			return marshalBrandingURLBody(map[string]any{"typography": map[string]any{"font_url": value}})
 		}},
 	}
 	for _, field := range fields {
 		t.Run(field.file+"/"+field.field, func(t *testing.T) {
-			pattern := regexp.MustCompile(specPattern(t, field.file, field.field))
-			for _, value := range urlCorpus() {
+			pattern := regexp.MustCompile(brandingURLSpecPattern(t, field.file, field.field))
+
+			// A pattern that matched nothing would never accept a URL the server
+			// refuses, so an ordinary URL has to pass both.
+			const ordinary = "https://cdn.example.com/logo.svg"
+			var ordinaryBranding api.Branding
+			require.True(t, pattern.MatchString(ordinary), "the pattern refuses an ordinary URL")
+			require.NoError(t, ordinaryBranding.Decode(jx.DecodeBytes(field.body(ordinary))),
+				"the server refuses an ordinary URL")
+
+			var tooLoose []string
+			for _, value := range brandingURLCorpus() {
 				var branding api.Branding
 				accepted := branding.Decode(jx.DecodeBytes(field.body(value))) == nil
 				if pattern.MatchString(value) && !accepted {
-					t.Errorf("the pattern accepts %q but the server's URL parser refuses it", value)
+					tooLoose = append(tooLoose, value)
 				}
+			}
+			if len(tooLoose) > 0 {
+				shown := tooLoose[:min(len(tooLoose), 10)]
+				t.Errorf("the pattern accepts %d URLs the server's URL parser refuses, for example %q",
+					len(tooLoose), shown)
 			}
 		})
 	}
 }
 
-func asBodyField(name string) func(string) []byte {
+func brandingURLBodyField(name string) func(string) []byte {
 	return func(value string) []byte {
-		return mustJSON(map[string]any{name: value})
+		return marshalBrandingURLBody(map[string]any{name: value})
 	}
 }
 
-func mustJSON(value any) []byte {
+func marshalBrandingURLBody(value any) []byte {
 	out, err := json.Marshal(value)
 	if err != nil {
 		panic(err)
@@ -154,9 +169,9 @@ func mustJSON(value any) []byte {
 	return out
 }
 
-// specPattern reads the pattern of a field from the spec source, which is the
+// brandingURLSpecPattern reads the pattern of a field from the spec source, which is the
 // text every generated client and the CLI compile.
-func specPattern(t *testing.T, file, field string) string {
+func brandingURLSpecPattern(t *testing.T, file, field string) string {
 	t.Helper()
 	raw, err := os.ReadFile("../../api/openapi/components/flows/" + file)
 	require.NoError(t, err)
@@ -171,10 +186,10 @@ func specPattern(t *testing.T, file, field string) string {
 	return pattern
 }
 
-// urlCorpus is every ASCII character in every position of a URL, every
+// brandingURLCorpus is every ASCII character in every position of a URL, every
 // percent-escape, a few non-ASCII characters, and the shapes of host, port and
 // IPv6 literal the spec's pattern has to take a side on.
-func urlCorpus() []string {
+func brandingURLCorpus() []string {
 	var corpus []string
 	for c := range 0x80 {
 		ch := string(rune(c))
