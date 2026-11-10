@@ -4,7 +4,7 @@ import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
 /**
- * Account settings → Settings (the profile), against a real instance.
+ * Account → Settings (the profile), against a real instance.
  *
  * The unit spec stubs `GET /users/me`. This proves the signed-in person's own
  * record reaches the screen through the session cookie alone: the email shown
@@ -25,8 +25,10 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
   await expect(email).toHaveValue(user.email);
   await expect(email).toBeDisabled();
 
-  const nav = page.getByRole("navigation", { name: "Account settings" });
+  const nav = page.getByRole("navigation", { name: "Account" });
   await expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("link", { name: "Back to dashboard" })).toBeVisible();
+  // Above every project: Projects heads the list, and the pill names none.
+  await expect(nav.getByRole("link", { name: "Projects" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("All projects");
   await expectNoErrorBoundary(page);
 });

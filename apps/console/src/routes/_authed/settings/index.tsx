@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 /**
- * Account settings: where the account dropdown leads, and the route that puts
- * the shell into its Settings view.
+ * Account settings: where the account dropdown leads, and a route above
+ * every project, so the sidebar lists the account's screens (D27).
  *
  * It carries no `staticData.nav` entry and no page of its own: Settings (the
  * person's profile) is the only screen, so this forwards to it. Accounts are

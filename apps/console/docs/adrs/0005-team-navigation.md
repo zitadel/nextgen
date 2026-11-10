@@ -62,12 +62,12 @@ team is a scope, following Vercel's model:
   Overview, Members, Access, Login flows, Branding, IdPs. Each configuration
   entry lists the project's resources and the team's overrides of them; an
   override is a resource whose `audience.team_ids` names the team.
-- **Way back:** the team nav's header carries the way back to the project,
-  as the Settings view's `Back to dashboard` does today.
+- **Way back:** the top bar's project switcher is the way back to the
+  project, as it is from Settings (D27).
 - **Top bar:** `Project ▾ / Team ▾`, two real switchers. Switching team keeps
   the current section.
 - **Route:** the team id stays in the path (`/teams/$teamId/...`), so the
-  view comes from the route, as the Settings view does (`app-shell.tsx`), and
+  view comes from the route, as the account list does (`app-shell.tsx`), and
   a team URL survives a refresh.
 
 The tabs from §1 become the team nav's first entries, so nothing built under
@@ -79,8 +79,8 @@ The tabs from §1 become the team nav's first entries, so nothing built under
 > [ADR 084](../../../../docs/adrs/084-hosted-cloud-business-systems.md) §3,
 > §6), so accounts matter, and §4 is due.
 
-The Settings view is the person's own space, with no section headings, and
-holds one screen: **Settings**, their profile. The cloud does not use
+Beside Projects, the account sidebar holds one screen of the console's own,
+with no section headings: **Settings**, the person's profile. The cloud does not use
 accounts (teams in the platform project) for anything a person acts on, so
 the console shows none: no account under the person's name, no list of
 their teams, no account rename, and no account in search.
