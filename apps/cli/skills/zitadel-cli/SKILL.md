@@ -425,6 +425,9 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+  A file under `.zitadel/` that cannot be written because a directory it needs
+  is a file fails with `<path> cannot be written (ENOTDIR)`; `details.blocker`
+  is that file. Remove it, then run the command again.
 - `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
   see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
