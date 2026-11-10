@@ -95,14 +95,17 @@ const AUDIT_VIEW_CATEGORIES = [...AUDIT_CATEGORIES, "signal"] as const;
 
 /**
  * The filters that narrow by one value the event carries. They are set from
- * an event (a row's menu, the event's page), not typed: the value is an id or
- * a type nobody knows by heart. `name` is what the value is called in a
- * sentence: "Only this actor", "Clear the actor filter".
+ * an event (a row's menu, the event's page), not typed: the value is an id
+ * nobody knows by heart. `name` is what the value is called in a sentence:
+ * "Only this request", "Clear the request filter".
+ *
+ * These three, the category and the views are every filter the list offers,
+ * because they are the ones an index serves on the server. `GET /events`
+ * also filters by type, actor and resource, but reads every event of the
+ * project to do it, so the console does not send those until they have an
+ * index of their own.
  */
 export const VALUE_FILTERS = [
-  { key: "type", label: "Type", name: "type" },
-  { key: "actor", label: "Actor", name: "actor" },
-  { key: "resource", label: "Resource", name: "resource" },
   { key: "request", label: "Request", name: "request" },
   { key: "session", label: "Session", name: "session" },
   { key: "flow", label: "Flow", name: "login flow" },
@@ -112,9 +115,6 @@ export type ValueFilterKey = ValueFilter["key"];
 
 /** The value of an event each filter matches. */
 const EVENT_VALUE: Record<ValueFilterKey, (event: LogEvent) => string | null | undefined> = {
-  type: (event) => event.event_type,
-  actor: (event) => event.actor_id,
-  resource: (event) => event.entity_id,
   request: (event) => event.request_id,
   session: (event) => event.session_id,
   flow: (event) => event.flow_id,
@@ -163,10 +163,7 @@ export function isNarrowed(search: LogsSearch): boolean {
 /** What `GET /events` is asked for under these filters. */
 export function eventsQuery(
   search: LogsSearch,
-): Pick<
-  ListEventsParams,
-  "category" | "event_type" | "actor_id" | "entity_id" | "request_id" | "session_id" | "flow_id"
-> {
+): Pick<ListEventsParams, "category" | "request_id" | "session_id" | "flow_id"> {
   const category: ListEventsParams["category"] =
     search.view === "requests"
       ? ["request"]
@@ -177,25 +174,20 @@ export function eventsQuery(
           : undefined;
   return {
     category,
-    event_type: search.type ? [search.type] : undefined,
-    actor_id: search.actor,
-    entity_id: search.resource,
     request_id: search.request,
     session_id: search.session,
     flow_id: search.flow,
   };
 }
 
-/** A request, a session and a login flow each tie audit events to the API requests behind them. */
-const CORRELATES: ReadonlySet<ValueFilterKey> = new Set(["request", "session", "flow"]);
-
 /**
  * The list narrowed by one more value, on top of what already narrows it.
- * Following a request, a session or a login flow reads every view: a
- * request's own event is not an audit event, and it is half of what happened.
+ * Following a request, a session or a login flow reads every view: each ties
+ * audit events to the API requests behind them, and a request's own event is
+ * not an audit event.
  */
 export function narrowedBy(current: LogsSearch, key: ValueFilterKey, value: string): LogsSearch {
-  return { ...current, view: CORRELATES.has(key) ? "all" : current.view, [key]: value };
+  return { ...current, view: "all", [key]: value };
 }
 
 /**

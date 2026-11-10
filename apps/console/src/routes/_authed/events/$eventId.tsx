@@ -20,8 +20,9 @@ import { formatTimestamp } from "@/lib/date";
  * lists the values its envelope carries: who caused it, through which
  * application, on which record, and the ids that tie it to the other events
  * of the same request, session or login flow. Related events leads on to
- * those: Logs narrowed to everything that shares one of its values, in every
- * view, since a request's own event is not an audit event. Document is the
+ * those: Logs narrowed to everything that shares its request, its session or
+ * its login flow, in every view, since a request's own event is not an audit
+ * event. Document is the
  * event as the API returns it, which is also what a webhook receives, so it
  * copies whole.
  *
@@ -76,19 +77,23 @@ function EventDetail() {
           </div>
         </DetailSection>
 
-        <DetailSection title="Related events">
-          <ul className="flex flex-wrap gap-2">
-            {related.map(({ filter, value }) => (
-              <li key={filter.key}>
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/events" search={sharing(filter.key, value)}>
-                    Same {filter.name}
-                  </Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </DetailSection>
+        {/* An event outside any request, session and login flow, as the
+            server's own startup writes, leads on to nothing. */}
+        {related.length > 0 && (
+          <DetailSection title="Related events">
+            <ul className="flex flex-wrap gap-2">
+              {related.map(({ filter, value }) => (
+                <li key={filter.key}>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/events" search={sharing(filter.key, value)}>
+                      Same {filter.name}
+                    </Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </DetailSection>
+        )}
 
         <DetailSection title="Document">
           <DocumentViewer document={event} noun="event" cliHint={false} />

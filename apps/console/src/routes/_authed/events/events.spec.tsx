@@ -170,7 +170,7 @@ describe("logs", () => {
       { data: [event("evt_2")], next_page_token: "page-2" },
       { data: [event("evt_1", { event_type: "user.created" })] },
     );
-    await renderAt("/events?category=entity&actor=user_admin");
+    await renderAt("/events?category=entity&session=sess_1");
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -179,7 +179,7 @@ describe("logs", () => {
     // A page token answers the question the first page asked.
     expect(queries[1]?.get("page_token")).toBe("page-2");
     expect(queries[1]?.getAll("category")).toEqual(["entity"]);
-    expect(queries[1]?.get("actor_id")).toBe("user_admin");
+    expect(queries[1]?.get("session_id")).toBe("sess_1");
     // Absent rather than disabled: its absence says the list is complete.
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
@@ -268,36 +268,36 @@ describe("logs filters", () => {
   });
 
   it("narrows by what an event carries from its row menu, on top of what is set", async () => {
-    const queries = serveEvents({ data: [event("evt_1")] });
+    const queries = serveEvents({ data: [event("evt_1", { session_id: "sess_1" })] });
     const router = await renderAt("/events?category=entity");
 
     const menu = await openRowMenu("user.deleted");
-    // The event's own page, then one item per value it carries; it has no
-    // session and no login flow.
+    // The event's own page, then one item per value it carries that an index
+    // serves; it has no login flow. Its type, actor and resource are not
+    // offered: the server would read every event of the project for them.
     expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
       "View event",
-      "Only this type",
-      "Only this actor",
-      "Only this resource",
       "Only this request",
+      "Only this session",
     ]);
-    await userEvent.click(menu.getByRole("menuitem", { name: "Only this actor" }));
+    await userEvent.click(menu.getByRole("menuitem", { name: "Only this session" }));
 
-    await waitFor(() => expect(queries.at(-1)?.get("actor_id")).toBe("user_admin"));
-    // The category stays: the actor narrows it further.
+    await waitFor(() => expect(queries.at(-1)?.get("session_id")).toBe("sess_1"));
+    // The category stays: the session narrows it further. A session ties
+    // audit events to the requests behind them, so every view is read.
     expect(queries.at(-1)?.getAll("category")).toEqual(["entity"]);
     expect(router.state.resolvedLocation?.search).toMatchObject({
-      view: "audit",
+      view: "all",
       category: "entity",
-      actor: "user_admin",
+      session: "sess_1",
     });
     // Set, it shows on the title row with its value, and the row no longer
     // offers it.
-    expect(await screen.findByRole("button", { name: "Clear the actor filter" })).toHaveTextContent(
-      "Actoruser_admin",
-    );
+    expect(
+      await screen.findByRole("button", { name: "Clear the session filter" }),
+    ).toHaveTextContent("Sessionsess_1");
     const again = await openRowMenu("user.deleted");
-    expect(again.queryByRole("menuitem", { name: "Only this actor" })).not.toBeInTheDocument();
+    expect(again.queryByRole("menuitem", { name: "Only this session" })).not.toBeInTheDocument();
   });
 
   it("follows a request through every view, since its own event is not an audit event", async () => {
@@ -322,15 +322,11 @@ describe("logs filters", () => {
 
   it("sends every filter the URL carries, and clears one from the title row", async () => {
     const queries = serveEvents({ data: [] });
-    const router = await renderAt(
-      "/events?view=all&type=user.deleted&actor=user_admin&resource=user_gone&session=sess_1&flow=flow_1",
-    );
+    const router = await renderAt("/events?view=all&request=req_1&session=sess_1&flow=flow_1");
 
     // Nothing matches, which is not the project having no events.
     expect(await screen.findByText("No events match these filters.")).toBeInTheDocument();
-    expect(queries[0]?.getAll("event_type")).toEqual(["user.deleted"]);
-    expect(queries[0]?.get("actor_id")).toBe("user_admin");
-    expect(queries[0]?.get("entity_id")).toBe("user_gone");
+    expect(queries[0]?.get("request_id")).toBe("req_1");
     expect(queries[0]?.get("session_id")).toBe("sess_1");
     expect(queries[0]?.get("flow_id")).toBe("flow_1");
 
@@ -342,6 +338,17 @@ describe("logs filters", () => {
     expect(
       screen.queryByRole("button", { name: "Clear the login flow filter" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("never sends a filter no index serves, though the API would take it", async () => {
+    const queries = serveEvents({ data: [event("evt_1")] });
+    await renderAt("/events?type=user.deleted&actor=user_admin&resource=user_gone");
+
+    await screen.findByRole("link", { name: "user.deleted" });
+    expect(queries[0]?.has("event_type")).toBe(false);
+    expect(queries[0]?.has("actor_id")).toBe(false);
+    expect(queries[0]?.has("entity_id")).toBe(false);
+    expect(screen.queryByRole("button", { name: /^Clear the/ })).not.toBeInTheDocument();
   });
 
   it("opens on the default view for a view or a category the URL makes up", async () => {
@@ -400,9 +407,10 @@ describe("event detail", () => {
     expect(screen.queryByText(/deploy your changes/)).not.toBeInTheDocument();
   });
 
-  it("leads on to the events that share one of its values, in every view", async () => {
-    server.use(http.get(`${EVENTS_URL}/evt_1`, () => HttpResponse.json(event("evt_1"))));
-    const queries = serveEvents({ data: [request("evt_2"), event("evt_1")] });
+  it("leads on to the events of its request, session or login flow, in every view", async () => {
+    const opened = event("evt_1", { session_id: "sess_1" });
+    server.use(http.get(`${EVENTS_URL}/evt_1`, () => HttpResponse.json(opened)));
+    const queries = serveEvents({ data: [request("evt_2"), opened] });
     const router = await renderAt("/events/evt_1");
 
     const related = within(
@@ -410,12 +418,10 @@ describe("event detail", () => {
         "[data-slot='card']",
       ) as HTMLElement,
     );
-    // One link per value the event carries: it has no session and no flow.
+    // One link per value the event carries: it has no login flow.
     expect(related.getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Same type",
-      "Same actor",
-      "Same resource",
       "Same request",
+      "Same session",
     ]);
 
     await userEvent.click(related.getByRole("link", { name: "Same request" }));
@@ -431,6 +437,20 @@ describe("event detail", () => {
     expect(
       await screen.findByRole("button", { name: "Clear the request filter" }),
     ).toBeInTheDocument();
+  });
+
+  it("leads on to nothing from an event outside any request, session and login flow", async () => {
+    server.use(
+      http.get(`${EVENTS_URL}/evt_1`, () =>
+        HttpResponse.json(
+          event("evt_1", { request_id: null, actor_id: null, actor_type: "system" }),
+        ),
+      ),
+    );
+    await renderAt("/events/evt_1");
+
+    expect(await screen.findByRole("heading", { name: "Details" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Related events" })).not.toBeInTheDocument();
   });
 
   it("says the event is gone when the project does not hold it, and leads back to Logs", async () => {

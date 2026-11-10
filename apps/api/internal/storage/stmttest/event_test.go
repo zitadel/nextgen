@@ -5,6 +5,7 @@ package stmttest
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -165,6 +166,134 @@ func TestEventStatements_ListKeyset_Desc(t *testing.T) {
 		require.Len(t, page2.Items, 1)
 		assert.Equal(t, "evt-001", page2.Items[0].ID, "the descending cursor pages back through older events")
 	})
+}
+
+// The list by category, and the reads that follow one request, session or
+// login flow, are what the events indexes serve (migration
+// events_filter_indexes): each returns exactly its rows.
+func TestEventStatements_ListByIndexedFilters(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		request, session, flow := "req_1", "sess_1", "flow_1"
+		for _, seed := range []struct {
+			id       string
+			category domain.EventCategory
+			request  *string
+			session  *string
+			flow     *string
+		}{
+			{id: "evt-001", category: domain.EventCategoryRequest, request: &request, session: &session},
+			{id: "evt-002", category: domain.EventCategoryEntity, request: &request},
+			{id: "evt-003", category: domain.EventCategoryAuth, session: &session, flow: &flow},
+			{id: "evt-004", category: domain.EventCategoryAuth},
+		} {
+			event := sampleEvent(projectID, seed.id)
+			event.Category = seed.category
+			event.RequestID, event.SessionID, event.FlowID = seed.request, seed.session, seed.flow
+			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
+		}
+
+		for name, tc := range map[string]struct {
+			field domain.EventField
+			value string
+			want  []string
+		}{
+			"category": {field: domain.EventFieldCategory, value: string(domain.EventCategoryAuth), want: []string{"evt-004", "evt-003"}},
+			"request":  {field: domain.EventFieldRequestID, value: request, want: []string{"evt-002", "evt-001"}},
+			"session":  {field: domain.EventFieldSessionID, value: session, want: []string{"evt-003", "evt-001"}},
+			"flow":     {field: domain.EventFieldFlowID, value: flow, want: []string{"evt-003"}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				opts := events.ListOptions(projectID, 10)
+				opts.Pagination.OrderBy = events.CreatedAtDesc()
+				opts.Filter = database.And(opts.Filter, database.Equal(database.Col(tc.field), tc.value))
+				page, err := d.stmts.ListEvents(t.Context(), opts)
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, eventIDs(page.Items))
+				assert.Empty(t, page.NextCursor)
+			})
+		}
+	})
+}
+
+// Several categories are read one at a time and merged
+// (events.ListEachCategory). The pages must be the ones a single ordered read
+// of those categories would serve: every event once, in order, whichever
+// category the page's last row was in.
+func TestEventStatements_ListEachCategory(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		// Interleaved in time, with a run of one category longer than a page
+		// and a category that is not asked for.
+		for i, category := range []domain.EventCategory{
+			domain.EventCategoryAuth,
+			domain.EventCategoryRequest,
+			domain.EventCategoryEntity,
+			domain.EventCategoryAuth,
+			domain.EventCategoryAuth,
+			domain.EventCategoryAuth,
+			domain.EventCategoryRequest,
+			domain.EventCategoryAdmin,
+			domain.EventCategoryEntity,
+		} {
+			event := sampleEvent(projectID, "evt-00"+string(rune('1'+i)))
+			event.Category = category
+			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
+		}
+		oldestFirst := []string{"evt-001", "evt-003", "evt-004", "evt-005", "evt-006", "evt-008", "evt-009"}
+		newestFirst := slices.Clone(oldestFirst)
+		slices.Reverse(newestFirst)
+		// One named twice lists its events once.
+		categories := []string{"auth", "entity", "admin", "signal", "auth"}
+
+		for name, tc := range map[string]struct {
+			order database.OrderBy[domain.EventField]
+			want  []string
+		}{
+			"newest first": {order: events.CreatedAtDesc(), want: newestFirst},
+			"oldest first": {order: events.CreatedAtAsc(), want: oldestFirst},
+		} {
+			t.Run(name, func(t *testing.T) {
+				var got []string
+				var cursor []byte
+				for pages := 0; ; pages++ {
+					require.Less(t, pages, len(tc.want)+1, "the list must end")
+					opts := events.ListOptions(projectID, 2)
+					opts.Pagination.OrderBy = tc.order
+					opts.Pagination.Cursor = cursor
+					page, err := events.ListEachCategory(t.Context(), d.stmts.ListEvents, opts, categories)
+					require.NoError(t, err)
+					require.LessOrEqual(t, len(page.Items), 2)
+					got = append(got, eventIDs(page.Items)...)
+					if len(page.NextCursor) == 0 {
+						break
+					}
+					cursor = page.NextCursor
+				}
+				assert.Equal(t, tc.want, got)
+			})
+		}
+
+		t.Run("no token after a page that ends the list", func(t *testing.T) {
+			opts := events.ListOptions(projectID, uint32(len(oldestFirst)))
+			page, err := events.ListEachCategory(t.Context(), d.stmts.ListEvents, opts, categories)
+			require.NoError(t, err)
+			assert.Equal(t, oldestFirst, eventIDs(page.Items))
+			assert.Empty(t, page.NextCursor)
+		})
+	})
+}
+
+func eventIDs(items []*domain.Event) []string {
+	ids := make([]string, len(items))
+	for i, item := range items {
+		ids[i] = item.ID
+	}
+	return ids
 }
 
 func TestEventStatements_Get_NotFound(t *testing.T) {

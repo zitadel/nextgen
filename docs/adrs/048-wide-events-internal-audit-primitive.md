@@ -18,6 +18,11 @@
 > Postgres stamps `clock_timestamp()`, not `now()`, and Spanner the commit
 > timestamp.
 >
+> **Amendment (2026-11-10):** `events` gains four indexes, for the list by
+> category and for following one request, session or login flow, and several
+> categories are read one at a time. See
+> [the amendment](#amendment-2026-11-10-indexes-for-the-reads-the-console-makes).
+>
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
 > if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
@@ -158,7 +163,9 @@ see [ADR 049 §3](049-events-api-retention-export.md).
   satisfy the tuple predicate as an efficient index range scan.
 - **Deferred:** Additional indexes when concrete query paths and predicates are
   measured. Avoid speculative partial indexes on `NOT NULL DEFAULT ''` columns
-  unless predicates exclude empty strings.
+  unless predicates exclude empty strings. The first four were measured and
+  added on 2026-11-10
+  ([amendment](#amendment-2026-11-10-indexes-for-the-reads-the-console-makes)).
 
 **Ordering:** List and export use keyset pagination on `(created_at, id)` within
 `project_id` per [ADR 027](027-cursor-based-pagination.md). Forensic "when did
@@ -612,3 +619,63 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 | [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | List API pagination over events |
 | [008 Users EAV Store](008-users-eav-store.md) | User event payload rules |
 | [019 Captcha Gate](019-captcha-gate-and-bot-signals.md) | `signal` category alignment |
+
+## Amendment (2026-11-10): indexes for the reads the console makes
+
+§1 kept one secondary index, `(project_id, created_at, id)`, and deferred the
+rest until a query path was measured. The console's Logs screen is that path:
+it opens on a project's audit events, every category but `request`, and
+follows one request, session or login flow from an event. The one index serves
+none of those. A filtered `GET /events` walked the project's events, newest
+first, until it had a page, or read the whole table and sorted the matches.
+
+**Measured** on Postgres 18 with 3,000,000 events (a project of 2,000,000,
+96% of them requests, and a project of 1,000,000 requests newer than its 40
+audit events), a page of 25, warm:
+
+| Read | Before | After |
+| --- | --- | --- |
+| One category, where requests are newer than every audit event | 139 ms, 1,000,000 rows read | 0.03 ms |
+| A category the project has no event of | 145 ms | 0.01 ms |
+| One request | 109 ms, the whole table read | 0.02 ms |
+| One session | 361 ms, 1,984,013 rows read | 0.02 ms |
+| One login flow | 107 ms, the whole table read | 0.06 ms |
+| The unfiltered list | 0.04 ms | unchanged |
+
+**Indexes.** Each read is a range of one index, already in the page's order:
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, category, created_at, id)` | the list by one category |
+| `(project_id, request_id, created_at, id)` | the events of one HTTP request |
+| `(project_id, session_id, created_at, id)` | the events of one session |
+| `(project_id, flow_id, created_at, id)` | the events of one login flow |
+
+- On Postgres and SQLite the last three leave out the rows that carry no such
+  id (`WHERE … IS NOT NULL`). A filter by equality implies the id is not
+  null, so the planner still uses them; SQLite's plans are pinned by
+  `TestListEvents_FilterPlans`.
+- On Spanner they index every row and keep `created_at` and `id` descending.
+  Its documentation promises a `NULL_FILTERED` index only to a query that says
+  `IS NOT NULL`, and declares keys `DESC` for a descending read. These were
+  not measured: no local Spanner shows a plan.
+
+**Several categories are read one at a time.** With the category index in
+place, one statement over five categories still walked the `created_at` index
+(176 ms in the measurement above): no single range holds five categories in
+time order. `events.ListEachCategory` reads a page of each category and merges
+them in the page's order, so the page costs its own rows per category. The
+page token stays the list's own, the last row's `(created_at, id)`.
+
+**Cost.** `events` takes a row per API request, and every index is a write on
+that path. On the measured data the table is 1,344 MB with 398 MB of indexes
+before, and the four add 820 MB (flow 7 MB, since few rows carry one). A bulk
+insert of 200,000 request rows took 1.6 to 1.9 s before and 2.9 to 4.7 s
+after.
+
+**What is still unindexed.** `GET /events` also filters by `event_type`,
+`actor_id`, `client_id`, `fingerprint`, `entity_type`, `entity_id`, `team_id`
+and the `created_at` bounds. Each of those, without one of the four filters
+above beside it, still reads the project's retained events. The console sends
+none of them: a filter joins Logs with its index. Whether the API keeps the
+rest, indexes them or drops them is open.
