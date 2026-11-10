@@ -154,7 +154,7 @@ own. Do not add a per-screen wrapper with its own padding.
 | Page top | 20px at `lg`, 16px below |
 | Page gutter | 16px |
 | Page bottom | 32px |
-| Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
+| Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, settings and System; a detail screen's `DetailHeader` has its own 24px title row |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
 
 ## Resource list layout — one shell for every list screen
@@ -177,7 +177,7 @@ its card below 576px rather than squeezing the cells.
 | --- | --- |
 | Page | `Page` — 16px gutter, the same inset as the table; 20px top at `lg` |
 | Header gutter | 24px at `lg`, the page gutter plus 8px; 16px below it |
-| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`) — every screen's title sits on this line |
+| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`), as settings and System; detail screens use `DetailHeader` |
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |

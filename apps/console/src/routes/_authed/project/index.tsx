@@ -32,8 +32,9 @@ import { projectScopeDeps, requireProjectScope } from "@/features/projects/proje
  * selected, so a link to one project's page still lands on it, and the
  * projects list's row menu opens it as `View project`.
  *
- * The header's identity line carries `Project ID` and `Created`. The design draws
- * a third value, `ISSUER` — the project's issuer origin — but nothing carries it:
+ * The header's identity line carries `Project ID` and `Created`. The design
+ * draws a third value, `Issuer` (the project's issuer origin), but nothing
+ * carries it:
  * `project-response` is `id`, `name`, `origins`, `created_at` and
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
  * domain layer. The value is left out rather than shown empty, and returns as one

@@ -275,7 +275,8 @@ export function DetailRows({
 /** One value on a detail header's identity line. */
 export interface DetailMetaItem {
   label: string;
-  value: string;
+  /** Left out of the line when there is none, as a user's unread created date. */
+  value?: string;
   /**
    * Shown in the foreground with a copy button, and cut in the middle rather
    * than widening the page: an id, or anything else a person copies.
@@ -308,6 +309,9 @@ export function DetailHeader({
   /** At the title row's end, e.g. the resource's actions menu. */
   action?: ReactNode;
 }) {
+  const items = meta.filter((item): item is DetailMetaItem & { value: string } =>
+    Boolean(item.value),
+  );
   return (
     <header className="flex items-start justify-between gap-4 px-2">
       <div className="flex min-w-0 flex-col gap-4">
@@ -329,27 +333,38 @@ export function DetailHeader({
           </div>
           {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
         </div>
-        <dl className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-0">
-          {meta.map((item, index) => (
-            <div key={item.label} className="flex min-w-0 items-center">
-              {index > 0 && <span aria-hidden className={META_RULE} />}
-              <dt className="shrink-0 whitespace-nowrap">{item.label}</dt>
-              {/* `gap-0.5`: the copy glyph sits 2px inside its 16px button, so
-                  it lands 4px after the id. */}
-              <dd className="ml-1 flex min-w-0 items-center gap-0.5">
-                {item.copyable ? (
-                  <>
-                    {/* One line, cut in the middle: a URI id must not widen the page. */}
-                    <IdText id={item.value} title={item.value} className="text-foreground" />
-                    <CopyButton value={item.value} label={`Copy ${item.label}`} size="inline" />
-                  </>
-                ) : (
-                  <span className="whitespace-nowrap">{item.value}</span>
+        {items.length > 0 && (
+          // One line from `sm`, never wrapped: a long id is cut in the middle
+          // to make room rather than pushing the next value onto a line that
+          // would start with a rule.
+          <dl className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center sm:gap-0">
+            {items.map((item, index) => (
+              <div
+                key={item.label}
+                className={cn(
+                  "flex items-center",
+                  item.copyable ? "min-w-0" : "shrink-0",
+                  index > 0 && META_RULE,
                 )}
-              </dd>
-            </div>
-          ))}
-        </dl>
+              >
+                <dt className="shrink-0 whitespace-nowrap">{item.label}</dt>
+                {/* `gap-0.5`: the copy glyph sits 2px inside its 16px button, so
+                  it lands 4px after the id. */}
+                <dd className="ml-1 flex min-w-0 items-center gap-0.5">
+                  {item.copyable ? (
+                    <>
+                      {/* One line, cut in the middle: a URI id must not widen the page. */}
+                      <IdText id={item.value} title={item.value} className="text-foreground" />
+                      <CopyButton value={item.value} label={`Copy ${item.label}`} size="inline" />
+                    </>
+                  ) : (
+                    <span className="whitespace-nowrap">{item.value}</span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
       {/* Beside the title and the identity line together, so it never pushes
           the line down. */}
@@ -358,5 +373,10 @@ export function DetailHeader({
   );
 }
 
-/** The rule between two identity values: 1px by 16px, 8px either side, from `sm`. */
-const META_RULE = "bg-border mx-2 hidden h-4 w-px shrink-0 sm:block";
+/**
+ * The rule before an identity value that follows another: 1px by 16px, 8px
+ * either side, from `sm`. A pseudo-element, so the `<dl>` holds only its
+ * groups.
+ */
+const META_RULE =
+  "sm:before:bg-border sm:before:mx-2 sm:before:h-4 sm:before:w-px sm:before:shrink-0 sm:before:content-['']";

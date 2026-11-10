@@ -34,7 +34,7 @@ import { UserProfileCard } from "@/features/users/components/user-profile-card";
  * markup. Rather than render labels with nothing behind them, each is left out
  * and recorded here:
  *
- *   - **Last login** on the header's identity line: no such field anywhere on the user
+ *   - **Last login** on the identity line: no such field anywhere on the user
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
  * The design's "Project permissions" block is not pending — it has been removed
@@ -80,9 +80,10 @@ function UserDetail() {
         subtitle={secondary}
         meta={[
           { label: "User ID", value: userId, copyable: true },
-          ...(metadata.createdAt
-            ? [{ label: "Created", value: formatDate(metadata.createdAt) }]
-            : []),
+          {
+            label: "Created",
+            value: metadata.createdAt ? formatDate(metadata.createdAt) : undefined,
+          },
         ]}
       />
 

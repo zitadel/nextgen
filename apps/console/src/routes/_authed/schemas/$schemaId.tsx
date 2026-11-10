@@ -93,7 +93,7 @@ function SchemaDetail() {
         title={name}
         meta={[
           { label: "Schema ID", value: schemaId, copyable: true },
-          ...(createdAt ? [{ label: "Created", value: formatDate(createdAt) }] : []),
+          { label: "Created", value: createdAt ? formatDate(createdAt) : undefined },
         ]}
       />
 
