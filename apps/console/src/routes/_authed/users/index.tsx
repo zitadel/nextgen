@@ -1,6 +1,8 @@
 import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { Plus, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormError } from "@/components/form-error";
+import { describeError } from "@/lib/api-error";
 import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import {
   LoadMore,
@@ -63,9 +65,14 @@ import { UserRowActions } from "@/features/users/components/user-row-actions";
 /** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
 const LEGACY_LATEST = "latest";
 
-/** What the URL's `q` searches for: nothing unless it is text with more than spaces in it. */
+/**
+ * What the URL's `q` searches for: nothing unless it is text with more than
+ * spaces in it. The router reads a hand-typed `?q=12345` as a number, which is
+ * still what someone is looking for: a phone number, a numeric username.
+ */
 function searchTerm(q: unknown): string | undefined {
-  return (typeof q === "string" && q.trim()) || undefined;
+  const text = typeof q === "number" ? String(q) : q;
+  return (typeof text === "string" && text.trim()) || undefined;
 }
 
 export const Route = createFileRoute("/_authed/users/")({
@@ -188,9 +195,12 @@ function UsersScreen() {
   // The answer to a term the load did not read, for as long as that load stands.
   // Only the latest term's answer is kept, whichever comes back last.
   const [found, setFound] = useState<{ base: LoadedUsers; page: LoadedUsers }>();
-  const [searchError, setSearchError] = useState<unknown>();
-  if (searchError) throw searchError;
+  // A failed search is said beside the list it could not replace, as a failed
+  // Load more is: thrown, it would take the screen and the field being typed in
+  // with it.
+  const [searchError, setSearchError] = useState<string>();
   useEffect(() => {
+    setSearchError(undefined);
     if (search.q === fromRoute.q) {
       setFound(undefined);
       return;
@@ -201,7 +211,7 @@ function UsersScreen() {
         if (latest) setFound({ base: fromRoute, page });
       },
       (cause) => {
-        if (latest) setSearchError(cause);
+        if (latest) setSearchError(describeError(cause, "Could not search the users."));
       },
     );
     return () => {
@@ -210,7 +220,7 @@ function UsersScreen() {
   }, [search, fromRoute]);
   const loaded = found?.base === fromRoute ? found.page : fromRoute;
   // The rows of the last search stand until the next one answers.
-  const searching = loaded.q !== search.q;
+  const searching = loaded.q !== search.q && !searchError;
   const searchField = useRef<HTMLInputElement>(null);
   const onSearch = useCallback(
     (q: string) =>
@@ -352,6 +362,7 @@ function UsersScreen() {
           column) stays pinned to the card's edge while the rest scrolls under
           it, so the menu is reachable at any width. Right-clicking the table
           opens the Columns menu. */}
+      <FormError message={searchError} className="mb-3" />
       <ColumnsContextMenu groups={pickable} pins={pins} onToggle={togglePin}>
         <div
           ref={scroll.ref}

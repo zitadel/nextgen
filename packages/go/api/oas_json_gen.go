@@ -47449,6 +47449,8 @@ func (s *FilterOperation) Decode(d *jx.Decoder) error {
 		*s = FilterOperationContains
 	case FilterOperationNotContains:
 		*s = FilterOperationNotContains
+	case FilterOperationStartsWith:
+		*s = FilterOperationStartsWith
 	case FilterOperationLessThan:
 		*s = FilterOperationLessThan
 	case FilterOperationLessThanOrEqual:

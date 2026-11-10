@@ -58,8 +58,8 @@ Projects is where the console lands whenever several projects can be chosen, and
 ### D20 · The Users table shows each value once — 2026-10-20 · [standing]
 The User cell carries the display name with the identifier under it, so there is no Identifier column, and a schema column that only repeats a row's name or identifier is dropped (under the default schema, the email). The ID column gives way first and truncates. Refines D4. The console's landing (`/`) is Users, where people who just signed up appear.
 
-### D19 · List page actions sit beside the title — 2026-10-07, amended 2026-11-03 · [standing]
-The primary action of a list screen (Add) stays on the title row at every breakpoint, never stretched to full width or dropped under the title. A list's own server-side search sits with its filters beside the title: the Users list searches by identifier, because no other way exists to find a user among pages of results, and Projects by name (D27). Filters and search take their own row under the title when they don't fit.
+### D19 · List page actions sit beside the title — 2026-10-07, amended 2026-11-03 and 2026-11-10 · [standing]
+The primary action of a list screen (Add) stays on the title row at every breakpoint, never stretched to full width or dropped under the title. A list's own server-side search sits with its filters beside the title: the Users list searches by the start of the identifier, because no other way exists to find a user among pages of results, and Projects by name (D27). A Users search lists its matches by identifier instead of newest first: that is the order an index returns them in, so the search stays fast in a project of any size. Filters and search take their own row under the title when they don't fit.
 
 ### D18 · Console corners are 8px — 2026-10-07 · [standing]
 Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab strips) uses the 8px radius token. The softer shadcn defaults (10px, 14px, 18px) are not used.
