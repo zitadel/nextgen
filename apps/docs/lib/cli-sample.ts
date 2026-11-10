@@ -110,7 +110,7 @@ function apiSample(
     names.includes("project_id") ||
     "project_id" in request.query;
   const run = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
-  const call = piped ? `printf '%s' ${quote(JSON.stringify(body))} | ${run}` : run;
+  const call = piped ? `printf '%s' ${quote(JSON.stringify(body, null, 2))} | ${run}` : run;
   return project ? `${context}\n${call}` : call;
 }
 

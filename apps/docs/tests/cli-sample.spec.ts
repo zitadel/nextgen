@@ -130,7 +130,9 @@ for (const [what, run, expected] of calls) {
 test("a variables body is piped as JSON, whatever its keys and values", () => {
   const body = { kind: "x", NOTE: "a\nb", N: 3 };
   const text = set({ kind: "primary", body });
-  expect(text).toContain(`printf '%s' '${JSON.stringify(body)}' | npx @zitadel/cli@latest api`);
+  expect(text).toContain(
+    `printf '%s' '${JSON.stringify(body, null, 2)}' | npx @zitadel/cli@latest api`,
+  );
   expect(text).toContain("--input -");
   expect(text).toContain("-F kind=primary");
   expect(text).not.toContain("-F kind=x");
