@@ -16,7 +16,7 @@
 
 ## Decisions
 
-### D30 · Search finds users and configuration, through one request — 2026-11-10 · [standing]
+### D30 · Search finds users and configuration, through the server's search — 2026-11-10 · [standing]
 The palette found pages, teams and projects, each through a request of its own, and no user, because the Users list had no text to search by. It now asks the server's search ([ADR 087](../adrs/087-search.md)) for what the selected project holds: users by part of their identifier, teams by name, and configuration (user schemas, login flows, identity providers) by what they are called, or any of them by an id pasted into the field. Users, Teams and Configuration are groups between the project's pages and Projects. A row shows the server's title, and on the right its second line (a user's identifier beside their name), or the project where there is none. The palette stays navigation, not a results page: it lists the best five of each kind, and when there are more users a last row opens the Users list on the same text. Users are asked for from three characters and apart from the rest, so teams and configuration do not wait for the slower user match.
 → Actions and recent items in the palette; search across projects once the API offers it.
 
