@@ -48699,9 +48699,14 @@ func (s *ListEventsOrder) UnmarshalText(data []byte) error {
 // A page of events.
 // Ref: #
 type ListEventsResponse struct {
+	// The events of this page. A filter the server matches event by event can
+	// leave it shorter than `limit`, or empty, while more events remain:
+	// `next_page_token` says whether they do.
 	Data []Event `json:"data"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
+	// Absent when there are no more results. A short or empty page still
+	// carries one while the server has not read every event the filter could
+	// match.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
