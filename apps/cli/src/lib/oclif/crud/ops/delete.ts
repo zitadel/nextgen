@@ -46,7 +46,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
         }),
         ...options.flags,
       },
-      args: idArg(resource),
+      args: idArg(resource, topic),
     };
   }
 
