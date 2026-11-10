@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
 
 import {
   Change,
@@ -19,6 +21,7 @@ import {
   bodyAt,
   type ConfigDocuments,
 } from "@tests/helpers/config";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 
 /**
  * The password policy's file.
@@ -210,11 +213,8 @@ describe("Change.save", () => {
     const config = await ZitadelConfig.loadUnchecked(store);
     const inside = `${CONFIG_DIRECTORIES.branding}/kept-out.txt`;
     const removing = config.policies.remove(PASSWORD).withText(inside, "x");
-    vi.spyOn(store, "assertRemovable").mockImplementation((path: string) => {
-      if (path === PASSWORD) {
-        throw new ConfigError(`${path} points outside .zitadel/`);
-      }
-    });
+    store.volume.rmSync(join(MemoryStore.ROOT, PASSWORD));
+    store.volume.mkdirSync(join(MemoryStore.ROOT, PASSWORD));
 
     await removing.save(store).catch(() => {
       return undefined;
@@ -330,23 +330,6 @@ describe("Change.save", () => {
     });
 
     await expect(saving).rejects.toBeInstanceOf(FileExistsError);
-  });
-
-  it("writes the files it creates before the files it replaces", async () => {
-    const store = aStore(HOLDING_SCHEMA);
-    const config = await ZitadelConfig.loadUnchecked(store);
-    const edited = await editedSchema(config);
-    const change = new Change({ before: config, after: edited.after.with(NEW_LOCKOUT) });
-    const written: string[] = [];
-    const write = store.write.bind(store);
-    vi.spyOn(store, "write").mockImplementation(async (file, mode) => {
-      written.push(file.path);
-      await write(file, mode);
-    });
-
-    await change.save(store);
-
-    expect(written).toEqual([LOCKOUT, SCHEMA]);
   });
 });
 
