@@ -113,9 +113,6 @@ describe("eventFields", () => {
 /** Every category but the requests', which the audit view asks for. */
 const AUDIT = ["auth", "session", "admin", "entity", "signal"];
 
-/** The value filters that read on their own: every one but the actor. */
-const ALONE = ["request", "flow", "session", "resource", "type"] as const;
-
 describe("parseLogsSearch", () => {
   it("opens on the audit events with nothing narrowing them", () => {
     expect(parseLogsSearch({})).toEqual({
@@ -136,11 +133,13 @@ describe("parseLogsSearch", () => {
       view: "all",
       category: "admin",
       since: "7d",
-      actor: " user_1 ",
+      actor: "user_1",
+      resource: "user_2",
+      request: " req_1 ",
       flow: "",
       session: 7,
       unknown: "x",
-      // Filters the API takes but no index serves.
+      // Filters the API takes but the list has no field for.
       client_id: "app_1",
       fingerprint: "fp_1",
       team_id: "team_1",
@@ -151,6 +150,8 @@ describe("parseLogsSearch", () => {
       category: "admin",
       since: "7d",
       actor: "user_1",
+      resource: "user_2",
+      request: "req_1",
     });
     expect(parsed.flow).toBeUndefined();
     expect(parsed.session).toBeUndefined();
@@ -166,68 +167,86 @@ describe("parseLogsSearch", () => {
     expect(parseLogsSearch({ since: "30d" }).since).toBeUndefined();
   });
 
-  it("reads a filter that stands alone on its own, whatever the URL puts beside it", () => {
-    for (const key of ALONE) {
-      expect(
-        parseLogsSearch({
-          view: "audit",
-          category: "auth",
-          actor: "user_1",
-          since: "24h",
-          [key]: " value_1 ",
-        }),
-        // The range is part of every index: it stays.
-      ).toEqual({ ...parseLogsSearch({ view: "all", since: "24h" }), [key]: "value_1" });
-    }
-  });
-
-  it("keeps the one that holds the fewest events when a URL carries several", () => {
+  it("reads a type in the All view with no category, whatever the URL puts beside it", () => {
     expect(
       parseLogsSearch({
-        type: "user.created",
+        view: "audit",
+        category: "auth",
+        type: "user.deleted",
+        actor: "user_1",
         resource: "user_2",
+        since: "24h",
+      }),
+    ).toMatchObject({
+      view: "all",
+      category: undefined,
+      type: "user.deleted",
+      // Every other filter combines with a type: the server bounds the read.
+      actor: "user_1",
+      resource: "user_2",
+      since: "24h",
+    });
+  });
+
+  it("keeps every value filter a URL carries, together", () => {
+    expect(
+      parseLogsSearch({
+        category: "auth",
+        since: "7d",
+        actor: "user_1",
+        resource: "user_2",
+        request: "req_1",
         session: "sess_1",
         flow: "flow_1",
-        request: "req_1",
       }),
-    ).toEqual({ ...parseLogsSearch({ view: "all" }), request: "req_1" });
-    expect(parseLogsSearch({ type: "user.created", resource: "user_2" })).toEqual({
-      ...parseLogsSearch({ view: "all" }),
+    ).toEqual({
+      view: "audit",
+      category: "auth",
+      since: "7d",
+      type: undefined,
+      actor: "user_1",
       resource: "user_2",
+      request: "req_1",
+      session: "sess_1",
+      flow: "flow_1",
     });
   });
 });
 
 describe("servedSearch", () => {
-  it("gives a type the All view, and neither a category nor an actor", () => {
+  it("gives a type the All view and no category", () => {
     expect(
       servedSearch({ view: "requests", category: "auth", type: "user.created", actor: "user_1" }),
-    ).toEqual({ view: "all", category: undefined, type: "user.created", actor: undefined });
+    ).toEqual({ view: "all", category: undefined, type: "user.created", actor: "user_1" });
   });
 
-  it("keeps only the time range beside a filter that reads on its own", () => {
-    for (const key of ALONE) {
-      expect(
-        servedSearch({
-          view: "audit",
-          category: "auth",
-          actor: "user_1",
-          since: "1h",
-          [key]: "value_1",
-        }),
-      ).toEqual({ view: "all", since: "1h", [key]: "value_1" });
-    }
+  it("keeps every other value filter and the range beside a type", () => {
+    const search: LogsSearch = {
+      view: "all",
+      type: "user.created",
+      actor: "user_1",
+      resource: "user_2",
+      request: "req_1",
+      session: "sess_1",
+      flow: "flow_1",
+      since: "1h",
+    };
+    expect(servedSearch(search)).toEqual(search);
   });
 
   it("gives the requests no category", () => {
     expect(servedSearch({ view: "requests", category: "auth" }).category).toBeUndefined();
   });
 
-  it("leaves alone what an index serves as it is", () => {
+  it("leaves every other combination as it is", () => {
     const search: LogsSearch = {
       view: "audit",
       category: "entity",
       actor: "user_1",
+      resource: "user_2",
+      request: "req_1",
+      session: "sess_1",
+      flow: "flow_1",
       since: "7d",
     };
     expect(servedSearch(search)).toBe(search);
@@ -252,28 +271,28 @@ describe("eventsQuery", () => {
   });
 
   it("names each value filter as the API's parameter, and no other", () => {
-    const params = {
-      actor: "actor_id",
-      resource: "entity_id",
-      request: "request_id",
-      session: "session_id",
-      flow: "flow_id",
-    } as const;
-    for (const [key, param] of Object.entries(params)) {
-      // Exactly these: `client_id`, `fingerprint`, `team_id` and `entity_type`
-      // are filters of the API that no index serves, so the list never sends them.
-      expect(eventsQuery(parseLogsSearch({ view: "all", [key]: "id_1" }))).toEqual({
-        category: undefined,
-        event_type: undefined,
-        actor_id: undefined,
-        entity_id: undefined,
-        request_id: undefined,
-        session_id: undefined,
-        flow_id: undefined,
-        created_after: undefined,
-        [param]: "id_1",
-      });
-    }
+    const query = eventsQuery(
+      parseLogsSearch({
+        view: "all",
+        actor: "user_1",
+        resource: "user_2",
+        request: "req_1",
+        session: "sess_1",
+        flow: "flow_1",
+      }),
+    );
+    // Exactly these, all together: `client_id`, `fingerprint`, `team_id` and
+    // `entity_type` are filters of the API the list has no field for.
+    expect(query).toEqual({
+      category: undefined,
+      event_type: undefined,
+      actor_id: "user_1",
+      entity_id: "user_2",
+      request_id: "req_1",
+      session_id: "sess_1",
+      flow_id: "flow_1",
+      created_after: undefined,
+    });
   });
 
   it("asks for one type, with no category beside it", () => {
@@ -282,8 +301,8 @@ describe("eventsQuery", () => {
     expect(query.category).toBeUndefined();
   });
 
-  it("never asks for a combination no index serves, even handed one", () => {
-    // Not through the URL's parser: the request gives way itself.
+  it("gives way itself, handed a search that did not", () => {
+    // Not through the URL's parser: a type still takes no category.
     const query = eventsQuery({
       view: "audit",
       category: "auth",
@@ -292,19 +311,7 @@ describe("eventsQuery", () => {
     });
     expect(query.event_type).toEqual(["user.created"]);
     expect(query.category).toBeUndefined();
-    expect(query.actor_id).toBeUndefined();
-
-    const session = eventsQuery({
-      view: "audit",
-      category: "auth",
-      session: "sess_1",
-      resource: "user_2",
-      actor: "user_1",
-    });
-    expect(session).toMatchObject({ session_id: "sess_1" });
-    expect(session.category).toBeUndefined();
-    expect(session.entity_id).toBeUndefined();
-    expect(session.actor_id).toBeUndefined();
+    expect(query.actor_id).toBe("user_1");
   });
 
   it("sends the start of the time range it is given", () => {
@@ -316,7 +323,7 @@ describe("eventsQuery", () => {
 });
 
 describe("the list in another view, category or range", () => {
-  it("keeps an actor across the views, but a filter that reads on its own only in All", () => {
+  it("keeps the filters across the views, but a type only in All", () => {
     const current = parseLogsSearch({ view: "all", actor: "user_1", since: "7d" });
     expect(withView(current, "audit")).toMatchObject({
       view: "audit",
@@ -324,12 +331,10 @@ describe("the list in another view, category or range", () => {
       since: "7d",
     });
 
-    for (const key of ALONE) {
-      const alone = parseLogsSearch({ [key]: "value_1", since: "7d" });
-      expect(withView(alone, "all")[key]).toBe("value_1");
-      for (const view of ["audit", "requests"] as const) {
-        expect(withView(alone, view)).toMatchObject({ view, [key]: undefined, since: "7d" });
-      }
+    const typed = parseLogsSearch({ type: "user.created", session: "sess_1" });
+    expect(withView(typed, "all").type).toBe("user.created");
+    for (const view of ["audit", "requests"] as const) {
+      expect(withView(typed, view)).toMatchObject({ view, type: undefined, session: "sess_1" });
     }
   });
 
@@ -339,16 +344,14 @@ describe("the list in another view, category or range", () => {
     expect(withView(current, "all")).toMatchObject({ view: "all", category: "auth" });
   });
 
-  it("gives up a filter that reads on its own for a category, and keeps it when none is chosen", () => {
-    for (const key of ALONE) {
-      const alone = parseLogsSearch({ [key]: "value_1" });
-      expect(withCategory(alone, "entity")).toMatchObject({
-        view: "all",
-        category: "entity",
-        [key]: undefined,
-      });
-      expect(withCategory(alone, undefined)[key]).toBe("value_1");
-    }
+  it("gives up the type for a category, and keeps it when the category is cleared", () => {
+    const typed = parseLogsSearch({ type: "user.created" });
+    expect(withCategory(typed, "entity")).toMatchObject({
+      view: "all",
+      category: "entity",
+      type: undefined,
+    });
+    expect(withCategory(typed, undefined).type).toBe("user.created");
   });
 
   it("keeps an actor beside a category", () => {
@@ -361,7 +364,7 @@ describe("the list in another view, category or range", () => {
   });
 
   it("changes the time range and nothing else", () => {
-    const current = parseLogsSearch({ request: "req_1" });
+    const current = parseLogsSearch({ type: "user.created", request: "req_1" });
     expect(withTimeRange(current, "1h")).toEqual({ ...current, since: "1h" });
     expect(withTimeRange({ ...current, since: "1h" }, undefined)).toEqual(current);
   });
@@ -386,53 +389,65 @@ describe("narrowing by one value", () => {
     ]);
   });
 
-  it("reads a request, a login flow, a session, a resource or a type on its own", () => {
-    const current = parseLogsSearch({ category: "auth", actor: "user_1", since: "24h" });
-    for (const key of ALONE) {
-      // The All view, no category, no actor: only the range stays.
-      expect(narrowedBy(current, key, "value_1")).toEqual({
-        ...parseLogsSearch({ view: "all", since: "24h" }),
-        [key]: "value_1",
+  it("follows a request, a session or a login flow through every view", () => {
+    const current = parseLogsSearch({ category: "entity" });
+    for (const key of ["request", "session", "flow"] as const) {
+      expect(narrowedBy(current, key, "id_1")).toMatchObject({
+        view: "all",
+        category: "entity",
+        [key]: "id_1",
       });
     }
   });
 
-  it("keeps the one set last, whichever the other was", () => {
-    for (const set of ALONE) {
-      for (const next of ALONE) {
+  it("narrows the view it is on by an actor or a resource", () => {
+    const current = parseLogsSearch({ category: "entity", since: "24h" });
+    for (const key of ["actor", "resource"] as const) {
+      expect(narrowedBy(current, key, "user_1")).toMatchObject({
+        view: "audit",
+        category: "entity",
+        since: "24h",
+        [key]: "user_1",
+      });
+    }
+  });
+
+  it("reads a type in the All view with no category, beside what else is set", () => {
+    const current = parseLogsSearch({ category: "auth", actor: "user_1", resource: "user_2" });
+    expect(narrowedBy(current, "type", "user.created")).toMatchObject({
+      view: "all",
+      category: undefined,
+      type: "user.created",
+      actor: "user_1",
+      resource: "user_2",
+    });
+  });
+
+  it("keeps a type beside an actor", () => {
+    const current = parseLogsSearch({ type: "user.created" });
+    expect(narrowedBy(current, "actor", "user_1")).toMatchObject({
+      view: "all",
+      type: "user.created",
+      actor: "user_1",
+    });
+  });
+
+  it("sets one ID beside another, whichever came first", () => {
+    const keys = ["actor", "resource", "request", "session", "flow"] as const;
+    for (const set of keys) {
+      for (const next of keys) {
         if (next === set) continue;
-        const current = parseLogsSearch({ [set]: "value_1" });
-        expect(narrowedBy(current, next, "value_2")).toEqual({
-          ...parseLogsSearch({ view: "all" }),
+        const current = parseLogsSearch({ view: "all", [set]: "value_1" });
+        expect(narrowedBy(current, next, "value_2")).toMatchObject({
+          [set]: "value_1",
           [next]: "value_2",
         });
       }
     }
   });
 
-  it("narrows the view it is on by an actor", () => {
-    const current = parseLogsSearch({ category: "entity", since: "24h" });
-    expect(narrowedBy(current, "actor", "user_1")).toMatchObject({
-      view: "audit",
-      category: "entity",
-      since: "24h",
-      actor: "user_1",
-    });
-  });
-
-  it("gives up a filter that reads on its own for an actor", () => {
-    for (const key of ALONE) {
-      const current = parseLogsSearch({ [key]: "value_1" });
-      expect(narrowedBy(current, "actor", "user_1")).toMatchObject({
-        view: "all",
-        [key]: undefined,
-        actor: "user_1",
-      });
-    }
-  });
-
   it("clears one filter and leaves the others", () => {
-    const current = parseLogsSearch({ category: "auth", actor: "user_1", since: "7d" });
+    const current = parseLogsSearch({ category: "auth", actor: "user_1", session: "sess_1" });
     for (const empty of [undefined, ""]) {
       expect(narrowedBy(current, "actor", empty)).toEqual({ ...current, actor: undefined });
     }
@@ -448,34 +463,24 @@ describe("narrowing by one value", () => {
     expect(filterCount(parseLogsSearch({ view: "all" }))).toBe(0);
     expect(isNarrowed(parseLogsSearch({ category: "auth" }))).toBe(true);
     expect(isNarrowed(parseLogsSearch({ since: "1h" }))).toBe(true);
-    expect(filterCount(parseLogsSearch({ category: "auth", since: "1h", actor: "user_1" }))).toBe(
-      3,
-    );
+    expect(
+      filterCount(parseLogsSearch({ category: "auth", since: "1h", actor: "user_1", flow: "f" })),
+    ).toBe(4);
   });
 });
 
-describe("no way to an unserved combination", () => {
+describe("what gives way, on every way into a list", () => {
   /**
-   * What one range of one index answers, read no further than the page: at
-   * most one of the filters that read on their own, with no category and no
-   * actor beside it. Only an actor stands beside a category, which its index
-   * holds.
+   * The two rules, and nothing else given up: the server bounds every read,
+   * so any other combination is sent as it is.
    */
   function expectServed(search: LogsSearch) {
     const query = eventsQuery(search);
-    const alone = [
-      query.event_type,
-      query.entity_id,
-      query.request_id,
-      query.session_id,
-      query.flow_id,
-    ].filter(Boolean);
-    expect(alone.length, JSON.stringify(search)).toBeLessThanOrEqual(1);
-    if (alone.length === 1) {
+    // A type names its own category: one type, and no category beside it.
+    if (query.event_type) {
+      expect(query.event_type).toHaveLength(1);
       expect(query.category, JSON.stringify(search)).toBeUndefined();
-      expect(query.actor_id, JSON.stringify(search)).toBeUndefined();
     }
-    if (query.event_type) expect(query.event_type).toHaveLength(1);
     // The requests are one category, never one of several.
     if (query.category?.includes("request")) expect(query.category).toEqual(["request"]);
     // What the URL holds is what is asked for: giving way changes nothing more.
@@ -506,11 +511,20 @@ describe("no way to an unserved combination", () => {
     }
   }
 
-  it("has none in any URL", () => {
+  it("holds in every URL", () => {
     for (const url of urls) expectServed(parseLogsSearch(url));
   });
 
-  it("has none one click on from any URL", () => {
+  it("drops no value filter a URL carries", () => {
+    for (const url of urls) {
+      const parsed = parseLogsSearch(url);
+      for (const { key } of VALUE_FILTERS) {
+        expect(parsed[key], JSON.stringify(url)).toBe(url[key]);
+      }
+    }
+  });
+
+  it("holds one click on from every URL", () => {
     for (const url of urls) {
       const current = parseLogsSearch(url);
       for (const view of LOG_VIEWS) expectServed(withView(current, view));

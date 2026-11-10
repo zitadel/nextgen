@@ -266,6 +266,20 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ListEventsResponse{}, resp, helpers.MustMarshal(t, resp))
 
+		// Filters combine, whether or not one index holds them all: what none
+		// holds is matched over a bounded number of events.
+		resp, err = session.ListEvents(t.Context(), api.ListEventsParams{
+			ProjectID: projectID,
+			Category:  []api.ListEventsCategoryItem{api.ListEventsCategoryItemAuth, api.ListEventsCategoryItemAdmin},
+			ActorID:   api.NewOptString(claimerID),
+			EntityID:  api.NewOptString(claimerID),
+			ClientID:  api.NewOptString("app_none"),
+		})
+		require.NoError(t, err)
+		combined, ok := resp.(*api.ListEventsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Empty(t, combined.Data)
+
 		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))

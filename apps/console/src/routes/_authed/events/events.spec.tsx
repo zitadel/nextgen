@@ -23,8 +23,10 @@ const OCCURRED_AT = "2026-11-10T08:15:43Z";
 const REQUEST_ID = "req_01TESTREQUEST";
 /** Every category but the requests', which the audit view asks for. */
 const AUDIT = ["auth", "session", "admin", "entity", "signal"];
-/** The filters the console must never send: no index serves them. */
-const UNSERVED = ["client_id", "fingerprint", "team_id", "entity_type", "created_before"];
+/** The filters of the API the list has no field for: it never sends them. */
+const UNOFFERED = ["client_id", "fingerprint", "team_id", "entity_type", "created_before"];
+/** As many events as the list asks for at once (`LIST_PAGE_SIZE`). */
+const PAGE_SIZE = 25;
 
 /** One entry of `GET /events`: a deleted user unless told otherwise. */
 function event(id: string, overrides: Record<string, unknown> = {}) {
@@ -69,6 +71,11 @@ function request(id: string, payload: Record<string, unknown> = {}) {
   });
 }
 
+/** A page as full as the list asks for: `user.deleted` events, ids under `prefix`. */
+function fullPage(prefix: string) {
+  return Array.from({ length: PAGE_SIZE }, (_, index) => event(`${prefix}_${index}`));
+}
+
 /** `GET /events`, answering each call with the next of `pages`; records the queries. */
 function serveEvents(...pages: { data: unknown[]; next_page_token?: string }[]) {
   const queries: URLSearchParams[] = [];
@@ -107,19 +114,15 @@ async function openRowMenu(name: string) {
 }
 
 /**
- * Nothing the console sends may be a filter no index serves, or more than one
- * range of one index: a filter that reads on its own has nothing beside it.
+ * What the list gives way on, and nothing else: it sends no filter it has no
+ * field for, a type takes no category beside it, and the requests are one
+ * category. The server bounds every read, so anything else may be combined.
  */
 function expectServed(query: URLSearchParams | undefined) {
-  for (const key of UNSERVED) expect(query?.has(key), key).toBe(false);
-  const alone = ["event_type", "entity_id", "request_id", "session_id", "flow_id"].filter((key) =>
-    query?.has(key),
-  );
-  expect(alone.length, alone.join()).toBeLessThanOrEqual(1);
-  if (alone.length === 1) {
-    expect(query?.has("category"), alone[0]).toBe(false);
-    expect(query?.has("actor_id"), alone[0]).toBe(false);
-  }
+  for (const key of UNOFFERED) expect(query?.has(key), key).toBe(false);
+  const categories = query?.getAll("category") ?? [];
+  if (query?.has("event_type")) expect(categories).toEqual([]);
+  if (categories.includes("request")) expect(categories).toEqual(["request"]);
 }
 
 describe("logs", () => {
@@ -195,19 +198,19 @@ describe("logs", () => {
 
   it("appends the next page on Load more, under the filters and the range the list began with", async () => {
     const queries = serveEvents(
-      { data: [event("evt_2")], next_page_token: "page-2" },
+      { data: fullPage("evt_a"), next_page_token: "page-2" },
       { data: [event("evt_1", { event_type: "user.created" })] },
     );
-    await renderAt("/events?category=entity&actor=user_admin&since=24h");
+    await renderAt("/events?category=entity&session=sess_1&since=24h");
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
 
     expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "user.deleted" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "user.deleted" })).toHaveLength(PAGE_SIZE);
     // A page token answers the question the first page asked.
     expect(queries[1]?.get("page_token")).toBe("page-2");
     expect(queries[1]?.getAll("category")).toEqual(["entity"]);
-    expect(queries[1]?.get("actor_id")).toBe("user_admin");
+    expect(queries[1]?.get("session_id")).toBe("sess_1");
     // The range was counted back once, when the list loaded: a second page
     // that counted again would slide past the rows between the two moments.
     const start = queries[0]?.get("created_after");
@@ -215,6 +218,75 @@ describe("logs", () => {
     expect(queries[1]?.get("created_after")).toBe(start);
     // Absent rather than disabled: its absence says the list is complete.
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("says so when a page comes back short with more behind it, and keeps looking", async () => {
+    // The server matched these filters over the events it read this request,
+    // and stopped at its bound: one row so far, and a token for the rest.
+    const queries = serveEvents(
+      { data: [event("evt_3")], next_page_token: "page-2" },
+      { data: fullPage("evt_b"), next_page_token: "page-3" },
+      { data: [event("evt_1", { event_type: "user.created" })] },
+    );
+    await renderAt("/events?actor=user_admin&resource=user_gone");
+
+    const keepLooking = await screen.findByRole("button", { name: "Keep looking" });
+    expect(screen.getByText("Not every event has been read yet for these filters.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    // One click is one request: nothing follows the token on its own.
+    expect(queries).toHaveLength(1);
+
+    await userEvent.click(keepLooking);
+
+    // A full page with a token is the ordinary case again.
+    expect(await screen.findByRole("button", { name: "Load more" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep looking" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Not every event has been read yet for these filters."),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "user.deleted" })).toHaveLength(PAGE_SIZE + 1);
+    expect(queries).toHaveLength(2);
+    expect(queries[1]?.get("page_token")).toBe("page-2");
+    expect(queries[1]?.get("actor_id")).toBe("user_admin");
+    expect(queries[1]?.get("entity_id")).toBe("user_gone");
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    // A page without a token is the end, however few rows it holds.
+    expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
+    expect(queries[2]?.get("page_token")).toBe("page-3");
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep looking" })).not.toBeInTheDocument();
+  });
+
+  it("says nothing has matched so far for an empty page with more behind it", async () => {
+    const queries = serveEvents(
+      { data: [], next_page_token: "page-2" },
+      { data: [], next_page_token: "page-3" },
+      { data: [] },
+    );
+    await renderAt("/events?session=sess_1&resource=user_gone");
+
+    // Not "no events match": events are still unread.
+    expect(await screen.findByText("No events have matched so far.")).toBeInTheDocument();
+    expect(screen.queryByText("No events match these filters.")).not.toBeInTheDocument();
+    expect(screen.getByText("Not every event has been read yet for these filters.")).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep looking" }));
+
+    // Still nothing, still more behind it: the same state, one request on.
+    await waitFor(() => expect(queries).toHaveLength(2));
+    expect(queries[1]?.get("page_token")).toBe("page-2");
+    expect(await screen.findByRole("button", { name: "Keep looking" })).toBeEnabled();
+    expect(screen.getByText("No events have matched so far.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep looking" }));
+
+    // Read to the end: now nothing matches.
+    expect(await screen.findByText("No events match these filters.")).toBeInTheDocument();
+    expect(queries[2]?.get("page_token")).toBe("page-3");
+    expect(screen.queryByText("No events have matched so far.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep looking" })).not.toBeInTheDocument();
   });
 
   it("reads the list again from the newest event on Refresh", async () => {
@@ -407,7 +479,7 @@ describe("logs filters", () => {
     expect(group.queryByText(/^\d+$/)).not.toBeInTheDocument();
   });
 
-  it("reads a type on its own: it takes the All view, and no category or actor", async () => {
+  it("reads a type in the All view with no category, and keeps the actor beside it", async () => {
     const queries = serveEvents({ data: [event("evt_1")] });
     const router = await renderAt("/events?category=entity&actor=user_admin");
     await screen.findByRole("link", { name: "user.deleted" });
@@ -416,22 +488,24 @@ describe("logs filters", () => {
     await userEvent.keyboard("{Enter}");
 
     await waitFor(() => expect(queries.at(-1)?.getAll("event_type")).toEqual(["user.deleted"]));
-    // The type's index holds no category and no actor, so neither is sent.
+    // A type names its own category, so none is sent beside it. The actor
+    // stays: the server bounds what the two read together.
     expect(queries.at(-1)?.has("category")).toBe(false);
-    expect(queries.at(-1)?.has("actor_id")).toBe(false);
+    expect(queries.at(-1)?.get("actor_id")).toBe("user_admin");
+    expectServed(queries.at(-1));
     expect(router.state.resolvedLocation?.search).toMatchObject({
       view: "all",
       type: "user.deleted",
+      actor: "user_admin",
     });
     expect(router.state.resolvedLocation?.search.category).toBeUndefined();
-    expect(router.state.resolvedLocation?.search.actor).toBeUndefined();
-    expect((await filters()).getByRole("textbox", { name: "Actor" })).toHaveValue("");
+    expect((await filters()).getByRole("textbox", { name: "Actor" })).toHaveValue("user_admin");
   });
 
   describe("with a type set", () => {
     const START = "/events?view=all&type=user.deleted";
 
-    it("gives up the type for an actor", async () => {
+    it("keeps the type beside an actor", async () => {
       const queries = serveEvents({ data: [event("evt_1")] });
       const router = await renderAt(START);
       await screen.findByRole("link", { name: "user.deleted" });
@@ -443,9 +517,13 @@ describe("logs filters", () => {
       );
 
       await waitFor(() => expect(queries.at(-1)?.get("actor_id")).toBe("user_admin"));
-      expect(queries.at(-1)?.has("event_type")).toBe(false);
-      expect(router.state.resolvedLocation?.search.type).toBeUndefined();
-      expect((await filters()).getByRole("textbox", { name: "Type" })).toHaveValue("");
+      expect(queries.at(-1)?.getAll("event_type")).toEqual(["user.deleted"]);
+      expect(router.state.resolvedLocation?.search).toMatchObject({
+        view: "all",
+        type: "user.deleted",
+        actor: "user_admin",
+      });
+      expect((await filters()).getByRole("textbox", { name: "Type" })).toHaveValue("user.deleted");
     });
 
     it("gives up the type for a category", async () => {
@@ -473,28 +551,30 @@ describe("logs filters", () => {
       expect(router.state.resolvedLocation?.search.type).toBeUndefined();
     });
 
-    it("keeps the type beside a time range", async () => {
+    it("keeps the type beside a time range and a request", async () => {
       const queries = serveEvents({ data: [event("evt_1")] });
-      await renderAt(`${START}&since=7d`);
+      await renderAt(`${START}&since=7d&request=${REQUEST_ID}`);
       await screen.findByRole("link", { name: "user.deleted" });
 
       expect(queries[0]?.getAll("event_type")).toEqual(["user.deleted"]);
+      expect(queries[0]?.get("request_id")).toBe(REQUEST_ID);
       expect(queries[0]?.has("created_after")).toBe(true);
       expectServed(queries[0]);
     });
   });
 
-  it("never sends a combination no index serves, whatever the URL says", async () => {
+  it("gives a type no category, and sends no filter it has no field for, whatever the URL says", async () => {
     const queries = serveEvents({ data: [] });
     await renderAt(
       "/events?view=audit&category=auth&type=user.deleted&actor=user_admin&client_id=app_1&team_id=team_1&entity_type=user",
     );
 
     await screen.findByText("No events match these filters.");
-    // A type beside a category and an actor: the type is read on its own.
+    // A type beside a category and an actor: the category gives way, the
+    // actor stays.
     expect(queries[0]?.getAll("event_type")).toEqual(["user.deleted"]);
     expect(queries[0]?.has("category")).toBe(false);
-    expect(queries[0]?.has("actor_id")).toBe(false);
+    expect(queries[0]?.get("actor_id")).toBe("user_admin");
     expectServed(queries[0]);
     expect((await logsNav()).getByRole("link", { name: "All" })).toHaveAttribute(
       "data-active",
@@ -502,31 +582,32 @@ describe("logs filters", () => {
     );
   });
 
-  it("reads one ID on its own, whatever the URL puts beside it, and clears the filters at once", async () => {
+  it("sends every filter the URL carries, together, and clears them all at once", async () => {
     const queries = serveEvents({ data: [] });
     const router = await renderAt(
-      "/events?view=audit&category=auth&since=7d&actor=user_admin&resource=user_gone&request=req_1&session=sess_1&flow=flow_1",
+      "/events?view=all&category=auth&since=7d&actor=user_admin&resource=user_gone&request=req_1&session=sess_1&flow=flow_1",
     );
 
     // Nothing matches, which is not the project having no events.
     expect(await screen.findByText("No events match these filters.")).toBeInTheDocument();
-    // A session or a resource can hold as many events as the project, so
-    // nothing is matched row by row over one: the request reads alone.
+    // The server bounds what a combination reads, so none is refused here.
+    expect(queries[0]?.getAll("category")).toEqual(["auth"]);
+    expect(queries[0]?.get("actor_id")).toBe("user_admin");
+    expect(queries[0]?.get("entity_id")).toBe("user_gone");
     expect(queries[0]?.get("request_id")).toBe("req_1");
-    for (const dropped of ["actor_id", "entity_id", "session_id", "flow_id", "category"]) {
-      expect(queries[0]?.has(dropped), dropped).toBe(false);
-    }
+    expect(queries[0]?.get("session_id")).toBe("sess_1");
+    expect(queries[0]?.get("flow_id")).toBe("flow_1");
     expect(queries[0]?.has("created_after")).toBe(true);
     expectServed(queries[0]);
-    // The fields show what the list is narrowed to, and nothing it is not.
+    // Each field shows what the list is narrowed to.
     expect((await filters()).getByRole("textbox", { name: "Request" })).toHaveValue("req_1");
-    expect((await filters()).getByRole("textbox", { name: "Session" })).toHaveValue("");
-    expect(router.state.resolvedLocation?.search).toMatchObject({ view: "all", request: "req_1" });
-    expect(router.state.resolvedLocation?.search.session).toBeUndefined();
+    expect((await filters()).getByRole("textbox", { name: "Login flow" })).toHaveValue("flow_1");
 
     await userEvent.click((await filters()).getByRole("button", { name: "Clear filters" }));
 
-    await waitFor(() => expect(queries.at(-1)?.has("request_id")).toBe(false));
+    await waitFor(() => expect(queries.at(-1)?.has("flow_id")).toBe(false));
+    expect(queries.at(-1)?.has("actor_id")).toBe(false);
+    expect(queries.at(-1)?.has("category")).toBe(false);
     expect(queries.at(-1)?.has("created_after")).toBe(false);
     // The view stays: clearing the filters is not leaving it.
     expect(router.state.resolvedLocation?.search).toMatchObject({ view: "all" });

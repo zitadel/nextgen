@@ -13,14 +13,14 @@ CREATE INDEX idx_events_project_actor_category
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE INDEX idx_events_project_entity
-    ON events (project_id, entity_id, created_at DESC, id DESC)
+CREATE INDEX idx_events_project_entity_category
+    ON events (project_id, entity_id, category, created_at DESC, id DESC)
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_events_project_entity
+DROP INDEX IF EXISTS idx_events_project_entity_category
 -- +goose StatementEnd
 
 -- +goose StatementBegin
