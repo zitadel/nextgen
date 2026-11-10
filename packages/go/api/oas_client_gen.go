@@ -1584,6 +1584,42 @@ type Invoker interface {
 	//
 	// POST /deployments/{deployment_id}/rollback
 	RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
+	// Search invokes search operation.
+	//
+	// Finds the resources of a project that match a text, across resource types.
+	// `query` is what the person typed and `types` names the kinds of result to
+	// look for; only those are searched. Each result is a reference: its `type`,
+	// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
+	// with the type's own operation, for example `GetUserByID`
+	// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
+	// What a type matches on:
+	// - `user`: the start of the value they carry as `identifier` or of a part
+	// of their `display` name, from three characters on
+	// - `team`: its name
+	// - `schema`: the `title` and the `objectType` of a user schema
+	// - `flow_definition`: its name
+	// - `idp`: the `slug` and the `display_name` of an identity provider
+	// connection
+	// A user matches from the start of the value; every other type matches the
+	// text anywhere in it. Matching ignores case. A `query` that is the `id` of
+	// a resource of a requested type finds that one. A schema and a flow
+	// definition are found at their newest revision. `project_id` names the
+	// project to search; without it, the credential's own project is searched. A
+	// caller with access to part of the project finds only what that access
+	// covers.
+	// Authenticate with the project secret (`oauth2`) or a console session cookie
+	// (`sessionCookie`). A preview secret is refused, as on every management
+	// operation.
+	// Results come best match first, at most `limit_per_type` of each type, and
+	// types can be mixed in the order. `incomplete_types` lists the types that
+	// have more to show: page those with the type's own list, such as
+	// `queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+	// How text is matched and ranked can change, and later versions can match
+	// more of a resource. Treat the results as suggestions; to filter by an exact
+	// rule, use the type's own list.
+	//
+	// POST /search
+	Search(ctx context.Context, request *SearchRequest, params SearchParams) (SearchRes, error)
 	// SetUserPassword invokes setUserPassword operation.
 	//
 	// Sets a user's password, hashed with the project's current password hashing
@@ -18193,6 +18229,191 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 
 	stage = "DecodeResponse"
 	result, err := decodeRollbackDeploymentResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// Search invokes search operation.
+//
+// Finds the resources of a project that match a text, across resource types.
+// `query` is what the person typed and `types` names the kinds of result to
+// look for; only those are searched. Each result is a reference: its `type`,
+// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
+// with the type's own operation, for example `GetUserByID`
+// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
+// What a type matches on:
+// - `user`: the start of the value they carry as `identifier` or of a part
+// of their `display` name, from three characters on
+// - `team`: its name
+// - `schema`: the `title` and the `objectType` of a user schema
+// - `flow_definition`: its name
+// - `idp`: the `slug` and the `display_name` of an identity provider
+// connection
+// A user matches from the start of the value; every other type matches the
+// text anywhere in it. Matching ignores case. A `query` that is the `id` of
+// a resource of a requested type finds that one. A schema and a flow
+// definition are found at their newest revision. `project_id` names the
+// project to search; without it, the credential's own project is searched. A
+// caller with access to part of the project finds only what that access
+// covers.
+// Authenticate with the project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). A preview secret is refused, as on every management
+// operation.
+// Results come best match first, at most `limit_per_type` of each type, and
+// types can be mixed in the order. `incomplete_types` lists the types that
+// have more to show: page those with the type's own list, such as
+// `queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+// How text is matched and ranked can change, and later versions can match
+// more of a resource. Treat the results as suggestions; to filter by an exact
+// rule, use the type's own list.
+//
+// POST /search
+func (c *Client) Search(ctx context.Context, request *SearchRequest, params SearchParams) (SearchRes, error) {
+	res, err := c.sendSearch(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSearch(ctx context.Context, request *SearchRequest, params SearchParams) (res SearchRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("search"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/search"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SearchOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/search"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSearchRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, SearchOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, SearchOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeSearchResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

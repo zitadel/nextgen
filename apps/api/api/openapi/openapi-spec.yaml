@@ -62,6 +62,11 @@ tags:
       These operations create, read, update, delete and query users, read the
       signed-in user, and manage a user's password, passkeys, identity links
       and team memberships.
+  - name: Search
+    description: |
+      Search finds the resources of a project that match a text, across
+      resource types in one request. It answers with references; the
+      resources themselves are read through their own operations.
   - name: Schemas
     description: |
       Schemas define the typed shape of user data and of other configurable
@@ -258,6 +263,8 @@ paths:
     $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
+  /search:
+    $ref: endpoints/search/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:

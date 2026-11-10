@@ -16,6 +16,14 @@
 
 ## Decisions
 
+### D33 · Search runs actions and remembers what it opened — 2026-11-10 · [standing]
+A palette that only finds things leaves the commonest next step, adding one, a page away. With a project selected it now lists Actions under the project's pages: Add user and Add team open the drawers their lists open (D15), over the screen the person is on, and land on what was created; Copy project ID puts the id on the clipboard and says so. An action shows as its list's Add button does, whatever the person may do: the console has no permissions read yet, and the server refuses what is not allowed. Before anything is typed the palette opens on Recent, the last five things opened from it in that project. They are kept in memory for the session only, because a row carries an end user's name and identifier, which do not belong in the browser's storage.
+→ Gate actions on effective permissions when the console can read them (Console ADR 0004 §5).
+
+### D32 · Search finds users and configuration, through the server's search — 2026-11-10 · [standing]
+The palette found pages, teams and projects, each through a request of its own, and no user, because the Users list had no text to search by. It now asks the server's search ([ADR 087](../adrs/087-search.md)) for what the selected project holds: users by the start of their identifier or of their given or family name, teams by name, and configuration (user schemas, login flows, identity providers) by what they are called, or any of them by an id pasted into the field. Users, Teams and Configuration are groups between the project's pages and Projects. A row shows the server's title, and on the right its second line (a user's identifier beside their name), or the project where there is none. The palette stays navigation, not a results page: it lists the best five of each kind, and when there are more users a last row opens the Users list on the same text. Users are asked for from three characters and apart from the rest, so neither answer waits for the other. The Users list that the last row opens searches identifiers only, so a person found by name is not on it.
+→ Actions and recent items in the palette; search across projects once the API offers it.
+
 ### D31 · A screen that needs a project asks for it with a picker — 2026-11-10
 Amends D22, which sent such a screen to Projects and only renamed that list "Continue to Teams". The list carried what the question does not need: each project's ID, its created date, its row menu and the title row's action. As in Vercel, the step is now a centred block (shadcn's Empty): the screen's icon, "Continue to Teams", "Choose a project to continue.", then the search and the projects, each as the project switcher draws it (its mark, its name, and its site's host or else its ID beneath, D21), and New project at the end. It is still Projects with `?next=`: the same read, newest first (D28), the same server-side search and Load more (D5). Opened for itself, Projects stays the list of D21 and D27. With no project yet there is none to choose from, so the page is the first project's command, as before.
 → Design review of the picker: the block's place on the page, the row, and New project in the list.
@@ -66,8 +74,8 @@ Projects is where the console lands whenever several projects can be chosen, and
 ### D20 · The Users table shows each value once — 2026-10-20 · [standing]
 The User cell carries the display name with the identifier under it, so there is no Identifier column, and a schema column that only repeats a row's name or identifier is dropped (under the default schema, the email). The ID column gives way first and truncates. Refines D4. The console's landing (`/`) is Users, where people who just signed up appear.
 
-### D19 · List page actions sit beside the title — 2026-10-07 · [standing]
-The primary action of a list screen (Add) stays on the title row at every breakpoint, never stretched to full width or dropped under the title. Search is out of the page headers until there is a console-wide solution.
+### D19 · List page actions sit beside the title — 2026-10-07, amended 2026-11-03 and 2026-11-10 · [standing]
+The primary action of a list screen (Add) stays on the title row at every breakpoint, never stretched to full width or dropped under the title. A list's own server-side search sits with its filters beside the title: the Users list searches by the start of the identifier, because no other way exists to find a user among pages of results, and Projects by name (D27). A Users search lists its matches by identifier instead of newest first: that is the order an index returns them in, so the search stays fast in a project of any size. Filters and search take their own row under the title when they don't fit.
 
 ### D18 · Console corners are 8px — 2026-10-07 · [standing]
 Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab strips) uses the 8px radius token. The softer shadcn defaults (10px, 14px, 18px) are not used.

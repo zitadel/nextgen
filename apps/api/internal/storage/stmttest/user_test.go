@@ -15,6 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
 func ensureUserTestProject(t testing.TB, stmts service.AllStatements) (projectID, schemaURL string) {
@@ -376,6 +377,156 @@ func TestUserStatements_ListUsersBySchemaRevision(t *testing.T) {
 		t.Run("ObjectTypeContains", func(t *testing.T) {
 			assert.Equal(t, []string{"user_rev_consumer_v1_a", "user_rev_consumer_v1_b", "user_rev_consumer_v2"},
 				list(t, database.StringContainsFold(objectType, "CONSUMER")))
+		})
+	})
+}
+
+// newSearchableTestUser is newTestUser with the search text a schema that
+// designates email and name would give both attributes.
+func newSearchableTestUser(t testing.TB, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
+	t.Helper()
+	user := newTestUser(t, projectID, schemaURL, userID, email, name)
+	user.Attributes.MarkSearchable([]domain.AttributeKey{"email", "name"})
+	return user
+}
+
+// A search read finds users by the start of an attribute's search text, in the
+// order of the search index, and resumes a page from where the last one
+// stopped.
+func TestUserStatements_ListUsers_Search(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		for _, spec := range []struct{ id, email, name string }{
+			{"user_search_alex", "Alex@Example.com", "Sam"},
+			{"user_search_ann", "ann@example.com", "Ann"},
+			{"user_search_pct", "100%_off@example.com", "Pat"},
+			{"user_search_sam", "sam@example.com", "alex"},
+			{"user_search_ss", "Straße@example.com", "Sigrid"},
+			{"user_search_uml", "Ünal@example.com", "SAM"},
+		} {
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newSearchableTestUser(t, projectID, schemaURL, spec.id, spec.email, spec.name)))
+		}
+		// No search reads this user's attributes: the schema designates none.
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, "user_search_unmarked", "alexander@example.com", "Sammy")))
+
+		arm := func(key domain.AttributeKey) service.UserSearchArm { return service.UserSearchArm{Key: key} }
+		search := func(t *testing.T, cursor []byte, limit uint32, term string, arms ...service.UserSearchArm) *database.ListResult[*domain.User] {
+			t.Helper()
+			prefix, ok := domain.SearchText(term)
+			require.True(t, ok)
+			result, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
+				Filter:     database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				Pagination: database.Page[domain.UserField]{Limit: limit, Cursor: cursor},
+			}, service.UserQueryOptions{Search: &service.UserSearch{ProjectID: projectID, Prefix: prefix, Arms: arms}})
+			require.NoError(t, err)
+			return result
+		}
+		ids := func(t *testing.T, term string, arms ...service.UserSearchArm) []string {
+			t.Helper()
+			return userIDs(search(t, nil, 0, term, arms...).Items)
+		}
+
+		t.Run("MatchesTheStartIgnoringCase", func(t *testing.T) {
+			assert.Equal(t, []string{"user_search_alex"}, ids(t, "ALEX", arm("email")))
+			assert.Empty(t, ids(t, "example", arm("email")), "a prefix search does not match inside a value")
+		})
+		t.Run("ReadsOnlyTheNamedKey", func(t *testing.T) {
+			assert.Equal(t, []string{"user_search_sam"}, ids(t, "sam@", arm("email")))
+			assert.Equal(t, []string{"user_search_sam"}, ids(t, "alex", arm("name")))
+		})
+		// The folding is the server's, so it is the same on every dialect.
+		t.Run("FoldsBeyondASCII", func(t *testing.T) {
+			assert.Equal(t, []string{"user_search_uml"}, ids(t, "ÜNAL", arm("email")))
+			assert.Equal(t, []string{"user_search_ss"}, ids(t, "STRASSE", arm("email")))
+			assert.Equal(t, []string{"user_search_ss"}, ids(t, "straße", arm("email")))
+		})
+		t.Run("TakesWildcardsLiterally", func(t *testing.T) {
+			assert.Equal(t, []string{"user_search_pct"}, ids(t, "100%", arm("email")))
+			assert.Empty(t, ids(t, "1__", arm("email")))
+			assert.Empty(t, ids(t, "%", arm("email")))
+		})
+		t.Run("ReturnsTheMatchedTextInIndexOrder", func(t *testing.T) {
+			result := search(t, nil, 0, "s", arm("email"), arm("name"))
+			type match struct{ id, text string }
+			got := make([]match, len(result.Items))
+			for i, user := range result.Items {
+				got[i] = match{user.ID, user.MatchedText}
+			}
+			// Equal texts order by user id.
+			assert.Equal(t, []match{
+				{"user_search_alex", "sam"},
+				{"user_search_uml", "sam"},
+				{"user_search_sam", "sam@example.com"},
+				{"user_search_ss", "sigrid"},
+				{"user_search_ss", "strasse@example.com"},
+			}, got)
+			require.NotEmpty(t, result.Items[0].Attributes, "a search read hydrates like any other")
+		})
+		t.Run("ReturnsAUserOncePerArm", func(t *testing.T) {
+			result := search(t, nil, 0, "ann", arm("email"), arm("name"))
+			require.Equal(t, []string{"user_search_ann", "user_search_ann"}, userIDs(result.Items))
+			// Each row is the whole user, whichever attribute matched.
+			for _, row := range result.Items {
+				assertUserAttributes(t, row, map[string]any{"email": "ann@example.com", "name": "Ann"})
+			}
+		})
+		t.Run("NarrowsAnArmToItsUsers", func(t *testing.T) {
+			on := func(url string) service.UserSearchArm {
+				return service.UserSearchArm{Key: "email", Users: database.Equal(database.Col(domain.UserFieldSchemaURL), url)}
+			}
+			assert.Equal(t, []string{"user_search_alex"}, ids(t, "alex", on(schemaURL)))
+			assert.Empty(t, ids(t, "alex", on("https://example.com/schemas/other")))
+		})
+		t.Run("FindsNobodyWithoutAnArm", func(t *testing.T) {
+			assert.Empty(t, ids(t, "alex"))
+		})
+		// One user per page, so every page boundary is crossed, the one
+		// between the two users sharing a text included.
+		t.Run("PagesThroughEveryMatch", func(t *testing.T) {
+			var got []string
+			var cursor []byte
+			for range 10 {
+				page := search(t, cursor, 1, "s", arm("email"), arm("name"))
+				got = append(got, userIDs(page.Items)...)
+				cursor = page.NextCursor
+				if len(cursor) == 0 {
+					break
+				}
+			}
+			assert.Equal(t, []string{"user_search_alex", "user_search_uml", "user_search_sam", "user_search_ss", "user_search_ss"}, got)
+		})
+		t.Run("ComposesWithATeamMembership", func(t *testing.T) {
+			team := "team_search_" + uniqueSuffix(t)
+			prefix, _ := domain.SearchText("a")
+			result, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
+				Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			}, service.UserQueryOptions{
+				MembershipTeamID: &team,
+				Search:           &service.UserSearch{ProjectID: projectID, Prefix: prefix, Arms: []service.UserSearchArm{arm("email")}},
+			})
+			require.NoError(t, err)
+			assert.Empty(t, result.Items, "nobody is on the team")
+		})
+		t.Run("APatchRewritesTheSearchText", func(t *testing.T) {
+			before := getUserByID(t, d.stmts, projectID, "user_search_pct")
+			email, err := domain.NewCreateAttribute("email", "renamed@example.com", domain.AttributeUniquenessProject)
+			require.NoError(t, err)
+			patch := patchStateOf(t, d.stmts, before, *email)
+			patch.Attributes.MarkSearchable([]domain.AttributeKey{"email"})
+			require.NoError(t, d.stmts.PatchUser(t.Context(), patch))
+
+			assert.Equal(t, []string{"user_search_pct"}, ids(t, "renamed", arm("email")))
+			assert.Empty(t, ids(t, "100%", arm("email")))
+			assert.Empty(t, ids(t, "pat", arm("name")), "the patch dropped the name")
+		})
+		// The search fields name columns only a search read joins in.
+		t.Run("OrderingByASearchFieldNeedsASearch", func(t *testing.T) {
+			_, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
+				Filter:     database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				Pagination: database.Page[domain.UserField]{OrderBy: v2user.SearchOrder()},
+			}, service.UserQueryOptions{})
+			require.Error(t, err)
 		})
 	})
 }
