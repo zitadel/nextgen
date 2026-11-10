@@ -798,7 +798,7 @@ describe("SocialSignInPrompt", () => {
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
-        message: "Continue without SSO?",
+        message: "Would you like to continue without setting up SSO?",
         initialValue: "back",
       });
     });
@@ -845,7 +845,7 @@ describe("SocialSignInPrompt", () => {
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
     expect(vi.mocked(multiselect).mock.calls[0]?.[0].message).toBe(
-      "Which external sign-in providers would you like to add? Space to select · Enter to continue.",
+      "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
     );
   });
 

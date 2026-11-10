@@ -201,7 +201,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         kind: "multiselect",
         name: "external sign-in providers",
         message:
-          "Which external sign-in providers would you like to add? Space to select · Enter to continue.",
+          "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
         required: false,
         options: [
           ...IDP_PROVIDERS.map((provider) => ({
@@ -220,7 +220,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       const decision = await ask({
         kind: "select",
         name: "continue without SSO",
-        message: "Continue without SSO?",
+        message: "Would you like to continue without setting up SSO?",
         initialValue: "back",
         options: [
           { value: "back", label: "Go back" },
