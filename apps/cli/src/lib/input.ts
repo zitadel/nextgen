@@ -187,6 +187,8 @@ class DrawnPrompter implements Prompter {
   private chosen<T>(answer: T | symbol): T {
     if (isCancel(answer)) {
       if (!this.guide) {
+        // The prompt's last frame would otherwise stay on screen as if answered.
+        flatOutput(process.stdout).erase();
         throw new ZitadelError("E_CANCELLED", "Cancelled by user");
       }
       cancel(CANCELLED);

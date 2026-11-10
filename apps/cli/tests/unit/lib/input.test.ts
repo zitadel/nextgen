@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, type Writable } from "node:stream";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ import type { ZitadelError } from "@/lib/errors";
 
 import { clackInputImports } from "@tests/helpers/clack-imports";
 import { sourceFiles } from "@tests/helpers/source-files";
+import { flatOutput } from "@/lib/flat-output";
 import { asker, type Session } from "@/lib/input";
 import { PromptCancelled } from "@/lib/errors";
 import { unscopedCommand } from "@/lib/suggestion";
@@ -672,6 +673,25 @@ describe("asker", () => {
             message: "Cancelled by user",
           });
           expect(error).not.toBeInstanceOf(PromptCancelled);
+        },
+      );
+
+      it.each(kinds)(
+        "takes the prompt off the screen when %s is cancelled without the guide",
+        async (_kind, prompt, act) => {
+          const screen = flatOutput(process.stdout);
+          const drawing = prompt(false) as ReturnType<typeof vi.fn>;
+          vi.mocked(isCancel).mockReturnValue(true);
+          let onScreen = 0;
+          drawing.mockImplementationOnce((options: { output: Writable }) => {
+            options.output.write("\u001b[?25l\n\n");
+            onScreen = screen.showing;
+            return Promise.resolve(Symbol("cancel"));
+          });
+
+          await act({ ...ask, guide: false }).catch(() => undefined);
+
+          expect([onScreen, screen.showing]).toEqual([2, 0]);
         },
       );
 

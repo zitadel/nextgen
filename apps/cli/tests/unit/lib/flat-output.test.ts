@@ -91,4 +91,65 @@ describe("flatOutput", () => {
 
     expect(resized).toEqual(["resize"]);
   });
+
+  describe("taking a prompt off the screen", () => {
+    const START = "\u001b[?25l";
+    const REDRAW = "\u001b[999D\u001b[4A\u001b[J";
+
+    const screen = () => {
+      const target = terminal(80);
+      const written: string[] = [];
+      target.on("data", (chunk: Buffer) => {
+        written.push(String(chunk));
+      });
+      return { target, output: flatOutput(target), written };
+    };
+
+    it("backs up over the lines of the prompt that is showing and clears them", () => {
+      const { output, written } = screen();
+      output.write(`${START}◆  Remove it?\n  ● No\n  ○ Yes\n  ↑/↓ to navigate\n`);
+
+      output.erase();
+
+      expect(written.at(-1)).toBe("\u001b[4A\r\u001b[J");
+    });
+
+    it("counts only the last frame of a prompt that was redrawn", () => {
+      const { output, written } = screen();
+      output.write(`${START}◆  Remove it?\n  ● No\n  ○ Yes\n  ↑/↓ to navigate\n`);
+      output.write(`${REDRAW}■  Remove it?\n  No\n`);
+
+      output.erase();
+
+      expect(written.at(-1)).toBe("\u001b[2A\r\u001b[J");
+    });
+
+    it("counts a prompt from its own start, not from the ones before it", () => {
+      const { output, written } = screen();
+      output.write(`${START}◇  First?\n  Yes\n`);
+      output.write(`${START}◆  Second?\n  ● No\n`);
+
+      output.erase();
+
+      expect(written.at(-1)).toBe("\u001b[2A\r\u001b[J");
+    });
+
+    it("writes nothing when no prompt is showing", () => {
+      const { output, written } = screen();
+
+      output.erase();
+
+      expect(written).toEqual([]);
+    });
+
+    it("erases a prompt once, however many times it is asked", () => {
+      const { output, written } = screen();
+      output.write(`${START}◆  Remove it?\n  ● No\n`);
+
+      output.erase();
+      output.erase();
+
+      expect(written.filter((chunk) => chunk.includes("\u001b[J"))).toHaveLength(1);
+    });
+  });
 });
