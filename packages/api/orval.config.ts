@@ -2,6 +2,7 @@ import { defineConfig } from "orval";
 
 import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { writeOperations } from "./scripts/operations.ts";
+import { writePatternMessages } from "./scripts/pattern-messages.ts";
 
 export default defineConfig({
   zitadel: {
@@ -60,6 +61,11 @@ export default defineConfig({
       // See the notes on the `zitadel` input above.
       parserOptions: { externalRefs: { allow: ["*"] } },
       override: { transformer: absoluteDocsLinks },
+    },
+    hooks: {
+      // The sentence each pattern's failure reads as, from the spec; orval's
+      // zod output carries none (scripts/pattern-messages.ts).
+      afterAllFilesWrite: writePatternMessages,
     },
     output: {
       mode: "split",
