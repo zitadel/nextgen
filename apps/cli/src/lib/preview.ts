@@ -57,14 +57,3 @@ export function detectPreviewUrls(env: NodeJS.ProcessEnv): DetectedPreviews {
   }
   return { urls: [...urls], variablesLookedFor };
 }
-
-/**
- * Whether an environment takes a preview deploy. `preview` skips every other
- * environment, so a command that suggests one asks this first.
- *
- * @param environment The environment's name.
- * @returns `true` for the `preview` and `development` environments.
- */
-export function takesPreview(environment: string): boolean {
-  return environment === "preview" || environment === "development";
-}
