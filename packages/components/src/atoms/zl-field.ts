@@ -494,7 +494,9 @@ export class ZlField extends FormAtom {
       const form = this.internals.form;
       if (form) {
         event.preventDefault();
-        form.requestSubmit();
+        // A listed element named requestSubmit or reset shadows the form's
+        // method through named access, so the prototype is called.
+        HTMLFormElement.prototype.requestSubmit.call(form);
       }
     }
   };

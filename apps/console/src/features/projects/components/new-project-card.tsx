@@ -1,24 +1,20 @@
 import { SquareTerminal } from "lucide-react";
 
-import { cliSetup } from "@/components/cli-hint";
-import { CopyButton } from "@/components/ui/copy-button";
 import { avatarVars } from "@/components/user-avatar";
-import { trackEvent } from "@/addon/analytics";
-import { serverOrigin } from "@/api/server-origin";
+
+import { SetupCommand } from "./setup-command";
 
 /**
- * How to create a project, beside the Projects list (decisions log D24).
+ * How to create a first project: what Projects shows in place of an empty
+ * list (decisions log D27).
  *
  * A project is created from the app it signs people in to: the CLI's `setup`
  * creates it and connects the app in one step, and the console holds nothing
- * that could do the second half. So the home hands over that command, naming
- * this console's server, rather than a button or a form. What follows `setup`
- * depends on the deployment (on the hosted cloud the project is claimed next),
- * so the card leaves that to the steps the CLI prints.
+ * that could do the second half. So the card hands over that command rather
+ * than a button or a form. Once there is a project the same command sits
+ * behind `New project` (`NewProjectSheet`).
  */
-export function NewProjectCard({ first = false }: { first?: boolean }) {
-  const command = cliSetup(serverOrigin());
-
+export function NewProjectCard() {
   return (
     <section
       aria-labelledby="new-project-title"
@@ -37,32 +33,13 @@ export function NewProjectCard({ first = false }: { first?: boolean }) {
             <SquareTerminal aria-hidden strokeWidth={1.5} className="size-4.5 text-foreground" />
           </span>
           <h2 id="new-project-title" className="font-serif text-base leading-5 text-foreground">
-            {first ? "Create your first project" : "Start a new project"}
+            Create your first project
           </h2>
         </div>
         <p className="text-sm text-muted-foreground">
           A project is created from the app it signs people in to. Run this in your app’s folder:
         </p>
-        {/* Wraps rather than scrolls: a `--server` origin can outrun the card,
-            and the button copies the command whole either way. `wrap-anywhere`
-            breaks at a space first, so the origin stays in one piece unless it
-            is longer than a line. */}
-        <div className="flex items-start gap-2 rounded-md border border-border bg-muted pr-1 pl-3">
-          <span aria-hidden className="py-1.5 font-mono text-xs leading-5 text-muted-foreground">
-            $
-          </span>
-          <code className="min-w-0 flex-1 py-1.5 font-mono text-xs leading-5 text-foreground wrap-anywhere">
-            {command}
-          </code>
-          {/* The console's one call to action: the copy is what reaches the
-              terminal, so it is reported (addon/analytics.ts). */}
-          <CopyButton
-            value={command}
-            label="Copy the setup command"
-            size="sm"
-            onCopied={() => trackEvent("copied_command", { page: "projects", snippet: "setup" })}
-          />
-        </div>
+        <SetupCommand />
         <p className="text-xs text-muted-foreground">
           It creates the project and connects your app. Follow the steps it prints to finish.
         </p>

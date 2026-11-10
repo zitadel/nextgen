@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { type ConfigOptions, type Issue, type JsonObject, ZitadelConfig } from "@/lib/zitadel";
+import {
+  type ConfigOptions,
+  type Issue,
+  type JsonObject,
+  UnparsedFile,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import { isJsonObject, listAt } from "@/lib/zitadel/utils/json";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import {
@@ -185,7 +191,7 @@ describe("SSO_RULES", () => {
     ({ documents }) => {
       const config = ZitadelConfig.of({
         ...configFiles(documents),
-        connections: [{ path: CONNECTION_PATH, unparsed: "invalid JSON at position 2" }],
+        connections: [UnparsedFile.invalidJson(CONNECTION_PATH, "{ not json")],
       });
 
       const issues = SSO_RULES.flatMap((rule) => {
