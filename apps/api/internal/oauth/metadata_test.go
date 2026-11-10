@@ -131,9 +131,13 @@ func TestMetadataServesTheAuthorizationServerDocument(t *testing.T) {
 	assert.Equal(t, []admitCall{{ProjectID: "proj_123", Origin: "https://app.example.com"}}, admitted.calls)
 }
 
-// Through the SDK proxy the client fetched the document under the proxy's
-// prefix, so the issuer and the authorization endpoint carry it; the token
-// endpoint does not, because the client calls the server directly.
+// Through the SDK proxy the client fetched the RFC 8414 form of the issuer
+// https://app.example.com/__nextgen/oauth/proj_123:
+// /.well-known/oauth-authorization-server/__nextgen/oauth/proj_123 on the
+// app. The SDK forwards that as the request below, with the proxy prefix
+// moved to X-Forwarded-Prefix. The issuer and the authorization endpoint
+// carry the prefix; the token endpoint does not, because the client calls
+// the server directly.
 func TestMetadataIssuerThroughTheSDKProxy(t *testing.T) {
 	t.Parallel()
 	mux := newMux(t, Config{})
@@ -242,6 +246,17 @@ func TestMetadataEmptyTenant(t *testing.T) {
 		// Its OpenID Connect Discovery form is routed to the metadata handler
 		// too, where it stays a 404 like every other.
 		assertNoMetadata(t, send(t, mux, http.MethodGet, "/oauth/.well-known/openid-configuration", "api.example.com", https))
+	})
+	t.Run("under a public base with a path", func(t *testing.T) {
+		t.Parallel()
+		mux := newMux(t, Config{PlatformEnabled: true, PublicBase: mustParseURL(t, "https://api.example.com/zitadel")})
+		rec := send(t, mux, http.MethodGet, metadataPath+"/oauth", "api.example.com", https)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var doc map[string]any
+		require.NoError(t, decodeJSON(rec.Body.String(), &doc))
+		assert.Equal(t, "https://api.example.com/zitadel/oauth", doc["issuer"])
+		assert.Equal(t, "https://api.example.com/zitadel/oauth/authorize", doc["authorization_endpoint"])
+		assert.Equal(t, "https://api.example.com/zitadel/oauth/token", doc["token_endpoint"])
 	})
 }
 

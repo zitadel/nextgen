@@ -16,9 +16,9 @@ import (
 // URL a client fetched its metadata from.
 type Issuer struct {
 	ProjectID string
-	// URL is the issuer identifier: the origin the request arrived at, the
-	// proxy prefix it came through, Prefix and, for a customer project, the
-	// project ID.
+	// URL is the issuer identifier. For a customer project: the origin the
+	// request arrived at, the proxy prefix it came through, Prefix and the
+	// project ID. For the platform project: the public base and Prefix.
 	URL *url.URL
 	// Platform is set for the platform project, whose issuer is Prefix
 	// itself on the server's public base.
@@ -117,12 +117,10 @@ func (s *server) withIssuer(next http.Handler) http.Handler {
 
 // deriveIssuer builds the issuer of a request to tenant. The empty tenant
 // is the platform project's issuer, only when a platform project is
-// configured; any other tenant must be a project ID. The URL is the one
-// the client fetched: the forwarded origin, normalized, the forwarded
-// prefix and Prefix, then the project ID. The platform project's own ID
-// is no tenant, because its issuer is the prefix itself, and that issuer
-// is only ever reached directly, so a forwarded prefix gives it no second
-// URL.
+// configured; any other tenant must be a project ID. A project's URL is the
+// one the client fetched: the forwarded origin, normalized, the forwarded
+// prefix and Prefix, then the project ID. The platform project's own ID is
+// no tenant, because its issuer is Prefix itself.
 func (s *server) deriveIssuer(r *http.Request, tenant string) (Issuer, error) {
 	issuer := Issuer{ProjectID: tenant}
 	switch {
@@ -139,21 +137,42 @@ func (s *server) deriveIssuer(r *http.Request, tenant string) (Issuer, error) {
 	if err != nil {
 		return Issuer{}, err
 	}
+	// NormalizeOrigin lets a `*` through for origin patterns; a request's
+	// host is never one.
+	if strings.Contains(origin, "*") {
+		return Issuer{}, domain.ErrOriginInvalid()
+	}
+	if issuer.Platform {
+		return s.platformIssuer(r, issuer, origin)
+	}
 	prefix, err := forwardedPrefix(r)
 	if err != nil {
 		return Issuer{}, err
-	}
-	if issuer.Platform && prefix != "" {
-		return Issuer{}, domain.ErrOriginInvalid()
 	}
 	issuer.URL, err = url.Parse(origin)
 	if err != nil {
 		return Issuer{}, domain.ErrOriginInvalid().WithParent(err)
 	}
-	issuer.URL.Path = prefix + Prefix
-	if tenant != "" {
-		issuer.URL.Path += "/" + tenant
+	issuer.URL.Path = prefix + Prefix + "/" + tenant
+	return issuer, nil
+}
+
+// platformIssuer is the platform project's issuer: Prefix under the
+// server's public base, path included, whatever path the request took
+// after a proxy stripped that path. It is reached only directly at the
+// public base's origin, never through an app, so a request at another
+// origin or through the SDK proxy has none.
+func (s *server) platformIssuer(r *http.Request, issuer Issuer, origin string) (Issuer, error) {
+	base := strings.TrimRight(s.publicBase.Path, "/")
+	switch strings.TrimSpace(r.Header.Get("X-Forwarded-Prefix")) {
+	case "", base:
+	default:
+		return Issuer{}, domain.ErrOriginInvalid()
 	}
+	if origin != s.publicBase.Scheme+"://"+s.publicBase.Host {
+		return Issuer{}, domain.ErrOriginInvalid()
+	}
+	issuer.URL = &url.URL{Scheme: s.publicBase.Scheme, Host: s.publicBase.Host, Path: base + Prefix}
 	return issuer, nil
 }
 

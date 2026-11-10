@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -231,13 +232,21 @@ func (c ServerConfig) Validate() error {
 	if _, err := configuredConsoleOrigins(c.ConsoleOrigins); err != nil {
 		return err
 	}
-	// ensure there are no path collisions between idp callbacks and the console path
+	// The console path must not collide with another handler's paths: the
+	// mux panics at startup on a duplicate pattern.
 	if !c.ConsoleEnabled {
 		return nil
 	}
+	reserved := map[string]string{
+		oauth.Prefix:   "the OAuth server",
+		"/.well-known": "the OAuth server metadata",
+	}
 	for _, prefix := range api.IDPCallbackPathPrefixes() {
+		reserved[prefix] = "the sign-in provider callback"
+	}
+	for prefix, owner := range reserved {
 		if c.ConsolePath == prefix || strings.HasPrefix(c.ConsolePath, prefix+"/") {
-			return fmt.Errorf("server.console_path %q must not be %s or under it: the path is reserved for the sign-in provider callback", c.ConsolePath, prefix)
+			return fmt.Errorf("server.console_path %q must not be %s or under it: the path is reserved for %s", c.ConsolePath, prefix, owner)
 		}
 	}
 	return nil

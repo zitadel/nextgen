@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"cmp"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,6 +22,7 @@ func TestDeriveIssuer(t *testing.T) {
 	for _, tt := range []struct {
 		name            string
 		platformEnabled bool
+		publicBase      string
 		tenant          string
 		host            string
 		headers         map[string]string
@@ -77,6 +79,37 @@ func TestDeriveIssuer(t *testing.T) {
 			wantErr: domain.ErrOriginInvalid(),
 		},
 		{
+			name:            "empty tenant under a public base with a path",
+			platformEnabled: true,
+			publicBase:      "https://api.example.com/zitadel/",
+			host:            "api.example.com",
+			headers:         map[string]string{"X-Forwarded-Proto": "https"},
+			want:            Issuer{ProjectID: domain.PlatformProjectID, URL: mustParseURL(t, "https://api.example.com/zitadel/oauth"), Platform: true},
+		},
+		{
+			name:            "empty tenant with the public base's path as forwarded prefix",
+			platformEnabled: true,
+			publicBase:      "https://api.example.com/zitadel",
+			host:            "api.example.com",
+			headers:         map[string]string{"X-Forwarded-Proto": "https", "X-Forwarded-Prefix": "/zitadel"},
+			want:            Issuer{ProjectID: domain.PlatformProjectID, URL: mustParseURL(t, "https://api.example.com/zitadel/oauth"), Platform: true},
+		},
+		{
+			name:            "empty tenant with a forged prefix",
+			platformEnabled: true,
+			publicBase:      "https://api.example.com/zitadel",
+			host:            "api.example.com",
+			headers:         map[string]string{"X-Forwarded-Proto": "https", "X-Forwarded-Prefix": "/evil"},
+			wantErr:         domain.ErrOriginInvalid(),
+		},
+		{
+			name:            "empty tenant at another origin",
+			platformEnabled: true,
+			host:            "app.example.com",
+			headers:         map[string]string{"X-Forwarded-Proto": "https"},
+			wantErr:         domain.ErrOriginInvalid(),
+		},
+		{
 			name:    "empty tenant without a platform project",
 			host:    "api.example.com",
 			wantErr: domain.ErrProjectNotFound(),
@@ -102,6 +135,13 @@ func TestDeriveIssuer(t *testing.T) {
 			wantErr: domain.ErrOriginInvalid(),
 		},
 		{
+			name:    "wildcard host",
+			tenant:  "proj_123",
+			host:    "*.example.com",
+			headers: map[string]string{"X-Forwarded-Proto": "https"},
+			wantErr: domain.ErrOriginInvalid(),
+		},
+		{
 			name:    "no host",
 			tenant:  "proj_123",
 			wantErr: domain.ErrOriginInvalid(),
@@ -114,7 +154,7 @@ func TestDeriveIssuer(t *testing.T) {
 			for k, v := range tt.headers {
 				r.Header.Set(k, v)
 			}
-			s := &server{platformEnabled: tt.platformEnabled}
+			s := &server{platformEnabled: tt.platformEnabled, publicBase: mustParseURL(t, cmp.Or(tt.publicBase, "https://api.example.com"))}
 			got, err := s.deriveIssuer(r, tt.tenant)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)

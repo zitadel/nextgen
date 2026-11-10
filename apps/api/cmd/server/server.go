@@ -505,9 +505,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		if err != nil {
 			return fmt.Errorf("failed to parse server public base: %w", err)
 		}
+		// Endpoint URLs and the platform issuer keep the public base's path,
+		// but spell its origin as a browser does, without a default port.
+		origin, err := publicOrigin(cfg.Server.PublicBase)
+		if err != nil {
+			return err
+		}
+		publicBase.Scheme, publicBase.Host, _ = strings.Cut(origin, "://")
 		oauthHandlers = oauth.New(oauth.Config{
 			PublicBase:      publicBase,
-			PlatformEnabled: cfg.Platform.BootstrapProject || cfg.Platform.ProjectID == domain.PlatformProjectID,
+			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
 			Admission:       oauth.DenyAll{},
 			Settings:        oauth.NotEnabled{},
 		})

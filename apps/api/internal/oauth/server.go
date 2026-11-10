@@ -13,8 +13,9 @@ import (
 
 // Config builds the handlers of the OAuth server.
 type Config struct {
-	// PublicBase is the server's own address; its origin hosts the
-	// back-channel endpoints of every issuer.
+	// PublicBase is the server's own address, its origin spelled as a
+	// browser does: it hosts the back-channel endpoints of every issuer
+	// and the platform project's issuer.
 	PublicBase *url.URL
 	// PlatformEnabled says whether the deployment has a platform project,
 	// whose issuer is the empty tenant.
@@ -33,6 +34,7 @@ type Handlers struct {
 // server holds what the issuer middleware shares between the handlers.
 type server struct {
 	platformEnabled bool
+	publicBase      *url.URL
 	admission       Admission
 }
 
@@ -46,7 +48,7 @@ type opServer struct {
 // issuer middleware, so a request to an issuer's well-known path and one
 // to its endpoints derive the same issuer.
 func New(cfg Config) *Handlers {
-	s := &server{platformEnabled: cfg.PlatformEnabled, admission: cfg.Admission}
+	s := &server{platformEnabled: cfg.PlatformEnabled, publicBase: cfg.PublicBase, admission: cfg.Admission}
 	metadata := op.RegisterMetadataServer(
 		metadataServer{settings: cfg.Settings, endpoints: NewEndpointFactory(cfg.PublicBase)},
 		op.WithTenantPrefix(Prefix),

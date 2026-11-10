@@ -20,14 +20,14 @@ type EndpointURLs struct {
 // browser visits, authorization and end session, are under the issuer: the
 // app proxy rewrites them onto the project ID path. The ones a client calls
 // from its back channel, token, revocation, JWKS and userinfo, are on the
-// server's own public host, at the same project ID path, so that no proxy
-// sits in between and no forwarded header is needed.
+// server's own public base, at the same project ID path under its path, so
+// that no proxy sits in between and no forwarded header is needed.
 type EndpointFactory struct {
 	publicBase *url.URL
 }
 
-// NewEndpointFactory builds endpoint URLs whose back-channel host is the
-// origin of publicBase.
+// NewEndpointFactory builds endpoint URLs whose back-channel endpoints are
+// under publicBase.
 func NewEndpointFactory(publicBase *url.URL) EndpointFactory {
 	return EndpointFactory{publicBase: publicBase}
 }
@@ -35,7 +35,7 @@ func NewEndpointFactory(publicBase *url.URL) EndpointFactory {
 // For returns the endpoint URLs of issuer.
 func (f EndpointFactory) For(issuer Issuer) EndpointURLs {
 	front := strings.TrimSuffix(issuer.URL.String(), "/")
-	back := f.publicBase.Scheme + "://" + f.publicBase.Host + Prefix
+	back := f.publicBase.JoinPath(Prefix).String()
 	if !issuer.Platform {
 		back += "/" + issuer.ProjectID
 	}
