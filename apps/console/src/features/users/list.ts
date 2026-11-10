@@ -20,7 +20,7 @@ import type { ColumnPins } from "./column-pins";
 
 /** What the Users list is narrowed to, as the URL carries it. */
 export interface UsersSearch {
-  /** Part of a user's identifier; absent for every user. */
+  /** The start of a user's identifier; absent for every user. */
   q?: string;
   /** A schema's object type; absent for every schema. */
   schema?: string;
@@ -68,14 +68,16 @@ export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
 
 /**
  * The server-side criteria for a search (#1669). `q` is matched by the server
- * across every page, never against the rows already loaded. Every revision of a
+ * across every page, never against the rows already loaded: against the start
+ * of the identifier, which an index answers, and the rows then come ordered by
+ * identifier instead of newest first. Every revision of a
  * schema shares its `object_type`, and a user's `schema` is the revision it is
  * on: one revision is `schema equals` its id, and `older` is `schema not_equals`
  * the newest one's, `latestId`, which it needs.
  */
 export function userFilter(search: UsersSearch, latestId?: string): UserFilter {
   const criteria: UserFilter = search.q
-    ? [{ field: "identifier", operation: "contains", value: search.q }]
+    ? [{ field: "identifier", operation: "starts_with", value: search.q }]
     : [];
   if (!search.schema) return criteria;
   criteria.push({ field: "schema_object_type", operation: "equals", value: search.schema });

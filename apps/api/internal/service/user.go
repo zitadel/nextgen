@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
-	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -318,16 +318,21 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
-	designated := sync.OnceValues(func() (map[string][]string, error) {
-		return designatedIdentifierKeys(ctx, s.v2Pool.Statements(), input.ProjectID)
-	})
 	for _, f := range columnFilters {
-		var filter database.Filter[domain.UserField]
 		if f.Field == userFieldIdentifier {
-			filter, err = userIdentifierFilter(f, designated)
-		} else {
-			filter, err = userFilter(f, s.builtinBases)
+			// The storage option holds one search and ADR 031 ANDs filters,
+			// so a second term would silently win over the first.
+			if queryOpts.Search != nil {
+				return nil, domain.ErrRequestInvalid().
+					WithDetails(fmt.Sprintf("%s may only be given once", userFieldIdentifier))
+			}
+			queryOpts.Search, err = userIdentifierSearch(ctx, s.v2Pool.Statements(), input.ProjectID, f)
+			if err != nil {
+				return nil, err
+			}
+			continue
 		}
+		filter, err := userFilter(f, s.builtinBases)
 		if err != nil {
 			return nil, err
 		}
@@ -339,6 +344,16 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 	orderBy, err := listOrderBy(input.Sorting, domain.UserFieldCreatedAt, database.OrderDesc, userField, domain.UserFieldID)
 	if err != nil {
 		return nil, err
+	}
+	if queryOpts.Search != nil {
+		// A search comes back in the order of the search index. Any other
+		// order would have the database collect every match before it could
+		// return the first page.
+		if input.Sorting != nil {
+			return nil, domain.ErrRequestInvalid().
+				WithDetails(fmt.Sprintf("sorting cannot be combined with an %s filter, which orders the users by identifier", userFieldIdentifier))
+		}
+		orderBy = v2user.SearchOrder()
 	}
 
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
@@ -463,50 +478,55 @@ func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filt
 	}
 }
 
-// identifierFilterValue reads the value of an identifier filter, refusing an
-// operation it has no comparison for before any schema is read. An empty value
-// is refused too: as a substring it would select every user with an identifier.
-func identifierFilterValue(f Filter) (string, error) {
-	if f.Operation != filterOpContains {
+// identifierSearchTerm reads the term of an identifier filter as the search
+// index holds text (see [domain.SearchText]), refusing an operation it has no
+// comparison for before any schema is read. An empty term is refused too: as a
+// prefix it would select every user with an identifier.
+func identifierSearchTerm(f Filter) (string, error) {
+	if f.Operation != filterOpStartsWith {
 		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, userFieldIdentifier))
 	}
 	value, err := stringFilterValue(f)
 	if err != nil {
 		return "", err
 	}
-	if value == "" {
+	if utf8.RuneCountInString(value) > domain.SearchTextMaxRunes {
+		return "", domain.ErrRequestInvalid().
+			WithDetails(fmt.Sprintf("%s filter value may be at most %d characters", userFieldIdentifier, domain.SearchTextMaxRunes))
+	}
+	term, ok := domain.SearchText(value)
+	if !ok {
 		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must not be empty", userFieldIdentifier))
 	}
-	return value, nil
+	return term, nil
 }
 
-// userIdentifierFilter matches users on the identifier their own schema
-// designates. Each property is read only for the schemas that designate it, as
-// an identifier lookup is (ADR 058 §5), so an equal value in another schema's
-// undesignated property never matches. With no designation nobody has an
-// identifier, which it says as a filter nothing passes, since no user has an
-// empty id: the query still runs, so the page token and the authz list filter
-// are checked as on any other list.
-func userIdentifierFilter(f Filter, readDesignated func() (map[string][]string, error)) (database.Filter[domain.UserField], error) {
-	value, err := identifierFilterValue(f)
+// userIdentifierSearch finds users by the start of the identifier their own
+// schema designates, from the search index. Each designated property is one
+// arm, counted only for the users on a schema that designates it, as an
+// identifier lookup is (ADR 058 §5): the same property may carry search text
+// under another schema as a display part, and that is not the user's
+// identifier. A user is on one schema, so the arms never share a user. With no
+// designation there is no arm and the search finds nobody; the read still
+// runs, so the page token and the authz list filter are checked as on any
+// other list.
+func userIdentifierSearch(ctx context.Context, stmts AllStatements, projectID string, f Filter) (*UserSearch, error) {
+	term, err := identifierSearchTerm(f)
 	if err != nil {
 		return nil, err
 	}
-	designated, err := readDesignated()
+	designated, err := designatedIdentifierKeys(ctx, stmts, projectID)
 	if err != nil {
 		return nil, mapListError(err, "failed to list schemas from database")
 	}
-	if len(designated) == 0 {
-		return database.StringEqual(database.Col(domain.UserFieldID), ""), nil
-	}
-	arms := make([]database.Filter[domain.UserField], 0, len(designated))
+	search := &UserSearch{ProjectID: projectID, Prefix: term, Arms: make([]UserSearchArm, 0, len(designated))}
 	for _, key := range slices.Sorted(maps.Keys(designated)) {
-		arms = append(arms, database.And(
-			database.Or(equalIDFilters(domain.UserFieldSchemaURL, designated[key])...),
-			v2user.IdentifierContains(key, value),
-		))
+		search.Arms = append(search.Arms, UserSearchArm{
+			Key:   domain.AttributeKey(key),
+			Users: database.Or(equalIDFilters(domain.UserFieldSchemaURL, designated[key])...),
+		})
 	}
-	return database.Or(arms...), nil
+	return search, nil
 }
 
 // userStatusFilter filters on the user's lifecycle status.
