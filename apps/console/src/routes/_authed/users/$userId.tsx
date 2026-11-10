@@ -11,7 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/date";
 import { fetchUserDetail } from "@/features/users/api";
-import { UserAuthentication } from "@/features/users/components/user-authentication";
+import {
+  UserAuthentication,
+  hasNoSignInMethod,
+} from "@/features/users/components/user-authentication";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { field } from "@/lib/record";
 import {
@@ -140,7 +143,13 @@ function UserDetail() {
         </TabsContent>
 
         <TabsContent value="authentication">
-          <DetailSection title="Authentication">
+          <DetailSection
+            title="Authentication"
+            description={
+              hasNoSignInMethod({ passwordSetAt, passkeys, identityLinks }) &&
+              "This user cannot sign in because no sign-in method is configured."
+            }
+          >
             <UserAuthentication
               passwordSetAt={passwordSetAt}
               passkeys={passkeys}
