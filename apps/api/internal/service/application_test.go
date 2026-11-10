@@ -108,7 +108,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 
 		got, err := f.svc.CreateOrRevise(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop 2","clients":[`+shopWeb+`]}`))
 		require.NoError(t, err)
-		assert.Nil(t, got.Secrets)
+		assert.Empty(t, got.Secrets)
 
 		require.Len(t, *f.events, 1)
 		assert.JSONEq(t, `{"name":"Shop 2","revision_id":"apprev_2"}`, string((*f.events)[0].Payload))

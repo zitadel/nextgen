@@ -123,9 +123,9 @@ func (s *applicationService) create(ctx context.Context, projectID string, next 
 	if _, ok := errors.AsType[*database.UniqueError](err); !ok {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create application")
 	}
-	// UniqueError hides which constraint fired, so read the state. The slug
-	// comes first: when another caller created the same application, its
-	// client holds the same client_id and the right answer is a revision.
+	// sqlite and spanner leave the constraint name empty, so read the state.
+	// The slug comes first: when another caller created the same application,
+	// its client holds the same client_id and the right answer is a revision.
 	existing, getErr := s.get(ctx, projectID, domain.ApplicationFieldSlug, next.Slug)
 	if getErr == nil {
 		return s.revise(ctx, existing, next, document)
@@ -188,7 +188,6 @@ func (s *applicationService) revise(ctx context.Context, existing *domain.Applic
 		return &CreateApplicationOutput{Application: entity, Secrets: clientSecrets(clients, plain)}, nil
 	}
 	if _, ok := errors.AsType[*database.UniqueError](err); ok {
-		// Read after the transaction: a failed statement aborts it on postgres.
 		if takenErr := s.clientIDTaken(ctx, clients); takenErr != nil {
 			return nil, takenErr
 		}
@@ -224,14 +223,9 @@ func (s *applicationService) newClients(projectID string, next domain.Applicatio
 }
 
 // clientIDTaken returns client_id_taken when another client of the project
-// holds the client_id one of clients supplied, and nil when none does.
+// holds the client_id of one of clients, and nil when none does.
 func (s *applicationService) clientIDTaken(ctx context.Context, clients []*domain.ApplicationClient) error {
 	for _, client := range clients {
-		// An empty ClientID takes a copy of the minted primary key, which no
-		// other client can hold.
-		if client.ClientID == "" {
-			continue
-		}
 		_, err := s.v2Pool.Statements().GetApplicationClientByClientID(ctx, client.ProjectID, client.ClientID)
 		if err == nil {
 			return domain.ErrApplicationClientIDTaken().WithDetails(map[string]string{"client_id": client.ClientID})
@@ -273,10 +267,6 @@ func applicationBy(projectID string, field domain.ApplicationField, value string
 }
 
 func clientSecrets(clients []*domain.ApplicationClient, plain []string) []ApplicationClientSecret {
-	// nil, not empty: the contract omits client_secrets when no client was created.
-	if len(clients) == 0 {
-		return nil
-	}
 	out := make([]ApplicationClientSecret, len(clients))
 	for i, client := range clients {
 		out[i] = ApplicationClientSecret{Slug: client.Slug, ClientID: client.ClientID, Secret: plain[i]}
