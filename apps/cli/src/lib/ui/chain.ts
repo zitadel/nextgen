@@ -105,8 +105,8 @@ export class Chain implements Drawing, Narratable {
    * is indented to the same column, so the marks still line up.
    */
   narrate(symbol: string, text: string): void {
-    // A bridged line is whatever the caller passed `log`, so it obeys no
-    // width of its own: wrapped here, or a long warning runs past the gutter.
+    // Not folded to a width: the terminal wraps a long line to its own, and a
+    // line it wraps is still one line when it is copied.
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
       // A blank line is a gap, so it carries no mark.

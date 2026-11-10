@@ -203,11 +203,9 @@ export class Progress {
   }
 
   /**
-   * One line of progress, wrapped to what is left of the terminal. A step
-   * names whatever it did — a sentence and a path, say — so without this a
-   * long one runs past the chain instead of folding under it. A caller drawing
-   * a row of a column layout passes `columns`, and {@link Prose} leaves it
-   * whole.
+   * One line of progress, with the marks a column builder left on it taken
+   * off. It is not folded to a width: the terminal wraps a long line to its
+   * own, and a line it wraps is still one line when it is copied.
    *
    * A normal command has no gutter and no marks: its step is a plain line,
    * like the answer it is working towards.
