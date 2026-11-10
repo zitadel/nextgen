@@ -41,6 +41,9 @@ export const PAGE_SURFACE_BACKGROUND = "#050505";
 /** The text colour that reads on {@link PAGE_SURFACE_BACKGROUND}. */
 const PAGE_FOREGROUND = "#fafafa";
 
+/** The height the profile page leaves under the session card for its attributes. */
+const LIST_ROOM = "10rem";
+
 const PAGE_WRAPPER_OPEN = `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark" }}>`;
 
 const PAGE_WRAPPER_COMMENT = `  // The wrapper paints the widget's dark page surface before the client-only
@@ -163,19 +166,27 @@ ${postureComment}
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the card inside a layout you own.
 ${PAGE_WRAPPER_COMMENT}`;
+      // The page-variant card is as tall as the viewport, so the list below it
+      // would start off screen: the card is shortened by the room the list
+      // needs, through the `--zl-page-min-height` hook the card exposes.
       const wrapperOpen = widget
         ? `<div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem 1rem" }}>`
-        : PAGE_WRAPPER_OPEN;
+        : `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark", "--zl-page-min-height": "calc(100vh - ${LIST_ROOM})" } as CSSProperties}>`;
+      const reactImport = widget
+        ? `import { useEffect, useState } from "react";`
+        : `import { type CSSProperties, useEffect, useState } from "react";`;
       const wrapperClose = widget ? `</div>` : `</main>`;
       // The page posture paints its own dark surface, so its list needs a light
       // foreground; the widget posture inherits the host app's styling.
-      const listStyle = widget ? "" : ` style={{ color: "${PAGE_FOREGROUND}" }}`;
+      const listStyle = widget
+        ? ""
+        : ` style={{ color: "${PAGE_FOREGROUND}", margin: "0 auto", maxWidth: "24rem", padding: "0 1rem 2rem" }}`;
       return {
         contents: `${MANAGED_MARKER}
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+${reactImport}
 
 // Lists the attributes captured at sign-in (email, name and any other field
 // of your user schema) from "/__nextgen/api/v1/users/me", which the session

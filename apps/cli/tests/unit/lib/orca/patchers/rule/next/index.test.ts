@@ -105,7 +105,7 @@ describe("NextPatcher.plan", () => {
       // paint is the host page's background (white in light mode) until the
       // widget mounts and paints dark.
       expect(page).toContain(
-        `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark" }}>`,
+        `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark"`,
       );
       expect(page).toContain('variant="widget"');
     }
@@ -166,7 +166,7 @@ describe("NextPatcher.plan", () => {
       expect(profile).toContain("Object.entries(attributes)");
       expect(profile).toContain("<Attributes />");
       if (posture === "page") {
-        expect(profile).toContain('<dl style={{ color: "#fafafa" }}>');
+        expect(profile).toContain('<dl style={{ color: "#fafafa", margin: "0 auto"');
       } else {
         expect(profile).toContain("<dl>");
       }
@@ -181,6 +181,21 @@ describe("NextPatcher.plan", () => {
       expect(profile).toContain("setFailed(true)");
       expect(profile).toContain("Could not load your details.");
     }
+  });
+
+  it("keeps the attributes on screen under the page-variant card", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), posture: "page" });
+    const profile = writeContents(plan, "app/profile/page.tsx");
+    expect(profile).toContain('"--zl-page-min-height": "calc(100vh - 10rem)"');
+    expect(profile).toContain("as CSSProperties");
+    expect(profile).toContain('import { type CSSProperties, useEffect, useState } from "react";');
+  });
+
+  it("imports no style type on the widget profile page, which sets no card height", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), posture: "widget" });
+    const profile = writeContents(plan, "app/profile/page.tsx");
+    expect(profile).not.toContain("CSSProperties");
+    expect(profile).toContain('import { useEffect, useState } from "react";');
   });
 
   it("shows no error on the profile page to a visitor who is not signed in", () => {
