@@ -22,12 +22,15 @@ properties:
   salt:
     type: string
     pattern: '^[0-9a-f]{32}$'
+    x-zitadel-pattern-message: "must be 32 lowercase hex digits"
   nonce:
     type: string
     pattern: '^[0-9a-f]{32}$'
+    x-zitadel-pattern-message: "must be 32 lowercase hex digits"
   key_prefix:
     type: string
     pattern: '^[0-9a-f]{32}$'
+    x-zitadel-pattern-message: "must be 32 lowercase hex digits"
   expires_at:
     type: string
     format: date-time

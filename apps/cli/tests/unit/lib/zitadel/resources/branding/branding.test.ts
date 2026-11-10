@@ -117,6 +117,69 @@ describe("Branding.read", () => {
     });
   });
 
+  it("reports a refused value once, under the contract, at its own field", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        {
+          severity: "error",
+          rule: "contract/branding",
+          file: PATH,
+          message: "typography.font_url must be a valid absolute https URL without credentials",
+        },
+      ],
+    });
+  });
+
+  it("keeps the refusals of other fields beside it", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          layout: "sideways",
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        { message: expect.stringMatching(/^layout /) },
+        { message: "typography.font_url must be a valid absolute https URL without credentials" },
+      ],
+    });
+  });
+
+  it("keeps it beside an unknown key", () => {
+    const reading = Branding.read(
+      aFile(
+        "branding",
+        NAME,
+        aBranding({
+          hero_urll: "https://cdn.example.com/hero.png",
+          typography: { font_family: "Inter", font_url: "http://localhost:3000/f.css" },
+        }),
+      ),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        { message: "typography.font_url must be a valid absolute https URL without credentials" },
+        { message: '(root) Unrecognized key: "hero_urll"' },
+      ],
+    });
+  });
+
   it("points a retired key that names no path at login.liquid", () => {
     const reading = Branding.read(
       aFile("branding", NAME, { layout: "centered", liquid_template_file: true }),
