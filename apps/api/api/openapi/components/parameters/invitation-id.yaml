@@ -1,0 +1,9 @@
+name: id
+in: path
+required: true
+description: |
+  The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
+  (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+schema:
+  $ref: '../schemas/invitation-id.yaml'
+example: inv_01JD3B7K2M9P4R6T8V0X2Z4C6E

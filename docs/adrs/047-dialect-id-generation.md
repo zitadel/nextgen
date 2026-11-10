@@ -77,6 +77,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | user recovery codes row | `urc` |
 | user passkey row | `upk` |
 | authz assignment | `asgn` |
+| invitation | `inv` |
 | event (audit wide-event) | `evt` |
 | event sink | `sink` |
 | job row | `job` |
@@ -84,6 +85,8 @@ the dialect generator is the only mint path, not that create always overwrites.
 > Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): the `sch` row no longer depends on whether a `$id` is declared; a schema's resource `id` is always dialect-minted.
 >
 > Amended by [ADR 065](065-background-jobs.md): registers the `job` prefix for job rows (not an HTTP resource).
+>
+> Amended by [ADR 086](086-invitations.md): registers the `inv` prefix for invitations.
 
 Existing style mix (`brnd` / `flowdef` / `enc_key` / `upw`) stays until a
 dedicated rename PR. Do not add more without the selection rules below.

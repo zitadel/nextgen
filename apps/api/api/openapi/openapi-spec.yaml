@@ -126,6 +126,11 @@ tags:
       Grants give a user or a team the project.viewer, project.editor or
       project.admin role on a project. These operations create, get, query and
       revoke grants. There is no operation to change a grant's role yet.
+  - name: Invitations
+    description: |
+      Invitations are 72-hour links that grant a project role (or, later, a team
+      role) to whoever redeems them. These operations create, list, read and
+      cancel invitations, and look up, accept or decline one by its token.
   - name: Events
     description: |
       Events are the project's audit trail: identity, session, admin and entity
@@ -295,6 +300,16 @@ paths:
     $ref: endpoints/grants/query/methods.yaml
   /grants/{id}:
     $ref: endpoints/grants/by_id/methods.yaml
+  /invitations:
+    $ref: endpoints/invitations/methods.yaml
+  /invitations/lookup:
+    $ref: endpoints/invitations/lookup/methods.yaml
+  /invitations/accept:
+    $ref: endpoints/invitations/accept/methods.yaml
+  /invitations/reject:
+    $ref: endpoints/invitations/reject/methods.yaml
+  /invitations/{id}:
+    $ref: endpoints/invitations/by_id/methods.yaml
   /events:
     $ref: endpoints/events/methods.yaml
   /events/{id}:

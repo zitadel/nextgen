@@ -111,6 +111,7 @@ func TestCheckSessionCSRF(t *testing.T) {
 			context.WithValue(context.Background(), csrfRequestKey{}, csrfRequest{unsafe: true, originErr: errors.New("cross-origin")}),
 			api.QueryUsersOperation, domain.ErrAuthCSRFInvalid()},
 		{"exempt query read needs no token", unsafe(""), api.QueryUsersOperation, nil},
+		{"exempt invitation lookup needs no token", unsafe(""), api.LookupInvitationOperation, nil},
 		{"logout without token is refused", unsafe(""), api.RevokeMySessionOperation, domain.ErrAuthCSRFInvalid()},
 		{"logout with the session's token passes", unsafe(CSRFToken(cookie)), api.RevokeMySessionOperation, nil},
 		{"write without token is refused", unsafe(""), api.CreateTeamOperation, domain.ErrAuthCSRFInvalid()},

@@ -24,6 +24,7 @@
     "teams",
     "users",
     "grants",
+    "invitations",
     "events",
     "event-webhooks",
     "---System---",
