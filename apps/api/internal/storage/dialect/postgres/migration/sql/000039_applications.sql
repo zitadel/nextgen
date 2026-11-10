@@ -58,12 +58,11 @@ CREATE TABLE zitadel_nextgen.application_clients (
         ON DELETE CASCADE
 );
 
--- This table breaks the IdP rule of one constraint a write can trip: a create
--- or revision can trip the application slug, revision created_at or client_id
--- index inside one transaction, and Spanner reports an empty constraint name.
--- The service tells them apart by reading state after the transaction has
--- ended, because an aborted postgres transaction refuses further statements;
--- applicationService.create and revise hold the order.
+-- A create or revision can trip the application slug, revision created_at or
+-- client_id index inside one transaction, and sqlite and Spanner report an
+-- empty constraint name. The service tells them apart by reading state after
+-- the transaction has rolled back; applicationService.create and revise hold
+-- the order.
 CREATE UNIQUE INDEX uq_application_clients_project_client_id
     ON zitadel_nextgen.application_clients (project_id, client_id);
 
