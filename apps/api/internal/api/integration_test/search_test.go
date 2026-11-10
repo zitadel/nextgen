@@ -1,0 +1,338 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package integration_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
+)
+
+// searchResults is the search answer for a request that must succeed.
+func searchResults(t *testing.T, client *helpers.ApiClient, req *api.SearchRequest, params api.SearchParams) *api.SearchResponse {
+	t.Helper()
+	resp, err := client.Search(t.Context(), req, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.SearchResponse{}, resp, helpers.MustMarshal(t, resp))
+	return resp.(*api.SearchResponse)
+}
+
+func searchResultIDs(results []api.SearchResult) []string {
+	ids := make([]string, 0, len(results))
+	for _, result := range results {
+		ids = append(ids, result.ID)
+	}
+	return ids
+}
+
+// seedSearchUser creates a user on schemaURL, or on the builtin human schema
+// when it is empty. That schema designates email as the identifier and no
+// display.
+func seedSearchUser(t *testing.T, projectID, schemaURL string, attributes map[string]any) string {
+	t.Helper()
+	if schemaURL == "" {
+		schemaURL = apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	}
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  projectID,
+		SchemaURL:  schemaURL,
+		Attributes: attributes,
+	})
+	require.NoError(t, err)
+	return user.ID
+}
+
+func TestSearch(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	// Teams and users cascade with their project.
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
+	otherProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), otherProject.ID)
+	})
+
+	createTeam := func(t *testing.T, projectID, name string) string {
+		t.Helper()
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: projectID, Name: name})
+		require.NoError(t, err)
+		return team.ID
+	}
+	annex := createTeam(t, project.ID, "Annex")
+	paymentsAlpha := createTeam(t, project.ID, "Payments Alpha")
+	createTeam(t, project.ID, "payments beta")
+	remote := createTeam(t, project.ID, "100% Remote")
+	// A team of another project must never surface in this project's results.
+	createTeam(t, otherProject.ID, "Rivals Annex")
+
+	// A second schema that also displays its users by name.
+	namedSchemaURL := harness.CreateUserSchema(t, project, `{
+		"title": "SearchNamedUser",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://search.example.com/schemas/named-user.json",
+		"kind": "user-schema",
+		"objectType": "search-named-user",
+		"type": "object",
+		"x-identifier": "email",
+		"x-display": ["givenName", "familyName"],
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project"},
+			"givenName": {"type": "string"},
+			"familyName": {"type": "string"}
+		}
+	}`)
+	ann := seedSearchUser(t, project.ID, namedSchemaURL, map[string]any{
+		"email": "ann@search.example.com", "givenName": "Ann", "familyName": "Lee",
+	})
+	joann := seedSearchUser(t, project.ID, "", map[string]any{"email": "joann@search.example.com"})
+	bob := seedSearchUser(t, project.ID, "", map[string]any{"email": "bob@search.example.com"})
+	seedSearchUser(t, project.ID, "", map[string]any{"email": "bobby@search.example.com"})
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	both := []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam}
+	search := func(t *testing.T, req *api.SearchRequest) *api.SearchResponse {
+		t.Helper()
+		return searchResults(t, client, req, api.SearchParams{})
+	}
+
+	t.Run("finds users and teams in one request, best match first", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "ann", Types: both})
+
+		// The user whose given name is the text, then the team it starts.
+		// joann@… only contains it: users match from the start of a value.
+		require.Equal(t, []string{ann, annex}, searchResultIDs(got.Results))
+		assert.Empty(t, got.IncompleteTypes)
+
+		assert.Equal(t, api.SearchResult{
+			Type:      api.SearchResultTypeUser,
+			ID:        ann,
+			ProjectID: api.ProjectID(project.ID),
+			Title:     "Ann Lee",
+			Subtitle:  api.NewOptString("ann@search.example.com"),
+		}, got.Results[0])
+		assert.Equal(t, api.SearchResult{
+			Type:      api.SearchResultTypeTeam,
+			ID:        annex,
+			ProjectID: api.ProjectID(project.ID),
+			Title:     "Annex",
+		}, got.Results[1])
+	})
+
+	t.Run("a user without a display is titled by their identifier alone", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "joa", Types: both})
+		assert.Equal(t, []api.SearchResult{{
+			Type:      api.SearchResultTypeUser,
+			ID:        joann,
+			ProjectID: api.ProjectID(project.ID),
+			Title:     "joann@search.example.com",
+		}}, got.Results)
+	})
+
+	t.Run("a part of the display name finds its user", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "LEE", Types: both})
+		assert.Equal(t, []string{ann}, searchResultIDs(got.Results))
+	})
+
+	t.Run("searches only the requested types", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "ann", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
+		assert.Equal(t, []string{annex}, searchResultIDs(got.Results))
+	})
+
+	t.Run("a whole identifier finds its user alone, whatever its case", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "ANN@search.example.com", Types: both})
+		assert.Equal(t, []string{ann}, searchResultIDs(got.Results))
+	})
+
+	t.Run("an id finds its resource", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: ann, Types: both})
+		assert.Equal(t, []string{ann}, searchResultIDs(got.Results))
+
+		got = search(t, &api.SearchRequest{Query: paymentsAlpha, Types: both})
+		assert.Equal(t, []string{paymentsAlpha}, searchResultIDs(got.Results))
+	})
+
+	t.Run("text too short for users leaves them incomplete", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "an", Types: both})
+		assert.Equal(t, []string{annex}, searchResultIDs(got.Results))
+		assert.Equal(t, []api.SearchResultType{api.SearchResultTypeUser}, got.IncompleteTypes)
+	})
+
+	t.Run("each type contributes at most the limit", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{
+			Query:        "pay",
+			Types:        both,
+			LimitPerType: api.NewOptInt(1),
+		})
+		assert.Equal(t, []string{paymentsAlpha}, searchResultIDs(got.Results))
+		assert.Equal(t, []api.SearchResultType{api.SearchResultTypeTeam}, got.IncompleteTypes)
+
+		// Users come from the search index best match first: bob@… before bobby@….
+		got = search(t, &api.SearchRequest{
+			Query:        "bob",
+			Types:        both,
+			LimitPerType: api.NewOptInt(1),
+		})
+		assert.Equal(t, []string{bob}, searchResultIDs(got.Results))
+		assert.Equal(t, []api.SearchResultType{api.SearchResultTypeUser}, got.IncompleteTypes)
+	})
+
+	t.Run("a wildcard character is text", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "%", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
+		assert.Equal(t, []string{remote}, searchResultIDs(got.Results))
+
+		got = search(t, &api.SearchRequest{Query: "%@%", Types: []api.SearchResultType{api.SearchResultTypeUser}})
+		assert.Empty(t, got.Results)
+	})
+
+	t.Run("text of spaces alone finds nothing", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "   ", Types: both})
+		assert.Empty(t, got.Results)
+		assert.Empty(t, got.IncompleteTypes)
+	})
+
+	t.Run("another project's resources stay out", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "Rivals", Types: both})
+		assert.Empty(t, got.Results)
+	})
+
+	t.Run("a project the credential cannot reach is not found", func(t *testing.T) {
+		t.Parallel()
+		resp, err := client.Search(t.Context(), &api.SearchRequest{Query: "ann", Types: both},
+			api.SearchParams{ProjectID: api.NewOptProjectID(api.ProjectID(otherProject.ID))})
+		require.NoError(t, err)
+		require.IsType(t, &api.SearchNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assertAuthzError(t, resp, domain.ErrProjectNotFound().Code)
+	})
+}
+
+// A Console session searches with its cookie alone: search is a read, so it
+// needs no CSRF token, and the person's grants decide what it finds.
+func TestSearchSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "Session Search"})
+	require.NoError(t, err)
+	subject := seedSearchUser(t, project.ID, "", map[string]any{"email": "search-subject@session.example.com"})
+
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	sessionClient := func(t *testing.T, userID string) *helpers.ApiClient {
+		t.Helper()
+		token, err := harness.CreateActiveSession(t, project.ID, userID).Token(tokenCrypter)
+		require.NoError(t, err)
+		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		client.SetSessionToken(token)
+		client.SetOmitCSRF(true)
+		return client
+	}
+	req := &api.SearchRequest{
+		Query: "search",
+		Types: []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam},
+	}
+
+	t.Run("a project viewer finds users and teams", func(t *testing.T) {
+		t.Parallel()
+		viewer := harness.CreateUserWithTeam(t, project.ID)
+		harness.SeedProjectViewer(t, project.ID, viewer)
+
+		got := searchResults(t, sessionClient(t, viewer), req, api.SearchParams{})
+		assert.ElementsMatch(t, []string{subject, team.ID}, searchResultIDs(got.Results))
+	})
+
+	t.Run("a person without a grant finds nothing", func(t *testing.T) {
+		t.Parallel()
+		stranger := harness.CreateUserWithTeam(t, project.ID)
+
+		got := searchResults(t, sessionClient(t, stranger), req, api.SearchParams{})
+		assert.Empty(t, got.Results)
+	})
+}
+
+// A grant scoped to one team narrows each type as it narrows that type's own
+// list (TestListAuthzTeamScopedOnlyPartialView): that team is found, the
+// other is not, and no user is.
+//
+// Serial for the reason that test gives: the list predicate is slow on the
+// Spanner emulator beside everything a parallel run has accumulated.
+func TestSearchTeamScopedPartialView(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
+	inScope, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "Partial In"})
+	require.NoError(t, err)
+	outOfScope, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "Partial Out"})
+	require.NoError(t, err)
+	seedSearchUser(t, project.ID, "", map[string]any{"email": "partial@search.example.com"})
+
+	// Replace the project secret's project-wide role with a viewer grant on
+	// one team.
+	stmts := harness.EnsureServiceDB(t).Statements()
+	assignments, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, assignments, "CreateProject seeds sk_proj → project.admin")
+	for _, assignment := range assignments {
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), project.ID, assignment.ID))
+	}
+	scoped := &domain.AuthzAssignment{
+		ProjectID:     project.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		PrincipalID:   project.ID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	scoped.ApplyScope(domain.NewTeamAssignmentScope(inScope.ID))
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), scoped))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	got := searchResults(t, client, &api.SearchRequest{
+		Query: "partial",
+		Types: []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam},
+	}, api.SearchParams{})
+	assert.Equal(t, []string{inScope.ID}, searchResultIDs(got.Results))
+
+	// An id outside the grant is not found either.
+	got = searchResults(t, client, &api.SearchRequest{
+		Query: outOfScope.ID,
+		Types: []api.SearchResultType{api.SearchResultTypeTeam},
+	}, api.SearchParams{})
+	assert.Empty(t, got.Results)
+}

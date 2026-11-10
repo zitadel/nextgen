@@ -1,0 +1,31 @@
+type: object
+description: |
+  One match: a reference to a resource, not the resource. Every type has this
+  shape.
+required:
+  - type
+  - id
+  - project_id
+  - title
+properties:
+  type:
+    $ref: search-result-type.yaml
+  id:
+    type: string
+    description: The resource's `id`, as its type's own operations take it.
+    example: user_01KWH3B72K7M7F0N9WD3P2E4YM
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+    description: The project the resource belongs to.
+  title:
+    type: string
+    description: |
+      What to call the resource. For a user, their `display`, else their
+      `identifier`, else their `id`. For a team, its name.
+    example: Ann Lee
+  subtitle:
+    type: string
+    description: |
+      A second line that tells two titles apart. For a user shown by their
+      `display`, their `identifier`. Absent when there is nothing to add.
+    example: ann@example.com

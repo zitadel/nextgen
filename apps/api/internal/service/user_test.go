@@ -1194,3 +1194,88 @@ func TestDeleteUserAction_RevokesTheUsersGrants(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+// A search reads every property a schema designates as identifier or display
+// part, and answers with each user once, the best match first.
+func TestUserService_SearchUsers(t *testing.T) {
+	t.Parallel()
+
+	newService := func(t *testing.T) (service.UserService, *servicemocks.MockAllStatements) {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{
+				{URL: "https://example.test/named", Schema: []byte(`{"x-identifier":"email","x-display":["givenName","familyName"]}`)},
+				{URL: "https://example.test/plain", Schema: []byte(`{"x-identifier":"username"}`)},
+				{URL: "https://example.test/undesignated", Schema: []byte(`{}`)},
+			}}, nil).AnyTimes()
+		svcPool := service.NewPool(pool)
+		return service.NewUserService(svcPool, nil, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
+	}
+	row := func(id, text string) *domain.User {
+		return &domain.User{ProjectID: "proj_1", ID: id, MatchedText: text}
+	}
+
+	t.Run("searches every designated property and keeps each user's best match", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newService(t)
+
+		var (
+			got     *database.ListOptions[domain.UserField]
+			gotOpts service.UserQueryOptions
+		)
+		stmts.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], queryOpts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				got, gotOpts = opts, queryOpts
+				return &database.ListResult[*domain.User]{Items: []*domain.User{
+					row("user_ann", "ann"),
+					row("user_ann", "ann@example.com"),
+					row("user_anna", "anna"),
+					row("user_annika", "annika@example.com"),
+				}}, nil
+			})
+
+		out, err := svc.SearchUsers(t.Context(), service.SearchUsersInput{ProjectID: "proj_1", Query: "ANN", Limit: 2})
+		require.NoError(t, err)
+
+		assert.Equal(t, &service.UserSearch{
+			ProjectID: "proj_1",
+			Prefix:    "ann",
+			Arms:      []service.UserSearchArm{{Key: "email"}, {Key: "familyName"}, {Key: "givenName"}, {Key: "username"}},
+		}, gotOpts.Search)
+		assert.Equal(t, v2user.SearchOrder(), got.Pagination.OrderBy)
+		// One schema designates three properties, so a user fills at most
+		// three rows: nine rows hold the two users asked for and one more.
+		assert.EqualValues(t, 9, got.Pagination.Limit)
+
+		require.Len(t, out.Items, 2)
+		assert.Equal(t, "user_ann", out.Items[0].ID)
+		assert.Equal(t, "ann", out.Items[0].MatchedText, "the first row of a user is their best match")
+		assert.Equal(t, "user_anna", out.Items[1].ID)
+		assert.True(t, out.More, "a third user matches")
+	})
+
+	t.Run("reports no more when every match fits", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newService(t)
+		stmts.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.User]{Items: []*domain.User{row("user_ann", "ann"), row("user_ann", "ann@example.com")}}, nil)
+
+		out, err := svc.SearchUsers(t.Context(), service.SearchUsersInput{ProjectID: "proj_1", Query: "ann", Limit: 2})
+		require.NoError(t, err)
+		require.Len(t, out.Items, 1)
+		assert.False(t, out.More)
+	})
+
+	t.Run("text that folds to nothing finds nobody without a read", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newService(t)
+		out, err := svc.SearchUsers(t.Context(), service.SearchUsersInput{ProjectID: "proj_1", Query: "", Limit: 2})
+		require.NoError(t, err)
+		assert.Empty(t, out.Items)
+		assert.False(t, out.More)
+	})
+}

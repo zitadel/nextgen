@@ -50,6 +50,10 @@
       "description": "Users are the identities of a project, such as people or service accounts.\nThese operations create, read, update, delete and query users, read the\nsigned-in user, and manage a user's password, passkeys, identity links\nand team memberships.\n"
     },
     {
+      "name": "Search",
+      "description": "Search finds the resources of a project that match a text, across\nresource types in one request. It answers with references; the\nresources themselves are read through their own operations.\n"
+    },
+    {
       "name": "Schemas",
       "description": "Schemas define the typed shape of user data and of other configurable\nresources. These operations create, list and read schemas.\n"
     },
@@ -5597,6 +5601,97 @@
           },
           "default": {
             "$ref": "#/components/responses/updateTeam-error-response"
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "operationId": "search",
+        "summary": "Search a project",
+        "description": "Finds the users and teams of a project that match a text.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, `GetUserByID` (`GET /users/{user_id}`) or\n`getTeam` (`GET /teams/{team_id}`).\n\nA user matches when the value they carry as `identifier`, or a part of\ntheir `display` name, starts with the text, from three characters on. A\nteam matches when its name contains it. Matching ignores case. A `query`\nthat is the `id` of a user or a team finds that one. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's query operation, `queryUsers`\n(`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use a query operation.\n",
+        "tags": [
+          "Search"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id-query"
+          }
+        ],
+        "requestBody": {
+          "description": "The text to find and the types to look for.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/search-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The best matches of each requested type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/search-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, for example no `types`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/search-error-response"
           }
         }
       }
@@ -18562,6 +18657,110 @@
           }
         }
       },
+      "search-result-type": {
+        "type": "string",
+        "description": "A type of result `search` (`POST /search`) finds:\n- `user`: a user, matched on the start of the value they carry as\n  `identifier` or of a part of their `display` name\n- `team`: a team, matched on its name\n",
+        "enum": [
+          "user",
+          "team"
+        ]
+      },
+      "search-request": {
+        "type": "object",
+        "description": "Request to search a project.",
+        "required": [
+          "query",
+          "types"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The text to find. Spaces around it are ignored, and a text of spaces\nalone finds nothing.\n",
+            "example": "ann@example.com"
+          },
+          "types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "The types to search. Only these appear in `results`, so a client never\nreceives a type it did not ask for.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result-type"
+            },
+            "example": [
+              "user",
+              "team"
+            ]
+          },
+          "limit_per_type": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5,
+            "description": "The most results each type contributes."
+          }
+        }
+      },
+      "search-result": {
+        "type": "object",
+        "description": "One match: a reference to a resource, not the resource. Every type has this\nshape.\n",
+        "required": [
+          "type",
+          "id",
+          "project_id",
+          "title"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/search-result-type"
+          },
+          "id": {
+            "type": "string",
+            "description": "The resource's `id`, as its type's own operations take it.",
+            "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id",
+            "description": "The project the resource belongs to."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to call the resource. For a user, their `display`, else their\n`identifier`, else their `id`. For a team, its name.\n",
+            "example": "Ann Lee"
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "A second line that tells two titles apart. For a user shown by their\n`display`, their `identifier`. Absent when there is nothing to add.\n",
+            "example": "ann@example.com"
+          }
+        }
+      },
+      "search-response": {
+        "type": "object",
+        "description": "The best matches of each requested type.",
+        "required": [
+          "results",
+          "incomplete_types"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "description": "The matches, best first. Types can be mixed in the order: group by\n`type` to show them by type.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result"
+            }
+          },
+          "incomplete_types": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, or the text was too short to search that\ntype. Empty when every requested type is complete.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result-type"
+            }
+          }
+        }
+      },
       "brnd-not_found": {
         "description": "Branding: not found\n\nError code: brnd.not_found\n",
         "allOf": [
@@ -31319,6 +31518,115 @@
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "search-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/team-team_not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/team-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/team-project_not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/user-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/user-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "team.team_not_found": "#/components/schemas/team-team_not_found",
+                  "team.permission_denied": "#/components/schemas/team-permission_denied",
+                  "team.project_not_found": "#/components/schemas/team-project_not_found",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "user.not_found": "#/components/schemas/user-not_found",
+                  "user.permission_denied": "#/components/schemas/user-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.permission_denied": {
+                "$ref": "#/components/examples/proj-permission_denied"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "team.team_not_found": {
+                "$ref": "#/components/examples/team-team_not_found"
+              },
+              "team.permission_denied": {
+                "$ref": "#/components/examples/team-permission_denied"
+              },
+              "team.project_not_found": {
+                "$ref": "#/components/examples/team-project_not_found"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "user.not_found": {
+                "$ref": "#/components/examples/user-not_found"
+              },
+              "user.permission_denied": {
+                "$ref": "#/components/examples/user-permission_denied"
               }
             }
           }

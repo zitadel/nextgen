@@ -1564,6 +1564,34 @@ type Handler interface {
 	//
 	// POST /deployments/{deployment_id}/rollback
 	RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
+	// Search implements search operation.
+	//
+	// Finds the users and teams of a project that match a text.
+	// `query` is what the person typed and `types` names the kinds of result to
+	// look for; only those are searched. Each result is a reference: its `type`,
+	// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
+	// with the type's own operation, `GetUserByID` (`GET /users/{user_id}`) or
+	// `getTeam` (`GET /teams/{team_id}`).
+	// A user matches when the value they carry as `identifier`, or a part of
+	// their `display` name, starts with the text, from three characters on. A
+	// team matches when its name contains it. Matching ignores case. A `query`
+	// that is the `id` of a user or a team finds that one. `project_id` names the
+	// project to search; without it, the credential's own project is searched. A
+	// caller with access to part of the project finds only what that access
+	// covers.
+	// Authenticate with the project secret (`oauth2`) or a console session cookie
+	// (`sessionCookie`). A preview secret is refused, as on every management
+	// operation.
+	// Results come best match first, at most `limit_per_type` of each type, and
+	// types can be mixed in the order. `incomplete_types` lists the types that
+	// have more to show: page those with the type's query operation, `queryUsers`
+	// (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+	// How text is matched and ranked can change, and later versions can match
+	// more of a resource. Treat the results as suggestions; to filter by an exact
+	// rule, use a query operation.
+	//
+	// POST /search
+	Search(ctx context.Context, req *SearchRequest, params SearchParams) (SearchRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Sets a user's password, hashed with the project's current password hashing
