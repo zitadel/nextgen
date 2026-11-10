@@ -74,6 +74,7 @@
         "client_id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.~@-]+$",
+          "x-zitadel-pattern-message": "must be letters, digits, or _ . ~ @ -",
           "minLength": 1,
           "maxLength": 255,
           "description": "The `client_id` the client presents. Leave it out and the server\ngenerates one the first time the client is written and fills it into\nthe stored document. Set it to keep an id the client already has: one\na Zitadel v4 issued (`<id>@<project>`), or one the CLI generated before\nany deploy. Once set, the id never changes: a later revision may leave it\nout, but may not provide a different one. No two clients in the project\nshare an id, and an id is never reused once a client has held it. A\nnew client may not supply an id that starts with `client_` or `dcr_`:\nthose prefixes mark ids the server generates. A server-generated id\nsent back unchanged in a revision is accepted.\n",

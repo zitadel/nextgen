@@ -30,6 +30,7 @@ properties:
   client_id:
     type: string
     pattern: ^[A-Za-z0-9_.~@-]+$
+    x-zitadel-pattern-message: "must be letters, digits, or _ . ~ @ -"
     minLength: 1
     maxLength: 255
     description: |
