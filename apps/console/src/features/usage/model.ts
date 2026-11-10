@@ -3,7 +3,7 @@ import type { GetUsage200 } from "@zitadel/api/generated/model";
 import type { UsagePrices } from "@/addon/contract";
 
 /**
- * What the server's meters are called on screen (ADR 087). A meter the
+ * What the server's meters are called on screen (ADR 088). A meter the
  * console does not know yet shows under its own name.
  */
 const METER_LABELS: Readonly<Record<string, string>> = {

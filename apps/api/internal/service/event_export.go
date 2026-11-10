@@ -15,7 +15,7 @@ const listProjectIDsPageSize = 500
 type EventExportAdapter struct {
 	Pool *DB
 	// CountsUsage is set where the usage projector runs (usage.enabled): the
-	// purge then keeps every event it has not counted (ADR 087 §6).
+	// purge then keeps every event it has not counted (ADR 088 §6).
 	CountsUsage bool
 }
 

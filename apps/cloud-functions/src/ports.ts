@@ -51,7 +51,7 @@ export interface Directory {
   usage(hour: UsageWindow): Promise<UsageRecord[]>;
   /**
    * One team's counts per project and UTC day within `days`, read as the
-   * person (`GET /usage`, root ADR 087): the projects they can act on that
+   * person (`GET /usage`, root ADR 088): the projects they can act on that
    * the team has claimed. Quantities only, which the cloud prices.
    */
   usageByDay(cookie: string, team: Team, days: UsageWindow): Promise<TeamDays>;

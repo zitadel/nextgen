@@ -513,6 +513,12 @@ type UserQueryOptions struct {
 	UniqueTeamID *string
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
+	// Search, when set, turns the read into a prefix search over the search
+	// index (see [UserSearch]). The read then returns users in
+	// [github.com/zitadel/nextgen/internal/storage/user.SearchOrder] and pages
+	// in it, whatever order the list options name, and each user carries the
+	// text it matched on. Not combinable with UniqueAttributesOnly.
+	Search *UserSearch
 	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
 	// by a batched second query keyed on the page's ids, never by joining it
 	// into the user query: a join multiplies rows, which would make LIMIT
@@ -526,6 +532,30 @@ type UserQueryOptions struct {
 	// keyed on the distinct owner ids the page returned; self-owned users
 	// contribute no id and stay nil.
 	IncludeLifecycleOwnerTeam bool
+}
+
+// UserSearch finds users by the start of an attribute's search text
+// ([domain.SearchText]), which only the attributes a user's schema designates
+// as identifier or display part carry. Every arm is one range of the search
+// index, read in index order, so the cost of a page does not grow with the
+// number of users that match.
+type UserSearch struct {
+	ProjectID string
+	// Prefix is the term as [domain.SearchText] returns it. Never empty.
+	Prefix string
+	// Arms are the attribute keys searched, each read on its own and merged.
+	// A search with no arm finds nobody. A user matching in two arms is
+	// returned once per arm, so a caller that pages gives the arms disjoint
+	// users.
+	Arms []UserSearchArm
+}
+
+// UserSearchArm is one attribute key of a [UserSearch].
+type UserSearchArm struct {
+	Key domain.AttributeKey
+	// Users narrows the arm to the users a match on Key counts for; nil
+	// counts it for everyone.
+	Users database.Filter[domain.UserField]
 }
 
 // DefaultUserTeamsLimit caps an embedded membership list. Embedded collections are not
@@ -932,7 +962,7 @@ type EventStatements interface {
 }
 
 // UsageStatements keep the usage rollups the projector counts from events
-// (ADR 087).
+// (ADR 088).
 type UsageStatements interface {
 	Statements
 	// ReadUsageEvents lists the project's settled events of the given types

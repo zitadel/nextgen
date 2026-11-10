@@ -103,6 +103,11 @@ type User struct {
 	// Attributes are populated by user read statements.
 	Attributes Attributes
 
+	// MatchedText is the search text this user was found by, set only on a
+	// search read ([UserFieldSearchText]). It is the read's sort key, so the
+	// page token is built from it; it is never part of a response.
+	MatchedText string
+
 	// Ref is the derived identity of ADR 058 §3a, resolved live from the
 	// schema's x-identifier/x-display designations. Populated by service
 	// reads that resolve it; nil on plain statement-level reads.
@@ -336,6 +341,7 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
+	attrs.MarkSearchable(SearchableAttributeKeys(mschema))
 	if len(attrs) == 0 {
 		return nil, ErrUserInvalid().WithMessage(emptyMessage)
 	}
@@ -369,4 +375,10 @@ const (
 	UserFieldCreatedAt
 	UserFieldUpdatedAt
 	UserFieldSchemaObjectType
+	// UserFieldSearchText and UserFieldSearchUserID order a search read: the
+	// search text a user matched on, then the user's id as the attribute row
+	// holds it. They name columns of the search index, not of the user row, so
+	// they are valid only on a read that searches.
+	UserFieldSearchText
+	UserFieldSearchUserID
 )

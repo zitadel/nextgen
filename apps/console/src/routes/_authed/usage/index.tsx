@@ -42,7 +42,7 @@ import {
 import { formatDateTime } from "@/lib/date";
 
 /**
- * The selected project's usage this UTC month (ADR 087): what each meter
+ * The selected project's usage this UTC month (ADR 088): what each meter
  * counted per day, drawn as stacked bars with shadcn's chart, and each
  * meter's month so far. Every build shows the counts; a build whose add-on
  * prices usage (the hosted cloud's) adds what they cost, and a deployment

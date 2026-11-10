@@ -5,7 +5,7 @@ get:
     Returns a project's usage per meter, by UTC day or hour, over a range of
     up to 31 days. The range starts at `from` and ends before `to`. These are
     counts only, which the hosted cloud prices and a self-hosted deployment
-    reads as they are (ADR 087). A `users` meter such as
+    reads as they are (ADR 088). A `users` meter such as
     `monthly_active_users` counts each user once a month, in the hour of their
     first activity, so a month's buckets add up to its count.
 

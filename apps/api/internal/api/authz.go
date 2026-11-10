@@ -197,7 +197,7 @@ var eventsAccess = resourceAccess{
 	denied:    domain.ErrEventPermissionDenied,
 }
 
-// usageAccess gates a project's usage read (ADR 087), project-scoped like
+// usageAccess gates a project's usage read (ADR 088), project-scoped like
 // the events it is counted from, until #420 mints a fine-grained relation.
 var usageAccess = resourceAccess{
 	readMiss:  domain.ErrUsageNotFound,

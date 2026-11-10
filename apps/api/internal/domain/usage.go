@@ -27,7 +27,7 @@ func ErrUsageDisabled() Error {
 	return newError(PrefixUsage.ErrorCodePrefix("disabled"), "usage: this deployment does not count usage", nil, nil)
 }
 
-// UsageMeter is a count the server keeps per project and UTC hour (ADR 087
+// UsageMeter is a count the server keeps per project and UTC hour (ADR 088
 // §1). Every meter so far counts users: a user counts once a month, in the
 // hour of their first event of the meter's types that month, so a month's
 // hours add up to its count.

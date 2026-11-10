@@ -44,7 +44,7 @@ interface MyProjects {
   next_page_token?: string | null;
 }
 
-/** `GET /usage`, as far as the functions read it (root ADR 087). */
+/** `GET /usage`, as far as the functions read it (root ADR 088). */
 interface ProjectUsage {
   data: { meter: string; start: string; value: number }[];
   team_id: string | null;

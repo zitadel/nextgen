@@ -18,7 +18,7 @@ const (
 // maxUsageRange bounds one read: a month of days, or of hours, per meter.
 const maxUsageRange = 31 * 24 * time.Hour
 
-// GetUsageRequest is the input for reading a project's usage (ADR 087).
+// GetUsageRequest is the input for reading a project's usage (ADR 088).
 type GetUsageRequest struct {
 	ProjectID   string
 	From, To    time.Time
@@ -44,7 +44,7 @@ type GetUsageResponse struct {
 	TeamID *string
 }
 
-// UsageService reads the usage rollups the projector keeps (ADR 087).
+// UsageService reads the usage rollups the projector keeps (ADR 088).
 type UsageService struct {
 	v2Pool *DB
 	// counts is usage.enabled: without the projector the rollups say nothing.

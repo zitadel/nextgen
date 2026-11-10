@@ -55,13 +55,14 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
   // A report of counts the server keeps, not a resource to create or edit;
-  // no command reads it yet (ADR 087).
+  // no command reads it yet (ADR 088).
   usage: "a project's usage report, read by the console; no `zitadel usage` command yet",
   // Registered applications are written through the API by other systems,
   // not from `.zitadel/`; the CLI has no command for them yet (#2788).
   applications: "registered applications are written through the API, not the CLI (#2788)",
   // OpenAPI contract lands first (#2849); CLI commands follow in #2858.
   invitations: "not yet exposed — `zitadel invitation` lands with #2858",
+  search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
 };
 
 /**

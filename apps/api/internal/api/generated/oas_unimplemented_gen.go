@@ -1156,7 +1156,7 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 // Returns a project's usage per meter, by UTC day or hour, over a range of
 // up to 31 days. The range starts at `from` and ends before `to`. These are
 // counts only, which the hosted cloud prices and a self-hosted deployment
-// reads as they are (ADR 087). A `users` meter such as
+// reads as they are (ADR 088). A `users` meter such as
 // `monthly_active_users` counts each user once a month, in the hour of their
 // first activity, so a month's buckets add up to its count.
 // A bucket that counted nothing is left out. One that starts at or after
@@ -1889,6 +1889,45 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 //
 // POST /deployments/{deployment_id}/rollback
 func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (r RollbackDeploymentRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// Search implements search operation.
+//
+// Finds the resources of a project that match a text, across resource types.
+// `query` is what the person typed and `types` names the kinds of result to
+// look for; only those are searched. Each result is a reference: its `type`,
+// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
+// with the type's own operation, for example `GetUserByID`
+// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
+// What a type matches on:
+// - `user`: the start of the value they carry as `identifier` or of a part
+// of their `display` name, from three characters on
+// - `team`: its name
+// - `schema`: the `title` and the `objectType` of a user schema
+// - `flow_definition`: its name
+// - `idp`: the `slug` and the `display_name` of an identity provider
+// connection
+// A user matches from the start of the value; every other type matches the
+// text anywhere in it. Matching ignores case. A `query` that is the `id` of
+// a resource of a requested type finds that one. A schema and a flow
+// definition are found at their newest revision. `project_id` names the
+// project to search; without it, the credential's own project is searched. A
+// caller with access to part of the project finds only what that access
+// covers.
+// Authenticate with the project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). A preview secret is refused, as on every management
+// operation.
+// Results come best match first, at most `limit_per_type` of each type, and
+// types can be mixed in the order. `incomplete_types` lists the types that
+// have more to show: page those with the type's own list, such as
+// `queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+// How text is matched and ranked can change, and later versions can match
+// more of a resource. Treat the results as suggestions; to filter by an exact
+// rule, use the type's own list.
+//
+// POST /search
+func (UnimplementedHandler) Search(ctx context.Context, req *SearchRequest, params SearchParams) (r SearchRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

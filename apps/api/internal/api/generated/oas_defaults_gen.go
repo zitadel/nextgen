@@ -151,6 +151,14 @@ func (s *ReleaseMetadata) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *SearchRequest) setDefaults() {
+	{
+		val := int(5)
+		s.LimitPerType.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *StepAction) setDefaults() {
 	{
 		val := bool(false)
