@@ -3,7 +3,7 @@
 // when one of them changes what ships, change its row here.
 
 // The day the rows last changed, shown on the page: change it with them.
-export const UPDATED = "2026-11-05";
+export const UPDATED = "2026-11-10";
 
 // The guide above the tables: when to start with the next version, when
 // with v4. Keep it in step with the rows.
