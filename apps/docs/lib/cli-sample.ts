@@ -160,9 +160,10 @@ function variableRunsAs(verb: string | undefined, kind: string | undefined): boo
 }
 
 /**
- * The `variable` command for a request it does exactly, else `undefined`, and
- * the sample is the `zitadel api` call. A `set` prompts for the value, or reads
- * it from stdin, so a credential stays out of the shell's history.
+ * The `variable` command for a request it does exactly; `undefined` for any
+ * other, which the caller shows as the `zitadel api` call. A `set` prompts for
+ * the value, or reads it from stdin, so a credential stays out of the shell's
+ * history.
  */
 function variableCommand(
   verb: string | undefined,
