@@ -1,30 +1,14 @@
 title: InvitationCreatedPayload
-type: object
 description: |
   Payload for `invitation.created`. The invitation ID is the event's
-  `entity_id`. `type` names the kind of invitation, and the object of the
-  same name says what its link grants. The metadata entered at creation and
-  the link's token never appear.
-required:
-  - type
-  - journey_id
-  - expires_at
-properties:
-  type:
-    type: string
-    enum:
-      - project_member
-      - team_member
-  project_member:
-    $ref: ../../invitations/invitation-project-member-payload.yaml
-  team_member:
-    $ref: ../../invitations/invitation-team-member-payload.yaml
-  journey_id:
-    type: string
-    description: Shared by an invitation and every invitation that replaces it.
-  replaces_invitation_id:
-    type: string
-    description: The invitation this one replaces, when it was created as a replacement.
-  expires_at:
-    type: string
-    format: date-time
+  `entity_id`. Discriminate on `type`; the object named after it says what
+  the invitation's link grants. The metadata entered at creation and the
+  link's token never appear.
+oneOf:
+  - $ref: invitation-created-project-member-payload.yaml
+  - $ref: invitation-created-team-member-payload.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: invitation-created-project-member-payload.yaml
+    team_member: invitation-created-team-member-payload.yaml

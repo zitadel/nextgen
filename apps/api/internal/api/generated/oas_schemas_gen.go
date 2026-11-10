@@ -46753,90 +46753,146 @@ func (s *InvitationAcceptedEventDelegationType) UnmarshalText(data []byte) error
 }
 
 // Payload for `invitation.accepted`. The invitation ID is the event's
-// `entity_id`, and `user_id` is the user who redeemed the link. The role or
-// membership the acceptance granted is recorded by its own event, such as
+// `entity_id`, and `user_id` is the user who redeemed the link. Discriminate
+// on `type`; the object named after it says what the invitation granted. The
+// role or membership itself is recorded by its own event, such as
 // `authz.granted`, which shares this event's `request_id`.
 // Ref: #
+// InvitationAcceptedPayload represents sum type.
 type InvitationAcceptedPayload struct {
-	Type          InvitationAcceptedPayloadType     `json:"type"`
-	ProjectMember OptInvitationProjectMemberPayload `json:"project_member"`
-	TeamMember    OptInvitationTeamMemberPayload    `json:"team_member"`
+	Type                                   InvitationAcceptedPayloadType // switch on this field
+	InvitationAcceptedProjectMemberPayload InvitationAcceptedProjectMemberPayload
+	InvitationAcceptedTeamMemberPayload    InvitationAcceptedTeamMemberPayload
+}
+
+// InvitationAcceptedPayloadType is oneOf type of InvitationAcceptedPayload.
+type InvitationAcceptedPayloadType string
+
+// Possible values for InvitationAcceptedPayloadType.
+const (
+	InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload InvitationAcceptedPayloadType = "project_member"
+	InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload    InvitationAcceptedPayloadType = "team_member"
+)
+
+// IsInvitationAcceptedProjectMemberPayload reports whether InvitationAcceptedPayload is InvitationAcceptedProjectMemberPayload.
+func (s InvitationAcceptedPayload) IsInvitationAcceptedProjectMemberPayload() bool {
+	return s.Type == InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload
+}
+
+// IsInvitationAcceptedTeamMemberPayload reports whether InvitationAcceptedPayload is InvitationAcceptedTeamMemberPayload.
+func (s InvitationAcceptedPayload) IsInvitationAcceptedTeamMemberPayload() bool {
+	return s.Type == InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload
+}
+
+// SetInvitationAcceptedProjectMemberPayload sets InvitationAcceptedPayload to InvitationAcceptedProjectMemberPayload.
+func (s *InvitationAcceptedPayload) SetInvitationAcceptedProjectMemberPayload(v InvitationAcceptedProjectMemberPayload) {
+	s.Type = InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload
+	s.InvitationAcceptedProjectMemberPayload = v
+}
+
+// GetInvitationAcceptedProjectMemberPayload returns InvitationAcceptedProjectMemberPayload and true boolean if InvitationAcceptedPayload is InvitationAcceptedProjectMemberPayload.
+func (s InvitationAcceptedPayload) GetInvitationAcceptedProjectMemberPayload() (v InvitationAcceptedProjectMemberPayload, ok bool) {
+	if !s.IsInvitationAcceptedProjectMemberPayload() {
+		return v, false
+	}
+	return s.InvitationAcceptedProjectMemberPayload, true
+}
+
+// NewInvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload returns new InvitationAcceptedPayload from InvitationAcceptedProjectMemberPayload.
+func NewInvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload(v InvitationAcceptedProjectMemberPayload) InvitationAcceptedPayload {
+	var s InvitationAcceptedPayload
+	s.SetInvitationAcceptedProjectMemberPayload(v)
+	return s
+}
+
+// SetInvitationAcceptedTeamMemberPayload sets InvitationAcceptedPayload to InvitationAcceptedTeamMemberPayload.
+func (s *InvitationAcceptedPayload) SetInvitationAcceptedTeamMemberPayload(v InvitationAcceptedTeamMemberPayload) {
+	s.Type = InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload
+	s.InvitationAcceptedTeamMemberPayload = v
+}
+
+// GetInvitationAcceptedTeamMemberPayload returns InvitationAcceptedTeamMemberPayload and true boolean if InvitationAcceptedPayload is InvitationAcceptedTeamMemberPayload.
+func (s InvitationAcceptedPayload) GetInvitationAcceptedTeamMemberPayload() (v InvitationAcceptedTeamMemberPayload, ok bool) {
+	if !s.IsInvitationAcceptedTeamMemberPayload() {
+		return v, false
+	}
+	return s.InvitationAcceptedTeamMemberPayload, true
+}
+
+// NewInvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload returns new InvitationAcceptedPayload from InvitationAcceptedTeamMemberPayload.
+func NewInvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload(v InvitationAcceptedTeamMemberPayload) InvitationAcceptedPayload {
+	var s InvitationAcceptedPayload
+	s.SetInvitationAcceptedTeamMemberPayload(v)
+	return s
+}
+
+// Merged schema.
+// Ref: #
+type InvitationAcceptedProjectMemberPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
-	JourneyID string `json:"journey_id"`
-	UserID    string `json:"user_id"`
-}
-
-// GetType returns the value of Type.
-func (s *InvitationAcceptedPayload) GetType() InvitationAcceptedPayloadType {
-	return s.Type
-}
-
-// GetProjectMember returns the value of ProjectMember.
-func (s *InvitationAcceptedPayload) GetProjectMember() OptInvitationProjectMemberPayload {
-	return s.ProjectMember
-}
-
-// GetTeamMember returns the value of TeamMember.
-func (s *InvitationAcceptedPayload) GetTeamMember() OptInvitationTeamMemberPayload {
-	return s.TeamMember
+	JourneyID     string                                     `json:"journey_id"`
+	UserID        string                                     `json:"user_id"`
+	Type          InvitationAcceptedProjectMemberPayloadType `json:"type"`
+	ProjectMember InvitationProjectMemberPayload             `json:"project_member"`
 }
 
 // GetJourneyID returns the value of JourneyID.
-func (s *InvitationAcceptedPayload) GetJourneyID() string {
+func (s *InvitationAcceptedProjectMemberPayload) GetJourneyID() string {
 	return s.JourneyID
 }
 
 // GetUserID returns the value of UserID.
-func (s *InvitationAcceptedPayload) GetUserID() string {
+func (s *InvitationAcceptedProjectMemberPayload) GetUserID() string {
 	return s.UserID
 }
 
-// SetType sets the value of Type.
-func (s *InvitationAcceptedPayload) SetType(val InvitationAcceptedPayloadType) {
-	s.Type = val
+// GetType returns the value of Type.
+func (s *InvitationAcceptedProjectMemberPayload) GetType() InvitationAcceptedProjectMemberPayloadType {
+	return s.Type
 }
 
-// SetProjectMember sets the value of ProjectMember.
-func (s *InvitationAcceptedPayload) SetProjectMember(val OptInvitationProjectMemberPayload) {
-	s.ProjectMember = val
-}
-
-// SetTeamMember sets the value of TeamMember.
-func (s *InvitationAcceptedPayload) SetTeamMember(val OptInvitationTeamMemberPayload) {
-	s.TeamMember = val
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationAcceptedProjectMemberPayload) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
 }
 
 // SetJourneyID sets the value of JourneyID.
-func (s *InvitationAcceptedPayload) SetJourneyID(val string) {
+func (s *InvitationAcceptedProjectMemberPayload) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
 // SetUserID sets the value of UserID.
-func (s *InvitationAcceptedPayload) SetUserID(val string) {
+func (s *InvitationAcceptedProjectMemberPayload) SetUserID(val string) {
 	s.UserID = val
 }
 
-type InvitationAcceptedPayloadType string
+// SetType sets the value of Type.
+func (s *InvitationAcceptedProjectMemberPayload) SetType(val InvitationAcceptedProjectMemberPayloadType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationAcceptedProjectMemberPayload) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type InvitationAcceptedProjectMemberPayloadType string
 
 const (
-	InvitationAcceptedPayloadTypeProjectMember InvitationAcceptedPayloadType = "project_member"
-	InvitationAcceptedPayloadTypeTeamMember    InvitationAcceptedPayloadType = "team_member"
+	InvitationAcceptedProjectMemberPayloadTypeProjectMember InvitationAcceptedProjectMemberPayloadType = "project_member"
 )
 
-// AllValues returns all InvitationAcceptedPayloadType values.
-func (InvitationAcceptedPayloadType) AllValues() []InvitationAcceptedPayloadType {
-	return []InvitationAcceptedPayloadType{
-		InvitationAcceptedPayloadTypeProjectMember,
-		InvitationAcceptedPayloadTypeTeamMember,
+// AllValues returns all InvitationAcceptedProjectMemberPayloadType values.
+func (InvitationAcceptedProjectMemberPayloadType) AllValues() []InvitationAcceptedProjectMemberPayloadType {
+	return []InvitationAcceptedProjectMemberPayloadType{
+		InvitationAcceptedProjectMemberPayloadTypeProjectMember,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s InvitationAcceptedPayloadType) MarshalText() ([]byte, error) {
+func (s InvitationAcceptedProjectMemberPayloadType) MarshalText() ([]byte, error) {
 	switch s {
-	case InvitationAcceptedPayloadTypeProjectMember:
-		return []byte(s), nil
-	case InvitationAcceptedPayloadTypeTeamMember:
+	case InvitationAcceptedProjectMemberPayloadTypeProjectMember:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -46844,13 +46900,94 @@ func (s InvitationAcceptedPayloadType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *InvitationAcceptedPayloadType) UnmarshalText(data []byte) error {
-	switch InvitationAcceptedPayloadType(data) {
-	case InvitationAcceptedPayloadTypeProjectMember:
-		*s = InvitationAcceptedPayloadTypeProjectMember
+func (s *InvitationAcceptedProjectMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedProjectMemberPayloadType(data) {
+	case InvitationAcceptedProjectMemberPayloadTypeProjectMember:
+		*s = InvitationAcceptedProjectMemberPayloadTypeProjectMember
 		return nil
-	case InvitationAcceptedPayloadTypeTeamMember:
-		*s = InvitationAcceptedPayloadTypeTeamMember
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationAcceptedTeamMemberPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID  string                                  `json:"journey_id"`
+	UserID     string                                  `json:"user_id"`
+	Type       InvitationAcceptedTeamMemberPayloadType `json:"type"`
+	TeamMember InvitationTeamMemberPayload             `json:"team_member"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationAcceptedTeamMemberPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationAcceptedTeamMemberPayload) GetUserID() string {
+	return s.UserID
+}
+
+// GetType returns the value of Type.
+func (s *InvitationAcceptedTeamMemberPayload) GetType() InvitationAcceptedTeamMemberPayloadType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationAcceptedTeamMemberPayload) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationAcceptedTeamMemberPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationAcceptedTeamMemberPayload) SetUserID(val string) {
+	s.UserID = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationAcceptedTeamMemberPayload) SetType(val InvitationAcceptedTeamMemberPayloadType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationAcceptedTeamMemberPayload) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type InvitationAcceptedTeamMemberPayloadType string
+
+const (
+	InvitationAcceptedTeamMemberPayloadTypeTeamMember InvitationAcceptedTeamMemberPayloadType = "team_member"
+)
+
+// AllValues returns all InvitationAcceptedTeamMemberPayloadType values.
+func (InvitationAcceptedTeamMemberPayloadType) AllValues() []InvitationAcceptedTeamMemberPayloadType {
+	return []InvitationAcceptedTeamMemberPayloadType{
+		InvitationAcceptedTeamMemberPayloadTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedTeamMemberPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedTeamMemberPayloadTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedTeamMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedTeamMemberPayloadType(data) {
+	case InvitationAcceptedTeamMemberPayloadTypeTeamMember:
+		*s = InvitationAcceptedTeamMemberPayloadTypeTeamMember
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -47835,102 +47972,157 @@ func (s *InvitationCreatedEventDelegationType) UnmarshalText(data []byte) error 
 }
 
 // Payload for `invitation.created`. The invitation ID is the event's
-// `entity_id`. `type` names the kind of invitation, and the object of the
-// same name says what its link grants. The metadata entered at creation and
-// the link's token never appear.
+// `entity_id`. Discriminate on `type`; the object named after it says what
+// the invitation's link grants. The metadata entered at creation and the
+// link's token never appear.
 // Ref: #
+// InvitationCreatedPayload represents sum type.
 type InvitationCreatedPayload struct {
-	Type          InvitationCreatedPayloadType      `json:"type"`
-	ProjectMember OptInvitationProjectMemberPayload `json:"project_member"`
-	TeamMember    OptInvitationTeamMemberPayload    `json:"team_member"`
+	Type                                  InvitationCreatedPayloadType // switch on this field
+	InvitationCreatedProjectMemberPayload InvitationCreatedProjectMemberPayload
+	InvitationCreatedTeamMemberPayload    InvitationCreatedTeamMemberPayload
+}
+
+// InvitationCreatedPayloadType is oneOf type of InvitationCreatedPayload.
+type InvitationCreatedPayloadType string
+
+// Possible values for InvitationCreatedPayloadType.
+const (
+	InvitationCreatedProjectMemberPayloadInvitationCreatedPayload InvitationCreatedPayloadType = "project_member"
+	InvitationCreatedTeamMemberPayloadInvitationCreatedPayload    InvitationCreatedPayloadType = "team_member"
+)
+
+// IsInvitationCreatedProjectMemberPayload reports whether InvitationCreatedPayload is InvitationCreatedProjectMemberPayload.
+func (s InvitationCreatedPayload) IsInvitationCreatedProjectMemberPayload() bool {
+	return s.Type == InvitationCreatedProjectMemberPayloadInvitationCreatedPayload
+}
+
+// IsInvitationCreatedTeamMemberPayload reports whether InvitationCreatedPayload is InvitationCreatedTeamMemberPayload.
+func (s InvitationCreatedPayload) IsInvitationCreatedTeamMemberPayload() bool {
+	return s.Type == InvitationCreatedTeamMemberPayloadInvitationCreatedPayload
+}
+
+// SetInvitationCreatedProjectMemberPayload sets InvitationCreatedPayload to InvitationCreatedProjectMemberPayload.
+func (s *InvitationCreatedPayload) SetInvitationCreatedProjectMemberPayload(v InvitationCreatedProjectMemberPayload) {
+	s.Type = InvitationCreatedProjectMemberPayloadInvitationCreatedPayload
+	s.InvitationCreatedProjectMemberPayload = v
+}
+
+// GetInvitationCreatedProjectMemberPayload returns InvitationCreatedProjectMemberPayload and true boolean if InvitationCreatedPayload is InvitationCreatedProjectMemberPayload.
+func (s InvitationCreatedPayload) GetInvitationCreatedProjectMemberPayload() (v InvitationCreatedProjectMemberPayload, ok bool) {
+	if !s.IsInvitationCreatedProjectMemberPayload() {
+		return v, false
+	}
+	return s.InvitationCreatedProjectMemberPayload, true
+}
+
+// NewInvitationCreatedProjectMemberPayloadInvitationCreatedPayload returns new InvitationCreatedPayload from InvitationCreatedProjectMemberPayload.
+func NewInvitationCreatedProjectMemberPayloadInvitationCreatedPayload(v InvitationCreatedProjectMemberPayload) InvitationCreatedPayload {
+	var s InvitationCreatedPayload
+	s.SetInvitationCreatedProjectMemberPayload(v)
+	return s
+}
+
+// SetInvitationCreatedTeamMemberPayload sets InvitationCreatedPayload to InvitationCreatedTeamMemberPayload.
+func (s *InvitationCreatedPayload) SetInvitationCreatedTeamMemberPayload(v InvitationCreatedTeamMemberPayload) {
+	s.Type = InvitationCreatedTeamMemberPayloadInvitationCreatedPayload
+	s.InvitationCreatedTeamMemberPayload = v
+}
+
+// GetInvitationCreatedTeamMemberPayload returns InvitationCreatedTeamMemberPayload and true boolean if InvitationCreatedPayload is InvitationCreatedTeamMemberPayload.
+func (s InvitationCreatedPayload) GetInvitationCreatedTeamMemberPayload() (v InvitationCreatedTeamMemberPayload, ok bool) {
+	if !s.IsInvitationCreatedTeamMemberPayload() {
+		return v, false
+	}
+	return s.InvitationCreatedTeamMemberPayload, true
+}
+
+// NewInvitationCreatedTeamMemberPayloadInvitationCreatedPayload returns new InvitationCreatedPayload from InvitationCreatedTeamMemberPayload.
+func NewInvitationCreatedTeamMemberPayloadInvitationCreatedPayload(v InvitationCreatedTeamMemberPayload) InvitationCreatedPayload {
+	var s InvitationCreatedPayload
+	s.SetInvitationCreatedTeamMemberPayload(v)
+	return s
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCreatedProjectMemberPayload struct {
 	// Shared by an invitation and every invitation that replaces it.
 	JourneyID string `json:"journey_id"`
 	// The invitation this one replaces, when it was created as a replacement.
-	ReplacesInvitationID OptString `json:"replaces_invitation_id"`
-	ExpiresAt            time.Time `json:"expires_at"`
-}
-
-// GetType returns the value of Type.
-func (s *InvitationCreatedPayload) GetType() InvitationCreatedPayloadType {
-	return s.Type
-}
-
-// GetProjectMember returns the value of ProjectMember.
-func (s *InvitationCreatedPayload) GetProjectMember() OptInvitationProjectMemberPayload {
-	return s.ProjectMember
-}
-
-// GetTeamMember returns the value of TeamMember.
-func (s *InvitationCreatedPayload) GetTeamMember() OptInvitationTeamMemberPayload {
-	return s.TeamMember
+	ReplacesInvitationID OptString                                 `json:"replaces_invitation_id"`
+	ExpiresAt            time.Time                                 `json:"expires_at"`
+	Type                 InvitationCreatedProjectMemberPayloadType `json:"type"`
+	ProjectMember        InvitationProjectMemberPayload            `json:"project_member"`
 }
 
 // GetJourneyID returns the value of JourneyID.
-func (s *InvitationCreatedPayload) GetJourneyID() string {
+func (s *InvitationCreatedProjectMemberPayload) GetJourneyID() string {
 	return s.JourneyID
 }
 
 // GetReplacesInvitationID returns the value of ReplacesInvitationID.
-func (s *InvitationCreatedPayload) GetReplacesInvitationID() OptString {
+func (s *InvitationCreatedProjectMemberPayload) GetReplacesInvitationID() OptString {
 	return s.ReplacesInvitationID
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
-func (s *InvitationCreatedPayload) GetExpiresAt() time.Time {
+func (s *InvitationCreatedProjectMemberPayload) GetExpiresAt() time.Time {
 	return s.ExpiresAt
 }
 
-// SetType sets the value of Type.
-func (s *InvitationCreatedPayload) SetType(val InvitationCreatedPayloadType) {
-	s.Type = val
+// GetType returns the value of Type.
+func (s *InvitationCreatedProjectMemberPayload) GetType() InvitationCreatedProjectMemberPayloadType {
+	return s.Type
 }
 
-// SetProjectMember sets the value of ProjectMember.
-func (s *InvitationCreatedPayload) SetProjectMember(val OptInvitationProjectMemberPayload) {
-	s.ProjectMember = val
-}
-
-// SetTeamMember sets the value of TeamMember.
-func (s *InvitationCreatedPayload) SetTeamMember(val OptInvitationTeamMemberPayload) {
-	s.TeamMember = val
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationCreatedProjectMemberPayload) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
 }
 
 // SetJourneyID sets the value of JourneyID.
-func (s *InvitationCreatedPayload) SetJourneyID(val string) {
+func (s *InvitationCreatedProjectMemberPayload) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
 // SetReplacesInvitationID sets the value of ReplacesInvitationID.
-func (s *InvitationCreatedPayload) SetReplacesInvitationID(val OptString) {
+func (s *InvitationCreatedProjectMemberPayload) SetReplacesInvitationID(val OptString) {
 	s.ReplacesInvitationID = val
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
-func (s *InvitationCreatedPayload) SetExpiresAt(val time.Time) {
+func (s *InvitationCreatedProjectMemberPayload) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-type InvitationCreatedPayloadType string
+// SetType sets the value of Type.
+func (s *InvitationCreatedProjectMemberPayload) SetType(val InvitationCreatedProjectMemberPayloadType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationCreatedProjectMemberPayload) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type InvitationCreatedProjectMemberPayloadType string
 
 const (
-	InvitationCreatedPayloadTypeProjectMember InvitationCreatedPayloadType = "project_member"
-	InvitationCreatedPayloadTypeTeamMember    InvitationCreatedPayloadType = "team_member"
+	InvitationCreatedProjectMemberPayloadTypeProjectMember InvitationCreatedProjectMemberPayloadType = "project_member"
 )
 
-// AllValues returns all InvitationCreatedPayloadType values.
-func (InvitationCreatedPayloadType) AllValues() []InvitationCreatedPayloadType {
-	return []InvitationCreatedPayloadType{
-		InvitationCreatedPayloadTypeProjectMember,
-		InvitationCreatedPayloadTypeTeamMember,
+// AllValues returns all InvitationCreatedProjectMemberPayloadType values.
+func (InvitationCreatedProjectMemberPayloadType) AllValues() []InvitationCreatedProjectMemberPayloadType {
+	return []InvitationCreatedProjectMemberPayloadType{
+		InvitationCreatedProjectMemberPayloadTypeProjectMember,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s InvitationCreatedPayloadType) MarshalText() ([]byte, error) {
+func (s InvitationCreatedProjectMemberPayloadType) MarshalText() ([]byte, error) {
 	switch s {
-	case InvitationCreatedPayloadTypeProjectMember:
-		return []byte(s), nil
-	case InvitationCreatedPayloadTypeTeamMember:
+	case InvitationCreatedProjectMemberPayloadTypeProjectMember:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -47938,13 +48130,106 @@ func (s InvitationCreatedPayloadType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *InvitationCreatedPayloadType) UnmarshalText(data []byte) error {
-	switch InvitationCreatedPayloadType(data) {
-	case InvitationCreatedPayloadTypeProjectMember:
-		*s = InvitationCreatedPayloadTypeProjectMember
+func (s *InvitationCreatedProjectMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedProjectMemberPayloadType(data) {
+	case InvitationCreatedProjectMemberPayloadTypeProjectMember:
+		*s = InvitationCreatedProjectMemberPayloadTypeProjectMember
 		return nil
-	case InvitationCreatedPayloadTypeTeamMember:
-		*s = InvitationCreatedPayloadTypeTeamMember
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCreatedTeamMemberPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	// The invitation this one replaces, when it was created as a replacement.
+	ReplacesInvitationID OptString                              `json:"replaces_invitation_id"`
+	ExpiresAt            time.Time                              `json:"expires_at"`
+	Type                 InvitationCreatedTeamMemberPayloadType `json:"type"`
+	TeamMember           InvitationTeamMemberPayload            `json:"team_member"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCreatedTeamMemberPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReplacesInvitationID returns the value of ReplacesInvitationID.
+func (s *InvitationCreatedTeamMemberPayload) GetReplacesInvitationID() OptString {
+	return s.ReplacesInvitationID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationCreatedTeamMemberPayload) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetType returns the value of Type.
+func (s *InvitationCreatedTeamMemberPayload) GetType() InvitationCreatedTeamMemberPayloadType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationCreatedTeamMemberPayload) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCreatedTeamMemberPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReplacesInvitationID sets the value of ReplacesInvitationID.
+func (s *InvitationCreatedTeamMemberPayload) SetReplacesInvitationID(val OptString) {
+	s.ReplacesInvitationID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationCreatedTeamMemberPayload) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationCreatedTeamMemberPayload) SetType(val InvitationCreatedTeamMemberPayloadType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationCreatedTeamMemberPayload) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type InvitationCreatedTeamMemberPayloadType string
+
+const (
+	InvitationCreatedTeamMemberPayloadTypeTeamMember InvitationCreatedTeamMemberPayloadType = "team_member"
+)
+
+// AllValues returns all InvitationCreatedTeamMemberPayloadType values.
+func (InvitationCreatedTeamMemberPayloadType) AllValues() []InvitationCreatedTeamMemberPayloadType {
+	return []InvitationCreatedTeamMemberPayloadType{
+		InvitationCreatedTeamMemberPayloadTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedTeamMemberPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedTeamMemberPayloadTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedTeamMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedTeamMemberPayloadType(data) {
+	case InvitationCreatedTeamMemberPayloadTypeTeamMember:
+		*s = InvitationCreatedTeamMemberPayloadTypeTeamMember
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -63441,52 +63726,6 @@ func (o OptInvitationMetadata) Or(d InvitationMetadata) InvitationMetadata {
 	return d
 }
 
-// NewOptInvitationProjectMemberPayload returns new OptInvitationProjectMemberPayload with value set to v.
-func NewOptInvitationProjectMemberPayload(v InvitationProjectMemberPayload) OptInvitationProjectMemberPayload {
-	return OptInvitationProjectMemberPayload{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInvitationProjectMemberPayload is optional InvitationProjectMemberPayload.
-type OptInvitationProjectMemberPayload struct {
-	Value InvitationProjectMemberPayload
-	Set   bool
-}
-
-// IsSet returns true if OptInvitationProjectMemberPayload was set.
-func (o OptInvitationProjectMemberPayload) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInvitationProjectMemberPayload) Reset() {
-	var v InvitationProjectMemberPayload
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInvitationProjectMemberPayload) SetTo(v InvitationProjectMemberPayload) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInvitationProjectMemberPayload) Get() (v InvitationProjectMemberPayload, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInvitationProjectMemberPayload) Or(d InvitationProjectMemberPayload) InvitationProjectMemberPayload {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptInvitationRejectedEventDelegationType returns new OptInvitationRejectedEventDelegationType with value set to v.
 func NewOptInvitationRejectedEventDelegationType(v InvitationRejectedEventDelegationType) OptInvitationRejectedEventDelegationType {
 	return OptInvitationRejectedEventDelegationType{
@@ -63573,52 +63812,6 @@ func (o OptInvitationStatus) Get() (v InvitationStatus, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvitationStatus) Or(d InvitationStatus) InvitationStatus {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInvitationTeamMemberPayload returns new OptInvitationTeamMemberPayload with value set to v.
-func NewOptInvitationTeamMemberPayload(v InvitationTeamMemberPayload) OptInvitationTeamMemberPayload {
-	return OptInvitationTeamMemberPayload{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInvitationTeamMemberPayload is optional InvitationTeamMemberPayload.
-type OptInvitationTeamMemberPayload struct {
-	Value InvitationTeamMemberPayload
-	Set   bool
-}
-
-// IsSet returns true if OptInvitationTeamMemberPayload was set.
-func (o OptInvitationTeamMemberPayload) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInvitationTeamMemberPayload) Reset() {
-	var v InvitationTeamMemberPayload
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInvitationTeamMemberPayload) SetTo(v InvitationTeamMemberPayload) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInvitationTeamMemberPayload) Get() (v InvitationTeamMemberPayload, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInvitationTeamMemberPayload) Or(d InvitationTeamMemberPayload) InvitationTeamMemberPayload {
 	if v, ok := o.Get(); ok {
 		return v
 	}

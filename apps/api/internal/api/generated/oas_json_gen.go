@@ -77031,31 +77031,133 @@ func (s *InvitationAcceptedEventDelegationType) UnmarshalJSON(data []byte) error
 	return s.Decode(d)
 }
 
+// Encode encodes InvitationAcceptedPayload as json.
+func (s InvitationAcceptedPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s InvitationAcceptedPayload) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload:
+		e.FieldStart("type")
+		e.Str("project_member")
+		{
+			s := s.InvitationAcceptedProjectMemberPayload
+			{
+				e.FieldStart("journey_id")
+				e.Str(s.JourneyID)
+			}
+			{
+				e.FieldStart("user_id")
+				e.Str(s.UserID)
+			}
+			{
+				e.FieldStart("project_member")
+				s.ProjectMember.Encode(e)
+			}
+		}
+	case InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload:
+		e.FieldStart("type")
+		e.Str("team_member")
+		{
+			s := s.InvitationAcceptedTeamMemberPayload
+			{
+				e.FieldStart("journey_id")
+				e.Str(s.JourneyID)
+			}
+			{
+				e.FieldStart("user_id")
+				e.Str(s.UserID)
+			}
+			{
+				e.FieldStart("team_member")
+				s.TeamMember.Encode(e)
+			}
+		}
+	}
+}
+
+// Decode decodes InvitationAcceptedPayload from json.
+func (s *InvitationAcceptedPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationAcceptedPayload to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "type":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "project_member":
+					s.Type = InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload
+					found = true
+				case "team_member":
+					s.Type = InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload:
+		if err := s.InvitationAcceptedProjectMemberPayload.Decode(d); err != nil {
+			return err
+		}
+	case InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload:
+		if err := s.InvitationAcceptedTeamMemberPayload.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationAcceptedPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationAcceptedPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
-func (s *InvitationAcceptedPayload) Encode(e *jx.Encoder) {
+func (s *InvitationAcceptedProjectMemberPayload) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *InvitationAcceptedPayload) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("type")
-		s.Type.Encode(e)
-	}
-	{
-		if s.ProjectMember.Set {
-			e.FieldStart("project_member")
-			s.ProjectMember.Encode(e)
-		}
-	}
-	{
-		if s.TeamMember.Set {
-			e.FieldStart("team_member")
-			s.TeamMember.Encode(e)
-		}
-	}
+func (s *InvitationAcceptedProjectMemberPayload) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("journey_id")
 		e.Str(s.JourneyID)
@@ -77064,57 +77166,34 @@ func (s *InvitationAcceptedPayload) encodeFields(e *jx.Encoder) {
 		e.FieldStart("user_id")
 		e.Str(s.UserID)
 	}
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("project_member")
+		s.ProjectMember.Encode(e)
+	}
 }
 
-var jsonFieldsNameOfInvitationAcceptedPayload = [5]string{
-	0: "type",
-	1: "project_member",
-	2: "team_member",
-	3: "journey_id",
-	4: "user_id",
+var jsonFieldsNameOfInvitationAcceptedProjectMemberPayload = [4]string{
+	0: "journey_id",
+	1: "user_id",
+	2: "type",
+	3: "project_member",
 }
 
-// Decode decodes InvitationAcceptedPayload from json.
-func (s *InvitationAcceptedPayload) Decode(d *jx.Decoder) error {
+// Decode decodes InvitationAcceptedProjectMemberPayload from json.
+func (s *InvitationAcceptedProjectMemberPayload) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode InvitationAcceptedPayload to nil")
+		return errors.New("invalid: unable to decode InvitationAcceptedProjectMemberPayload to nil")
 	}
 	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "type":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.Type.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"type\"")
-			}
-		case "project_member":
-			if err := func() error {
-				s.ProjectMember.Reset()
-				if err := s.ProjectMember.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"project_member\"")
-			}
-		case "team_member":
-			if err := func() error {
-				s.TeamMember.Reset()
-				if err := s.TeamMember.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_member\"")
-			}
 		case "journey_id":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Str()
 				s.JourneyID = string(v)
@@ -77126,7 +77205,7 @@ func (s *InvitationAcceptedPayload) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"journey_id\"")
 			}
 		case "user_id":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := d.Str()
 				s.UserID = string(v)
@@ -77137,17 +77216,37 @@ func (s *InvitationAcceptedPayload) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"user_id\"")
 			}
+		case "type":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "project_member":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.ProjectMember.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_member\"")
+			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode InvitationAcceptedPayload")
+		return errors.Wrap(err, "decode InvitationAcceptedProjectMemberPayload")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00011001,
+		0b00001111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -77159,8 +77258,8 @@ func (s *InvitationAcceptedPayload) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfInvitationAcceptedPayload) {
-					name = jsonFieldsNameOfInvitationAcceptedPayload[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfInvitationAcceptedProjectMemberPayload) {
+					name = jsonFieldsNameOfInvitationAcceptedProjectMemberPayload[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -77181,54 +77280,233 @@ func (s *InvitationAcceptedPayload) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *InvitationAcceptedPayload) MarshalJSON() ([]byte, error) {
+func (s *InvitationAcceptedProjectMemberPayload) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *InvitationAcceptedPayload) UnmarshalJSON(data []byte) error {
+func (s *InvitationAcceptedProjectMemberPayload) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes InvitationAcceptedPayloadType as json.
-func (s InvitationAcceptedPayloadType) Encode(e *jx.Encoder) {
+// Encode encodes InvitationAcceptedProjectMemberPayloadType as json.
+func (s InvitationAcceptedProjectMemberPayloadType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes InvitationAcceptedPayloadType from json.
-func (s *InvitationAcceptedPayloadType) Decode(d *jx.Decoder) error {
+// Decode decodes InvitationAcceptedProjectMemberPayloadType from json.
+func (s *InvitationAcceptedProjectMemberPayloadType) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode InvitationAcceptedPayloadType to nil")
+		return errors.New("invalid: unable to decode InvitationAcceptedProjectMemberPayloadType to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch InvitationAcceptedPayloadType(v) {
-	case InvitationAcceptedPayloadTypeProjectMember:
-		*s = InvitationAcceptedPayloadTypeProjectMember
-	case InvitationAcceptedPayloadTypeTeamMember:
-		*s = InvitationAcceptedPayloadTypeTeamMember
+	switch InvitationAcceptedProjectMemberPayloadType(v) {
+	case InvitationAcceptedProjectMemberPayloadTypeProjectMember:
+		*s = InvitationAcceptedProjectMemberPayloadTypeProjectMember
 	default:
-		*s = InvitationAcceptedPayloadType(v)
+		*s = InvitationAcceptedProjectMemberPayloadType(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s InvitationAcceptedPayloadType) MarshalJSON() ([]byte, error) {
+func (s InvitationAcceptedProjectMemberPayloadType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *InvitationAcceptedPayloadType) UnmarshalJSON(data []byte) error {
+func (s *InvitationAcceptedProjectMemberPayloadType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *InvitationAcceptedTeamMemberPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvitationAcceptedTeamMemberPayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("journey_id")
+		e.Str(s.JourneyID)
+	}
+	{
+		e.FieldStart("user_id")
+		e.Str(s.UserID)
+	}
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("team_member")
+		s.TeamMember.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfInvitationAcceptedTeamMemberPayload = [4]string{
+	0: "journey_id",
+	1: "user_id",
+	2: "type",
+	3: "team_member",
+}
+
+// Decode decodes InvitationAcceptedTeamMemberPayload from json.
+func (s *InvitationAcceptedTeamMemberPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationAcceptedTeamMemberPayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "journey_id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.JourneyID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"journey_id\"")
+			}
+		case "user_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.UserID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "team_member":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.TeamMember.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_member\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvitationAcceptedTeamMemberPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00001111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvitationAcceptedTeamMemberPayload) {
+					name = jsonFieldsNameOfInvitationAcceptedTeamMemberPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvitationAcceptedTeamMemberPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationAcceptedTeamMemberPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvitationAcceptedTeamMemberPayloadType as json.
+func (s InvitationAcceptedTeamMemberPayloadType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes InvitationAcceptedTeamMemberPayloadType from json.
+func (s *InvitationAcceptedTeamMemberPayloadType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationAcceptedTeamMemberPayloadType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch InvitationAcceptedTeamMemberPayloadType(v) {
+	case InvitationAcceptedTeamMemberPayloadTypeTeamMember:
+		*s = InvitationAcceptedTeamMemberPayloadTypeTeamMember
+	default:
+		*s = InvitationAcceptedTeamMemberPayloadType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationAcceptedTeamMemberPayloadType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationAcceptedTeamMemberPayloadType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -78571,31 +78849,145 @@ func (s *InvitationCreatedEventDelegationType) UnmarshalJSON(data []byte) error 
 	return s.Decode(d)
 }
 
+// Encode encodes InvitationCreatedPayload as json.
+func (s InvitationCreatedPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s InvitationCreatedPayload) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case InvitationCreatedProjectMemberPayloadInvitationCreatedPayload:
+		e.FieldStart("type")
+		e.Str("project_member")
+		{
+			s := s.InvitationCreatedProjectMemberPayload
+			{
+				e.FieldStart("journey_id")
+				e.Str(s.JourneyID)
+			}
+			{
+				if s.ReplacesInvitationID.Set {
+					e.FieldStart("replaces_invitation_id")
+					s.ReplacesInvitationID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("expires_at")
+				json.EncodeDateTime(e, s.ExpiresAt)
+			}
+			{
+				e.FieldStart("project_member")
+				s.ProjectMember.Encode(e)
+			}
+		}
+	case InvitationCreatedTeamMemberPayloadInvitationCreatedPayload:
+		e.FieldStart("type")
+		e.Str("team_member")
+		{
+			s := s.InvitationCreatedTeamMemberPayload
+			{
+				e.FieldStart("journey_id")
+				e.Str(s.JourneyID)
+			}
+			{
+				if s.ReplacesInvitationID.Set {
+					e.FieldStart("replaces_invitation_id")
+					s.ReplacesInvitationID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("expires_at")
+				json.EncodeDateTime(e, s.ExpiresAt)
+			}
+			{
+				e.FieldStart("team_member")
+				s.TeamMember.Encode(e)
+			}
+		}
+	}
+}
+
+// Decode decodes InvitationCreatedPayload from json.
+func (s *InvitationCreatedPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCreatedPayload to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "type":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "project_member":
+					s.Type = InvitationCreatedProjectMemberPayloadInvitationCreatedPayload
+					found = true
+				case "team_member":
+					s.Type = InvitationCreatedTeamMemberPayloadInvitationCreatedPayload
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case InvitationCreatedProjectMemberPayloadInvitationCreatedPayload:
+		if err := s.InvitationCreatedProjectMemberPayload.Decode(d); err != nil {
+			return err
+		}
+	case InvitationCreatedTeamMemberPayloadInvitationCreatedPayload:
+		if err := s.InvitationCreatedTeamMemberPayload.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationCreatedPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCreatedPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
-func (s *InvitationCreatedPayload) Encode(e *jx.Encoder) {
+func (s *InvitationCreatedProjectMemberPayload) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *InvitationCreatedPayload) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("type")
-		s.Type.Encode(e)
-	}
-	{
-		if s.ProjectMember.Set {
-			e.FieldStart("project_member")
-			s.ProjectMember.Encode(e)
-		}
-	}
-	{
-		if s.TeamMember.Set {
-			e.FieldStart("team_member")
-			s.TeamMember.Encode(e)
-		}
-	}
+func (s *InvitationCreatedProjectMemberPayload) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("journey_id")
 		e.Str(s.JourneyID)
@@ -78610,58 +79002,35 @@ func (s *InvitationCreatedPayload) encodeFields(e *jx.Encoder) {
 		e.FieldStart("expires_at")
 		json.EncodeDateTime(e, s.ExpiresAt)
 	}
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("project_member")
+		s.ProjectMember.Encode(e)
+	}
 }
 
-var jsonFieldsNameOfInvitationCreatedPayload = [6]string{
-	0: "type",
-	1: "project_member",
-	2: "team_member",
-	3: "journey_id",
-	4: "replaces_invitation_id",
-	5: "expires_at",
+var jsonFieldsNameOfInvitationCreatedProjectMemberPayload = [5]string{
+	0: "journey_id",
+	1: "replaces_invitation_id",
+	2: "expires_at",
+	3: "type",
+	4: "project_member",
 }
 
-// Decode decodes InvitationCreatedPayload from json.
-func (s *InvitationCreatedPayload) Decode(d *jx.Decoder) error {
+// Decode decodes InvitationCreatedProjectMemberPayload from json.
+func (s *InvitationCreatedProjectMemberPayload) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode InvitationCreatedPayload to nil")
+		return errors.New("invalid: unable to decode InvitationCreatedProjectMemberPayload to nil")
 	}
 	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "type":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.Type.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"type\"")
-			}
-		case "project_member":
-			if err := func() error {
-				s.ProjectMember.Reset()
-				if err := s.ProjectMember.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"project_member\"")
-			}
-		case "team_member":
-			if err := func() error {
-				s.TeamMember.Reset()
-				if err := s.TeamMember.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_member\"")
-			}
 		case "journey_id":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Str()
 				s.JourneyID = string(v)
@@ -78683,7 +79052,7 @@ func (s *InvitationCreatedPayload) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"replaces_invitation_id\"")
 			}
 		case "expires_at":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.ExpiresAt = v
@@ -78694,17 +79063,37 @@ func (s *InvitationCreatedPayload) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"expires_at\"")
 			}
+		case "type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "project_member":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.ProjectMember.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_member\"")
+			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode InvitationCreatedPayload")
+		return errors.Wrap(err, "decode InvitationCreatedProjectMemberPayload")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00101001,
+		0b00011101,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -78716,8 +79105,8 @@ func (s *InvitationCreatedPayload) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfInvitationCreatedPayload) {
-					name = jsonFieldsNameOfInvitationCreatedPayload[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfInvitationCreatedProjectMemberPayload) {
+					name = jsonFieldsNameOfInvitationCreatedProjectMemberPayload[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -78738,54 +79127,250 @@ func (s *InvitationCreatedPayload) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *InvitationCreatedPayload) MarshalJSON() ([]byte, error) {
+func (s *InvitationCreatedProjectMemberPayload) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *InvitationCreatedPayload) UnmarshalJSON(data []byte) error {
+func (s *InvitationCreatedProjectMemberPayload) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes InvitationCreatedPayloadType as json.
-func (s InvitationCreatedPayloadType) Encode(e *jx.Encoder) {
+// Encode encodes InvitationCreatedProjectMemberPayloadType as json.
+func (s InvitationCreatedProjectMemberPayloadType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes InvitationCreatedPayloadType from json.
-func (s *InvitationCreatedPayloadType) Decode(d *jx.Decoder) error {
+// Decode decodes InvitationCreatedProjectMemberPayloadType from json.
+func (s *InvitationCreatedProjectMemberPayloadType) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode InvitationCreatedPayloadType to nil")
+		return errors.New("invalid: unable to decode InvitationCreatedProjectMemberPayloadType to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch InvitationCreatedPayloadType(v) {
-	case InvitationCreatedPayloadTypeProjectMember:
-		*s = InvitationCreatedPayloadTypeProjectMember
-	case InvitationCreatedPayloadTypeTeamMember:
-		*s = InvitationCreatedPayloadTypeTeamMember
+	switch InvitationCreatedProjectMemberPayloadType(v) {
+	case InvitationCreatedProjectMemberPayloadTypeProjectMember:
+		*s = InvitationCreatedProjectMemberPayloadTypeProjectMember
 	default:
-		*s = InvitationCreatedPayloadType(v)
+		*s = InvitationCreatedProjectMemberPayloadType(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s InvitationCreatedPayloadType) MarshalJSON() ([]byte, error) {
+func (s InvitationCreatedProjectMemberPayloadType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *InvitationCreatedPayloadType) UnmarshalJSON(data []byte) error {
+func (s *InvitationCreatedProjectMemberPayloadType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *InvitationCreatedTeamMemberPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvitationCreatedTeamMemberPayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("journey_id")
+		e.Str(s.JourneyID)
+	}
+	{
+		if s.ReplacesInvitationID.Set {
+			e.FieldStart("replaces_invitation_id")
+			s.ReplacesInvitationID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("expires_at")
+		json.EncodeDateTime(e, s.ExpiresAt)
+	}
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("team_member")
+		s.TeamMember.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfInvitationCreatedTeamMemberPayload = [5]string{
+	0: "journey_id",
+	1: "replaces_invitation_id",
+	2: "expires_at",
+	3: "type",
+	4: "team_member",
+}
+
+// Decode decodes InvitationCreatedTeamMemberPayload from json.
+func (s *InvitationCreatedTeamMemberPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCreatedTeamMemberPayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "journey_id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.JourneyID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"journey_id\"")
+			}
+		case "replaces_invitation_id":
+			if err := func() error {
+				s.ReplacesInvitationID.Reset()
+				if err := s.ReplacesInvitationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"replaces_invitation_id\"")
+			}
+		case "expires_at":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.ExpiresAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"expires_at\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "team_member":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.TeamMember.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_member\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvitationCreatedTeamMemberPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00011101,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvitationCreatedTeamMemberPayload) {
+					name = jsonFieldsNameOfInvitationCreatedTeamMemberPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvitationCreatedTeamMemberPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCreatedTeamMemberPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvitationCreatedTeamMemberPayloadType as json.
+func (s InvitationCreatedTeamMemberPayloadType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes InvitationCreatedTeamMemberPayloadType from json.
+func (s *InvitationCreatedTeamMemberPayloadType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCreatedTeamMemberPayloadType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch InvitationCreatedTeamMemberPayloadType(v) {
+	case InvitationCreatedTeamMemberPayloadTypeTeamMember:
+		*s = InvitationCreatedTeamMemberPayloadTypeTeamMember
+	default:
+		*s = InvitationCreatedTeamMemberPayloadType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationCreatedTeamMemberPayloadType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCreatedTeamMemberPayloadType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -95778,39 +96363,6 @@ func (s *OptInvitationMetadata) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes InvitationProjectMemberPayload as json.
-func (o OptInvitationProjectMemberPayload) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes InvitationProjectMemberPayload from json.
-func (o *OptInvitationProjectMemberPayload) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInvitationProjectMemberPayload to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInvitationProjectMemberPayload) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInvitationProjectMemberPayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes InvitationRejectedEventDelegationType as json.
 func (o OptInvitationRejectedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -95840,39 +96392,6 @@ func (s OptInvitationRejectedEventDelegationType) MarshalJSON() ([]byte, error) 
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInvitationRejectedEventDelegationType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes InvitationTeamMemberPayload as json.
-func (o OptInvitationTeamMemberPayload) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes InvitationTeamMemberPayload from json.
-func (o *OptInvitationTeamMemberPayload) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInvitationTeamMemberPayload to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInvitationTeamMemberPayload) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInvitationTeamMemberPayload) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

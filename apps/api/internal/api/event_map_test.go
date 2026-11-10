@@ -135,6 +135,30 @@ func TestEventToAPI_InvitationPayloads(t *testing.T) {
 	}
 }
 
+// A payload whose type names an object it lacks does not decode.
+func TestEventToAPI_InvitationPayloadMissingTypeObject(t *testing.T) {
+	t.Parallel()
+	payload, err := json.Marshal(domain.InvitationAcceptedPayload{
+		Type:       "project_member",
+		TeamMember: &domain.InvitationTeamMemberPayload{TeamID: "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", Role: "member"},
+		JourneyID:  "journey_1",
+		UserID:     "user_1",
+	})
+	require.NoError(t, err)
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	_, err = eventToAPI(&domain.Event{
+		ID:         "evt_inv",
+		ProjectID:  "proj_1",
+		EventType:  domain.EventTypeInvitationAccepted,
+		Category:   domain.EventCategoryAdmin,
+		OccurredAt: now,
+		CreatedAt:  now,
+		ClientID:   "app_1",
+		Payload:    payload,
+	})
+	require.Error(t, err)
+}
+
 func TestEventToAPI_EmptyPayload(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
