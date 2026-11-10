@@ -168,61 +168,105 @@ func TestEventStatements_ListKeyset_Desc(t *testing.T) {
 	})
 }
 
-// The list by category, and the reads that follow one request, session or
-// login flow, are what the events indexes serve (migration
-// events_filter_indexes): each returns exactly its rows.
+// The reads the events indexes serve (migrations events_filter_indexes and
+// events_value_indexes): by category, type, actor and resource, and the events
+// of one request, session or login flow. Each returns exactly its rows.
 func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)
 		ensureEventProject(t, d.stmts, projectID)
 
 		request, session, flow := "req_1", "sess_1", "flow_1"
+		alice, service, resource := "user_alice", "svc_backend", "user_bob"
 		for _, seed := range []struct {
-			id       string
-			category domain.EventCategory
-			request  *string
-			session  *string
-			flow     *string
+			id        string
+			eventType domain.EventType
+			category  domain.EventCategory
+			actor     *string
+			entity    *string
+			request   *string
+			session   *string
+			flow      *string
 		}{
-			{id: "evt-001", category: domain.EventCategoryRequest, request: &request, session: &session},
-			{id: "evt-002", category: domain.EventCategoryEntity, request: &request},
-			{id: "evt-003", category: domain.EventCategoryAuth, session: &session, flow: &flow},
-			{id: "evt-004", category: domain.EventCategoryAuth},
+			{id: "evt-001", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &alice, request: &request, session: &session},
+			{id: "evt-002", eventType: domain.EventTypeUserCreated, category: domain.EventCategoryEntity, actor: &alice, entity: &resource, request: &request},
+			{id: "evt-003", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, session: &session, flow: &flow},
+			{id: "evt-004", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, actor: &service},
+			{id: "evt-005", eventType: domain.EventTypeUserDeleted, category: domain.EventCategoryEntity, actor: &service, entity: &resource},
 		} {
 			event := sampleEvent(projectID, seed.id)
-			event.Category = seed.category
+			event.EventType, event.Category = seed.eventType, seed.category
+			event.ActorID, event.EntityID = seed.actor, seed.entity
 			event.RequestID, event.SessionID, event.FlowID = seed.request, seed.session, seed.flow
 			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
 		}
 
+		equal := func(field domain.EventField, value string) database.Filter[domain.EventField] {
+			return database.Equal(database.Col(field), value)
+		}
 		for name, tc := range map[string]struct {
-			field domain.EventField
-			value string
-			want  []string
+			filter database.Filter[domain.EventField]
+			want   []string
 		}{
-			"category": {field: domain.EventFieldCategory, value: string(domain.EventCategoryAuth), want: []string{"evt-004", "evt-003"}},
-			"request":  {field: domain.EventFieldRequestID, value: request, want: []string{"evt-002", "evt-001"}},
-			"session":  {field: domain.EventFieldSessionID, value: session, want: []string{"evt-003", "evt-001"}},
-			"flow":     {field: domain.EventFieldFlowID, value: flow, want: []string{"evt-003"}},
+			"category": {filter: equal(domain.EventFieldCategory, string(domain.EventCategoryAuth)), want: []string{"evt-004", "evt-003"}},
+			"request":  {filter: equal(domain.EventFieldRequestID, request), want: []string{"evt-002", "evt-001"}},
+			"session":  {filter: equal(domain.EventFieldSessionID, session), want: []string{"evt-003", "evt-001"}},
+			"flow":     {filter: equal(domain.EventFieldFlowID, flow), want: []string{"evt-003"}},
+			"type":     {filter: equal(domain.EventFieldEventType, string(domain.EventTypeAuthCheckSucceeded)), want: []string{"evt-004", "evt-003"}},
+			"resource": {filter: equal(domain.EventFieldEntityID, resource), want: []string{"evt-005", "evt-002"}},
+			"actor in one category": {
+				filter: database.And(equal(domain.EventFieldActorID, alice), equal(domain.EventFieldCategory, string(domain.EventCategoryEntity))),
+				want:   []string{"evt-002"},
+			},
 		} {
 			t.Run(name, func(t *testing.T) {
 				opts := events.ListOptions(projectID, 10)
 				opts.Pagination.OrderBy = events.CreatedAtDesc()
-				opts.Filter = database.And(opts.Filter, database.Equal(database.Col(tc.field), tc.value))
+				opts.Filter = database.And(opts.Filter, tc.filter)
 				page, err := d.stmts.ListEvents(t.Context(), opts)
 				require.NoError(t, err)
 				assert.Equal(t, tc.want, eventIDs(page.Items))
 				assert.Empty(t, page.NextCursor)
 			})
 		}
+
+		// One actor across every category, and several types: a read per
+		// value, merged newest first (events.ListEach).
+		t.Run("actor across categories", func(t *testing.T) {
+			opts := events.ListOptions(projectID, 10)
+			opts.Pagination.OrderBy = events.CreatedAtDesc()
+			opts.Filter = database.And(opts.Filter, equal(domain.EventFieldActorID, alice))
+			categories := make([]string, 0, len(domain.EventCategories()))
+			for _, category := range domain.EventCategories() {
+				categories = append(categories, string(category))
+			}
+			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldCategory, categories)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"evt-002", "evt-001"}, eventIDs(page.Items))
+		})
+		t.Run("several types", func(t *testing.T) {
+			opts := events.ListOptions(projectID, 2)
+			opts.Pagination.OrderBy = events.CreatedAtDesc()
+			types := []string{string(domain.EventTypeUserCreated), string(domain.EventTypeUserDeleted), string(domain.EventTypeAuthCheckSucceeded)}
+			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldEventType, types)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"evt-005", "evt-004"}, eventIDs(page.Items))
+			require.NotEmpty(t, page.NextCursor)
+
+			opts.Pagination.Cursor = page.NextCursor
+			rest, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldEventType, types)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"evt-003", "evt-002"}, eventIDs(rest.Items))
+			assert.Empty(t, rest.NextCursor)
+		})
 	})
 }
 
 // Several categories are read one at a time and merged
-// (events.ListEachCategory). The pages must be the ones a single ordered read
+// (events.ListEach). The pages must be the ones a single ordered read
 // of those categories would serve: every event once, in order, whichever
 // category the page's last row was in.
-func TestEventStatements_ListEachCategory(t *testing.T) {
+func TestEventStatements_ListEach(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)
 		ensureEventProject(t, d.stmts, projectID)
@@ -265,7 +309,7 @@ func TestEventStatements_ListEachCategory(t *testing.T) {
 					opts := events.ListOptions(projectID, 2)
 					opts.Pagination.OrderBy = tc.order
 					opts.Pagination.Cursor = cursor
-					page, err := events.ListEachCategory(t.Context(), d.stmts.ListEvents, opts, categories)
+					page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldCategory, categories)
 					require.NoError(t, err)
 					require.LessOrEqual(t, len(page.Items), 2)
 					got = append(got, eventIDs(page.Items)...)
@@ -280,7 +324,7 @@ func TestEventStatements_ListEachCategory(t *testing.T) {
 
 		t.Run("no token after a page that ends the list", func(t *testing.T) {
 			opts := events.ListOptions(projectID, uint32(len(oldestFirst)))
-			page, err := events.ListEachCategory(t.Context(), d.stmts.ListEvents, opts, categories)
+			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldCategory, categories)
 			require.NoError(t, err)
 			assert.Equal(t, oldestFirst, eventIDs(page.Items))
 			assert.Empty(t, page.NextCursor)

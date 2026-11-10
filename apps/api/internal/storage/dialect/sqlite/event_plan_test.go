@@ -67,6 +67,38 @@ func TestListEvents_FilterPlans(t *testing.T) {
 			filter: database.Equal(database.Col(domain.EventFieldFlowID), "flow_1"),
 			search: "SEARCH events USING INDEX idx_events_project_flow (project_id=? AND flow_id=?",
 		},
+		{
+			name:   "one type",
+			filter: database.Equal(database.Col(domain.EventFieldEventType), "user.created"),
+			search: "SEARCH events USING INDEX idx_events_project_type (project_id=? AND event_type=?",
+		},
+		{
+			name:   "one resource",
+			filter: database.Equal(database.Col(domain.EventFieldEntityID), "user_2"),
+			search: "SEARCH events USING INDEX idx_events_project_entity (project_id=? AND entity_id=?",
+		},
+		{
+			// One read of the merge across categories (events.ListEach).
+			name: "one actor in one category",
+			filter: database.And(
+				database.Equal(database.Col(domain.EventFieldActorID), "user_1"),
+				database.Equal(database.Col(domain.EventFieldCategory), "admin"),
+			),
+			search: "SEARCH events USING INDEX idx_events_project_actor_category (project_id=? AND actor_id=? AND category=?",
+		},
+		{
+			// A session's own events are few: its index finds them, and the
+			// categories filter what it found.
+			name: "one session, several categories",
+			filter: database.And(
+				database.Or(
+					database.Equal(database.Col(domain.EventFieldCategory), "auth"),
+					database.Equal(database.Col(domain.EventFieldCategory), "admin"),
+				),
+				database.Equal(database.Col(domain.EventFieldSessionID), "sess_1"),
+			),
+			search: "SEARCH events USING INDEX idx_events_project_session (project_id=? AND session_id=?",
+		},
 	} {
 		for _, page := range []struct {
 			name   string

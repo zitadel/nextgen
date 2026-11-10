@@ -83,10 +83,8 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *List
 
 	list := s.v2Pool.Statements().ListEvents
 	var result *database.ListResult[*domain.Event]
-	if len(req.Categories) > 1 {
-		// One read per category, merged: each is a range of the category
-		// index, where one statement over several categories is not.
-		result, err = events.ListEachCategory(ctx, list, opts, req.Categories)
+	if field, values := readEach(req); len(values) > 1 {
+		result, err = events.ListEach(ctx, list, opts, field, values)
 	} else {
 		result, err = list(ctx, opts)
 	}
@@ -138,21 +136,74 @@ func (s *EventService) projectEventsVisible(ctx context.Context, projectID strin
 	return projectIsClaimed(ctx, s.v2Pool.Statements(), projectID)
 }
 
+// readEach says which field's values List reads one at a time and merges
+// (events.ListEach), so that each read is a range of one index, in order, and
+// stops at the page. It returns no values for a list that one read serves.
+//
+//   - A request, a session, a login flow and a resource each hold few events.
+//     Their index finds those, and whatever else is asked filters them: one
+//     read.
+//   - One actor's events are indexed by category, then time. An actor's
+//     events are mostly its API requests, so a read across categories, named
+//     or not, reads each category on its own.
+//   - Several categories are a range each of the category index.
+//   - Several event types, with nothing beside them, are a range each of the
+//     type index.
+//
+// Anything else is one read with every filter in it, as before. That includes
+// the combinations no index serves in order, such as a type beside a category
+// or an actor.
+func readEach(req ListEventsRequest) (domain.EventField, []string) {
+	if req.RequestID != "" || req.SessionID != "" || req.FlowID != "" || req.EntityID != "" {
+		return domain.EventFieldUnspecified, nil
+	}
+	if len(req.EventTypes) > 0 {
+		if len(req.EventTypes) > 1 && len(req.Categories) == 0 && req.ActorID == "" {
+			return domain.EventFieldEventType, req.EventTypes
+		}
+		return domain.EventFieldUnspecified, nil
+	}
+	if req.ActorID != "" && len(req.Categories) == 0 {
+		categories := domain.EventCategories()
+		all := make([]string, len(categories))
+		for i, category := range categories {
+			all[i] = string(category)
+		}
+		return domain.EventFieldCategory, all
+	}
+	if len(req.Categories) > 1 {
+		return domain.EventFieldCategory, req.Categories
+	}
+	return domain.EventFieldUnspecified, nil
+}
+
+// appendAnyOf adds "field is any of values" to filters; nothing for no values.
+func appendAnyOf(filters []database.Filter[domain.EventField], field domain.EventField, values []string) []database.Filter[domain.EventField] {
+	switch len(values) {
+	case 0:
+		return filters
+	case 1:
+		return append(filters, database.Equal(database.Col(field), values[0]))
+	}
+	ors := make([]database.Filter[domain.EventField], 0, len(values))
+	for _, value := range values {
+		ors = append(ors, database.Equal(database.Col(field), value))
+	}
+	return append(filters, database.Or(ors...))
+}
+
 func listEventsOptions(req ListEventsRequest) (*database.ListOptions[domain.EventField], error) {
 	filters := make([]database.Filter[domain.EventField], 0, 16)
 	filters = append(filters, database.Equal(database.Col(domain.EventFieldProjectID), req.ProjectID))
 
-	// Several categories are not part of the filter: List reads them one at a
-	// time (events.ListEachCategory).
-	if len(req.Categories) == 1 {
-		filters = append(filters, database.Equal(database.Col(domain.EventFieldCategory), req.Categories[0]))
+	// The values List reads one at a time are not part of the filter:
+	// events.ListEach adds each to its own read.
+	each, _ := readEach(req)
+	if each != domain.EventFieldCategory {
+		filters = appendAnyOf(filters, domain.EventFieldCategory, req.Categories)
 	}
-	if len(req.EventTypes) > 0 {
-		ors := make([]database.Filter[domain.EventField], 0, len(req.EventTypes))
-		for _, t := range req.EventTypes {
-			ors = append(ors, database.Equal(database.Col(domain.EventFieldEventType), t))
-		}
-		filters = append(filters, database.Or(ors...))
+	if each != domain.EventFieldEventType {
+		filters = appendAnyOf(filters, domain.EventFieldEventType, req.EventTypes)
 	}
 	if req.ActorID != "" {
 		filters = append(filters, database.Equal(database.Col(domain.EventFieldActorID), req.ActorID))

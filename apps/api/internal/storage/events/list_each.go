@@ -13,33 +13,35 @@ import (
 // ListFunc is a dialect's ListEvents.
 type ListFunc func(context.Context, *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
 
-// ListEachCategory serves one keyset page of the events in any of categories:
-// it reads the page of each category on its own and merges them in the
-// page's order.
+// ListEach serves one keyset page of the events whose field is any of values:
+// it reads the page of each value on its own and merges them in the page's
+// order. It is how a list over several categories, or several event types,
+// stays on an index.
 //
-// One read per category is what keeps the page on an index. A category's
-// events are a range of (project_id, category, created_at, id), already in
-// order, so each read stops at the page size. A single statement over several
-// categories has no such range: the database either walks every event of the
-// project until it has a page, or collects every match and sorts it.
+// The events of one value are a range of an index that ends in
+// (created_at, id), already in order, so each read stops at the page size. A
+// single statement over several values has no such range: the database either
+// walks every event of the project until it has a page, or collects every
+// match and sorts it.
 //
 // opts carries the rest of the filter, the order, the limit and the cursor,
-// and must not filter by category itself. The cursor is the list's own, the
-// last row's (created_at, id), so a token from one call resumes every
-// category behind that row, whichever category the row was in.
-func ListEachCategory(
+// and must not filter by field itself. The cursor is the list's own, the last
+// row's (created_at, id), so a token from one call resumes every value behind
+// that row, whichever value the row carried.
+func ListEach(
 	ctx context.Context,
 	list ListFunc,
 	opts *database.ListOptions[domain.EventField],
-	categories []string,
+	field domain.EventField,
+	values []string,
 ) (*database.ListResult[*domain.Event], error) {
 	page := opts.Pagination
 	var merged []*domain.Event
-	// A category that filled its own page may hold more behind it.
+	// A value that filled its own page may hold more behind it.
 	more := false
-	for _, category := range uniqueCategories(categories) {
+	for _, value := range unique(values) {
 		sub := *opts
-		sub.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCategory), category))
+		sub.Filter = database.And(opts.Filter, database.Equal(database.Col(field), value))
 		res, err := list(ctx, &sub)
 		if err != nil {
 			return nil, err
@@ -56,7 +58,7 @@ func ListEachCategory(
 		return order
 	})
 
-	// The first rows of the merge are the page: no category holds a row that
+	// The first rows of the merge are the page: no value holds a row that
 	// belongs before the last of its own first page.
 	if page.Limit != 0 && uint64(len(merged)) > uint64(page.Limit) {
 		merged = merged[:page.Limit]
@@ -70,13 +72,13 @@ func ListEachCategory(
 	return result, nil
 }
 
-// uniqueCategories drops a category named twice, which would list its events twice.
-func uniqueCategories(categories []string) []string {
-	unique := make([]string, 0, len(categories))
-	for _, category := range categories {
-		if !slices.Contains(unique, category) {
-			unique = append(unique, category)
+// unique drops a value named twice, which would list its events twice.
+func unique(values []string) []string {
+	distinct := make([]string, 0, len(values))
+	for _, value := range values {
+		if !slices.Contains(distinct, value) {
+			distinct = append(distinct, value)
 		}
 	}
-	return unique
+	return distinct
 }
