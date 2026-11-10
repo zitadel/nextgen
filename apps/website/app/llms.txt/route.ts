@@ -26,7 +26,7 @@ ${[folderCommand, ...commands].join("\n")}
 
 ${files}
 
-To change the user model or the login flow, edit those files, then publish the change: \`${dryRunCommand}\` shows what changes, \`${deployCommand} -m "<why this release changes>"\` makes it live (a non-interactive run needs \`-m\` unless a clean git commit supplies the message). To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet, and restyle its card, fields and buttons with \`::part()\`.
+To change the user model or the login flow, edit those files and commit \`.zitadel/\` (a release records the commit it was built from, and the commit's subject is its message), then publish the change: \`${dryRunCommand}\` shows what changes, \`${deployCommand}\` makes it live. To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet, and restyle its card, fields and buttons with \`::part()\`.
 
 Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 

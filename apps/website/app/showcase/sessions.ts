@@ -56,13 +56,13 @@ const registration: Page = { url: "localhost:3000/register", screens: [register]
 export const loginAfterFlowChange: Page = { url: login.url, screens: [signInWithPassword, done] };
 
 // The showcase's recorded steps, from zitadel/new-website's narrative redesign
-// (its homepage's terminalSection), re-recorded on 5 November 2026 with
-// @zitadel/cli 0.4.0, the hero's commands: the first step is what that
+// (its homepage's terminalSection), re-recorded on 10 November 2026 with
+// @zitadel/cli 0.5.0, the hero's commands: the first step is what that
 // session's start printed; the second the files its setup wrote (the rest it
 // summed up as "env, project config, the editable user schema and login
-// flow"); the next two its recorded diffs and command output, each deploy's
-// digest cut short. The pages beside them are the screens above, as that
-// session's app served them.
+// flow"); the next two its recorded diffs and command output, each change
+// committed before its dry run and each deploy's digest cut short. The pages
+// beside them are the screens above, as that session's app served them.
 // Re-record rather than edit when the CLI changes (AGENTS.md). The last step,
 // the brand, is live (brand-row.tsx).
 export const sessions: Session[] = [
@@ -102,7 +102,7 @@ export const sessions: Session[] = [
   {
     label: "Add a field",
     description:
-      "Add a property to the user schema, ask for it on the registration step, do a dry run, deploy. The form shows it.",
+      "Add a property to the user schema, ask for it on the registration step, commit, do a dry run, deploy. The form shows it.",
     artifact: {
       files: [
         {
@@ -134,7 +134,7 @@ export const sessions: Session[] = [
         },
         {
           command: deployCommand,
-          output: "Deployed sha256:edf544a5…\n  3 resources to 1 origin\n  - http://localhost:3000",
+          output: "Deployed sha256:a2807ed6…\n  3 resources to 1 origin\n  - http://localhost:3000",
         },
       ],
     },
@@ -147,7 +147,7 @@ export const sessions: Session[] = [
   {
     label: "Change the flow",
     description:
-      "Change what a step asks for and where it goes next, do a dry run, deploy. The login follows.",
+      "Change what a step asks for and where it goes next, commit, do a dry run, deploy. The login follows.",
     artifact: {
       // After the change the identifier step asks for the password too: its
       // pill shows it, or the flow would look like it lost the password.
@@ -180,7 +180,7 @@ export const sessions: Session[] = [
         },
         {
           command: deployCommand,
-          output: "Deployed sha256:e660e797…\n  3 resources to 1 origin\n  - http://localhost:3000",
+          output: "Deployed sha256:7166cbe0…\n  3 resources to 1 origin\n  - http://localhost:3000",
         },
       ],
     },
