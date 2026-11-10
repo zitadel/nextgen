@@ -510,6 +510,51 @@ describe("resources the platform rejected", () => {
     );
   });
 
+  it("appends the fields a connection may not change", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.field_immutable",
+            kind: "idp",
+            handle: "zitadel-cloud",
+            message:
+              "identity provider connection: the field is fixed for the life of the connection",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp zitadel-cloud: identity provider connection: the field is fixed for the life of the connection: oidc.issuer.",
+    );
+  });
+
+  it("appends the endpoints a connection left out", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.endpoints_partial",
+            kind: "idp",
+            handle: "acme-sso",
+            message: "identity provider connection: the endpoints are partially set",
+            details: { details: { missing: ["jwks_uri", "token_endpoint"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp acme-sso: identity provider connection: the endpoints are partially set: jwks_uri, token_endpoint.",
+    );
+  });
+
   it("adds no hint when a resource has no message", () => {
     expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
       undefined,

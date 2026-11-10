@@ -49,7 +49,7 @@ import { formatDateTime } from "@/lib/date";
  * that counts no usage says so.
  */
 export const Route = createFileRoute("/_authed/usage/")({
-  staticData: { scope: "project", nav: { label: "Usage", order: 9, icon: ChartColumn } },
+  staticData: { scope: "project", nav: { label: "Usage", order: 10, icon: ChartColumn } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);

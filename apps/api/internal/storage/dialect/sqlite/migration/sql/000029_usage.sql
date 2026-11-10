@@ -1,5 +1,5 @@
 -- +goose Up
--- See the postgres peer (000039_usage.sql). Times are unix nanoseconds.
+-- See the postgres peer (000042_usage.sql). Times are unix nanoseconds.
 -- +goose StatementBegin
 CREATE TABLE usage_first_seen (
     project_id  TEXT NOT NULL,

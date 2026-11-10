@@ -44,6 +44,7 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`).
 - **Branding** (`/branding`).
 - **Authentication** (`/authentication`).
+- **Logs** (`/events`, `/events/$eventId`): the project's events.
 - **Usage** (`/usage`), the project's usage this UTC month, which the hosted
   cloud's add-on prices (`usagePrices`, Console ADR 0006).
 - **Project settings** (`/project`).

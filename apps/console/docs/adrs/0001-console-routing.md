@@ -225,6 +225,18 @@ the sidebar.
 > anything beneath it shows Settings' (`view: "settings"`), under a heading
 > row that leads back to Projects.
 
+> **Amendment (2026-11-10, design decision D30):** `/events` with anything
+> beneath it shows a list of its own too, Logs' (`NavView` `"logs"`), under a
+> heading row that leads back to the project's landing route, `/`. The route
+> still picks the list, and it is the first whose rows are not
+> `staticData.nav` entries: no route declares `view: "logs"`. Its rows are the
+> views of the one Logs screen and its filters, which live in that route's
+> search params (`validateSearch`) and which the events feature draws
+> (`src/features/events/components/logs-nav.tsx`). A Logs URL therefore
+> restores the list, the view and the filters on a refresh. A screen gets such
+> a list only when its views and filters are navigation the way Logs' are;
+> every other entry stays a route with `staticData.nav`.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;

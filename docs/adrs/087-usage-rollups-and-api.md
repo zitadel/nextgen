@@ -78,7 +78,7 @@ prices a new meter from the first of the following month.
 ### 2. Rollup tables, written only by the projector
 
 ```sql
--- Postgres (migration 000039); Spanner and SQLite mirror it.
+-- Postgres (migration 000042); Spanner and SQLite mirror it.
 CREATE TABLE zitadel_nextgen.usage_first_seen (
     project_id  TEXT COLLATE "C" NOT NULL
     , meter     TEXT COLLATE "C" NOT NULL

@@ -55,6 +55,12 @@ INSERT INTO events (
     payload, metadata
 FROM events`
 
+	// eventScanSelect and eventScanFrom are ScanEvents' statement, around the
+	// expression that says whether a row matched.
+	eventScanSelect = `SELECT id, created_at, `
+	eventScanFrom   = `
+FROM events`
+
 	deleteEventsOlderThanStmt = `
 DELETE FROM events
 WHERE created_at < ?`
@@ -179,6 +185,48 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 		Items:      items,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// ScanEvents implements [service.EventStatements]. It reads the rows of one
+// index range, within, in its order and no further than its limit, and says
+// of each whether it satisfies match. match is not part of the WHERE: the
+// database then has nothing to choose another index by, so the read is the
+// range and stops at the limit, whatever the data. A nil match matches every
+// row.
+func (e eventStatements) ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error) {
+	var compiler statementCompiler
+	compiler.WriteString(eventScanSelect)
+	if match == nil {
+		compiler.WriteString("1")
+	} else {
+		compiler.WriteString("CASE WHEN ")
+		compileFilter(&compiler, match, events.Schema)
+		compiler.WriteString(" THEN 1 ELSE 0 END")
+	}
+	if err := compileRead(&compiler, eventScanFrom, within, events.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := e.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	scanned, err := collectRows(rows, func(row *sql.Rows) (events.Scanned, error) {
+		var (
+			s           events.Scanned
+			createdNano int64
+			matched     int64
+		)
+		if err := row.Scan(&s.ID, &createdNano, &matched); err != nil {
+			return s, err
+		}
+		s.CreatedAt = timeFromUnixNano(createdNano)
+		s.Matched = matched != 0
+		return s, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return scanned, nil
 }
 
 // DeleteEventsOlderThan implements [service.EventStatements].

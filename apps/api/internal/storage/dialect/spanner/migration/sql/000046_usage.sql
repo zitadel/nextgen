@@ -1,6 +1,6 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- See the postgres peer (000039_usage.sql).
+-- See the postgres peer (000042_usage.sql).
 -- +goose StatementBegin
 CREATE TABLE usage_first_seen (
     project_id  STRING(MAX) NOT NULL,
