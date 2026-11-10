@@ -97,6 +97,9 @@ func (s *applicationService) create(ctx context.Context, projectID string, next 
 		if err := stmts.CreateApplication(ctx, entity, clients); err != nil {
 			return err
 		}
+		if err := storeClientSecrets(ctx, stmts, clients, plain); err != nil {
+			return err
+		}
 		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationCreated, entity, domain.ApplicationPayloadSnapshot(entity, next, clients))
 	})
 	if err == nil {
@@ -169,6 +172,9 @@ func (s *applicationService) revise(ctx context.Context, existing *domain.Applic
 		if err := stmts.ReviseApplication(ctx, entity, clients); err != nil {
 			return err
 		}
+		if err := storeClientSecrets(ctx, stmts, clients, plain); err != nil {
+			return err
+		}
 		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationUpdated, entity, domain.ApplicationPayloadDelta(stored, next, entity, clients))
 	})
 	if err == nil {
@@ -186,8 +192,8 @@ func (s *applicationService) revise(ctx context.Context, existing *domain.Applic
 	return nil, domain.ErrInternal(err).WithMessage("failed to revise application")
 }
 
-// newClients builds a stored client with a fresh secret for each slug in
-// added, and returns the plaintext secrets in the same order.
+// newClients builds a client and a fresh secret for each slug in added, and
+// returns the plaintext secrets in the same order.
 func (s *applicationService) newClients(projectID string, next domain.ApplicationDocument, added []string) ([]*domain.ApplicationClient, []string, error) {
 	clients := make([]*domain.ApplicationClient, 0, len(added))
 	plain := make([]string, 0, len(added))
@@ -199,7 +205,7 @@ func (s *applicationService) newClients(projectID string, next domain.Applicatio
 		if err != nil {
 			return nil, nil, domain.ErrInternal(err).WithMessage("failed to generate client secret")
 		}
-		stored := &domain.ApplicationClient{ProjectID: projectID, Slug: client.Slug, SecretHash: domain.HashSecret(secret)}
+		stored := &domain.ApplicationClient{ProjectID: projectID, Slug: client.Slug}
 		if client.ClientID != nil {
 			stored.ClientID = *client.ClientID
 		}
@@ -207,6 +213,19 @@ func (s *applicationService) newClients(projectID string, next domain.Applicatio
 		plain = append(plain, secret)
 	}
 	return clients, plain, nil
+}
+
+// storeClientSecrets stores the hash of plain[i] as the secret of clients[i].
+// It runs after the write that gave the clients their ids, in the same
+// transaction.
+func storeClientSecrets(ctx context.Context, stmts AllStatements, clients []*domain.ApplicationClient, plain []string) error {
+	for i, client := range clients {
+		secret := &domain.ApplicationClientSecret{ProjectID: client.ProjectID, ApplicationClientID: client.ID, SecretHash: domain.HashSecret(plain[i])}
+		if err := stmts.CreateApplicationClientSecret(ctx, secret); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // clientIDTaken returns client_id_taken when another client of the project

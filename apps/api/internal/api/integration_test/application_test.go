@@ -33,9 +33,13 @@ func TestCreateApplication(t *testing.T) {
 	})
 
 	t.Run("only the hash of the secret is stored", func(t *testing.T) {
-		stored, err := harness.EnsureServiceDB(t).Statements().GetApplicationClientByClientID(t.Context(), f.project.ID, web.ClientID)
+		stmts := harness.EnsureServiceDB(t).Statements()
+		client, err := stmts.GetApplicationClientByClientID(t.Context(), f.project.ID, web.ClientID)
 		require.NoError(t, err)
-		assert.Equal(t, domain.HashSecret(web.Secret), stored.SecretHash)
+		secrets, err := stmts.ListApplicationClientSecrets(t.Context(), f.project.ID, client.ID)
+		require.NoError(t, err)
+		require.Len(t, secrets, 1)
+		assert.Equal(t, domain.HashSecret(web.Secret), secrets[0].SecretHash)
 	})
 
 	// The stored client is sent back without its client_id: it keeps the one it has.

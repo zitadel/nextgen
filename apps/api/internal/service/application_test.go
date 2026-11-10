@@ -39,13 +39,13 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 				require.Len(t, clients, 2)
 				assert.Equal(t, "", clients[0].ClientID, "storage generates the id the document left out")
 				assert.Equal(t, "shop-admin", clients[1].ClientID)
-				assert.Equal(t, domain.HashSecret("sk_client_1"), clients[0].SecretHash)
-				assert.Equal(t, domain.HashSecret("sk_client_2"), clients[1].SecretHash)
 				app.ID, app.RevisionID = "app_1", "apprev_1"
+				clients[0].ID, clients[1].ID = "client_1", "client_2"
 				clients[0].ClientID = "client_1"
 				return nil
 			},
 		)
+		secrets := f.expectSecrets(2)
 
 		got, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
 		require.NoError(t, err)
@@ -55,6 +55,10 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 			{Slug: "web", ClientID: "client_1", Secret: "sk_client_1"},
 			{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_2"},
 		}, got.Secrets)
+		assert.Equal(t, []*domain.ApplicationClientSecret{
+			{ProjectID: appProjectID, ApplicationClientID: "client_1", SecretHash: domain.HashSecret("sk_client_1")},
+			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_client_2")},
+		}, *secrets, "each client stores the hash of the secret it was returned")
 
 		require.Len(t, *f.events, 1)
 		ev := (*f.events)[0]
@@ -78,14 +82,19 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 				require.Len(t, clients, 1)
 				assert.Equal(t, "admin", clients[0].Slug)
 				app.RevisionID = "apprev_2"
+				clients[0].ID = "client_2"
 				return nil
 			},
 		)
+		secrets := f.expectSecrets(1)
 
 		got, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
 		require.NoError(t, err)
 		assert.False(t, got.Created)
 		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_1"}}, got.Secrets)
+		assert.Equal(t, []*domain.ApplicationClientSecret{
+			{ProjectID: appProjectID, ApplicationClientID: "client_2", SecretHash: domain.HashSecret("sk_client_1")},
+		}, *secrets)
 
 		require.Len(t, *f.events, 1)
 		ev := (*f.events)[0]
@@ -185,6 +194,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		*f.eventErr = errors.New("event insert failed")
 		f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
 		f.tx.EXPECT().CreateApplication(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		f.expectSecrets(1)
 
 		got, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb))
 		assert.ErrorIs(t, err, domain.ErrInternal(nil))
@@ -288,6 +298,19 @@ func (f applicationFixture) expectLockedRead(current *domain.Application) {
 		f.tx.EXPECT().LockApplication(gomock.Any(), current.ProjectID, current.ID).Return(nil),
 		f.tx.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(current, nil),
 	)
+}
+
+// expectSecrets expects n client secrets stored inside the transaction and
+// returns them in the order they were stored.
+func (f applicationFixture) expectSecrets(n int) *[]*domain.ApplicationClientSecret {
+	secrets := new([]*domain.ApplicationClientSecret)
+	f.tx.EXPECT().CreateApplicationClientSecret(gomock.Any(), gomock.Any()).Times(n).DoAndReturn(
+		func(_ context.Context, secret *domain.ApplicationClientSecret) error {
+			*secrets = append(*secrets, secret)
+			return nil
+		},
+	)
+	return secrets
 }
 
 // storedShop holds client web with the client_id storage filled in.
