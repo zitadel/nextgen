@@ -81,6 +81,54 @@ func TestEventService_List_claimedAppliesFilters(t *testing.T) {
 	assert.Equal(t, "evt_1", resp.Events[0].ID)
 }
 
+// Several categories are one read each, merged in the page's order, so each
+// read is a range of the category index. One statement over all of them
+// would walk the project's events or sort every match.
+func TestEventService_List_readsEachCategoryOnItsOwn(t *testing.T) {
+	svc, stmts := newMockedEventService(t)
+
+	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
+
+	at := time.Date(2026, 11, 10, 8, 0, 0, 0, time.UTC)
+	event := func(id string, category domain.EventCategory, second int) *domain.Event {
+		return &domain.Event{ProjectID: "proj_1", ID: id, Category: category, CreatedAt: at.Add(time.Duration(second) * time.Second)}
+	}
+	byCategory := map[domain.EventCategory][]*domain.Event{
+		domain.EventCategoryAuth:   {event("evt_4", domain.EventCategoryAuth, 4), event("evt_1", domain.EventCategoryAuth, 1)},
+		domain.EventCategoryEntity: {event("evt_3", domain.EventCategoryEntity, 3), event("evt_2", domain.EventCategoryEntity, 2)},
+	}
+	var asked []database.Filter[domain.EventField]
+	stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).Times(2).
+		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
+			asked = append(asked, opts.Filter)
+			assert.Equal(t, uint32(3), opts.Pagination.Limit, "each category is asked for a whole page")
+			// In the order the service names the categories.
+			category := []domain.EventCategory{domain.EventCategoryAuth, domain.EventCategoryEntity}[len(asked)-1]
+			return &database.ListResult[*domain.Event]{Items: byCategory[category]}, nil
+		})
+
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{
+		ProjectID:  "proj_1",
+		Categories: []string{"auth", "entity"},
+		Limit:      3,
+	})
+	require.NoError(t, err)
+
+	project := database.Equal(database.Col(domain.EventFieldProjectID), "proj_1")
+	category := func(c string) database.Filter[domain.EventField] {
+		return database.And(database.And(project), database.Equal(database.Col(domain.EventFieldCategory), c))
+	}
+	assert.Equal(t, []database.Filter[domain.EventField]{category("auth"), category("entity")}, asked)
+
+	ids := make([]string, len(resp.Events))
+	for i, e := range resp.Events {
+		ids[i] = e.ID
+	}
+	assert.Equal(t, []string{"evt_4", "evt_3", "evt_2"}, ids, "newest first across both categories, cut at the page")
+	assert.NotEmpty(t, resp.NextPageToken, "a fourth event is left behind the page")
+}
+
 // Paging forward, a token passes every event before its page, so an ascending
 // list ends where the project's events are still settling: an event that
 // commits behind a page would be skipped for good.

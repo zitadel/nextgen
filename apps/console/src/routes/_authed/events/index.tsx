@@ -62,9 +62,11 @@ import { cn } from "@/lib/utils";
  * **All** reads both. The filters narrow that further, and live in the URL
  * like the tab: they are server-side, so they belong to the request the
  * loader makes. **Category** is chosen on the title row. The rest match one
- * value an event carries (its type, actor, resource, request, session or
- * login flow) and are set from an event: a row's menu here, or the links on
- * the event's page. Once set, each shows on the title row and clears there.
+ * value an event carries (its request, session or login flow) and are set
+ * from an event: a row's menu here, or the links on the event's page. Once
+ * set, each shows on the title row and clears there. Every filter here is one
+ * an index serves on the server (`VALUE_FILTERS`): a filter that reads every
+ * event of the project is not offered.
  *
  * The list is a snapshot of the moment it loaded: **Refresh** reads it again
  * from the newest event.

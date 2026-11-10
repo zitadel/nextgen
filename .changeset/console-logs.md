@@ -2,4 +2,6 @@
 "@zitadel/server": minor
 ---
 
-The console has a Logs screen: a project's events, newest first, on tabs for audit events, API requests and all, filtered by category or, from any event, by its type, actor, resource, request, session or login flow. A row opens the event. `GET /events` and `GET /events/{id}` now accept the console's session cookie as well as a bearer token ([Events](https://preview.zitadel.com/docs/reference/api/events)).
+The console has a Logs screen: a project's events, newest first, on tabs for audit events, API requests and all, filtered by category or, from any event, by its request, session or login flow. `GET /events` and `GET /events/{id}` now accept the console's session cookie, and `GET /events` answers those filters from an index instead of reading every event ([Events](https://preview.zitadel.com/docs/reference/api/events)).
+
+**Upgrading:** the migration builds four indexes on `events`. On Postgres it builds them without blocking writes, and takes longer the more events you keep.

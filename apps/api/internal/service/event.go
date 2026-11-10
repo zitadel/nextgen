@@ -81,7 +81,15 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *List
 		}
 	}
 
-	result, err := s.v2Pool.Statements().ListEvents(ctx, opts)
+	list := s.v2Pool.Statements().ListEvents
+	var result *database.ListResult[*domain.Event]
+	if len(req.Categories) > 1 {
+		// One read per category, merged: each is a range of the category
+		// index, where one statement over several categories is not.
+		result, err = events.ListEachCategory(ctx, list, opts, req.Categories)
+	} else {
+		result, err = list(ctx, opts)
+	}
 	if err != nil {
 		return nil, mapListError(err, "failed to list events")
 	}
@@ -134,12 +142,10 @@ func listEventsOptions(req ListEventsRequest) (*database.ListOptions[domain.Even
 	filters := make([]database.Filter[domain.EventField], 0, 16)
 	filters = append(filters, database.Equal(database.Col(domain.EventFieldProjectID), req.ProjectID))
 
-	if len(req.Categories) > 0 {
-		ors := make([]database.Filter[domain.EventField], 0, len(req.Categories))
-		for _, c := range req.Categories {
-			ors = append(ors, database.Equal(database.Col(domain.EventFieldCategory), c))
-		}
-		filters = append(filters, database.Or(ors...))
+	// Several categories are not part of the filter: List reads them one at a
+	// time (events.ListEachCategory).
+	if len(req.Categories) == 1 {
+		filters = append(filters, database.Equal(database.Col(domain.EventFieldCategory), req.Categories[0]))
 	}
 	if len(req.EventTypes) > 0 {
 		ors := make([]database.Filter[domain.EventField], 0, len(req.EventTypes))
