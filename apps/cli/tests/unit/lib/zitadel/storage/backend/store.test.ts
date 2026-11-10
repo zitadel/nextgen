@@ -13,6 +13,11 @@ import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 const IDP_A = `${CONFIG_DIRECTORIES.connections}/a.json`;
 
 /**
+ * A directory beside the connection files, which a symlink can point at.
+ */
+const KEPT = `${CONFIG_DIRECTORIES.connections}/kept`;
+
+/**
  * Another connection's file, which sorts after {@link IDP_A}.
  */
 const IDP_B = `${CONFIG_DIRECTORIES.connections}/b.json`;
@@ -381,16 +386,24 @@ describe("Store.remove", () => {
       expect(error).toBeUndefined();
     });
 
-    it("removes a symlink to a directory as the link it is", async ({ dir, other }) => {
+    it("removes a symlink to a directory", async ({ dir, other }) => {
       const { store, project } = open(dir, other);
-      const kept = `${CONFIG_DIRECTORIES.connections}/kept`;
-      await project.directory(kept);
-      await project.symlink(kept, IDP_A);
+      await project.directory(KEPT);
+      await project.symlink(KEPT, IDP_A);
 
       await store.remove(IDP_A);
 
       expect(await store.exists(IDP_A)).toBe(false);
-      expect(await store.exists(kept)).toBe(true);
+    });
+
+    it("keeps the directory a removed symlink pointed at", async ({ dir, other }) => {
+      const { store, project } = open(dir, other);
+      await project.directory(KEPT);
+      await project.symlink(KEPT, IDP_A);
+
+      await store.remove(IDP_A);
+
+      expect(await store.exists(KEPT)).toBe(true);
     });
 
     it("refuses a directory where the file should be", async ({ dir, other }) => {
@@ -402,6 +415,16 @@ describe("Store.remove", () => {
       });
 
       expect(error).toBeInstanceOf(ConfigError);
+    });
+
+    it("names the directory it refuses to remove", async ({ dir, other }) => {
+      const { store, project } = open(dir, other);
+      await project.directory(IDP_A);
+
+      const error = await rejectionOf(() => {
+        return store.remove(IDP_A);
+      });
+
       expect(error).toMatchObject({ details: { file: IDP_A, code: "EISDIR" } });
     });
 
@@ -467,6 +490,16 @@ describe("Store.assertRemovable", () => {
       });
 
       expect(error).toBeInstanceOf(ConfigError);
+    });
+
+    it("names the directory it refuses as removable", async ({ dir, other }) => {
+      const { store, project } = open(dir, other);
+      await project.directory(IDP_A);
+
+      const error = thrownBy(() => {
+        store.assertRemovable(IDP_A);
+      });
+
       expect(error).toMatchObject({ details: { file: IDP_A, code: "EISDIR" } });
     });
 
