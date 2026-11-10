@@ -11,7 +11,7 @@ import {
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
 import type { Issue } from "@/lib/zitadel/rules/types";
-import { MemoryStore } from "@/lib/zitadel/storage";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { thrownBy } from "@tests/helpers/thrown-value";

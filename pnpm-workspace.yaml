@@ -104,6 +104,7 @@ catalog:
   lucide: ^1.16.0
   lucide-react: ^1.16.0
   marked: ^18.0.14
+  memfs: ^4.80.0
   msw: ^2.14.6
   msw-storybook-addon: ^3.0.3
   next: ^16.3.8
@@ -254,3 +255,13 @@ skills:
 # platform, pnpm 12's check reinstalls them all over an install made with
 # --os=current --cpu=current, which breaks the Vercel services' shared node_modules.
 verifyDepsBeforeRun: false
+
+# orval dedupes each union it generates by splitting it on its top-level `|`,
+# and reads a quote or bracket in a member's JSDoc as code. An odd number of
+# apostrophes in the event docs makes it cut members apart and drop repeated
+# pieces, so `@zitadel/api` loses fields. The patch skips comments in that scan;
+# packages/api/scripts/orval-union.spec.ts holds it. An orval bump fails the
+# install until the patch is moved to the new version, or dropped once orval's
+# own dedupeUnionType skips comments.
+patchedDependencies:
+  '@orval/core@8.42.0': patches/@orval__core@8.42.0.patch
