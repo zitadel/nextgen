@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CONFIG_DIRECTORIES, MemoryStore } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, MemoryStore, UnparsedFile } from "@/lib/zitadel";
 
 /**
  * A connection's file.
@@ -28,7 +28,7 @@ describe("MemoryStore.get", () => {
 
 describe("MemoryStore.read", () => {
   it("hands a file it holds unparsed on as it is, without a body", async () => {
-    const unparsed = { path: IDP, unparsed: "invalid JSON at position 2" };
+    const unparsed = UnparsedFile.invalidJson(IDP, "{ not json");
     const store = new MemoryStore([unparsed]);
 
     const files = await store.read("connections");
@@ -37,7 +37,7 @@ describe("MemoryStore.read", () => {
   });
 
   it("holds no body for a file it holds unparsed", () => {
-    const store = new MemoryStore([{ path: IDP, unparsed: "not a JSON object" }]);
+    const store = new MemoryStore([UnparsedFile.notAnObject(IDP)]);
 
     const body = store.get(IDP);
 

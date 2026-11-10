@@ -48,6 +48,12 @@ const TEMPLATE = `${CONFIG_DIRECTORIES.branding}/login.liquid`;
 const MAIN = "<main></main>";
 
 /**
+ * A secret pasted into a file by mistake, short enough that V8 would quote all
+ * of it (it quotes at most 10 characters of the token it choked on).
+ */
+const PASTED = "pasted_v";
+
+/**
  * Whether the tests run as root, whom no file mode keeps out.
  */
 const AS_ROOT = process.getuid?.() === 0;
@@ -67,20 +73,30 @@ const itWithLockedConnections = it.extend<{ locked: string }>({
 });
 
 describe("DiskStore.read", () => {
-  it("hands a file that is not valid json on as unparsed, naming the position", async ({ dir }) => {
-    await write(dir, { [IDP]: "{ not json" });
+  it("hands a file that is not valid json on as unparsed, naming the line and column", async ({
+    dir,
+  }) => {
+    await write(dir, { [IDP]: '{\n  "a": 1,\n  "b": "\\x"\n}' });
 
     const files = await new DiskStore(dir).read("connections");
 
-    expect(files).toEqual([{ path: IDP, unparsed: "invalid JSON at position 2" }]);
+    expect(files).toEqual([{ path: IDP, unparsed: "invalid JSON at line 3, column 10" }]);
+  });
+
+  it("names the line and column of an error the parser gives no position for", async ({ dir }) => {
+    await write(dir, { [IDP]: `{\n  "secret": ${PASTED}\n}` });
+
+    const files = await new DiskStore(dir).read("connections");
+
+    expect(files).toEqual([{ path: IDP, unparsed: "invalid JSON at line 2, column 13" }]);
   });
 
   it("keeps the file's text out of the reason it could not be parsed", async ({ dir }) => {
-    await write(dir, { [IDP]: '{"secret": sk_live_123}' });
+    await write(dir, { [IDP]: `{"secret": ${PASTED}}` });
 
     const files = await new DiskStore(dir).read("connections");
 
-    expect(JSON.stringify(files)).not.toContain("sk_live_123");
+    expect(JSON.stringify(files)).not.toContain(PASTED);
   });
 
   it("hands a directory named like a file on as unparsed, naming it", async ({ dir }) => {

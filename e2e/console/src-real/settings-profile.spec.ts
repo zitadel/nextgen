@@ -4,7 +4,7 @@ import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
 /**
- * Account settings → Settings (the profile), against a real instance.
+ * Settings → Profile, against a real instance.
  *
  * The unit spec stubs `GET /users/me`. This proves the signed-in person's own
  * record reaches the screen through the session cookie alone: the email shown
@@ -19,14 +19,23 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
 
   await page.goto("/settings/profile");
 
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
 
   const email = page.getByLabel("Email", { exact: true });
   await expect(email).toHaveValue(user.email);
   await expect(email).toBeDisabled();
 
-  const nav = page.getByRole("navigation", { name: "Account settings" });
-  await expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("link", { name: "Back to dashboard" })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Settings" });
+  await expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("aria-current", "page");
+  // Above every project: the pill names none, and the list's heading leads
+  // back up to the account's list, which Projects heads.
+  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("All projects");
+  await nav.getByRole("link", { name: "Settings: back to Projects" }).click();
+  const account = page.getByRole("navigation", { name: "Account" });
+  await expect(account.getByRole("link", { name: "Projects" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(account.getByRole("link", { name: "Settings" })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
