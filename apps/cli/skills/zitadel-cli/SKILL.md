@@ -83,7 +83,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   whose flag only the user may agree to (next rule).
 - **Ask the user before `--force` on anything destructive.** A command that
   deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
-  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
+  `invitation cancel`, `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
   person first. Non-interactive and without `--force`, it fails with
   `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
   same command with `--force`, except for `api`, whose body may hold a secret
@@ -176,6 +176,17 @@ nothing; `data.skills` and `data.directories` say what it added where.
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
   The repair deploys the newest primary release to it when there is one;
   otherwise `warnings` says to `deploy`.
+- **Invitations.** `zitadel invitation create --relation viewer|editor|admin`
+  makes a link that grants that role on the project to whoever opens it and
+  signs in; `--name` labels who it is for and is never matched. `data.link` is
+  in the create result only and never again: hand it to the user, never put it
+  in a file or a commit. It expires in 72 hours; `--replaces <invitation_id>`
+  makes a new link for a lost or expired one. Non-interactive, `create` asks
+  nothing and needs `--relation`. `invitation list [--status …] [--type …]`
+  and `invitation get <invitation_id>` read them; `invitation cancel
+  <invitation_id>` stops a pending link and needs `--force` when
+  non-interactive. A project nobody has claimed refuses invitations until it is
+  claimed (`zitadel claim`). Existing members are read with `grants list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need

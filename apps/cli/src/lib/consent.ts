@@ -10,6 +10,7 @@ import type { SuggestedCommand } from "./suggestion";
  */
 export type Verb =
   | "call"
+  | "cancel"
   | "deactivate"
   | "delete"
   | "deploy"

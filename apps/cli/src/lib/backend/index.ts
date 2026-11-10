@@ -66,6 +66,17 @@ export {
 } from "./services/flow";
 export { IdpService, type IdpSummary } from "./services/idp";
 export {
+  InvitationService,
+  invitationRole,
+  type CreatedInvitation,
+  type Invitation,
+  type InvitationInput,
+  type InvitationPageQuery,
+  type InvitationRelation,
+  type InvitationStatus,
+  type InvitationType,
+} from "./services/invitation";
+export {
   Operation,
   OperationService,
   type ApiOperation,

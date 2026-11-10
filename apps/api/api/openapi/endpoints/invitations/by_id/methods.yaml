@@ -1,5 +1,6 @@
 get:
   operationId: getInvitation
+  x-zitadel-cli: invitation get
   summary: Get an invitation
   description: |
     Returns one invitation by ID for the project named by `project_id`.
@@ -47,6 +48,7 @@ get:
 
 delete:
   operationId: cancelInvitation
+  x-zitadel-cli: invitation cancel
   summary: Cancel an invitation
   description: |
     Deletes a pending invitation. Its link can no longer be redeemed. Only a

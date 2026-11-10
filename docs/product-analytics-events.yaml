@@ -423,6 +423,13 @@ properties:
   variable_count:
     type: number
     description: How many variables `variables list` found.
+  role:
+    type: string
+    values: [project_viewer, project_editor, project_admin]
+    description: The role `invitation create` invited someone into; never a name, an id or the link.
+  is_replace:
+    type: boolean
+    description: Whether `invitation create` replaced an earlier invitation.
   operation:
     type: string
     description: The `operationId` `zitadel api` called, never a path, an id or a field.
@@ -573,6 +580,7 @@ components:
       variable:list: [variable_count]
       variable:set: [is_secret]
       variable:resolve: [variable_count]
+      invitation:create: [role, is_replace]
       api: [operation, is_paginated]
       claim: [claim_outcome, poll_count, browser_opened]
     profile:
