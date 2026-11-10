@@ -4,7 +4,7 @@ import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
 import { BrokenFilesError, RefusedEditError, UserSchema } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
-import { MemoryStore } from "@/lib/zitadel/storage";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { aFile, aUserSchema } from "@tests/helpers/config";
 import { slug } from "@tests/helpers/idp-values";

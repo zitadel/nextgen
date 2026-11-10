@@ -354,6 +354,12 @@ Each invocation prints one JSON object:
   blank `-m` is refused. A release keeps the message of
   the run that first built its content, usually the pull request's `preview`.
   `deployment rollback -m` records why on the rollback.
+- `deployment get`, `deployment rollback`, `deployment create --release`,
+  `release revoke` and the `users`, `sessions` and `release` commands that take
+  an id refuse a value that is not that kind of id (surrounding whitespace is
+  trimmed) before they ask or call the server, saying what one looks like and
+  suggesting the list command. `claim --challenge-id` refuses a malformed
+  challenge id the same way.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
@@ -425,6 +431,11 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+  A file under `.zitadel/` that cannot be written because a directory it needs
+  is a file fails with `<path> cannot be written (ENOTDIR)`; `details.blocker`
+  is that file. Remove it, then run the command again. A directory where a
+  file is to be removed fails with `<path> cannot be removed (EISDIR)`; remove
+  the directory, then run the command again.
 - `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
   see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
