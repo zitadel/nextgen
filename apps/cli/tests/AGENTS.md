@@ -121,7 +121,7 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   `app.writeLocalSecret`. A `.zitadel/...` string in a spec is only ever a
   value the CLI reported back.
 - **No HTTP.** The platform is arranged in its own terms —
-  `platform.rejectsSchemaUploads()`, `platform.recovers()`,
+  `platform.rejectsASchema()`, `platform.recovers()`,
   `platform.capturesBrandingPublishes()`. msw stays in `helpers/platform.ts`.
 - **One assertion vocabulary**, from `tests/helpers/matchers.ts`: `toSucceed`,
   `toFail`, `toFailWith`, `toExitWith`, `toBeSkipped`, `toExplain`, `toHintAt`,
@@ -177,6 +177,45 @@ it stays here deliberately rather than by oversight.
   first.
 - Where the mock accepts what the real engine refuses, a comment names the
   server-side validator the spec stands in for.
+
+## The shape of a unit test
+
+- The top `describe` names the unit: a class (`Publisher`), a method
+  (`Publisher.deploy`), a function (`runSteps`) or a command (`doctor`).
+- A nested `describe` names the situation, starting "when …" or "with …".
+- An `it` states one observable claim in plain words: "refuses a slug another
+  connection uses", not "works" or "test slug". One claim per test; split
+  rather than assert two things.
+- Variants of one claim are one `it.each` table, never near-duplicate tests;
+  `it.for` where the rows need a fixture.
+- A body is arrange, a blank line, one act, a blank line, assertions; a test
+  with nothing to arrange starts at the act.
+- The act and the assertions stay in the body: a helper may arrange, never act
+  or assert.
+- Build configuration with `tests/helpers/config.ts` (`aConfig`, `aStore`,
+  `aUserSchema`, `anOidcConnection`, `aLoginFlow`, `aBranding`,
+  `aPasswordPolicy`), naming only what the test is about as overrides.
+- Build a publish step's context with `aStepContext` (`helpers/step-context.ts`),
+  a doctor check's with `aCheckContext` (`helpers/check-context.ts`), an API
+  record or variables answer with `helpers/records.ts`, and a client with
+  `fakeClient`.
+- Extend the shared builders rather than adding one to a test file; a double
+  only one file needs, such as a fake platform's answers, stays in that file.
+- A temporary directory is the `dir` fixture (`helpers/fixtures.ts`); a git
+  repository is built with `helpers/git-repo.ts`.
+- Catch a refusal with `thrownBy` or `rejectionOf` (`helpers/thrown-value.ts`),
+  then assert its class with `toBeInstanceOf`, then the fields that matter with
+  `toMatchObject`. No `toThrow`, no `rejects`, no `try`/`catch`.
+- No casts, no non-null `!`, no `any`: a double that needs one is the wrong
+  double; build it with `fakeClient` or a real class. `as const` is not a cast.
+- Observe a real collaborator with `vi.spyOn` on it, not a hand-rolled recorder.
+- No sleeps or time-bounded waits: a test that orders work holds promises it
+  settles itself, and one that waits on time uses `ManualClock`.
+- Stub the environment with `vi.stubEnv`, never by writing `process.env`.
+- No comments in a body and no commented-out code. A rare why goes on the
+  helper or constant it explains, as TSDoc.
+- A value used more than once, or whose meaning is not obvious, is a named
+  constant.
 
 ## Ports and network
 

@@ -3,15 +3,50 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SANITY_CHECKS, type CheckOutcome } from "@/commands/doctor/checks";
+import { type CheckOutcome, SANITY_CHECKS } from "@/commands/doctor/checks";
 import {
-  categoryOf,
   CHECK_CATEGORIES,
+  categoryOf,
+  type DoctorReportInput,
   renderDoctorReport,
   withCategories,
-  type DoctorReportInput,
 } from "@/commands/doctor/report";
 
+/**
+ * The cause several credential checks share when the secret is gone.
+ */
+const SECRET_MISSING = ".zitadel/secret was not found";
+
+/**
+ * The command that upgrades the CLI.
+ */
+const UPGRADE = "npx @zitadel/cli@latest upgrade";
+
+/**
+ * A CLI version check that found a newer release.
+ */
+const BEHIND: CheckOutcome = {
+  name: "cli-version",
+  status: "warn",
+  message: "behind",
+  details: { latest: "2.0.0", remedy_command: UPGRADE },
+};
+
+/**
+ * Every check the command files under a category.
+ */
+const FILED = CHECK_CATEGORIES.flatMap((category) => {
+  return category.checks;
+});
+
+/**
+ * The doctor's report of `checks`, for a configured project whose local
+ * server runs as a binary on port 8080.
+ *
+ * @param checks - What the checks found.
+ * @param input - What the report differs in from the default.
+ * @returns The rendered report.
+ */
 function report(checks: CheckOutcome[], input: Partial<DoctorReportInput> = {}): string {
   return renderDoctorReport({
     checks,
@@ -25,216 +60,292 @@ function report(checks: CheckOutcome[], input: Partial<DoctorReportInput> = {}):
   });
 }
 
-const pass = (name: string, message = `${name} ok`): CheckOutcome => ({
-  name,
-  status: "pass",
-  message,
-});
+/**
+ * A check that passed.
+ *
+ * @param name - The check's name.
+ * @param message - What it said.
+ * @returns The outcome.
+ */
+function pass(name: string, message = `${name} ok`): CheckOutcome {
+  return { name, status: "pass", message };
+}
 
-describe("categories", () => {
-  it("files every check the command registers", () => {
-    const filed = CHECK_CATEGORIES.flatMap((category) => category.checks);
+/**
+ * How many times `text` says `phrase`.
+ *
+ * @param text - The report.
+ * @param phrase - What to count.
+ * @returns The count.
+ */
+function timesSaid(text: string, phrase: string): number {
+  return text.split(phrase).length - 1;
+}
 
-    for (const check of SANITY_CHECKS) {
-      expect(filed, check.name).toContain(check.name);
-    }
+/**
+ * The names of the checks `src/commands/doctor/index.ts` builds itself.
+ *
+ * @returns The names.
+ */
+async function checksTheCommandBuilds(): Promise<string[]> {
+  const source = await readFile(
+    join(import.meta.dirname, "../../../../src/commands/doctor/index.ts"),
+    "utf8",
+  );
+  return [...source.matchAll(/(?:await check\(\s*|check\(\s*|name: )"([a-z-]+)"/g)].flatMap(
+    (match) => {
+      return match[1] === undefined ? [] : [match[1]];
+    },
+  );
+}
+
+describe("CHECK_CATEGORIES", () => {
+  it.each(
+    SANITY_CHECKS.map((check) => {
+      return check.name;
+    }),
+  )("files the registered check %s", (name) => {
+    expect(FILED).toContain(name);
   });
 
   it("files every check the command builds itself", async () => {
-    const source = await readFile(
-      join(import.meta.dirname, "../../../../src/commands/doctor/index.ts"),
-      "utf8",
-    );
-    const built = [
-      ...source.matchAll(/(?:await check\(\s*|check\(\s*|name: )"([a-z-]+)"/g),
-    ].flatMap((match) => (match[1] === undefined ? [] : [match[1]]));
-    const filed = CHECK_CATEGORIES.flatMap((category) => category.checks);
+    const built = await checksTheCommandBuilds();
 
-    expect(built.length).toBeGreaterThan(0);
-    for (const name of built) {
-      expect(filed, name).toContain(name);
-    }
+    expect(FILED).toEqual(expect.arrayContaining(built));
+  });
+
+  it("finds checks the command builds itself", async () => {
+    const built = await checksTheCommandBuilds();
+
+    expect(built).not.toEqual([]);
   });
 
   it("files a check under one category only", () => {
-    const filed = CHECK_CATEGORIES.flatMap((category) => category.checks);
-
-    expect(new Set(filed).size).toBe(filed.length);
+    expect(new Set(FILED).size).toBe(FILED.length);
   });
+});
 
+describe("withCategories", () => {
   it("puts the category on the checks the envelope carries", () => {
-    expect(withCategories([pass("port")])).toEqual([
+    const checks = withCategories([pass("port")]);
+
+    expect(checks).toEqual([
       { name: "port", status: "pass", message: "port ok", category: "local_server" },
     ]);
+  });
+});
+
+describe("categoryOf", () => {
+  it("names the category a check is filed under", () => {
     expect(categoryOf("secret")).toBe("credentials");
   });
 });
 
 describe("renderDoctorReport", () => {
-  it("collapses a category whose checks all passed", () => {
+  describe("when a category's checks all passed", () => {
     const text = report([pass("config"), pass("schema")]);
 
-    expect(text).toContain("[✓] Project");
-    expect(text).toContain("2 checks passed");
-    expect(text).not.toContain("config ok");
-    expect(text).toContain("✓ Zitadel doctor passed.");
+    it.each(["[✓] Project", "2 checks passed", "✓ Zitadel doctor passed."])("says %s", (said) => {
+      expect(text).toContain(said);
+    });
+
+    it("collapses the category", () => {
+      expect(text).not.toContain("config ok");
+    });
+
+    it("ends with how to see every check", () => {
+      expect(text).toContain("Run with -v to see all 2 checks.");
+    });
   });
 
-  it("lists what needs attention under its category", () => {
+  describe("when a category needs attention", () => {
     const text = report([
       pass("config"),
       { name: "schema", status: "warn", message: "No schema files" },
     ]);
 
-    expect(text).toContain("[!] Project");
-    expect(text).toContain("    ! No schema files");
-    expect(text).not.toContain("config ok");
-    expect(text).toContain("! Zitadel doctor passed with warnings in 1 category.");
+    it.each([
+      "[!] Project",
+      "    ! No schema files",
+      "! Zitadel doctor passed with warnings in 1 category.",
+    ])("says %s", (said) => {
+      expect(text).toContain(said);
+    });
+
+    it("leaves out the checks that passed", () => {
+      expect(text).not.toContain("config ok");
+    });
   });
 
-  it("marks a category by the worst of its checks", () => {
+  describe("when checks of a category disagree", () => {
     const text = report([
       { name: "framework", status: "warn", message: "a warning" },
       { name: "dependency", status: "fail", message: "a failure" },
       { name: "secret", status: "fail", message: "another" },
     ]);
 
-    expect(text).toContain("[✗] App integration");
-    expect(text).toContain("✗ Zitadel doctor found issues in 2 categories.");
+    it("marks the category by the worst of its checks", () => {
+      expect(text).toContain("[✗] App integration");
+    });
+
+    it("counts the categories with issues", () => {
+      expect(text).toContain("✗ Zitadel doctor found issues in 2 categories.");
+    });
   });
 
   it("says a cause several checks share once", () => {
-    const missing = ".zitadel/secret was not found";
     const text = report([
-      { name: "secret", status: "fail", message: missing },
-      { name: "secret-permissions", status: "fail", message: missing },
-      { name: "project-match", status: "fail", message: missing },
+      { name: "secret", status: "fail", message: SECRET_MISSING },
+      { name: "secret-permissions", status: "fail", message: SECRET_MISSING },
+      { name: "project-match", status: "fail", message: SECRET_MISSING },
     ]);
 
-    expect(text.split(missing)).toHaveLength(2);
-  });
-
-  it("expands every check with --verbose, by name", () => {
-    const text = report([pass("config")], { verbose: true });
-
-    expect(text).toContain("✓ config: config ok");
-    expect(text).not.toContain("Run with -v");
-  });
-
-  it("names every check that shares a cause with --verbose", () => {
-    const missing = ".zitadel/secret was not found";
-    const text = report(
-      [
-        { name: "secret", status: "fail", message: missing },
-        { name: "project-match", status: "fail", message: missing },
-      ],
-      { verbose: true },
-    );
-
-    expect(text).toContain(`secret: ${missing}`);
-    expect(text).toContain(`project-match: ${missing}`);
+    expect(timesSaid(text, SECRET_MISSING)).toBe(1);
   });
 
   it("orders the categories whatever order the checks ran in", () => {
     const text = report([pass("config"), pass("port"), pass("cli-version")]);
 
-    expect(text.indexOf("Versions")).toBeLessThan(text.indexOf("Local server"));
-    expect(text.indexOf("Local server")).toBeLessThan(text.indexOf("Project"));
-  });
+    const positions = ["Versions", "Local server", "Project"].map((category) => {
+      return text.indexOf(category);
+    });
 
-  it("shows the CLI's version, and the newer one when there is one", () => {
-    expect(report([pass("cli-version")])).toContain("CLI 1.0.0");
-    expect(
-      report([
-        {
-          name: "cli-version",
-          status: "warn",
-          message: "behind",
-          details: { latest: "2.0.0", remedy_command: "npx @zitadel/cli@latest upgrade" },
-        },
-      ]),
-    ).toContain("CLI 1.0.0, 2.0.0 available");
-  });
-
-  it("pulls out the command that repairs a warning", () => {
-    const text = report([
-      {
-        name: "cli-version",
-        status: "warn",
-        message: "behind",
-        details: { latest: "2.0.0", remedy_command: "npx @zitadel/cli@latest upgrade" },
-      },
-    ]);
-
-    expect(text).toContain("→ npx @zitadel/cli@latest upgrade");
-  });
-
-  it("lets upgrade stand in for aligning the pins with an older CLI", () => {
-    const text = report([
-      {
-        name: "cli-version",
-        status: "warn",
-        message: "behind",
-        details: { latest: "2.0.0", remedy_command: "npx @zitadel/cli@latest upgrade" },
-      },
-      {
-        name: "dependency-version",
-        status: "warn",
-        message: "pins differ",
-        details: { remedy_command: "npm install --save-exact @zitadel/sdk-next@1.0.0" },
-      },
-    ]);
-
-    expect(text).toContain("→ npx @zitadel/cli@latest upgrade");
-    expect(text).not.toContain("npm install --save-exact");
-  });
-
-  it("offers setup in a directory with no project, and no project checks", () => {
-    const text = report([pass("port")], { projectConfigured: false });
-
-    expect(text).toContain("[-] Project");
-    expect(text).toContain("no zitadel.json in this directory");
-    expect(text).toContain("→ npx @zitadel/cli@1.0.0 setup");
-    expect(text).not.toContain("Credentials");
-  });
-
-  it("carries --cwd in the setup it offers", () => {
-    const text = report([pass("port")], { projectConfigured: false, typedCwd: "apps/web" });
-
-    expect(text).toContain("→ npx @zitadel/cli@1.0.0 setup --cwd apps/web");
-  });
-
-  it("says a hosted project uses no local server", () => {
-    const text = report([pass("config")], { hostedServer: "https://z.example" });
-
-    expect(text).toContain("[-] Local server");
-    expect(text).toContain("https://z.example");
+    expect(positions).toEqual(
+      [...positions].sort((a, b) => {
+        return a - b;
+      }),
+    );
   });
 
   it("leaves out a category no check ran for", () => {
-    expect(report([pass("port")])).not.toContain("Environment");
+    const text = report([pass("port")]);
+
+    expect(text).not.toContain("Environment");
   });
 
-  it("ends with the next steps, not repeating a command shown under a row", () => {
-    const upgrade = "npx @zitadel/cli@latest upgrade";
-    const text = report(
-      [
+  describe("with --verbose", () => {
+    it("expands every check, by name", () => {
+      const text = report([pass("config")], { verbose: true });
+
+      expect(text).toContain("✓ config: config ok");
+    });
+
+    it("does not say how to see every check", () => {
+      const text = report([pass("config")], { verbose: true });
+
+      expect(text).not.toContain("Run with -v");
+    });
+
+    it.each(["secret", "project-match"])("names %s, which shares a cause", (name) => {
+      const text = report(
+        [
+          { name: "secret", status: "fail", message: SECRET_MISSING },
+          { name: "project-match", status: "fail", message: SECRET_MISSING },
+        ],
+        { verbose: true },
+      );
+
+      expect(text).toContain(`${name}: ${SECRET_MISSING}`);
+    });
+  });
+
+  describe("with the CLI's version", () => {
+    it("shows it", () => {
+      const text = report([pass("cli-version")]);
+
+      expect(text).toContain("CLI 1.0.0");
+    });
+
+    it("shows the newer one when there is one", () => {
+      const text = report([BEHIND]);
+
+      expect(text).toContain("CLI 1.0.0, 2.0.0 available");
+    });
+
+    it("pulls out the command that repairs a warning", () => {
+      const text = report([BEHIND]);
+
+      expect(text).toContain(`→ ${UPGRADE}`);
+    });
+
+    it("lets upgrade stand in for aligning the pins with an older CLI", () => {
+      const text = report([
+        BEHIND,
         {
-          name: "cli-version",
+          name: "dependency-version",
           status: "warn",
-          message: "behind",
-          details: { latest: "2.0.0", remedy_command: upgrade },
+          message: "pins differ",
+          details: { remedy_command: "npm install --save-exact @zitadel/sdk-next@1.0.0" },
         },
-      ],
-      { next: { actions: ["Do the thing."], commands: [upgrade, "zitadel doctor --fix"] } },
+      ]);
+
+      expect(text).not.toContain("npm install --save-exact");
+    });
+  });
+
+  describe("in a directory with no project", () => {
+    const text = report([pass("port")], { projectConfigured: false });
+
+    it.each(["[-] Project", "no zitadel.json in this directory", "→ npx @zitadel/cli@1.0.0 setup"])(
+      "says %s",
+      (said) => {
+        expect(text).toContain(said);
+      },
     );
 
-    expect(text).toContain("Next:\n  Do the thing.");
-    expect(text).toContain("$ zitadel doctor --fix");
-    expect(text.split(upgrade)).toHaveLength(2);
+    it("runs no project checks", () => {
+      expect(text).not.toContain("Credentials");
+    });
+
+    it("carries --cwd in the setup it offers", () => {
+      const typed = report([pass("port")], { projectConfigured: false, typedCwd: "apps/web" });
+
+      expect(typed).toContain("→ npx @zitadel/cli@1.0.0 setup --cwd apps/web");
+    });
   });
 
-  it("puts a warning's fix under it, not again among the next steps", () => {
+  describe("with a hosted project", () => {
+    const text = report([pass("config")], { hostedServer: "https://z.example" });
+
+    it.each(["[-] Local server", "https://z.example"])("says %s", (said) => {
+      expect(text).toContain(said);
+    });
+  });
+
+  describe("with the local server", () => {
+    it("says it is running", () => {
+      const text = report([pass("runtime")]);
+
+      expect(text).toContain("running on port 8080 (binary)");
+    });
+
+    it("names its port when it is down", () => {
+      const text = report([{ name: "runtime", status: "fail", message: "down" }]);
+
+      expect(text).toContain("port 8080 (binary)");
+    });
+
+    it("does not call it running when it is down", () => {
+      const text = report([{ name: "runtime", status: "fail", message: "down" }]);
+
+      expect(text).not.toContain("running on");
+    });
+  });
+
+  describe("with next steps", () => {
+    const next = { actions: ["Do the thing."], commands: [UPGRADE, "zitadel doctor --fix"] };
+    const text = report([BEHIND], { next });
+
+    it.each(["Next:\n  Do the thing.", "$ zitadel doctor --fix"])("says %s", (said) => {
+      expect(text).toContain(said);
+    });
+
+    it("does not repeat a command shown under a row", () => {
+      expect(timesSaid(text, UPGRADE)).toBe(1);
+    });
+  });
+
+  describe("with a warning whose fix is known", () => {
     const stop = "npx @zitadel/cli@1.0.0 stop --all";
     const action = "Check the other local Zitadel servers.";
     const text = report(
@@ -252,65 +363,81 @@ describe("renderDoctorReport", () => {
       },
     );
 
-    expect(text).toContain(
-      `    ! 1 other local Zitadel server is running on this machine.\n    → ${stop}`,
-    );
-    expect(text).not.toContain(action);
-    expect(text).toContain("Next:\n  Watch the log.");
-    expect(text.split(stop)).toHaveLength(2);
-  });
-
-  it("says whether the local server is running", () => {
-    expect(report([pass("runtime")])).toContain("running on port 8080 (binary)");
-    expect(report([{ name: "runtime", status: "fail", message: "down" }])).toContain(
-      "port 8080 (binary)",
-    );
-    expect(report([{ name: "runtime", status: "fail", message: "down" }])).not.toContain(
-      "running on",
-    );
-  });
-
-  it("ends with how to see every check, unless it shows them", () => {
-    expect(report([pass("config"), pass("schema")])).toContain("Run with -v to see all 2 checks.");
-    expect(report([pass("config")], { verbose: true })).not.toContain("Run with -v");
-  });
-
-  it("wraps a long message under itself to the terminal's width", () => {
-    const text = report([{ name: "schema", status: "warn", message: "word ".repeat(20).trim() }], {
-      columns: 40,
+    it("puts the fix's command under the warning", () => {
+      expect(text).toContain(
+        `    ! 1 other local Zitadel server is running on this machine.\n    → ${stop}`,
+      );
     });
-    const lines = text.split("\n").filter((line) => line.includes("word"));
 
-    expect(lines.length).toBeGreaterThan(1);
-    expect(lines[0]?.startsWith("    ! word")).toBe(true);
-    expect(lines[1]?.startsWith("      word")).toBe(true);
-    for (const line of lines) {
-      expect(line.length).toBeLessThanOrEqual(40);
-    }
+    it("does not repeat the fix's action", () => {
+      expect(text).not.toContain(action);
+    });
+
+    it("keeps the other next steps", () => {
+      expect(text).toContain("Next:\n  Watch the log.");
+    });
+
+    it("shows the fix's command once", () => {
+      expect(timesSaid(text, stop)).toBe(1);
+    });
   });
 
-  it.each([undefined, 0])("does not wrap at a width of %s", (columns) => {
-    const message = "word ".repeat(40).trim();
-
-    expect(report([{ name: "schema", status: "warn", message }], { columns })).toContain(message);
-  });
-
-  // The report is painted, so it is printed as it came: a check's message
-  // names what it read, and only a passing check's line is dimmed.
-  it.each(["pass", "warn", "fail"] as const)(
-    "spells out what a %s check's message names, which it read from elsewhere",
-    (status) => {
-      const text = report([{ name: "schema", status, message: "at app.acme.com\u001b[2Jwiped" }], {
-        verbose: true,
+  describe("with a long message", () => {
+    const message = "word ".repeat(20).trim();
+    const lines = report([{ name: "schema", status: "warn", message }], { columns: 40 })
+      .split("\n")
+      .filter((line) => {
+        return line.includes("word");
       });
 
-      expect(text).toContain("at app.acme.com\\x1b[2Jwiped");
-    },
-  );
+    it("wraps it", () => {
+      expect(lines.length).toBeGreaterThan(1);
+    });
 
-  it("spells out the server a skipped category names, which the project resolved", () => {
-    const text = report([], { hostedServer: "https://acme.example\u001b[2Jwiped" });
+    it("starts it under the warning's mark", () => {
+      expect(lines[0]).toMatch(/^ {4}! word/);
+    });
 
-    expect(text).toContain("https://acme.example\\x1b[2Jwiped");
+    it("indents the lines it wraps under the message", () => {
+      expect(lines[1]).toMatch(/^ {6}word/);
+    });
+
+    it("keeps every line within the terminal's width", () => {
+      expect(
+        lines.filter((line) => {
+          return line.length > 40;
+        }),
+      ).toEqual([]);
+    });
+
+    it.each([undefined, 0])("does not wrap at a width of %s", (columns) => {
+      const unwrapped = "word ".repeat(40).trim();
+
+      const text = report([{ name: "schema", status: "warn", message: unwrapped }], { columns });
+
+      expect(text).toContain(unwrapped);
+    });
+  });
+
+  describe("with text it read from elsewhere", () => {
+    it.each(["pass", "warn", "fail"] as const)(
+      "spells out what a %s check's message names",
+      (status) => {
+        const text = report(
+          [{ name: "schema", status, message: "at app.acme.com\u001b[2Jwiped" }],
+          {
+            verbose: true,
+          },
+        );
+
+        expect(text).toContain("at app.acme.com\\x1b[2Jwiped");
+      },
+    );
+
+    it("spells out the server a skipped category names", () => {
+      const text = report([], { hostedServer: "https://acme.example\u001b[2Jwiped" });
+
+      expect(text).toContain("https://acme.example\\x1b[2Jwiped");
+    });
   });
 });

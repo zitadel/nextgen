@@ -1,5 +1,4 @@
 import type { ListPolicies200PoliciesItem } from "@zitadel/api/generated/model";
-import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 
 /**
  * The password policy as the project page reads it (ADR 066): the config of
@@ -11,10 +10,6 @@ export type PasswordPolicyConfig = ListPolicies200PoliciesItem["config"];
 /** What the password policy enforces, as the project page states it. */
 export interface PasswordRequirements {
   minimumLength: string;
-  /** The policy sets a minimum, whatever its value. */
-  minimumSet: boolean;
-  /** The minimum is under {@link RECOMMENDED_PASSWORD_MIN_LENGTH}, or there is none. */
-  belowRecommended: boolean;
   history: string;
 }
 
@@ -33,8 +28,6 @@ export function passwordRequirements(config: PasswordPolicyConfig = {}): Passwor
         : min_length === 1
           ? "1 character"
           : `${min_length} characters`,
-    minimumSet: min_length !== undefined,
-    belowRecommended: (min_length ?? 0) < RECOMMENDED_PASSWORD_MIN_LENGTH,
     history:
       history_depth === undefined
         ? "Reuse allowed"

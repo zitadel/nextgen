@@ -43,7 +43,7 @@ workflow, not the task graph.
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through, turbo when a turbo task runs them (`TURBO_HASH`); maps `project:task` to turbo tasks. |
 | Ported scripts | `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `e2e/journey/scripts/local-registry.mjs` | Work under either runner; tests added for the turbo paths. |
-| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, three parallel jobs (the gate, the journey, the other e2e lanes) behind one non-required check, `full-pr-turbo`, on pull requests, the merge queue, pushes to main and nightly; turbo's `--affected` selects what each job runs (decision 9). |
+| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, one job per role (`checks`, `build-test`, `go-db`, `generated`, `e2e`, `journey`; `release` on a version PR), each a task list on a runner of its own, behind one non-required check, `full-pr-turbo`, on pull requests, the merge queue, pushes to main and nightly; turbo's `--affected` selects what each role runs (decision 9). |
 | Unchanged | all `moon.yml`, `.moon/`, ci.yml, the required check | Moon runs exactly as before. |
 
 Verified in the prototype, 2026-10-12:
@@ -345,20 +345,22 @@ still runs the whole gate: it has no base to compare with.
 
 ### `ci.yml` → the draft `ci-turbo.yml`
 
-Three jobs run side by side on runners of their own and share the remote
-cache: the gate, the journey and the other e2e lanes. `full-pr-turbo` needs
-all three and is the one check name.
+One job per role runs side by side, each on a runner of its own, and the
+roles share the remote cache: `checks`, `build-test`, `go-db`, `generated`,
+`e2e` and `journey`, or `release` on a version PR. A role is one task list,
+`turbo run $TASKS --affected`; the journey alone has steps of its own.
+`full-pr-turbo` needs every role and is the one check name.
 
 | ci.yml step | turbo draft |
 |---|---|
 | `MOON_SUMMARY=detailed` | none: turbo groups each task's log and annotates every failed task itself |
-| `node scripts/ci-mode.mjs <base>`: the mode, the lane gates, the journey matrix | none: every `turbo run` below takes `--affected` (`TURBO_SCM_BASE`: the merge group's base, the pull request's, or the commit a push to main replaced); each job sets up Go, then asks `turbo query affected --exit-code` about its own tasks before it installs anything else, and skips its other steps when none is affected; the journey's job asks it for the journey matrix too, and each lane that opens Chromium installs it through `install-browsers`; a version PR is its `changeset-release/*` branch |
-| `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --filter=@zitadel/server --affected`, on pushes to main too |
-| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph test-postgres test-sqlite --affected --continue=dependencies-successful` in the gate's job, the database lanes not on pushes to main |
-| `moon run server:test` | dropped: part of the gate (moon re-ran it because `moon ci` selects by affectedness) |
-| `moon run server:test-postgres` / `test-sqlite` | dropped: part of the gate's run, beside its other tasks |
-| `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` first in the journey's job, without `--affected`: the journey needs it whenever it runs (no `env -u`; no arguments after `--`, see turborepo.md) |
-| `moon exec e2e:all --ignore-ci-checks` (gate `e2e`): `e2e:journey-local` (`JOURNEY_*` env on the step), `testing:test-integration`, the console and demo lanes, side by side in one step after the graph | `JOURNEY_MATRIX=… turbo run journey-local --filter=@zitadel/e2e` after the snapshot in the journey's job; `turbo run test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing --affected --continue=dependencies-successful` in the other lanes' job: the affected lanes, side by side |
+| `node scripts/ci-mode.mjs <base>`: the mode, the lane gates, the journey matrix | none: every `turbo run` below takes `--affected` (`TURBO_SCM_BASE`: the merge group's base, the pull request's, or the commit a push to main replaced); a role the change does not reach runs nothing after its setup; the journey's role alone asks `turbo query affected --exit-code` first, which gates its snapshot, and asks it for the journey matrix too, and each lane that opens Chromium installs it through `install-browsers`; a version PR is its `changeset-release/*` branch |
+| `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --affected` in the `generated` role, on pushes to main too |
+| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck check-adrs check-moon-graph … --affected --continue=dependencies-successful` in `checks` and `turbo run build test …` in `build-test`, on pushes to main too |
+| `moon run server:test` | dropped: part of `build-test` (moon re-ran it because `moon ci` selects by affectedness) |
+| `moon run server:test-postgres` / `test-sqlite` | `turbo run test-postgres test-sqlite --affected` in the `go-db` role, not on pushes to main |
+| `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` first in the journey's role, without `--affected`: the journey needs it whenever it runs (no `env -u`; no arguments after `--`, see turborepo.md) |
+| `moon exec e2e:all --ignore-ci-checks` (gate `e2e`): `e2e:journey-local` (`JOURNEY_*` env on the step), `testing:test-integration`, the console and demo lanes, side by side in one step after the graph | `JOURNEY_MATRIX=… turbo run journey-local --filter=@zitadel/e2e` after the snapshot in the journey's role; `turbo run @zitadel/testing#test:integration @zitadel/e2e#demo-next-real … --affected --continue=dependencies-successful` in the `e2e` role: the affected lanes, side by side |
 | `… moon run release:version` / `release:pack` | `turbo run version --filter=@zitadel/release --affected` / `pack` |
 | Depot's remote cache (implicit) | the remote-cache step, see below |
 

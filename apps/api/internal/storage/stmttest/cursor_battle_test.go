@@ -68,10 +68,12 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("projects", func(t *testing.T) { battleProjects(t, d) })
 		t.Run("projects_name", func(t *testing.T) { battleProjectsByName(t, d) })
+		t.Run("projects_created_at", func(t *testing.T) { battleProjectsByCreation(t, d) })
 		t.Run("teams", func(t *testing.T) { battleTeams(t, d) })
 		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
 		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
 		t.Run("authorized_projects", func(t *testing.T) { battleAuthorizedProjects(t, d) })
+		t.Run("authorized_projects_created_at", func(t *testing.T) { battleAuthorizedProjectsByCreation(t, d) })
 		t.Run("project_admins", func(t *testing.T) { battleProjectAdmins(t, d) })
 		t.Run("authorized_projects_name", func(t *testing.T) { battleAuthorizedProjectsByName(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
@@ -204,6 +206,62 @@ func battleProjectsByName(t *testing.T, d dialect) {
 	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 
+// projectsOrderByCreationAsc is the order `GET /users/me/projects` pages in
+// when asked for one: creation time, with id breaking ties. Descending is
+// newest first.
+var projectsOrderByCreationAsc = database.OrderBy[domain.ProjectField]{
+	Columns: []database.Column[domain.ProjectField]{
+		database.Col(domain.ProjectFieldCreatedAt),
+		database.Col(domain.ProjectFieldID),
+	},
+	Direction: database.OrderAsc,
+}
+
+// seedProjectsOutOfIDOrder creates five projects whose ids sort in neither
+// the order they were created in nor its reverse, and returns the ids oldest
+// first. An id carries no creation order on every dialect (ADR 047), so a
+// list that pages these by id in either direction fails the drain.
+func seedProjectsOutOfIDOrder(t *testing.T, stmts service.AllStatements) []string {
+	t.Helper()
+	prefix := uniqueProjectID(t)
+	created := make([]*domain.Project, 0, 5)
+	for _, letter := range []string{"c", "a", "e", "b", "d"} {
+		p := newTestProject(prefix + "-" + letter)
+		require.NoError(t, stmts.CreateProject(t.Context(), p))
+		t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), p.ID) })
+		created = append(created, p)
+	}
+	// From the stored timestamps, not the insert order: two inserts the
+	// database stamped alike are told apart by id, as the list tells them.
+	slices.SortStableFunc(created, func(a, b *domain.Project) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
+	})
+	oldestFirst := projectIDs(created)
+
+	byID := slices.Sorted(slices.Values(oldestFirst))
+	require.NotEqual(t, byID, oldestFirst, "creation order must differ from id order")
+	slices.Reverse(byID)
+	require.NotEqual(t, byID, oldestFirst, "creation order must differ from reverse id order")
+	return oldestFirst
+}
+
+// battleProjectsByCreation drains ListProjects by creation time, which is what
+// a platform operator's console pages newest first (ADR 075 §6).
+func battleProjectsByCreation(t *testing.T, d dialect) {
+	t.Helper()
+	want := seedProjectsOutOfIDOrder(t, d.stmts)
+	filters := make([]database.Filter[domain.ProjectField], 0, len(want))
+	for _, id := range want {
+		filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), id))
+	}
+	filter := database.Or(filters...)
+	drainIncarnation(t, want, projectsOrderByCreationAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(p *domain.Project) string { return p.ID }, 2)
+}
+
 func battleTeams(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
@@ -258,6 +316,25 @@ func battleAuthorizedProjects(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, authorizedProjectsOrderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+			Pagination: page,
+		})
+	}, func(p *domain.Project) string { return p.ID }, 2)
+}
+
+// battleAuthorizedProjectsByCreation drains the authorized-projects query by
+// creation time: the grant predicate and the created_at keyset share one
+// statement, and descending is the console's newest-first Projects list.
+func battleAuthorizedProjectsByCreation(t *testing.T, d dialect) {
+	t.Helper()
+	u := seedAuthorizedUser(t, d.stmts)
+	want := seedProjectsOutOfIDOrder(t, d.stmts)
+	for _, customer := range want {
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(customer, u.teamID)))
+	}
+	// Created and never granted: it must not take a place on any page.
+	ensureProject(t, d.stmts)
+	drainIncarnation(t, want, projectsOrderByCreationAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
 			Pagination: page,
 		})

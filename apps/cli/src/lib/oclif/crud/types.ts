@@ -1,5 +1,6 @@
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 import type { Interfaces } from "@oclif/core";
+import type { ZodType } from "zod";
 
 import type { Consent } from "@/lib/consent";
 import type { CommandGroup } from "@/lib/oclif/groups";
@@ -271,6 +272,12 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * it as a noun phrase that follows "by".
    */
   idDescription?: string;
+  /**
+   * The schema the API spec generated for this resource's id, when the id has
+   * a format (`user_…`). The positional is refused before any call when it
+   * does not match. Leave it off when the positional also takes a name.
+   */
+  idSchema?: ZodType<string, string>;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */
   columns: readonly string[];
   /**
