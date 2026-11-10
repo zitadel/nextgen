@@ -863,22 +863,6 @@ type ListProjectAdminsParams struct {
 	ProjectID ProjectID
 }
 
-// ListProjectMembersParams is parameters of listProjectMembers operation.
-type ListProjectMembersParams struct {
-	// Maximum number of items to return.
-	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
-	PageToken OptPageToken `json:",omitempty,omitzero"`
-	ProjectID ProjectID
-	// Only members whose strongest role is at least this relation.
-	// `admin` beats `editor` beats `viewer`, so `relation=admin` lists
-	// administrators only.
-	Relation OptListProjectMembersRelation `json:",omitempty,omitzero"`
-}
-
 // ListReleasesParams is parameters of listReleases operation.
 type ListReleasesParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints

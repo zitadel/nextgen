@@ -1187,27 +1187,6 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
-	// ListProjectMembers implements listProjectMembers operation.
-	//
-	// Lists everyone with a role on a project, with each person's strongest
-	// `relation` and its `sources`.
-	// This is today's `listProjectAdmins` (`GET /projects/{project_id}/admins`)
-	// widened from `admin` to every relation. A person appears once. Optional
-	// `relation` means at least that role, so `relation=admin` gives the admins
-	// view (`admin` beats `editor` beats `viewer`). Owning-team membership always
-	// contributes `admin`.
-	// A person who left a team, or whose team or user was deactivated, is not
-	// listed through that source. Expired grants are left out. A person whose
-	// access comes only through teams the caller is not a member of is left out;
-	// a team the caller is not in is named by `team_id` only.
-	// The list is ordered by `user_id` and paginated with `page_token`.
-	// Authenticate with a project secret (`oauth2`), or with the session cookie
-	// (`sessionCookie`) of a signed-in person who can read the project. It needs
-	// `project.write` or a session, never `project.read`, which the browser-plane
-	// preview secret carries.
-	//
-	// GET /projects/{project_id}/members
-	ListProjectMembers(ctx context.Context, params ListProjectMembersParams) (ListProjectMembersRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first. A release is a snapshot of the
