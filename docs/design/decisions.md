@@ -16,6 +16,10 @@
 
 ## Decisions
 
+### D31 · Search runs actions and remembers what it opened — 2026-11-10 · [standing]
+A palette that only finds things leaves the commonest next step, adding one, a page away. With a project selected it now lists Actions under the project's pages: Add user and Add team open the drawers their lists open (D15), over the screen the person is on, and land on what was created; Copy project ID puts the id on the clipboard and says so. An action shows as its list's Add button does, whatever the person may do: the console has no permissions read yet, and the server refuses what is not allowed. Before anything is typed the palette opens on Recent, the last five things opened from it in that project. They are kept in memory for the session only, because a row carries an end user's name and identifier, which do not belong in the browser's storage.
+→ Gate actions on effective permissions when the console can read them (Console ADR 0004 §5).
+
 ### D30 · Search finds users and configuration, through one request — 2026-11-10 · [standing]
 The palette found pages, teams and projects, each through a request of its own, and no user, because the Users list had no text to search by. It now asks the server's search ([ADR 087](../adrs/087-search.md)) for what the selected project holds: users by part of their identifier, teams by name, and configuration (user schemas, login flows, identity providers) by what they are called, or any of them by an id pasted into the field. Users, Teams and Configuration are groups between the project's pages and Projects. A row shows the server's title, and on the right its second line (a user's identifier beside their name), or the project where there is none. The palette stays navigation, not a results page: it lists the best five of each kind, and when there are more users a last row opens the Users list on the same text. Users are asked for from three characters and apart from the rest, so teams and configuration do not wait for the slower user match.
 → Actions and recent items in the palette; search across projects once the API offers it.

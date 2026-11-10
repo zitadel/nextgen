@@ -1112,6 +1112,83 @@ describe("search", () => {
     );
   });
 
+  it("opens the drawers its actions name, over the screen it was opened on", async () => {
+    const router = renderShell(scopedPath("/users", "proj_1"));
+    for (const action of ["Add team", "Add user"]) {
+      await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+      const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+      await userEvent.type(
+        dialog.getByPlaceholderText("Go to a page, user, team or project"),
+        "add",
+      );
+
+      const actions = within(await dialog.findByRole("group", { name: "Actions" }));
+      await userEvent.click(actions.getByRole("option", { name: action }));
+
+      // The palette makes way for the drawer, and the screen stays.
+      const drawer = await screen.findByRole("dialog", { name: action });
+      expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument();
+      expect(router.state.resolvedLocation?.pathname).toBe("/users");
+      await userEvent.click(within(drawer).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: action })).not.toBeInTheDocument(),
+      );
+    }
+  });
+
+  it("copies the selected project's id and says so", async () => {
+    // `setup()` is what gives the page a clipboard to write to.
+    const user = userEvent.setup();
+    renderShell(scopedPath("/users", "proj_1"));
+    await user.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await user.type(dialog.getByPlaceholderText("Go to a page, user, team or project"), "copy");
+
+    await user.click(await dialog.findByRole("option", { name: /Copy project ID/ }));
+
+    expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
+    expect(await navigator.clipboard.readText()).toBe("proj_1");
+  });
+
+  it("lists what was opened from it, until something is typed", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        return HttpResponse.json({
+          results: body.types.includes("team")
+            ? [{ type: "team", id: "team_s", project_id: "proj_1", title: "Support" }]
+            : [],
+          incomplete_types: [],
+        });
+      }),
+      http.get("*/api/v1/teams/team_s", () =>
+        HttpResponse.json({
+          id: "team_s",
+          name: "Support",
+          status: "active",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+    const router = renderShell(scopedPath("/users", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    let dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    // Nothing was opened yet.
+    expect(dialog.queryByRole("group", { name: "Recent" })).not.toBeInTheDocument();
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, user, team or project"), "sup");
+    await userEvent.click(await dialog.findByRole("option", { name: /Support/ }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_s"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const recent = within(await dialog.findByRole("group", { name: "Recent" }));
+    expect(recent.getByRole("option", { name: /Support/ })).toBeInTheDocument();
+
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, user, team or project"), "x");
+    expect(dialog.queryByRole("group", { name: "Recent" })).not.toBeInTheDocument();
+  });
+
   it("finds projects by name on the server and selects one", async () => {
     const searched: string[] = [];
     server.use(
