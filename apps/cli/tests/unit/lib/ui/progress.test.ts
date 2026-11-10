@@ -1,11 +1,11 @@
-import { stripAnsi } from "consola/utils";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
 import { log, spinner } from "@clack/prompts";
-import { consola } from "consola";
 
+import { recordLog } from "../../../helpers/log";
 import { type Drawing, Progress } from "../../../../src/lib/ui/progress";
 
 /** A chain that remembers what progress asked of it, and draws nothing. */
@@ -33,14 +33,18 @@ const drawn = (): string[] =>
       `${stripAnsi(String(options?.symbol ?? ""))} ${stripAnsi(String(text))}`.trim(),
     );
 
+let recorded = recordLog();
+
+/** What was said at one level, in order. */
+const at = (level: string): string[] =>
+  recorded.said.filter((line) => line.level === level).map((line) => line.text);
+
 beforeEach(() => {
-  vi.spyOn(consola, "start").mockImplementation(() => undefined);
-  vi.spyOn(consola, "info").mockImplementation(() => undefined);
-  vi.spyOn(consola, "success").mockImplementation(() => undefined);
-  vi.spyOn(consola, "error").mockImplementation(() => undefined);
+  recorded = recordLog();
 });
 
 afterEach(() => {
+  recorded.stop();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
@@ -58,8 +62,8 @@ describe("Progress", () => {
         }),
       ).rejects.toThrow("boom");
 
-      expect(consola.start).toHaveBeenCalledWith("Fetching");
-      expect(consola.error).toHaveBeenCalledWith("Fetching failed");
+      expect(at("start")).toEqual(["Fetching"]);
+      expect(at("fail")).toEqual(["Fetching failed"]);
     });
 
     it("spins while it runs and says so when it is done", async () => {
@@ -129,9 +133,9 @@ describe("Progress", () => {
       });
 
       expect(spinner).not.toHaveBeenCalled();
-      expect(consola.start).toHaveBeenCalledWith("Fetching users");
-      expect(consola.info).toHaveBeenCalledWith("Wrote .env.local");
-      expect(consola.success).toHaveBeenCalledWith("Fetching users");
+      expect(at("start")).toEqual(["Fetching users"]);
+      expect(at("info")).toEqual(["Wrote .env.local"]);
+      expect(at("done")).toEqual(["Fetching users"]);
     });
   });
 
@@ -193,8 +197,8 @@ describe("Progress", () => {
       step.done("Detected Next.js");
 
       expect(spinner).not.toHaveBeenCalled();
-      expect(consola.info).toHaveBeenCalledWith("package.json");
-      expect(consola.success).toHaveBeenCalledWith("Detected Next.js");
+      expect(at("info")).toEqual(["package.json"]);
+      expect(at("done")).toEqual(["Detected Next.js"]);
     });
 
     // Ending once is the step's contract, not the chain's: a caller that ends
@@ -204,8 +208,8 @@ describe("Progress", () => {
       step.done("Detected Next.js");
       step.fail("Detected nothing");
 
-      expect(consola.success).toHaveBeenCalledTimes(1);
-      expect(consola.error).not.toHaveBeenCalled();
+      expect(at("done")).toHaveLength(1);
+      expect(at("fail")).toEqual([]);
     });
   });
 });
@@ -214,12 +218,7 @@ describe("Progress", () => {
 // not have; `task` and `begin` were not, so either one drew a `│` above that
 // command's answer and made it look like a wizard that happened to do work.
 describe("progress for a command that draws no chain", () => {
-  const said = (): string[] =>
-    vi.mocked(consola.log).mock.calls.map(([text]) => stripAnsi(String(text)));
-
-  beforeEach(() => {
-    vi.spyOn(consola, "log").mockImplementation(() => undefined);
-  });
+  const said = (): string[] => at("plain").map((text) => stripAnsi(text));
 
   it("draws no gutter for work as a callback", async () => {
     await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);

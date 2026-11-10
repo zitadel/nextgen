@@ -385,7 +385,7 @@
     {
       "id": "logs",
       "group": "Local development",
-      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.",
+      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -3750,7 +3750,7 @@
     {
       "id": "api ls",
       "group": "Diagnostics and utilities",
-      "description": "List the operations of the Zitadel API that `zitadel api` calls.",
+      "description": "List the operations of the Zitadel API that the api command calls.",
       "args": [
         {
           "name": "filter",

@@ -37,7 +37,8 @@ function entryOf(operation: Operation) {
  * what an agent needs to build the call.
  */
 export default class ApiLs extends Tabulatable(BaseCommand) {
-  static override description = "List the operations of the Zitadel API that `zitadel api` calls.";
+  static override description =
+    "List the operations of the Zitadel API that the api command calls.";
   static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> api ls",

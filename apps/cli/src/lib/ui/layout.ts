@@ -1,4 +1,4 @@
-import { colors, stripAnsi } from "consola/utils";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
 
@@ -292,23 +292,25 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
 };
 
 /**
- * A rounded green frame round `text`, with `title` set into the top border: what
- * `consola.box` draws for `padding: 1`, measured in the columns a terminal shows.
- *
- * It is drawn here rather than by consola because consola pads a line by its
- * length in code units, so a line holding double-width characters is padded for
- * the width it does not have and its right border lands out of line.
+ * A rounded green frame round `text`, with `title` set into the top border: with
+ * a column of padding either side, measured in the columns a terminal shows
+ * rather than in code units, so a line holding double-width characters does
+ * not leave its right border out of line.
  */
-const drawBox = (text: string, title: string): string => {
+export const drawBox = (
+  text: string,
+  title: string,
+  paint: (text: string) => string = pc.green,
+): string => {
   const padding = 2;
-  const edge = (character: string): string => colors.green(character);
+  const edge = (character: string): string => paint(character);
   const lines = text.split("\n");
   const width = Math.max(...lines.map(visible), visible(title)) + padding;
   const left = Math.floor((width - visible(title)) / 2);
   const right = width - visible(title) - left + padding;
   const blank = `\u0020${edge("\u2502")}${" ".repeat(width + padding)}${edge("\u2502")}`;
   return [
-    `\u0020${edge("\u256d")}${edge("\u2500").repeat(left)}${colors.green(title)}${edge("\u2500").repeat(right)}${edge("\u256e")}`,
+    `\u0020${edge("\u256d")}${edge("\u2500").repeat(left)}${paint(title)}${edge("\u2500").repeat(right)}${edge("\u256e")}`,
     blank,
     ...lines.map(
       (line) =>
@@ -360,12 +362,10 @@ export class Frame implements Renderable {
       ...this.steps.map((step) => this.step(step)),
       ...(this.footer === undefined ? [] : [new Prose(this.footer, Frame.INNER, false).render()]),
     ];
-    // Not `consola.box`: while a chain is open, consola's own output is drawn
-    // inside it. The last line is padded so every box is the same width, which
-    // consola otherwise sizes to its content. consola measures a line without
-    // its colour, so the padding must too: a styled last line — a command, or
-    // the dimmed footer — would otherwise count its escapes as width and leave
-    // the box as narrow as whatever it happens to hold.
+    // The last line is padded so every box is the same width, rather than as
+    // wide as its content. The padding is measured without the colour: a styled
+    // last line — a command, or the dimmed footer — would otherwise count its
+    // escapes as width and leave the box as narrow as whatever it happens to hold.
     const lines = blocks.join("\n\n").split("\n");
     const last = lines.length - 1;
     const tail = lines[last] ?? "";

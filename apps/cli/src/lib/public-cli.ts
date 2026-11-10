@@ -103,6 +103,28 @@ export function normalizePublicCliCommands<T extends string>(
 }
 
 /**
+ * Text as a terminal shows it: a command quoted in backticks is written out
+ * as the one that runs on the reader's machine, and every other backtick span
+ * loses its backticks, because a terminal prints them rather than rendering
+ * them as code.
+ *
+ * Library code writes its hints in the readable form, with the command in
+ * backticks. This is the single place that form becomes what a person sees,
+ * so no hint has to know the version of the CLI or how it is run.
+ *
+ * @param text - A message or hint as its author wrote it.
+ * @param cliVersion - The running CLI's version, which the public command pins.
+ * @returns The text without backticks and with each `zitadel …` command spelled out.
+ */
+export function spellOutCommands(text: string, cliVersion: string): string {
+  return text.replace(/`([^`\n]+)`/g, (_match, span: string) => {
+    return span.replace(/(^|\|\s*)zitadel(?= |$)/g, (_found, lead: string) => {
+      return `${lead}${publicCliCommand("", cliVersion)}`;
+    });
+  });
+}
+
+/**
  * Rewrites `zitadel …` command mentions in scaffolded prose (the
  * `.zitadel/**` READMEs) to the public `npx @zitadel/cli@<version> …` form.
  *

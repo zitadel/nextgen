@@ -1,9 +1,9 @@
 import { intro, log, note, outro } from "@clack/prompts";
-import { consola } from "consola";
 import pc from "picocolors";
 
 import { CANCELLED, PromptCancelled, ZitadelError } from "../errors";
 import { asker } from "../input";
+import { log as narration } from "../log";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
@@ -26,7 +26,7 @@ import { Where } from "./where";
  * by {@link Chain.finish} or {@link Chain.abort}. A `plain`
  * {@link Presentation} draws no chain however the run goes, and with a
  * non-interactive {@link Audience} nothing is drawn at all; either way
- * narration falls back to plain `consola` lines.
+ * narration falls back to plain lines.
  *
  * A command never opens or closes it: it asks ({@link Chain.questions}), notes
  * what the person must act on, reports its work, and the base command closes
@@ -105,13 +105,7 @@ export class Chain implements Drawing, Narratable {
    * is indented to the same column, so the marks still line up.
    */
   narrate(symbol: string, text: string): void {
-    if (!this.chained) {
-      if (this.audience.interactive) {
-        consola.log(text);
-      }
-      return;
-    }
-    // A bridged line is whatever the caller passed `consola`, so it obeys no
+    // A bridged line is whatever the caller passed `log`, so it obeys no
     // width of its own: wrapped here, or a long warning runs past the gutter.
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
@@ -245,7 +239,7 @@ export class Chain implements Drawing, Narratable {
       this.narrate(MARK.info, text);
       return;
     }
-    consola.info(text);
+    narration.info(text);
   }
 
   note(title: string, lines: readonly string[]): void {
@@ -257,7 +251,7 @@ export class Chain implements Drawing, Narratable {
       return;
     }
     for (const line of [title, ...lines]) {
-      consola.info(line);
+      narration.info(line);
     }
   }
 

@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
-import { consola } from "consola";
+import { log } from "@/lib/log";
 
 import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { deployInitialRelease, type InitialDeployment, isEnvironmentName } from "@/lib/environment";
@@ -268,7 +268,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      consola.success(`Created project ${escapeControlCharacters(project.id)}`);
+      log.done(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     // This command creates the project and deploys to it, so it says where it
@@ -288,7 +288,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await writeManagedEnvFile(environment.path, values);
-    consola.success(`Wrote ${environment.file}`);
+    log.done(`Wrote ${environment.file}`);
 
     const appVariables: PlatformVariable[] = [
       { name: "ZITADEL_URL", value: server },
@@ -360,7 +360,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // permits overwriting the env file, never answers a `yes-no`.
     const offerDeployment = hasSomewhereToLand && !nonInteractive && projectSecret !== undefined;
     if (offerDeployment) {
-      consola.info(
+      log.info(
         "Nothing is deployed to this environment yet, so sign-in is refused until your .zitadel/ files are deployed.",
       );
     }
@@ -521,7 +521,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     projectSecret: string;
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
-    consola.start("Deploying .zitadel/ to the new environment");
+    log.start("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
@@ -543,7 +543,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           return projectCommand(args, opts.selector, this.cliVersion);
         },
       });
-      consola.success(
+      log.done(
         `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
       );
       return deployment;

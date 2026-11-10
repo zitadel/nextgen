@@ -12,7 +12,7 @@ export type Audience = {
    * Whether a person is watching. False under `--json`, under
    * `--non-interactive`, and when stdout or stdin is not a terminal. When it is
    * false the chain draws nothing, questions are answered from flags and piped
-   * stdin only, and narration falls back to plain `consola` lines, which
+   * stdin only, and narration falls back to plain lines, which
    * `--json` silences in turn, so the envelope travels alone on stdout.
    */
   readonly interactive: boolean;

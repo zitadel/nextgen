@@ -63,10 +63,10 @@ export default class Reset extends Destructive(BaseCommand) {
         message: [
           `Permanently delete the local Zitadel server's data in ${dataDir}?`,
           "",
-          "It stops and removes the local server if one is running, so `status` no longer reports it.",
+          "It stops and removes the local server if one is running, so the status command no longer reports it.",
           "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
           `Kept: ${adminFile}, the local admin sign-in, and everything else in your project.`,
-          `Run \`${this.suggestUnscoped("start")}\` afterwards to set up a fresh server.`,
+          `Run ${this.suggestUnscoped("start")} afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: () => ({
           status: "ok",

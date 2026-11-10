@@ -782,7 +782,7 @@ export const RESOURCES = {
         }
         const notFound = () =>
           new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
-            hint: `Run \`policies list\` to see the project's policies. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
+            hint: `List the project's policies with the policies list command. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
           });
         const operation = POLICY_OPERATIONS.find((known) => known === ref);
         if (operation === undefined) {

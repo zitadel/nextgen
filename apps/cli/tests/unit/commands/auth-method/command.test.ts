@@ -9,7 +9,6 @@ vi.mock("@clack/prompts", async () => {
 
 import * as prompts from "@clack/prompts";
 import { Config, Errors } from "@oclif/core";
-import { consola } from "consola";
 
 import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
@@ -18,6 +17,7 @@ import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type clackDouble } from "@tests/helpers/clack";
+import { recordLog } from "@tests/helpers/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -602,39 +602,36 @@ describe("AuthMethodCommand.write", () => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, aNewSchema(read));
 
-    expect(success).toHaveBeenCalledWith(`Wrote ${NEW_SCHEMA_FILE}`);
+    recorded.stop();
+    expect(recorded.said).toEqual([{ level: "done", text: `Wrote ${NEW_SCHEMA_FILE}` }]);
   });
 
   it("says it updated a file the change edits", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, read.config.schemas.enable(read.schema, "password"));
 
-    expect(success).toHaveBeenCalledWith(`Updated ${SCHEMA_FILE}`);
+    recorded.stop();
+    expect(recorded.said).toEqual([{ level: "done", text: `Updated ${SCHEMA_FILE}` }]);
   });
 
   it("says it removed a file the change deletes", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, read.config.schemas.remove(SCHEMA_FILE));
 
-    expect(success).toHaveBeenCalledWith(`Removed ${SCHEMA_FILE}`);
+    recorded.stop();
+    expect(recorded.said).toEqual([{ level: "done", text: `Removed ${SCHEMA_FILE}` }]);
   });
 
   it("writes the change to the Project", async ({ dir }) => {
@@ -714,13 +711,12 @@ describe("AuthMethodCommand.write", () => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, read.config.schemas.enable(read.schema, "passkey"));
 
-    expect(success).not.toHaveBeenCalled();
+    recorded.stop();
+    expect(recorded.said).toEqual([]);
   });
 });
 

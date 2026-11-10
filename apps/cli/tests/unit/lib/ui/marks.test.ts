@@ -1,4 +1,4 @@
-import { stripAnsi } from "consola/utils";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { describe, expect, it } from "vitest";
 
 import { GUIDE, MARK } from "../../../../src/lib/ui/marks";

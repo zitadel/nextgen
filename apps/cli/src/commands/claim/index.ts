@@ -1,10 +1,9 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import consola from "consola";
+import { log } from "@/lib/log";
 import pRetry, { AbortError } from "p-retry";
 
 import { ClaimService } from "@/lib/backend";
-import { BOX_STYLE, wrapForBox } from "@/lib/box";
 import { openInBrowser } from "@/lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
 import { requireValue } from "@/lib/environment";
@@ -286,20 +285,13 @@ export default class Claim extends EnvironmentCommand {
       // instruction on its own, so a launch that never happens (headless box,
       // no `xdg-open`, `--no-open`, an agent) needs no separate path.
       //
-      // The URL prints as a bare line under the frame rather than inside it:
-      // it must never be split (clickability, and the journey e2e scrape reads
-      // it out of the narration), and consola pads every box line to the
-      // longest one, so a ~110-character URL inside the box would re-break the
-      // frame on any terminal narrower than the URL itself. `wrapForBox` keeps
-      // the frame's own content inside the terminal width.
-      consola.box({
-        title: "Finish in your browser",
-        message: wrapForBox(
-          "Create an account or sign in to claim your project, make it permanent and start collaborating.",
-        ),
-        style: BOX_STYLE.info,
-      });
-      consola.log(challenge.claim_url);
+      // The URL prints as a bare line under the explanation rather than inside
+      // anything: it must never be split (clickability, and the journey e2e
+      // scrape reads it out of the narration).
+      this.ui.note("Finish in your browser", [
+        "Create an account or sign in to claim your project, make it permanent and start collaborating.",
+      ]);
+      log.plain(challenge.claim_url);
 
       if (flags.noWait) {
         return this.linkIssued(projectId, challenge);
@@ -308,7 +300,7 @@ export default class Claim extends EnvironmentCommand {
       const skipLaunch = flags.noOpen || this.nonInteractive;
       opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
       if (!opened) {
-        consola.info("Open the link above to continue.");
+        log.info("Open the link above to continue.");
       }
       waitFor = {
         challengeId: challenge.challenge_id,
@@ -326,7 +318,7 @@ export default class Claim extends EnvironmentCommand {
         deadline: claimDeadline({ timeoutSeconds: flags.timeout, now: Date.now() }),
       };
     }
-    consola.start("Waiting for the browser step to finish");
+    log.start("Waiting for the browser step to finish");
 
     const completed = await this.poll(
       claimService,
@@ -350,7 +342,7 @@ export default class Claim extends EnvironmentCommand {
     }
     // The team id stays out of the human output by design (it lives in the
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
-    consola.success("Project claimed");
+    log.done("Project claimed");
 
     this.recordTelemetry({ claim_outcome: "completed", browser_opened: opened });
 
@@ -504,7 +496,7 @@ export default class Claim extends EnvironmentCommand {
     dashboard_url?: string;
   }): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
-    consola.info(`This project already belongs to team ${data.team_id}.`);
+    log.info(`This project already belongs to team ${data.team_id}.`);
 
     return this.emit({
       status: "skipped",

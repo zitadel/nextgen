@@ -14,31 +14,16 @@ const PACKAGE = join(SRC, "lib/ui");
 const asWritten = (file: string): string => relative(SRC, file).split(sep).join("/");
 
 /**
- * What the narration bridge still carries: a command that says things with
- * `consola`, or writes to a stream itself, instead of through the UI package.
- * Moving these is the rest of the one-chain-per-command work; until then the
- * list is pinned so the debt cannot grow.
+ * The files that still write to a stream themselves instead of saying it with
+ * `log`: a log stream, a version notice, the prompts and telemetry. The list is
+ * pinned so that it only ever shrinks.
  */
 const STILL_DRAWING_THEMSELVES = [
-  "commands/api/index.ts: imports consola",
-  "commands/auth-method/sso/enable/index.ts: imports consola",
-  "commands/branding/eject.ts: imports consola",
-  "commands/claim/index.ts: imports consola",
-  "commands/console.ts: imports consola",
-  "commands/doctor/index.ts: imports consola",
-  "commands/env/add/index.ts: imports consola",
   "commands/logs/index.ts: writes to process.stdout",
   "hooks/version-notice.ts: writes to process.stderr",
-  "lib/idp/credentials.ts: imports consola",
   "lib/input.ts: imports @clack/prompts",
-  "lib/local-server/server.ts: imports consola",
-  "commands/auth-method/command.ts: imports consola",
-  "lib/oclif/base.ts: imports consola",
   "lib/oclif/base.ts: writes to process.stderr",
-  "lib/publish/steps/asset-probe.ts: imports consola",
-  "lib/skills-hint.ts: imports consola",
   "lib/telemetry/sink.ts: writes to process.stderr",
-  "lib/warnings.ts: imports consola",
 ].sort();
 
 /**
@@ -103,6 +88,23 @@ describe("the UI package", () => {
       "lib/ui/progress.ts",
       "lib/ui/spinner.ts",
     ]);
+  });
+});
+
+describe("saying what a command is doing", () => {
+  // Narration is `log`, drawn by the sink the running command installs, so a
+  // line looks the same wherever it was written and `--json` can silence it.
+  // A second logger would say things in a look of its own.
+  it("is done with `log` alone, so no module imports a logger of its own", async () => {
+    const loggers: string[] = [];
+    for (const file of await sourceFiles(SRC)) {
+      const source = await readFile(file, "utf8");
+      if (/from ["']consola["']/.test(source)) {
+        loggers.push(asWritten(file));
+      }
+    }
+
+    expect(loggers).toEqual([]);
   });
 });
 

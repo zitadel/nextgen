@@ -57,7 +57,9 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
 
     const columns = COLUMNS;
     const empty = nothingFound("resources");
-    const footer = [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`];
+    const footer = [
+      `Run ${this.suggestUnscoped("<resource> <verb> --help")} for a command's flags.`,
+    ];
     const page = null;
     const extra = {};
 

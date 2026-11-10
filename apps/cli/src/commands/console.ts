@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import consola from "consola";
+import { log } from "@/lib/log";
 
 import { openInBrowser } from "@/lib/browser";
 import { findLocalAdminDir, readLocalAdmin } from "@/lib/local-server/admin-credential";
@@ -68,7 +68,7 @@ export default class Console extends BaseCommand {
     // handoff token on the server — a mutation, so a dry run only reports who
     // it would sign in as.
     if (this.dryRun) {
-      consola.info(`Would mint a console sign-in link for ${admin.email}.`);
+      log.info(`Would mint a console sign-in link for ${admin.email}.`);
 
       return this.emit({
         status: "ok",
@@ -84,8 +84,8 @@ export default class Console extends BaseCommand {
     const serverUrl = await LocalServer.resolveUrl(localDir);
     const signInUrl = await consoleSignInUrl(serverUrl, admin, this.signal);
 
-    consola.log(`Signed in to the local console as ${admin.email}:`);
-    consola.log(signInUrl);
+    log.plain(`Signed in to the local console as ${admin.email}:`);
+    log.plain(signInUrl);
     const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 

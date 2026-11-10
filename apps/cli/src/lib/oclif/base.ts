@@ -6,13 +6,13 @@ import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 import { byName, type ByName } from "./names";
 import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
-import consola from "consola";
+import { log } from "@/lib/log";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
-import { normalizePublicCliCommands, publicCliCommand } from "@/lib/public-cli";
+import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "@/lib/public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
@@ -175,7 +175,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // Declared so oclif accepts `--color`/`--no-color` rather than refusing them
     // as unknown; the colour decision itself is applied in `bin/run.js` (which
     // sets NO_COLOR/FORCE_COLOR before the libraries load) and honoured here.
-    // picocolors reads `--no-color` from argv on its own; consola reads the env.
+    // picocolors reads `--no-color` from argv on its own; the env covers the rest.
     color: Flags.boolean({
       default: true,
       allowNo: true,
@@ -436,7 +436,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected narrate(notices: readonly string[]): void {
     for (const notice of notices) {
-      consola.log(notice.replace(/\n+$/, ""));
+      log.plain(notice.replace(/\n+$/, ""));
     }
   }
 
@@ -474,12 +474,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);
     const debug = Boolean(flags.debug);
-    // Default to `info` (3) so users see step-by-step narration (start/info/
-    // success/box). `--json` silences consola entirely so the structured
-    // envelope is the only thing on stdout. `--debug` raises to 4 (debug);
-    // `--verbose` is reserved for richer per-step detail and currently maps
-    // to the same level as default.
-    consola.level = json ? -999 : debug ? 4 : 3;
     // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
     // parsed `color` flag. The flag's value is the source of truth here so that
@@ -493,16 +487,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
       useColor &&
       (Boolean(process.env[FORCE_COLOR.name]) ||
         (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
-    // Drop the right-aligned timestamp the FancyReporter adds by default.
-    // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
-    // lines (e.g. created-schema URL), and clutter the visual rhythm of the
-    // ◐/✔/ℹ glyphs that anchor each step.
-    consola.options.formatOptions = {
-      ...consola.options.formatOptions,
-      date: false,
-      colors: useColor,
-      compact: true,
-    };
     this.meta = {
       cwd,
       nonInteractive: Boolean(flags.nonInteractive) || !isTTY || json,
@@ -525,7 +509,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
     );
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
-    this.ui.bridgeNarration();
+    // `--json` draws no narration, so the structured envelope is the only
+    // thing on stdout. `--debug` also draws the detail it asks for.
+    if (!json) {
+      this.ui.bridgeNarration({ debug });
+    }
     // Only a box carries the offer, so only a wizard looks for it, and a dry
     // run changes nothing, so it does not spend the one offer a machine gets.
     this.skillsOffered =
@@ -883,8 +871,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
-    // `consola` is process-wide: the chain borrows its reporters while this
-    // command runs and must give them back however the command ended.
+    // The narration sink is process-wide: it is installed while this command
+    // runs and must be removed however the command ended.
     this.ui.releaseNarration();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
@@ -1009,7 +997,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     source: meta.source,
     code: error.code,
     message: error.message,
-    hint: error.hint,
+    hint: error.hint === undefined ? undefined : spellOutCommands(error.hint, meta.cliVersion),
     next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
     details: error.details,
   };
@@ -1055,9 +1043,11 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // as every other suggestion, rather than under oclif's "See more help with".
   const commands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
   return {
-    title: `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(sentence.replace(/\.$/, ""))}`,
+    title: `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(spellOutCommands(sentence, meta.cliVersion).replace(/\.$/, ""))}`,
     sections: [],
-    lines: error.hint ? [escapeControlCharacters(error.hint)] : [],
+    lines: error.hint
+      ? [escapeControlCharacters(spellOutCommands(error.hint, meta.cliVersion))]
+      : [],
     ...(commands.length === 0
       ? {}
       : { next: [{ text: NEXT_LABEL, command: commands.join("\n") }], boxed: true }),

@@ -23,6 +23,8 @@ const text = (s: string): string => escapeControlCharacters(s);
 export const command = (s: string): string => pc.bold(pc.cyan(text(s)));
 /** Cyan, for filesystem paths the user can open. */
 export const path = (s: string): string => pc.cyan(text(s));
+/** Cyan, for a frame that says what to read or do, as against green for what succeeded. */
+export const notice = (s: string): string => pc.cyan(s);
 /** Cyan, for URLs (browser-clickable in most terminals). */
 export const url = (s: string): string => pc.cyan(text(s));
 /**

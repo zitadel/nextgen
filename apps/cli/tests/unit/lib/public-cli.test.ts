@@ -15,6 +15,7 @@ import {
   portableCommands,
   publicCliCommand,
   sdkVersionForCli,
+  spellOutCommands,
 } from "@/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -55,6 +56,37 @@ describe("public CLI command formatting", () => {
     );
     expect(normalizePublicCliCommand("npm install", "0.1.0-alpha.1")).toBe("npm install");
     expect(normalizePublicCliCommand("docker version", "0.1.0-alpha.1")).toBe("docker version");
+  });
+});
+
+describe("spellOutCommands", () => {
+  it("spells a quoted zitadel command out as the one that runs, without backticks", () => {
+    expect(spellOutCommands("Run `zitadel setup` first.", "0.1.0-alpha.1")).toBe(
+      "Run npx @zitadel/cli@0.1.0-alpha.1 setup first.",
+    );
+  });
+
+  it("spells out each command in a hint, and the one after a pipe", () => {
+    expect(
+      spellOutCommands(
+        "Run `zitadel reset --force`, then `zitadel start`; or `cat body.json | zitadel api x`.",
+        "0.1.0",
+      ),
+    ).toBe(
+      "Run npx @zitadel/cli@0.1.0 reset --force, then npx @zitadel/cli@0.1.0 start; or cat body.json | npx @zitadel/cli@0.1.0 api x.",
+    );
+  });
+
+  it("takes the backticks off anything else that was quoted, and leaves the words", () => {
+    expect(spellOutCommands("Set one with `variable set`, or pass `--preview`.", "0.1.0")).toBe(
+      "Set one with variable set, or pass --preview.",
+    );
+  });
+
+  it("leaves a file name that merely starts with the word alone", () => {
+    expect(spellOutCommands("Edit `zitadel.json` and `.zitadel/secret`.", "0.1.0")).toBe(
+      "Edit zitadel.json and .zitadel/secret.",
+    );
   });
 });
 
@@ -218,23 +250,11 @@ describe("the CLI names itself once in human output", () => {
   const COMMANDS = join(import.meta.dirname, "../../../src/commands");
 
   /**
-   * The commands whose prose still spells a command by hand. Pinned rather
-   * than fixed here because each is another chain's to convert; the list is
-   * what stops the debt growing while they are.
+   * The commands whose prose still spells a command by hand. Pinned so that
+   * the list only ever shrinks: it is empty, and a command that needs a
+   * command in its prose builds it with `suggest`.
    */
-  const NOT_YET_CONVERTED = [
-    "commands/api/index.ts",
-    "commands/api/ls.ts",
-    "commands/deployment/rollback/index.ts",
-    "commands/env/index.ts",
-    "commands/logs/index.ts",
-    "commands/release/create.ts",
-    "commands/reset.ts",
-    "commands/resources-list.ts",
-    "commands/resources.ts",
-    "commands/start/index.ts",
-    "commands/stop.ts",
-  ];
+  const NOT_YET_CONVERTED: string[] = [];
 
   /**
    * The source with every comment blanked, keeping each line where it was.

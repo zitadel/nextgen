@@ -1,4 +1,4 @@
-import { stripAnsi } from "consola/utils";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach } from "vitest";
 
 /**

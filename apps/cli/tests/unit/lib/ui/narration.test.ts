@@ -1,118 +1,109 @@
-import { stripAnsi } from "consola/utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { consola } from "consola";
-
+import { log } from "../../../../src/lib/log";
 import { MARK } from "../../../../src/lib/ui/marks";
 import { Narration } from "../../../../src/lib/ui/narration";
 
 /** A chain that collects what was narrated into it, as `mark text`. */
 class Collected {
   readonly lines: string[] = [];
+  readonly chained: boolean;
+
+  constructor(chained = true) {
+    this.chained = chained;
+  }
 
   narrate(symbol: string, text: string): void {
     this.lines.push(`${stripAnsi(symbol)} ${text}`);
   }
 }
 
-/** A narration installed on consola, torn down however the test ends. */
-const bridged = (): { chain: Collected; narration: Narration } => {
-  const chain = new Collected();
+const installed: Narration[] = [];
+
+/** A narration installed as the sink, torn down however the test ends. */
+const drawn = (chain = new Collected(), options: { debug?: boolean } = {}) => {
   const narration = new Narration(chain);
-  narration.install();
+  narration.install(options);
   installed.push(narration);
   return { chain, narration };
 };
-
-const installed: Narration[] = [];
-let level = 0;
-
-beforeEach(() => {
-  // Off a terminal consola reports warnings and above only, which would hide
-  // the very lines the bridge exists to redraw.
-  level = consola.level;
-  consola.level = 5;
-});
 
 afterEach(() => {
   for (const narration of installed.splice(0)) {
     narration.restore();
   }
-  consola.level = level;
 });
 
 describe("Narration", () => {
-  it("draws the lines a command still writes with consola into the chain", () => {
-    const { chain } = bridged();
+  it("draws what a command says into the chain", () => {
+    const { chain } = drawn();
 
-    consola.info("Looking for a project");
+    log.info("Looking for a project");
 
     expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} Looking for a project`]);
   });
 
-  it("draws a consola box as its title and message, not as an object", () => {
-    const { chain } = bridged();
+  it("gives each level the mark that level deserves", () => {
+    const { chain } = drawn();
 
-    consola.box({ title: "Finish in your browser", message: "Sign in to claim the project." });
-
-    expect(chain.lines.join("\n")).toContain(
-      "Finish in your browser\nSign in to claim the project.",
-    );
-    expect(chain.lines.join("\n")).not.toContain("borderStyle");
-  });
-
-  it("gives each consola level the mark that level deserves", () => {
-    const { chain } = bridged();
-
-    consola.success("Done");
-    consola.warn("Careful");
-    consola.error("Broken");
+    log.done("Done");
+    log.warn("Careful");
+    log.fail("Broken");
+    log.start("Working");
 
     expect(chain.lines.map((line) => line.split(" ")[0])).toEqual(
-      [MARK.done, MARK.warning, MARK.failed].map(stripAnsi),
+      [MARK.done, MARK.warning, MARK.failed, MARK.started].map(stripAnsi),
     );
   });
 
   it("says nothing for a line that is only whitespace", () => {
-    const { chain } = bridged();
+    const { chain } = drawn();
 
-    consola.info("   ");
+    log.info("   ");
 
     expect(chain.lines).toEqual([]);
   });
 
   it("drops the blank lines a command padded its message with", () => {
-    const { chain } = bridged();
+    const { chain } = drawn();
 
-    consola.info("\n\nLooking for a project");
+    log.info("\n\nLooking for a project");
 
     expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} Looking for a project`]);
   });
 
+  it("keeps debug detail back unless it was asked for", () => {
+    const quiet = drawn();
+    log.debug("an internal detail");
+    quiet.narration.restore();
+
+    const loud = drawn(new Collected(), { debug: true });
+    log.debug("an internal detail");
+
+    expect([quiet.chain.lines, loud.chain.lines.length]).toEqual([[], 1]);
+  });
+
   it("is installed once, however many times it is asked", () => {
-    const { narration } = bridged();
+    const { narration } = drawn();
     narration.install();
     narration.restore();
 
     expect(narration.installed).toBe(false);
   });
 
-  it("gives consola its own reporters back, so the next command starts clean", () => {
-    const before = [...consola.options.reporters];
-    const { narration, chain } = bridged();
+  it("stops drawing when restored, so the next command starts clean", () => {
+    const { narration, chain } = drawn();
 
     narration.restore();
-    consola.info("after the command ended");
+    log.info("after the command ended");
 
-    expect(consola.options.reporters).toEqual(before);
     expect(chain.lines).toEqual([]);
   });
 
   it("restores nothing when it was never installed", () => {
-    const before = [...consola.options.reporters];
-
-    new Narration(new Collected()).restore();
-
-    expect(consola.options.reporters).toEqual(before);
+    expect(() => {
+      new Narration(new Collected()).restore();
+    }).not.toThrow();
   });
 });

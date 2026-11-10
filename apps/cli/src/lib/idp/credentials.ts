@@ -5,7 +5,7 @@ import type {
   ClientSecretVariable,
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
+import { log } from "@/lib/log";
 
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
@@ -148,7 +148,7 @@ async function publishSecret(
     await publish(name, value, { secret });
     return "stored";
   } catch (error) {
-    consola.debug(`Publishing ${name} to the project failed`, error);
+    log.debug(`Publishing ${name} to the project failed`, error);
     return "failed";
   }
 }
@@ -248,7 +248,7 @@ export function republishArgs(
  * {@link republishArgs} as commands to run.
  *
  * @remarks
- * Built for a run that prints nothing: with `--json` consola is disabled, so
+ * Built for a run that prints nothing: with `--json` narration is disabled, so
  * the warnings above never appear and this list is the only place the recovery
  * step is stated.
  *
@@ -291,7 +291,7 @@ function reportPublished(
 ): void {
   switch (state) {
     case "stored": {
-      consola.success(`Published ${name} to the project`);
+      log.done(`Published ${name} to the project`);
       return;
     }
     case "deferred": {

@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import consola from "consola";
+import { log } from "@/lib/log";
 
 import { createZitadelClient } from "@/lib/backend";
 import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
@@ -240,7 +240,7 @@ export default class Doctor extends Destructive(BaseCommand) {
             reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
             continue;
           }
-          consola.debug(`doctor --fix: ${check.name} repair failed`, error);
+          log.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }
     }

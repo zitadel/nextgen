@@ -6,16 +6,16 @@ import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { it } from "@tests/helpers/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
-const log = vi.hoisted(() => vi.fn());
 const homedir = vi.hoisted(() => vi.fn<() => string>());
 
 vi.mock("rosie-skills", () => rosie);
-vi.mock("consola", () => ({ default: { log } }));
 vi.mock("node:os", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:os")>();
   return { ...actual, homedir };
 });
 
+import { installLogSink } from "@/lib/log";
+import { recordLog } from "@tests/helpers/log";
 import { claimSkills, eligibleForSkills, showSkillsHint } from "@/lib/skills-hint";
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
@@ -24,11 +24,16 @@ const cliVersion = "1.2.3";
 /** The environment of a user whose config home is `dir`. */
 const envIn = (dir: string): NodeJS.ProcessEnv => ({ XDG_CONFIG_HOME: dir });
 
+let recorded = recordLog();
+const said = (): string[] => recorded.said.map((line) => line.text);
+
 beforeEach(() => {
   rosie.agents.mockResolvedValue([CLAUDE]);
+  recorded = recordLog();
 });
 
 afterEach(() => {
+  recorded.stop();
   vi.clearAllMocks();
 });
 
@@ -40,7 +45,7 @@ describe("showSkillsHint", () => {
   }) => {
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
 
-    const message = log.mock.calls[0]?.[0] as string;
+    const message = said()[0] ?? "";
     expect(message).toContain("Using an AI coding agent?");
     expect(message).toContain("npx @zitadel/cli@1.2.3 skills add");
     expect(message).toContain("Optional. You can continue without installing skills.");
@@ -49,21 +54,29 @@ describe("showSkillsHint", () => {
   it("does not name the agents it detected or mention the opt-out variable", async ({ dir }) => {
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
 
-    const message = log.mock.calls[0]?.[0] as string;
+    const message = said()[0] ?? "";
     expect(message).not.toContain("Claude Code");
     expect(message).not.toContain("detected");
     expect(message).not.toContain("NO_SKILLS_PROMPT");
   });
 
   it("is not counted as shown when showing it fails", async ({ dir }) => {
-    log.mockImplementationOnce(() => {
-      throw new Error("closed stream");
+    recorded.stop();
+    let first = true;
+    const calls: string[] = [];
+    const stop = installLogSink((_level, text) => {
+      calls.push(text);
+      if (first) {
+        first = false;
+        throw new Error("closed stream");
+      }
     });
 
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
 
-    expect(log).toHaveBeenCalledTimes(2);
+    stop();
+    expect(calls).toHaveLength(2);
     expect(existsSync(shownFile(dir))).toBe(true);
   });
 
@@ -71,7 +84,7 @@ describe("showSkillsHint", () => {
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
 
-    expect(log).toHaveBeenCalledTimes(1);
+    expect(said()).toHaveLength(1);
   });
 
   it.for<[string, { interactive: boolean; extra?: NodeJS.ProcessEnv }]>([
@@ -81,7 +94,7 @@ describe("showSkillsHint", () => {
   ])("stays silent when it %s", async ([_name, { interactive, extra }], { dir }) => {
     await showSkillsHint({ env: { ...envIn(dir), ...extra }, interactive, cliVersion });
 
-    expect(log).not.toHaveBeenCalled();
+    expect(said()).toEqual([]);
     expect(existsSync(shownFile(dir))).toBe(false);
   });
 
@@ -90,7 +103,7 @@ describe("showSkillsHint", () => {
 
     await showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
 
-    expect(log).not.toHaveBeenCalled();
+    expect(said()).toEqual([]);
   });
 
   it("shows once even when two first runs race for the marker", async ({ dir }) => {
@@ -98,7 +111,7 @@ describe("showSkillsHint", () => {
     const second = showSkillsHint({ env: envIn(dir), interactive: true, cliVersion });
     await Promise.all([first, second]);
 
-    expect(log).toHaveBeenCalledTimes(1);
+    expect(said()).toHaveLength(1);
   });
 
   it("stays silent when the home directory cannot be determined", async () => {
@@ -108,7 +121,7 @@ describe("showSkillsHint", () => {
 
     await showSkillsHint({ env: {}, interactive: true, cliVersion });
 
-    expect(log).not.toHaveBeenCalled();
+    expect(said()).toEqual([]);
   });
 
   it("never throws into the command", async ({ dir }) => {
@@ -178,7 +191,7 @@ describe("the two ways of offering the skills", () => {
 
     await showSkillsHint({ env, interactive, cliVersion });
 
-    expect(log).not.toHaveBeenCalled();
+    expect(said()).toEqual([]);
     expect(await eligibleForSkills({ env, interactive, cliVersion })).toBe(false);
   });
 });

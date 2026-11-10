@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { consola } from "consola";
+import { log as narration } from "../log";
 
 import { stripColumnMarks } from "./layout";
 import { GUIDE, MARK } from "./marks";
@@ -9,7 +9,7 @@ import { DrawnSpinner } from "./spinner";
  * Work in progress, drawn as one line. A spinner runs while the work runs and
  * is replaced by the line that says how it ended, with whatever the work
  * reported underneath. With nobody at a terminal the same thing is narrated as
- * plain `consola` lines, which `--json` silences.
+ * plain lines, which `--json` silences.
  *
  * Only the chain builds one; a command reaches it through `this.ui.task(...)`
  * or `this.ui.begin(...)`.
@@ -84,19 +84,19 @@ export class Progress {
     const lines: Line[] = [];
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
-      consola.start(label);
+      narration.start(label);
       let result: T;
       try {
         result = await work(report);
       } catch (error) {
         // Closed as failed, as the drawn step is, so the step never dangles.
-        consola.error(`${label} failed`);
+        narration.fail(`${label} failed`);
         throw error;
       }
       for (const { verb, subject } of lines) {
-        consola.info(`${verb} ${subject}`);
+        narration.info(`${verb} ${subject}`);
       }
-      consola.success(done?.(result) ?? label);
+      narration.done(done?.(result) ?? label);
       return result;
     }
     this.drawing.open();
@@ -123,7 +123,7 @@ export class Progress {
    */
   begin(label: string): Step {
     if (!this.drawing.interactive) {
-      consola.start(label);
+      narration.start(label);
       // Ending once is the step's contract, not the chain's: a caller that
       // ends its own step in both a `try` and a `catch` must not narrate the
       // step twice just because nobody is watching.
@@ -136,9 +136,9 @@ export class Progress {
         narrate();
       };
       return {
-        detail: (text) => consola.info(text),
-        done: (text) => once(() => consola.success(text ?? label)),
-        fail: (text) => once(() => consola.error(text ?? `${label} failed`)),
+        detail: (text) => narration.info(text),
+        done: (text) => once(() => narration.done(text ?? label)),
+        fail: (text) => once(() => narration.fail(text ?? `${label} failed`)),
       };
     }
     this.drawing.open();
@@ -196,7 +196,7 @@ export class Progress {
    */
   private detail(text: string): void {
     if (!this.drawing.chained) {
-      consola.log(stripColumnMarks(`  ${text}`));
+      narration.plain(stripColumnMarks(`  ${text}`));
       return;
     }
     this.line(GUIDE, text);
@@ -214,7 +214,7 @@ export class Progress {
    */
   private line(symbol: string, text: string): void {
     if (!this.drawing.chained) {
-      consola.log(stripColumnMarks(text));
+      narration.plain(stripColumnMarks(text));
       return;
     }
     log.message(stripColumnMarks(text), { symbol, spacing: 0 });

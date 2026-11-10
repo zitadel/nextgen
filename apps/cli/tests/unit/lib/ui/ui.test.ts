@@ -1,11 +1,11 @@
-import { stripAnsi } from "consola/utils";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
 import { confirm, intro, outro, spinner } from "@clack/prompts";
-import { consola } from "consola";
 
+import { log } from "../../../../src/lib/log";
 import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
 import { Ui } from "../../../../src/lib/ui/ui";
 
@@ -15,13 +15,15 @@ const forced = () => new Ui({ interactive: true, force: true });
 const scripted = () => new Ui({ interactive: false, force: false });
 
 let written: string[] = [];
-let level = 0;
+let errors: string[] = [];
 
 beforeEach(() => {
   written = [];
-  // Off a terminal consola reports warnings and above only.
-  level = consola.level;
-  consola.level = 5;
+  errors = [];
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    errors.push(stripAnsi(String(chunk)));
+    return true;
+  });
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     written.push(stripAnsi(String(chunk)));
     return true;
@@ -29,7 +31,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  consola.level = level;
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
@@ -187,13 +188,13 @@ describe("Ui", () => {
     });
   });
 
-  describe("the consola bridge", () => {
-    it("draws a command's consola lines inside the chain", () => {
+  describe("the narration", () => {
+    it("draws what a command says inside the chain", () => {
       const ui = watched();
       ui.describe("Listing origins");
       ui.bridgeNarration();
 
-      consola.info("Looking for a project");
+      log.info("Looking for a project");
       ui.releaseNarration();
 
       expect(intro).toHaveBeenCalledWith("Listing origins");
@@ -201,25 +202,59 @@ describe("Ui", () => {
 
     // What a line of narration says belongs to the command, so a wizard's
     // goes through the chain whether or not it can be drawn: written, it
-    // carries the chain's mark instead of consola's ` WARN ` badge.
-    it("takes a wizard's consola lines even when nobody is watching", () => {
+    // carries the chain's mark.
+    it("takes a wizard's lines even when nobody is watching", () => {
       const ui = scripted();
 
       ui.bridgeNarration();
-      consola.warn("the flow was edited by hand");
+      log.warn("the flow was edited by hand");
       ui.releaseNarration();
 
       expect(printed()).toContain("!  the flow was edited by hand");
     });
 
-    it("is never installed for a normal command, which has no chain to take them into", () => {
-      const before = [...consola.options.reporters];
-      const ui = new Ui({ interactive: false, force: false }, "plain");
+    it("says a normal command's lines plainly, with no mark and no chain", () => {
+      const ui = normally();
 
       ui.bridgeNarration();
-
-      expect(consola.options.reporters).toEqual(before);
+      log.done("Wrote .zitadel/idps/google.json");
+      log.info("Callback URI   https://example.com/callback");
       ui.releaseNarration();
+
+      expect(printed()).toBe(
+        "Wrote .zitadel/idps/google.json\nCallback URI   https://example.com/callback\n",
+      );
+      expect(intro).not.toHaveBeenCalled();
+    });
+
+    it("says a normal command's warning on stderr, named, so it is not taken for the answer", () => {
+      const ui = normally();
+
+      ui.bridgeNarration();
+      log.warn("the flow was edited by hand");
+      ui.releaseNarration();
+
+      expect([errors.join(""), printed()]).toEqual(["Warning: the flow was edited by hand\n", ""]);
+    });
+
+    it("keeps debug detail back unless it was asked for", () => {
+      const ui = normally();
+
+      ui.bridgeNarration();
+      log.debug("an internal detail");
+      ui.releaseNarration();
+
+      expect(printed()).toBe("");
+    });
+
+    it("stops saying anything once released", () => {
+      const ui = normally();
+
+      ui.bridgeNarration();
+      ui.releaseNarration();
+      log.info("after the command ended");
+
+      expect(printed()).toBe("");
     });
   });
 

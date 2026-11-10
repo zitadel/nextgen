@@ -20,7 +20,7 @@ import {
   selectionName,
   validated,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
+import { log } from "@/lib/log";
 import { z } from "zod";
 
 import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
@@ -406,7 +406,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       return target.config.connections.enable(target.schema, located, options);
     });
     if (summary.reused) {
-      consola.success(`Reusing ${summary.connection.path}`);
+      log.done(`Reusing ${summary.connection.path}`);
     }
     // The credentials go before the files: saving writes the connection first,
     // so a write that then fails would leave a connection on disk whose
@@ -525,20 +525,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // Which project this ran against is the summary's last line, not a label
     // printed before the first question: `connect()` above already recorded it.
     // The schema is this command's own subject, so it stays as narration.
-    consola.info(
+    log.info(
       `Editing ${schema.path}${schema.methods.length > 0 ? `, which offers ${schema.methods.join(", ")}` : ""}`,
     );
     if (!summary.reused) {
-      consola.info(`${provider.displayName} needs an OAuth application.`);
+      log.info(`${provider.displayName} needs an OAuth application.`);
     }
-    consola.info(`Callback URI   ${summary.callbackUri}`);
+    log.info(`Callback URI   ${summary.callbackUri}`);
     // A custom provider has no console to send the developer to: it is
     // theirs, and the issuer they gave is the only address known.
     if (!summary.reused && provider.consoleUrl === undefined) {
-      consola.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
+      log.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
     }
     if (!summary.reused && provider.consoleUrl !== undefined) {
-      consola.info(`Create it at   ${provider.consoleUrl}`);
+      log.info(`Create it at   ${provider.consoleUrl}`);
     }
   }
 
@@ -670,9 +670,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       reportWarning(`${provider.displayName} points at ${endpointIssuer}, not the provider`);
     }
     if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
-      consola.info(
-        `${outcome.schema.name} and its login flow already offer ${provider.displayName}`,
-      );
+      log.info(`${outcome.schema.name} and its login flow already offer ${provider.displayName}`);
     }
   }
 

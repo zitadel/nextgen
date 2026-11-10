@@ -35,7 +35,7 @@ import type { Summary } from "./summary";
  * ```
  *
  * {@link describe}, {@link bridgeNarration} and {@link finish} are the base
- * command's, not a command's: they name the chain, bridge `consola` into it
+ * command's, not a command's: they name the chain, draw narration into it
  * and close it on the result the command returned. A command that reaches for
  * them is a command drawing outside its own chain. The chain opens itself at
  * the first thing a person sees, so nothing opens it by hand.
@@ -43,12 +43,10 @@ import type { Summary } from "./summary";
 export class Ui {
   private readonly chain: Chain;
   private readonly narration: Narration;
-  private readonly presentation: Presentation;
   /** Whether a command took its own ending away as text ({@link ending}). */
   private handedOver = false;
 
   constructor(audience: Audience, presentation: Presentation = "wizard") {
-    this.presentation = presentation;
     this.chain = new Chain(audience, presentation);
     this.narration = new Narration(this.chain);
   }
@@ -119,25 +117,25 @@ export class Ui {
   }
 
   /**
-   * Takes the narration the CLI still writes with `consola` into the chain,
-   * until {@link releaseNarration}. A normal command has no chain to put it
-   * in, so its `consola` lines stay its own: a warning must not be what turns
-   * a normal command into a wizard.
+   * Draws what the command and the library code under it say with `log`, until
+   * {@link releaseNarration}. A wizard draws it in its chain with a mark; a
+   * normal command says it as plain lines, because a warning must not be what
+   * turns a normal command into a wizard.
    *
-   * It is installed whether or not anybody is watching, because what a line
-   * of narration says belongs to the command: a run nothing is drawn into
-   * gets the same marks written out rather than `consola`'s own ` WARN `
-   * badge. `--json` silences `consola` outright, so nothing reaches it there.
+   * It is installed whether or not anybody is watching, because what a line of
+   * narration says belongs to the command: a run nothing is drawn into gets
+   * the same marks written out. `--json` installs nothing, so nothing reaches
+   * a terminal there.
+   *
+   * @param options - `debug` also draws the detail that only `--debug` asks for.
    */
-  bridgeNarration(): void {
-    if (this.presentation === "wizard") {
-      this.narration.install();
-    }
+  bridgeNarration(options: { debug?: boolean } = {}): void {
+    this.narration.install(options);
   }
 
   /**
-   * Gives `consola` its reporters back. The base command calls it when the
-   * command ends, so the next command in this process starts from a clean slate.
+   * Stops drawing narration. The base command calls it when the command ends,
+   * so the next command in this process starts from a clean slate.
    */
   releaseNarration(): void {
     this.narration.restore();
@@ -160,7 +158,7 @@ export class Ui {
    * One line in the chain that states something the run has settled, such as
    * what happens now that a provider was skipped. It is not a question, not a
    * {@link task} that did work and not something to go and do ({@link note});
-   * with nobody watching it is a plain `consola` line.
+   * with nobody watching it is a plain line.
    */
   say(text: string): void {
     this.chain.say(text);

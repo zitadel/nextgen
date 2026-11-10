@@ -13,7 +13,7 @@ import {
 } from "@/lib/zitadel";
 
 import { Flags } from "@oclif/core";
-import { consola } from "consola";
+import { log } from "@/lib/log";
 
 import {
   type BrandingDesign,
@@ -211,7 +211,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     }
 
     for (const file of filesWritten) {
-      consola.info(`Wrote ${file}`);
+      log.info(`Wrote ${file}`);
     }
     // Said once, by the line the command ends on.
     const ejected = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;

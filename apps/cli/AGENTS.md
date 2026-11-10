@@ -118,9 +118,17 @@
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never
   imports `lib/oclif`.
+- Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
+  library alike, never a logger or stream of your own: the running command's
+  sink decides the look, and `--json` installs none. A unit test fails on a
+  `consola` import.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
-  result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
-  test fails on any other `consola.warn`.
+  result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
+  fails on any other `log.warn`.
+- Quote a command in a hint or message as `` `zitadel …` ``; the base command
+  spells it out as the `npx @zitadel/cli@<version> …` form and takes the other
+  backticks off (`spellOutCommands`). Source in `src/commands` still builds
+  its commands with `suggest`.
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/confirm`
   (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
@@ -142,8 +150,8 @@
     already chooses off a terminal (`--plain` is implied, so a list is
     tab-separated rows and a record is the record). The ending never
     decorates one, or `cut`, `awk` and `wc -l` stop working.
-- Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`,
-  `consola` or a write to `process.stdout`/`process.stderr` in a new file.
+- Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`
+  or a write to `process.stdout`/`process.stderr` in a new file.
   `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.

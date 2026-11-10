@@ -1,10 +1,9 @@
-import { box } from "consola/utils";
-
 import { exactZitadelPins } from "@/lib/zitadel-pins";
-import { BOX_STYLE, wrapForBox } from "./box";
-import { command } from "./style";
+import { wrapForBox } from "./box";
+import { command, notice } from "./style";
 import { escapeControlCharacters } from "./terminal-text";
 import { upgradeCommand } from "./suggestion";
+import { drawBox } from "./ui/layout";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-check";
 
 /**
@@ -44,8 +43,9 @@ export async function updateNotice(input: {
   if (behind.length === 0) {
     return undefined;
   }
-  return box(wrapForBox([...behind, "", command(upgradeCommand(cliVersion))].join("\n"), columns), {
-    title: "Update available",
-    style: BOX_STYLE.info,
-  });
+  return drawBox(
+    wrapForBox([...behind, "", command(upgradeCommand(cliVersion))].join("\n"), columns),
+    "Update available",
+    notice,
+  );
 }

@@ -7,7 +7,7 @@ import {
   UnavailableError,
   type UnavailableReason,
 } from "./backend";
-import { stripAnsi } from "consola/utils";
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 import {

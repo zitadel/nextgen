@@ -1,8 +1,8 @@
 import wrapAnsi from "wrap-ansi";
 
 /**
- * Frame overhead of a `consola.box` with `padding: 1`: two border columns,
- * the padding columns, and consola's left margin. Content wrapped to the
+ * Frame overhead of a box with a column of padding: two border columns,
+ * the padding columns, and the left margin. Content wrapped to the
  * terminal width minus this stays inside the frame instead of soft-wrapping
  * under the right border.
  */
@@ -10,14 +10,8 @@ const BOX_OVERHEAD = 8;
 const MIN_CONTENT_WIDTH = 20;
 const MAX_TERMINAL_WIDTH = 80;
 
-/** A `consola.box`'s frame: green when a run succeeded, cyan for what to read or do. */
-export const BOX_STYLE = {
-  success: { padding: 1, borderStyle: "rounded", borderColor: "green" },
-  info: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
-} as const;
-
 /**
- * Wraps box content to the terminal (capped at 80 columns) so consola's
+ * Wraps box content to the terminal (capped at 80 columns) so the
  * frame, which sizes itself to the longest content line, never exceeds the
  * window. ANSI-aware, preserves hard line breaks and indentation, and never
  * splits a token: URLs and commands stay whole for clicking, copying, and the

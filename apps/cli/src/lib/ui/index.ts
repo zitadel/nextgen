@@ -1,7 +1,7 @@
 /**
  * Everything the CLI draws.
  *
- * This is the only place `@clack/prompts` and `consola` are drawn with, and
+ * This is the only place `@clack/prompts` is drawn with, and
  * the only place that writes to stdout or stderr for a person to read, so that
  * every command's output has the same shape however its own code is written.
  * Commands reach it as `this.ui` ({@link Ui}); nothing else constructs one.
@@ -48,8 +48,8 @@
  *   {@link Summary} the chain closes on.
  *
  * What is not exported is not for callers. The layout (how a box is framed,
- * how facts are aligned, which glyph a mark is), the chain, the `consola`
- * bridge and the spinners are reached through {@link Ui} alone: a caller that
+ * how facts are aligned, which glyph a mark is), the chain, the narration
+ * sink and the spinners are reached through {@link Ui} alone: a caller that
  * could render a frame itself could render one that does not match.
  */
 export type { Audience } from "./audience";

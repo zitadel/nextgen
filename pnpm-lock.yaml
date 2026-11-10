@@ -403,7 +403,7 @@ catalogs:
       version: 1.16.0
     lucide-react:
       specifier: ^1.16.0
-      version: 1.61.0
+      version: 1.20.0
     marked:
       specifier: ^18.0.14
       version: 18.0.14
@@ -714,9 +714,6 @@ importers:
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
-      consola:
-        specifier: ^3.4.2
-        version: 3.4.2
       escape-string-regexp:
         specifier: 'catalog:'
         version: 5.0.0
@@ -12462,6 +12459,7 @@ packages:
   image-size@0.5.5:
     resolution: {integrity: sha512-6TDAlDPZxUFCv+fuOkIoXT/V/f3Qbq8e37p+YOiYrUv3v9cc3/6x78VdfPgFVaB9dZYeLUfKgHRebpkm/oP2VQ==}
     engines: {node: '>=0.10.0'}
+    deprecated: Please migrate to image-size@2.x
     hasBin: true
 
   imagetools-core@9.1.0:

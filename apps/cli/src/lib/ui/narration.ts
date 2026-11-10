@@ -1,91 +1,86 @@
-import { consola, type ConsolaReporter } from "consola";
-import { format } from "node:util";
-
+import { installLogSink, type LogLevel } from "../log";
 import { GUIDE, MARK } from "./marks";
 
 /**
- * A bridge for the narration the CLI still writes with `consola`.
+ * Draws the narration that library code and commands write with `log`.
  *
- * Most of the CLI says what it is doing with `consola.info` and friends.
- * Rewriting every one of those into a task at once would be a large, risky
- * change, so while a chain is open those lines are drawn inside it with its
- * gutter and the mark their level deserves. A command that has been moved to
- * tasks and steps needs none of this; one that has not still looks like the
- * others.
- *
- * `consola` is a process-wide singleton, so the bridge is installed for one
- * command and {@link Narration.restore}d when it ends. Without that, a second
- * command in the same process — every command in the unit tests — would keep
- * drawing into a chain that has closed.
+ * A wizard puts each line in its chain with the mark its level deserves. A
+ * normal command says every level as a plain line, with no mark and no gutter,
+ * so its narration looks like its flat prompts and its answer. The sink is
+ * installed for one command and {@link Narration.restore}d when it ends, so a
+ * second command in the same process — every command in the unit tests — never
+ * draws into a chain that has closed.
  */
 
-/** What the bridge needs of the chain it draws into, and nothing more. */
+/** What the narration needs of the chain it draws into, and nothing more. */
 export interface Narratable {
+  /** Whether the command draws a chain, which is what a wizard does. */
+  readonly chained: boolean;
   /** One line in the chain: its mark, then the text. */
   narrate(symbol: string, text: string): void;
 }
 
-/** The mark a consola level deserves. An unlisted level is a plain gutter line. */
-const MARKS: Readonly<Record<string, string>> = {
-  success: MARK.done,
-  ready: MARK.done,
+/** The mark a level deserves in a chain. */
+const MARKS: Readonly<Record<LogLevel, string>> = {
+  done: MARK.done,
   info: MARK.info,
   start: MARK.started,
   warn: MARK.warning,
-  error: MARK.failed,
   fail: MARK.failed,
-  fatal: MARK.failed,
+  plain: GUIDE,
   debug: MARK.detail,
-  trace: MARK.detail,
 };
 
 export class Narration {
   private readonly chain: Narratable;
-  private previous: ConsolaReporter[] | undefined;
+  private debug = false;
+  private release: (() => void) | undefined;
 
   constructor(chain: Narratable) {
     this.chain = chain;
   }
 
-  /** Whether consola is currently drawing into the chain. */
+  /** Whether narration is currently drawn by this. */
   get installed(): boolean {
-    return this.previous !== undefined;
+    return this.release !== undefined;
   }
 
-  /** Draws consola's output into the chain until {@link restore}. */
-  install(): void {
-    if (this.previous !== undefined) {
+  /**
+   * Draws narration until {@link restore}.
+   *
+   * @param options - `debug` also draws the detail that only `--debug` asks for.
+   */
+  install(options: { debug?: boolean } = {}): void {
+    if (this.release !== undefined) {
       return;
     }
-    this.previous = [...consola.options.reporters];
-    consola.setReporters([
-      {
-        log: (entry) => {
-          // A box keeps its title apart from its message, so a line drawn from
-          // the message alone would lose what the box was for.
-          const said = format(...entry.args);
-          this.draw(
-            entry.type === "box" && entry.title ? `${entry.title}\n${said}` : said,
-            entry.type,
-          );
-        },
-      },
-    ]);
+    this.debug = options.debug ?? false;
+    this.release = installLogSink((level, text) => {
+      this.draw(level, text);
+    });
   }
 
-  /** Gives consola its own reporters back, whatever happened to the command. */
+  /** Stops drawing narration, whatever happened to the command. */
   restore(): void {
-    if (this.previous === undefined) {
-      return;
-    }
-    consola.setReporters(this.previous);
-    this.previous = undefined;
+    this.release?.();
+    this.release = undefined;
   }
 
-  private draw(text: string, type: string): void {
-    if (text.trim() === "") {
+  private draw(level: LogLevel, text: string): void {
+    const body = text.replace(/^\n+/, "");
+    if (body.trim() === "" || (level === "debug" && !this.debug)) {
       return;
     }
-    this.chain.narrate(MARKS[type] ?? GUIDE, text.replace(/^\n+/, ""));
+    if (this.chain.chained) {
+      this.chain.narrate(MARKS[level], body);
+      return;
+    }
+    // What went wrong goes where errors go, and a warning says so, because a
+    // line with no mark cannot otherwise be told apart from the answer.
+    if (level === "warn") {
+      process.stderr.write(`Warning: ${body}\n`);
+      return;
+    }
+    (level === "fail" ? process.stderr : process.stdout).write(`${body}\n`);
   }
 }

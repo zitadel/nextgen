@@ -25,6 +25,7 @@ const GENERIC = [
   "lib/host",
   "lib/input",
   "lib/json",
+  "lib/log",
   "lib/paths",
   "lib/public-cli",
   "lib/server",

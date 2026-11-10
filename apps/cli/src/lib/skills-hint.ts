@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import consola from "consola";
+import { log } from "@/lib/log";
 import * as rosie from "rosie-skills";
 
 import type { BoxAction } from "./box";
@@ -118,7 +118,7 @@ export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
     });
 
     try {
-      consola.log(
+      log.plain(
         [
           "",
           "Using an AI coding agent?",

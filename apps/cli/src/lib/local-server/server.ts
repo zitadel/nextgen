@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import consola from "consola";
+import { log } from "@/lib/log";
 
 import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
@@ -338,7 +338,7 @@ export class LocalServer {
           existing.server_version !== version &&
           (await BinaryLauncher.isRecordRunning(existing))
         ) {
-          consola.info(
+          log.info(
             `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
           );
         }

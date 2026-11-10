@@ -1,6 +1,6 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
-import { consola } from "consola";
+import { log } from "@/lib/log";
 
 import {
   type ApiRequest,
@@ -57,7 +57,7 @@ const METHOD: Refused<string> = {
 
 const UNCALLABLE_REFUSAL: Refusal = {
   message: "{reason}",
-  hint: "Call it from the app it belongs to, through the SDK; `zitadel api ls` marks what the CLI can call.",
+  hint: "Call it from the app it belongs to, through the SDK; the api ls command marks what the CLI can call.",
 };
 
 const NOTHING_TO_PAGE_REFUSAL: Refusal = {
@@ -214,7 +214,7 @@ function quote(value: string): string {
 }
 
 /**
- * `zitadel api` — call any operation of the Zitadel API with the server and
+ * The api command — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
  * resource command covers yet, as `gh api` and `vercel api` are for theirs.
  *
@@ -365,7 +365,7 @@ export default class Api extends Destructive(BaseCommand) {
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (this.isOnScreen) {
-      consola.info(`${operation.method} ${url}`);
+      log.info(`${operation.method} ${url}`);
     }
     const destructive = request.operation.destructive;
     const consent = destructive

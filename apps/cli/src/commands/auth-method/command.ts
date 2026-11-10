@@ -1,4 +1,4 @@
-import { consola } from "consola";
+import { log } from "@/lib/log";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
@@ -473,13 +473,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const written = await change.save(target.store);
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
-        consola.success(`Wrote ${path}`);
+        log.done(`Wrote ${path}`);
       } else {
-        consola.success(`Updated ${path}`);
+        log.done(`Updated ${path}`);
       }
     }
     for (const path of change.removedPaths) {
-      consola.success(`Removed ${path}`);
+      log.done(`Removed ${path}`);
     }
     return written;
   }
@@ -498,7 +498,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       if (notice.severity === "warning") {
         reportWarning(notice.message);
       } else {
-        consola.info(notice.message);
+        log.info(notice.message);
       }
     }
   }
