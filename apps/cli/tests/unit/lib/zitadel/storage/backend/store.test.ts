@@ -381,6 +381,18 @@ describe("Store.remove", () => {
       expect(error).toBeUndefined();
     });
 
+    it("removes a symlink to a directory as the link it is", async ({ dir, other }) => {
+      const { store, project } = open(dir, other);
+      const kept = `${CONFIG_DIRECTORIES.connections}/kept`;
+      await project.directory(kept);
+      await project.symlink(kept, IDP_A);
+
+      await store.remove(IDP_A);
+
+      expect(await store.exists(IDP_A)).toBe(false);
+      expect(await store.exists(kept)).toBe(true);
+    });
+
     it("refuses a directory where the file should be", async ({ dir, other }) => {
       const { store, project } = open(dir, other);
       await project.directory(IDP_A);
@@ -444,6 +456,18 @@ describe("Store.assertRemovable", () => {
       });
 
       expect(error).toBeUndefined();
+    });
+
+    it("refuses a directory where the file should be", async ({ dir, other }) => {
+      const { store, project } = open(dir, other);
+      await project.directory(IDP_A);
+
+      const error = thrownBy(() => {
+        store.assertRemovable(IDP_A);
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({ details: { file: IDP_A, code: "EISDIR" } });
     });
 
     it("refuses a path outside .zitadel/", async ({ dir, other }) => {

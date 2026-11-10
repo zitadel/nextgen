@@ -93,13 +93,12 @@ export interface FileSystem {
     writeFile(path: string, data: string, options: { readonly flag: string }): Promise<void>;
 
     /**
-     * Remove a file.
+     * Remove a file, or a symlink itself, never what it points at.
      *
      * @param path - The absolute path.
-     * @param options - Take a file that is not there as removed.
      * @returns Nothing, once it is gone.
      */
-    rm(path: string, options: { readonly force: true }): Promise<void>;
+    unlink(path: string): Promise<void>;
   };
 
   /**
@@ -123,9 +122,9 @@ export interface FileSystem {
    * Describe a path without following a symlink.
    *
    * @param path - The absolute path.
-   * @returns Whether it is a symlink.
+   * @returns Whether it is a symlink, and whether it is a directory.
    */
-  lstatSync(path: string): { isSymbolicLink(): boolean };
+  lstatSync(path: string): { isSymbolicLink(): boolean; isDirectory(): boolean };
 
   /**
    * Describe a path, following a symlink.

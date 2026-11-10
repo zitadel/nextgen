@@ -163,10 +163,10 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @throws {@link ConfigError} When the path, or the real target behind a
-   *   symlink on the way, leaves `.zitadel/`.
+   *   symlink on the way, leaves `.zitadel/`, or it is a directory.
    */
   assertRemovable(path: string): void {
-    this.place(path);
+    this.removable(path);
   }
 
   /**
@@ -194,24 +194,14 @@ export abstract class Store implements ConfigStore {
    *   a directory.
    */
   async remove(path: string): Promise<void> {
-    await this.fs.promises
-      .rm(this.place(path).toString(), { force: true })
-      .catch((error: unknown) => {
-        const code = Store.errnoOf(error);
-        // A directory on the way is a file, so there is nothing to remove.
-        if (code === "ENOTDIR") {
-          return;
-        }
-        // A directory where the file should be is not a file to delete, and
-        // `rm` without `recursive` will not take it.
-        if (code === "EISDIR" || code === "ERR_FS_EISDIR") {
-          throw new ConfigError(`${path} cannot be removed (EISDIR)`, {
-            hint: `Remove ${path}, which is a directory where a file is expected, then run the command again.`,
-            details: { file: path, code: "EISDIR" },
-          });
-        }
+    await this.fs.promises.unlink(this.removable(path)).catch((error: unknown) => {
+      // A file that is not there, or a directory on the way that is a file,
+      // is already removed.
+      const code = Store.errnoOf(error);
+      if (code !== "ENOENT" && code !== "ENOTDIR") {
         throw error;
-      });
+      }
+    });
   }
 
   /**
@@ -328,6 +318,22 @@ export abstract class Store implements ConfigStore {
       !realDirectory.contains(realTarget)
     ) {
       throw outsideConfig(path);
+    }
+    return target;
+  }
+
+  /**
+   * Place a file the store removes, inside `.zitadel/` and not a directory.
+   *
+   * @param path - The project-relative path.
+   * @returns The path to remove.
+   * @throws {@link ConfigError} When the path, or the real target behind a
+   *   symlink on the way, leaves `.zitadel/`, or it is a directory.
+   */
+  private removable(path: string): string {
+    const target = this.place(path).toString();
+    if (this.fs.existsSync(target) && this.fs.lstatSync(target).isDirectory()) {
+      throw Store.directoryInTheWay(path);
     }
     return target;
   }
@@ -455,6 +461,19 @@ export abstract class Store implements ConfigStore {
         details: { file: path, code: "ENOTDIR", blocker },
       });
     }
+  }
+
+  /**
+   * The failure for a directory where a file is to be removed.
+   *
+   * @param path - The project-relative path.
+   * @returns The error to throw.
+   */
+  private static directoryInTheWay(path: string): ConfigError {
+    return new ConfigError(`${path} cannot be removed (EISDIR)`, {
+      hint: `Remove ${path}, which is a directory where a file is expected, then run the command again.`,
+      details: { file: path, code: "EISDIR" },
+    });
   }
 
   /**

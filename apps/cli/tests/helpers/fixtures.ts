@@ -34,14 +34,11 @@ async function unlock(path: string): Promise<void> {
 
 async function withTempDir(use: (dir: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-"));
-  try {
-    await use(dir);
-  } finally {
-    await rm(dir, { recursive: true, force: true }).catch(async () => {
-      await unlock(dir);
-      await rm(dir, { recursive: true, force: true });
-    });
-  }
+  await use(dir);
+  await rm(dir, { recursive: true, force: true }).catch(async () => {
+    await unlock(dir);
+    await rm(dir, { recursive: true, force: true });
+  });
 }
 
 /**
