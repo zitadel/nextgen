@@ -824,7 +824,7 @@ func requireTakenFields(t *testing.T, err error, keys ...domain.AttributeKey) {
 // a non-unique attribute, are not named.
 func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 	t.Parallel()
-	unique := database.NewUniqueError("zitadel_nextgen.user_unique_attributes", "pk", nil)
+	unique := database.NewUniqueError("zitadel_nextgen.user_attributes", "idx_user_attributes_unique", nil)
 
 	t.Run("create", func(t *testing.T) {
 		t.Parallel()

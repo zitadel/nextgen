@@ -761,8 +761,8 @@ func TestUserStatements_UniqueAttributes_CaseInsensitive(t *testing.T) {
 	})
 }
 
-// A team-scoped registry row for the same value is legal next to a
-// project-scoped one (the registry key includes team_id), so a lookup for a
+// A team-scoped claim on the same value is legal next to a project-scoped one
+// (the unique index includes unique_team_id), so a lookup for a
 // project-scoped owner must not see it.
 func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -791,7 +791,7 @@ func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
 			Attributes:           attrs,
 			UniqueAttributesOnly: true,
 		})
-		require.Error(t, err, "without a team filter both registry rows match")
+		require.Error(t, err, "without a team filter both claims match")
 
 		projectScope := ""
 		got, err := d.stmts.GetUser(t.Context(), projectFilter, service.UserQueryOptions{
