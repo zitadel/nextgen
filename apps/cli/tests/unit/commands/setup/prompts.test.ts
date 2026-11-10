@@ -1460,6 +1460,17 @@ describe("askCustomSettings", () => {
     });
   });
 
+  it.each(["Google", "Custom"])(
+    "suggests no slug for the built-in provider name %j",
+    async (displayName) => {
+      vi.mocked(text).mockResolvedValueOnce(displayName).mockResolvedValueOnce("acme-sso");
+
+      await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+      expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({ initialValue: "" });
+    },
+  );
+
   it("suggests no slug when the display name has nothing a slug can keep", async () => {
     vi.mocked(text).mockResolvedValueOnce("!!!").mockResolvedValueOnce("slug");
 

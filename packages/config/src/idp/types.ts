@@ -94,16 +94,18 @@ export function parseConnectionSlug(
 }
 
 /**
- * The slug a display name suggests: lowercase, every run of other characters
- * a dash, and the dashes at the ends dropped, so `Zitadel Cloud` is
- * `zitadel-cloud`. It is cut to the slug's length, and is empty when the name
- * has no letter or digit, which `parseConnectionSlug` then refuses.
+ * The slug a display name suggests: accents dropped, lowercase, every run of
+ * other characters a dash, and the dashes at the ends dropped, so `Zitadel
+ * Cloud` is `zitadel-cloud`. It is cut to the slug's length, and is empty when
+ * the name has no letter or digit, which `parseConnectionSlug` then refuses.
  *
  * @param displayName - The name shown on the sign-in button.
  * @returns The suggested slug, which the developer may still change.
  */
 export function slugFromDisplayName(displayName: string): string {
   return displayName
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")

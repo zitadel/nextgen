@@ -61,6 +61,9 @@ export async function askCustomSettings(
     parse: parseDisplayName,
     given: given.displayName,
   });
+  // A suggestion that is a built-in provider's name would be refused on Enter,
+  // so it is left empty for the developer to type.
+  const suggestedSlug = slugFromDisplayName(displayName);
   const slug = await ask({
     kind: "text",
     name: "connection name",
@@ -68,7 +71,7 @@ export async function askCustomSettings(
       "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
     parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
     given: given.slug,
-    initialValue: slugFromDisplayName(displayName),
+    initialValue: RESERVED_SLUGS.includes(suggestedSlug) ? "" : suggestedSlug,
   });
   const issuer = await ask({
     kind: "text",

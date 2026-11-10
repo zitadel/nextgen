@@ -14,6 +14,7 @@ import {
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  RESERVED_SLUGS,
   type Scopes,
   slugFromDisplayName,
   variableReference,
@@ -61,8 +62,12 @@ describe("slugFromDisplayName", () => {
 
   it("suggests only a slug the parser accepts", () => {
     for (const name of ["Zitadel Cloud", "Acme SSO", "1Password", "a".repeat(200)]) {
-      expect(parseConnectionSlug(slugFromDisplayName(name)).ok, name).toBe(true);
+      expect(parseConnectionSlug(slugFromDisplayName(name), RESERVED_SLUGS).ok, name).toBe(true);
     }
+  });
+
+  it("drops accents rather than turning the letters into dashes", () => {
+    expect(slugFromDisplayName("Ünïcode Login")).toBe("unicode-login");
   });
 
   it("suggests nothing when the name has no letter or digit", () => {
