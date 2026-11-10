@@ -32,12 +32,12 @@ import { projectScopeDeps, requireProjectScope } from "@/features/projects/proje
  * selected, so a link to one project's page still lands on it, and the
  * projects list's row menu opens it as `View project`.
  *
- * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
- * cell, `ISSUER` — the project's issuer origin — but nothing carries it:
+ * The header's identity line carries `Project ID` and `Created`. The design draws
+ * a third value, `ISSUER` — the project's issuer origin — but nothing carries it:
  * `project-response` is `id`, `name`, `origins`, `created_at` and
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
- * domain layer. The cell is left out rather than shown empty, and returns as one
- * more `MetaValue` when the field lands.
+ * domain layer. The value is left out rather than shown empty, and returns as one
+ * more `meta` item when the field lands.
  *
  * Two tabs, as the team's page, and the team page's rhythm: 24px under the
  * tab row on both tabs, `Details` as the name card's title, and secondary

@@ -148,7 +148,7 @@ describe("user schemas list", () => {
     // Derived rather than hardcoded: the row renders the viewer's locale, so
     // asserting one locale's output would pass only on machines set to it.
     expect(table.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
-    // The id moved to the detail header card; the row no longer repeats it.
+    // The id lives on the detail header's identity line; the row does not repeat it.
     expect(table.queryByText("sch_business")).not.toBeInTheDocument();
   });
 

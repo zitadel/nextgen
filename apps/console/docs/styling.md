@@ -234,8 +234,8 @@ labelled rows, in a centred column `--zl-container-settings` wide. Compose
 `Page` + `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE`
 heading with no header gutter, then `SettingsCard`
 (`src/components/settings-card.tsx`) holding `Field` rows: 24px inset, 20px
-block, 16px between rows. No icon tile and no header card: a settings screen is
-not a resource with an id.
+block, 16px between rows. No icon tile and no identity line: a settings screen
+is not a resource with an id.
 
 `DetailHeader` is the title row (an icon tile on resource and release
 screens, the title, a status beside it) over one identity line: the `meta`
