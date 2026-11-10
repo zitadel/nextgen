@@ -234,13 +234,13 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           next: write.preview
             ? {
                 actions: [
-                  "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
+                  "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
                   ...(previewable
                     ? []
                     : [
                         verdict === "unnamed-ci-build"
-                          ? "Name the environment with `--env preview`: a CI build that names none is not known to be a preview, and `preview` skips it."
-                          : "Run it in the preview or development environment: `preview` skips any other.",
+                          ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
+                          : "Run it in the preview or development environment: preview skips any other.",
                       ]),
                 ],
                 commands: previewable
@@ -249,7 +249,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               }
             : {
                 actions: [
-                  "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
+                  "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
                 ],
                 commands: [this.suggest(DEPLOY_ARGS)],
               },

@@ -173,7 +173,7 @@ describe("variable set", () => {
         const result = await app.setVariable("FOO", "bar");
 
         const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
-        expect(data.next_actions.join("\n")).toContain("applies after the next `deploy`");
+        expect(data.next_actions.join("\n")).toContain("applies after the next deploy");
       });
 
       it("suggests the deploy that applies it", async () => {
