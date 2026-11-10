@@ -163,94 +163,20 @@ function whenNothingElseIsWrong(payload: { readonly issues: readonly unknown[] }
 }
 
 /**
- * Whether a value holds an ASCII control character, a tab or a newline among
- * them, which the server's URL parser refuses anywhere in a URL.
- *
- * @param value - The value.
- * @returns True when it holds one.
- */
-function hasControlCharacter(value: string): boolean {
-  for (const character of value) {
-    const code = character.charCodeAt(0);
-    if (code < 0x20 || code === 0x7f) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Whether a URL holds a percent sign that does not start an escape.
- *
- * @param value - The URL.
- * @returns True when a `%` is not followed by two hexadecimal digits.
- */
-function hasMalformedPercentEscape(value: string): boolean {
-  return /%(?![0-9a-fA-F]{2})/.test(value);
-}
-
-/**
- * Whether a URL holds a percent sign in its host.
- *
- * @param value - The URL.
- * @returns True when the part between the scheme and the first `/`, `?` or `#`
- *   holds a `%`.
- */
-function hasPercentInHost(value: string): boolean {
-  const withoutScheme = value.replace(/^[^:/?#]*:\/\//, "");
-  return (withoutScheme.split(/[/?#]/, 1)[0] ?? "").includes("%");
-}
-
-/**
- * Hold a URL field to what the server enforces and the spec cannot say.
+ * Hold a URL field to the server's byte limit.
  *
  * @remarks
- * The spec's pattern leaves a URL's path and query unconstrained, but the
- * server's URL parser refuses a control character anywhere in it, a malformed
- * percent-escape in its host or path, and an escape that spells an ASCII
- * character in its host (validateBrandingAssetURL in
- * internal/domain/branding_validator.go). The checks here are the same or a
- * little stricter: a `%` is refused in the host altogether and malformed
- * escapes are refused in the query too, which the server accepts, since a
- * plan that is stricter than apply is harmless. The pattern's `maxLength`
- * counts characters while the server counts bytes, so a URL with non-ASCII
- * characters can be short in characters and still too long, and the spec has
- * no way to say bytes. Every one speaks only for a value the generated checks
- * accepted.
+ * The spec's `maxLength` counts characters while the server counts bytes, so a
+ * URL with non-ASCII characters can be short in characters and still too long,
+ * and the spec has no way to say bytes. It speaks only for a value the
+ * generated checks accepted, so a value is refused once.
  *
  * @param field - The generated URL field.
- * @returns The field, refused at its own path.
+ * @returns The field, refused at its own path above the limit.
  */
-function holdUrl(field: z.ZodOptional<z.ZodString>): z.ZodOptional<z.ZodString> {
+function withinUrlBytes(field: z.ZodOptional<z.ZodString>): z.ZodOptional<z.ZodString> {
   return field
     .unwrap()
-    .refine(
-      (value) => {
-        return !hasControlCharacter(value);
-      },
-      {
-        message: "must not contain a control character, such as a tab or a newline",
-        when: whenNothingElseIsWrong,
-      },
-    )
-    .refine(
-      (value) => {
-        return !hasMalformedPercentEscape(value);
-      },
-      {
-        message: "must not contain a % that is not followed by two hexadecimal digits",
-        when: whenNothingElseIsWrong,
-      },
-    )
-    .refine(
-      (value) => {
-        return !hasPercentInHost(value);
-      },
-      {
-        message: "must not contain a percent-escape in its host",
-        when: whenNothingElseIsWrong,
-      },
-    )
     .refine(
       (value) => {
         return new TextEncoder().encode(value).length <= MAX_BRANDING_URL_BYTES;
@@ -264,7 +190,7 @@ function holdUrl(field: z.ZodOptional<z.ZodString>): z.ZodOptional<z.ZodString> 
 }
 
 /**
- * One theme side, with its logo held to the server's URL limits and its
+ * One theme side, with its logo held to the server's byte limit and its
  * colours to the colour functions the server allows.
  *
  * @param side - The generated light or dark side.
@@ -276,7 +202,7 @@ function brandingThemeSide(
   return side
     .unwrap()
     .extend({
-      logo_url: holdUrl(side.unwrap().shape.logo_url),
+      logo_url: withinUrlBytes(side.unwrap().shape.logo_url),
       palette: withAllowedColours(side.unwrap().shape.palette),
     })
     .optional();
@@ -301,6 +227,9 @@ function withAllowedColours(palette: typeof BRANDING_PALETTE): typeof BRANDING_P
   const shape = palette.unwrap().shape;
   const checked = Object.fromEntries(
     Object.entries(shape).map(([key, colour]) => {
+      if (!(colour instanceof z.ZodOptional)) {
+        return [key, colour];
+      }
       return [
         key,
         colour
@@ -326,7 +255,7 @@ function withAllowedColours(palette: typeof BRANDING_PALETTE): typeof BRANDING_P
  * The values the server gates are held to the spec's own patterns, which carry
  * their messages (`x-zitadel-pattern-message`), so a refusal names its field
  * and says what a valid value looks like. What the spec cannot say is checked
- * at the field it is about: a URL's control characters and byte limit, the
+ * at the field it is about: a URL's byte limit, the
  * colour functions the server allows, and the pair of a stylesheet and its
  * font stack, which the server rejects as a pair (validateBrandingFontURL), or
  * apply fails after schemas and flows have already been written.
@@ -337,8 +266,8 @@ export const brandingConfigSchema = z.strictObject({
   // editor meta-schema already rejects unknown keys; the CLI gate has to
   // agree.
   ...CreateBrandingBody.shape,
-  logo_url: holdUrl(CreateBrandingBody.shape.logo_url),
-  hero_url: holdUrl(CreateBrandingBody.shape.hero_url),
+  logo_url: withinUrlBytes(CreateBrandingBody.shape.logo_url),
+  hero_url: withinUrlBytes(CreateBrandingBody.shape.hero_url),
   theme: BRANDING_THEME.extend({
     light: brandingThemeSide(BRANDING_THEME.shape.light),
     dark: brandingThemeSide(BRANDING_THEME.shape.dark),
@@ -358,7 +287,7 @@ export const brandingConfigSchema = z.strictObject({
           when: whenNothingElseIsWrong,
         })
         .optional(),
-      font_url: holdUrl(CreateBrandingBody.shape.typography.unwrap().shape.font_url),
+      font_url: withinUrlBytes(CreateBrandingBody.shape.typography.unwrap().shape.font_url),
     })
     .refine(
       (value) => {

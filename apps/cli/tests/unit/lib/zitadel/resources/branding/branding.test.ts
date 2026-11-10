@@ -134,7 +134,7 @@ describe("Branding.read", () => {
           severity: "error",
           rule: "contract/branding",
           file: PATH,
-          message: "typography.font_url must be an absolute https URL with no credentials",
+          message: "typography.font_url must be a valid absolute https URL without credentials",
         },
       ],
     });
@@ -155,7 +155,7 @@ describe("Branding.read", () => {
     expect(reading).toMatchObject({
       issues: [
         { message: expect.stringMatching(/^layout /) },
-        { message: "typography.font_url must be an absolute https URL with no credentials" },
+        { message: "typography.font_url must be a valid absolute https URL without credentials" },
       ],
     });
   });
@@ -174,7 +174,7 @@ describe("Branding.read", () => {
 
     expect(reading).toMatchObject({
       issues: [
-        { message: "typography.font_url must be an absolute https URL with no credentials" },
+        { message: "typography.font_url must be a valid absolute https URL without credentials" },
         { message: '(root) Unrecognized key: "hero_urll"' },
       ],
     });

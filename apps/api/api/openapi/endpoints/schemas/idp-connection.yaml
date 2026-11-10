@@ -54,6 +54,9 @@ properties:
     additionalProperties:
       anyOf:
       - const: true
+      # No x-zitadel-pattern-message here: the OpenAPI mirror widens this branch
+      # (endpoints/idps/idp-connection.yaml), so the pattern never reaches the
+      # spec, and idp_connection_mirror_test.go pins this branch exactly.
       - type: string
         pattern: ^[^$]
     description: "Maps a verifiable user schema property to its verification source: a claim name (read the claim) or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved for future sources. Distinct from `claim_mapping`, which carries values, not verification state."

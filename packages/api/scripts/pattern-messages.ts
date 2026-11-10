@@ -161,7 +161,7 @@ export function withPatternMessages(source: string, messages: ReadonlyMap<string
   const bare = messaged.match(BARE_REGEX_CALL);
   if (bare !== null) {
     throw new Error(
-      `A generated .regex() call was left without a message, which orval may now write differently:\n${[...new Set(bare)].join("\n")}`,
+      `A generated .regex() call was left without a message:\n${[...new Set(bare)].join("\n")}\nIf it checks a spec pattern, orval may now write that pattern's constant differently, so teach REGEXP_CONSTANT and REGEX_CHAIN the new form. If orval wrote it for a format and the spec has no pattern there, allow it in BARE_REGEX_CALL.`,
     );
   }
   return messaged;
