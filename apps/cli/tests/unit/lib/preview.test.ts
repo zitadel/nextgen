@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectPreviewUrls } from "@/lib/preview";
+import { detectPreviewUrls, takesPreview } from "@/lib/preview";
 
 describe("detectPreviewUrls", () => {
   it("reads Vercel's branch and deployment hosts, prepending the scheme", () => {
@@ -49,5 +49,15 @@ describe("detectPreviewUrls", () => {
       DEPLOY_URL: "https://acme.netlify.app",
     });
     expect(detected.urls).toEqual(["https://acme.netlify.app"]);
+  });
+});
+
+describe("takesPreview", () => {
+  it.each(["preview", "development"])("takes a preview in %s", (environment) => {
+    expect(takesPreview(environment)).toBe(true);
+  });
+
+  it.each(["production", "staging", ""])("skips the preview in %s", (environment) => {
+    expect(takesPreview(environment)).toBe(false);
   });
 });

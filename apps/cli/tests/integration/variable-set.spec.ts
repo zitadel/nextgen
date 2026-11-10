@@ -207,6 +207,8 @@ describe("variable set", () => {
           "--json",
         ]);
 
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join("\n")).toContain("Run it in the preview or development");
         expect(result).not.toSuggest("preview");
       });
 

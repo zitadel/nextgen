@@ -8,6 +8,7 @@ import { variableNameArg } from "./name";
 import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
+import { takesPreview } from "@/lib/preview";
 import { DEPLOY_ARGS, inShell } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
@@ -200,8 +201,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         );
         const primary = unread.has("primary") ? UNKNOWN_STATE : stateOf(written.state.primary);
         const preview = unread.has("preview") ? UNKNOWN_STATE : stateOf(written.state.preview);
-        // `preview` skips every environment but these two, so it is not suggested in another.
-        const previewable = ["preview", "development"].includes(this.environment.name.value);
         return this.emit({
           status: "ok",
           data: {
@@ -217,29 +216,45 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }),
           ),
-          next: write.preview
-            ? {
-                actions: [
-                  "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
-                  ...(previewable
-                    ? []
-                    : [
-                        "Run it in the preview or development environment: `preview` skips any other.",
-                      ]),
-                ],
-                commands: previewable
-                  ? [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")]
-                  : [],
-              }
-            : {
-                actions: [
-                  "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
-                ],
-                commands: [this.suggest(DEPLOY_ARGS)],
-              },
+          next: this.nextSteps(write.preview),
         });
       }
     }
+  }
+
+  /**
+   * What the write leaves to do. A sign-in keeps using the variables the last
+   * deploy froze, so a primary write applies after the next `deploy`; a
+   * preview write applies to the next `preview`, which only some environments
+   * take.
+   *
+   * @param preview Whether the write was to the preview value.
+   * @returns The actions and commands to put in the envelope.
+   */
+  private nextSteps(preview: boolean) {
+    if (!preview) {
+      return {
+        actions: [
+          "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
+        ],
+        commands: [this.suggest(DEPLOY_ARGS)],
+      };
+    }
+    const applies =
+      "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.";
+    if (!takesPreview(this.environment.name.value)) {
+      return {
+        actions: [
+          applies,
+          "Run it in the preview or development environment: `preview` skips any other.",
+        ],
+        commands: [],
+      };
+    }
+    return {
+      actions: [applies],
+      commands: [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")],
+    };
   }
 }
 

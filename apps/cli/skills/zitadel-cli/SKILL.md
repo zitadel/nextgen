@@ -371,6 +371,8 @@ Each invocation prints one JSON object:
   `deploy` leaves the preview value unapplied; a pull-request build that sets its
   own preview URL can drop `--origin`. In an environment other than
   `preview` or `development`, where `preview` skips, no command is suggested.
+  A secret written without `--preview` clears the name's preview value; set it again
+  with `variable set <name> --secret --preview`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` (the origins that deployment froze) and `data.pointers`, the
   `{kind, handle, revision_id}` revisions that release pins; the `schema` one

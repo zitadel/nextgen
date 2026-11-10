@@ -15,7 +15,7 @@ import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/
 
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { detectPreviewUrls } from "@/lib/preview";
+import { detectPreviewUrls, takesPreview } from "@/lib/preview";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
@@ -128,7 +128,7 @@ export function previewVerdict(input: {
   credentialSet: boolean;
   strict: boolean;
 }): PreviewVerdict {
-  if (input.environment !== "preview" && input.environment !== "development") {
+  if (!takesPreview(input.environment)) {
     return "production-build";
   }
   if (input.fromDefault && input.ci) {
