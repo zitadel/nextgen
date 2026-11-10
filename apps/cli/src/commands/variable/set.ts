@@ -8,6 +8,8 @@ import { variableNameArg } from "./name";
 import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
+import { previewVerdict } from "@/commands/preview";
+import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { DEPLOY_ARGS, inShell } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
@@ -200,8 +202,16 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         );
         const primary = unread.has("primary") ? UNKNOWN_STATE : stateOf(written.state.primary);
         const preview = unread.has("preview") ? UNKNOWN_STATE : stateOf(written.state.preview);
-        // `preview` skips every environment but these two, so it is not suggested in another.
-        const previewable = ["preview", "development"].includes(this.environment.name.value);
+        // `preview` skips other environments, and a CI build that names none, so
+        // it is suggested only when it would run.
+        const verdict = previewVerdict({
+          environment: this.environment.name.value,
+          fromDefault: this.environment.name.source === "default",
+          ci: runsInCi(this.env),
+          credentialSet: true,
+          strict: false,
+        });
+        const previewable = verdict === "preview";
         return this.emit({
           status: "ok",
           data: {
@@ -224,7 +234,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
                   ...(previewable
                     ? []
                     : [
-                        "Run it in the preview or development environment: `preview` skips any other.",
+                        verdict === "unnamed-ci-build"
+                          ? "Name the environment with `--env preview`: a CI build that names none is not known to be a preview, and `preview` skips it."
+                          : "Run it in the preview or development environment: `preview` skips any other.",
                       ]),
                 ],
                 commands: previewable

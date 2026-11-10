@@ -212,6 +212,18 @@ describe("variable set", () => {
         expect(result).not.toSuggest("preview");
       });
 
+      it("does not suggest a preview that a CI build naming no environment would skip", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "set", "FOO", "bar", "--preview", "--json"], {
+          CI: "true",
+        });
+
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join("\n")).toContain("Name the environment with `--env preview`");
+        expect(result).not.toSuggest("preview");
+      });
+
       it("refuses a value on the command line for a secret", async () => {
         const app = await aSetUpApp();
 
