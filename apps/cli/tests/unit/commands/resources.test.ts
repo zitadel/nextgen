@@ -2617,7 +2617,7 @@ describe("the id of a resource whose id has a format", () => {
    * @returns The positional as the resource declares it.
    */
   function positional(topic: keyof typeof IDS) {
-    const arg = idArg(RESOURCES[topic]).id;
+    const arg = idArg(RESOURCES[topic], topic).id;
     if (arg === undefined) {
       throw new Error(`${topic} declares no id positional`);
     }
@@ -2649,6 +2649,7 @@ describe("the id of a resource whose id has a format", () => {
     await expect(parseArg(positional(topic), value, "id")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining(`must be ${IDS[topic][1]} ID`),
+      hint: `Find one with \`zitadel ${topic} list\`.`,
     });
   });
 });

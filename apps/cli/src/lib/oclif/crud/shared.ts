@@ -16,10 +16,14 @@ import { escapeJsonControlCharacters } from "@/lib/terminal-text";
 /** The name of a resource's positional argument. */
 export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resource.idArg ?? "id";
 
-/** The single positional argument the id-taking verbs share. */
-export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
+/**
+ * The single positional argument the id-taking verbs share. Given the
+ * resource's `topic`, a refused id points at `<topic> list` when it has one.
+ */
+export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) => {
   const name = idName(resource);
   const description = resource.idDescription ?? `${resource.singular} ${name}`;
+  const lists = topic !== undefined && resource.list !== undefined;
   const take =
     resource.idSchema === undefined
       ? nonBlankArg
@@ -28,7 +32,10 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
             schema: z.string().trim().pipe(resource.idSchema),
             refusal: {
               message: "Invalid {input}: {problem}",
-              hint: "Pass the id exactly as it was listed.",
+              hint: lists
+                ? `Find one with \`zitadel ${topic} list\`.`
+                : "Pass the id exactly as it was listed.",
+              next: lists ? [`${topic} list`] : undefined,
               details: {
                 argument: "{input}",
               },
