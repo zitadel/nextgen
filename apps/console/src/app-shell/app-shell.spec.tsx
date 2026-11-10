@@ -38,6 +38,7 @@ const NAV_ORDER = [
   "Branding",
   "Deployments",
   "Authentication",
+  "Logs",
   "Settings",
 ];
 // What sits above every project: the home, then Settings, a list of its own.

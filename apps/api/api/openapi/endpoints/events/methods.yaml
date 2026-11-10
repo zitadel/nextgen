@@ -22,6 +22,7 @@ get:
   security:
     - oauth2:
         - events.read
+    - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - name: category

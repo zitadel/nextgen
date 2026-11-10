@@ -16,6 +16,10 @@
 
 ## Decisions
 
+### D30 · Logs lists the project's events — 2026-11-10
+A project's sidebar gains Logs, after Authentication and before Settings: the project's events, newest first (`GET /events`), each with its type, what it was about (an API request's method, operation and status, or the record a change touched), who caused it and when, to the second. A row opens the event: its values, and the event as the API returns it. The name is Logs for now, as in Vercel, where the entry holds every kind of log: API requests are best-effort records, which "Audit log" would overpromise, and "Events" reads as webhooks. The API, the CLI and the route keep `events`. There are no filters yet, so requests sit among the changes they made; filters come as they are needed. No total count (D5).
+→ Design review of the list's columns and the event page, neither of which has a design.
+
 ### D29 · Settings is one row that opens its own list — 2026-11-09 · [standing]
 Amends D27, whose account sidebar listed Settings' pages (Billing, Support, Email and the profile) flat beside Projects. That list was mostly Settings, and its Settings row opened the same page as the account menu's first row. As in Vercel, the account sidebar is now Projects and one Settings row, and choosing it swaps the list for Settings' own: Profile (the person's profile, which D27 called Settings), then what the hosted cloud adds. The list is headed by its name beside a chevron, a row that leads back up to Projects. That is moving up through the left nav, as D13 asks, and not the "Back to dashboard" button D27 removed: the pill still reads "All projects" there and is still the way into a project. The account menu keeps its one row for the person, which opens Profile. Search lists Settings' pages under Account, each marked Settings, and finds them by either name.
 → Design review of the heading row and of Profile as the page's name.

@@ -239,6 +239,9 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetPolicyOperation:           true,
 	api.ListPolicyRevisionsOperation: true,
 	api.GetPolicyRevisionOperation:   true,
+	// The Logs screen lists a project's events and opens one.
+	api.ListEventsOperation: true,
+	api.GetEventOperation:   true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

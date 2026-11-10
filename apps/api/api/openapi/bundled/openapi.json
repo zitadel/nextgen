@@ -9300,6 +9300,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -9511,6 +9514,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
