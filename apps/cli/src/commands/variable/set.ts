@@ -8,7 +8,9 @@ import { variableNameArg } from "./name";
 import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
-import { inShell } from "@/lib/suggestion";
+import { previewVerdict } from "@/commands/preview";
+import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
+import { DEPLOY_ARGS, inShell } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -202,6 +204,16 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         );
         const primary = unread.has("primary") ? UNKNOWN_STATE : stateOf(written.state.primary);
         const preview = unread.has("preview") ? UNKNOWN_STATE : stateOf(written.state.preview);
+        // `preview` skips other environments, and a CI build that names none, so
+        // it is suggested only when it would run.
+        const verdict = previewVerdict({
+          environment: this.environment.name.value,
+          fromDefault: this.environment.name.source === "default",
+          ci: runsInCi(this.env),
+          credentialSet: true,
+          strict: false,
+        });
+        const previewable = verdict === "preview";
         return this.emit({
           status: "ok",
           data: {
@@ -219,6 +231,28 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }).split("\n"),
           },
+          next: write.preview
+            ? {
+                actions: [
+                  "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
+                  ...(previewable
+                    ? []
+                    : [
+                        verdict === "unnamed-ci-build"
+                          ? "Name the environment with `--env preview`: a CI build that names none is not known to be a preview, and `preview` skips it."
+                          : "Run it in the preview or development environment: `preview` skips any other.",
+                      ]),
+                ],
+                commands: previewable
+                  ? [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")]
+                  : [],
+              }
+            : {
+                actions: [
+                  "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
+                ],
+                commands: [this.suggest(DEPLOY_ARGS)],
+              },
         });
       }
     }

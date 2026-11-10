@@ -372,6 +372,17 @@ Each invocation prints one JSON object:
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
+- `variable set` stores the value on the project, but a sign-in keeps using the
+  variables the last `deploy` froze, so the change applies after the next
+  `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
+  holds `deploy -m '<what changed>'`. With `--preview` it points to
+  `preview --origin '<preview-url>' -m '<what changed>'` instead, since a primary
+  `deploy` leaves the preview value unapplied; a pull-request build that sets its
+  own preview URL can drop `--origin`. In an environment other than
+  `preview` or `development`, where `preview` skips, no command is suggested; nor in a
+  CI build that names no environment, where it says to pass `--env preview`.
+  A secret written without `--preview` clears the name's preview value; set it again
+  with `variable set <name> --secret --preview`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` (the origins that deployment froze) and `data.pointers`, the
   `{kind, handle, revision_id}` revisions that release pins; the `schema` one
