@@ -18,6 +18,7 @@ const (
 	filterOpNotEquals          = "not_equals"
 	filterOpContains           = "contains"
 	filterOpNotContains        = "not_contains"
+	filterOpStartsWith         = "starts_with"
 	filterOpLessThan           = "less_than"
 	filterOpLessThanOrEqual    = "less_than_or_equal"
 	filterOpGreaterThan        = "greater_than"
@@ -179,7 +180,7 @@ func stringFilter[F ~uint8](op string, col database.Column[F], value string) (da
 	case filterOpNotEquals, filterOpNotContains:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
-	case filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+	case filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual, filterOpStartsWith:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))

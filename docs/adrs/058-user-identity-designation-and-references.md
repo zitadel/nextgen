@@ -24,6 +24,18 @@
 > per-property `x-unique: {compare: "exact"}` opt-out (§4a), and §5's check
 > that identifier values stay unique across designations, with its conflict
 > scan on redesignation.
+>
+> **Note (2026-11-10):** the designated attributes are also what a search
+> reads. When a user is written, the identifier and each display part store a
+> search text beside the value (`user_attributes.search_text`): the string
+> under the case folding §4a uses for uniqueness, cut to 256 characters. One
+> index, `(project_id, key, search_text, user_id)` over the rows that carry
+> it, answers a prefix match as one range per property, read in index order,
+> so a page costs the same whether one user matches or every user does.
+> `identifier` with `starts_with` on `POST /users/query` is the first reader
+> ([ADR 031](031-openapi-querying.md)). A substring match has no such index
+> and is not offered. The text follows the revision the user was last written
+> under, as the `identifier` on a user response does.
 
 ## Decision
 
