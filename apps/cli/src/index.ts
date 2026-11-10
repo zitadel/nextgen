@@ -22,6 +22,10 @@ import Eject from "./commands/eject";
 import Env from "./commands/env/index";
 import EnvAdd from "./commands/env/add";
 import EnvList from "./commands/env/list";
+import InvitationCancel from "./commands/invitation/cancel";
+import InvitationCreate from "./commands/invitation/create";
+import InvitationGet from "./commands/invitation/get";
+import InvitationList from "./commands/invitation/list";
 import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
@@ -88,6 +92,10 @@ export const COMMANDS: Record<string, typeof Command> = {
   "deployment:rollback": DeploymentRollback,
   "env:add": EnvAdd,
   "env:list": EnvList,
+  "invitation:cancel": InvitationCancel,
+  "invitation:create": InvitationCreate,
+  "invitation:get": InvitationGet,
+  "invitation:list": InvitationList,
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,

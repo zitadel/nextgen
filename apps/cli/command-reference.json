@@ -3621,6 +3621,203 @@
       ]
     },
     {
+      "id": "invitation create",
+      "group": "Project administration",
+      "description": "Invite someone into the project with a link to share.",
+      "args": [],
+      "flags": [
+        {
+          "name": "name",
+          "description": "Who the invitation is for, shown to other administrators. Never matched.",
+          "type": "option"
+        },
+        {
+          "name": "relation",
+          "description": "The project role whoever accepts receives.",
+          "type": "option",
+          "options": [
+            "viewer",
+            "editor",
+            "admin"
+          ]
+        },
+        {
+          "name": "replaces",
+          "description": "The invitation this one replaces; the new one keeps its journey.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "invitation create"
+        },
+        {
+          "command": "invitation create --name \"John Doe\" --relation editor"
+        },
+        {
+          "command": "invitation create --replaces inv_01JCQK5R7T9V1X3Z5B7D9F1H3J --relation editor"
+        }
+      ]
+    },
+    {
+      "id": "invitation list",
+      "group": "Project administration",
+      "description": "List the project's invitations, newest first.",
+      "args": [],
+      "flags": [
+        {
+          "name": "status",
+          "description": "Only invitations with this status.",
+          "type": "option",
+          "options": [
+            "pending",
+            "accepted",
+            "rejected",
+            "expired"
+          ]
+        },
+        {
+          "name": "type",
+          "description": "Only invitations of this type.",
+          "type": "option",
+          "options": [
+            "project_member",
+            "team_member"
+          ]
+        },
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "invitation list"
+        },
+        {
+          "command": "invitation list --status pending"
+        },
+        {
+          "command": "invitation list --all --json"
+        }
+      ]
+    },
+    {
+      "id": "invitation get",
+      "group": "Project administration",
+      "description": "Read one invitation by id.",
+      "args": [
+        {
+          "name": "invitation_id",
+          "description": "The invitation to read.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "invitation get inv_01JCQK5R7T9V1X3Z5B7D9F1H3J"
+        }
+      ]
+    },
+    {
+      "id": "invitation cancel",
+      "group": "Project administration",
+      "description": "Cancel a pending invitation so its link stops working.",
+      "args": [
+        {
+          "name": "invitation_id",
+          "description": "The invitation to cancel. Omit it to pick one of the pending invitations."
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Cancel the invitation without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "invitation cancel"
+        },
+        {
+          "command": "invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J"
+        },
+        {
+          "command": "invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J --force"
+        }
+      ]
+    },
+    {
       "id": "doctor",
       "group": "Diagnostics and utilities",
       "description": "Verify local runtime and project state.",
