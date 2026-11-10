@@ -7,9 +7,12 @@ description: |
   - `id`: user ID
   - `identifier`: the value returned as the user's `identifier`: the property
     designated by `x-identifier` in the revision of the schema the user is on.
-    `contains`, a case-insensitive substring match, is the only operation. The
-    value may not be empty, and only string values match. No index backs it, so
-    narrow a search with other filters on a large project.
+    `starts_with`, a case-insensitive match on the start of the value, is the
+    only operation. Case is folded as for a unique property, so a value found
+    here is the value sign-in resolves. The value may not be empty or longer
+    than 256 characters, only string values match, and the filter may be given
+    once. An index answers it, and the users come back ordered by identifier,
+    then `id`: `sorting` cannot be combined with it.
   - `schema`: the schema the user's attributes satisfy, matched against the
     value the user carries as `schema`. Each revision of a schema has its own
     URL, so `equals` selects the users on one revision and `not_equals` the

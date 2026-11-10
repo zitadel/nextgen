@@ -3,7 +3,6 @@ package user
 import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pattern"
 )
 
 func coerceUserStatus(v any) (any, error) {
@@ -21,12 +20,6 @@ func coerceUserStatus(v any) (any, error) {
 type SchemaSQL struct {
 	// TablePrefix qualifies every table name on a dialect that uses a schema.
 	TablePrefix string
-	// AttributeString reads a.value as text when it holds a JSON string, so a
-	// value matches as it was written rather than as its encoding, and is NULL
-	// for any other JSON type, whose text differs by dialect.
-	AttributeString string
-	// LikeEscape follows a LIKE on a dialect with no default escape character.
-	LikeEscape string
 }
 
 // NewSchema binds user list/filter/order fields for one dialect's SQL.
@@ -35,8 +28,8 @@ type SchemaSQL struct {
 // dialects without a users-to-schemas foreign key, for a missing schema row,
 // so not_equals still matches those users.
 //
-// IdentifierContains reads the attribute row rather than the unique-attributes
-// registry, which holds only hashes. It matches string values only.
+// The two search fields name the columns a search read joins in (see
+// search.go), so they sort and resume such a read and nothing else.
 func NewSchema(dialect SchemaSQL) database.Schema[domain.UserField, domain.User] {
 	usersTable, jsonSchemasTable := dialect.TablePrefix+"users", dialect.TablePrefix+"json_schemas"
 	return database.NewSchema(map[domain.UserField]database.FieldBinding[domain.User]{
@@ -81,20 +74,17 @@ func NewSchema(dialect SchemaSQL) database.Schema[domain.UserField, domain.User]
 				` WHERE s.project_id = ` + usersTable + `.project_id AND s.url = ` + usersTable + `.schema_url), '')`,
 			Computed: true,
 		},
-		domain.UserFieldIdentifierContains: {
-			SQLName: `EXISTS (SELECT 1 FROM ` + dialect.TablePrefix + `user_attributes a` +
-				` WHERE a.project_id = ` + usersTable + `.project_id AND a.user_id = ` + usersTable + `.id` +
-				` AND a.key = `,
-			SQLBetween: []string{` AND LOWER(` + dialect.AttributeString + `) LIKE LOWER(`},
-			SQLSuffix:  `)` + dialect.LikeEscape + `)`,
-			Computed:   true,
+		domain.UserFieldSearchText: {
+			SQLName:  SearchTextColumn,
+			Accessor: func(u *domain.User) any { return u.MatchedText },
+			Coerce:   database.CoerceString,
+			Computed: true,
+		},
+		domain.UserFieldSearchUserID: {
+			SQLName:  SearchUserIDColumn,
+			Accessor: func(u *domain.User) any { return u.ID },
+			Coerce:   database.CoerceString,
+			Computed: true,
 		},
 	})
-}
-
-// IdentifierContains matches users whose designated identifier property key
-// holds a string with value anywhere in it, ignoring case as far as the
-// database's LOWER folds it.
-func IdentifierContains(key, value string) database.Filter[domain.UserField] {
-	return database.CorrelatedEqual(database.Col(domain.UserFieldIdentifierContains), key, "%"+pattern.EscapeLikePattern(value)+"%")
 }

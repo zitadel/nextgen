@@ -4239,8 +4239,8 @@ FLAGS
       created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
       qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
       _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
-      identifier (contains), schema (equals|not_equals|contains|not_contain
-      s|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      identifier (starts_with), schema (equals|not_equals|contains|not_contains|le
+      ss_than|less_than_or_equal|greater_than|greater_than_or_equal),
       schema_object_type (equals|not_equals|contains), status
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
       r_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_conta
