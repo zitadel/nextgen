@@ -1633,7 +1633,7 @@
       "get": {
         "operationId": "listMyProjects",
         "summary": "List the projects I can act on",
-        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
+        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
         "tags": [
           "Projects"
         ],
@@ -1660,6 +1660,16 @@
             "example": "acme"
           },
           {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sorts the list by `created_at` and then `id`: `desc` lists the newest\nproject first, `asc` the oldest first. Leave it out to list by\nproject ID, which says nothing about when a project was created. Send\nthe same value with every `page_token` the list returns: a token\ncontinues the list it came from, and under another order it is\nrefused with `400`.\n",
+            "schema": {
+              "$ref": "#/components/schemas/sort-direction"
+            },
+            "example": "desc"
+          },
+          {
             "$ref": "#/components/parameters/session-project-id"
           }
         ],
@@ -1680,7 +1690,7 @@
             }
           },
           "400": {
-            "description": "The page token or limit was not valid.",
+            "description": "The page token or limit was not valid, or the token was issued under another `order`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5042,7 +5052,8 @@
             "description": "The flow name to filter by. Every revision of a flow shares its\n`name`, so the result is that flow's revisions, newest by creation\ntime first.\n",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z][a-z0-9-]*$"
+              "pattern": "^[a-z][a-z0-9-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -"
             }
           },
           {
@@ -11082,11 +11093,13 @@
       "project-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
       "team-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
       "create-user-request": {
@@ -11294,6 +11307,7 @@
       "user-id": {
         "type": "string",
         "pattern": "^user_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a user ID: user_ followed by letters, digits, _ or -",
         "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
       },
       "user-attributes": {
@@ -12567,6 +12581,7 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
               "maxLength": 64,
               "examples": [
                 "google",
@@ -12627,6 +12642,7 @@
         "x-meta-schema": true,
         "type": "string",
         "pattern": "^[^.]+$",
+        "x-zitadel-pattern-message": "must not be empty or contain a .",
         "description": "The name of a single user attribute."
       },
       "user-property": {
@@ -12864,6 +12880,7 @@
           "flow_definition_name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
             "description": "Name of a specific flow definition to use.\nWhen omitted, the server selects the best-matching definition\nbased on purpose + audience context.\n",
             "example": "custom-login"
           },
@@ -12877,6 +12894,7 @@
             "type": "string",
             "description": "Semver version of the flow definition JSON Schema to use.\nWhen omitted, the latest version is used.\n",
             "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "x-zitadel-pattern-message": "must be a version such as 1.2.3",
             "example": "1.0.0"
           },
           "challenge_nonce": {
@@ -13525,6 +13543,7 @@
         "maxLength": 128,
         "description": "A color on a theme side: hex (`#4F46E5`), a CSS color name, or a color\nfunction: `rgb()`, `rgba()`, `hsl()`, `hsla()`, `hwb()`, `lab()`, `lch()`,\n`oklab()`, `oklch()`, `color()` or `color-mix()`. `url()` and `var()` are\nrejected: the value is written into a stylesheet, so only forms that resolve\nto a color are stored.\n\nThe pattern pins the shape: no semicolons, braces, comment markers or\nbackslashes, so a value cannot leave its declaration whatever it spells.\nWhich names CSS actually knows is the browser's business: an unrecognized\none is stored and paints nothing, rather than being refused here.\n",
         "pattern": "^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]{3,24}|[a-zA-Z][a-zA-Z-]{2,12}\\((?:[0-9a-zA-Z%.,+/# -]|[a-zA-Z][a-zA-Z-]{2,12}\\([0-9a-zA-Z%.,+/# -]*\\))*\\))$",
+        "x-zitadel-pattern-message": "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch()",
         "examples": [
           "#4F46E5",
           "#fff",
@@ -13604,7 +13623,8 @@
             "maxLength": 2048,
             "description": "The logo for this surface. A logo is never recolored, so each side\ncarries its own file. Absent means no logo on this side, unless the\ntop-level `logo_url` is the only one set.\n",
             "example": "https://cdn.example.com/logo-on-light.svg",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "palette": {
             "$ref": "#/components/schemas/branding-palette"
@@ -13649,6 +13669,7 @@
             "minLength": 1,
             "maxLength": 256,
             "pattern": "^ *(?:\"[^\"\\\\;{}]*\"|'[^'\\\\;{}]*'|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*)(?: *, *(?:\"[^\"\\\\;{}]*\"|'[^'\\\\;{}]*'|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*))* *$",
+            "x-zitadel-pattern-message": "must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name (\"APK Futural\")",
             "description": "CSS font stack for body and heading text. Include a generic family so\nthe surface still renders when the named face is unavailable.\n\nComma-separated family names, each either an identifier (`Inter`,\n`ui-sans-serif`, `Helvetica Neue`) or a quoted name (`\"APK Futural\"`).\nAnything else is rejected. The stack is written into a stylesheet, so\nonly names are stored, and a quoted name must close the quote it opened.\n",
             "example": "Inter, ui-sans-serif, sans-serif"
           },
@@ -13658,7 +13679,8 @@
             "maxLength": 2048,
             "description": "Stylesheet that loads `font_family`, for example a Google Fonts CSS URL.\nMust be https; unlike the logo and hero assets there is no\nloopback carve-out. Rejected without `font_family`, which would name\nnothing to paint with.\n\nLoaded only when the login component runs as `variant=\"page\"`, the\nfull-page login. In the default `variant=\"widget\"` it is stored but not\nloaded: the component injects no stylesheet, and the embedding page\nloads the face.\n",
             "example": "https://fonts.googleapis.com/css2?family=Inter&display=swap",
-            "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)"
+            "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials"
           },
           "scale": {
             "type": "number",
@@ -13749,14 +13771,16 @@
             "format": "uri",
             "maxLength": 2048,
             "description": "Fallback logo, used only when neither `theme.light.logo_url` nor\n`theme.dark.logo_url` is set. Prefer the per-side logos, because one\nfile cannot serve both surfaces.\n",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "hero_url": {
             "type": "string",
             "format": "uri",
             "maxLength": 2048,
             "description": "Hero image URL, for templates that reference `branding.hero_url`. The\nbundled default template does not use it.\n",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "theme": {
             "$ref": "#/components/schemas/branding-theme"
@@ -14160,6 +14184,7 @@
       "session-id": {
         "type": "string",
         "pattern": "^sess_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a session ID: sess_ followed by letters, digits, _ or -",
         "example": "sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this session, an opaque string with a `sess_` prefix."
       },
@@ -14215,6 +14240,7 @@
       "attempt-id": {
         "type": "string",
         "pattern": "^att_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be an attempt ID: att_ followed by letters, digits, _ or -",
         "example": "att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this authentication attempt, an opaque string with an `att_` prefix."
       },
@@ -14358,6 +14384,7 @@
       "challenge-id": {
         "type": "string",
         "pattern": "^ch_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a challenge ID: ch_ followed by letters, digits, _ or -",
         "example": "ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this challenge, an opaque string with a `ch_` prefix."
       },
@@ -15726,6 +15753,7 @@
         "type": "string",
         "description": "A web origin: `http` or `https`, a lowercase host (a DNS name or a\nbracketed IPv6 address) and, when it is not the scheme's default, a port\nfrom 1 to 65535. No user info, path, query or fragment, and no trailing\nslash. Compared exactly, so `https://app.acme.com` and\n`https://app.acme.com:443` are different strings.\n",
         "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
+        "x-zitadel-pattern-message": "must be an origin: http or https, a lowercase host and an optional port, with no path",
         "maxLength": 2048,
         "example": "https://app.acme.com"
       },
@@ -16811,6 +16839,7 @@
             "type": "string",
             "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
             "pattern": "^[a-z][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits, _ and -",
             "example": "login"
           },
           "fields": {
@@ -16867,6 +16896,7 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
               "maxLength": 64
             },
             "default": [],
@@ -17006,6 +17036,7 @@
           "name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
             "examples": [
               "standard-login",
               "combined-auth"
@@ -17653,6 +17684,7 @@
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
             "maxLength": 64,
             "description": "Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers`) reference it. Unique within the project.",
             "examples": [
@@ -17686,7 +17718,8 @@
             "type": "object",
             "additionalProperties": {
               "type": "string",
-              "pattern": "^[^$]"
+              "pattern": "^[^$]",
+              "x-zitadel-pattern-message": "must not be empty or start with $"
             },
             "description": "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
           },
@@ -17741,11 +17774,13 @@
               "issuer": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
               },
               "jwks_uri": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "id_token_mapping": {
@@ -17756,16 +17791,19 @@
               "authorization_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "token_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "userinfo_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set."
               },
               "client_id": {
@@ -17777,6 +17815,7 @@
               "client_secret": {
                 "type": "string",
                 "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
+                "x-zitadel-pattern-message": "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself",
                 "description": "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The server resolves it against the environment serving the request."
               },
               "token_endpoint_auth_method": {
@@ -18133,12 +18172,14 @@
         "type": "string",
         "description": "The identifier of a policy, shared by all of its revisions.",
         "pattern": "^pol_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a policy ID: pol_ followed by letters, digits, _ or -",
         "example": "pol_01KXA4F3Q8R7F0N9WD3P2E4YM5"
       },
       "policy-revision-id": {
         "type": "string",
         "description": "The identifier of one immutable revision of a policy.",
         "pattern": "^polrev_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a policy revision ID: polrev_ followed by letters, digits, _ or -",
         "example": "polrev_01KXA4F3Q8R7F0N9WD3P2E4YM6"
       },
       "password-set-config": {
@@ -18474,6 +18515,7 @@
         "type": "string",
         "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding` or `idp`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
         "pattern": "^sha256:[0-9a-f]{64}$",
+        "x-zitadel-pattern-message": "must be sha256: followed by 64 lowercase hex digits",
         "minLength": 71,
         "maxLength": 71,
         "example": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f"
@@ -18502,6 +18544,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a release.",
         "pattern": "^rel_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a release ID: rel_ followed by letters, digits, _ or -",
         "example": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
       },
       "release-metadata": {
@@ -19078,6 +19121,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a deployment.",
         "pattern": "^dep_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
       "revoke-release-conflict": {
@@ -21663,6 +21707,7 @@
         "minLength": 1,
         "maxLength": 255,
         "pattern": "^\\w+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits or _",
         "example": "GITHUB_CLIENT_ID",
         "description": "A variable's name, unique per project and kind.\n\nWord characters only, which is exactly what the `${{ NAME }}` reference\nsyntax can address: a name outside that grammar could be stored\nbut never referenced from a configuration document.\n"
       },
@@ -22118,6 +22163,7 @@
         "items": {
           "type": "string",
           "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
+          "x-zitadel-pattern-message": "must be an origin: http or https, a lowercase host and an optional port, with no path",
           "maxLength": 2048
         },
         "example": [

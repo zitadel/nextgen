@@ -63668,6 +63668,52 @@ func (o OptSessionProofToken) Or(d SessionProofToken) SessionProofToken {
 	return d
 }
 
+// NewOptSortDirection returns new OptSortDirection with value set to v.
+func NewOptSortDirection(v SortDirection) OptSortDirection {
+	return OptSortDirection{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSortDirection is optional SortDirection.
+type OptSortDirection struct {
+	Value SortDirection
+	Set   bool
+}
+
+// IsSet returns true if OptSortDirection was set.
+func (o OptSortDirection) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSortDirection) Reset() {
+	var v SortDirection
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSortDirection) SetTo(v SortDirection) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSortDirection) Get() (v SortDirection, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSortDirection) Or(d SortDirection) SortDirection {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{

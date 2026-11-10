@@ -38,7 +38,7 @@ function project(id: string, name: string) {
  *
  * Worth its own spec because these are the two paths nobody navigates to
  * deliberately: `/` is where sign-in, the logo and the claim flow's "Open the
- * console" all arrive, and `/settings` is where the account dropdown goes.
+ * console" all arrive, and `/settings` is where the sidebar's Settings row goes.
  */
 describe("landing routes", () => {
   // `/` lands on Users, a project-scoped screen, so with no `?project=` the
@@ -188,7 +188,9 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
-    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Create your first project" }),
+    ).toBeInTheDocument();
   });
 
   it("selects nothing when the person's projects cannot be read", async () => {
@@ -205,9 +207,9 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on Settings from settings", async () => {
-    // Settings has no landing page of its own; the account dropdown's target
-    // forwards to the profile, its only screen.
+  it("lands on the profile from settings", async () => {
+    // Settings has no landing page of its own: the sidebar's row forwards to
+    // the profile, its list's first page.
     server.use(
       http.get("http://localhost/api/v1/users/me", () =>
         HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
@@ -216,7 +218,7 @@ describe("landing routes", () => {
     const router = await renderAt("/settings");
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
