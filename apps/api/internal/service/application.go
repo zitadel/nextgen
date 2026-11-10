@@ -83,7 +83,7 @@ func (s *applicationService) validate(document []byte) (domain.ApplicationDocume
 }
 
 func (s *applicationService) create(ctx context.Context, projectID string, next domain.ApplicationDocument, document []byte) (*CreateApplicationOutput, error) {
-	added, err := domain.ApplicationRevisionNewClients(domain.ApplicationDocument{}, next)
+	added, err := domain.ApplicationClientsToCreate(domain.ApplicationDocument{}, next)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (s *applicationService) revise(ctx context.Context, existing *domain.Applic
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse stored application")
 		}
-		added, err := domain.ApplicationRevisionNewClients(stored, next)
+		added, err := domain.ApplicationClientsToCreate(stored, next)
 		if err != nil {
 			return err
 		}
