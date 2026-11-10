@@ -135,6 +135,16 @@ ALTER TABLE zitadel_nextgen.idp_identity_links
     ADD CONSTRAINT fk_idp_identity_links_user
     FOREIGN KEY (project_id, user_id) REFERENCES zitadel_nextgen.users(project_id, id) ON DELETE CASCADE;
 
+-- A project delete runs its cascades in constraint creation order. Users must
+-- go before IdP connections: the user cascade removes the identity links, and
+-- fk_idp_identity_links_connection (NO ACTION) refuses a connection delete
+-- while a link remains. Re-adding the connection FK makes it newer than
+-- fk_users_project again.
+ALTER TABLE zitadel_nextgen.idp_connections DROP CONSTRAINT idp_connections_project_id_fkey;
+ALTER TABLE zitadel_nextgen.idp_connections
+    ADD CONSTRAINT idp_connections_project_id_fkey
+    FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects(id) ON DELETE CASCADE;
+
 -- Serves the cascade from users. Partial: every session starts with an
 -- anonymous token whose user_id is NULL, and the cascade never looks for one.
 CREATE INDEX idx_tokens_user
@@ -289,6 +299,12 @@ ALTER TABLE zitadel_nextgen.team_memberships
 ALTER TABLE zitadel_nextgen.idp_identity_links
     ADD CONSTRAINT fk_idp_identity_links_user
     FOREIGN KEY (project_id, user_id) REFERENCES zitadel_nextgen.users(project_id, id) ON DELETE CASCADE;
+
+-- Keeps the users cascade ahead of the IdP connections cascade, as in the Up.
+ALTER TABLE zitadel_nextgen.idp_connections DROP CONSTRAINT idp_connections_project_id_fkey;
+ALTER TABLE zitadel_nextgen.idp_connections
+    ADD CONSTRAINT idp_connections_project_id_fkey
+    FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects(id) ON DELETE CASCADE;
 
 -- +goose StatementBegin
 DO $$
