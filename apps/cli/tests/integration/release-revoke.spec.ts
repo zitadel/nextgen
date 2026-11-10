@@ -241,7 +241,7 @@ describe("release revoke", () => {
 
           const result = await app.run(["release", "revoke", releaseId, "--force", "--json"]);
 
-          expect(result).not.toSuggest("deployment rollback");
+          expect(result).not.toSuggest("deploy");
         });
 
         it("quotes the preview it suggests removing as one shell word", async () => {

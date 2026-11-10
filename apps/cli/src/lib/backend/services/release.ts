@@ -161,26 +161,18 @@ export class ReleaseService extends ApiService {
   }
 }
 
-/**
- * The origins a `rel.in_use` refusal names. The server nests them in the
- * envelope's `details.details`, the contract in `details`, so both are read.
- */
+/** The origins a `rel.in_use` refusal names under `details.origins`. */
 function servingOrigins(body: unknown): RevokeRelease409DetailsOriginsItem[] {
-  let node: unknown = body;
-  for (let depth = 0; depth < 3 && isObject(node); depth += 1) {
-    const { origins } = node;
-    if (Array.isArray(origins)) {
-      return origins.filter((item): item is RevokeRelease409DetailsOriginsItem => {
-        return (
-          isObject(item) &&
-          typeof item.origin === "string" &&
-          typeof item.deployment_id === "string"
-        );
-      });
-    }
-    node = node.details;
+  const details = isObject(body) ? body.details : undefined;
+  const origins = isObject(details) ? details.origins : undefined;
+  if (!Array.isArray(origins)) {
+    return [];
   }
-  return [];
+  return origins.filter((item): item is RevokeRelease409DetailsOriginsItem => {
+    return (
+      isObject(item) && typeof item.origin === "string" && typeof item.deployment_id === "string"
+    );
+  });
 }
 
 /** Whether a value is a non-null object. */

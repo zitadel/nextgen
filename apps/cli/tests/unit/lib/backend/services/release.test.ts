@@ -82,12 +82,9 @@ describe("ReleaseService.revoke", () => {
     });
   });
 
-  it.each([
-    ["the contract's", { origins: [SERVED] }],
-    ["the server's nested", { details: { origins: [SERVED] } }],
-  ])("names the origins %s details say still serve it", async (_, details) => {
+  it("names the origins the refusal says still serve it", async () => {
     const revokeRelease = vi.fn(async () => {
-      throw inUse(details);
+      throw inUse({ origins: [SERVED] });
     });
     const releaseService = new ReleaseService(
       fakeClient({ revokeRelease, getProject: async () => ({ origins: [] }) }),
