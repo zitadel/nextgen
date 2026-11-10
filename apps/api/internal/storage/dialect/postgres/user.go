@@ -36,25 +36,16 @@ _user_header AS (
     VALUES ($1, $2, $3, $4, 'active')
     RETURNING project_id, id
 ),
-_registry AS (
-    INSERT INTO zitadel_nextgen.user_unique_attributes (
-        project_id, user_id, team_id, key, value_hash
-    )
-    SELECT h.project_id, h.id,
-           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
-                THEN ''
-                ELSE COALESCE($5::text, '')
-           END,
-           d.key, d.value_hash
-    FROM _input_data d CROSS JOIN _user_header h
-    WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
-      AND d.value_hash IS NOT NULL
-),
 _attributes AS (
     INSERT INTO zitadel_nextgen.user_attributes (
-        project_id, team_id, user_id, key, value
+        project_id, user_id, key, value, unique_team_id, value_hash
     )
-    SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
+    SELECT h.project_id, h.id, d.key, d.value,
+           CASE WHEN d.value_hash IS NULL THEN NULL
+                WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope THEN ''
+                ELSE COALESCE($5::text, '')
+           END,
+           d.value_hash
     FROM _input_data d CROSS JOIN _user_header h
 ),
 _membership AS (
@@ -77,13 +68,8 @@ WHERE project_id = $2 AND id = $3 AND updated_at = $4
 `
 
 	selectUserUniqueAttrScopesStmt = `
-SELECT key, team_id FROM zitadel_nextgen.user_unique_attributes
-WHERE project_id = $1 AND user_id = $2
-`
-
-	deleteUserUniqueAttributesStmt = `
-DELETE FROM zitadel_nextgen.user_unique_attributes
-WHERE project_id = $1 AND user_id = $2
+SELECT key, unique_team_id FROM zitadel_nextgen.user_attributes
+WHERE project_id = $1 AND user_id = $2 AND value_hash IS NOT NULL
 `
 
 	deleteUserAttributesStmt = `
@@ -91,46 +77,31 @@ DELETE FROM zitadel_nextgen.user_attributes
 WHERE project_id = $1 AND user_id = $2
 `
 
-	// patchUserAttributesSQL bulk-inserts the full post-merge attribute set
-	// plus its registry rows, mirroring the tail of userInsertSQL. It runs
-	// after the delete statements above, so the whole patch is a full rewrite
-	// of the user's rows; diff-based reconciliation (see
-	// migration/sql/user_examples/patch.sql) is the upgrade path if attribute
-	// counts ever make that churn matter. Registry team scopes come
-	// per-attribute ($8), resolved by the service from the pre-rewrite rows
-	// so an existing claim keeps the scope create gave it.
+	// patchUserAttributesSQL bulk-inserts the full post-merge attribute set,
+	// mirroring the tail of userInsertSQL. It runs after the delete statement
+	// above, so the whole patch is a full rewrite of the user's rows;
+	// diff-based reconciliation (see migration/sql/user_examples/patch.sql) is
+	// the upgrade path if attribute counts ever make that churn matter. Team
+	// scopes come per-attribute ($6), resolved by the service from the
+	// pre-rewrite rows so an existing claim keeps the scope create gave it.
 	patchUserAttributesSQL = `
-WITH _input_data AS (
-    SELECT *,
-           unique_scope_txt::zitadel_nextgen.uniqueness_scope AS unique_scope
-    FROM unnest(
-        $4::text[],
-        $5::jsonb[],
-        $6::bytea[],
-        $7::text[],
-        $8::text[]
-    ) AS t(key, value, value_hash, unique_scope_txt, registry_team_id)
-),
-_registry AS (
-    INSERT INTO zitadel_nextgen.user_unique_attributes (
-        project_id, user_id, team_id, key, value_hash
-    )
-    SELECT $1, $2, d.registry_team_id, d.key, d.value_hash
-    FROM _input_data d
-    WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
-      AND d.value_hash IS NOT NULL
-)
 INSERT INTO zitadel_nextgen.user_attributes (
-    project_id, team_id, user_id, key, value
+    project_id, user_id, key, value, unique_team_id, value_hash
 )
-SELECT $1, $3::text, $2, d.key, d.value
-FROM _input_data d
+SELECT $1, $2, d.key, d.value,
+       CASE WHEN d.value_hash IS NOT NULL THEN d.unique_team_id END,
+       d.value_hash
+FROM unnest(
+    $3::text[],
+    $4::jsonb[],
+    $5::bytea[],
+    $6::text[]
+) AS d(key, value, value_hash, unique_team_id)
 `
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
 
-	userAttributesTable       = "zitadel_nextgen.user_attributes"
-	userUniqueAttributesTable = "zitadel_nextgen.user_unique_attributes"
+	userAttributesTable = "zitadel_nextgen.user_attributes"
 
 	// userTeamsByIDsQuery hydrates the team memberships of one page of users
 	// (ADR 059), ordered so each user's rows arrive together and by team name.
@@ -273,8 +244,8 @@ func userAttributeArrays(attrs domain.CreateAttributes) (keys []domain.Attribute
 }
 
 // PatchUser implements [service.UserStatements] as a full rewrite of the
-// user's attribute and registry rows; a registry insert colliding with
-// another user's claim still surfaces as a UniqueError.
+// user's attribute rows; a unique value colliding with another user's claim
+// still surfaces as a UniqueError.
 func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
@@ -282,7 +253,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.RegistryTeamScopes) != len(user.Attributes) {
 		return fmt.Errorf("user patch requires one registry team scope per attribute")
 	}
-	keys, values, hashes, scopes, err := userAttributeArrays(user.Attributes)
+	keys, values, hashes, _, err := userAttributeArrays(user.Attributes)
 	if err != nil {
 		return err
 	}
@@ -297,15 +268,12 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if tag.RowsAffected() == 0 {
 			return wrapError(pgx.ErrNoRows)
 		}
-		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
-			return wrapError(err)
-		}
 		if _, err := tx.Exec(ctx, deleteUserAttributesStmt, user.ProjectID, user.UserID); err != nil {
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, patchUserAttributesSQL,
-			user.ProjectID, user.UserID, user.AttributeTeamScope,
-			keys, values, hashes, scopes, user.RegistryTeamScopes,
+			user.ProjectID, user.UserID,
+			keys, values, hashes, user.RegistryTeamScopes,
 		); err != nil {
 			return wrapError(err)
 		}
@@ -344,7 +312,7 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 	}
 	var compiler statementCompiler
 	compiler.WriteString("SELECT key FROM ")
-	compiler.WriteString(userUniqueAttributesTable)
+	compiler.WriteString(userAttributesTable)
 	compiler.WriteString(" WHERE project_id = ")
 	compiler.WriteArg(projectID)
 	compiler.WriteString(" AND user_id <> ")
@@ -354,7 +322,7 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 		if i > 0 {
 			compiler.WriteString(" OR ")
 		}
-		compiler.WriteString("(team_id = ")
+		compiler.WriteString("(unique_team_id = ")
 		compiler.WriteArg(claim.TeamID)
 		compiler.WriteString(" AND key = ")
 		compiler.WriteArg(claim.Key)
@@ -415,19 +383,19 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
 				}
 				// A join, not IN: Postgres 16 and older run a correlated IN once
-				// per users row. The registry is reached by the outer project_id
-				// equality, which the planner pushes into the subquery. DISTINCT
-				// keeps one row per user holding the value in several team scopes,
-				// so LIMIT counts users.
+				// per users row. The subquery renames its columns so the
+				// unqualified users filter stays unambiguous; the planner pushes
+				// the outer project_id equality into it. A user holds one row per
+				// key, so the join keeps one row per user and LIMIT counts users.
 				alias := fmt.Sprintf("ua%d", i)
-				compiler.WriteString(" JOIN (SELECT DISTINCT project_id AS ua_project_id, user_id AS ua_user_id FROM ")
-				compiler.WriteString(userUniqueAttributesTable)
+				compiler.WriteString(" JOIN (SELECT project_id AS ua_project_id, user_id AS ua_user_id FROM ")
+				compiler.WriteString(userAttributesTable)
 				compiler.WriteString(" WHERE key = ")
 				compiler.WriteArg(a.Key)
 				compiler.WriteString(" AND value_hash = ")
 				compiler.WriteArg(hash[:])
 				if opts.UniqueTeamID != nil {
-					compiler.WriteString(" AND team_id = ")
+					compiler.WriteString(" AND unique_team_id = ")
 					compiler.WriteArg(*opts.UniqueTeamID)
 				}
 				compiler.WriteString(") " + alias + " ON " + alias + ".ua_project_id = zitadel_nextgen.users.project_id AND " + alias + ".ua_user_id = zitadel_nextgen.users.id")

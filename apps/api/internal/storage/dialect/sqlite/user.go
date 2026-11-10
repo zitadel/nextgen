@@ -20,11 +20,8 @@ const (
 	createUserHeaderStmt = `INSERT INTO users (project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)`
 
-	createUserAttributeStmt = `INSERT INTO user_attributes (project_id, team_id, user_id, key, value)
-VALUES (?, ?, ?, ?, ?)`
-
-	createUserUniqueAttrStmt = `INSERT INTO user_unique_attributes (project_id, user_id, team_id, key, value_hash)
-VALUES (?, ?, ?, ?, ?)`
+	createUserAttributeStmt = `INSERT INTO user_attributes (project_id, user_id, key, value, unique_team_id, value_hash)
+VALUES (?, ?, ?, ?, ?, ?)`
 
 	createUserMembershipStmt = `INSERT INTO team_memberships (project_id, team_id, user_id, status, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?)`
@@ -62,9 +59,7 @@ WHERE project_id = ? AND id IN (SELECT value FROM json_each(?))`
 	patchUserHeaderStmt = `UPDATE users SET updated_at = ?, schema_url = ?
 WHERE project_id = ? AND id = ? AND updated_at = ?`
 
-	selectUserUniqueAttrScopesStmt = `SELECT key, team_id FROM user_unique_attributes WHERE project_id = ? AND user_id = ?`
-
-	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = ? AND user_id = ?`
+	selectUserUniqueAttrScopesStmt = `SELECT key, unique_team_id FROM user_attributes WHERE project_id = ? AND user_id = ? AND value_hash IS NOT NULL`
 
 	deleteUserAttributesStmt = `DELETE FROM user_attributes WHERE project_id = ? AND user_id = ?`
 
@@ -106,7 +101,7 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			return wrapError(err)
 		}
 
-		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, teamScope, user.Attributes,
+		if err := insertUserAttributes(ctx, tx, user.ProjectID, user.ID, user.Attributes,
 			user.Attributes.RegistryTeamScopes(nil, teamScope)); err != nil {
 			return err
 		}
@@ -129,26 +124,22 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	})
 }
 
-// insertUserAttributes writes one attribute row per entry, plus a registry
-// row for each unique-scoped value. registryTeams is index-aligned with attrs
-// (see [domain.CreateAttributes.RegistryTeamScopes]).
-func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID, attrTeamID string, attrs domain.CreateAttributes, registryTeams []string) error {
+// insertUserAttributes writes one attribute row per entry, with the team
+// scope and value hash set for a unique-scoped value. registryTeams is
+// index-aligned with attrs (see [domain.CreateAttributes.RegistryTeamScopes]).
+func insertUserAttributes(ctx context.Context, tx queryExecutor, projectID, userID string, attrs domain.CreateAttributes, registryTeams []string) error {
 	for i, a := range attrs {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
+		var team, hash any
+		if a.UniqueScope != domain.AttributeUniquenessUnspecified {
+			sum := a.ValueHash
+			team, hash = registryTeams[i], sum[:]
+		}
 		if _, err := tx.Exec(ctx, createUserAttributeStmt,
-			projectID, attrTeamID, userID, string(a.Key), string(raw),
-		); err != nil {
-			return wrapError(err)
-		}
-		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-			continue
-		}
-		sum := a.ValueHash
-		if _, err := tx.Exec(ctx, createUserUniqueAttrStmt,
-			projectID, userID, registryTeams[i], string(a.Key), sum[:],
+			projectID, userID, string(a.Key), string(raw), team, hash,
 		); err != nil {
 			return wrapError(err)
 		}
@@ -181,7 +172,7 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 		return nil, nil
 	}
 	var compiler statementCompiler
-	compiler.WriteString("SELECT key FROM user_unique_attributes WHERE project_id = ")
+	compiler.WriteString("SELECT key FROM user_attributes WHERE project_id = ")
 	compiler.WriteArg(projectID)
 	compiler.WriteString(" AND user_id <> ")
 	compiler.WriteArg(userID)
@@ -190,7 +181,7 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 		if i > 0 {
 			compiler.WriteString(" OR ")
 		}
-		compiler.WriteString("(team_id = ")
+		compiler.WriteString("(unique_team_id = ")
 		compiler.WriteArg(claim.TeamID)
 		compiler.WriteString(" AND key = ")
 		compiler.WriteArg(claim.Key)
@@ -217,8 +208,8 @@ func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projec
 }
 
 // PatchUser implements [service.UserStatements] as a full rewrite of the
-// user's attribute and registry rows; a registry insert colliding with
-// another user's claim still surfaces as a UniqueError.
+// user's attribute rows; a unique value colliding with another user's claim
+// still surfaces as a UniqueError.
 func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) error {
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user patch requires attributes")
@@ -236,13 +227,10 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		if n == 0 {
 			return database.NewNoRowFoundError(nil)
 		}
-		if _, err := tx.Exec(ctx, deleteUserUniqueAttributesStmt, user.ProjectID, user.UserID); err != nil {
-			return wrapError(err)
-		}
 		if _, err := tx.Exec(ctx, deleteUserAttributesStmt, user.ProjectID, user.UserID); err != nil {
 			return wrapError(err)
 		}
-		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.AttributeTeamScope, user.Attributes,
+		return insertUserAttributes(ctx, tx, user.ProjectID, user.UserID, user.Attributes,
 			user.RegistryTeamScopes)
 	})
 }
@@ -288,17 +276,18 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
 				}
 				// A join, not IN: under a filter on an indexed users column
-				// (schema_url) SQLite walks those users and probes the registry per
-				// row. The registry is reached by the outer project_id equality,
-				// which SQLite pushes into the subquery. DISTINCT keeps one row per
-				// user holding the value in several team scopes, so LIMIT counts users.
+				// (schema_url) SQLite walks those users and probes the attributes
+				// per row. The subquery renames its columns so the unqualified
+				// users filter stays unambiguous; SQLite pushes the outer
+				// project_id equality into it. A user holds one row per key, so
+				// the join keeps one row per user and LIMIT counts users.
 				alias := fmt.Sprintf("ua%d", i)
-				compiler.WriteString(" JOIN (SELECT DISTINCT project_id AS ua_project_id, user_id AS ua_user_id FROM user_unique_attributes WHERE key = ")
+				compiler.WriteString(" JOIN (SELECT project_id AS ua_project_id, user_id AS ua_user_id FROM user_attributes WHERE key = ")
 				compiler.WriteArg(string(a.Key))
 				compiler.WriteString(" AND value_hash = ")
 				compiler.WriteArg(hash[:])
 				if opts.UniqueTeamID != nil {
-					compiler.WriteString(" AND team_id = ")
+					compiler.WriteString(" AND unique_team_id = ")
 					compiler.WriteArg(*opts.UniqueTeamID)
 				}
 				compiler.WriteString(") " + alias + " ON " + alias + ".ua_project_id = users.project_id AND " + alias + ".ua_user_id = users.id")
