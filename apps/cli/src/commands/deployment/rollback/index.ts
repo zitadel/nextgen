@@ -36,10 +36,10 @@ const NOTHING_EARLIER_REFUSAL: Refusal = {
  * refused before anything is asked or called, and says what one looks like.
  */
 const DEPLOYMENT_ID: Refused<string> = {
-  schema: RollbackDeploymentParams.shape.deployment_id,
+  schema: z.string().trim().pipe(RollbackDeploymentParams.shape.deployment_id),
   refusal: {
-    message: 'Invalid {input} "{value}": {problem}',
-    hint: "Find one with `zitadel deployment list`.",
+    message: "Invalid {input}: {problem}",
+    hint: "Find one with `zitadel deployment list`, or omit it to undo the last deploy.",
     next: ["deployment list"],
     details: {
       argument: "{input}",

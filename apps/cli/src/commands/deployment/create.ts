@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DeploymentService } from "@/lib/backend";
-import { CreateDeploymentBody } from "@/lib/backend/schemas";
+import { GetReleaseByIdParams } from "@/lib/backend/schemas";
 
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
@@ -15,9 +15,9 @@ import { prose } from "@/lib/oclif/rendering";
  * says what one looks like.
  */
 const RELEASE: Refused<string> = {
-  schema: CreateDeploymentBody.shape.release_id.unwrap(),
+  schema: z.string().trim().pipe(GetReleaseByIdParams.shape.release_id),
   refusal: {
-    message: 'Invalid {input} "{value}": {problem}',
+    message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel release list`.",
     next: ["release list"],
     details: {

@@ -1,4 +1,5 @@
 import { Args, Flags } from "@oclif/core";
+import { z } from "zod";
 
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { mutatedData } from "@/lib/oclif/envelope";
@@ -13,9 +14,9 @@ import { prose } from "@/lib/oclif/rendering";
  * refused before anything is asked or called, and says what one looks like.
  */
 const RELEASE_ID: Refused<string> = {
-  schema: RevokeReleaseParams.shape.release_id,
+  schema: z.string().trim().pipe(RevokeReleaseParams.shape.release_id),
   refusal: {
-    message: 'Invalid {input} "{value}": {problem}',
+    message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel release list`.",
     next: ["release list"],
     details: {
