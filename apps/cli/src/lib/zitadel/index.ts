@@ -157,6 +157,6 @@ export {
   type ScaffoldedProvider,
   type ScaffoldOptions,
   type StoredFile,
-  type UnparsedFile,
   RELEASE_POLICY_GLOBS,
 } from "@/lib/zitadel/types";
+export { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
