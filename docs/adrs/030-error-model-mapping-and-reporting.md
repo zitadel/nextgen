@@ -308,16 +308,16 @@ Forbidden: credential material, full storage error strings, rows/records contain
 
 #### Worked example: debugging a unique-attribute conflict
 
-Scenario: a user cannot register because a unique attribute (for example their email) is already taken. The data model matters here. User attributes are stored EAV in `zitadel_nextgen.user_attributes`; uniqueness is enforced indirectly by hashing the value with SHA-256 and writing it to `zitadel_nextgen.user_unique_attributes`, whose primary key `(project_id, team_id, key, value_hash)` is the unique constraint. A duplicate raises a `23505` on that table's partition. The two facts involved have different owners:
+Scenario: a user cannot register because a unique attribute (for example their email) is already taken. The data model matters here. User attributes are stored EAV in `zitadel_nextgen.user_attributes`; uniqueness is enforced indirectly by hashing the value with SHA-256 and storing the hash in the row's `value_hash` column, where the partial unique index `idx_user_attributes_unique (project_id, key, value_hash, unique_team_id)` is the unique constraint. A duplicate raises a `23505` on that index. The two facts involved have different owners:
 
-1. **Which rule failed** is the error's job — but only partially. The pg dialect captures `table` + `constraint`, here `user_unique_attributes` and a partition PK such as `user_unique_attributes_part_0_pkey`. The storage error's `LogValue` emits those typed fields and drops the driver `Detail`. Two reasons the `Detail` must be dropped: the row it names contains the `value_hash` (a salt-less SHA-256 of, for example, an email — reversible for low-entropy identifiers, so still sensitive), and the PK constraint name is shared by *all* unique attributes, so it does not even reveal which attribute collided.
+1. **Which rule failed** is the error's job — but only partially. The pg dialect captures `table` + `constraint`, here `user_attributes` and `idx_user_attributes_unique`. The storage error's `LogValue` emits those typed fields and drops the driver `Detail`. Two reasons the `Detail` must be dropped: the row it names contains the `value_hash` (a salt-less SHA-256 of, for example, an email — reversible for low-entropy identifiers, so still sensitive), and the index name is shared by *all* unique attributes, so it does not even reveal which attribute collided.
 
 The **`level=WARN` line below is emitted by the registration service** when it maps the storage `UniqueError` to a domain error (for example `domain.ErrEmailTaken().WithParent(err)`) — a **client error** (409), not an application failure. The storage error is the `parent` on that log line. Optional `Debug` logs inside `internal/storage` are package-scoped instrumentation only; they are not the primary error-reporting path for request handling.
 
 ```
 level=WARN msg="registration failed" code=user.email_taken
   parent.db_error=integrity_violation parent.integrity_type=unique
-  parent.table=user_unique_attributes parent.constraint=user_unique_attributes_part_0_pkey
+  parent.table=user_attributes parent.constraint=idx_user_attributes_unique
   request_id=... trace_id=... org_id=...
 ```
 
@@ -329,7 +329,7 @@ logger.LogAttrs(ctx, slog.LevelDebug, "unique attribute conflict",
 )
 ```
 
-This keeps both the value and its hash out of logs without losing debuggability: the structured cause says a uniqueness rule fired on `user_unique_attributes`, the caller adds the safe discriminator (`attribute_key=email`), and correlation identifiers (`request_id` / `trace_id`) let an operator pivot from the log line back to the originating request — including a captured HAR or trace that already carries the entered value — under the access controls that protect request data, rather than baking the value or its hash into every error log permanently.
+This keeps both the value and its hash out of logs without losing debuggability: the structured cause says a uniqueness rule failed on `user_attributes`, the caller adds the safe discriminator (`attribute_key=email`), and correlation identifiers (`request_id` / `trace_id`) let an operator pivot from the log line back to the originating request — including a captured HAR or trace that already carries the entered value — under the access controls that protect request data, rather than baking the value or its hash into every error log permanently.
 
 #### Masking limits for schema-driven data
 

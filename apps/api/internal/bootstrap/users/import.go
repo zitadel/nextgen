@@ -147,7 +147,7 @@ func userExists(ctx context.Context, stmts service.AllStatements, h Header) (boo
 // creation does (domain.CreateAttributesFromMap): from the property's
 // `x-unique` annotation in the user's schema. Without that, a bootstrap user
 // whose schema identifies users by `email` cannot be found at sign-in, because
-// identifier resolution looks the value up in the unique-attributes registry.
+// identifier resolution looks the value up among the unique claims.
 // `username` stays project-unique regardless, as it always was for bootstrap
 // users.
 func buildCreateAttributes(
