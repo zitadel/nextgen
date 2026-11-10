@@ -28,7 +28,7 @@ Evaluated before a password is stored, whichever path stores it.
 ## `user.create`
 
 Evaluated before a sign-up creates a user, on the public plane
-([ADR 087](../../adrs/087-abuse-protection-per-operation.md)). The guard, the
+([ADR 088](../../adrs/088-abuse-protection-per-operation.md)). The guard, the
 signup proof of work and its per-flow limits, applies with or without a
 policy; the policy chooses the challenge and never switches the guard off.
 
@@ -45,4 +45,4 @@ policy; the policy chooses the challenge and never switches the guard off.
 | Default policy | [`default-user-create-policy.json`](../../../packages/config/defaults/default-user-create-policy.json): the guard's challenge, written by `zitadel setup` and deployed by the platform project; `TestDefaultUserCreatePolicy_EqualsTheGuard` keeps it equal to `domain.SignupGateProvider` |
 | Values tied to | `domain.SignupGateProvider` (the enum offers it; `TestUserCreateTemplate_OffersTheGuardsChallenge`) |
 | Domain guards, not policy | the proof of work on every password sign-up from a flow, and the per-flow issuance and verification limits (`service.SignupProtection`) |
-| Call site | `SignupProtection.Challenge` when a step whose `on_success` is `create_user` renders, and `SignupProtection.Consume` when it submits. Not gated: user creation through the API, whose credentialed callers are never challenged (ADR 087 §3), and sign-up with a passkey or through a sign-in provider, which create the user elsewhere |
+| Call site | `SignupProtection.Challenge` when a step whose `on_success` is `create_user` renders, and `SignupProtection.Consume` when it submits. Not gated: user creation through the API, whose credentialed callers are never challenged (ADR 088 §3), and sign-up with a passkey or through a sign-in provider, which create the user elsewhere |

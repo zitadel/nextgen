@@ -35,6 +35,15 @@ func TestIDPConnectionImmutableFieldsChanged(t *testing.T) {
 			want: []string{"oidc.issuer"},
 		},
 		{
+			// The provider publishes one form; the other never verifies. A
+			// correction waits on discovery running on a revision.
+			name:   "an issuer that differs by a trailing slash is reported",
+			stored: oidcConnection,
+			next: `{"slug":"google","protocol":"oidc","display_name":"Google",
+				"oidc":{"issuer":"https://accounts.google.com/","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`,
+			want: []string{"oidc.issuer"},
+		},
+		{
 			name:   "absent OIDC subject_claim equals sub",
 			stored: oidcConnection,
 			next: `{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"sub",

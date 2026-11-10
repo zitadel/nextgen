@@ -80,6 +80,13 @@ export interface PlatformMock {
   predatesTheSignupPolicy(): void;
 
   /**
+   * Refuses every release build as a server does a bundle whose connection
+   * changes a field fixed for the life of the connection: `rel.invalid`, with
+   * the field named in the resource's own `details`.
+   */
+  rejectsAConnection(): void;
+
+  /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
    * which is what a mistyped or wrong `--server` points at: every route 404s
    * with a body that is not a platform error envelope.
@@ -371,6 +378,19 @@ export function usePlatformMock(): PlatformMock {
           details: {
             details: 'step "register-password": on_success create_user requires "identifier"',
           },
+        },
+      ]);
+    },
+
+    rejectsAConnection() {
+      refuseReleases([
+        {
+          kind: "idp",
+          handle: "google",
+          code: "idp.field_immutable",
+          message:
+            "identity provider connection: the field is fixed for the life of the connection",
+          details: { details: { fields: ["oidc.issuer"] } },
         },
       ]);
     },

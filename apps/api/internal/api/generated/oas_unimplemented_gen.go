@@ -13,6 +13,24 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// AcceptInvitation implements acceptInvitation operation.
+//
+// Accepts a pending invitation for the signed-in user and returns the updated
+// invitation.
+// Send the plaintext token from the invitation link fragment. Acceptance
+// grants the invitation's role (a project grant for `project_member`) when
+// the invitation is pending and unexpired, the project is active and claimed,
+// and the creator still holds `admin` unless `created_by` is null. The
+// inviter cannot accept their own invitation. Every unknown or finished token
+// answers the same opaque `404`.
+// Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+//
+// POST /invitations/accept
+func (UnimplementedHandler) AcceptInvitation(ctx context.Context, req *InvitationTokenRequest) (r AcceptInvitationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // AddOrigin implements addOrigin operation.
 //
 // Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
@@ -88,6 +106,22 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 //
 // POST /releases/build
 func (UnimplementedHandler) BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (r BuildReleaseRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CancelInvitation implements cancelInvitation operation.
+//
+// Deletes a pending invitation. Its link can no longer be redeemed. Only a
+// `pending` invitation can be cancelled; a finished invitation answers the
+// same opaque `404` as a miss. Expired invitations keep their row until a
+// later cleanup job removes them.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Cancelling needs the same project `admin` check as
+// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+// rules.
+//
+// DELETE /invitations/{id}
+func (UnimplementedHandler) CancelInvitation(ctx context.Context, params CancelInvitationParams) (r CancelInvitationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -412,6 +446,31 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 //
 // POST /idps
 func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (r CreateIdpRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateInvitation implements createInvitation operation.
+//
+// Creates an invitation for a project, or replaces an existing one, and
+// returns the invitation and its one-shot link.
+// Send `type` and the object named after it. `project_member` takes
+// `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
+// and `role`, and answers `501` `not_implemented` until team invitations
+// ship. Optional `metadata.name` labels who the link is for. Optional
+// `replaces_invitation_id` replaces that invitation: the new row keeps the
+// original's `journey_id`, and a pending original is deleted in the same
+// transaction.
+// The `link` appears only in this response. Share it out of band; whoever
+// opens it and is signed in can redeem the role. It expires in 72 hours.
+// Refused for an unclaimed project, on a server without a platform project,
+// and when the project's pending-invitation cap is reached.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Creation needs the same project `admin` check as
+// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+// rules.
+//
+// POST /invitations
+func (UnimplementedHandler) CreateInvitation(ctx context.Context, req CreateInvitationRequest, params CreateInvitationParams) (r CreateInvitationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -878,6 +937,19 @@ func (UnimplementedHandler) GetIdpRevisionById(ctx context.Context, params GetId
 	return r, ht.ErrNotImplemented
 }
 
+// GetInvitation implements getInvitation operation.
+//
+// Returns one invitation by ID for the project named by `project_id`.
+// The response never includes the redeem token or the create-time `link`.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Reading needs the same project `admin` check as
+// `createGrant` (`POST /grants`).
+//
+// GET /invitations/{id}
+func (UnimplementedHandler) GetInvitation(ctx context.Context, params GetInvitationParams) (r GetInvitationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetLive implements getLive operation.
 //
 // Answers `ok` while the server process serves HTTP, and checks nothing
@@ -1219,6 +1291,13 @@ func (UnimplementedHandler) ListDeployments(ctx context.Context, params ListDepl
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and
 // the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+// Filters combine. These are answered from an index and fill their pages: no
+// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
+// `entity_id` or `actor_id` with or without `category`, each with or without
+// the time bounds. Any other filter or combination is matched event by
+// event, over at most a few thousand events per request. Such a page can
+// hold fewer events than `limit`, or none, and still carry
+// `next_page_token`: keep passing the token until a response has none.
 //
 // GET /events
 func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsParams) (r ListEventsRes, _ error) {
@@ -1248,6 +1327,20 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 //
 // GET /idps/{id}/revisions
 func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (r ListIdpRevisionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListInvitations implements listInvitations operation.
+//
+// Lists a project's invitations, newest first, in any status, paginated with
+// `limit` and `page_token`.
+// Optional `status` and `type` filters narrow the page. `expired` is derived
+// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+// a console session cookie (`sessionCookie`). Listing needs the same project
+// `admin` check as `createGrant` (`POST /grants`).
+//
+// GET /invitations
+func (UnimplementedHandler) ListInvitations(ctx context.Context, params ListInvitationsParams) (r ListInvitationsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1456,6 +1549,21 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 	return r, ht.ErrNotImplemented
 }
 
+// LookupInvitation implements lookupInvitation operation.
+//
+// Returns a lean view of the invitation for the signed-in accept page:
+// project, role, inviter and expiry.
+// Send the plaintext token from the invitation link fragment. Every unknown
+// or finished token answers the same opaque `404`. Authenticate with a
+// platform-project user session cookie (`sessionCookie`). Lookup is a read:
+// same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
+// reject still do). The call is rate-limited.
+//
+// POST /invitations/lookup
+func (UnimplementedHandler) LookupInvitation(ctx context.Context, req *InvitationTokenRequest) (r LookupInvitationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // PatchMyUser implements patchMyUser operation.
 //
 // Partially updates the caller's own schema-defined attributes. The merged
@@ -1621,6 +1729,20 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 	return r, ht.ErrNotImplemented
 }
 
+// RejectInvitation implements rejectInvitation operation.
+//
+// Declines a pending invitation for the signed-in user and returns the
+// updated invitation with status `rejected`.
+// Send the plaintext token from the invitation link fragment. Metadata is
+// cleared. Every unknown or finished token answers the same opaque `404`.
+// Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+//
+// POST /invitations/reject
+func (UnimplementedHandler) RejectInvitation(ctx context.Context, req *InvitationTokenRequest) (r RejectInvitationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RemoveOrigin implements removeOrigin operation.
 //
 // Removes one origin pattern from the project's origins.
@@ -1748,6 +1870,45 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 //
 // POST /deployments/{deployment_id}/rollback
 func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (r RollbackDeploymentRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// Search implements search operation.
+//
+// Finds the resources of a project that match a text, across resource types.
+// `query` is what the person typed and `types` names the kinds of result to
+// look for; only those are searched. Each result is a reference: its `type`,
+// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
+// with the type's own operation, for example `GetUserByID`
+// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
+// What a type matches on:
+// - `user`: the start of the value they carry as `identifier` or of a part
+// of their `display` name, from three characters on
+// - `team`: its name
+// - `schema`: the `title` and the `objectType` of a user schema
+// - `flow_definition`: its name
+// - `idp`: the `slug` and the `display_name` of an identity provider
+// connection
+// A user matches from the start of the value; every other type matches the
+// text anywhere in it. Matching ignores case. A `query` that is the `id` of
+// a resource of a requested type finds that one. A schema and a flow
+// definition are found at their newest revision. `project_id` names the
+// project to search; without it, the credential's own project is searched. A
+// caller with access to part of the project finds only what that access
+// covers.
+// Authenticate with the project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). A preview secret is refused, as on every management
+// operation.
+// Results come best match first, at most `limit_per_type` of each type, and
+// types can be mixed in the order. `incomplete_types` lists the types that
+// have more to show: page those with the type's own list, such as
+// `queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+// How text is matched and ranked can change, and later versions can match
+// more of a resource. Treat the results as suggestions; to filter by an exact
+// rule, use the type's own list.
+//
+// POST /search
+func (UnimplementedHandler) Search(ctx context.Context, req *SearchRequest, params SearchParams) (r SearchRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

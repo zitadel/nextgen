@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 )
 
-// TestUserCreatePolicy covers the sign-up policy end to end (ADR 087 §5): it
+// TestUserCreatePolicy covers the sign-up policy end to end (ADR 088 §5): it
 // publishes and reads back like any policy, refuses a challenge the server
 // cannot issue, allows the built-in proof of work in a dry run, and a sign-up
 // under it solves the same challenge as one without it.

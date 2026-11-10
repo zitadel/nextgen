@@ -1,0 +1,17 @@
+title: CreateProjectMemberInvitationResponse
+description: |
+  The created project-member invitation and its one-shot link. Only this
+  response returns the link; later reads never include it.
+allOf:
+  - $ref: invitation-project-member.yaml
+  - type: object
+    required:
+      - link
+    properties:
+      link:
+        type: string
+        format: uri
+        description: |
+          The browser URL to share. It carries the redeem token in the fragment.
+          Only this create or replace response returns it.
+        example: https://console.example.com/invitations/accept#token=dGhpc2lzYXRva2Vu

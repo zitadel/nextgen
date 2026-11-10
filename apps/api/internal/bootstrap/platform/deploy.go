@@ -190,7 +190,7 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 
 // platformPolicies are the policies `zitadel setup` writes for a new project:
 // the recommended password policy, and the free sign-up protection, which
-// restates the guard (ADR 087 §5).
+// restates the guard (ADR 088 §5).
 func platformPolicies() ([]service.BuildPolicy, error) {
 	var out []service.BuildPolicy
 	for _, def := range []struct {

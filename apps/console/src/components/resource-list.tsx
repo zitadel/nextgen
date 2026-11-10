@@ -61,8 +61,8 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 /**
  * The title row of a list screen: the heading with, where the screen has one,
  * its primary action beside it at every width (D19), and any filter beside
- * that. 36px tall (`PAGE_TITLE_ROW`), except on a phone with a filter, where
- * the filter takes a second row under the title.
+ * that. 36px tall (`PAGE_TITLE_ROW`), except where the row is too narrow for a
+ * filter, which then takes a row of its own under the title.
  */
 export function ResourceTitle({
   children,
@@ -72,21 +72,36 @@ export function ResourceTitle({
   children: ReactNode;
   action?: ReactNode;
   /**
-   * Controls that narrow the list, beside the action and 8px from it. On a
-   * phone they drop to their own row under the title while the action keeps
-   * the title row (D19).
+   * Controls that narrow the list, beside the action and 8px from it. By the
+   * width of the row, not the viewport, since the sidebar takes part of it: too
+   * narrow, they drop to their own row under the title while the action keeps
+   * the title row (D19). Wide enough, a basis of 0 keeps them on the title row
+   * whatever they hold, and they wrap among themselves rather than push the
+   * action off it.
    */
   filter?: ReactNode;
 }) {
+  if (!filter) {
+    return (
+      <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
+        <h1 className={RESOURCE_TITLE}>{children}</h1>
+        <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+      </div>
+    );
+  }
   return (
-    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
-      <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {filter && (
-        <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
-          {filter}
-        </div>
+    <div
+      className={cn(
+        RESOURCE_HEADER,
+        PAGE_TITLE_ROW,
+        "@container/title-row flex-wrap gap-x-2 gap-y-4",
       )}
-      <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+    >
+      <h1 className={RESOURCE_TITLE}>{children}</h1>
+      <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 @3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end">
+        {filter}
+      </div>
+      <div className="order-2 ml-auto @3xl/title-row:order-3 @3xl/title-row:ml-0">{action}</div>
     </div>
   );
 }
@@ -294,20 +309,34 @@ export function RowMenu({
  * `Load more` under a cursor-paginated list (decisions log D5: a button, not
  * pagination controls). Its presence means there is more; its absence means the
  * list is complete.
+ *
+ * A list whose server may stop reading before a page is full names the button
+ * for that (`label`) and says so in a line above it (`note`).
  */
-export function LoadMore({ paging }: { paging: LoadMoreState }) {
+export function LoadMore({
+  paging,
+  label = "Load more",
+  note,
+}: {
+  paging: LoadMoreState;
+  label?: string;
+  note?: ReactNode;
+}) {
   return (
     <>
       <FormError message={paging.error} className="mt-3" />
       {paging.hasMore && (
-        <Button
-          variant="secondary"
-          className="mt-6 h-9 w-full gap-1.5 px-2.5"
-          onClick={() => void paging.loadMore()}
-          loading={paging.loading}
-        >
-          Load more
-        </Button>
+        <>
+          {note && <p className="text-muted-foreground mt-6 text-center text-sm">{note}</p>}
+          <Button
+            variant="secondary"
+            className={cn("h-9 w-full gap-1.5 px-2.5", note ? "mt-3" : "mt-6")}
+            onClick={() => void paging.loadMore()}
+            loading={paging.loading}
+          >
+            {label}
+          </Button>
+        </>
       )}
     </>
   );

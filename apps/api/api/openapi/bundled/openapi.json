@@ -50,6 +50,10 @@
       "description": "Users are the identities of a project, such as people or service accounts.\nThese operations create, read, update, delete and query users, read the\nsigned-in user, and manage a user's password, passkeys, identity links\nand team memberships.\n"
     },
     {
+      "name": "Search",
+      "description": "Search finds the resources of a project that match a text, across\nresource types in one request. It answers with references; the\nresources themselves are read through their own operations.\n"
+    },
+    {
       "name": "Schemas",
       "description": "Schemas define the typed shape of user data and of other configurable\nresources. These operations create, list and read schemas.\n"
     },
@@ -84,6 +88,10 @@
     {
       "name": "Grants",
       "description": "Grants give a user or a team the project.viewer, project.editor or\nproject.admin role on a project. These operations create, get, query and\nrevoke grants. There is no operation to change a grant's role yet.\n"
+    },
+    {
+      "name": "Invitations",
+      "description": "Invitations are 72-hour links that grant a project role (or, later, a team\nrole) to whoever redeems them. These operations create, list, read and\ncancel invitations, and look up, accept or decline one by its token.\n"
     },
     {
       "name": "Events",
@@ -5597,6 +5605,97 @@
         }
       }
     },
+    "/search": {
+      "post": {
+        "operationId": "search",
+        "summary": "Search a project",
+        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
+        "tags": [
+          "Search"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id-query"
+          }
+        ],
+        "requestBody": {
+          "description": "The text to find and the types to look for.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/search-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The best matches of each requested type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/search-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, for example no `types`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/search-error-response"
+          }
+        }
+      }
+    },
     "/branding": {
       "post": {
         "operationId": "createBranding",
@@ -8643,12 +8742,672 @@
         }
       }
     },
+    "/invitations": {
+      "post": {
+        "operationId": "createInvitation",
+        "summary": "Create an invitation",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original is deleted in the same\ntransaction.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create-invitation-request"
+              },
+              "examples": {
+                "project_member": {
+                  "summary": "Invite a project viewer",
+                  "value": {
+                    "type": "project_member",
+                    "project_member": {
+                      "relation": "viewer"
+                    },
+                    "metadata": {
+                      "name": "John Doe"
+                    }
+                  }
+                },
+                "replace_project_member": {
+                  "summary": "Replace a pending invitation and keep its journey",
+                  "value": {
+                    "type": "project_member",
+                    "project_member": {
+                      "relation": "editor"
+                    },
+                    "metadata": {
+                      "name": "John Doe"
+                    },
+                    "replaces_invitation_id": "inv_01JCQK5R7T9V1X3Z5B7D9F1H3J"
+                  }
+                },
+                "team_member": {
+                  "summary": "Invite a team member (answers 501 until implemented)",
+                  "value": {
+                    "type": "team_member",
+                    "team_member": {
+                      "team_id": "team_01JCQK5R7T9V1X3Z5B7D9F1H3J",
+                      "role": "member"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invitation was created, with its one-shot link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create-invitation-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body or parameters were not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found, or the invitation to replace was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project cannot accept invitations yet (unclaimed), the pending\ninvitation cap was reached, or the server has no platform project.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "`type` is `team_member`, which is declared but not implemented yet.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_implemented"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/createInvitation-error-response"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listInvitations",
+        "summary": "List invitations",
+        "description": "Lists a project's invitations, newest first, in any status, paginated with\n`limit` and `page_token`.\n\nOptional `status` and `type` filters narrow the page. `expired` is derived\non read from `expires_at`. Authenticate with a project secret (`oauth2`) or\na console session cookie (`sessionCookie`). Listing needs the same project\n`admin` check as `createGrant` (`POST /grants`).\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page-token"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Only invitations with this status.",
+            "schema": {
+              "$ref": "#/components/schemas/invitation-status"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Only invitations of this type.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "project_member",
+                "team_member"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the project's invitations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/list-invitations-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The page token is not valid. Send the `next_page_token` from the previous response unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/listInvitations-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/lookup": {
+      "post": {
+        "operationId": "lookupInvitation",
+        "summary": "Look up an invitation by token",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do). The call is rate-limited.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-token-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation details for the accept page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation-lookup-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body was not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Lookup is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/lookupInvitation-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/accept": {
+      "post": {
+        "operationId": "acceptInvitation",
+        "summary": "Accept an invitation",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-token-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation was accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body was not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The inviter cannot accept their own invitation, the creator no longer\nholds admin, or CSRF failed (`auth.csrf_invalid`).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is unclaimed or inactive, so acceptance cannot complete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Accept is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/acceptInvitation-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/reject": {
+      "post": {
+        "operationId": "rejectInvitation",
+        "summary": "Decline an invitation",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. Every unknown or finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-token-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation was declined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body was not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF failed (`auth.csrf_invalid`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Decline is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/rejectInvitation-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/{id}": {
+      "get": {
+        "operationId": "getInvitation",
+        "summary": "Get an invitation",
+        "description": "Returns one invitation by ID for the project named by `project_id`.\n\nThe response never includes the redeem token or the create-time `link`.\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Reading needs the same project `admin` check as\n`createGrant` (`POST /grants`).\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invitation-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invitation or project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getInvitation-error-response"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelInvitation",
+        "summary": "Cancel an invitation",
+        "description": "Deletes a pending invitation. Its link can no longer be redeemed. Only a\n`pending` invitation can be cancelled; a finished invitation answers the\nsame opaque `404` as a miss. Expired invitations keep their row until a\nlater cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invitation-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The invitation was deleted."
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invitation or project not found, or the invitation is no longer\npending.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/cancelInvitation-error-response"
+          }
+        }
+      }
+    },
     "/events": {
       "get": {
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,\n`entity_id` or `actor_id` with or without `category`, each with or without\nthe time bounds. Any other filter or combination is matched event by\nevent, over at most a few thousand events per request. Such a page can\nhold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -8657,6 +9416,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -8868,6 +9630,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -11456,7 +12221,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "__Host-zitadel_session",
-        "description": "The session cookie issued at session creation or superseding handoff exchange.\n\nA browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain\nhttp to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it\nas `zitadel_session` instead, without `Secure` or the prefix, so that Safari\nkeeps it, and accepts that name there too; `__Host-zitadel_session` takes\nprecedence. A program sends `__Host-zitadel_session` over any transport.\n\nA missing or invalid cookie yields `401` with code `auth.unauthorized` and the message\n`Missing or invalid session token.`\n\nCross-site request forgery (CSRF) protection: a state-changing request that\nthis cookie authenticates must come from the same origin. A cross-site\nbrowser request is refused with `403` and code `auth.csrf_invalid`. Every\nsuch request must also send the session's token from `GET /sessions/me/csrf`\nin the `X-Zitadel-CSRF` header, or it answers the same `403`. The only\nexceptions are the `POST …/query` reads, which need no token. Safe methods\n(`GET`) are not checked. A request a project secret authenticates is not\naffected.\n"
+        "description": "The session cookie issued at session creation or superseding handoff exchange.\n\nA browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain\nhttp to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it\nas `zitadel_session` instead, without `Secure` or the prefix, so that Safari\nkeeps it, and accepts that name there too; `__Host-zitadel_session` takes\nprecedence. A program sends `__Host-zitadel_session` over any transport.\n\nA missing or invalid cookie yields `401` with code `auth.unauthorized` and the message\n`Missing or invalid session token.`\n\nCross-site request forgery (CSRF) protection: a state-changing request that\nthis cookie authenticates must come from the same origin. A cross-site\nbrowser request is refused with `403` and code `auth.csrf_invalid`. Every\nsuch request must also send the session's token from `GET /sessions/me/csrf`\nin the `X-Zitadel-CSRF` header, or it answers the same `403`. The only\nexceptions are the `POST …/query` reads and `POST /invitations/lookup`,\nwhich need no token. Safe methods (`GET`) are not checked. A request a\nproject secret authenticates is not affected.\n"
       }
     },
     "schemas": {
@@ -11987,10 +12752,11 @@
       },
       "user-filter-field": {
         "type": "string",
-        "description": "The field to filter users by, one of:\n- `created_at`: RFC3339 timestamp\n- `id`: user ID\n- `schema`: the schema the user's attributes satisfy, matched against the\n  value the user carries as `schema`. Each revision of a schema has its own\n  URL, so `equals` selects the users on one revision and `not_equals` the\n  users on any other.\n- `schema_object_type`: the `object_type` of the user's schema, which every\n  revision of that schema shares. It may be repeated, like any field: give\n  `not_equals` once per object type to exclude several. A schema without an\n  object type reads as `\"\"`, so `not_equals` matches its users and `equals`\n  `\"\"` selects them. Combine `equals` here with `schema` `not_equals` the\n  newest revision to find the users still on an older one.\n- `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`\n- `team_id`: restricts the result to users holding an **active** membership\n  in that team. A user who has been invited but has not accepted does not\n  match. `equals` is the only operation, and the field may be given once,\n  because it names one team, not a set.\n- `lifecycle_owner_team_id`: the team that owns the user's identity\n  lifecycle. A self-owned user has no owning team, and a null filter value\n  is rejected, so self-owned users cannot be selected by this field.\n\n**The two team fields answer different questions.** `team_id` is membership:\nwhich team the user collaborates in, readable per user at\n`GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which\nteam may deprovision the user. A user can belong to many teams while owning\ntheir own lifecycle, so the two disagree often and neither implies the other.\n\n`team_id` and `schema_object_type` are filterable but not sortable, so\nneither is a valid sort field.\n\nFiltering on `team_id` requires `team_membership.read` in addition to\n`user.read`: it reads the same memberships that `expand: [\"teams\"]` embeds.\nA console session, which carries no scopes, may filter on it when it may read\nthe whole project (the `viewer` role or above); with a grant covering only\npart of the project the filter is refused with `403 user.permission_denied`.\n",
+        "description": "The field to filter users by, one of:\n- `created_at`: RFC3339 timestamp\n- `id`: user ID\n- `identifier`: the value returned as the user's `identifier`: the property\n  designated by `x-identifier` in the revision of the schema the user is on.\n  `starts_with`, a case-insensitive match on the start of the value, is the\n  only operation. Case is folded as for a unique property, so a value found\n  here is the value sign-in resolves. The value may not be empty or longer\n  than 256 characters, only string values match, and the filter may be given\n  once. An index answers it, and the users come back ordered by identifier,\n  then `id`: `sorting` cannot be combined with it.\n- `schema`: the schema the user's attributes satisfy, matched against the\n  value the user carries as `schema`. Each revision of a schema has its own\n  URL, so `equals` selects the users on one revision and `not_equals` the\n  users on any other.\n- `schema_object_type`: the `object_type` of the user's schema, which every\n  revision of that schema shares. It may be repeated, like any field: give\n  `not_equals` once per object type to exclude several. A schema without an\n  object type reads as `\"\"`, so `not_equals` matches its users and `equals`\n  `\"\"` selects them. Combine `equals` here with `schema` `not_equals` the\n  newest revision to find the users still on an older one.\n- `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`\n- `team_id`: restricts the result to users holding an **active** membership\n  in that team. A user who has been invited but has not accepted does not\n  match. `equals` is the only operation, and the field may be given once,\n  because it names one team, not a set.\n- `lifecycle_owner_team_id`: the team that owns the user's identity\n  lifecycle. A self-owned user has no owning team, and a null filter value\n  is rejected, so self-owned users cannot be selected by this field.\n\n**The two team fields answer different questions.** `team_id` is membership:\nwhich team the user collaborates in, readable per user at\n`GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which\nteam may deprovision the user. A user can belong to many teams while owning\ntheir own lifecycle, so the two disagree often and neither implies the other.\n\n`identifier`, `team_id` and `schema_object_type` are filterable but not\nsortable, so none is a valid sort field.\n\nFiltering on `team_id` requires `team_membership.read` in addition to\n`user.read`: it reads the same memberships that `expand: [\"teams\"]` embeds.\nA console session, which carries no scopes, may filter on it when it may read\nthe whole project (the `viewer` role or above); with a grant covering only\npart of the project the filter is refused with `403 user.permission_denied`.\n",
         "enum": [
           "created_at",
           "id",
+          "identifier",
           "schema",
           "schema_object_type",
           "status",
@@ -12017,12 +12783,13 @@
       },
       "filter-operation": {
         "type": "string",
-        "description": "The operation a filter applies to a field on a query endpoint.\n\nOn text fields, `contains` is a case-insensitive substring match. `equals`\ncompares the whole value and is case-sensitive unless the field documents\notherwise.\n",
+        "description": "The operation a filter applies to a field on a query endpoint.\n\nOn text fields, `contains` is a case-insensitive substring match. `equals`\ncompares the whole value and is case-sensitive unless the field documents\notherwise. `starts_with` is a case-insensitive match on the start of the\nvalue, answered from an index; only the fields that name it accept it.\n",
         "enum": [
           "equals",
           "not_equals",
           "contains",
           "not_contains",
+          "starts_with",
           "less_than",
           "less_than_or_equal",
           "greater_than",
@@ -18084,6 +18851,133 @@
           }
         }
       },
+      "search-result-type": {
+        "type": "string",
+        "description": "A type of result `search` (`POST /search`) finds:\n- `user`: a user, matched on the start of the value they carry as\n  `identifier` or of a part of their `display` name\n- `team`: a team, matched on its name\n- `schema`: a user schema at its newest revision, matched on its `title`\n  and its `objectType`\n- `flow_definition`: a flow definition at its newest revision, matched on\n  its name\n- `idp`: an identity provider connection, matched on its `slug` and its\n  `display_name`\n",
+        "enum": [
+          "user",
+          "team",
+          "schema",
+          "flow_definition",
+          "idp"
+        ]
+      },
+      "search-request": {
+        "type": "object",
+        "description": "Request to search a project.",
+        "required": [
+          "query",
+          "types"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The text to find. Spaces around it are ignored, and a text of spaces\nalone finds nothing.\n",
+            "example": "ann@example.com"
+          },
+          "types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "The types to search. Only these appear in `results`, so a client never\nreceives a type it did not ask for.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result-type"
+            },
+            "example": [
+              "user",
+              "team"
+            ]
+          },
+          "limit_per_type": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5,
+            "description": "The most results each type contributes."
+          }
+        }
+      },
+      "idp-permission_denied": {
+        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "idp.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "search-result": {
+        "type": "object",
+        "description": "One match: a reference to a resource, not the resource. Every type has this\nshape.\n",
+        "required": [
+          "type",
+          "id",
+          "project_id",
+          "title"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/search-result-type"
+          },
+          "id": {
+            "type": "string",
+            "description": "The resource's `id`, as its type's own operations take it. For a schema\nand a flow definition, the `id` of the newest revision.\n",
+            "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id",
+            "description": "The project the resource belongs to."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to call the resource:\n- a user: their `display`, else their `identifier`, else their `id`\n- a team: its name\n- a schema: its `title`, else its `objectType`, else its `id`\n- a flow definition: its name\n- an identity provider connection: its `display_name`, else its `slug`\n",
+            "example": "Ann Lee"
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "A second line that tells two titles apart, absent when there is nothing\nto add:\n- a user shown by their `display`: their `identifier`\n- a schema shown by its `title`: its `objectType`\n- a flow definition: the purposes it handles\n- an identity provider connection shown by its `display_name`: its\n  `slug`\n",
+            "example": "ann@example.com"
+          }
+        }
+      },
+      "search-response": {
+        "type": "object",
+        "description": "The best matches of each requested type.",
+        "required": [
+          "results",
+          "incomplete_types"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "description": "The matches, best first. Types can be mixed in the order: group by\n`type` to show them by type.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result"
+            }
+          },
+          "incomplete_types": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\nor the project holds more of that type than one search reads. Empty when\nevery requested type is complete.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result-type"
+            }
+          }
+        }
+      },
       "brnd-not_found": {
         "description": "Branding: not found\n\nError code: brnd.not_found\n",
         "allOf": [
@@ -18457,26 +19351,6 @@
               "code": {
                 "type": "string",
                 "const": "idp.field_immutable"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "idp-permission_denied": {
-        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "idp.permission_denied"
               }
             },
             "required": [
@@ -20523,6 +21397,715 @@
             ]
           }
         }
+      },
+      "invitation-status": {
+        "title": "InvitationStatus",
+        "type": "string",
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected",
+          "expired"
+        ],
+        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace of a\npending invitation delete the row rather than leaving a cancelled status.\n"
+      },
+      "inv-not_found": {
+        "description": "Invitation not found\n\nError code: inv.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-permission_denied": {
+        "description": "Insufficient permissions to manage invitations\n\nError code: inv.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "invitation-id": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
+        "description": "The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`\n(`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.\n",
+        "example": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E"
+      },
+      "invitation-metadata": {
+        "title": "InvitationMetadata",
+        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel and replace of a pending\ninvitation delete the row, so the metadata goes with it.\n",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "A display name for who the invitation is intended for.",
+            "example": "John Doe"
+          }
+        }
+      },
+      "invitation-created-by-type": {
+        "title": "InvitationCreatedByType",
+        "description": "What kind of principal `created_by` names.",
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "human",
+              "service",
+              "system",
+              "agent"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "example": "human"
+      },
+      "invitation-common": {
+        "title": "InvitationCommon",
+        "description": "Fields every invitation carries. Each type adds its own `type` const and the\nnested object named after that type.\n",
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "status",
+          "created_at",
+          "expires_at",
+          "journey_id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/invitation-id"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id"
+          },
+          "metadata": {
+            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace of a pending invitation delete the row.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/invitation-metadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/invitation-status"
+          },
+          "created_by": {
+            "description": "The user who created the invitation. Null when a project secret created\nit (`created_by_type` is then `service`).\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by_type": {
+            "$ref": "#/components/schemas/invitation-created-by-type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation was created.",
+            "example": "2026-11-04T10:00:00Z"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation expires (72 hours after create).",
+            "example": "2026-11-07T10:00:00Z"
+          },
+          "journey_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Correlates this invitation with its replacements. A replacement keeps the\noriginal's `journey_id`. It is a random correlation id, not a resource id.\n",
+            "example": "q7Z0bX2rT1aM4cV8nL5wYg"
+          },
+          "accepted_by": {
+            "description": "The user who redeemed the link. Null until accepted.",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted_at": {
+            "description": "When the invitation was accepted. Null until accepted.",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "invitation-project-member-payload": {
+        "title": "ProjectMemberInvitationPayload",
+        "description": "Type-specific input for a `project_member` invitation.",
+        "type": "object",
+        "required": [
+          "relation"
+        ],
+        "properties": {
+          "relation": {
+            "type": "string",
+            "enum": [
+              "viewer",
+              "editor",
+              "admin"
+            ],
+            "description": "The project role the accepter receives, as in `POST /grants`."
+          }
+        }
+      },
+      "invitation-project-member": {
+        "title": "ProjectMemberInvitation",
+        "description": "An invitation that grants a project role (`viewer`, `editor` or `admin`) to\nwhoever redeems its link.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-team-member-payload": {
+        "title": "TeamMemberInvitationPayload",
+        "description": "Type-specific input for a `team_member` invitation.",
+        "type": "object",
+        "required": [
+          "team_id",
+          "role"
+        ],
+        "properties": {
+          "team_id": {
+            "$ref": "#/components/schemas/team-id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member"
+            ],
+            "description": "The team role the accepter receives."
+          }
+        }
+      },
+      "invitation-team-member": {
+        "title": "TeamMemberInvitation",
+        "description": "An invitation that adds the accepter to a team. Declared now so the contract\ndoes not change when team invitations ship; creating one answers `501`\n`not_implemented` until then.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation": {
+        "title": "Invitation",
+        "description": "An invitation is a link, valid for 72 hours, that grants a role to whoever\nredeems it. Discriminate on `type`; the object named after the type holds\neverything specific to that type.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-project-member"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-team-member"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-project-member",
+            "team_member": "#/components/schemas/invitation-team-member"
+          }
+        }
+      },
+      "list-invitations-response": {
+        "title": "ListInvitationsResponse",
+        "description": "A page of a project's invitations, newest first.",
+        "type": "object",
+        "required": [
+          "invitations"
+        ],
+        "properties": {
+          "invitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/invitation"
+            }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "create-invitation-common": {
+        "title": "CreateInvitationCommon",
+        "description": "Shared optional fields on every create-invitation request.",
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "description": "Optional label for who the link is for. Displayed only; never matched.",
+            "$ref": "#/components/schemas/invitation-metadata"
+          },
+          "replaces_invitation_id": {
+            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id`, and a pending original is deleted in the\nsame transaction. Use the `id` that `createInvitation`\n(`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.\n",
+            "$ref": "#/components/schemas/invitation-id"
+          }
+        }
+      },
+      "create-invitation-project-member-request": {
+        "title": "CreateProjectMemberInvitationRequest",
+        "description": "Creates a project-member invitation, or replaces an existing one.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-team-member-request": {
+        "title": "CreateTeamMemberInvitationRequest",
+        "description": "Creates a team-member invitation. Declared now; creating one answers `501`\n`not_implemented` until team invitations ship.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-request": {
+        "title": "CreateInvitationRequest",
+        "description": "Creates an invitation. Discriminate on `type`. Optional `metadata` labels who\nthe link is for. Optional `replaces_invitation_id` replaces an existing\ninvitation in the same create.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-project-member-request"
+          },
+          {
+            "$ref": "#/components/schemas/create-invitation-team-member-request"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/create-invitation-project-member-request",
+            "team_member": "#/components/schemas/create-invitation-team-member-request"
+          }
+        }
+      },
+      "inv-invalid": {
+        "description": "The invitation request is invalid\n\nError code: inv.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-pending_limit": {
+        "description": "The project has reached its pending invitation limit\n\nError code: inv.pending_limit\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.pending_limit"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-platform_required": {
+        "description": "Invitations require a platform project\n\nError code: inv.platform_required\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.platform_required"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-project_unclaimed": {
+        "description": "Claim the project before inviting into it\n\nError code: inv.project_unclaimed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.project_unclaimed"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "create-invitation-project-member-response": {
+        "title": "CreateProjectMemberInvitationResponse",
+        "description": "The created project-member invitation and its one-shot link. Only this\nresponse returns the link; later reads never include it.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-project-member"
+          },
+          {
+            "type": "object",
+            "required": [
+              "link"
+            ],
+            "properties": {
+              "link": {
+                "type": "string",
+                "format": "uri",
+                "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n",
+                "example": "https://console.example.com/invitations/accept#token=dGhpc2lzYXRva2Vu"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-team-member-response": {
+        "title": "CreateTeamMemberInvitationResponse",
+        "description": "The created team-member invitation and its one-shot link. Creating a\nteam-member invitation answers `501` until team invitations ship.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-team-member"
+          },
+          {
+            "type": "object",
+            "required": [
+              "link"
+            ],
+            "properties": {
+              "link": {
+                "type": "string",
+                "format": "uri",
+                "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-response": {
+        "title": "CreateInvitationResponse",
+        "description": "The created invitation and its one-shot `link`. Discriminate on `type`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-project-member-response"
+          },
+          {
+            "$ref": "#/components/schemas/create-invitation-team-member-response"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/create-invitation-project-member-response",
+            "team_member": "#/components/schemas/create-invitation-team-member-response"
+          }
+        }
+      },
+      "invitation-token-request": {
+        "title": "InvitationTokenRequest",
+        "description": "The redeem token from an invitation link's fragment.",
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The plaintext token from the invitation link fragment. It never appears in\na URL query. Every unknown or finished token gets the same `404`.\n"
+          }
+        }
+      },
+      "invitation-lookup-common": {
+        "title": "LookupInvitationCommon",
+        "description": "Shared fields of the lean invitation view for the accept page.\n",
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "status",
+          "expires_at"
+        ],
+        "properties": {
+          "project_id": {
+            "$ref": "#/components/schemas/project-id"
+          },
+          "project_name": {
+            "type": "string",
+            "description": "The project's display name."
+          },
+          "created_by": {
+            "description": "The user who created the invitation. Null when a project secret created it.\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by_type": {
+            "$ref": "#/components/schemas/invitation-created-by-type"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation expires."
+          },
+          "status": {
+            "$ref": "#/components/schemas/invitation-status"
+          }
+        }
+      },
+      "invitation-lookup-project-member-response": {
+        "title": "LookupProjectMemberInvitationResponse",
+        "description": "Lean view of a project-member invitation for the accept page: project, role,\ninviter and expiry.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-lookup-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-lookup-team-member-response": {
+        "title": "LookupTeamMemberInvitationResponse",
+        "description": "Lean view of a team-member invitation for the accept page: project, team role,\ninviter and expiry.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-lookup-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-lookup-response": {
+        "title": "LookupInvitationResponse",
+        "description": "Lean invitation view for the signed-in accept page. Discriminate on `type`.\nUnknown and finished tokens answer the same opaque `404`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-lookup-project-member-response"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-lookup-team-member-response"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-lookup-project-member-response",
+            "team_member": "#/components/schemas/invitation-lookup-team-member-response"
+          }
+        }
+      },
+      "inv-self_accept": {
+        "description": "The inviter cannot accept their own invitation\n\nError code: inv.self_accept\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.self_accept"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
       },
       "evt-not_found": {
         "description": "Event: not found\n\nError code: evt.not_found\n",
@@ -22620,13 +24203,14 @@
         ],
         "properties": {
           "data": {
+            "description": "The events of this page. A filter the server matches event by event can\nleave it shorter than `limit`, or empty, while more events remain:\n`next_page_token` says whether they do.\n",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/event"
             }
           },
           "next_page_token": {
-            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results. A short or empty page still\ncarries one while the server has not read every event the filter could\nmatch.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/page-token"
@@ -24209,6 +25793,13 @@
           "message": "the team still owns a project and cannot be deactivated while it does"
         }
       },
+      "idp-permission_denied": {
+        "summary": "idp.permission_denied",
+        "value": {
+          "code": "idp.permission_denied",
+          "message": "identity provider connection: the caller's project role does not allow this operation"
+        }
+      },
       "brnd-not_found": {
         "summary": "brnd.not_found",
         "value": {
@@ -24242,13 +25833,6 @@
         "value": {
           "code": "idp.field_immutable",
           "message": "identity provider connection: the field is fixed for the life of the connection"
-        }
-      },
-      "idp-permission_denied": {
-        "summary": "idp.permission_denied",
-        "value": {
-          "code": "idp.permission_denied",
-          "message": "identity provider connection: the caller's project role does not allow this operation"
         }
       },
       "idp-revision_conflict": {
@@ -24375,6 +25959,55 @@
         "value": {
           "code": "grant.project_unclaimed",
           "message": "claim the project before granting access to it"
+        }
+      },
+      "inv-not_found": {
+        "summary": "inv.not_found",
+        "value": {
+          "code": "inv.not_found",
+          "message": "invitation not found"
+        }
+      },
+      "inv-permission_denied": {
+        "summary": "inv.permission_denied",
+        "value": {
+          "code": "inv.permission_denied",
+          "message": "insufficient permissions to manage invitations"
+        }
+      },
+      "inv-invalid": {
+        "summary": "inv.invalid",
+        "value": {
+          "code": "inv.invalid",
+          "message": "the invitation request is invalid"
+        }
+      },
+      "inv-pending_limit": {
+        "summary": "inv.pending_limit",
+        "value": {
+          "code": "inv.pending_limit",
+          "message": "the project has reached its pending invitation limit"
+        }
+      },
+      "inv-platform_required": {
+        "summary": "inv.platform_required",
+        "value": {
+          "code": "inv.platform_required",
+          "message": "invitations require a platform project"
+        }
+      },
+      "inv-project_unclaimed": {
+        "summary": "inv.project_unclaimed",
+        "value": {
+          "code": "inv.project_unclaimed",
+          "message": "claim the project before inviting into it"
+        }
+      },
+      "inv-self_accept": {
+        "summary": "inv.self_accept",
+        "value": {
+          "code": "inv.self_accept",
+          "message": "the inviter cannot accept their own invitation"
         }
       },
       "evt-not_found": {
@@ -30325,6 +31958,171 @@
           }
         }
       },
+      "search-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/idp-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/idp-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/sch-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/sch-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-missing_project_id"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/team-team_not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/team-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/team-project_not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/user-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/user-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "flowdef.invalid": "#/components/schemas/flowdef-invalid",
+                  "flowdef.not_found": "#/components/schemas/flowdef-not_found",
+                  "flowdef.permission_denied": "#/components/schemas/flowdef-permission_denied",
+                  "idp.not_found": "#/components/schemas/idp-not_found",
+                  "idp.permission_denied": "#/components/schemas/idp-permission_denied",
+                  "internal": "#/components/schemas/internal",
+                  "sch.not_found": "#/components/schemas/sch-not_found",
+                  "sch.permission_denied": "#/components/schemas/sch-permission_denied",
+                  "flowdef.missing_project_id": "#/components/schemas/flowdef-missing_project_id",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "team.team_not_found": "#/components/schemas/team-team_not_found",
+                  "team.permission_denied": "#/components/schemas/team-permission_denied",
+                  "team.project_not_found": "#/components/schemas/team-project_not_found",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "user.not_found": "#/components/schemas/user-not_found",
+                  "user.permission_denied": "#/components/schemas/user-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "flowdef.invalid": {
+                "$ref": "#/components/examples/flowdef-invalid"
+              },
+              "flowdef.not_found": {
+                "$ref": "#/components/examples/flowdef-not_found"
+              },
+              "flowdef.permission_denied": {
+                "$ref": "#/components/examples/flowdef-permission_denied"
+              },
+              "idp.not_found": {
+                "$ref": "#/components/examples/idp-not_found"
+              },
+              "idp.permission_denied": {
+                "$ref": "#/components/examples/idp-permission_denied"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "sch.not_found": {
+                "$ref": "#/components/examples/sch-not_found"
+              },
+              "sch.permission_denied": {
+                "$ref": "#/components/examples/sch-permission_denied"
+              },
+              "flowdef.missing_project_id": {
+                "$ref": "#/components/examples/flowdef-missing_project_id"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.permission_denied": {
+                "$ref": "#/components/examples/proj-permission_denied"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "team.team_not_found": {
+                "$ref": "#/components/examples/team-team_not_found"
+              },
+              "team.permission_denied": {
+                "$ref": "#/components/examples/team-permission_denied"
+              },
+              "team.project_not_found": {
+                "$ref": "#/components/examples/team-project_not_found"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "user.not_found": {
+                "$ref": "#/components/examples/user-not_found"
+              },
+              "user.permission_denied": {
+                "$ref": "#/components/examples/user-permission_denied"
+              }
+            }
+          }
+        }
+      },
       "listBranding-error-response": {
         "description": "Error response",
         "content": {
@@ -32336,6 +34134,538 @@
           }
         }
       },
+      "listInvitations-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "createInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-pending_limit"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-platform_required"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-project_unclaimed"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.invalid": "#/components/schemas/inv-invalid",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.pending_limit": "#/components/schemas/inv-pending_limit",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "inv.platform_required": "#/components/schemas/inv-platform_required",
+                  "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.invalid": {
+                "$ref": "#/components/examples/inv-invalid"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.pending_limit": {
+                "$ref": "#/components/examples/inv-pending_limit"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "inv.platform_required": {
+                "$ref": "#/components/examples/inv-platform_required"
+              },
+              "inv.project_unclaimed": {
+                "$ref": "#/components/examples/inv-project_unclaimed"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "lookupInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "acceptInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-platform_required"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-project_unclaimed"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-self_accept"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.platform_required": "#/components/schemas/inv-platform_required",
+                  "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
+                  "inv.self_accept": "#/components/schemas/inv-self_accept",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.platform_required": {
+                "$ref": "#/components/examples/inv-platform_required"
+              },
+              "inv.project_unclaimed": {
+                "$ref": "#/components/examples/inv-project_unclaimed"
+              },
+              "inv.self_accept": {
+                "$ref": "#/components/examples/inv-self_accept"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "rejectInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "cancelInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
       "listEvents-error-response": {
         "description": "Error response",
         "content": {
@@ -33605,6 +35935,16 @@
           "type": "string"
         },
         "example": "asgn_01KWH9D4R2V7F0N9WD3P2E4YM8"
+      },
+      "invitation-id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`\n(`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.\n",
+        "schema": {
+          "$ref": "#/components/schemas/invitation-id"
+        },
+        "example": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E"
       },
       "event-id": {
         "name": "id",

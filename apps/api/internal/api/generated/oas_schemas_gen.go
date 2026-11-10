@@ -12,6 +12,350 @@ import (
 	"go.zitadel.com/zitadel/v5/ogenx"
 )
 
+type AcceptInvitationBadRequest ErrorDetails
+
+func (*AcceptInvitationBadRequest) acceptInvitationRes() {}
+
+type AcceptInvitationConflict ErrorDetails
+
+func (*AcceptInvitationConflict) acceptInvitationRes() {}
+
+// AcceptInvitationErrorResponse represents sum type.
+type AcceptInvitationErrorResponse struct {
+	Type                AcceptInvitationErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	InvNotFound         InvNotFound
+	InvPlatformRequired InvPlatformRequired
+	InvProjectUnclaimed InvProjectUnclaimed
+	InvSelfAccept       InvSelfAccept
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// AcceptInvitationErrorResponseType is oneOf type of AcceptInvitationErrorResponse.
+type AcceptInvitationErrorResponseType string
+
+// Possible values for AcceptInvitationErrorResponseType.
+const (
+	AuthCsrfInvalidAcceptInvitationErrorResponse     AcceptInvitationErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "auth.unauthorized"
+	InternalAcceptInvitationErrorResponse            AcceptInvitationErrorResponseType = "internal"
+	InvNotFoundAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "inv.not_found"
+	InvPlatformRequiredAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.platform_required"
+	InvProjectUnclaimedAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.project_unclaimed"
+	InvSelfAcceptAcceptInvitationErrorResponse       AcceptInvitationErrorResponseType = "inv.self_accept"
+	NotImplementedAcceptInvitationErrorResponse      AcceptInvitationErrorResponseType = "not_implemented"
+	ReqInvalidAcceptInvitationErrorResponse          AcceptInvitationErrorResponseType = "req.invalid"
+	UnavailableAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether AcceptInvitationErrorResponse is AuthCsrfInvalid.
+func (s AcceptInvitationErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidAcceptInvitationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether AcceptInvitationErrorResponse is AuthUnauthorized.
+func (s AcceptInvitationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedAcceptInvitationErrorResponse
+}
+
+// IsInternal reports whether AcceptInvitationErrorResponse is Internal.
+func (s AcceptInvitationErrorResponse) IsInternal() bool {
+	return s.Type == InternalAcceptInvitationErrorResponse
+}
+
+// IsInvNotFound reports whether AcceptInvitationErrorResponse is InvNotFound.
+func (s AcceptInvitationErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundAcceptInvitationErrorResponse
+}
+
+// IsInvPlatformRequired reports whether AcceptInvitationErrorResponse is InvPlatformRequired.
+func (s AcceptInvitationErrorResponse) IsInvPlatformRequired() bool {
+	return s.Type == InvPlatformRequiredAcceptInvitationErrorResponse
+}
+
+// IsInvProjectUnclaimed reports whether AcceptInvitationErrorResponse is InvProjectUnclaimed.
+func (s AcceptInvitationErrorResponse) IsInvProjectUnclaimed() bool {
+	return s.Type == InvProjectUnclaimedAcceptInvitationErrorResponse
+}
+
+// IsInvSelfAccept reports whether AcceptInvitationErrorResponse is InvSelfAccept.
+func (s AcceptInvitationErrorResponse) IsInvSelfAccept() bool {
+	return s.Type == InvSelfAcceptAcceptInvitationErrorResponse
+}
+
+// IsNotImplemented reports whether AcceptInvitationErrorResponse is NotImplemented.
+func (s AcceptInvitationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedAcceptInvitationErrorResponse
+}
+
+// IsReqInvalid reports whether AcceptInvitationErrorResponse is ReqInvalid.
+func (s AcceptInvitationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidAcceptInvitationErrorResponse
+}
+
+// IsUnavailable reports whether AcceptInvitationErrorResponse is Unavailable.
+func (s AcceptInvitationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableAcceptInvitationErrorResponse
+}
+
+// SetAuthCsrfInvalid sets AcceptInvitationErrorResponse to AuthCsrfInvalid.
+func (s *AcceptInvitationErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidAcceptInvitationErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if AcceptInvitationErrorResponse is AuthCsrfInvalid.
+func (s AcceptInvitationErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidAcceptInvitationErrorResponse(v AuthCsrfInvalid) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets AcceptInvitationErrorResponse to AuthUnauthorized.
+func (s *AcceptInvitationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedAcceptInvitationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if AcceptInvitationErrorResponse is AuthUnauthorized.
+func (s AcceptInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedAcceptInvitationErrorResponse(v AuthUnauthorized) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets AcceptInvitationErrorResponse to Internal.
+func (s *AcceptInvitationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalAcceptInvitationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if AcceptInvitationErrorResponse is Internal.
+func (s AcceptInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from Internal.
+func NewInternalAcceptInvitationErrorResponse(v Internal) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvNotFound sets AcceptInvitationErrorResponse to InvNotFound.
+func (s *AcceptInvitationErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundAcceptInvitationErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if AcceptInvitationErrorResponse is InvNotFound.
+func (s AcceptInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvNotFound.
+func NewInvNotFoundAcceptInvitationErrorResponse(v InvNotFound) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvPlatformRequired sets AcceptInvitationErrorResponse to InvPlatformRequired.
+func (s *AcceptInvitationErrorResponse) SetInvPlatformRequired(v InvPlatformRequired) {
+	s.Type = InvPlatformRequiredAcceptInvitationErrorResponse
+	s.InvPlatformRequired = v
+}
+
+// GetInvPlatformRequired returns InvPlatformRequired and true boolean if AcceptInvitationErrorResponse is InvPlatformRequired.
+func (s AcceptInvitationErrorResponse) GetInvPlatformRequired() (v InvPlatformRequired, ok bool) {
+	if !s.IsInvPlatformRequired() {
+		return v, false
+	}
+	return s.InvPlatformRequired, true
+}
+
+// NewInvPlatformRequiredAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvPlatformRequired.
+func NewInvPlatformRequiredAcceptInvitationErrorResponse(v InvPlatformRequired) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvPlatformRequired(v)
+	return s
+}
+
+// SetInvProjectUnclaimed sets AcceptInvitationErrorResponse to InvProjectUnclaimed.
+func (s *AcceptInvitationErrorResponse) SetInvProjectUnclaimed(v InvProjectUnclaimed) {
+	s.Type = InvProjectUnclaimedAcceptInvitationErrorResponse
+	s.InvProjectUnclaimed = v
+}
+
+// GetInvProjectUnclaimed returns InvProjectUnclaimed and true boolean if AcceptInvitationErrorResponse is InvProjectUnclaimed.
+func (s AcceptInvitationErrorResponse) GetInvProjectUnclaimed() (v InvProjectUnclaimed, ok bool) {
+	if !s.IsInvProjectUnclaimed() {
+		return v, false
+	}
+	return s.InvProjectUnclaimed, true
+}
+
+// NewInvProjectUnclaimedAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvProjectUnclaimed.
+func NewInvProjectUnclaimedAcceptInvitationErrorResponse(v InvProjectUnclaimed) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvProjectUnclaimed(v)
+	return s
+}
+
+// SetInvSelfAccept sets AcceptInvitationErrorResponse to InvSelfAccept.
+func (s *AcceptInvitationErrorResponse) SetInvSelfAccept(v InvSelfAccept) {
+	s.Type = InvSelfAcceptAcceptInvitationErrorResponse
+	s.InvSelfAccept = v
+}
+
+// GetInvSelfAccept returns InvSelfAccept and true boolean if AcceptInvitationErrorResponse is InvSelfAccept.
+func (s AcceptInvitationErrorResponse) GetInvSelfAccept() (v InvSelfAccept, ok bool) {
+	if !s.IsInvSelfAccept() {
+		return v, false
+	}
+	return s.InvSelfAccept, true
+}
+
+// NewInvSelfAcceptAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvSelfAccept.
+func NewInvSelfAcceptAcceptInvitationErrorResponse(v InvSelfAccept) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvSelfAccept(v)
+	return s
+}
+
+// SetNotImplemented sets AcceptInvitationErrorResponse to NotImplemented.
+func (s *AcceptInvitationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedAcceptInvitationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if AcceptInvitationErrorResponse is NotImplemented.
+func (s AcceptInvitationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from NotImplemented.
+func NewNotImplementedAcceptInvitationErrorResponse(v NotImplemented) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets AcceptInvitationErrorResponse to ReqInvalid.
+func (s *AcceptInvitationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidAcceptInvitationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if AcceptInvitationErrorResponse is ReqInvalid.
+func (s AcceptInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from ReqInvalid.
+func NewReqInvalidAcceptInvitationErrorResponse(v ReqInvalid) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets AcceptInvitationErrorResponse to Unavailable.
+func (s *AcceptInvitationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableAcceptInvitationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if AcceptInvitationErrorResponse is Unavailable.
+func (s AcceptInvitationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from Unavailable.
+func NewUnavailableAcceptInvitationErrorResponse(v Unavailable) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// AcceptInvitationErrorResponseStatusCode wraps AcceptInvitationErrorResponse with StatusCode.
+type AcceptInvitationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   AcceptInvitationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *AcceptInvitationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *AcceptInvitationErrorResponseStatusCode) GetResponse() AcceptInvitationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *AcceptInvitationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *AcceptInvitationErrorResponseStatusCode) SetResponse(val AcceptInvitationErrorResponse) {
+	s.Response = val
+}
+
+func (*AcceptInvitationErrorResponseStatusCode) acceptInvitationRes() {}
+
+type AcceptInvitationForbidden ErrorDetails
+
+func (*AcceptInvitationForbidden) acceptInvitationRes() {}
+
+type AcceptInvitationNotFound ErrorDetails
+
+func (*AcceptInvitationNotFound) acceptInvitationRes() {}
+
+type AcceptInvitationTooManyRequests ErrorDetails
+
+func (*AcceptInvitationTooManyRequests) acceptInvitationRes() {}
+
+type AcceptInvitationUnauthorized ErrorDetails
+
+func (*AcceptInvitationUnauthorized) acceptInvitationRes() {}
+
 // AddOriginErrorResponse represents sum type.
 type AddOriginErrorResponse struct {
 	Type                   AddOriginErrorResponseType // switch on this field
@@ -10739,6 +11083,287 @@ func (s *BundleResourceErrorDetails) init() BundleResourceErrorDetails {
 	return m
 }
 
+// CancelInvitationErrorResponse represents sum type.
+type CancelInvitationErrorResponse struct {
+	Type                CancelInvitationErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	InvNotFound         InvNotFound
+	InvPermissionDenied InvPermissionDenied
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// CancelInvitationErrorResponseType is oneOf type of CancelInvitationErrorResponse.
+type CancelInvitationErrorResponseType string
+
+// Possible values for CancelInvitationErrorResponseType.
+const (
+	AuthCsrfInvalidCancelInvitationErrorResponse     CancelInvitationErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCancelInvitationErrorResponse    CancelInvitationErrorResponseType = "auth.unauthorized"
+	InternalCancelInvitationErrorResponse            CancelInvitationErrorResponseType = "internal"
+	InvNotFoundCancelInvitationErrorResponse         CancelInvitationErrorResponseType = "inv.not_found"
+	InvPermissionDeniedCancelInvitationErrorResponse CancelInvitationErrorResponseType = "inv.permission_denied"
+	NotImplementedCancelInvitationErrorResponse      CancelInvitationErrorResponseType = "not_implemented"
+	ReqInvalidCancelInvitationErrorResponse          CancelInvitationErrorResponseType = "req.invalid"
+	UnavailableCancelInvitationErrorResponse         CancelInvitationErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether CancelInvitationErrorResponse is AuthCsrfInvalid.
+func (s CancelInvitationErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCancelInvitationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether CancelInvitationErrorResponse is AuthUnauthorized.
+func (s CancelInvitationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCancelInvitationErrorResponse
+}
+
+// IsInternal reports whether CancelInvitationErrorResponse is Internal.
+func (s CancelInvitationErrorResponse) IsInternal() bool {
+	return s.Type == InternalCancelInvitationErrorResponse
+}
+
+// IsInvNotFound reports whether CancelInvitationErrorResponse is InvNotFound.
+func (s CancelInvitationErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundCancelInvitationErrorResponse
+}
+
+// IsInvPermissionDenied reports whether CancelInvitationErrorResponse is InvPermissionDenied.
+func (s CancelInvitationErrorResponse) IsInvPermissionDenied() bool {
+	return s.Type == InvPermissionDeniedCancelInvitationErrorResponse
+}
+
+// IsNotImplemented reports whether CancelInvitationErrorResponse is NotImplemented.
+func (s CancelInvitationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCancelInvitationErrorResponse
+}
+
+// IsReqInvalid reports whether CancelInvitationErrorResponse is ReqInvalid.
+func (s CancelInvitationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCancelInvitationErrorResponse
+}
+
+// IsUnavailable reports whether CancelInvitationErrorResponse is Unavailable.
+func (s CancelInvitationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCancelInvitationErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CancelInvitationErrorResponse to AuthCsrfInvalid.
+func (s *CancelInvitationErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCancelInvitationErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CancelInvitationErrorResponse is AuthCsrfInvalid.
+func (s CancelInvitationErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCancelInvitationErrorResponse(v AuthCsrfInvalid) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets CancelInvitationErrorResponse to AuthUnauthorized.
+func (s *CancelInvitationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCancelInvitationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CancelInvitationErrorResponse is AuthUnauthorized.
+func (s CancelInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCancelInvitationErrorResponse(v AuthUnauthorized) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CancelInvitationErrorResponse to Internal.
+func (s *CancelInvitationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCancelInvitationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CancelInvitationErrorResponse is Internal.
+func (s CancelInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from Internal.
+func NewInternalCancelInvitationErrorResponse(v Internal) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvNotFound sets CancelInvitationErrorResponse to InvNotFound.
+func (s *CancelInvitationErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundCancelInvitationErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if CancelInvitationErrorResponse is InvNotFound.
+func (s CancelInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from InvNotFound.
+func NewInvNotFoundCancelInvitationErrorResponse(v InvNotFound) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvPermissionDenied sets CancelInvitationErrorResponse to InvPermissionDenied.
+func (s *CancelInvitationErrorResponse) SetInvPermissionDenied(v InvPermissionDenied) {
+	s.Type = InvPermissionDeniedCancelInvitationErrorResponse
+	s.InvPermissionDenied = v
+}
+
+// GetInvPermissionDenied returns InvPermissionDenied and true boolean if CancelInvitationErrorResponse is InvPermissionDenied.
+func (s CancelInvitationErrorResponse) GetInvPermissionDenied() (v InvPermissionDenied, ok bool) {
+	if !s.IsInvPermissionDenied() {
+		return v, false
+	}
+	return s.InvPermissionDenied, true
+}
+
+// NewInvPermissionDeniedCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from InvPermissionDenied.
+func NewInvPermissionDeniedCancelInvitationErrorResponse(v InvPermissionDenied) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetInvPermissionDenied(v)
+	return s
+}
+
+// SetNotImplemented sets CancelInvitationErrorResponse to NotImplemented.
+func (s *CancelInvitationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCancelInvitationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CancelInvitationErrorResponse is NotImplemented.
+func (s CancelInvitationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from NotImplemented.
+func NewNotImplementedCancelInvitationErrorResponse(v NotImplemented) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets CancelInvitationErrorResponse to ReqInvalid.
+func (s *CancelInvitationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCancelInvitationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CancelInvitationErrorResponse is ReqInvalid.
+func (s CancelInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from ReqInvalid.
+func NewReqInvalidCancelInvitationErrorResponse(v ReqInvalid) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CancelInvitationErrorResponse to Unavailable.
+func (s *CancelInvitationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCancelInvitationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CancelInvitationErrorResponse is Unavailable.
+func (s CancelInvitationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from Unavailable.
+func NewUnavailableCancelInvitationErrorResponse(v Unavailable) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// CancelInvitationErrorResponseStatusCode wraps CancelInvitationErrorResponse with StatusCode.
+type CancelInvitationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CancelInvitationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CancelInvitationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CancelInvitationErrorResponseStatusCode) GetResponse() CancelInvitationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CancelInvitationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CancelInvitationErrorResponseStatusCode) SetResponse(val CancelInvitationErrorResponse) {
+	s.Response = val
+}
+
+func (*CancelInvitationErrorResponseStatusCode) cancelInvitationRes() {}
+
+type CancelInvitationForbidden ErrorDetails
+
+func (*CancelInvitationForbidden) cancelInvitationRes() {}
+
+// CancelInvitationNoContent is response for CancelInvitation operation.
+type CancelInvitationNoContent struct{}
+
+func (*CancelInvitationNoContent) cancelInvitationRes() {}
+
+type CancelInvitationNotFound ErrorDetails
+
+func (*CancelInvitationNotFound) cancelInvitationRes() {}
+
+type CancelInvitationUnauthorized ErrorDetails
+
+func (*CancelInvitationUnauthorized) cancelInvitationRes() {}
+
 type ChallengeID string
 
 // An authentication factor method a client can challenge. It leaves out
@@ -17065,6 +17690,1242 @@ func (s *CreateIdpRequest) SetIdp(val IdpConnection) {
 type CreateIdpUnauthorized ErrorDetails
 
 func (*CreateIdpUnauthorized) createIdpRes() {}
+
+type CreateInvitationBadRequest ErrorDetails
+
+func (*CreateInvitationBadRequest) createInvitationRes() {}
+
+type CreateInvitationConflict ErrorDetails
+
+func (*CreateInvitationConflict) createInvitationRes() {}
+
+// CreateInvitationErrorResponse represents sum type.
+type CreateInvitationErrorResponse struct {
+	Type                CreateInvitationErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	InvInvalid          InvInvalid
+	InvNotFound         InvNotFound
+	InvPendingLimit     InvPendingLimit
+	InvPermissionDenied InvPermissionDenied
+	InvPlatformRequired InvPlatformRequired
+	InvProjectUnclaimed InvProjectUnclaimed
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// CreateInvitationErrorResponseType is oneOf type of CreateInvitationErrorResponse.
+type CreateInvitationErrorResponseType string
+
+// Possible values for CreateInvitationErrorResponseType.
+const (
+	AuthCsrfInvalidCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "auth.unauthorized"
+	InternalCreateInvitationErrorResponse            CreateInvitationErrorResponseType = "internal"
+	InvInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "inv.invalid"
+	InvNotFoundCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "inv.not_found"
+	InvPendingLimitCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "inv.pending_limit"
+	InvPermissionDeniedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "inv.permission_denied"
+	InvPlatformRequiredCreateInvitationErrorResponse CreateInvitationErrorResponseType = "inv.platform_required"
+	InvProjectUnclaimedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "inv.project_unclaimed"
+	NotImplementedCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "not_implemented"
+	ReqInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "req.invalid"
+	UnavailableCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether CreateInvitationErrorResponse is AuthCsrfInvalid.
+func (s CreateInvitationErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateInvitationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether CreateInvitationErrorResponse is AuthUnauthorized.
+func (s CreateInvitationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateInvitationErrorResponse
+}
+
+// IsInternal reports whether CreateInvitationErrorResponse is Internal.
+func (s CreateInvitationErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateInvitationErrorResponse
+}
+
+// IsInvInvalid reports whether CreateInvitationErrorResponse is InvInvalid.
+func (s CreateInvitationErrorResponse) IsInvInvalid() bool {
+	return s.Type == InvInvalidCreateInvitationErrorResponse
+}
+
+// IsInvNotFound reports whether CreateInvitationErrorResponse is InvNotFound.
+func (s CreateInvitationErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundCreateInvitationErrorResponse
+}
+
+// IsInvPendingLimit reports whether CreateInvitationErrorResponse is InvPendingLimit.
+func (s CreateInvitationErrorResponse) IsInvPendingLimit() bool {
+	return s.Type == InvPendingLimitCreateInvitationErrorResponse
+}
+
+// IsInvPermissionDenied reports whether CreateInvitationErrorResponse is InvPermissionDenied.
+func (s CreateInvitationErrorResponse) IsInvPermissionDenied() bool {
+	return s.Type == InvPermissionDeniedCreateInvitationErrorResponse
+}
+
+// IsInvPlatformRequired reports whether CreateInvitationErrorResponse is InvPlatformRequired.
+func (s CreateInvitationErrorResponse) IsInvPlatformRequired() bool {
+	return s.Type == InvPlatformRequiredCreateInvitationErrorResponse
+}
+
+// IsInvProjectUnclaimed reports whether CreateInvitationErrorResponse is InvProjectUnclaimed.
+func (s CreateInvitationErrorResponse) IsInvProjectUnclaimed() bool {
+	return s.Type == InvProjectUnclaimedCreateInvitationErrorResponse
+}
+
+// IsNotImplemented reports whether CreateInvitationErrorResponse is NotImplemented.
+func (s CreateInvitationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateInvitationErrorResponse
+}
+
+// IsReqInvalid reports whether CreateInvitationErrorResponse is ReqInvalid.
+func (s CreateInvitationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateInvitationErrorResponse
+}
+
+// IsUnavailable reports whether CreateInvitationErrorResponse is Unavailable.
+func (s CreateInvitationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateInvitationErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateInvitationErrorResponse to AuthCsrfInvalid.
+func (s *CreateInvitationErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateInvitationErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateInvitationErrorResponse is AuthCsrfInvalid.
+func (s CreateInvitationErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateInvitationErrorResponse(v AuthCsrfInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets CreateInvitationErrorResponse to AuthUnauthorized.
+func (s *CreateInvitationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateInvitationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateInvitationErrorResponse is AuthUnauthorized.
+func (s CreateInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateInvitationErrorResponse(v AuthUnauthorized) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateInvitationErrorResponse to Internal.
+func (s *CreateInvitationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateInvitationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateInvitationErrorResponse is Internal.
+func (s CreateInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from Internal.
+func NewInternalCreateInvitationErrorResponse(v Internal) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvInvalid sets CreateInvitationErrorResponse to InvInvalid.
+func (s *CreateInvitationErrorResponse) SetInvInvalid(v InvInvalid) {
+	s.Type = InvInvalidCreateInvitationErrorResponse
+	s.InvInvalid = v
+}
+
+// GetInvInvalid returns InvInvalid and true boolean if CreateInvitationErrorResponse is InvInvalid.
+func (s CreateInvitationErrorResponse) GetInvInvalid() (v InvInvalid, ok bool) {
+	if !s.IsInvInvalid() {
+		return v, false
+	}
+	return s.InvInvalid, true
+}
+
+// NewInvInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from InvInvalid.
+func NewInvInvalidCreateInvitationErrorResponse(v InvInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInvInvalid(v)
+	return s
+}
+
+// SetInvNotFound sets CreateInvitationErrorResponse to InvNotFound.
+func (s *CreateInvitationErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundCreateInvitationErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if CreateInvitationErrorResponse is InvNotFound.
+func (s CreateInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from InvNotFound.
+func NewInvNotFoundCreateInvitationErrorResponse(v InvNotFound) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvPendingLimit sets CreateInvitationErrorResponse to InvPendingLimit.
+func (s *CreateInvitationErrorResponse) SetInvPendingLimit(v InvPendingLimit) {
+	s.Type = InvPendingLimitCreateInvitationErrorResponse
+	s.InvPendingLimit = v
+}
+
+// GetInvPendingLimit returns InvPendingLimit and true boolean if CreateInvitationErrorResponse is InvPendingLimit.
+func (s CreateInvitationErrorResponse) GetInvPendingLimit() (v InvPendingLimit, ok bool) {
+	if !s.IsInvPendingLimit() {
+		return v, false
+	}
+	return s.InvPendingLimit, true
+}
+
+// NewInvPendingLimitCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from InvPendingLimit.
+func NewInvPendingLimitCreateInvitationErrorResponse(v InvPendingLimit) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInvPendingLimit(v)
+	return s
+}
+
+// SetInvPermissionDenied sets CreateInvitationErrorResponse to InvPermissionDenied.
+func (s *CreateInvitationErrorResponse) SetInvPermissionDenied(v InvPermissionDenied) {
+	s.Type = InvPermissionDeniedCreateInvitationErrorResponse
+	s.InvPermissionDenied = v
+}
+
+// GetInvPermissionDenied returns InvPermissionDenied and true boolean if CreateInvitationErrorResponse is InvPermissionDenied.
+func (s CreateInvitationErrorResponse) GetInvPermissionDenied() (v InvPermissionDenied, ok bool) {
+	if !s.IsInvPermissionDenied() {
+		return v, false
+	}
+	return s.InvPermissionDenied, true
+}
+
+// NewInvPermissionDeniedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from InvPermissionDenied.
+func NewInvPermissionDeniedCreateInvitationErrorResponse(v InvPermissionDenied) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInvPermissionDenied(v)
+	return s
+}
+
+// SetInvPlatformRequired sets CreateInvitationErrorResponse to InvPlatformRequired.
+func (s *CreateInvitationErrorResponse) SetInvPlatformRequired(v InvPlatformRequired) {
+	s.Type = InvPlatformRequiredCreateInvitationErrorResponse
+	s.InvPlatformRequired = v
+}
+
+// GetInvPlatformRequired returns InvPlatformRequired and true boolean if CreateInvitationErrorResponse is InvPlatformRequired.
+func (s CreateInvitationErrorResponse) GetInvPlatformRequired() (v InvPlatformRequired, ok bool) {
+	if !s.IsInvPlatformRequired() {
+		return v, false
+	}
+	return s.InvPlatformRequired, true
+}
+
+// NewInvPlatformRequiredCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from InvPlatformRequired.
+func NewInvPlatformRequiredCreateInvitationErrorResponse(v InvPlatformRequired) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInvPlatformRequired(v)
+	return s
+}
+
+// SetInvProjectUnclaimed sets CreateInvitationErrorResponse to InvProjectUnclaimed.
+func (s *CreateInvitationErrorResponse) SetInvProjectUnclaimed(v InvProjectUnclaimed) {
+	s.Type = InvProjectUnclaimedCreateInvitationErrorResponse
+	s.InvProjectUnclaimed = v
+}
+
+// GetInvProjectUnclaimed returns InvProjectUnclaimed and true boolean if CreateInvitationErrorResponse is InvProjectUnclaimed.
+func (s CreateInvitationErrorResponse) GetInvProjectUnclaimed() (v InvProjectUnclaimed, ok bool) {
+	if !s.IsInvProjectUnclaimed() {
+		return v, false
+	}
+	return s.InvProjectUnclaimed, true
+}
+
+// NewInvProjectUnclaimedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from InvProjectUnclaimed.
+func NewInvProjectUnclaimedCreateInvitationErrorResponse(v InvProjectUnclaimed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetInvProjectUnclaimed(v)
+	return s
+}
+
+// SetNotImplemented sets CreateInvitationErrorResponse to NotImplemented.
+func (s *CreateInvitationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateInvitationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateInvitationErrorResponse is NotImplemented.
+func (s CreateInvitationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from NotImplemented.
+func NewNotImplementedCreateInvitationErrorResponse(v NotImplemented) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets CreateInvitationErrorResponse to ReqInvalid.
+func (s *CreateInvitationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateInvitationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateInvitationErrorResponse is ReqInvalid.
+func (s CreateInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from ReqInvalid.
+func NewReqInvalidCreateInvitationErrorResponse(v ReqInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateInvitationErrorResponse to Unavailable.
+func (s *CreateInvitationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateInvitationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateInvitationErrorResponse is Unavailable.
+func (s CreateInvitationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from Unavailable.
+func NewUnavailableCreateInvitationErrorResponse(v Unavailable) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// CreateInvitationErrorResponseStatusCode wraps CreateInvitationErrorResponse with StatusCode.
+type CreateInvitationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateInvitationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateInvitationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateInvitationErrorResponseStatusCode) GetResponse() CreateInvitationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateInvitationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateInvitationErrorResponseStatusCode) SetResponse(val CreateInvitationErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateInvitationErrorResponseStatusCode) createInvitationRes() {}
+
+type CreateInvitationForbidden ErrorDetails
+
+func (*CreateInvitationForbidden) createInvitationRes() {}
+
+type CreateInvitationNotFound ErrorDetails
+
+func (*CreateInvitationNotFound) createInvitationRes() {}
+
+// Merged schema.
+// Ref: #
+type CreateInvitationProjectMemberRequest struct {
+	// Optional label for who the link is for. Displayed only; never matched.
+	Metadata OptInvitationMetadata `json:"metadata"`
+	// When set, this create replaces that invitation: the new invitation keeps
+	// the original's `journey_id`, and a pending original is deleted in the
+	// same transaction. Use the `id` that `createInvitation`
+	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	ReplacesInvitationID OptInvitationID                          `json:"replaces_invitation_id"`
+	Type                 CreateInvitationProjectMemberRequestType `json:"type"`
+	ProjectMember        InvitationProjectMemberPayload           `json:"project_member"`
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *CreateInvitationProjectMemberRequest) GetMetadata() OptInvitationMetadata {
+	return s.Metadata
+}
+
+// GetReplacesInvitationID returns the value of ReplacesInvitationID.
+func (s *CreateInvitationProjectMemberRequest) GetReplacesInvitationID() OptInvitationID {
+	return s.ReplacesInvitationID
+}
+
+// GetType returns the value of Type.
+func (s *CreateInvitationProjectMemberRequest) GetType() CreateInvitationProjectMemberRequestType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *CreateInvitationProjectMemberRequest) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *CreateInvitationProjectMemberRequest) SetMetadata(val OptInvitationMetadata) {
+	s.Metadata = val
+}
+
+// SetReplacesInvitationID sets the value of ReplacesInvitationID.
+func (s *CreateInvitationProjectMemberRequest) SetReplacesInvitationID(val OptInvitationID) {
+	s.ReplacesInvitationID = val
+}
+
+// SetType sets the value of Type.
+func (s *CreateInvitationProjectMemberRequest) SetType(val CreateInvitationProjectMemberRequestType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *CreateInvitationProjectMemberRequest) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type CreateInvitationProjectMemberRequestType string
+
+const (
+	CreateInvitationProjectMemberRequestTypeProjectMember CreateInvitationProjectMemberRequestType = "project_member"
+)
+
+// AllValues returns all CreateInvitationProjectMemberRequestType values.
+func (CreateInvitationProjectMemberRequestType) AllValues() []CreateInvitationProjectMemberRequestType {
+	return []CreateInvitationProjectMemberRequestType{
+		CreateInvitationProjectMemberRequestTypeProjectMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateInvitationProjectMemberRequestType) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateInvitationProjectMemberRequestTypeProjectMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateInvitationProjectMemberRequestType) UnmarshalText(data []byte) error {
+	switch CreateInvitationProjectMemberRequestType(data) {
+	case CreateInvitationProjectMemberRequestTypeProjectMember:
+		*s = CreateInvitationProjectMemberRequestTypeProjectMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type CreateInvitationProjectMemberResponse struct {
+	ID        InvitationID `json:"id"`
+	ProjectID ProjectID    `json:"project_id"`
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
+	Metadata OptNilInvitationMetadata `json:"metadata"`
+	Status   InvitationStatus         `json:"status"`
+	// The user who created the invitation. Null when a project secret created
+	// it (`created_by_type` is then `service`).
+	CreatedBy     OptNilString                                             `json:"created_by"`
+	CreatedByType OptNilCreateInvitationProjectMemberResponseCreatedByType `json:"created_by_type"`
+	// When the invitation was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When the invitation expires (72 hours after create).
+	ExpiresAt time.Time `json:"expires_at"`
+	// Correlates this invitation with its replacements. A replacement keeps the
+	// original's `journey_id`. It is a random correlation id, not a resource id.
+	JourneyID string `json:"journey_id"`
+	// The user who redeemed the link. Null until accepted.
+	AcceptedBy OptNilString `json:"accepted_by"`
+	// When the invitation was accepted. Null until accepted.
+	AcceptedAt    OptNilDateTime                            `json:"accepted_at"`
+	Type          CreateInvitationProjectMemberResponseType `json:"type"`
+	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
+	// The browser URL to share. It carries the redeem token in the fragment.
+	// Only this create or replace response returns it.
+	Link url.URL `json:"link"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateInvitationProjectMemberResponse) GetID() InvitationID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateInvitationProjectMemberResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *CreateInvitationProjectMemberResponse) GetMetadata() OptNilInvitationMetadata {
+	return s.Metadata
+}
+
+// GetStatus returns the value of Status.
+func (s *CreateInvitationProjectMemberResponse) GetStatus() InvitationStatus {
+	return s.Status
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *CreateInvitationProjectMemberResponse) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *CreateInvitationProjectMemberResponse) GetCreatedByType() OptNilCreateInvitationProjectMemberResponseCreatedByType {
+	return s.CreatedByType
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateInvitationProjectMemberResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *CreateInvitationProjectMemberResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *CreateInvitationProjectMemberResponse) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetAcceptedBy returns the value of AcceptedBy.
+func (s *CreateInvitationProjectMemberResponse) GetAcceptedBy() OptNilString {
+	return s.AcceptedBy
+}
+
+// GetAcceptedAt returns the value of AcceptedAt.
+func (s *CreateInvitationProjectMemberResponse) GetAcceptedAt() OptNilDateTime {
+	return s.AcceptedAt
+}
+
+// GetType returns the value of Type.
+func (s *CreateInvitationProjectMemberResponse) GetType() CreateInvitationProjectMemberResponseType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *CreateInvitationProjectMemberResponse) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// GetLink returns the value of Link.
+func (s *CreateInvitationProjectMemberResponse) GetLink() url.URL {
+	return s.Link
+}
+
+// SetID sets the value of ID.
+func (s *CreateInvitationProjectMemberResponse) SetID(val InvitationID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateInvitationProjectMemberResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *CreateInvitationProjectMemberResponse) SetMetadata(val OptNilInvitationMetadata) {
+	s.Metadata = val
+}
+
+// SetStatus sets the value of Status.
+func (s *CreateInvitationProjectMemberResponse) SetStatus(val InvitationStatus) {
+	s.Status = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *CreateInvitationProjectMemberResponse) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *CreateInvitationProjectMemberResponse) SetCreatedByType(val OptNilCreateInvitationProjectMemberResponseCreatedByType) {
+	s.CreatedByType = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateInvitationProjectMemberResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *CreateInvitationProjectMemberResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *CreateInvitationProjectMemberResponse) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetAcceptedBy sets the value of AcceptedBy.
+func (s *CreateInvitationProjectMemberResponse) SetAcceptedBy(val OptNilString) {
+	s.AcceptedBy = val
+}
+
+// SetAcceptedAt sets the value of AcceptedAt.
+func (s *CreateInvitationProjectMemberResponse) SetAcceptedAt(val OptNilDateTime) {
+	s.AcceptedAt = val
+}
+
+// SetType sets the value of Type.
+func (s *CreateInvitationProjectMemberResponse) SetType(val CreateInvitationProjectMemberResponseType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *CreateInvitationProjectMemberResponse) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+// SetLink sets the value of Link.
+func (s *CreateInvitationProjectMemberResponse) SetLink(val url.URL) {
+	s.Link = val
+}
+
+type CreateInvitationProjectMemberResponseCreatedByType string
+
+const (
+	CreateInvitationProjectMemberResponseCreatedByTypeHuman   CreateInvitationProjectMemberResponseCreatedByType = "human"
+	CreateInvitationProjectMemberResponseCreatedByTypeService CreateInvitationProjectMemberResponseCreatedByType = "service"
+	CreateInvitationProjectMemberResponseCreatedByTypeSystem  CreateInvitationProjectMemberResponseCreatedByType = "system"
+	CreateInvitationProjectMemberResponseCreatedByTypeAgent   CreateInvitationProjectMemberResponseCreatedByType = "agent"
+)
+
+// AllValues returns all CreateInvitationProjectMemberResponseCreatedByType values.
+func (CreateInvitationProjectMemberResponseCreatedByType) AllValues() []CreateInvitationProjectMemberResponseCreatedByType {
+	return []CreateInvitationProjectMemberResponseCreatedByType{
+		CreateInvitationProjectMemberResponseCreatedByTypeHuman,
+		CreateInvitationProjectMemberResponseCreatedByTypeService,
+		CreateInvitationProjectMemberResponseCreatedByTypeSystem,
+		CreateInvitationProjectMemberResponseCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateInvitationProjectMemberResponseCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateInvitationProjectMemberResponseCreatedByTypeHuman:
+		return []byte(s), nil
+	case CreateInvitationProjectMemberResponseCreatedByTypeService:
+		return []byte(s), nil
+	case CreateInvitationProjectMemberResponseCreatedByTypeSystem:
+		return []byte(s), nil
+	case CreateInvitationProjectMemberResponseCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateInvitationProjectMemberResponseCreatedByType) UnmarshalText(data []byte) error {
+	switch CreateInvitationProjectMemberResponseCreatedByType(data) {
+	case CreateInvitationProjectMemberResponseCreatedByTypeHuman:
+		*s = CreateInvitationProjectMemberResponseCreatedByTypeHuman
+		return nil
+	case CreateInvitationProjectMemberResponseCreatedByTypeService:
+		*s = CreateInvitationProjectMemberResponseCreatedByTypeService
+		return nil
+	case CreateInvitationProjectMemberResponseCreatedByTypeSystem:
+		*s = CreateInvitationProjectMemberResponseCreatedByTypeSystem
+		return nil
+	case CreateInvitationProjectMemberResponseCreatedByTypeAgent:
+		*s = CreateInvitationProjectMemberResponseCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CreateInvitationProjectMemberResponseType string
+
+const (
+	CreateInvitationProjectMemberResponseTypeProjectMember CreateInvitationProjectMemberResponseType = "project_member"
+)
+
+// AllValues returns all CreateInvitationProjectMemberResponseType values.
+func (CreateInvitationProjectMemberResponseType) AllValues() []CreateInvitationProjectMemberResponseType {
+	return []CreateInvitationProjectMemberResponseType{
+		CreateInvitationProjectMemberResponseTypeProjectMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateInvitationProjectMemberResponseType) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateInvitationProjectMemberResponseTypeProjectMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateInvitationProjectMemberResponseType) UnmarshalText(data []byte) error {
+	switch CreateInvitationProjectMemberResponseType(data) {
+	case CreateInvitationProjectMemberResponseTypeProjectMember:
+		*s = CreateInvitationProjectMemberResponseTypeProjectMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Creates an invitation. Discriminate on `type`. Optional `metadata` labels who
+// the link is for. Optional `replaces_invitation_id` replaces an existing
+// invitation in the same create.
+// Ref: #
+// CreateInvitationRequest represents sum type.
+type CreateInvitationRequest struct {
+	Type                                 CreateInvitationRequestType // switch on this field
+	CreateInvitationProjectMemberRequest CreateInvitationProjectMemberRequest
+	CreateInvitationTeamMemberRequest    CreateInvitationTeamMemberRequest
+}
+
+// CreateInvitationRequestType is oneOf type of CreateInvitationRequest.
+type CreateInvitationRequestType string
+
+// Possible values for CreateInvitationRequestType.
+const (
+	CreateInvitationProjectMemberRequestCreateInvitationRequest CreateInvitationRequestType = "project_member"
+	CreateInvitationTeamMemberRequestCreateInvitationRequest    CreateInvitationRequestType = "team_member"
+)
+
+// IsCreateInvitationProjectMemberRequest reports whether CreateInvitationRequest is CreateInvitationProjectMemberRequest.
+func (s CreateInvitationRequest) IsCreateInvitationProjectMemberRequest() bool {
+	return s.Type == CreateInvitationProjectMemberRequestCreateInvitationRequest
+}
+
+// IsCreateInvitationTeamMemberRequest reports whether CreateInvitationRequest is CreateInvitationTeamMemberRequest.
+func (s CreateInvitationRequest) IsCreateInvitationTeamMemberRequest() bool {
+	return s.Type == CreateInvitationTeamMemberRequestCreateInvitationRequest
+}
+
+// SetCreateInvitationProjectMemberRequest sets CreateInvitationRequest to CreateInvitationProjectMemberRequest.
+func (s *CreateInvitationRequest) SetCreateInvitationProjectMemberRequest(v CreateInvitationProjectMemberRequest) {
+	s.Type = CreateInvitationProjectMemberRequestCreateInvitationRequest
+	s.CreateInvitationProjectMemberRequest = v
+}
+
+// GetCreateInvitationProjectMemberRequest returns CreateInvitationProjectMemberRequest and true boolean if CreateInvitationRequest is CreateInvitationProjectMemberRequest.
+func (s CreateInvitationRequest) GetCreateInvitationProjectMemberRequest() (v CreateInvitationProjectMemberRequest, ok bool) {
+	if !s.IsCreateInvitationProjectMemberRequest() {
+		return v, false
+	}
+	return s.CreateInvitationProjectMemberRequest, true
+}
+
+// NewCreateInvitationProjectMemberRequestCreateInvitationRequest returns new CreateInvitationRequest from CreateInvitationProjectMemberRequest.
+func NewCreateInvitationProjectMemberRequestCreateInvitationRequest(v CreateInvitationProjectMemberRequest) CreateInvitationRequest {
+	var s CreateInvitationRequest
+	s.SetCreateInvitationProjectMemberRequest(v)
+	return s
+}
+
+// SetCreateInvitationTeamMemberRequest sets CreateInvitationRequest to CreateInvitationTeamMemberRequest.
+func (s *CreateInvitationRequest) SetCreateInvitationTeamMemberRequest(v CreateInvitationTeamMemberRequest) {
+	s.Type = CreateInvitationTeamMemberRequestCreateInvitationRequest
+	s.CreateInvitationTeamMemberRequest = v
+}
+
+// GetCreateInvitationTeamMemberRequest returns CreateInvitationTeamMemberRequest and true boolean if CreateInvitationRequest is CreateInvitationTeamMemberRequest.
+func (s CreateInvitationRequest) GetCreateInvitationTeamMemberRequest() (v CreateInvitationTeamMemberRequest, ok bool) {
+	if !s.IsCreateInvitationTeamMemberRequest() {
+		return v, false
+	}
+	return s.CreateInvitationTeamMemberRequest, true
+}
+
+// NewCreateInvitationTeamMemberRequestCreateInvitationRequest returns new CreateInvitationRequest from CreateInvitationTeamMemberRequest.
+func NewCreateInvitationTeamMemberRequestCreateInvitationRequest(v CreateInvitationTeamMemberRequest) CreateInvitationRequest {
+	var s CreateInvitationRequest
+	s.SetCreateInvitationTeamMemberRequest(v)
+	return s
+}
+
+// The created invitation and its one-shot `link`. Discriminate on `type`.
+// Ref: #
+// CreateInvitationResponse represents sum type.
+type CreateInvitationResponse struct {
+	Type                                  CreateInvitationResponseType // switch on this field
+	CreateInvitationProjectMemberResponse CreateInvitationProjectMemberResponse
+	CreateInvitationTeamMemberResponse    CreateInvitationTeamMemberResponse
+}
+
+// CreateInvitationResponseType is oneOf type of CreateInvitationResponse.
+type CreateInvitationResponseType string
+
+// Possible values for CreateInvitationResponseType.
+const (
+	CreateInvitationProjectMemberResponseCreateInvitationResponse CreateInvitationResponseType = "project_member"
+	CreateInvitationTeamMemberResponseCreateInvitationResponse    CreateInvitationResponseType = "team_member"
+)
+
+// IsCreateInvitationProjectMemberResponse reports whether CreateInvitationResponse is CreateInvitationProjectMemberResponse.
+func (s CreateInvitationResponse) IsCreateInvitationProjectMemberResponse() bool {
+	return s.Type == CreateInvitationProjectMemberResponseCreateInvitationResponse
+}
+
+// IsCreateInvitationTeamMemberResponse reports whether CreateInvitationResponse is CreateInvitationTeamMemberResponse.
+func (s CreateInvitationResponse) IsCreateInvitationTeamMemberResponse() bool {
+	return s.Type == CreateInvitationTeamMemberResponseCreateInvitationResponse
+}
+
+// SetCreateInvitationProjectMemberResponse sets CreateInvitationResponse to CreateInvitationProjectMemberResponse.
+func (s *CreateInvitationResponse) SetCreateInvitationProjectMemberResponse(v CreateInvitationProjectMemberResponse) {
+	s.Type = CreateInvitationProjectMemberResponseCreateInvitationResponse
+	s.CreateInvitationProjectMemberResponse = v
+}
+
+// GetCreateInvitationProjectMemberResponse returns CreateInvitationProjectMemberResponse and true boolean if CreateInvitationResponse is CreateInvitationProjectMemberResponse.
+func (s CreateInvitationResponse) GetCreateInvitationProjectMemberResponse() (v CreateInvitationProjectMemberResponse, ok bool) {
+	if !s.IsCreateInvitationProjectMemberResponse() {
+		return v, false
+	}
+	return s.CreateInvitationProjectMemberResponse, true
+}
+
+// NewCreateInvitationProjectMemberResponseCreateInvitationResponse returns new CreateInvitationResponse from CreateInvitationProjectMemberResponse.
+func NewCreateInvitationProjectMemberResponseCreateInvitationResponse(v CreateInvitationProjectMemberResponse) CreateInvitationResponse {
+	var s CreateInvitationResponse
+	s.SetCreateInvitationProjectMemberResponse(v)
+	return s
+}
+
+// SetCreateInvitationTeamMemberResponse sets CreateInvitationResponse to CreateInvitationTeamMemberResponse.
+func (s *CreateInvitationResponse) SetCreateInvitationTeamMemberResponse(v CreateInvitationTeamMemberResponse) {
+	s.Type = CreateInvitationTeamMemberResponseCreateInvitationResponse
+	s.CreateInvitationTeamMemberResponse = v
+}
+
+// GetCreateInvitationTeamMemberResponse returns CreateInvitationTeamMemberResponse and true boolean if CreateInvitationResponse is CreateInvitationTeamMemberResponse.
+func (s CreateInvitationResponse) GetCreateInvitationTeamMemberResponse() (v CreateInvitationTeamMemberResponse, ok bool) {
+	if !s.IsCreateInvitationTeamMemberResponse() {
+		return v, false
+	}
+	return s.CreateInvitationTeamMemberResponse, true
+}
+
+// NewCreateInvitationTeamMemberResponseCreateInvitationResponse returns new CreateInvitationResponse from CreateInvitationTeamMemberResponse.
+func NewCreateInvitationTeamMemberResponseCreateInvitationResponse(v CreateInvitationTeamMemberResponse) CreateInvitationResponse {
+	var s CreateInvitationResponse
+	s.SetCreateInvitationTeamMemberResponse(v)
+	return s
+}
+
+func (*CreateInvitationResponse) createInvitationRes() {}
+
+// Merged schema.
+// Ref: #
+type CreateInvitationTeamMemberRequest struct {
+	// Optional label for who the link is for. Displayed only; never matched.
+	Metadata OptInvitationMetadata `json:"metadata"`
+	// When set, this create replaces that invitation: the new invitation keeps
+	// the original's `journey_id`, and a pending original is deleted in the
+	// same transaction. Use the `id` that `createInvitation`
+	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	ReplacesInvitationID OptInvitationID                       `json:"replaces_invitation_id"`
+	Type                 CreateInvitationTeamMemberRequestType `json:"type"`
+	TeamMember           InvitationTeamMemberPayload           `json:"team_member"`
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *CreateInvitationTeamMemberRequest) GetMetadata() OptInvitationMetadata {
+	return s.Metadata
+}
+
+// GetReplacesInvitationID returns the value of ReplacesInvitationID.
+func (s *CreateInvitationTeamMemberRequest) GetReplacesInvitationID() OptInvitationID {
+	return s.ReplacesInvitationID
+}
+
+// GetType returns the value of Type.
+func (s *CreateInvitationTeamMemberRequest) GetType() CreateInvitationTeamMemberRequestType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *CreateInvitationTeamMemberRequest) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *CreateInvitationTeamMemberRequest) SetMetadata(val OptInvitationMetadata) {
+	s.Metadata = val
+}
+
+// SetReplacesInvitationID sets the value of ReplacesInvitationID.
+func (s *CreateInvitationTeamMemberRequest) SetReplacesInvitationID(val OptInvitationID) {
+	s.ReplacesInvitationID = val
+}
+
+// SetType sets the value of Type.
+func (s *CreateInvitationTeamMemberRequest) SetType(val CreateInvitationTeamMemberRequestType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *CreateInvitationTeamMemberRequest) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type CreateInvitationTeamMemberRequestType string
+
+const (
+	CreateInvitationTeamMemberRequestTypeTeamMember CreateInvitationTeamMemberRequestType = "team_member"
+)
+
+// AllValues returns all CreateInvitationTeamMemberRequestType values.
+func (CreateInvitationTeamMemberRequestType) AllValues() []CreateInvitationTeamMemberRequestType {
+	return []CreateInvitationTeamMemberRequestType{
+		CreateInvitationTeamMemberRequestTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateInvitationTeamMemberRequestType) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateInvitationTeamMemberRequestTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateInvitationTeamMemberRequestType) UnmarshalText(data []byte) error {
+	switch CreateInvitationTeamMemberRequestType(data) {
+	case CreateInvitationTeamMemberRequestTypeTeamMember:
+		*s = CreateInvitationTeamMemberRequestTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type CreateInvitationTeamMemberResponse struct {
+	ID        InvitationID `json:"id"`
+	ProjectID ProjectID    `json:"project_id"`
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
+	Metadata OptNilInvitationMetadata `json:"metadata"`
+	Status   InvitationStatus         `json:"status"`
+	// The user who created the invitation. Null when a project secret created
+	// it (`created_by_type` is then `service`).
+	CreatedBy     OptNilString                                          `json:"created_by"`
+	CreatedByType OptNilCreateInvitationTeamMemberResponseCreatedByType `json:"created_by_type"`
+	// When the invitation was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When the invitation expires (72 hours after create).
+	ExpiresAt time.Time `json:"expires_at"`
+	// Correlates this invitation with its replacements. A replacement keeps the
+	// original's `journey_id`. It is a random correlation id, not a resource id.
+	JourneyID string `json:"journey_id"`
+	// The user who redeemed the link. Null until accepted.
+	AcceptedBy OptNilString `json:"accepted_by"`
+	// When the invitation was accepted. Null until accepted.
+	AcceptedAt OptNilDateTime                         `json:"accepted_at"`
+	Type       CreateInvitationTeamMemberResponseType `json:"type"`
+	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
+	// The browser URL to share. It carries the redeem token in the fragment.
+	// Only this create or replace response returns it.
+	Link url.URL `json:"link"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateInvitationTeamMemberResponse) GetID() InvitationID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateInvitationTeamMemberResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *CreateInvitationTeamMemberResponse) GetMetadata() OptNilInvitationMetadata {
+	return s.Metadata
+}
+
+// GetStatus returns the value of Status.
+func (s *CreateInvitationTeamMemberResponse) GetStatus() InvitationStatus {
+	return s.Status
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *CreateInvitationTeamMemberResponse) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *CreateInvitationTeamMemberResponse) GetCreatedByType() OptNilCreateInvitationTeamMemberResponseCreatedByType {
+	return s.CreatedByType
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateInvitationTeamMemberResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *CreateInvitationTeamMemberResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *CreateInvitationTeamMemberResponse) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetAcceptedBy returns the value of AcceptedBy.
+func (s *CreateInvitationTeamMemberResponse) GetAcceptedBy() OptNilString {
+	return s.AcceptedBy
+}
+
+// GetAcceptedAt returns the value of AcceptedAt.
+func (s *CreateInvitationTeamMemberResponse) GetAcceptedAt() OptNilDateTime {
+	return s.AcceptedAt
+}
+
+// GetType returns the value of Type.
+func (s *CreateInvitationTeamMemberResponse) GetType() CreateInvitationTeamMemberResponseType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *CreateInvitationTeamMemberResponse) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// GetLink returns the value of Link.
+func (s *CreateInvitationTeamMemberResponse) GetLink() url.URL {
+	return s.Link
+}
+
+// SetID sets the value of ID.
+func (s *CreateInvitationTeamMemberResponse) SetID(val InvitationID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateInvitationTeamMemberResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *CreateInvitationTeamMemberResponse) SetMetadata(val OptNilInvitationMetadata) {
+	s.Metadata = val
+}
+
+// SetStatus sets the value of Status.
+func (s *CreateInvitationTeamMemberResponse) SetStatus(val InvitationStatus) {
+	s.Status = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *CreateInvitationTeamMemberResponse) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *CreateInvitationTeamMemberResponse) SetCreatedByType(val OptNilCreateInvitationTeamMemberResponseCreatedByType) {
+	s.CreatedByType = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateInvitationTeamMemberResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *CreateInvitationTeamMemberResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *CreateInvitationTeamMemberResponse) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetAcceptedBy sets the value of AcceptedBy.
+func (s *CreateInvitationTeamMemberResponse) SetAcceptedBy(val OptNilString) {
+	s.AcceptedBy = val
+}
+
+// SetAcceptedAt sets the value of AcceptedAt.
+func (s *CreateInvitationTeamMemberResponse) SetAcceptedAt(val OptNilDateTime) {
+	s.AcceptedAt = val
+}
+
+// SetType sets the value of Type.
+func (s *CreateInvitationTeamMemberResponse) SetType(val CreateInvitationTeamMemberResponseType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *CreateInvitationTeamMemberResponse) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+// SetLink sets the value of Link.
+func (s *CreateInvitationTeamMemberResponse) SetLink(val url.URL) {
+	s.Link = val
+}
+
+type CreateInvitationTeamMemberResponseCreatedByType string
+
+const (
+	CreateInvitationTeamMemberResponseCreatedByTypeHuman   CreateInvitationTeamMemberResponseCreatedByType = "human"
+	CreateInvitationTeamMemberResponseCreatedByTypeService CreateInvitationTeamMemberResponseCreatedByType = "service"
+	CreateInvitationTeamMemberResponseCreatedByTypeSystem  CreateInvitationTeamMemberResponseCreatedByType = "system"
+	CreateInvitationTeamMemberResponseCreatedByTypeAgent   CreateInvitationTeamMemberResponseCreatedByType = "agent"
+)
+
+// AllValues returns all CreateInvitationTeamMemberResponseCreatedByType values.
+func (CreateInvitationTeamMemberResponseCreatedByType) AllValues() []CreateInvitationTeamMemberResponseCreatedByType {
+	return []CreateInvitationTeamMemberResponseCreatedByType{
+		CreateInvitationTeamMemberResponseCreatedByTypeHuman,
+		CreateInvitationTeamMemberResponseCreatedByTypeService,
+		CreateInvitationTeamMemberResponseCreatedByTypeSystem,
+		CreateInvitationTeamMemberResponseCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateInvitationTeamMemberResponseCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateInvitationTeamMemberResponseCreatedByTypeHuman:
+		return []byte(s), nil
+	case CreateInvitationTeamMemberResponseCreatedByTypeService:
+		return []byte(s), nil
+	case CreateInvitationTeamMemberResponseCreatedByTypeSystem:
+		return []byte(s), nil
+	case CreateInvitationTeamMemberResponseCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateInvitationTeamMemberResponseCreatedByType) UnmarshalText(data []byte) error {
+	switch CreateInvitationTeamMemberResponseCreatedByType(data) {
+	case CreateInvitationTeamMemberResponseCreatedByTypeHuman:
+		*s = CreateInvitationTeamMemberResponseCreatedByTypeHuman
+		return nil
+	case CreateInvitationTeamMemberResponseCreatedByTypeService:
+		*s = CreateInvitationTeamMemberResponseCreatedByTypeService
+		return nil
+	case CreateInvitationTeamMemberResponseCreatedByTypeSystem:
+		*s = CreateInvitationTeamMemberResponseCreatedByTypeSystem
+		return nil
+	case CreateInvitationTeamMemberResponseCreatedByTypeAgent:
+		*s = CreateInvitationTeamMemberResponseCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CreateInvitationTeamMemberResponseType string
+
+const (
+	CreateInvitationTeamMemberResponseTypeTeamMember CreateInvitationTeamMemberResponseType = "team_member"
+)
+
+// AllValues returns all CreateInvitationTeamMemberResponseType values.
+func (CreateInvitationTeamMemberResponseType) AllValues() []CreateInvitationTeamMemberResponseType {
+	return []CreateInvitationTeamMemberResponseType{
+		CreateInvitationTeamMemberResponseTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateInvitationTeamMemberResponseType) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateInvitationTeamMemberResponseTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateInvitationTeamMemberResponseType) UnmarshalText(data []byte) error {
+	switch CreateInvitationTeamMemberResponseType(data) {
+	case CreateInvitationTeamMemberResponseTypeTeamMember:
+		*s = CreateInvitationTeamMemberResponseTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CreateInvitationUnauthorized ErrorDetails
+
+func (*CreateInvitationUnauthorized) createInvitationRes() {}
 
 // CreateProjectErrorResponse represents sum type.
 type CreateProjectErrorResponse struct {
@@ -26269,7 +28130,8 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 // The operation a filter applies to a field on a query endpoint.
 // On text fields, `contains` is a case-insensitive substring match. `equals`
 // compares the whole value and is case-sensitive unless the field documents
-// otherwise.
+// otherwise. `starts_with` is a case-insensitive match on the start of the
+// value, answered from an index; only the fields that name it accept it.
 // Ref: #
 type FilterOperation string
 
@@ -26278,6 +28140,7 @@ const (
 	FilterOperationNotEquals          FilterOperation = "not_equals"
 	FilterOperationContains           FilterOperation = "contains"
 	FilterOperationNotContains        FilterOperation = "not_contains"
+	FilterOperationStartsWith         FilterOperation = "starts_with"
 	FilterOperationLessThan           FilterOperation = "less_than"
 	FilterOperationLessThanOrEqual    FilterOperation = "less_than_or_equal"
 	FilterOperationGreaterThan        FilterOperation = "greater_than"
@@ -26291,6 +28154,7 @@ func (FilterOperation) AllValues() []FilterOperation {
 		FilterOperationNotEquals,
 		FilterOperationContains,
 		FilterOperationNotContains,
+		FilterOperationStartsWith,
 		FilterOperationLessThan,
 		FilterOperationLessThanOrEqual,
 		FilterOperationGreaterThan,
@@ -26308,6 +28172,8 @@ func (s FilterOperation) MarshalText() ([]byte, error) {
 	case FilterOperationContains:
 		return []byte(s), nil
 	case FilterOperationNotContains:
+		return []byte(s), nil
+	case FilterOperationStartsWith:
 		return []byte(s), nil
 	case FilterOperationLessThan:
 		return []byte(s), nil
@@ -26336,6 +28202,9 @@ func (s *FilterOperation) UnmarshalText(data []byte) error {
 		return nil
 	case FilterOperationNotContains:
 		*s = FilterOperationNotContains
+		return nil
+	case FilterOperationStartsWith:
+		*s = FilterOperationStartsWith
 		return nil
 	case FilterOperationLessThan:
 		*s = FilterOperationLessThan
@@ -36755,6 +38624,254 @@ type GetIdpRevisionByIdUnauthorized ErrorDetails
 
 func (*GetIdpRevisionByIdUnauthorized) getIdpRevisionByIdRes() {}
 
+// GetInvitationErrorResponse represents sum type.
+type GetInvitationErrorResponse struct {
+	Type                GetInvitationErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	InvNotFound         InvNotFound
+	InvPermissionDenied InvPermissionDenied
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// GetInvitationErrorResponseType is oneOf type of GetInvitationErrorResponse.
+type GetInvitationErrorResponseType string
+
+// Possible values for GetInvitationErrorResponseType.
+const (
+	AuthUnauthorizedGetInvitationErrorResponse    GetInvitationErrorResponseType = "auth.unauthorized"
+	InternalGetInvitationErrorResponse            GetInvitationErrorResponseType = "internal"
+	InvNotFoundGetInvitationErrorResponse         GetInvitationErrorResponseType = "inv.not_found"
+	InvPermissionDeniedGetInvitationErrorResponse GetInvitationErrorResponseType = "inv.permission_denied"
+	NotImplementedGetInvitationErrorResponse      GetInvitationErrorResponseType = "not_implemented"
+	ReqInvalidGetInvitationErrorResponse          GetInvitationErrorResponseType = "req.invalid"
+	UnavailableGetInvitationErrorResponse         GetInvitationErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetInvitationErrorResponse is AuthUnauthorized.
+func (s GetInvitationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetInvitationErrorResponse
+}
+
+// IsInternal reports whether GetInvitationErrorResponse is Internal.
+func (s GetInvitationErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetInvitationErrorResponse
+}
+
+// IsInvNotFound reports whether GetInvitationErrorResponse is InvNotFound.
+func (s GetInvitationErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundGetInvitationErrorResponse
+}
+
+// IsInvPermissionDenied reports whether GetInvitationErrorResponse is InvPermissionDenied.
+func (s GetInvitationErrorResponse) IsInvPermissionDenied() bool {
+	return s.Type == InvPermissionDeniedGetInvitationErrorResponse
+}
+
+// IsNotImplemented reports whether GetInvitationErrorResponse is NotImplemented.
+func (s GetInvitationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetInvitationErrorResponse
+}
+
+// IsReqInvalid reports whether GetInvitationErrorResponse is ReqInvalid.
+func (s GetInvitationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetInvitationErrorResponse
+}
+
+// IsUnavailable reports whether GetInvitationErrorResponse is Unavailable.
+func (s GetInvitationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetInvitationErrorResponse
+}
+
+// SetAuthUnauthorized sets GetInvitationErrorResponse to AuthUnauthorized.
+func (s *GetInvitationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetInvitationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetInvitationErrorResponse is AuthUnauthorized.
+func (s GetInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetInvitationErrorResponse returns new GetInvitationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetInvitationErrorResponse(v AuthUnauthorized) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetInvitationErrorResponse to Internal.
+func (s *GetInvitationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetInvitationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetInvitationErrorResponse is Internal.
+func (s GetInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetInvitationErrorResponse returns new GetInvitationErrorResponse from Internal.
+func NewInternalGetInvitationErrorResponse(v Internal) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvNotFound sets GetInvitationErrorResponse to InvNotFound.
+func (s *GetInvitationErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundGetInvitationErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if GetInvitationErrorResponse is InvNotFound.
+func (s GetInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundGetInvitationErrorResponse returns new GetInvitationErrorResponse from InvNotFound.
+func NewInvNotFoundGetInvitationErrorResponse(v InvNotFound) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvPermissionDenied sets GetInvitationErrorResponse to InvPermissionDenied.
+func (s *GetInvitationErrorResponse) SetInvPermissionDenied(v InvPermissionDenied) {
+	s.Type = InvPermissionDeniedGetInvitationErrorResponse
+	s.InvPermissionDenied = v
+}
+
+// GetInvPermissionDenied returns InvPermissionDenied and true boolean if GetInvitationErrorResponse is InvPermissionDenied.
+func (s GetInvitationErrorResponse) GetInvPermissionDenied() (v InvPermissionDenied, ok bool) {
+	if !s.IsInvPermissionDenied() {
+		return v, false
+	}
+	return s.InvPermissionDenied, true
+}
+
+// NewInvPermissionDeniedGetInvitationErrorResponse returns new GetInvitationErrorResponse from InvPermissionDenied.
+func NewInvPermissionDeniedGetInvitationErrorResponse(v InvPermissionDenied) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetInvPermissionDenied(v)
+	return s
+}
+
+// SetNotImplemented sets GetInvitationErrorResponse to NotImplemented.
+func (s *GetInvitationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetInvitationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetInvitationErrorResponse is NotImplemented.
+func (s GetInvitationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetInvitationErrorResponse returns new GetInvitationErrorResponse from NotImplemented.
+func NewNotImplementedGetInvitationErrorResponse(v NotImplemented) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetInvitationErrorResponse to ReqInvalid.
+func (s *GetInvitationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetInvitationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetInvitationErrorResponse is ReqInvalid.
+func (s GetInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetInvitationErrorResponse returns new GetInvitationErrorResponse from ReqInvalid.
+func NewReqInvalidGetInvitationErrorResponse(v ReqInvalid) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetInvitationErrorResponse to Unavailable.
+func (s *GetInvitationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetInvitationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetInvitationErrorResponse is Unavailable.
+func (s GetInvitationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetInvitationErrorResponse returns new GetInvitationErrorResponse from Unavailable.
+func NewUnavailableGetInvitationErrorResponse(v Unavailable) GetInvitationErrorResponse {
+	var s GetInvitationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetInvitationErrorResponseStatusCode wraps GetInvitationErrorResponse with StatusCode.
+type GetInvitationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetInvitationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetInvitationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetInvitationErrorResponseStatusCode) GetResponse() GetInvitationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetInvitationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetInvitationErrorResponseStatusCode) SetResponse(val GetInvitationErrorResponse) {
+	s.Response = val
+}
+
+func (*GetInvitationErrorResponseStatusCode) getInvitationRes() {}
+
+type GetInvitationForbidden ErrorDetails
+
+func (*GetInvitationForbidden) getInvitationRes() {}
+
+type GetInvitationNotFound ErrorDetails
+
+func (*GetInvitationNotFound) getInvitationRes() {}
+
+type GetInvitationUnauthorized ErrorDetails
+
+func (*GetInvitationUnauthorized) getInvitationRes() {}
+
 // GetLiveErrorResponse represents sum type.
 type GetLiveErrorResponse struct {
 	Type       GetLiveErrorResponseType // switch on this field
@@ -44757,6 +46874,1616 @@ func (s *InternalDetails) init() InternalDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type InvInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvInvalid) GetDetails() OptInvInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvInvalid) SetDetails(val OptInvInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvInvalidDetails map[string]jx.Raw
+
+func (s *InvInvalidDetails) init() InvInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvNotFound) GetDetails() OptInvNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvNotFound) SetDetails(val OptInvNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvNotFoundDetails map[string]jx.Raw
+
+func (s *InvNotFoundDetails) init() InvNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvPendingLimit struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvPendingLimitDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvPendingLimit) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvPendingLimit) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvPendingLimit) GetDetails() OptInvPendingLimitDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvPendingLimit) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvPendingLimit) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvPendingLimit) SetDetails(val OptInvPendingLimitDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvPendingLimitDetails map[string]jx.Raw
+
+func (s *InvPendingLimitDetails) init() InvPendingLimitDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvPermissionDenied) GetDetails() OptInvPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvPermissionDenied) SetDetails(val OptInvPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvPermissionDeniedDetails map[string]jx.Raw
+
+func (s *InvPermissionDeniedDetails) init() InvPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvPlatformRequired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvPlatformRequiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvPlatformRequired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvPlatformRequired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvPlatformRequired) GetDetails() OptInvPlatformRequiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvPlatformRequired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvPlatformRequired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvPlatformRequired) SetDetails(val OptInvPlatformRequiredDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvPlatformRequiredDetails map[string]jx.Raw
+
+func (s *InvPlatformRequiredDetails) init() InvPlatformRequiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvProjectUnclaimed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvProjectUnclaimedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvProjectUnclaimed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvProjectUnclaimed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvProjectUnclaimed) GetDetails() OptInvProjectUnclaimedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvProjectUnclaimed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvProjectUnclaimed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvProjectUnclaimed) SetDetails(val OptInvProjectUnclaimedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvProjectUnclaimedDetails map[string]jx.Raw
+
+func (s *InvProjectUnclaimedDetails) init() InvProjectUnclaimedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvSelfAccept struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvSelfAcceptDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvSelfAccept) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvSelfAccept) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvSelfAccept) GetDetails() OptInvSelfAcceptDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvSelfAccept) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvSelfAccept) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvSelfAccept) SetDetails(val OptInvSelfAcceptDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvSelfAcceptDetails map[string]jx.Raw
+
+func (s *InvSelfAcceptDetails) init() InvSelfAcceptDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// An invitation is a link, valid for 72 hours, that grants a role to whoever
+// redeems it. Discriminate on `type`; the object named after the type holds
+// everything specific to that type.
+// Ref: #
+// Invitation represents sum type.
+type Invitation struct {
+	Type                    InvitationType // switch on this field
+	InvitationProjectMember InvitationProjectMember
+	InvitationTeamMember    InvitationTeamMember
+}
+
+// InvitationType is oneOf type of Invitation.
+type InvitationType string
+
+// Possible values for InvitationType.
+const (
+	InvitationProjectMemberInvitation InvitationType = "project_member"
+	InvitationTeamMemberInvitation    InvitationType = "team_member"
+)
+
+// IsInvitationProjectMember reports whether Invitation is InvitationProjectMember.
+func (s Invitation) IsInvitationProjectMember() bool {
+	return s.Type == InvitationProjectMemberInvitation
+}
+
+// IsInvitationTeamMember reports whether Invitation is InvitationTeamMember.
+func (s Invitation) IsInvitationTeamMember() bool { return s.Type == InvitationTeamMemberInvitation }
+
+// SetInvitationProjectMember sets Invitation to InvitationProjectMember.
+func (s *Invitation) SetInvitationProjectMember(v InvitationProjectMember) {
+	s.Type = InvitationProjectMemberInvitation
+	s.InvitationProjectMember = v
+}
+
+// GetInvitationProjectMember returns InvitationProjectMember and true boolean if Invitation is InvitationProjectMember.
+func (s Invitation) GetInvitationProjectMember() (v InvitationProjectMember, ok bool) {
+	if !s.IsInvitationProjectMember() {
+		return v, false
+	}
+	return s.InvitationProjectMember, true
+}
+
+// NewInvitationProjectMemberInvitation returns new Invitation from InvitationProjectMember.
+func NewInvitationProjectMemberInvitation(v InvitationProjectMember) Invitation {
+	var s Invitation
+	s.SetInvitationProjectMember(v)
+	return s
+}
+
+// SetInvitationTeamMember sets Invitation to InvitationTeamMember.
+func (s *Invitation) SetInvitationTeamMember(v InvitationTeamMember) {
+	s.Type = InvitationTeamMemberInvitation
+	s.InvitationTeamMember = v
+}
+
+// GetInvitationTeamMember returns InvitationTeamMember and true boolean if Invitation is InvitationTeamMember.
+func (s Invitation) GetInvitationTeamMember() (v InvitationTeamMember, ok bool) {
+	if !s.IsInvitationTeamMember() {
+		return v, false
+	}
+	return s.InvitationTeamMember, true
+}
+
+// NewInvitationTeamMemberInvitation returns new Invitation from InvitationTeamMember.
+func NewInvitationTeamMemberInvitation(v InvitationTeamMember) Invitation {
+	var s Invitation
+	s.SetInvitationTeamMember(v)
+	return s
+}
+
+func (*Invitation) acceptInvitationRes() {}
+func (*Invitation) getInvitationRes()    {}
+func (*Invitation) rejectInvitationRes() {}
+
+type InvitationID string
+
+// Merged schema.
+// Ref: #
+type InvitationLookupProjectMemberResponse struct {
+	ProjectID ProjectID `json:"project_id"`
+	// The project's display name.
+	ProjectName string `json:"project_name"`
+	// The user who created the invitation. Null when a project secret created it.
+	CreatedBy     OptNilString                                             `json:"created_by"`
+	CreatedByType OptNilInvitationLookupProjectMemberResponseCreatedByType `json:"created_by_type"`
+	// When the invitation expires.
+	ExpiresAt     time.Time                                 `json:"expires_at"`
+	Status        InvitationStatus                          `json:"status"`
+	Type          InvitationLookupProjectMemberResponseType `json:"type"`
+	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationLookupProjectMemberResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetProjectName returns the value of ProjectName.
+func (s *InvitationLookupProjectMemberResponse) GetProjectName() string {
+	return s.ProjectName
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *InvitationLookupProjectMemberResponse) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *InvitationLookupProjectMemberResponse) GetCreatedByType() OptNilInvitationLookupProjectMemberResponseCreatedByType {
+	return s.CreatedByType
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationLookupProjectMemberResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetStatus returns the value of Status.
+func (s *InvitationLookupProjectMemberResponse) GetStatus() InvitationStatus {
+	return s.Status
+}
+
+// GetType returns the value of Type.
+func (s *InvitationLookupProjectMemberResponse) GetType() InvitationLookupProjectMemberResponseType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationLookupProjectMemberResponse) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationLookupProjectMemberResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetProjectName sets the value of ProjectName.
+func (s *InvitationLookupProjectMemberResponse) SetProjectName(val string) {
+	s.ProjectName = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *InvitationLookupProjectMemberResponse) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *InvitationLookupProjectMemberResponse) SetCreatedByType(val OptNilInvitationLookupProjectMemberResponseCreatedByType) {
+	s.CreatedByType = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationLookupProjectMemberResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetStatus sets the value of Status.
+func (s *InvitationLookupProjectMemberResponse) SetStatus(val InvitationStatus) {
+	s.Status = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationLookupProjectMemberResponse) SetType(val InvitationLookupProjectMemberResponseType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationLookupProjectMemberResponse) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type InvitationLookupProjectMemberResponseCreatedByType string
+
+const (
+	InvitationLookupProjectMemberResponseCreatedByTypeHuman   InvitationLookupProjectMemberResponseCreatedByType = "human"
+	InvitationLookupProjectMemberResponseCreatedByTypeService InvitationLookupProjectMemberResponseCreatedByType = "service"
+	InvitationLookupProjectMemberResponseCreatedByTypeSystem  InvitationLookupProjectMemberResponseCreatedByType = "system"
+	InvitationLookupProjectMemberResponseCreatedByTypeAgent   InvitationLookupProjectMemberResponseCreatedByType = "agent"
+)
+
+// AllValues returns all InvitationLookupProjectMemberResponseCreatedByType values.
+func (InvitationLookupProjectMemberResponseCreatedByType) AllValues() []InvitationLookupProjectMemberResponseCreatedByType {
+	return []InvitationLookupProjectMemberResponseCreatedByType{
+		InvitationLookupProjectMemberResponseCreatedByTypeHuman,
+		InvitationLookupProjectMemberResponseCreatedByTypeService,
+		InvitationLookupProjectMemberResponseCreatedByTypeSystem,
+		InvitationLookupProjectMemberResponseCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationLookupProjectMemberResponseCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationLookupProjectMemberResponseCreatedByTypeHuman:
+		return []byte(s), nil
+	case InvitationLookupProjectMemberResponseCreatedByTypeService:
+		return []byte(s), nil
+	case InvitationLookupProjectMemberResponseCreatedByTypeSystem:
+		return []byte(s), nil
+	case InvitationLookupProjectMemberResponseCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationLookupProjectMemberResponseCreatedByType) UnmarshalText(data []byte) error {
+	switch InvitationLookupProjectMemberResponseCreatedByType(data) {
+	case InvitationLookupProjectMemberResponseCreatedByTypeHuman:
+		*s = InvitationLookupProjectMemberResponseCreatedByTypeHuman
+		return nil
+	case InvitationLookupProjectMemberResponseCreatedByTypeService:
+		*s = InvitationLookupProjectMemberResponseCreatedByTypeService
+		return nil
+	case InvitationLookupProjectMemberResponseCreatedByTypeSystem:
+		*s = InvitationLookupProjectMemberResponseCreatedByTypeSystem
+		return nil
+	case InvitationLookupProjectMemberResponseCreatedByTypeAgent:
+		*s = InvitationLookupProjectMemberResponseCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type InvitationLookupProjectMemberResponseType string
+
+const (
+	InvitationLookupProjectMemberResponseTypeProjectMember InvitationLookupProjectMemberResponseType = "project_member"
+)
+
+// AllValues returns all InvitationLookupProjectMemberResponseType values.
+func (InvitationLookupProjectMemberResponseType) AllValues() []InvitationLookupProjectMemberResponseType {
+	return []InvitationLookupProjectMemberResponseType{
+		InvitationLookupProjectMemberResponseTypeProjectMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationLookupProjectMemberResponseType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationLookupProjectMemberResponseTypeProjectMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationLookupProjectMemberResponseType) UnmarshalText(data []byte) error {
+	switch InvitationLookupProjectMemberResponseType(data) {
+	case InvitationLookupProjectMemberResponseTypeProjectMember:
+		*s = InvitationLookupProjectMemberResponseTypeProjectMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Lean invitation view for the signed-in accept page. Discriminate on `type`.
+// Unknown and finished tokens answer the same opaque `404`.
+// Ref: #
+// InvitationLookupResponse represents sum type.
+type InvitationLookupResponse struct {
+	Type                                  InvitationLookupResponseType // switch on this field
+	InvitationLookupProjectMemberResponse InvitationLookupProjectMemberResponse
+	InvitationLookupTeamMemberResponse    InvitationLookupTeamMemberResponse
+}
+
+// InvitationLookupResponseType is oneOf type of InvitationLookupResponse.
+type InvitationLookupResponseType string
+
+// Possible values for InvitationLookupResponseType.
+const (
+	InvitationLookupProjectMemberResponseInvitationLookupResponse InvitationLookupResponseType = "project_member"
+	InvitationLookupTeamMemberResponseInvitationLookupResponse    InvitationLookupResponseType = "team_member"
+)
+
+// IsInvitationLookupProjectMemberResponse reports whether InvitationLookupResponse is InvitationLookupProjectMemberResponse.
+func (s InvitationLookupResponse) IsInvitationLookupProjectMemberResponse() bool {
+	return s.Type == InvitationLookupProjectMemberResponseInvitationLookupResponse
+}
+
+// IsInvitationLookupTeamMemberResponse reports whether InvitationLookupResponse is InvitationLookupTeamMemberResponse.
+func (s InvitationLookupResponse) IsInvitationLookupTeamMemberResponse() bool {
+	return s.Type == InvitationLookupTeamMemberResponseInvitationLookupResponse
+}
+
+// SetInvitationLookupProjectMemberResponse sets InvitationLookupResponse to InvitationLookupProjectMemberResponse.
+func (s *InvitationLookupResponse) SetInvitationLookupProjectMemberResponse(v InvitationLookupProjectMemberResponse) {
+	s.Type = InvitationLookupProjectMemberResponseInvitationLookupResponse
+	s.InvitationLookupProjectMemberResponse = v
+}
+
+// GetInvitationLookupProjectMemberResponse returns InvitationLookupProjectMemberResponse and true boolean if InvitationLookupResponse is InvitationLookupProjectMemberResponse.
+func (s InvitationLookupResponse) GetInvitationLookupProjectMemberResponse() (v InvitationLookupProjectMemberResponse, ok bool) {
+	if !s.IsInvitationLookupProjectMemberResponse() {
+		return v, false
+	}
+	return s.InvitationLookupProjectMemberResponse, true
+}
+
+// NewInvitationLookupProjectMemberResponseInvitationLookupResponse returns new InvitationLookupResponse from InvitationLookupProjectMemberResponse.
+func NewInvitationLookupProjectMemberResponseInvitationLookupResponse(v InvitationLookupProjectMemberResponse) InvitationLookupResponse {
+	var s InvitationLookupResponse
+	s.SetInvitationLookupProjectMemberResponse(v)
+	return s
+}
+
+// SetInvitationLookupTeamMemberResponse sets InvitationLookupResponse to InvitationLookupTeamMemberResponse.
+func (s *InvitationLookupResponse) SetInvitationLookupTeamMemberResponse(v InvitationLookupTeamMemberResponse) {
+	s.Type = InvitationLookupTeamMemberResponseInvitationLookupResponse
+	s.InvitationLookupTeamMemberResponse = v
+}
+
+// GetInvitationLookupTeamMemberResponse returns InvitationLookupTeamMemberResponse and true boolean if InvitationLookupResponse is InvitationLookupTeamMemberResponse.
+func (s InvitationLookupResponse) GetInvitationLookupTeamMemberResponse() (v InvitationLookupTeamMemberResponse, ok bool) {
+	if !s.IsInvitationLookupTeamMemberResponse() {
+		return v, false
+	}
+	return s.InvitationLookupTeamMemberResponse, true
+}
+
+// NewInvitationLookupTeamMemberResponseInvitationLookupResponse returns new InvitationLookupResponse from InvitationLookupTeamMemberResponse.
+func NewInvitationLookupTeamMemberResponseInvitationLookupResponse(v InvitationLookupTeamMemberResponse) InvitationLookupResponse {
+	var s InvitationLookupResponse
+	s.SetInvitationLookupTeamMemberResponse(v)
+	return s
+}
+
+func (*InvitationLookupResponse) lookupInvitationRes() {}
+
+// Merged schema.
+// Ref: #
+type InvitationLookupTeamMemberResponse struct {
+	ProjectID ProjectID `json:"project_id"`
+	// The project's display name.
+	ProjectName string `json:"project_name"`
+	// The user who created the invitation. Null when a project secret created it.
+	CreatedBy     OptNilString                                          `json:"created_by"`
+	CreatedByType OptNilInvitationLookupTeamMemberResponseCreatedByType `json:"created_by_type"`
+	// When the invitation expires.
+	ExpiresAt  time.Time                              `json:"expires_at"`
+	Status     InvitationStatus                       `json:"status"`
+	Type       InvitationLookupTeamMemberResponseType `json:"type"`
+	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationLookupTeamMemberResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetProjectName returns the value of ProjectName.
+func (s *InvitationLookupTeamMemberResponse) GetProjectName() string {
+	return s.ProjectName
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *InvitationLookupTeamMemberResponse) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *InvitationLookupTeamMemberResponse) GetCreatedByType() OptNilInvitationLookupTeamMemberResponseCreatedByType {
+	return s.CreatedByType
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationLookupTeamMemberResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetStatus returns the value of Status.
+func (s *InvitationLookupTeamMemberResponse) GetStatus() InvitationStatus {
+	return s.Status
+}
+
+// GetType returns the value of Type.
+func (s *InvitationLookupTeamMemberResponse) GetType() InvitationLookupTeamMemberResponseType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationLookupTeamMemberResponse) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationLookupTeamMemberResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetProjectName sets the value of ProjectName.
+func (s *InvitationLookupTeamMemberResponse) SetProjectName(val string) {
+	s.ProjectName = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *InvitationLookupTeamMemberResponse) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *InvitationLookupTeamMemberResponse) SetCreatedByType(val OptNilInvitationLookupTeamMemberResponseCreatedByType) {
+	s.CreatedByType = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationLookupTeamMemberResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetStatus sets the value of Status.
+func (s *InvitationLookupTeamMemberResponse) SetStatus(val InvitationStatus) {
+	s.Status = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationLookupTeamMemberResponse) SetType(val InvitationLookupTeamMemberResponseType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationLookupTeamMemberResponse) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type InvitationLookupTeamMemberResponseCreatedByType string
+
+const (
+	InvitationLookupTeamMemberResponseCreatedByTypeHuman   InvitationLookupTeamMemberResponseCreatedByType = "human"
+	InvitationLookupTeamMemberResponseCreatedByTypeService InvitationLookupTeamMemberResponseCreatedByType = "service"
+	InvitationLookupTeamMemberResponseCreatedByTypeSystem  InvitationLookupTeamMemberResponseCreatedByType = "system"
+	InvitationLookupTeamMemberResponseCreatedByTypeAgent   InvitationLookupTeamMemberResponseCreatedByType = "agent"
+)
+
+// AllValues returns all InvitationLookupTeamMemberResponseCreatedByType values.
+func (InvitationLookupTeamMemberResponseCreatedByType) AllValues() []InvitationLookupTeamMemberResponseCreatedByType {
+	return []InvitationLookupTeamMemberResponseCreatedByType{
+		InvitationLookupTeamMemberResponseCreatedByTypeHuman,
+		InvitationLookupTeamMemberResponseCreatedByTypeService,
+		InvitationLookupTeamMemberResponseCreatedByTypeSystem,
+		InvitationLookupTeamMemberResponseCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationLookupTeamMemberResponseCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationLookupTeamMemberResponseCreatedByTypeHuman:
+		return []byte(s), nil
+	case InvitationLookupTeamMemberResponseCreatedByTypeService:
+		return []byte(s), nil
+	case InvitationLookupTeamMemberResponseCreatedByTypeSystem:
+		return []byte(s), nil
+	case InvitationLookupTeamMemberResponseCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationLookupTeamMemberResponseCreatedByType) UnmarshalText(data []byte) error {
+	switch InvitationLookupTeamMemberResponseCreatedByType(data) {
+	case InvitationLookupTeamMemberResponseCreatedByTypeHuman:
+		*s = InvitationLookupTeamMemberResponseCreatedByTypeHuman
+		return nil
+	case InvitationLookupTeamMemberResponseCreatedByTypeService:
+		*s = InvitationLookupTeamMemberResponseCreatedByTypeService
+		return nil
+	case InvitationLookupTeamMemberResponseCreatedByTypeSystem:
+		*s = InvitationLookupTeamMemberResponseCreatedByTypeSystem
+		return nil
+	case InvitationLookupTeamMemberResponseCreatedByTypeAgent:
+		*s = InvitationLookupTeamMemberResponseCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type InvitationLookupTeamMemberResponseType string
+
+const (
+	InvitationLookupTeamMemberResponseTypeTeamMember InvitationLookupTeamMemberResponseType = "team_member"
+)
+
+// AllValues returns all InvitationLookupTeamMemberResponseType values.
+func (InvitationLookupTeamMemberResponseType) AllValues() []InvitationLookupTeamMemberResponseType {
+	return []InvitationLookupTeamMemberResponseType{
+		InvitationLookupTeamMemberResponseTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationLookupTeamMemberResponseType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationLookupTeamMemberResponseTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) error {
+	switch InvitationLookupTeamMemberResponseType(data) {
+	case InvitationLookupTeamMemberResponseTypeTeamMember:
+		*s = InvitationLookupTeamMemberResponseTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// What the administrator entered at creation, so other administrators know who
+// the link is for. It is only displayed, never matched. Null once the
+// invitation is accepted or declined. Cancel and replace of a pending
+// invitation delete the row, so the metadata goes with it.
+// Ref: #
+type InvitationMetadata struct {
+	// A display name for who the invitation is intended for.
+	Name string `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *InvitationMetadata) GetName() string {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *InvitationMetadata) SetName(val string) {
+	s.Name = val
+}
+
+// Merged schema.
+// Ref: #
+type InvitationProjectMember struct {
+	ID        InvitationID `json:"id"`
+	ProjectID ProjectID    `json:"project_id"`
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
+	Metadata OptNilInvitationMetadata `json:"metadata"`
+	Status   InvitationStatus         `json:"status"`
+	// The user who created the invitation. Null when a project secret created
+	// it (`created_by_type` is then `service`).
+	CreatedBy     OptNilString                               `json:"created_by"`
+	CreatedByType OptNilInvitationProjectMemberCreatedByType `json:"created_by_type"`
+	// When the invitation was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When the invitation expires (72 hours after create).
+	ExpiresAt time.Time `json:"expires_at"`
+	// Correlates this invitation with its replacements. A replacement keeps the
+	// original's `journey_id`. It is a random correlation id, not a resource id.
+	JourneyID string `json:"journey_id"`
+	// The user who redeemed the link. Null until accepted.
+	AcceptedBy OptNilString `json:"accepted_by"`
+	// When the invitation was accepted. Null until accepted.
+	AcceptedAt    OptNilDateTime                 `json:"accepted_at"`
+	Type          InvitationProjectMemberType    `json:"type"`
+	ProjectMember InvitationProjectMemberPayload `json:"project_member"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationProjectMember) GetID() InvitationID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationProjectMember) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationProjectMember) GetMetadata() OptNilInvitationMetadata {
+	return s.Metadata
+}
+
+// GetStatus returns the value of Status.
+func (s *InvitationProjectMember) GetStatus() InvitationStatus {
+	return s.Status
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *InvitationProjectMember) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *InvitationProjectMember) GetCreatedByType() OptNilInvitationProjectMemberCreatedByType {
+	return s.CreatedByType
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationProjectMember) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationProjectMember) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationProjectMember) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetAcceptedBy returns the value of AcceptedBy.
+func (s *InvitationProjectMember) GetAcceptedBy() OptNilString {
+	return s.AcceptedBy
+}
+
+// GetAcceptedAt returns the value of AcceptedAt.
+func (s *InvitationProjectMember) GetAcceptedAt() OptNilDateTime {
+	return s.AcceptedAt
+}
+
+// GetType returns the value of Type.
+func (s *InvitationProjectMember) GetType() InvitationProjectMemberType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationProjectMember) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// SetID sets the value of ID.
+func (s *InvitationProjectMember) SetID(val InvitationID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationProjectMember) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationProjectMember) SetMetadata(val OptNilInvitationMetadata) {
+	s.Metadata = val
+}
+
+// SetStatus sets the value of Status.
+func (s *InvitationProjectMember) SetStatus(val InvitationStatus) {
+	s.Status = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *InvitationProjectMember) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *InvitationProjectMember) SetCreatedByType(val OptNilInvitationProjectMemberCreatedByType) {
+	s.CreatedByType = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationProjectMember) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationProjectMember) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationProjectMember) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetAcceptedBy sets the value of AcceptedBy.
+func (s *InvitationProjectMember) SetAcceptedBy(val OptNilString) {
+	s.AcceptedBy = val
+}
+
+// SetAcceptedAt sets the value of AcceptedAt.
+func (s *InvitationProjectMember) SetAcceptedAt(val OptNilDateTime) {
+	s.AcceptedAt = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationProjectMember) SetType(val InvitationProjectMemberType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationProjectMember) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type InvitationProjectMemberCreatedByType string
+
+const (
+	InvitationProjectMemberCreatedByTypeHuman   InvitationProjectMemberCreatedByType = "human"
+	InvitationProjectMemberCreatedByTypeService InvitationProjectMemberCreatedByType = "service"
+	InvitationProjectMemberCreatedByTypeSystem  InvitationProjectMemberCreatedByType = "system"
+	InvitationProjectMemberCreatedByTypeAgent   InvitationProjectMemberCreatedByType = "agent"
+)
+
+// AllValues returns all InvitationProjectMemberCreatedByType values.
+func (InvitationProjectMemberCreatedByType) AllValues() []InvitationProjectMemberCreatedByType {
+	return []InvitationProjectMemberCreatedByType{
+		InvitationProjectMemberCreatedByTypeHuman,
+		InvitationProjectMemberCreatedByTypeService,
+		InvitationProjectMemberCreatedByTypeSystem,
+		InvitationProjectMemberCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationProjectMemberCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationProjectMemberCreatedByTypeHuman:
+		return []byte(s), nil
+	case InvitationProjectMemberCreatedByTypeService:
+		return []byte(s), nil
+	case InvitationProjectMemberCreatedByTypeSystem:
+		return []byte(s), nil
+	case InvitationProjectMemberCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationProjectMemberCreatedByType) UnmarshalText(data []byte) error {
+	switch InvitationProjectMemberCreatedByType(data) {
+	case InvitationProjectMemberCreatedByTypeHuman:
+		*s = InvitationProjectMemberCreatedByTypeHuman
+		return nil
+	case InvitationProjectMemberCreatedByTypeService:
+		*s = InvitationProjectMemberCreatedByTypeService
+		return nil
+	case InvitationProjectMemberCreatedByTypeSystem:
+		*s = InvitationProjectMemberCreatedByTypeSystem
+		return nil
+	case InvitationProjectMemberCreatedByTypeAgent:
+		*s = InvitationProjectMemberCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Type-specific input for a `project_member` invitation.
+// Ref: #
+type InvitationProjectMemberPayload struct {
+	// The project role the accepter receives, as in `POST /grants`.
+	Relation InvitationProjectMemberPayloadRelation `json:"relation"`
+}
+
+// GetRelation returns the value of Relation.
+func (s *InvitationProjectMemberPayload) GetRelation() InvitationProjectMemberPayloadRelation {
+	return s.Relation
+}
+
+// SetRelation sets the value of Relation.
+func (s *InvitationProjectMemberPayload) SetRelation(val InvitationProjectMemberPayloadRelation) {
+	s.Relation = val
+}
+
+// The project role the accepter receives, as in `POST /grants`.
+type InvitationProjectMemberPayloadRelation string
+
+const (
+	InvitationProjectMemberPayloadRelationViewer InvitationProjectMemberPayloadRelation = "viewer"
+	InvitationProjectMemberPayloadRelationEditor InvitationProjectMemberPayloadRelation = "editor"
+	InvitationProjectMemberPayloadRelationAdmin  InvitationProjectMemberPayloadRelation = "admin"
+)
+
+// AllValues returns all InvitationProjectMemberPayloadRelation values.
+func (InvitationProjectMemberPayloadRelation) AllValues() []InvitationProjectMemberPayloadRelation {
+	return []InvitationProjectMemberPayloadRelation{
+		InvitationProjectMemberPayloadRelationViewer,
+		InvitationProjectMemberPayloadRelationEditor,
+		InvitationProjectMemberPayloadRelationAdmin,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationProjectMemberPayloadRelation) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationProjectMemberPayloadRelationViewer:
+		return []byte(s), nil
+	case InvitationProjectMemberPayloadRelationEditor:
+		return []byte(s), nil
+	case InvitationProjectMemberPayloadRelationAdmin:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationProjectMemberPayloadRelation) UnmarshalText(data []byte) error {
+	switch InvitationProjectMemberPayloadRelation(data) {
+	case InvitationProjectMemberPayloadRelationViewer:
+		*s = InvitationProjectMemberPayloadRelationViewer
+		return nil
+	case InvitationProjectMemberPayloadRelationEditor:
+		*s = InvitationProjectMemberPayloadRelationEditor
+		return nil
+	case InvitationProjectMemberPayloadRelationAdmin:
+		*s = InvitationProjectMemberPayloadRelationAdmin
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type InvitationProjectMemberType string
+
+const (
+	InvitationProjectMemberTypeProjectMember InvitationProjectMemberType = "project_member"
+)
+
+// AllValues returns all InvitationProjectMemberType values.
+func (InvitationProjectMemberType) AllValues() []InvitationProjectMemberType {
+	return []InvitationProjectMemberType{
+		InvitationProjectMemberTypeProjectMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationProjectMemberType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationProjectMemberTypeProjectMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationProjectMemberType) UnmarshalText(data []byte) error {
+	switch InvitationProjectMemberType(data) {
+	case InvitationProjectMemberTypeProjectMember:
+		*s = InvitationProjectMemberTypeProjectMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Lifecycle status of the invitation. `expired` is derived on read from
+// `expires_at`; `accepted` and `rejected` are final. Cancel and replace of a
+// pending invitation delete the row rather than leaving a cancelled status.
+// Ref: #
+type InvitationStatus string
+
+const (
+	InvitationStatusPending  InvitationStatus = "pending"
+	InvitationStatusAccepted InvitationStatus = "accepted"
+	InvitationStatusRejected InvitationStatus = "rejected"
+	InvitationStatusExpired  InvitationStatus = "expired"
+)
+
+// AllValues returns all InvitationStatus values.
+func (InvitationStatus) AllValues() []InvitationStatus {
+	return []InvitationStatus{
+		InvitationStatusPending,
+		InvitationStatusAccepted,
+		InvitationStatusRejected,
+		InvitationStatusExpired,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationStatusPending:
+		return []byte(s), nil
+	case InvitationStatusAccepted:
+		return []byte(s), nil
+	case InvitationStatusRejected:
+		return []byte(s), nil
+	case InvitationStatusExpired:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationStatus) UnmarshalText(data []byte) error {
+	switch InvitationStatus(data) {
+	case InvitationStatusPending:
+		*s = InvitationStatusPending
+		return nil
+	case InvitationStatusAccepted:
+		*s = InvitationStatusAccepted
+		return nil
+	case InvitationStatusRejected:
+		*s = InvitationStatusRejected
+		return nil
+	case InvitationStatusExpired:
+		*s = InvitationStatusExpired
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationTeamMember struct {
+	ID        InvitationID `json:"id"`
+	ProjectID ProjectID    `json:"project_id"`
+	// Who the administrator said the link is for. Null after accept or decline.
+	// Cancel and replace of a pending invitation delete the row.
+	Metadata OptNilInvitationMetadata `json:"metadata"`
+	Status   InvitationStatus         `json:"status"`
+	// The user who created the invitation. Null when a project secret created
+	// it (`created_by_type` is then `service`).
+	CreatedBy     OptNilString                            `json:"created_by"`
+	CreatedByType OptNilInvitationTeamMemberCreatedByType `json:"created_by_type"`
+	// When the invitation was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When the invitation expires (72 hours after create).
+	ExpiresAt time.Time `json:"expires_at"`
+	// Correlates this invitation with its replacements. A replacement keeps the
+	// original's `journey_id`. It is a random correlation id, not a resource id.
+	JourneyID string `json:"journey_id"`
+	// The user who redeemed the link. Null until accepted.
+	AcceptedBy OptNilString `json:"accepted_by"`
+	// When the invitation was accepted. Null until accepted.
+	AcceptedAt OptNilDateTime              `json:"accepted_at"`
+	Type       InvitationTeamMemberType    `json:"type"`
+	TeamMember InvitationTeamMemberPayload `json:"team_member"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationTeamMember) GetID() InvitationID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationTeamMember) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationTeamMember) GetMetadata() OptNilInvitationMetadata {
+	return s.Metadata
+}
+
+// GetStatus returns the value of Status.
+func (s *InvitationTeamMember) GetStatus() InvitationStatus {
+	return s.Status
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *InvitationTeamMember) GetCreatedBy() OptNilString {
+	return s.CreatedBy
+}
+
+// GetCreatedByType returns the value of CreatedByType.
+func (s *InvitationTeamMember) GetCreatedByType() OptNilInvitationTeamMemberCreatedByType {
+	return s.CreatedByType
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationTeamMember) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationTeamMember) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationTeamMember) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetAcceptedBy returns the value of AcceptedBy.
+func (s *InvitationTeamMember) GetAcceptedBy() OptNilString {
+	return s.AcceptedBy
+}
+
+// GetAcceptedAt returns the value of AcceptedAt.
+func (s *InvitationTeamMember) GetAcceptedAt() OptNilDateTime {
+	return s.AcceptedAt
+}
+
+// GetType returns the value of Type.
+func (s *InvitationTeamMember) GetType() InvitationTeamMemberType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationTeamMember) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetID sets the value of ID.
+func (s *InvitationTeamMember) SetID(val InvitationID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationTeamMember) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationTeamMember) SetMetadata(val OptNilInvitationMetadata) {
+	s.Metadata = val
+}
+
+// SetStatus sets the value of Status.
+func (s *InvitationTeamMember) SetStatus(val InvitationStatus) {
+	s.Status = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *InvitationTeamMember) SetCreatedBy(val OptNilString) {
+	s.CreatedBy = val
+}
+
+// SetCreatedByType sets the value of CreatedByType.
+func (s *InvitationTeamMember) SetCreatedByType(val OptNilInvitationTeamMemberCreatedByType) {
+	s.CreatedByType = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationTeamMember) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationTeamMember) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationTeamMember) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetAcceptedBy sets the value of AcceptedBy.
+func (s *InvitationTeamMember) SetAcceptedBy(val OptNilString) {
+	s.AcceptedBy = val
+}
+
+// SetAcceptedAt sets the value of AcceptedAt.
+func (s *InvitationTeamMember) SetAcceptedAt(val OptNilDateTime) {
+	s.AcceptedAt = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationTeamMember) SetType(val InvitationTeamMemberType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationTeamMember) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type InvitationTeamMemberCreatedByType string
+
+const (
+	InvitationTeamMemberCreatedByTypeHuman   InvitationTeamMemberCreatedByType = "human"
+	InvitationTeamMemberCreatedByTypeService InvitationTeamMemberCreatedByType = "service"
+	InvitationTeamMemberCreatedByTypeSystem  InvitationTeamMemberCreatedByType = "system"
+	InvitationTeamMemberCreatedByTypeAgent   InvitationTeamMemberCreatedByType = "agent"
+)
+
+// AllValues returns all InvitationTeamMemberCreatedByType values.
+func (InvitationTeamMemberCreatedByType) AllValues() []InvitationTeamMemberCreatedByType {
+	return []InvitationTeamMemberCreatedByType{
+		InvitationTeamMemberCreatedByTypeHuman,
+		InvitationTeamMemberCreatedByTypeService,
+		InvitationTeamMemberCreatedByTypeSystem,
+		InvitationTeamMemberCreatedByTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationTeamMemberCreatedByType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationTeamMemberCreatedByTypeHuman:
+		return []byte(s), nil
+	case InvitationTeamMemberCreatedByTypeService:
+		return []byte(s), nil
+	case InvitationTeamMemberCreatedByTypeSystem:
+		return []byte(s), nil
+	case InvitationTeamMemberCreatedByTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationTeamMemberCreatedByType) UnmarshalText(data []byte) error {
+	switch InvitationTeamMemberCreatedByType(data) {
+	case InvitationTeamMemberCreatedByTypeHuman:
+		*s = InvitationTeamMemberCreatedByTypeHuman
+		return nil
+	case InvitationTeamMemberCreatedByTypeService:
+		*s = InvitationTeamMemberCreatedByTypeService
+		return nil
+	case InvitationTeamMemberCreatedByTypeSystem:
+		*s = InvitationTeamMemberCreatedByTypeSystem
+		return nil
+	case InvitationTeamMemberCreatedByTypeAgent:
+		*s = InvitationTeamMemberCreatedByTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Type-specific input for a `team_member` invitation.
+// Ref: #
+type InvitationTeamMemberPayload struct {
+	TeamID TeamID `json:"team_id"`
+	// The team role the accepter receives.
+	Role InvitationTeamMemberPayloadRole `json:"role"`
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationTeamMemberPayload) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetRole returns the value of Role.
+func (s *InvitationTeamMemberPayload) GetRole() InvitationTeamMemberPayloadRole {
+	return s.Role
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationTeamMemberPayload) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetRole sets the value of Role.
+func (s *InvitationTeamMemberPayload) SetRole(val InvitationTeamMemberPayloadRole) {
+	s.Role = val
+}
+
+// The team role the accepter receives.
+type InvitationTeamMemberPayloadRole string
+
+const (
+	InvitationTeamMemberPayloadRoleMember InvitationTeamMemberPayloadRole = "member"
+)
+
+// AllValues returns all InvitationTeamMemberPayloadRole values.
+func (InvitationTeamMemberPayloadRole) AllValues() []InvitationTeamMemberPayloadRole {
+	return []InvitationTeamMemberPayloadRole{
+		InvitationTeamMemberPayloadRoleMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationTeamMemberPayloadRole) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationTeamMemberPayloadRoleMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationTeamMemberPayloadRole) UnmarshalText(data []byte) error {
+	switch InvitationTeamMemberPayloadRole(data) {
+	case InvitationTeamMemberPayloadRoleMember:
+		*s = InvitationTeamMemberPayloadRoleMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type InvitationTeamMemberType string
+
+const (
+	InvitationTeamMemberTypeTeamMember InvitationTeamMemberType = "team_member"
+)
+
+// AllValues returns all InvitationTeamMemberType values.
+func (InvitationTeamMemberType) AllValues() []InvitationTeamMemberType {
+	return []InvitationTeamMemberType{
+		InvitationTeamMemberTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationTeamMemberType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationTeamMemberTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationTeamMemberType) UnmarshalText(data []byte) error {
+	switch InvitationTeamMemberType(data) {
+	case InvitationTeamMemberTypeTeamMember:
+		*s = InvitationTeamMemberTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The redeem token from an invitation link's fragment.
+// Ref: #
+type InvitationTokenRequest struct {
+	// The plaintext token from the invitation link fragment. It never appears in
+	// a URL query. Every unknown or finished token gets the same `404`.
+	Token string `json:"token"`
+}
+
+// GetToken returns the value of Token.
+func (s *InvitationTokenRequest) GetToken() string {
+	return s.Token
+}
+
+// SetToken sets the value of Token.
+func (s *InvitationTokenRequest) SetToken(val string) {
+	s.Token = val
+}
+
 // IssueChallengeErrorResponse represents sum type.
 type IssueChallengeErrorResponse struct {
 	Type                IssueChallengeErrorResponseType // switch on this field
@@ -46090,9 +49817,14 @@ func (s *ListEventsOrder) UnmarshalText(data []byte) error {
 // A page of events.
 // Ref: #
 type ListEventsResponse struct {
+	// The events of this page. A filter the server matches event by event can
+	// leave it shorter than `limit`, or empty, while more events remain:
+	// `next_page_token` says whether they do.
 	Data []Event `json:"data"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
+	// Absent when there are no more results. A short or empty page still
+	// carries one while the server has not read every event the filter could
+	// match.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
@@ -46858,6 +50590,330 @@ func (*ListIdpRevisionsResponse) listIdpRevisionsRes() {}
 type ListIdpRevisionsUnauthorized ErrorDetails
 
 func (*ListIdpRevisionsUnauthorized) listIdpRevisionsRes() {}
+
+type ListInvitationsBadRequest ErrorDetails
+
+func (*ListInvitationsBadRequest) listInvitationsRes() {}
+
+// ListInvitationsErrorResponse represents sum type.
+type ListInvitationsErrorResponse struct {
+	Type                ListInvitationsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	InvNotFound         InvNotFound
+	InvPermissionDenied InvPermissionDenied
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// ListInvitationsErrorResponseType is oneOf type of ListInvitationsErrorResponse.
+type ListInvitationsErrorResponseType string
+
+// Possible values for ListInvitationsErrorResponseType.
+const (
+	AuthUnauthorizedListInvitationsErrorResponse    ListInvitationsErrorResponseType = "auth.unauthorized"
+	InternalListInvitationsErrorResponse            ListInvitationsErrorResponseType = "internal"
+	InvNotFoundListInvitationsErrorResponse         ListInvitationsErrorResponseType = "inv.not_found"
+	InvPermissionDeniedListInvitationsErrorResponse ListInvitationsErrorResponseType = "inv.permission_denied"
+	NotImplementedListInvitationsErrorResponse      ListInvitationsErrorResponseType = "not_implemented"
+	ReqInvalidListInvitationsErrorResponse          ListInvitationsErrorResponseType = "req.invalid"
+	UnavailableListInvitationsErrorResponse         ListInvitationsErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether ListInvitationsErrorResponse is AuthUnauthorized.
+func (s ListInvitationsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListInvitationsErrorResponse
+}
+
+// IsInternal reports whether ListInvitationsErrorResponse is Internal.
+func (s ListInvitationsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListInvitationsErrorResponse
+}
+
+// IsInvNotFound reports whether ListInvitationsErrorResponse is InvNotFound.
+func (s ListInvitationsErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundListInvitationsErrorResponse
+}
+
+// IsInvPermissionDenied reports whether ListInvitationsErrorResponse is InvPermissionDenied.
+func (s ListInvitationsErrorResponse) IsInvPermissionDenied() bool {
+	return s.Type == InvPermissionDeniedListInvitationsErrorResponse
+}
+
+// IsNotImplemented reports whether ListInvitationsErrorResponse is NotImplemented.
+func (s ListInvitationsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListInvitationsErrorResponse
+}
+
+// IsReqInvalid reports whether ListInvitationsErrorResponse is ReqInvalid.
+func (s ListInvitationsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListInvitationsErrorResponse
+}
+
+// IsUnavailable reports whether ListInvitationsErrorResponse is Unavailable.
+func (s ListInvitationsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListInvitationsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListInvitationsErrorResponse to AuthUnauthorized.
+func (s *ListInvitationsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListInvitationsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListInvitationsErrorResponse is AuthUnauthorized.
+func (s ListInvitationsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListInvitationsErrorResponse returns new ListInvitationsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListInvitationsErrorResponse(v AuthUnauthorized) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListInvitationsErrorResponse to Internal.
+func (s *ListInvitationsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListInvitationsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListInvitationsErrorResponse is Internal.
+func (s ListInvitationsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListInvitationsErrorResponse returns new ListInvitationsErrorResponse from Internal.
+func NewInternalListInvitationsErrorResponse(v Internal) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvNotFound sets ListInvitationsErrorResponse to InvNotFound.
+func (s *ListInvitationsErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundListInvitationsErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if ListInvitationsErrorResponse is InvNotFound.
+func (s ListInvitationsErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundListInvitationsErrorResponse returns new ListInvitationsErrorResponse from InvNotFound.
+func NewInvNotFoundListInvitationsErrorResponse(v InvNotFound) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvPermissionDenied sets ListInvitationsErrorResponse to InvPermissionDenied.
+func (s *ListInvitationsErrorResponse) SetInvPermissionDenied(v InvPermissionDenied) {
+	s.Type = InvPermissionDeniedListInvitationsErrorResponse
+	s.InvPermissionDenied = v
+}
+
+// GetInvPermissionDenied returns InvPermissionDenied and true boolean if ListInvitationsErrorResponse is InvPermissionDenied.
+func (s ListInvitationsErrorResponse) GetInvPermissionDenied() (v InvPermissionDenied, ok bool) {
+	if !s.IsInvPermissionDenied() {
+		return v, false
+	}
+	return s.InvPermissionDenied, true
+}
+
+// NewInvPermissionDeniedListInvitationsErrorResponse returns new ListInvitationsErrorResponse from InvPermissionDenied.
+func NewInvPermissionDeniedListInvitationsErrorResponse(v InvPermissionDenied) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetInvPermissionDenied(v)
+	return s
+}
+
+// SetNotImplemented sets ListInvitationsErrorResponse to NotImplemented.
+func (s *ListInvitationsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListInvitationsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListInvitationsErrorResponse is NotImplemented.
+func (s ListInvitationsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListInvitationsErrorResponse returns new ListInvitationsErrorResponse from NotImplemented.
+func NewNotImplementedListInvitationsErrorResponse(v NotImplemented) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListInvitationsErrorResponse to ReqInvalid.
+func (s *ListInvitationsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListInvitationsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListInvitationsErrorResponse is ReqInvalid.
+func (s ListInvitationsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListInvitationsErrorResponse returns new ListInvitationsErrorResponse from ReqInvalid.
+func NewReqInvalidListInvitationsErrorResponse(v ReqInvalid) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListInvitationsErrorResponse to Unavailable.
+func (s *ListInvitationsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListInvitationsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListInvitationsErrorResponse is Unavailable.
+func (s ListInvitationsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListInvitationsErrorResponse returns new ListInvitationsErrorResponse from Unavailable.
+func NewUnavailableListInvitationsErrorResponse(v Unavailable) ListInvitationsErrorResponse {
+	var s ListInvitationsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListInvitationsErrorResponseStatusCode wraps ListInvitationsErrorResponse with StatusCode.
+type ListInvitationsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListInvitationsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListInvitationsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListInvitationsErrorResponseStatusCode) GetResponse() ListInvitationsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListInvitationsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListInvitationsErrorResponseStatusCode) SetResponse(val ListInvitationsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListInvitationsErrorResponseStatusCode) listInvitationsRes() {}
+
+type ListInvitationsForbidden ErrorDetails
+
+func (*ListInvitationsForbidden) listInvitationsRes() {}
+
+type ListInvitationsNotFound ErrorDetails
+
+func (*ListInvitationsNotFound) listInvitationsRes() {}
+
+// A page of a project's invitations, newest first.
+// Ref: #
+type ListInvitationsResponse struct {
+	Invitations []Invitation `json:"invitations"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetInvitations returns the value of Invitations.
+func (s *ListInvitationsResponse) GetInvitations() []Invitation {
+	return s.Invitations
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListInvitationsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetInvitations sets the value of Invitations.
+func (s *ListInvitationsResponse) SetInvitations(val []Invitation) {
+	s.Invitations = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListInvitationsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListInvitationsResponse) listInvitationsRes() {}
+
+type ListInvitationsType string
+
+const (
+	ListInvitationsTypeProjectMember ListInvitationsType = "project_member"
+	ListInvitationsTypeTeamMember    ListInvitationsType = "team_member"
+)
+
+// AllValues returns all ListInvitationsType values.
+func (ListInvitationsType) AllValues() []ListInvitationsType {
+	return []ListInvitationsType{
+		ListInvitationsTypeProjectMember,
+		ListInvitationsTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListInvitationsType) MarshalText() ([]byte, error) {
+	switch s {
+	case ListInvitationsTypeProjectMember:
+		return []byte(s), nil
+	case ListInvitationsTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListInvitationsType) UnmarshalText(data []byte) error {
+	switch ListInvitationsType(data) {
+	case ListInvitationsTypeProjectMember:
+		*s = ListInvitationsTypeProjectMember
+		return nil
+	case ListInvitationsTypeTeamMember:
+		*s = ListInvitationsTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ListInvitationsUnauthorized ErrorDetails
+
+func (*ListInvitationsUnauthorized) listInvitationsRes() {}
 
 // ListMyIdentityLinksErrorResponse represents sum type.
 type ListMyIdentityLinksErrorResponse struct {
@@ -50547,6 +54603,258 @@ type ListUserTeamsUnauthorized ErrorDetails
 
 func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 
+type LookupInvitationBadRequest ErrorDetails
+
+func (*LookupInvitationBadRequest) lookupInvitationRes() {}
+
+// LookupInvitationErrorResponse represents sum type.
+type LookupInvitationErrorResponse struct {
+	Type             LookupInvitationErrorResponseType // switch on this field
+	AuthCsrfInvalid  AuthCsrfInvalid
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	InvNotFound      InvNotFound
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// LookupInvitationErrorResponseType is oneOf type of LookupInvitationErrorResponse.
+type LookupInvitationErrorResponseType string
+
+// Possible values for LookupInvitationErrorResponseType.
+const (
+	AuthCsrfInvalidLookupInvitationErrorResponse  LookupInvitationErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedLookupInvitationErrorResponse LookupInvitationErrorResponseType = "auth.unauthorized"
+	InternalLookupInvitationErrorResponse         LookupInvitationErrorResponseType = "internal"
+	InvNotFoundLookupInvitationErrorResponse      LookupInvitationErrorResponseType = "inv.not_found"
+	NotImplementedLookupInvitationErrorResponse   LookupInvitationErrorResponseType = "not_implemented"
+	ReqInvalidLookupInvitationErrorResponse       LookupInvitationErrorResponseType = "req.invalid"
+	UnavailableLookupInvitationErrorResponse      LookupInvitationErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether LookupInvitationErrorResponse is AuthCsrfInvalid.
+func (s LookupInvitationErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidLookupInvitationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether LookupInvitationErrorResponse is AuthUnauthorized.
+func (s LookupInvitationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedLookupInvitationErrorResponse
+}
+
+// IsInternal reports whether LookupInvitationErrorResponse is Internal.
+func (s LookupInvitationErrorResponse) IsInternal() bool {
+	return s.Type == InternalLookupInvitationErrorResponse
+}
+
+// IsInvNotFound reports whether LookupInvitationErrorResponse is InvNotFound.
+func (s LookupInvitationErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundLookupInvitationErrorResponse
+}
+
+// IsNotImplemented reports whether LookupInvitationErrorResponse is NotImplemented.
+func (s LookupInvitationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedLookupInvitationErrorResponse
+}
+
+// IsReqInvalid reports whether LookupInvitationErrorResponse is ReqInvalid.
+func (s LookupInvitationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidLookupInvitationErrorResponse
+}
+
+// IsUnavailable reports whether LookupInvitationErrorResponse is Unavailable.
+func (s LookupInvitationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableLookupInvitationErrorResponse
+}
+
+// SetAuthCsrfInvalid sets LookupInvitationErrorResponse to AuthCsrfInvalid.
+func (s *LookupInvitationErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidLookupInvitationErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if LookupInvitationErrorResponse is AuthCsrfInvalid.
+func (s LookupInvitationErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidLookupInvitationErrorResponse(v AuthCsrfInvalid) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets LookupInvitationErrorResponse to AuthUnauthorized.
+func (s *LookupInvitationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedLookupInvitationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if LookupInvitationErrorResponse is AuthUnauthorized.
+func (s LookupInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedLookupInvitationErrorResponse(v AuthUnauthorized) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets LookupInvitationErrorResponse to Internal.
+func (s *LookupInvitationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalLookupInvitationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if LookupInvitationErrorResponse is Internal.
+func (s LookupInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from Internal.
+func NewInternalLookupInvitationErrorResponse(v Internal) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvNotFound sets LookupInvitationErrorResponse to InvNotFound.
+func (s *LookupInvitationErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundLookupInvitationErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if LookupInvitationErrorResponse is InvNotFound.
+func (s LookupInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from InvNotFound.
+func NewInvNotFoundLookupInvitationErrorResponse(v InvNotFound) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetNotImplemented sets LookupInvitationErrorResponse to NotImplemented.
+func (s *LookupInvitationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedLookupInvitationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if LookupInvitationErrorResponse is NotImplemented.
+func (s LookupInvitationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from NotImplemented.
+func NewNotImplementedLookupInvitationErrorResponse(v NotImplemented) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets LookupInvitationErrorResponse to ReqInvalid.
+func (s *LookupInvitationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidLookupInvitationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if LookupInvitationErrorResponse is ReqInvalid.
+func (s LookupInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from ReqInvalid.
+func NewReqInvalidLookupInvitationErrorResponse(v ReqInvalid) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets LookupInvitationErrorResponse to Unavailable.
+func (s *LookupInvitationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableLookupInvitationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if LookupInvitationErrorResponse is Unavailable.
+func (s LookupInvitationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableLookupInvitationErrorResponse returns new LookupInvitationErrorResponse from Unavailable.
+func NewUnavailableLookupInvitationErrorResponse(v Unavailable) LookupInvitationErrorResponse {
+	var s LookupInvitationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// LookupInvitationErrorResponseStatusCode wraps LookupInvitationErrorResponse with StatusCode.
+type LookupInvitationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   LookupInvitationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *LookupInvitationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *LookupInvitationErrorResponseStatusCode) GetResponse() LookupInvitationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *LookupInvitationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *LookupInvitationErrorResponseStatusCode) SetResponse(val LookupInvitationErrorResponse) {
+	s.Response = val
+}
+
+func (*LookupInvitationErrorResponseStatusCode) lookupInvitationRes() {}
+
+type LookupInvitationNotFound ErrorDetails
+
+func (*LookupInvitationNotFound) lookupInvitationRes() {}
+
+type LookupInvitationTooManyRequests ErrorDetails
+
+func (*LookupInvitationTooManyRequests) lookupInvitationRes() {}
+
+type LookupInvitationUnauthorized ErrorDetails
+
+func (*LookupInvitationUnauthorized) lookupInvitationRes() {}
+
 // NewNilDateTime returns new NilDateTime with value set to v.
 func NewNilDateTime(v time.Time) NilDateTime {
 	return NilDateTime{
@@ -50722,6 +55030,8 @@ func (s *NotImplemented) SetMessage(val string) {
 func (s *NotImplemented) SetDetails(val OptNotImplementedDetails) {
 	s.Details = val
 }
+
+func (*NotImplemented) createInvitationRes() {}
 
 // Additional error-specific context.
 type NotImplementedDetails map[string]jx.Raw
@@ -57660,6 +61970,466 @@ func (o OptInternalDetails) Or(d InternalDetails) InternalDetails {
 	return d
 }
 
+// NewOptInvInvalidDetails returns new OptInvInvalidDetails with value set to v.
+func NewOptInvInvalidDetails(v InvInvalidDetails) OptInvInvalidDetails {
+	return OptInvInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvInvalidDetails is optional InvInvalidDetails.
+type OptInvInvalidDetails struct {
+	Value InvInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvInvalidDetails was set.
+func (o OptInvInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvInvalidDetails) Reset() {
+	var v InvInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvInvalidDetails) SetTo(v InvInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvInvalidDetails) Get() (v InvInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvInvalidDetails) Or(d InvInvalidDetails) InvInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvNotFoundDetails returns new OptInvNotFoundDetails with value set to v.
+func NewOptInvNotFoundDetails(v InvNotFoundDetails) OptInvNotFoundDetails {
+	return OptInvNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvNotFoundDetails is optional InvNotFoundDetails.
+type OptInvNotFoundDetails struct {
+	Value InvNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvNotFoundDetails was set.
+func (o OptInvNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvNotFoundDetails) Reset() {
+	var v InvNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvNotFoundDetails) SetTo(v InvNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvNotFoundDetails) Get() (v InvNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvNotFoundDetails) Or(d InvNotFoundDetails) InvNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvPendingLimitDetails returns new OptInvPendingLimitDetails with value set to v.
+func NewOptInvPendingLimitDetails(v InvPendingLimitDetails) OptInvPendingLimitDetails {
+	return OptInvPendingLimitDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvPendingLimitDetails is optional InvPendingLimitDetails.
+type OptInvPendingLimitDetails struct {
+	Value InvPendingLimitDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvPendingLimitDetails was set.
+func (o OptInvPendingLimitDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvPendingLimitDetails) Reset() {
+	var v InvPendingLimitDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvPendingLimitDetails) SetTo(v InvPendingLimitDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvPendingLimitDetails) Get() (v InvPendingLimitDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvPendingLimitDetails) Or(d InvPendingLimitDetails) InvPendingLimitDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvPermissionDeniedDetails returns new OptInvPermissionDeniedDetails with value set to v.
+func NewOptInvPermissionDeniedDetails(v InvPermissionDeniedDetails) OptInvPermissionDeniedDetails {
+	return OptInvPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvPermissionDeniedDetails is optional InvPermissionDeniedDetails.
+type OptInvPermissionDeniedDetails struct {
+	Value InvPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvPermissionDeniedDetails was set.
+func (o OptInvPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvPermissionDeniedDetails) Reset() {
+	var v InvPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvPermissionDeniedDetails) SetTo(v InvPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvPermissionDeniedDetails) Get() (v InvPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvPermissionDeniedDetails) Or(d InvPermissionDeniedDetails) InvPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvPlatformRequiredDetails returns new OptInvPlatformRequiredDetails with value set to v.
+func NewOptInvPlatformRequiredDetails(v InvPlatformRequiredDetails) OptInvPlatformRequiredDetails {
+	return OptInvPlatformRequiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvPlatformRequiredDetails is optional InvPlatformRequiredDetails.
+type OptInvPlatformRequiredDetails struct {
+	Value InvPlatformRequiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvPlatformRequiredDetails was set.
+func (o OptInvPlatformRequiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvPlatformRequiredDetails) Reset() {
+	var v InvPlatformRequiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvPlatformRequiredDetails) SetTo(v InvPlatformRequiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvPlatformRequiredDetails) Get() (v InvPlatformRequiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvPlatformRequiredDetails) Or(d InvPlatformRequiredDetails) InvPlatformRequiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvProjectUnclaimedDetails returns new OptInvProjectUnclaimedDetails with value set to v.
+func NewOptInvProjectUnclaimedDetails(v InvProjectUnclaimedDetails) OptInvProjectUnclaimedDetails {
+	return OptInvProjectUnclaimedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvProjectUnclaimedDetails is optional InvProjectUnclaimedDetails.
+type OptInvProjectUnclaimedDetails struct {
+	Value InvProjectUnclaimedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvProjectUnclaimedDetails was set.
+func (o OptInvProjectUnclaimedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvProjectUnclaimedDetails) Reset() {
+	var v InvProjectUnclaimedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvProjectUnclaimedDetails) SetTo(v InvProjectUnclaimedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvProjectUnclaimedDetails) Get() (v InvProjectUnclaimedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvProjectUnclaimedDetails) Or(d InvProjectUnclaimedDetails) InvProjectUnclaimedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvSelfAcceptDetails returns new OptInvSelfAcceptDetails with value set to v.
+func NewOptInvSelfAcceptDetails(v InvSelfAcceptDetails) OptInvSelfAcceptDetails {
+	return OptInvSelfAcceptDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvSelfAcceptDetails is optional InvSelfAcceptDetails.
+type OptInvSelfAcceptDetails struct {
+	Value InvSelfAcceptDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvSelfAcceptDetails was set.
+func (o OptInvSelfAcceptDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvSelfAcceptDetails) Reset() {
+	var v InvSelfAcceptDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvSelfAcceptDetails) SetTo(v InvSelfAcceptDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvSelfAcceptDetails) Get() (v InvSelfAcceptDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvSelfAcceptDetails) Or(d InvSelfAcceptDetails) InvSelfAcceptDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationID returns new OptInvitationID with value set to v.
+func NewOptInvitationID(v InvitationID) OptInvitationID {
+	return OptInvitationID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationID is optional InvitationID.
+type OptInvitationID struct {
+	Value InvitationID
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationID was set.
+func (o OptInvitationID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationID) Reset() {
+	var v InvitationID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationID) SetTo(v InvitationID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationID) Get() (v InvitationID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationID) Or(d InvitationID) InvitationID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationMetadata returns new OptInvitationMetadata with value set to v.
+func NewOptInvitationMetadata(v InvitationMetadata) OptInvitationMetadata {
+	return OptInvitationMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationMetadata is optional InvitationMetadata.
+type OptInvitationMetadata struct {
+	Value InvitationMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationMetadata was set.
+func (o OptInvitationMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationMetadata) Reset() {
+	var v InvitationMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationMetadata) SetTo(v InvitationMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationMetadata) Get() (v InvitationMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationMetadata) Or(d InvitationMetadata) InvitationMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationStatus returns new OptInvitationStatus with value set to v.
+func NewOptInvitationStatus(v InvitationStatus) OptInvitationStatus {
+	return OptInvitationStatus{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationStatus is optional InvitationStatus.
+type OptInvitationStatus struct {
+	Value InvitationStatus
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationStatus was set.
+func (o OptInvitationStatus) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationStatus) Reset() {
+	var v InvitationStatus
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationStatus) SetTo(v InvitationStatus) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationStatus) Get() (v InvitationStatus, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationStatus) Or(d InvitationStatus) InvitationStatus {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIssueChallengeRequestPasskeyOptions returns new OptIssueChallengeRequestPasskeyOptions with value set to v.
 func NewOptIssueChallengeRequestPasskeyOptions(v IssueChallengeRequestPasskeyOptions) OptIssueChallengeRequestPasskeyOptions {
 	return OptIssueChallengeRequestPasskeyOptions{
@@ -57930,6 +62700,52 @@ func (o OptListFlowDefinitionsRevisions) Get() (v ListFlowDefinitionsRevisions, 
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListFlowDefinitionsRevisions) Or(d ListFlowDefinitionsRevisions) ListFlowDefinitionsRevisions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListInvitationsType returns new OptListInvitationsType with value set to v.
+func NewOptListInvitationsType(v ListInvitationsType) OptListInvitationsType {
+	return OptListInvitationsType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListInvitationsType is optional ListInvitationsType.
+type OptListInvitationsType struct {
+	Value ListInvitationsType
+	Set   bool
+}
+
+// IsSet returns true if OptListInvitationsType was set.
+func (o OptListInvitationsType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListInvitationsType) Reset() {
+	var v ListInvitationsType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListInvitationsType) SetTo(v ListInvitationsType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListInvitationsType) Get() (v ListInvitationsType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListInvitationsType) Or(d ListInvitationsType) ListInvitationsType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -58910,6 +63726,132 @@ func (o OptNilBrandingCreatedEventActorType) Or(d BrandingCreatedEventActorType)
 	return d
 }
 
+// NewOptNilCreateInvitationProjectMemberResponseCreatedByType returns new OptNilCreateInvitationProjectMemberResponseCreatedByType with value set to v.
+func NewOptNilCreateInvitationProjectMemberResponseCreatedByType(v CreateInvitationProjectMemberResponseCreatedByType) OptNilCreateInvitationProjectMemberResponseCreatedByType {
+	return OptNilCreateInvitationProjectMemberResponseCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilCreateInvitationProjectMemberResponseCreatedByType is optional nullable CreateInvitationProjectMemberResponseCreatedByType.
+type OptNilCreateInvitationProjectMemberResponseCreatedByType struct {
+	Value CreateInvitationProjectMemberResponseCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilCreateInvitationProjectMemberResponseCreatedByType was set.
+func (o OptNilCreateInvitationProjectMemberResponseCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilCreateInvitationProjectMemberResponseCreatedByType) Reset() {
+	var v CreateInvitationProjectMemberResponseCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilCreateInvitationProjectMemberResponseCreatedByType) SetTo(v CreateInvitationProjectMemberResponseCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilCreateInvitationProjectMemberResponseCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilCreateInvitationProjectMemberResponseCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v CreateInvitationProjectMemberResponseCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilCreateInvitationProjectMemberResponseCreatedByType) Get() (v CreateInvitationProjectMemberResponseCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilCreateInvitationProjectMemberResponseCreatedByType) Or(d CreateInvitationProjectMemberResponseCreatedByType) CreateInvitationProjectMemberResponseCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilCreateInvitationTeamMemberResponseCreatedByType returns new OptNilCreateInvitationTeamMemberResponseCreatedByType with value set to v.
+func NewOptNilCreateInvitationTeamMemberResponseCreatedByType(v CreateInvitationTeamMemberResponseCreatedByType) OptNilCreateInvitationTeamMemberResponseCreatedByType {
+	return OptNilCreateInvitationTeamMemberResponseCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilCreateInvitationTeamMemberResponseCreatedByType is optional nullable CreateInvitationTeamMemberResponseCreatedByType.
+type OptNilCreateInvitationTeamMemberResponseCreatedByType struct {
+	Value CreateInvitationTeamMemberResponseCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilCreateInvitationTeamMemberResponseCreatedByType was set.
+func (o OptNilCreateInvitationTeamMemberResponseCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilCreateInvitationTeamMemberResponseCreatedByType) Reset() {
+	var v CreateInvitationTeamMemberResponseCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilCreateInvitationTeamMemberResponseCreatedByType) SetTo(v CreateInvitationTeamMemberResponseCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilCreateInvitationTeamMemberResponseCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilCreateInvitationTeamMemberResponseCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v CreateInvitationTeamMemberResponseCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilCreateInvitationTeamMemberResponseCreatedByType) Get() (v CreateInvitationTeamMemberResponseCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilCreateInvitationTeamMemberResponseCreatedByType) Or(d CreateInvitationTeamMemberResponseCreatedByType) CreateInvitationTeamMemberResponseCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilDateTime returns new OptNilDateTime with value set to v.
 func NewOptNilDateTime(v time.Time) OptNilDateTime {
 	return OptNilDateTime{
@@ -59786,6 +64728,321 @@ func (o OptNilIdpUpdatedEventActorType) Get() (v IdpUpdatedEventActorType, ok bo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilIdpUpdatedEventActorType) Or(d IdpUpdatedEventActorType) IdpUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationLookupProjectMemberResponseCreatedByType returns new OptNilInvitationLookupProjectMemberResponseCreatedByType with value set to v.
+func NewOptNilInvitationLookupProjectMemberResponseCreatedByType(v InvitationLookupProjectMemberResponseCreatedByType) OptNilInvitationLookupProjectMemberResponseCreatedByType {
+	return OptNilInvitationLookupProjectMemberResponseCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationLookupProjectMemberResponseCreatedByType is optional nullable InvitationLookupProjectMemberResponseCreatedByType.
+type OptNilInvitationLookupProjectMemberResponseCreatedByType struct {
+	Value InvitationLookupProjectMemberResponseCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationLookupProjectMemberResponseCreatedByType was set.
+func (o OptNilInvitationLookupProjectMemberResponseCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationLookupProjectMemberResponseCreatedByType) Reset() {
+	var v InvitationLookupProjectMemberResponseCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationLookupProjectMemberResponseCreatedByType) SetTo(v InvitationLookupProjectMemberResponseCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationLookupProjectMemberResponseCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationLookupProjectMemberResponseCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationLookupProjectMemberResponseCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationLookupProjectMemberResponseCreatedByType) Get() (v InvitationLookupProjectMemberResponseCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationLookupProjectMemberResponseCreatedByType) Or(d InvitationLookupProjectMemberResponseCreatedByType) InvitationLookupProjectMemberResponseCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationLookupTeamMemberResponseCreatedByType returns new OptNilInvitationLookupTeamMemberResponseCreatedByType with value set to v.
+func NewOptNilInvitationLookupTeamMemberResponseCreatedByType(v InvitationLookupTeamMemberResponseCreatedByType) OptNilInvitationLookupTeamMemberResponseCreatedByType {
+	return OptNilInvitationLookupTeamMemberResponseCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationLookupTeamMemberResponseCreatedByType is optional nullable InvitationLookupTeamMemberResponseCreatedByType.
+type OptNilInvitationLookupTeamMemberResponseCreatedByType struct {
+	Value InvitationLookupTeamMemberResponseCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationLookupTeamMemberResponseCreatedByType was set.
+func (o OptNilInvitationLookupTeamMemberResponseCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationLookupTeamMemberResponseCreatedByType) Reset() {
+	var v InvitationLookupTeamMemberResponseCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationLookupTeamMemberResponseCreatedByType) SetTo(v InvitationLookupTeamMemberResponseCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationLookupTeamMemberResponseCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationLookupTeamMemberResponseCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationLookupTeamMemberResponseCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationLookupTeamMemberResponseCreatedByType) Get() (v InvitationLookupTeamMemberResponseCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationLookupTeamMemberResponseCreatedByType) Or(d InvitationLookupTeamMemberResponseCreatedByType) InvitationLookupTeamMemberResponseCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationMetadata returns new OptNilInvitationMetadata with value set to v.
+func NewOptNilInvitationMetadata(v InvitationMetadata) OptNilInvitationMetadata {
+	return OptNilInvitationMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationMetadata is optional nullable InvitationMetadata.
+type OptNilInvitationMetadata struct {
+	Value InvitationMetadata
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationMetadata was set.
+func (o OptNilInvitationMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationMetadata) Reset() {
+	var v InvitationMetadata
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationMetadata) SetTo(v InvitationMetadata) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationMetadata) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationMetadata) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationMetadata
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationMetadata) Get() (v InvitationMetadata, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationMetadata) Or(d InvitationMetadata) InvitationMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationProjectMemberCreatedByType returns new OptNilInvitationProjectMemberCreatedByType with value set to v.
+func NewOptNilInvitationProjectMemberCreatedByType(v InvitationProjectMemberCreatedByType) OptNilInvitationProjectMemberCreatedByType {
+	return OptNilInvitationProjectMemberCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationProjectMemberCreatedByType is optional nullable InvitationProjectMemberCreatedByType.
+type OptNilInvitationProjectMemberCreatedByType struct {
+	Value InvitationProjectMemberCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationProjectMemberCreatedByType was set.
+func (o OptNilInvitationProjectMemberCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationProjectMemberCreatedByType) Reset() {
+	var v InvitationProjectMemberCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationProjectMemberCreatedByType) SetTo(v InvitationProjectMemberCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationProjectMemberCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationProjectMemberCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationProjectMemberCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationProjectMemberCreatedByType) Get() (v InvitationProjectMemberCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationProjectMemberCreatedByType) Or(d InvitationProjectMemberCreatedByType) InvitationProjectMemberCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationTeamMemberCreatedByType returns new OptNilInvitationTeamMemberCreatedByType with value set to v.
+func NewOptNilInvitationTeamMemberCreatedByType(v InvitationTeamMemberCreatedByType) OptNilInvitationTeamMemberCreatedByType {
+	return OptNilInvitationTeamMemberCreatedByType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationTeamMemberCreatedByType is optional nullable InvitationTeamMemberCreatedByType.
+type OptNilInvitationTeamMemberCreatedByType struct {
+	Value InvitationTeamMemberCreatedByType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationTeamMemberCreatedByType was set.
+func (o OptNilInvitationTeamMemberCreatedByType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationTeamMemberCreatedByType) Reset() {
+	var v InvitationTeamMemberCreatedByType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationTeamMemberCreatedByType) SetTo(v InvitationTeamMemberCreatedByType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationTeamMemberCreatedByType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationTeamMemberCreatedByType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationTeamMemberCreatedByType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationTeamMemberCreatedByType) Get() (v InvitationTeamMemberCreatedByType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationTeamMemberCreatedByType) Or(d InvitationTeamMemberCreatedByType) InvitationTeamMemberCreatedByType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -79721,6 +84978,262 @@ type QueryUsersUnauthorized ErrorDetails
 
 func (*QueryUsersUnauthorized) queryUsersRes() {}
 
+type RejectInvitationBadRequest ErrorDetails
+
+func (*RejectInvitationBadRequest) rejectInvitationRes() {}
+
+// RejectInvitationErrorResponse represents sum type.
+type RejectInvitationErrorResponse struct {
+	Type             RejectInvitationErrorResponseType // switch on this field
+	AuthCsrfInvalid  AuthCsrfInvalid
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	InvNotFound      InvNotFound
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// RejectInvitationErrorResponseType is oneOf type of RejectInvitationErrorResponse.
+type RejectInvitationErrorResponseType string
+
+// Possible values for RejectInvitationErrorResponseType.
+const (
+	AuthCsrfInvalidRejectInvitationErrorResponse  RejectInvitationErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRejectInvitationErrorResponse RejectInvitationErrorResponseType = "auth.unauthorized"
+	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
+	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
+	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
+	ReqInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "req.invalid"
+	UnavailableRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether RejectInvitationErrorResponse is AuthCsrfInvalid.
+func (s RejectInvitationErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRejectInvitationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether RejectInvitationErrorResponse is AuthUnauthorized.
+func (s RejectInvitationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRejectInvitationErrorResponse
+}
+
+// IsInternal reports whether RejectInvitationErrorResponse is Internal.
+func (s RejectInvitationErrorResponse) IsInternal() bool {
+	return s.Type == InternalRejectInvitationErrorResponse
+}
+
+// IsInvNotFound reports whether RejectInvitationErrorResponse is InvNotFound.
+func (s RejectInvitationErrorResponse) IsInvNotFound() bool {
+	return s.Type == InvNotFoundRejectInvitationErrorResponse
+}
+
+// IsNotImplemented reports whether RejectInvitationErrorResponse is NotImplemented.
+func (s RejectInvitationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRejectInvitationErrorResponse
+}
+
+// IsReqInvalid reports whether RejectInvitationErrorResponse is ReqInvalid.
+func (s RejectInvitationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRejectInvitationErrorResponse
+}
+
+// IsUnavailable reports whether RejectInvitationErrorResponse is Unavailable.
+func (s RejectInvitationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRejectInvitationErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RejectInvitationErrorResponse to AuthCsrfInvalid.
+func (s *RejectInvitationErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRejectInvitationErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RejectInvitationErrorResponse is AuthCsrfInvalid.
+func (s RejectInvitationErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRejectInvitationErrorResponse(v AuthCsrfInvalid) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets RejectInvitationErrorResponse to AuthUnauthorized.
+func (s *RejectInvitationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRejectInvitationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RejectInvitationErrorResponse is AuthUnauthorized.
+func (s RejectInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRejectInvitationErrorResponse(v AuthUnauthorized) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets RejectInvitationErrorResponse to Internal.
+func (s *RejectInvitationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRejectInvitationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RejectInvitationErrorResponse is Internal.
+func (s RejectInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from Internal.
+func NewInternalRejectInvitationErrorResponse(v Internal) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetInvNotFound sets RejectInvitationErrorResponse to InvNotFound.
+func (s *RejectInvitationErrorResponse) SetInvNotFound(v InvNotFound) {
+	s.Type = InvNotFoundRejectInvitationErrorResponse
+	s.InvNotFound = v
+}
+
+// GetInvNotFound returns InvNotFound and true boolean if RejectInvitationErrorResponse is InvNotFound.
+func (s RejectInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool) {
+	if !s.IsInvNotFound() {
+		return v, false
+	}
+	return s.InvNotFound, true
+}
+
+// NewInvNotFoundRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from InvNotFound.
+func NewInvNotFoundRejectInvitationErrorResponse(v InvNotFound) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetInvNotFound(v)
+	return s
+}
+
+// SetNotImplemented sets RejectInvitationErrorResponse to NotImplemented.
+func (s *RejectInvitationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRejectInvitationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RejectInvitationErrorResponse is NotImplemented.
+func (s RejectInvitationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from NotImplemented.
+func NewNotImplementedRejectInvitationErrorResponse(v NotImplemented) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RejectInvitationErrorResponse to ReqInvalid.
+func (s *RejectInvitationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRejectInvitationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RejectInvitationErrorResponse is ReqInvalid.
+func (s RejectInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from ReqInvalid.
+func NewReqInvalidRejectInvitationErrorResponse(v ReqInvalid) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets RejectInvitationErrorResponse to Unavailable.
+func (s *RejectInvitationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRejectInvitationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RejectInvitationErrorResponse is Unavailable.
+func (s RejectInvitationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from Unavailable.
+func NewUnavailableRejectInvitationErrorResponse(v Unavailable) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// RejectInvitationErrorResponseStatusCode wraps RejectInvitationErrorResponse with StatusCode.
+type RejectInvitationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RejectInvitationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RejectInvitationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RejectInvitationErrorResponseStatusCode) GetResponse() RejectInvitationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RejectInvitationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RejectInvitationErrorResponseStatusCode) SetResponse(val RejectInvitationErrorResponse) {
+	s.Response = val
+}
+
+func (*RejectInvitationErrorResponseStatusCode) rejectInvitationRes() {}
+
+type RejectInvitationForbidden ErrorDetails
+
+func (*RejectInvitationForbidden) rejectInvitationRes() {}
+
+type RejectInvitationNotFound ErrorDetails
+
+func (*RejectInvitationNotFound) rejectInvitationRes() {}
+
+type RejectInvitationTooManyRequests ErrorDetails
+
+func (*RejectInvitationTooManyRequests) rejectInvitationRes() {}
+
+type RejectInvitationUnauthorized ErrorDetails
+
+func (*RejectInvitationUnauthorized) rejectInvitationRes() {}
+
 // Merged schema.
 // Ref: #
 type RelInUse struct {
@@ -86090,6 +91603,864 @@ func (s *SchemaURL) SetKind(val string) {
 func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
 }
+
+type SearchBadRequest ErrorDetails
+
+func (*SearchBadRequest) searchRes() {}
+
+// SearchErrorResponse represents sum type.
+type SearchErrorResponse struct {
+	Type                    SearchErrorResponseType // switch on this field
+	AuthCsrfInvalid         AuthCsrfInvalid
+	AuthUnauthorized        AuthUnauthorized
+	FlowdefInvalid          FlowdefInvalid
+	FlowdefNotFound         FlowdefNotFound
+	FlowdefPermissionDenied FlowdefPermissionDenied
+	IdpNotFound             IdpNotFound
+	IdpPermissionDenied     IdpPermissionDenied
+	Internal                Internal
+	SchNotFound             SchNotFound
+	SchPermissionDenied     SchPermissionDenied
+	FlowdefMissingProjectID FlowdefMissingProjectID
+	NotImplemented          NotImplemented
+	ProjNotFound            ProjNotFound
+	ProjPermissionDenied    ProjPermissionDenied
+	ReqInvalid              ReqInvalid
+	TeamTeamNotFound        TeamTeamNotFound
+	TeamPermissionDenied    TeamPermissionDenied
+	TeamProjectNotFound     TeamProjectNotFound
+	Unavailable             Unavailable
+	UserNotFound            UserNotFound
+	UserPermissionDenied    UserPermissionDenied
+}
+
+// SearchErrorResponseType is oneOf type of SearchErrorResponse.
+type SearchErrorResponseType string
+
+// Possible values for SearchErrorResponseType.
+const (
+	AuthCsrfInvalidSearchErrorResponse         SearchErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedSearchErrorResponse        SearchErrorResponseType = "auth.unauthorized"
+	FlowdefInvalidSearchErrorResponse          SearchErrorResponseType = "flowdef.invalid"
+	FlowdefNotFoundSearchErrorResponse         SearchErrorResponseType = "flowdef.not_found"
+	FlowdefPermissionDeniedSearchErrorResponse SearchErrorResponseType = "flowdef.permission_denied"
+	IdpNotFoundSearchErrorResponse             SearchErrorResponseType = "idp.not_found"
+	IdpPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "idp.permission_denied"
+	InternalSearchErrorResponse                SearchErrorResponseType = "internal"
+	SchNotFoundSearchErrorResponse             SearchErrorResponseType = "sch.not_found"
+	SchPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "sch.permission_denied"
+	FlowdefMissingProjectIDSearchErrorResponse SearchErrorResponseType = "flowdef.missing_project_id"
+	NotImplementedSearchErrorResponse          SearchErrorResponseType = "not_implemented"
+	ProjNotFoundSearchErrorResponse            SearchErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "proj.permission_denied"
+	ReqInvalidSearchErrorResponse              SearchErrorResponseType = "req.invalid"
+	TeamTeamNotFoundSearchErrorResponse        SearchErrorResponseType = "team.team_not_found"
+	TeamPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "team.permission_denied"
+	TeamProjectNotFoundSearchErrorResponse     SearchErrorResponseType = "team.project_not_found"
+	UnavailableSearchErrorResponse             SearchErrorResponseType = "unavailable"
+	UserNotFoundSearchErrorResponse            SearchErrorResponseType = "user.not_found"
+	UserPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthCsrfInvalid reports whether SearchErrorResponse is AuthCsrfInvalid.
+func (s SearchErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidSearchErrorResponse
+}
+
+// IsAuthUnauthorized reports whether SearchErrorResponse is AuthUnauthorized.
+func (s SearchErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedSearchErrorResponse
+}
+
+// IsFlowdefInvalid reports whether SearchErrorResponse is FlowdefInvalid.
+func (s SearchErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidSearchErrorResponse
+}
+
+// IsFlowdefNotFound reports whether SearchErrorResponse is FlowdefNotFound.
+func (s SearchErrorResponse) IsFlowdefNotFound() bool {
+	return s.Type == FlowdefNotFoundSearchErrorResponse
+}
+
+// IsFlowdefPermissionDenied reports whether SearchErrorResponse is FlowdefPermissionDenied.
+func (s SearchErrorResponse) IsFlowdefPermissionDenied() bool {
+	return s.Type == FlowdefPermissionDeniedSearchErrorResponse
+}
+
+// IsIdpNotFound reports whether SearchErrorResponse is IdpNotFound.
+func (s SearchErrorResponse) IsIdpNotFound() bool { return s.Type == IdpNotFoundSearchErrorResponse }
+
+// IsIdpPermissionDenied reports whether SearchErrorResponse is IdpPermissionDenied.
+func (s SearchErrorResponse) IsIdpPermissionDenied() bool {
+	return s.Type == IdpPermissionDeniedSearchErrorResponse
+}
+
+// IsInternal reports whether SearchErrorResponse is Internal.
+func (s SearchErrorResponse) IsInternal() bool { return s.Type == InternalSearchErrorResponse }
+
+// IsSchNotFound reports whether SearchErrorResponse is SchNotFound.
+func (s SearchErrorResponse) IsSchNotFound() bool { return s.Type == SchNotFoundSearchErrorResponse }
+
+// IsSchPermissionDenied reports whether SearchErrorResponse is SchPermissionDenied.
+func (s SearchErrorResponse) IsSchPermissionDenied() bool {
+	return s.Type == SchPermissionDeniedSearchErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether SearchErrorResponse is FlowdefMissingProjectID.
+func (s SearchErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDSearchErrorResponse
+}
+
+// IsNotImplemented reports whether SearchErrorResponse is NotImplemented.
+func (s SearchErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedSearchErrorResponse
+}
+
+// IsProjNotFound reports whether SearchErrorResponse is ProjNotFound.
+func (s SearchErrorResponse) IsProjNotFound() bool { return s.Type == ProjNotFoundSearchErrorResponse }
+
+// IsProjPermissionDenied reports whether SearchErrorResponse is ProjPermissionDenied.
+func (s SearchErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedSearchErrorResponse
+}
+
+// IsReqInvalid reports whether SearchErrorResponse is ReqInvalid.
+func (s SearchErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidSearchErrorResponse }
+
+// IsTeamTeamNotFound reports whether SearchErrorResponse is TeamTeamNotFound.
+func (s SearchErrorResponse) IsTeamTeamNotFound() bool {
+	return s.Type == TeamTeamNotFoundSearchErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether SearchErrorResponse is TeamPermissionDenied.
+func (s SearchErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedSearchErrorResponse
+}
+
+// IsTeamProjectNotFound reports whether SearchErrorResponse is TeamProjectNotFound.
+func (s SearchErrorResponse) IsTeamProjectNotFound() bool {
+	return s.Type == TeamProjectNotFoundSearchErrorResponse
+}
+
+// IsUnavailable reports whether SearchErrorResponse is Unavailable.
+func (s SearchErrorResponse) IsUnavailable() bool { return s.Type == UnavailableSearchErrorResponse }
+
+// IsUserNotFound reports whether SearchErrorResponse is UserNotFound.
+func (s SearchErrorResponse) IsUserNotFound() bool { return s.Type == UserNotFoundSearchErrorResponse }
+
+// IsUserPermissionDenied reports whether SearchErrorResponse is UserPermissionDenied.
+func (s SearchErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedSearchErrorResponse
+}
+
+// SetAuthCsrfInvalid sets SearchErrorResponse to AuthCsrfInvalid.
+func (s *SearchErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidSearchErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if SearchErrorResponse is AuthCsrfInvalid.
+func (s SearchErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidSearchErrorResponse returns new SearchErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidSearchErrorResponse(v AuthCsrfInvalid) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets SearchErrorResponse to AuthUnauthorized.
+func (s *SearchErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedSearchErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if SearchErrorResponse is AuthUnauthorized.
+func (s SearchErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedSearchErrorResponse returns new SearchErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedSearchErrorResponse(v AuthUnauthorized) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetFlowdefInvalid sets SearchErrorResponse to FlowdefInvalid.
+func (s *SearchErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidSearchErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if SearchErrorResponse is FlowdefInvalid.
+func (s SearchErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidSearchErrorResponse returns new SearchErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidSearchErrorResponse(v FlowdefInvalid) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetFlowdefNotFound sets SearchErrorResponse to FlowdefNotFound.
+func (s *SearchErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
+	s.Type = FlowdefNotFoundSearchErrorResponse
+	s.FlowdefNotFound = v
+}
+
+// GetFlowdefNotFound returns FlowdefNotFound and true boolean if SearchErrorResponse is FlowdefNotFound.
+func (s SearchErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
+	if !s.IsFlowdefNotFound() {
+		return v, false
+	}
+	return s.FlowdefNotFound, true
+}
+
+// NewFlowdefNotFoundSearchErrorResponse returns new SearchErrorResponse from FlowdefNotFound.
+func NewFlowdefNotFoundSearchErrorResponse(v FlowdefNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetFlowdefNotFound(v)
+	return s
+}
+
+// SetFlowdefPermissionDenied sets SearchErrorResponse to FlowdefPermissionDenied.
+func (s *SearchErrorResponse) SetFlowdefPermissionDenied(v FlowdefPermissionDenied) {
+	s.Type = FlowdefPermissionDeniedSearchErrorResponse
+	s.FlowdefPermissionDenied = v
+}
+
+// GetFlowdefPermissionDenied returns FlowdefPermissionDenied and true boolean if SearchErrorResponse is FlowdefPermissionDenied.
+func (s SearchErrorResponse) GetFlowdefPermissionDenied() (v FlowdefPermissionDenied, ok bool) {
+	if !s.IsFlowdefPermissionDenied() {
+		return v, false
+	}
+	return s.FlowdefPermissionDenied, true
+}
+
+// NewFlowdefPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from FlowdefPermissionDenied.
+func NewFlowdefPermissionDeniedSearchErrorResponse(v FlowdefPermissionDenied) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetFlowdefPermissionDenied(v)
+	return s
+}
+
+// SetIdpNotFound sets SearchErrorResponse to IdpNotFound.
+func (s *SearchErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundSearchErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if SearchErrorResponse is IdpNotFound.
+func (s SearchErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundSearchErrorResponse returns new SearchErrorResponse from IdpNotFound.
+func NewIdpNotFoundSearchErrorResponse(v IdpNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpPermissionDenied sets SearchErrorResponse to IdpPermissionDenied.
+func (s *SearchErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
+	s.Type = IdpPermissionDeniedSearchErrorResponse
+	s.IdpPermissionDenied = v
+}
+
+// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if SearchErrorResponse is IdpPermissionDenied.
+func (s SearchErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
+	if !s.IsIdpPermissionDenied() {
+		return v, false
+	}
+	return s.IdpPermissionDenied, true
+}
+
+// NewIdpPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from IdpPermissionDenied.
+func NewIdpPermissionDeniedSearchErrorResponse(v IdpPermissionDenied) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetIdpPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets SearchErrorResponse to Internal.
+func (s *SearchErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalSearchErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if SearchErrorResponse is Internal.
+func (s SearchErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalSearchErrorResponse returns new SearchErrorResponse from Internal.
+func NewInternalSearchErrorResponse(v Internal) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets SearchErrorResponse to SchNotFound.
+func (s *SearchErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundSearchErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if SearchErrorResponse is SchNotFound.
+func (s SearchErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundSearchErrorResponse returns new SearchErrorResponse from SchNotFound.
+func NewSchNotFoundSearchErrorResponse(v SchNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchPermissionDenied sets SearchErrorResponse to SchPermissionDenied.
+func (s *SearchErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
+	s.Type = SchPermissionDeniedSearchErrorResponse
+	s.SchPermissionDenied = v
+}
+
+// GetSchPermissionDenied returns SchPermissionDenied and true boolean if SearchErrorResponse is SchPermissionDenied.
+func (s SearchErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
+	if !s.IsSchPermissionDenied() {
+		return v, false
+	}
+	return s.SchPermissionDenied, true
+}
+
+// NewSchPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from SchPermissionDenied.
+func NewSchPermissionDeniedSearchErrorResponse(v SchPermissionDenied) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetSchPermissionDenied(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets SearchErrorResponse to FlowdefMissingProjectID.
+func (s *SearchErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDSearchErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if SearchErrorResponse is FlowdefMissingProjectID.
+func (s SearchErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDSearchErrorResponse returns new SearchErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDSearchErrorResponse(v FlowdefMissingProjectID) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetFlowdefMissingProjectID(v)
+	return s
+}
+
+// SetNotImplemented sets SearchErrorResponse to NotImplemented.
+func (s *SearchErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedSearchErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if SearchErrorResponse is NotImplemented.
+func (s SearchErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedSearchErrorResponse returns new SearchErrorResponse from NotImplemented.
+func NewNotImplementedSearchErrorResponse(v NotImplemented) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets SearchErrorResponse to ProjNotFound.
+func (s *SearchErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundSearchErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if SearchErrorResponse is ProjNotFound.
+func (s SearchErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundSearchErrorResponse returns new SearchErrorResponse from ProjNotFound.
+func NewProjNotFoundSearchErrorResponse(v ProjNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjPermissionDenied sets SearchErrorResponse to ProjPermissionDenied.
+func (s *SearchErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedSearchErrorResponse
+	s.ProjPermissionDenied = v
+}
+
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if SearchErrorResponse is ProjPermissionDenied.
+func (s SearchErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+	if !s.IsProjPermissionDenied() {
+		return v, false
+	}
+	return s.ProjPermissionDenied, true
+}
+
+// NewProjPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedSearchErrorResponse(v ProjPermissionDenied) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetProjPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets SearchErrorResponse to ReqInvalid.
+func (s *SearchErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidSearchErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if SearchErrorResponse is ReqInvalid.
+func (s SearchErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidSearchErrorResponse returns new SearchErrorResponse from ReqInvalid.
+func NewReqInvalidSearchErrorResponse(v ReqInvalid) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamTeamNotFound sets SearchErrorResponse to TeamTeamNotFound.
+func (s *SearchErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
+	s.Type = TeamTeamNotFoundSearchErrorResponse
+	s.TeamTeamNotFound = v
+}
+
+// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if SearchErrorResponse is TeamTeamNotFound.
+func (s SearchErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
+	if !s.IsTeamTeamNotFound() {
+		return v, false
+	}
+	return s.TeamTeamNotFound, true
+}
+
+// NewTeamTeamNotFoundSearchErrorResponse returns new SearchErrorResponse from TeamTeamNotFound.
+func NewTeamTeamNotFoundSearchErrorResponse(v TeamTeamNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetTeamTeamNotFound(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets SearchErrorResponse to TeamPermissionDenied.
+func (s *SearchErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedSearchErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if SearchErrorResponse is TeamPermissionDenied.
+func (s SearchErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedSearchErrorResponse(v TeamPermissionDenied) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetTeamProjectNotFound sets SearchErrorResponse to TeamProjectNotFound.
+func (s *SearchErrorResponse) SetTeamProjectNotFound(v TeamProjectNotFound) {
+	s.Type = TeamProjectNotFoundSearchErrorResponse
+	s.TeamProjectNotFound = v
+}
+
+// GetTeamProjectNotFound returns TeamProjectNotFound and true boolean if SearchErrorResponse is TeamProjectNotFound.
+func (s SearchErrorResponse) GetTeamProjectNotFound() (v TeamProjectNotFound, ok bool) {
+	if !s.IsTeamProjectNotFound() {
+		return v, false
+	}
+	return s.TeamProjectNotFound, true
+}
+
+// NewTeamProjectNotFoundSearchErrorResponse returns new SearchErrorResponse from TeamProjectNotFound.
+func NewTeamProjectNotFoundSearchErrorResponse(v TeamProjectNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetTeamProjectNotFound(v)
+	return s
+}
+
+// SetUnavailable sets SearchErrorResponse to Unavailable.
+func (s *SearchErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableSearchErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if SearchErrorResponse is Unavailable.
+func (s SearchErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableSearchErrorResponse returns new SearchErrorResponse from Unavailable.
+func NewUnavailableSearchErrorResponse(v Unavailable) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetUserNotFound sets SearchErrorResponse to UserNotFound.
+func (s *SearchErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundSearchErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if SearchErrorResponse is UserNotFound.
+func (s SearchErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundSearchErrorResponse returns new SearchErrorResponse from UserNotFound.
+func NewUserNotFoundSearchErrorResponse(v UserNotFound) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets SearchErrorResponse to UserPermissionDenied.
+func (s *SearchErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedSearchErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if SearchErrorResponse is UserPermissionDenied.
+func (s SearchErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedSearchErrorResponse(v UserPermissionDenied) SearchErrorResponse {
+	var s SearchErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// SearchErrorResponseStatusCode wraps SearchErrorResponse with StatusCode.
+type SearchErrorResponseStatusCode struct {
+	StatusCode int
+	Response   SearchErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *SearchErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *SearchErrorResponseStatusCode) GetResponse() SearchErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *SearchErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SearchErrorResponseStatusCode) SetResponse(val SearchErrorResponse) {
+	s.Response = val
+}
+
+func (*SearchErrorResponseStatusCode) searchRes() {}
+
+type SearchForbidden ErrorDetails
+
+func (*SearchForbidden) searchRes() {}
+
+type SearchNotFound ErrorDetails
+
+func (*SearchNotFound) searchRes() {}
+
+// Request to search a project.
+// Ref: #
+type SearchRequest struct {
+	// The text to find. Spaces around it are ignored, and a text of spaces
+	// alone finds nothing.
+	Query string `json:"query"`
+	// The types to search. Only these appear in `results`, so a client never
+	// receives a type it did not ask for.
+	Types []SearchResultType `json:"types"`
+	// The most results each type contributes.
+	LimitPerType OptInt `json:"limit_per_type"`
+}
+
+// GetQuery returns the value of Query.
+func (s *SearchRequest) GetQuery() string {
+	return s.Query
+}
+
+// GetTypes returns the value of Types.
+func (s *SearchRequest) GetTypes() []SearchResultType {
+	return s.Types
+}
+
+// GetLimitPerType returns the value of LimitPerType.
+func (s *SearchRequest) GetLimitPerType() OptInt {
+	return s.LimitPerType
+}
+
+// SetQuery sets the value of Query.
+func (s *SearchRequest) SetQuery(val string) {
+	s.Query = val
+}
+
+// SetTypes sets the value of Types.
+func (s *SearchRequest) SetTypes(val []SearchResultType) {
+	s.Types = val
+}
+
+// SetLimitPerType sets the value of LimitPerType.
+func (s *SearchRequest) SetLimitPerType(val OptInt) {
+	s.LimitPerType = val
+}
+
+// The best matches of each requested type.
+// Ref: #
+type SearchResponse struct {
+	// The matches, best first. Types can be mixed in the order: group by
+	// `type` to show them by type.
+	Results []SearchResult `json:"results"`
+	// The requested types whose matches are not all in `results`: there were
+	// more than `limit_per_type`, the text was too short to search that type,
+	// or the project holds more of that type than one search reads. Empty when
+	// every requested type is complete.
+	IncompleteTypes []SearchResultType `json:"incomplete_types"`
+}
+
+// GetResults returns the value of Results.
+func (s *SearchResponse) GetResults() []SearchResult {
+	return s.Results
+}
+
+// GetIncompleteTypes returns the value of IncompleteTypes.
+func (s *SearchResponse) GetIncompleteTypes() []SearchResultType {
+	return s.IncompleteTypes
+}
+
+// SetResults sets the value of Results.
+func (s *SearchResponse) SetResults(val []SearchResult) {
+	s.Results = val
+}
+
+// SetIncompleteTypes sets the value of IncompleteTypes.
+func (s *SearchResponse) SetIncompleteTypes(val []SearchResultType) {
+	s.IncompleteTypes = val
+}
+
+func (*SearchResponse) searchRes() {}
+
+// One match: a reference to a resource, not the resource. Every type has this
+// shape.
+// Ref: #
+type SearchResult struct {
+	Type SearchResultType `json:"type"`
+	// The resource's `id`, as its type's own operations take it. For a schema
+	// and a flow definition, the `id` of the newest revision.
+	ID string `json:"id"`
+	// The project the resource belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// What to call the resource:
+	// - a user: their `display`, else their `identifier`, else their `id`
+	// - a team: its name
+	// - a schema: its `title`, else its `objectType`, else its `id`
+	// - a flow definition: its name
+	// - an identity provider connection: its `display_name`, else its `slug`.
+	Title string `json:"title"`
+	// A second line that tells two titles apart, absent when there is nothing
+	// to add:
+	// - a user shown by their `display`: their `identifier`
+	// - a schema shown by its `title`: its `objectType`
+	// - a flow definition: the purposes it handles
+	// - an identity provider connection shown by its `display_name`: its
+	// `slug`.
+	Subtitle OptString `json:"subtitle"`
+}
+
+// GetType returns the value of Type.
+func (s *SearchResult) GetType() SearchResultType {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *SearchResult) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *SearchResult) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTitle returns the value of Title.
+func (s *SearchResult) GetTitle() string {
+	return s.Title
+}
+
+// GetSubtitle returns the value of Subtitle.
+func (s *SearchResult) GetSubtitle() OptString {
+	return s.Subtitle
+}
+
+// SetType sets the value of Type.
+func (s *SearchResult) SetType(val SearchResultType) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *SearchResult) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *SearchResult) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTitle sets the value of Title.
+func (s *SearchResult) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetSubtitle sets the value of Subtitle.
+func (s *SearchResult) SetSubtitle(val OptString) {
+	s.Subtitle = val
+}
+
+// A type of result `search` (`POST /search`) finds:
+// - `user`: a user, matched on the start of the value they carry as
+// `identifier` or of a part of their `display` name
+// - `team`: a team, matched on its name
+// - `schema`: a user schema at its newest revision, matched on its `title`
+// and its `objectType`
+// - `flow_definition`: a flow definition at its newest revision, matched on
+// its name
+// - `idp`: an identity provider connection, matched on its `slug` and its
+// `display_name`.
+// Ref: #
+type SearchResultType string
+
+const (
+	SearchResultTypeUser           SearchResultType = "user"
+	SearchResultTypeTeam           SearchResultType = "team"
+	SearchResultTypeSchema         SearchResultType = "schema"
+	SearchResultTypeFlowDefinition SearchResultType = "flow_definition"
+	SearchResultTypeIdp            SearchResultType = "idp"
+)
+
+// AllValues returns all SearchResultType values.
+func (SearchResultType) AllValues() []SearchResultType {
+	return []SearchResultType{
+		SearchResultTypeUser,
+		SearchResultTypeTeam,
+		SearchResultTypeSchema,
+		SearchResultTypeFlowDefinition,
+		SearchResultTypeIdp,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SearchResultType) MarshalText() ([]byte, error) {
+	switch s {
+	case SearchResultTypeUser:
+		return []byte(s), nil
+	case SearchResultTypeTeam:
+		return []byte(s), nil
+	case SearchResultTypeSchema:
+		return []byte(s), nil
+	case SearchResultTypeFlowDefinition:
+		return []byte(s), nil
+	case SearchResultTypeIdp:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SearchResultType) UnmarshalText(data []byte) error {
+	switch SearchResultType(data) {
+	case SearchResultTypeUser:
+		*s = SearchResultTypeUser
+		return nil
+	case SearchResultTypeTeam:
+		*s = SearchResultTypeTeam
+		return nil
+	case SearchResultTypeSchema:
+		*s = SearchResultTypeSchema
+		return nil
+	case SearchResultTypeFlowDefinition:
+		*s = SearchResultTypeFlowDefinition
+		return nil
+	case SearchResultTypeIdp:
+		*s = SearchResultTypeIdp
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type SearchUnauthorized ErrorDetails
+
+func (*SearchUnauthorized) searchRes() {}
 
 // A secret as the API returns it. It says that a value is held under this
 // name and that the value is secret. It never carries the value itself.
@@ -95272,6 +101643,14 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // The field to filter users by, one of:
 // - `created_at`: RFC3339 timestamp
 // - `id`: user ID
+// - `identifier`: the value returned as the user's `identifier`: the property
+// designated by `x-identifier` in the revision of the schema the user is on.
+// `starts_with`, a case-insensitive match on the start of the value, is the
+// only operation. Case is folded as for a unique property, so a value found
+// here is the value sign-in resolves. The value may not be empty or longer
+// than 256 characters, only string values match, and the filter may be given
+// once. An index answers it, and the users come back ordered by identifier,
+// then `id`: `sorting` cannot be combined with it.
 // - `schema`: the schema the user's attributes satisfy, matched against the
 // value the user carries as `schema`. Each revision of a schema has its own
 // URL, so `equals` selects the users on one revision and `not_equals` the
@@ -95295,8 +101674,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // `GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which
 // team may deprovision the user. A user can belong to many teams while owning
 // their own lifecycle, so the two disagree often and neither implies the other.
-// `team_id` and `schema_object_type` are filterable but not sortable, so
-// neither is a valid sort field.
+// `identifier`, `team_id` and `schema_object_type` are filterable but not
+// sortable, so none is a valid sort field.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 // A console session, which carries no scopes, may filter on it when it may read
@@ -95308,6 +101687,7 @@ type UserFilterField string
 const (
 	UserFilterFieldCreatedAt            UserFilterField = "created_at"
 	UserFilterFieldID                   UserFilterField = "id"
+	UserFilterFieldIdentifier           UserFilterField = "identifier"
 	UserFilterFieldSchema               UserFilterField = "schema"
 	UserFilterFieldSchemaObjectType     UserFilterField = "schema_object_type"
 	UserFilterFieldStatus               UserFilterField = "status"
@@ -95320,6 +101700,7 @@ func (UserFilterField) AllValues() []UserFilterField {
 	return []UserFilterField{
 		UserFilterFieldCreatedAt,
 		UserFilterFieldID,
+		UserFilterFieldIdentifier,
 		UserFilterFieldSchema,
 		UserFilterFieldSchemaObjectType,
 		UserFilterFieldStatus,
@@ -95334,6 +101715,8 @@ func (s UserFilterField) MarshalText() ([]byte, error) {
 	case UserFilterFieldCreatedAt:
 		return []byte(s), nil
 	case UserFilterFieldID:
+		return []byte(s), nil
+	case UserFilterFieldIdentifier:
 		return []byte(s), nil
 	case UserFilterFieldSchema:
 		return []byte(s), nil
@@ -95358,6 +101741,9 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case UserFilterFieldID:
 		*s = UserFilterFieldID
+		return nil
+	case UserFilterFieldIdentifier:
+		*s = UserFilterFieldIdentifier
 		return nil
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema

@@ -294,6 +294,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.QueryGrantsOperation,
 		api.QueryUsersOperation,
 		api.QueryTeamsOperation,
+		api.SearchOperation,
 		api.GetTeamOperation,
 		api.CreateUserOperation,
 		api.GetUserByIDOperation,
