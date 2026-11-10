@@ -422,7 +422,7 @@ properties:
     description: Whether a variable is secret; never its name or value.
   variable_count:
     type: number
-    description: How many variables `variable list` found.
+    description: How many variables `variables list` found.
   operation:
     type: string
     description: The `operationId` `zitadel api` called, never a path, an id or a field.

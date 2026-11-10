@@ -9,8 +9,8 @@ describe("projectCommand", () => {
   it("appends the run's selector", () => {
     const selector = environmentSelectorSuffix({ envName: "production" });
 
-    expect(projectCommand("variable list", selector, VERSION)).toBe(
-      "npx @zitadel/cli@1.0.0-alpha.25 variable list --env production",
+    expect(projectCommand("variables list", selector, VERSION)).toBe(
+      "npx @zitadel/cli@1.0.0-alpha.25 variables list --env production",
     );
   });
 
@@ -54,13 +54,13 @@ describe("inShell", () => {
 
   it("puts a redirection after the selector", () => {
     const command = projectCommand(
-      "variable set TOKEN --secret",
+      "variables set TOKEN --secret",
       environmentSelectorSuffix({ envName: "ci" }),
       VERSION,
     );
 
     expect(inShell(command, { after: " < value.txt" })).toBe(
-      "npx @zitadel/cli@1.0.0-alpha.25 variable set TOKEN --secret --env ci < value.txt",
+      "npx @zitadel/cli@1.0.0-alpha.25 variables set TOKEN --secret --env ci < value.txt",
     );
   });
 });

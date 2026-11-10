@@ -390,7 +390,7 @@ entries.
   secret itself is refused and redacted.
 
 A secret's value still never travels as an argument. It comes from a prompt or
-stdin, and is published as a variable (§4, `variable set`). Help and examples
+stdin, and is published as a variable (§4, `variables set`). Help and examples
 write references in single quotes: inside double quotes, bash stops at `${{`
 with "bad substitution" before the CLI runs.
 

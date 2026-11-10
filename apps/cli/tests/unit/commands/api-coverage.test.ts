@@ -230,7 +230,7 @@ const PIPELINE_SOURCES: readonly string[] = [
 
 /**
  * The client operations each standalone command calls, read from its source
- * and keyed by its command (`variable set`). The registry's evidence is which
+ * and keyed by its command (`variables set`). The registry's evidence is which
  * client properties its verbs touch; a `client.<operation>(` call site, or a
  * destructive one's `consent.unlock(client).<operation>(`, is the same evidence, so a command that stops calling an operation leaves that
  * operation unaccounted and this test fails. The release and deployment

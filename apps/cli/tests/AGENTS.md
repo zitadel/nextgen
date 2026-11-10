@@ -30,7 +30,7 @@ reclassified until it is one.
 - **Specs** (`tests/integration/**/*.spec.ts`) drive the built CLI through
   `runCliForTest` against `@zitadel/api-mock`'s platform handlers and assert
   only what a developer could observe.
-- One spec file per command, named after it (`variable-set.spec.ts`), the
+- One spec file per command, named after it (`variables-set.spec.ts`), the
   only spec that drives that command. No cross-command, "contract" or
   "round-trip" files.
 - A property every command must have lives in the fixture: `ScaffoldedApp`
