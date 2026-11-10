@@ -1,8 +1,11 @@
+import type { Writable } from "node:stream";
+
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 
 import type { Parsed } from "@zitadel/config/idp";
 
 import { CANCELLED, confirmationHint, PromptCancelled, ZitadelError } from "./errors";
+import { flatOutput } from "./flat-output";
 import type {
   Choice,
   ConfirmQuestion,
@@ -104,6 +107,19 @@ class DrawnPrompter implements Prompter {
     this.guide = guide;
   }
 
+  /**
+   * What every prompt is given besides its question. With the guide, clack
+   * draws on the terminal as it is; without it, on a stream that takes the
+   * mark and the indent off ({@link flatOutput}), which is the one place a
+   * normal command's prompts are made to look as they do.
+   */
+  private get drawing(): { withGuide: boolean; input?: NodeJS.ReadStream; output?: Writable } {
+    if (this.guide) {
+      return { withGuide: true };
+    }
+    return { withGuide: false, input: process.stdin, output: flatOutput(process.stdout) };
+  }
+
   async text(question: AnyQuestion, validate: Validate): Promise<string> {
     return this.answered(
       await text({
@@ -111,15 +127,13 @@ class DrawnPrompter implements Prompter {
         validate,
         initialValue: question.initialValue as string | undefined,
         placeholder: question.placeholder,
-        withGuide: this.guide,
+        ...this.drawing,
       }),
     );
   }
 
   async secret(question: AnyQuestion, validate: Validate): Promise<string> {
-    return this.answered(
-      await password({ message: question.message, validate, withGuide: this.guide }),
-    );
+    return this.answered(await password({ message: question.message, validate, ...this.drawing }));
   }
 
   async select(question: AnyQuestion): Promise<unknown> {
@@ -128,7 +142,7 @@ class DrawnPrompter implements Prompter {
         message: question.message,
         options: question.options ?? [],
         initialValue: question.initialValue,
-        withGuide: this.guide,
+        ...this.drawing,
       }),
     );
   }
@@ -139,17 +153,32 @@ class DrawnPrompter implements Prompter {
         message: question.message,
         options: question.options ?? [],
         required: question.required,
-        withGuide: this.guide,
+        ...this.drawing,
       }),
     ) as unknown[];
   }
 
+  /**
+   * A yes or no. A wizard asks it on one line, as clack does. A normal command
+   * asks it as a list of two, so it is answered the way every other choice is:
+   * up and down, then Enter. "No" is first, so Enter alone declines.
+   */
   async confirm(question: AnyQuestion): Promise<boolean> {
+    const initialValue = (question.initialValue as boolean | undefined) ?? false;
+    if (this.guide) {
+      return this.chosen(
+        await confirm({ message: question.message, initialValue, ...this.drawing }),
+      ) as boolean;
+    }
     return this.chosen(
-      await confirm({
+      await select<boolean>({
         message: question.message,
-        initialValue: (question.initialValue as boolean | undefined) ?? false,
-        withGuide: this.guide,
+        options: [
+          { value: false, label: "No" },
+          { value: true, label: "Yes" },
+        ],
+        initialValue,
+        ...this.drawing,
       }),
     ) as boolean;
   }

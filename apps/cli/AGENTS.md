@@ -130,8 +130,9 @@
   inferred from how a run went (`src/lib/ui/presentation.ts`). A wizard sets
   `static override wizard = true` and gets the chain, the guide beside its
   prompts and the summary box; every other command draws neither chain nor
-  box, asks the same clack prompts without the guide (`withGuide: false`), and
-  ends on its answer and one dim footer. Nothing else reads a line from the
+  box, asks the same clack prompts with no guide, no mark and no indent
+  (`src/lib/flat-output.ts`), a yes or no as a No/Yes list, and ends on its
+  answer and one dim footer. Nothing else reads a line from the
   terminal: a unit test fails on a `readline` import. Adding a question, a
   warning or a `--force` to a command must not change its shape.
   - The shape holds off a terminal: a run nothing can be drawn into has its

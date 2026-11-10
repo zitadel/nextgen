@@ -529,7 +529,9 @@ describe("asker", () => {
 
   describe("the guide", () => {
     const question = { name: "x", message: "X", options };
-    const kinds: Array<[string, () => unknown, (session: Session) => Promise<unknown>]> = [
+    const kinds: Array<
+      [string, (guide: boolean) => unknown, (session: Session) => Promise<unknown>]
+    > = [
       ["a text prompt", () => vi.mocked(text), (session) => asker(session).text(typed())],
       ["a secret prompt", () => vi.mocked(password), (session) => asker(session).secret(typed())],
       ["a select", () => vi.mocked(select), (session) => asker(session).select(question)],
@@ -540,12 +542,12 @@ describe("asker", () => {
       ],
       [
         "a yes or no",
-        () => vi.mocked(confirm),
+        (guide) => (guide ? vi.mocked(confirm) : vi.mocked(select)),
         (session) => asker(session).yesNo({ name: "x", message: "X?" }),
       ],
       [
         "a confirm",
-        () => vi.mocked(confirm),
+        (guide) => (guide ? vi.mocked(confirm) : vi.mocked(select)),
         (session) => asker(session).confirm({ name: "x", message: "X?" }),
       ],
     ];
@@ -553,11 +555,11 @@ describe("asker", () => {
     it.each(kinds)(
       "draws %s without the guide when the session has none",
       async (_kind, prompt, act) => {
-        (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
+        (prompt(false) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
 
         await act({ ...ask, guide: false });
 
-        expect((prompt() as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
+        expect((prompt(false) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
           withGuide: false,
         });
       },
@@ -566,23 +568,85 @@ describe("asker", () => {
     it.each(kinds)(
       "draws %s with the guide when the session says so",
       async (_kind, prompt, act) => {
-        (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
+        (prompt(true) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
 
         await act({ ...ask, guide: true });
 
-        expect((prompt() as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
+        expect((prompt(true) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
           withGuide: true,
         });
       },
     );
 
     it.each(kinds)("draws %s with the guide by default", async (_kind, prompt, act) => {
-      (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
+      (prompt(true) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
 
       await act(ask);
 
-      expect((prompt() as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
+      expect((prompt(true) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
         withGuide: true,
+      });
+    });
+
+    it.each(kinds)(
+      "draws %s on a stream that flattens it, without the guide",
+      async (_kind, prompt, act) => {
+        (prompt(false) as ReturnType<typeof vi.fn>).mockResolvedValueOnce("x");
+
+        await act({ ...ask, guide: false });
+
+        const drawn = (prompt(false) as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+          input: unknown;
+          output: { isTTY: boolean };
+        };
+        expect(drawn.input).toBe(process.stdin);
+        expect(drawn.output).toMatchObject({ isTTY: true });
+      },
+    );
+
+    it("draws a wizard's prompts on the terminal itself", async () => {
+      vi.mocked(text).mockResolvedValueOnce("x");
+
+      await asker({ ...ask, guide: true }).text(typed());
+
+      expect(vi.mocked(text).mock.calls[0]?.[0]).not.toHaveProperty("output");
+    });
+
+    describe("a confirmation without the guide", () => {
+      it("is a list of No then Yes, so Enter alone declines", async () => {
+        vi.mocked(select).mockResolvedValueOnce(false);
+
+        const agreed = await asker({ ...ask, guide: false }).confirm({ name: "x", message: "X?" });
+
+        expect(agreed).toBe(false);
+        expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+          message: "X?",
+          options: [
+            { value: false, label: "No" },
+            { value: true, label: "Yes" },
+          ],
+          initialValue: false,
+        });
+      });
+
+      it("answers yes when Yes is chosen", async () => {
+        vi.mocked(select).mockResolvedValueOnce(true);
+
+        await expect(
+          asker({ ...ask, guide: false }).confirm({ name: "x", message: "X?" }),
+        ).resolves.toBe(true);
+      });
+
+      it("starts on Yes for a question that defaults to yes", async () => {
+        vi.mocked(select).mockResolvedValueOnce(true);
+
+        await asker({ ...ask, guide: false }).yesNo({
+          name: "x",
+          message: "X?",
+          initialValue: true,
+        });
+
+        expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: true });
       });
     });
 
@@ -600,7 +664,7 @@ describe("asker", () => {
       it.each(kinds)(
         "throws a plain E_CANCELLED from %s without the guide",
         async (_kind, prompt, act) => {
-          const error = await cancelled(prompt(), act, { ...ask, guide: false });
+          const error = await cancelled(prompt(false), act, { ...ask, guide: false });
 
           expect(error).toMatchObject({
             code: "E_CANCELLED",
@@ -612,7 +676,7 @@ describe("asker", () => {
       );
 
       it.each(kinds)("closes no chain from %s without the guide", async (_kind, prompt, act) => {
-        await cancelled(prompt(), act, { ...ask, guide: false });
+        await cancelled(prompt(false), act, { ...ask, guide: false });
 
         expect(cancel).not.toHaveBeenCalled();
       });
@@ -620,7 +684,7 @@ describe("asker", () => {
       it.each(kinds)(
         "throws PromptCancelled from %s with the guide",
         async (_kind, prompt, act) => {
-          const error = await cancelled(prompt(), act, { ...ask, guide: true });
+          const error = await cancelled(prompt(true), act, { ...ask, guide: true });
 
           expect(error).toBeInstanceOf(PromptCancelled);
         },

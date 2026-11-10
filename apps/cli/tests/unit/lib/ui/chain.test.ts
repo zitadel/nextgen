@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
 import * as prompts from "@clack/prompts";
-import { confirm, intro, log, note, outro, spinner } from "@clack/prompts";
+import { confirm, intro, log, note, outro, select, spinner } from "@clack/prompts";
 
 import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
 import { Chain } from "../../../../src/lib/ui/chain";
@@ -347,7 +347,7 @@ describe("a normal command's chain, which is no chain at all", () => {
       }),
     );
 
-    expect(vi.mocked(confirm)).toHaveBeenCalledWith(
+    expect(vi.mocked(select)).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Remove B from the project?", withGuide: false }),
     );
   });
