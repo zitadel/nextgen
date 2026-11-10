@@ -311,6 +311,12 @@ const DoctorRecovery = z.looseObject({
     .optional(),
 });
 
+/** The refusal `release revoke` answers for a release origins still serve. */
+const ServedRefusal = z.looseObject({
+  message: z.string(),
+  details: z.looseObject({ origins: z.array(z.looseObject({ origin: z.string() })) }),
+});
+
 /**
  * Whether a value passes `schema`'s checks, as a guard over the value itself
  * rather than the copy `parse` makes, so an edit lands on the document as read
@@ -811,6 +817,17 @@ export class ScaffoldedApp {
   suggestedArgsOf(result: CliResult): string[][] {
     const { details } = DoctorRecovery.parse(this.envelopeOf(result));
     return details?.suggested_args ?? [];
+  }
+
+  /**
+   * The message and the origins listed in the details of a refused `release revoke`.
+   *
+   * @param result - The `release revoke --json` run.
+   * @returns The refusal's message and every origin its details name.
+   */
+  servedRefusalOf(result: CliResult): { message: string; origins: string[] } {
+    const { message, details } = ServedRefusal.parse(this.envelopeOf(result));
+    return { message, origins: details.origins.map((one) => one.origin) };
   }
 
   /** Leaves this directory with the record of a local server that is not running. */

@@ -17,10 +17,17 @@ async function aRelease(app: ScaffoldedApp): Promise<string> {
   return app.envelopeOf<{ release_id: string }>(result).data.release_id;
 }
 
-/** Try to revoke the release a primary origin serves, which the server refuses. */
-async function aRefusedRevoke() {
+/**
+ * Try to revoke the release primary origins serve, which the server refuses.
+ *
+ * @param more - Hosts of further primary origins the release is served on.
+ */
+async function aRefusedRevoke(more: string[] = []) {
   const app = await aSetUpApp();
   await app.addPrimaryOrigin();
+  for (const host of more) {
+    await app.addPrimaryOrigin(`https://${host}.example.com`);
+  }
   const served = await app.deployData();
   const result = await app.run([
     "release",
@@ -205,26 +212,13 @@ describe("release revoke", () => {
       });
 
       it("names only the first few serving origins, leaving the rest to the --json details", async () => {
-        const app = await aSetUpApp();
-        for (const host of ["a", "b", "c", "d"]) {
-          await app.addPrimaryOrigin(`https://${host}.example.com`);
+        const { app, result } = await aRefusedRevoke(["a", "b", "c", "d"]);
+
+        const { message, origins } = app.servedRefusalOf(result);
+        expect(origins.length).toBeGreaterThan(3);
+        for (const [index, origin] of origins.entries()) {
+          expect(message.includes(origin) === index < 3).toBe(true);
         }
-        const served = await app.deployData();
-
-        const result = await app.run([
-          "release",
-          "revoke",
-          served.release_id ?? "",
-          "--force",
-          "--non-interactive",
-          "--json",
-        ]);
-
-        const { message, details } = app.envelopeOf(result) as unknown as {
-          message: string;
-          details: { origins: { origin: string }[] };
-        };
-        expect(message).not.toContain(details.origins.at(-1)?.origin);
       });
 
       it("suggests rolling back or deploying another release before revoking again", async () => {

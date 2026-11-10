@@ -31,6 +31,28 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 /** The kind of resource a release pins a revision of. */
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
+const IN_USE_ORIGINS = z
+  .array(
+    z.object({
+      origin: z.string(),
+      deployment_id: z.string(),
+    }),
+  )
+  .min(1);
+
+/**
+ * The body of a `rel.in_use` refusal, parsed rather than trusted: one that does
+ * not hold the origins the contract promises is rethrown as the conflict it is.
+ * The origins are read at both depths, as the error mapper reads them: the
+ * typed answer carries them in `details`, the generic one a level down.
+ */
+const RELEASE_IN_USE_BODY = z.object({
+  details: z.union([
+    z.object({ origins: IN_USE_ORIGINS }),
+    z.object({ details: z.object({ origins: IN_USE_ORIGINS }) }),
+  ]),
+});
+
 /**
  * What revoking a release came to: revoked, or refused because origins still
  * serve it, each one named with the deployment that pins the release there.
@@ -123,23 +145,7 @@ export class ReleaseService extends ApiService {
       return { outcome: "revoked", release };
     } catch (error) {
       if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
-        // The body is parsed rather than trusted: one that does not hold the
-        // origins the contract promises is rethrown as the conflict it is. The
-        // origins are read at both depths, as the error mapper reads them: the
-        // typed answer carries them in `details`, the generic one a level down.
-        const origins = z
-          .array(
-            z.object({
-              origin: z.string(),
-              deployment_id: z.string(),
-            }),
-          )
-          .min(1);
-        const refusal = z
-          .object({
-            details: z.union([z.object({ origins }), z.object({ details: z.object({ origins }) })]),
-          })
-          .safeParse(error.body);
+        const refusal = RELEASE_IN_USE_BODY.safeParse(error.body);
         if (refusal.success) {
           const { details } = refusal.data;
           return {

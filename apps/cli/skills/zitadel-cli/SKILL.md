@@ -367,9 +367,10 @@ Each invocation prints one JSON object:
   suggesting the list command. `claim --challenge-id` refuses a malformed
   challenge id the same way.
 - `release revoke` on a release an origin still serves fails with `E_CONFLICT`.
-  The `message` names each origin and the deployment that pins the release
-  there, `details.origins` lists them as `{ origin, deployment_id }`, and the
-  next steps are `deploy` or `deployment rollback`.
+  The `message` names the first three origins with the deployment that pins the
+  release there and counts the rest, `details.origins` lists every one as
+  `{ origin, deployment_id }`, and the next steps are `deploy` or
+  `deployment rollback`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.

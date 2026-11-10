@@ -97,7 +97,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
               return `${one.origin} (deployment ${one.deployment_id})`;
             });
             const rest = outcome.origins.length - named.length;
-            const served = (rest > 0 ? [...named, `${rest} more`] : named).join(", ");
+            const served = rest > 0 ? `${named.join(", ")} and ${rest} more` : named.join(", ");
             throw refusalError(
               RELEASE_IN_USE_REFUSAL,
               {
