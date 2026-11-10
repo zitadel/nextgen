@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { forwardSignIn, isFlowWrite } from "./sign-in";
+import { forwardSignIn, isApiPath, isFlowWrite } from "./sign-in";
 
 const human = async () => ({ isBot: false, isVerifiedBot: false });
 const bot = async () => ({ isBot: true, isVerifiedBot: false });
@@ -111,6 +111,29 @@ describe("the sign-in widget's calls", () => {
     expect(answer.status).toBe(404);
     expect(await answer.json()).toMatchObject({ code: "req.not_found" });
     expect(verdict).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  // `new URL(path, server)` resolves dot segments, so one would leave the prefix.
+  it.each([
+    "/api/v1/../../docs",
+    "/api/v1/..",
+    "/api/v1/./flow",
+    "/api/v1/flow/../../../cloud/zitadel/api/v1/flow",
+  ])("takes %s for no path of the API", (path) => {
+    expect(isApiPath(path)).toBe(false);
+  });
+
+  it("refuses a path whose dot segments lead out of the API", async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    for (const path of ["/api/v1/../../docs", "/api/v1/%2e%2e/%2E%2E/docs"]) {
+      const answer = await forwardSignIn(
+        new Request(`https://cloud.example/cloud/zitadel${path}`, { method: "POST", body: "{}" }),
+        human,
+      );
+      expect(answer.status, path).toBe(404);
+    }
     expect(upstream).not.toHaveBeenCalled();
   });
 

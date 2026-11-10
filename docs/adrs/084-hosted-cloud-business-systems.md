@@ -243,7 +243,8 @@ website's catch-all.
 - The add-on contract gains `signInApiBase`: where the sign-in widget (login,
   sign-up, claim) sends its calls. The cloud's add-on sets it to
   `/cloud/zitadel`, and starts BotID's client to protect the widget's two
-  flow writes, `POST /flow` and `POST /flow/{id}/submit`, beneath that base.
+  flow writes, `POST /flow` and `POST /flow/{id}/submit`, beneath that base
+  and the API's prefix (`/cloud/zitadel/api/v1/flow`).
   Every other console call stays direct.
 - `cloud-functions` forwards the API's paths beneath `/cloud/zitadel/`
   (`/cloud/zitadel/api/v1/…`) to the server unchanged (cookies, `Origin`,

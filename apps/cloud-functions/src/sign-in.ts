@@ -35,8 +35,14 @@ const PLAIN_PATH = /^(\/[A-Za-z0-9._~-]+)+$/;
  * open path would fetch the docs, the website or these functions again, each
  * `/cloud/zitadel` in it one more invocation, with a preview's bypass secret.
  */
-function isApiPath(path: string): boolean {
-  return PLAIN_PATH.test(path) && path.startsWith(`${API_PREFIX}/`);
+export function isApiPath(path: string): boolean {
+  return (
+    PLAIN_PATH.test(path) &&
+    path.startsWith(`${API_PREFIX}/`) &&
+    // `new URL` resolves these, which would lead out of the prefix again. A
+    // request's own URL arrives resolved; this holds for any other caller.
+    !path.split("/").some((segment) => segment === "." || segment === "..")
+  );
 }
 
 /** Headers that describe one hop, never the request itself. */
