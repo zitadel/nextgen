@@ -28046,7 +28046,8 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 // The operation a filter applies to a field on a query endpoint.
 // On text fields, `contains` is a case-insensitive substring match. `equals`
 // compares the whole value and is case-sensitive unless the field documents
-// otherwise.
+// otherwise. `starts_with` is a case-insensitive match on the start of the
+// value, answered from an index; only the fields that name it accept it.
 // Ref: #
 type FilterOperation string
 
@@ -28055,6 +28056,7 @@ const (
 	FilterOperationNotEquals          FilterOperation = "not_equals"
 	FilterOperationContains           FilterOperation = "contains"
 	FilterOperationNotContains        FilterOperation = "not_contains"
+	FilterOperationStartsWith         FilterOperation = "starts_with"
 	FilterOperationLessThan           FilterOperation = "less_than"
 	FilterOperationLessThanOrEqual    FilterOperation = "less_than_or_equal"
 	FilterOperationGreaterThan        FilterOperation = "greater_than"
@@ -28068,6 +28070,7 @@ func (FilterOperation) AllValues() []FilterOperation {
 		FilterOperationNotEquals,
 		FilterOperationContains,
 		FilterOperationNotContains,
+		FilterOperationStartsWith,
 		FilterOperationLessThan,
 		FilterOperationLessThanOrEqual,
 		FilterOperationGreaterThan,
@@ -28085,6 +28088,8 @@ func (s FilterOperation) MarshalText() ([]byte, error) {
 	case FilterOperationContains:
 		return []byte(s), nil
 	case FilterOperationNotContains:
+		return []byte(s), nil
+	case FilterOperationStartsWith:
 		return []byte(s), nil
 	case FilterOperationLessThan:
 		return []byte(s), nil
@@ -28113,6 +28118,9 @@ func (s *FilterOperation) UnmarshalText(data []byte) error {
 		return nil
 	case FilterOperationNotContains:
 		*s = FilterOperationNotContains
+		return nil
+	case FilterOperationStartsWith:
+		*s = FilterOperationStartsWith
 		return nil
 	case FilterOperationLessThan:
 		*s = FilterOperationLessThan
@@ -98533,9 +98541,12 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // - `id`: user ID
 // - `identifier`: the value returned as the user's `identifier`: the property
 // designated by `x-identifier` in the revision of the schema the user is on.
-// `contains`, a case-insensitive substring match, is the only operation. The
-// value may not be empty, and only string values match. No index backs it, so
-// narrow a search with other filters on a large project.
+// `starts_with`, a case-insensitive match on the start of the value, is the
+// only operation. Case is folded as for a unique property, so a value found
+// here is the value sign-in resolves. The value may not be empty or longer
+// than 256 characters, only string values match, and the filter may be given
+// once. An index answers it, and the users come back ordered by identifier,
+// then `id`: `sorting` cannot be combined with it.
 // - `schema`: the schema the user's attributes satisfy, matched against the
 // value the user carries as `schema`. Each revision of a schema has its own
 // URL, so `equals` selects the users on one revision and `not_equals` the

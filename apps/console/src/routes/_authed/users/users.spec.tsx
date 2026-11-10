@@ -1563,7 +1563,7 @@ describe("users screen", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "alex" }));
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
-        filter: [{ field: "identifier", operation: "contains", value: "alex" }],
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
       }),
     );
 
@@ -1571,7 +1571,7 @@ describe("users screen", () => {
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
         page_token: "next",
-        filter: [{ field: "identifier", operation: "contains", value: "alex" }],
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
       }),
     );
   });
@@ -1611,7 +1611,7 @@ describe("users screen", () => {
     // reads is still in flight when the next test starts.
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
-        filter: [{ field: "identifier", operation: "contains", value: "alexx" }],
+        filter: [{ field: "identifier", operation: "starts_with", value: "alexx" }],
       }),
     );
     await waitFor(
@@ -1636,7 +1636,7 @@ describe("users screen", () => {
     );
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
-        filter: [{ field: "identifier", operation: "contains", value: "second" }],
+        filter: [{ field: "identifier", operation: "starts_with", value: "second" }],
       }),
     );
     await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
@@ -1671,7 +1671,7 @@ describe("users screen", () => {
       expect(bodies.at(-1)).toEqual(
         expect.objectContaining({
           filter: [
-            { field: "identifier", operation: "contains", value: "ada" },
+            { field: "identifier", operation: "starts_with", value: "ada" },
             { field: "schema_object_type", operation: "equals", value: "business" },
             { field: "schema", operation: "not_equals", value: "sch_business_2" },
           ],
@@ -1701,9 +1701,49 @@ describe("users screen", () => {
 
     await waitFor(() =>
       expect(bodies[0]).toMatchObject({
-        filter: [{ field: "identifier", operation: "contains", value: "alex" }],
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
       }),
     );
+  });
+
+  it("searches for a number someone typed into the URL", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=12345`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "12345" }],
+      }),
+    );
+  });
+
+  it("keeps the list and the field when a search fails, and says so", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    recordQueries((body) =>
+      body.filter
+        ? HttpResponse.json({ message: "The search is unavailable." }, { status: 503 })
+        : HttpResponse.json({
+            users: [
+              {
+                id: "user_all",
+                schema: "sch_business",
+                identifier: "user_all@acme.com",
+                attributes: { email: "user_all@acme.com" },
+              },
+            ],
+          }),
+    );
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+
+    expect(await screen.findByText("The search is unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(screen.getByText("user_all@acme.com")).toBeInTheDocument();
   });
 
   it("still shows the pending state on a slow first load", async () => {
@@ -1770,7 +1810,7 @@ describe("users screen", () => {
     expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
     expect(bodies.at(-1)).toMatchObject({
       filter: [
-        { field: "identifier", operation: "contains", value: "alex" },
+        { field: "identifier", operation: "starts_with", value: "alex" },
         { field: "schema_object_type", operation: "equals", value: "business" },
       ],
     });

@@ -6622,6 +6622,8 @@ func (s FilterOperation) Validate() error {
 		return nil
 	case "not_contains":
 		return nil
+	case "starts_with":
+		return nil
 	case "less_than":
 		return nil
 	case "less_than_or_equal":
