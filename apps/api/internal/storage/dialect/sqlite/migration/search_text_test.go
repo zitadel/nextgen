@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The users that exist when 000027 runs get their search text from the
+// The users that exist when 000029 runs get their search text from the
 // migration: only the attributes their own schema designates, only strings,
 // and never an empty one.
 func TestSearchTextBackfill(t *testing.T) {
@@ -28,7 +28,7 @@ func TestSearchTextBackfill(t *testing.T) {
 
 	p, err := newProvider(db)
 	require.NoError(t, err)
-	_, err = p.UpTo(ctx, 26)
+	_, err = p.UpTo(ctx, 28)
 	require.NoError(t, err)
 
 	exec := func(query string, args ...any) {
@@ -60,7 +60,7 @@ func TestSearchTextBackfill(t *testing.T) {
 		exec(`INSERT INTO user_attributes (project_id, user_id, key, value) VALUES ('p', ?, ?, ?)`, attr.user, attr.key, attr.value)
 	}
 
-	_, err = p.UpTo(ctx, 27)
+	_, err = p.UpTo(ctx, 29)
 	require.NoError(t, err)
 
 	rows, err := db.QueryContext(ctx, `SELECT user_id || '/' || key, search_text FROM user_attributes WHERE search_text IS NOT NULL ORDER BY 1`)

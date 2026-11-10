@@ -9386,7 +9386,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,\n`entity_id` or `actor_id` with or without `category`, each with or without\nthe time bounds. Any other filter or combination is matched event by\nevent, over at most a few thousand events per request. Such a page can\nhold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9395,6 +9395,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -9606,6 +9609,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -23800,13 +23806,14 @@
         ],
         "properties": {
           "data": {
+            "description": "The events of this page. A filter the server matches event by event can\nleave it shorter than `limit`, or empty, while more events remain:\n`next_page_token` says whether they do.\n",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/event"
             }
           },
           "next_page_token": {
-            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results. A short or empty page still\ncarries one while the server has not read every event the filter could\nmatch.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/page-token"

@@ -258,6 +258,33 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		assert.Equal(t, api.VariableByKind{Primary: api.NewOptVariable(held)}, *one.(*api.VariableByKind))
 	})
 
+	t.Run("events", func(t *testing.T) {
+		t.Parallel()
+		// The Logs screen lists the project's events and opens one. An event
+		// this project does not hold is a miss, not a refused credential.
+		resp, err := session.ListEvents(t.Context(), api.ListEventsParams{ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListEventsResponse{}, resp, helpers.MustMarshal(t, resp))
+
+		// Filters combine, whether or not one index holds them all: what none
+		// holds is matched over a bounded number of events.
+		resp, err = session.ListEvents(t.Context(), api.ListEventsParams{
+			ProjectID: projectID,
+			Category:  []api.ListEventsCategoryItem{api.ListEventsCategoryItemAuth, api.ListEventsCategoryItemAdmin},
+			ActorID:   api.NewOptString(claimerID),
+			EntityID:  api.NewOptString(claimerID),
+			ClientID:  api.NewOptString("app_none"),
+		})
+		require.NoError(t, err)
+		combined, ok := resp.(*api.ListEventsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Empty(t, combined.Data)
+
+		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))
+	})
+
 	t.Run("teams", func(t *testing.T) {
 		t.Parallel()
 		created, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
@@ -369,6 +396,19 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		denied := resp.(*api.ListBrandingErrorResponseStatusCode)
 		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 		assert.True(t, denied.Response.IsBrndNotFound(), helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("cannot list or read another project's events", func(t *testing.T) {
+		resp, err := session.ListEvents(t.Context(), api.ListEventsParams{ProjectID: otherID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListEventsErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ListEventsErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.True(t, denied.Response.IsEvtNotFound(), helpers.MustMarshal(t, resp))
+
+		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: otherID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))
 	})
 
 	t.Run("cannot create a team in another project", func(t *testing.T) {

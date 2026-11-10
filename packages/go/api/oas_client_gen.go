@@ -1107,6 +1107,13 @@ type Invoker interface {
 	// credential's team. Team-scoped credentials are not issued today.
 	// Each item carries an `event_type` that says which type of event it is, and
 	// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+	// Filters combine. These are answered from an index and fill their pages: no
+	// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
+	// `entity_id` or `actor_id` with or without `category`, each with or without
+	// the time bounds. Any other filter or combination is matched event by
+	// event, over at most a few thousand events per request. Such a page can
+	// hold fewer events than `limit`, or none, and still carry
+	// `next_page_token`: keep passing the token until a response has none.
 	//
 	// GET /events
 	ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error)
@@ -7500,11 +7507,23 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetEventOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11784,6 +11803,13 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and
 // the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+// Filters combine. These are answered from an index and fill their pages: no
+// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
+// `entity_id` or `actor_id` with or without `category`, each with or without
+// the time bounds. Any other filter or combination is matched event by
+// event, over at most a few thousand events per request. Such a page can
+// hold fewer events than `limit`, or none, and still carry
+// `next_page_token`: keep passing the token until a response has none.
 //
 // GET /events
 func (c *Client) ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error) {
@@ -12169,11 +12195,23 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListEventsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
