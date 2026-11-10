@@ -8629,6 +8629,7 @@
     "/invitations": {
       "post": {
         "operationId": "createInvitation",
+        "x-zitadel-cli": "invitation create",
         "summary": "Create an invitation",
         "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original is deleted in the same\ntransaction.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
@@ -8774,6 +8775,7 @@
       },
       "get": {
         "operationId": "listInvitations",
+        "x-zitadel-cli": "invitation list",
         "summary": "List invitations",
         "description": "Lists a project's invitations, newest first, in any status, paginated with\n`limit` and `page_token`.\n\nOptional `status` and `type` filters narrow the page. `expired` is derived\non read from `expires_at`. Authenticate with a project secret (`oauth2`) or\na console session cookie (`sessionCookie`). Listing needs the same project\n`admin` check as `createGrant` (`POST /grants`).\n",
         "tags": [
@@ -9152,6 +9154,7 @@
     "/invitations/{id}": {
       "get": {
         "operationId": "getInvitation",
+        "x-zitadel-cli": "invitation get",
         "summary": "Get an invitation",
         "description": "Returns one invitation by ID for the project named by `project_id`.\n\nThe response never includes the redeem token or the create-time `link`.\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Reading needs the same project `admin` check as\n`createGrant` (`POST /grants`).\n",
         "tags": [
@@ -9223,6 +9226,7 @@
       },
       "delete": {
         "operationId": "cancelInvitation",
+        "x-zitadel-cli": "invitation cancel",
         "summary": "Cancel an invitation",
         "description": "Deletes a pending invitation. Its link can no longer be redeemed. Only a\n`pending` invitation can be cancelled; a finished invitation answers the\nsame opaque `404` as a miss. Expired invitations keep their row until a\nlater cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
