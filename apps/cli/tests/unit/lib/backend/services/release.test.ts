@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { ConflictError } from "@/lib/backend/errors";
 import { ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
 
@@ -59,5 +60,90 @@ describe("ReleaseService.revoke", () => {
     await releaseService.revoke("rel_1");
 
     expect(revokeRelease).toHaveBeenCalledWith("rel_1", { project_id: "proj_1" });
+  });
+
+  it("answers revoked with the release the server revoked", async () => {
+    const revokeRelease = vi.fn(async () => ({ id: "rel_1", revoked_at: "2026-01-01T00:00:00Z" }));
+    const releaseService = new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+
+    await expect(releaseService.revoke("rel_1")).resolves.toMatchObject({
+      outcome: "revoked",
+      release: { id: "rel_1" },
+    });
+  });
+
+  it("answers in-use with each origin and the deployment that pins the release there", async () => {
+    const revokeRelease = vi.fn(async () => {
+      throw new ConflictError("release: still served by an origin", {
+        status: 409,
+        body: {
+          code: "rel.in_use",
+          message: "release: still served by an origin",
+          details: {
+            origins: [
+              { origin: "https://app.example.com", deployment_id: "dep_1" },
+              { origin: "https://preview.example.com", deployment_id: "dep_2" },
+            ],
+          },
+        },
+      });
+    });
+    const releaseService = new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+
+    await expect(releaseService.revoke("rel_1")).resolves.toEqual({
+      outcome: "in-use",
+      origins: [
+        { origin: "https://app.example.com", deploymentId: "dep_1" },
+        { origin: "https://preview.example.com", deploymentId: "dep_2" },
+      ],
+    });
+  });
+
+  it("reads origins from the nested details the envelope can carry", async () => {
+    const revokeRelease = vi.fn(async () => {
+      throw new ConflictError("release: still served by an origin", {
+        status: 409,
+        body: {
+          code: "rel.in_use",
+          details: {
+            details: {
+              origins: [{ origin: "https://app.example.com", deployment_id: "dep_1" }],
+            },
+          },
+        },
+      });
+    });
+    const releaseService = new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+
+    await expect(releaseService.revoke("rel_1")).resolves.toMatchObject({
+      outcome: "in-use",
+      origins: [{ origin: "https://app.example.com", deploymentId: "dep_1" }],
+    });
+  });
+
+  it("rethrows a rel.in_use refusal that names no origins", async () => {
+    const revokeRelease = vi.fn(async () => {
+      throw new ConflictError("release: still served by an origin", {
+        status: 409,
+        body: { code: "rel.in_use", message: "release: still served by an origin" },
+      });
+    });
+    const releaseService = new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+
+    await expect(releaseService.revoke("rel_1")).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("rethrows any other conflict rather than answering in-use", async () => {
+    const revokeRelease = vi.fn(async () => {
+      throw new ConflictError("release: revoked", {
+        status: 409,
+        body: { code: "rel.revoked", message: "release: revoked" },
+      });
+    });
+    const releaseService = new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+
+    await expect(releaseService.revoke("rel_1")).rejects.toMatchObject({
+      serverCode: "rel.revoked",
+    });
   });
 });

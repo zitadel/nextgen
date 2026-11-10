@@ -6,6 +6,8 @@ import type {
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
+import { z } from "zod";
+
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
 import { ConflictError } from "@/lib/backend/errors";
@@ -27,6 +29,60 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 
 /** The kind of resource a release pins a revision of. */
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+
+/** An origin that still serves a release, with the deployment that pins the release there. */
+export type ServedOrigin = Readonly<{
+  origin: string;
+  deploymentId: string;
+}>;
+
+/**
+ * What revoking a release came to: revoked, or refused because origins still
+ * serve it, each one named with the deployment that pins the release there.
+ */
+export type RevokeOutcome =
+  | Readonly<{ outcome: "revoked"; release: Release }>
+  | Readonly<{ outcome: "in-use"; origins: readonly ServedOrigin[] }>;
+
+/** The origins a `rel.in_use` refusal carries, each with the deployment that pins the release there. */
+const ServedOriginsDetails = z.object({
+  origins: z.array(
+    z.object({
+      origin: z.string(),
+      deployment_id: z.string(),
+    }),
+  ),
+});
+
+/**
+ * The body of a `rel.in_use` refusal. The server nests the details it writes
+ * one level deeper than the payload itself, so the payload is accepted at either
+ * depth: the serialiser's wrapper is not part of the contract, and a reader that
+ * insisted on it would go silent the day it goes away.
+ */
+const ServedOriginsBody = z.object({
+  details: z.union([ServedOriginsDetails, z.object({ details: ServedOriginsDetails })]),
+});
+
+/**
+ * The origins a `rel.in_use` refusal names. The body is parsed rather than
+ * trusted: a body that does not hold the expected shape names none.
+ *
+ * @param body - The parsed error body the server answered with.
+ * @returns The origins it names, empty when it names none.
+ */
+function servedOriginsOf(body: unknown): ServedOrigin[] {
+  const parsed = ServedOriginsBody.safeParse(body);
+  if (!parsed.success) {
+    return [];
+  }
+  const { details } = parsed.data;
+  const payload = "origins" in details ? details : details.details;
+  return payload.origins.map(({ origin, deployment_id }) => ({
+    origin,
+    deploymentId: deployment_id,
+  }));
+}
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -99,11 +155,23 @@ export class ReleaseService extends ApiService {
    * Revoke a release so its content is never served again. Idempotent.
    *
    * @param releaseId - The release to revoke.
-   * @returns The release, now revoked.
+   * @returns `revoked` with the release, or `in-use` with each origin that still
+   * serves it and the deployment that pins it there. Any other failure is thrown.
    */
-  async revoke(releaseId: string): Promise<Release> {
-    return this.client.revokeRelease(releaseId, {
-      project_id: this.projectId,
-    });
+  async revoke(releaseId: string): Promise<RevokeOutcome> {
+    try {
+      const release = await this.client.revokeRelease(releaseId, {
+        project_id: this.projectId,
+      });
+      return { outcome: "revoked", release };
+    } catch (error) {
+      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
+        const origins = servedOriginsOf(error.body);
+        if (origins.length > 0) {
+          return { outcome: "in-use", origins };
+        }
+      }
+      throw error;
+    }
   }
 }

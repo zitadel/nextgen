@@ -8,6 +8,7 @@ import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Destructive } from "@/lib/oclif/destructive";
 import { prose } from "@/lib/oclif/rendering";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 /**
  * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
@@ -23,6 +24,18 @@ const RELEASE_ID: Refused<string> = {
       argument: "{input}",
     },
   },
+};
+
+/**
+ * A release an origin still serves. The server names each origin and the
+ * deployment that pins the release there; `{served}` lists them, so the person
+ * sees what to move off before the next step.
+ */
+const RELEASE_IN_USE_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "Release {release_id} is still served by {served}.",
+  hint: "Deploy another release with `zitadel deploy`, or roll back with `zitadel deployment rollback`, then revoke this release again.",
+  next: ["deploy", "deployment rollback"],
 };
 
 /**
@@ -71,7 +84,20 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         },
         apply: async (consent, { client, projectId }) => {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
-          const release = await releaseService.revoke(args.releaseId);
+          const outcome = await releaseService.revoke(args.releaseId);
+          if (outcome.outcome === "in-use") {
+            const served = outcome.origins
+              .map((one) => `${one.origin} (deployment ${one.deploymentId})`)
+              .join(", ");
+            throw refusalError(
+              RELEASE_IN_USE_REFUSAL,
+              { release_id: args.releaseId, served },
+              (next) => {
+                return this.suggest(next);
+              },
+            );
+          }
+          const { release } = outcome;
           return {
             status: "ok",
             data: {
