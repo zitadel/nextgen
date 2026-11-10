@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,7 +117,8 @@ func TestValidateApplicationDocument(t *testing.T) {
 			}
 			require.ErrorIs(t, err, tt.wantErr)
 			if tt.want != nil {
-				de, ok := err.(domain.Error)
+				var de domain.Error
+				ok := errors.As(err, &de)
 				require.True(t, ok)
 				assert.Equal(t, tt.want, de.Details)
 			}
@@ -124,55 +126,66 @@ func TestValidateApplicationDocument(t *testing.T) {
 	}
 }
 
-func TestApplicationRevisionNewClients(t *testing.T) {
+func TestApplicationClientsToCreate(t *testing.T) {
 	t.Parallel()
 
-	stored := domain.ApplicationDocument{Clients: []domain.ApplicationClientDocument{
+	current := domain.ApplicationDocument{Clients: []domain.ApplicationClientDocument{
 		{Slug: "web", ClientID: new("client_01KWH3B")},
 	}}
 
 	tests := []struct {
 		name        string
-		stored      domain.ApplicationDocument
-		next        []domain.ApplicationClientDocument
+		current     domain.ApplicationDocument
+		document    []domain.ApplicationClientDocument
 		want        []string
 		wantErr     error
 		wantDetails any
 	}{
 		{
-			name: "on create every client is new",
-			next: []domain.ApplicationClientDocument{{Slug: "web"}, {Slug: "api", ClientID: new("289374592837459283@shop")}},
-			want: []string{"web", "api"},
+			name:     "on create every client is new",
+			document: []domain.ApplicationClientDocument{{Slug: "web"}, {Slug: "api", ClientID: new("289374592837459283@shop")}},
+			want:     []string{"web", "api"},
 		},
 		{
-			name:   "a stored client may leave its id out",
-			stored: stored,
-			next:   []domain.ApplicationClientDocument{{Slug: "web"}},
+			name:     "a current client may leave its id out",
+			current:  current,
+			document: []domain.ApplicationClientDocument{{Slug: "web"}},
 		},
 		{
-			name:   "a stored client keeps a reserved prefix",
-			stored: stored,
-			next:   []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("client_01KWH3B")}, {Slug: "api"}},
-			want:   []string{"api"},
+			name:     "a current client keeps a reserved prefix",
+			current:  current,
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("client_01KWH3B")}, {Slug: "api"}},
+			want:     []string{"api"},
 		},
 		{
 			name:        "a changed client_id",
-			stored:      stored,
-			next:        []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("other")}},
+			current:     current,
+			document:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("other")}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string]any{"field": "/clients/0/client_id"},
+			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
 		},
 		{
 			name:        "an omitted client",
-			stored:      stored,
-			next:        []domain.ApplicationClientDocument{{Slug: "api"}},
+			current:     current,
+			document:    []domain.ApplicationClientDocument{{Slug: "api"}},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
-			wantDetails: map[string]any{"field": "/clients/web"},
+			wantDetails: map[string][]string{"fields": {"/clients/web"}},
 		},
 		{
-			name:    "every new client with a reserved prefix",
-			next:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("client_mine")}, {Slug: "api"}, {Slug: "cli", ClientID: new("dcr_mine")}},
-			wantErr: domain.ErrApplicationInvalid(nil, nil),
+			name: "every omitted client and changed client_id",
+			current: domain.ApplicationDocument{Clients: []domain.ApplicationClientDocument{
+				{Slug: "web", ClientID: new("client_01KWH3B")},
+				{Slug: "api", ClientID: new("client_01KWH3C")},
+				{Slug: "cli", ClientID: new("client_01KWH3D")},
+			}},
+			document:    []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("other")}},
+			wantErr:     domain.ErrApplicationFieldImmutable(nil),
+			wantDetails: map[string][]string{"fields": {"/clients/web", "/clients/api", "/clients/0/client_id"}},
+		},
+		{
+			name:     "every new client with a reserved prefix",
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("client_mine")}, {Slug: "api"}, {Slug: "cli", ClientID: new("dcr_mine")}},
+			wantErr:  domain.ErrApplicationInvalid(nil, nil),
 			wantDetails: map[string]string{
 				"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_",
 				"/clients/2/client_id": "a supplied client_id may not start with client_ or dcr_",
@@ -183,14 +196,15 @@ func TestApplicationRevisionNewClients(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := domain.ApplicationRevisionNewClients(tt.stored, domain.ApplicationDocument{Clients: tt.next})
+			got, err := domain.ApplicationClientsToCreate(tt.current, domain.ApplicationDocument{Clients: tt.document})
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 				return
 			}
 			require.ErrorIs(t, err, tt.wantErr)
-			de, ok := err.(domain.Error)
+			var de domain.Error
+			ok := errors.As(err, &de)
 			require.True(t, ok)
 			assert.Equal(t, tt.wantDetails, de.Details)
 		})

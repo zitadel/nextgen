@@ -105,7 +105,7 @@ type ApplicationClientSecret struct {
 // "application".
 
 // ErrApplicationFieldImmutable rejects a revision that changes a client's
-// client_id or omits a stored client. details holds the field's location: the
+// client_id or omits a stored client. details lists the location of each: the
 // client's index in the new document, or its slug for an omitted client, which
 // has no index there.
 // todo (@grvijayan) : denying removal of a client is temporary until the deletion semantics are defined.
@@ -161,46 +161,59 @@ func ValidateApplicationDocument(doc ApplicationDocument) error {
 	return nil
 }
 
-// ApplicationRevisionNewClients returns the slugs of the clients in next that
-// stored does not have; on create, stored is the zero document. Each stored
-// client keeps its slug and client_id: next may leave the id out, but may not
-// change it or omit the client. Only a new client is checked for a reserved
-// client_id prefix, so a stored id keeps working; every such client is
-// reported at once. next must have passed [ValidateApplicationDocument],
-// which rejects a slug used twice.
-func ApplicationRevisionNewClients(stored, next ApplicationDocument) ([]string, error) {
-	nextIndex := make(map[string]int, len(next.Clients))
-	for i, client := range next.Clients {
-		nextIndex[client.Slug] = i
-	}
-	storedSlugs := make(map[string]bool, len(stored.Clients))
-	for _, before := range stored.Clients {
-		storedSlugs[before.Slug] = true
-		i, ok := nextIndex[before.Slug]
-		if !ok {
-			return nil, ErrApplicationFieldImmutable(map[string]any{"field": "/clients/" + before.Slug})
-		}
-		if after := next.Clients[i]; after.ClientID != nil && !sameString(before.ClientID, after.ClientID) {
-			return nil, ErrApplicationFieldImmutable(map[string]any{"field": fmt.Sprintf("/clients/%d/client_id", i)})
+// ApplicationClientsToCreate returns the slugs of the clients in document that
+// current does not have; on create, current is the zero document. document
+// must have passed [ValidateApplicationDocument], which rejects a slug used
+// twice.
+func ApplicationClientsToCreate(current, document ApplicationDocument) ([]string, error) {
+	// Every omitted client and changed client_id is reported.
+	var immutable []string
+	// A revision may not remove a client.
+	for _, currentClient := range current.Clients {
+		if _, found := findClient(document, currentClient.Slug); !found {
+			immutable = append(immutable, "/clients/"+currentClient.Slug)
 		}
 	}
-	var added []string
+
+	var toCreate []string
+	// Every new client with a reserved client_id is reported, not only the first.
 	failures := make(map[string]string)
-	for i, client := range next.Clients {
-		if storedSlugs[client.Slug] {
+	for i, documentClient := range document.Clients {
+		currentClient, found := findClient(current, documentClient.Slug)
+		if !found {
+			if hasReservedPrefix(documentClient.ClientID) {
+				failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with " + strings.Join(reservedClientIDPrefixes, " or ")
+			}
+			toCreate = append(toCreate, documentClient.Slug)
 			continue
 		}
-		if client.ClientID != nil && slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
-			return strings.HasPrefix(*client.ClientID, prefix)
-		}) {
-			failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with " + strings.Join(reservedClientIDPrefixes, " or ")
+		// A current client may leave its client_id out, which keeps it, but may
+		// not change it.
+		if documentClient.ClientID != nil && !sameString(currentClient.ClientID, documentClient.ClientID) {
+			immutable = append(immutable, fmt.Sprintf("/clients/%d/client_id", i))
 		}
-		added = append(added, client.Slug)
+	}
+	if len(immutable) > 0 {
+		return nil, ErrApplicationFieldImmutable(map[string][]string{"fields": immutable})
 	}
 	if len(failures) > 0 {
 		return nil, ErrApplicationInvalid(failures, nil)
 	}
-	return added, nil
+	return toCreate, nil
+}
+
+func findClient(doc ApplicationDocument, slug string) (ApplicationClientDocument, bool) {
+	i := slices.IndexFunc(doc.Clients, func(client ApplicationClientDocument) bool { return client.Slug == slug })
+	if i < 0 {
+		return ApplicationClientDocument{}, false
+	}
+	return doc.Clients[i], true
+}
+
+func hasReservedPrefix(clientID *string) bool {
+	return clientID != nil && slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
+		return strings.HasPrefix(*clientID, prefix)
+	})
 }
 
 func isRefreshTokenIssuingGrant(grant string) bool {
