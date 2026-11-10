@@ -240,4 +240,8 @@ func (s *stubQueryUsersService) PatchMyUser(context.Context, service.PatchMyUser
 	return nil, errors.New("unexpected PatchMyUser")
 }
 
+func (s *stubQueryUsersService) SearchUsers(context.Context, service.SearchUsersInput) (*service.SearchUsersOutput, error) {
+	return nil, errors.New("unexpected SearchUsers")
+}
+
 var _ service.UserService = (*stubQueryUsersService)(nil)

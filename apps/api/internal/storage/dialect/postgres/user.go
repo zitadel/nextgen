@@ -15,10 +15,7 @@ import (
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
-var userSchema = v2user.NewSchema(v2user.SchemaSQL{
-	TablePrefix:     "zitadel_nextgen.",
-	AttributeString: "CASE WHEN jsonb_typeof(a.value) = 'string' THEN a.value #>> '{}' END",
-})
+var userSchema = v2user.NewSchema(v2user.SchemaSQL{TablePrefix: "zitadel_nextgen."})
 
 const (
 	teamMembershipsTable = "zitadel_nextgen.team_memberships"
@@ -31,8 +28,9 @@ WITH _input_data AS (
         $6::text[],
         $7::jsonb[],
         $8::bytea[],
-        $9::text[]
-    ) AS t(key, value, value_hash, unique_scope_txt)
+        $9::text[],
+        $11::text[]
+    ) AS t(key, value, value_hash, unique_scope_txt, search_text)
 ),
 _user_header AS (
     INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
@@ -41,14 +39,15 @@ _user_header AS (
 ),
 _attributes AS (
     INSERT INTO zitadel_nextgen.user_attributes (
-        project_id, user_id, key, value, unique_team_id, value_hash
+        project_id, user_id, key, value, unique_team_id, value_hash, search_text
     )
     SELECT h.project_id, h.id, d.key, d.value,
            CASE WHEN d.value_hash IS NULL THEN NULL
                 WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope THEN ''
                 ELSE COALESCE($5::text, '')
            END,
-           d.value_hash
+           d.value_hash,
+           d.search_text
     FROM _input_data d CROSS JOIN _user_header h
 ),
 _membership AS (
@@ -89,20 +88,36 @@ WHERE project_id = $1 AND user_id = $2
 	// pre-rewrite rows so an existing claim keeps the scope create gave it.
 	patchUserAttributesSQL = `
 INSERT INTO zitadel_nextgen.user_attributes (
-    project_id, user_id, key, value, unique_team_id, value_hash
+    project_id, user_id, key, value, unique_team_id, value_hash, search_text
 )
 SELECT $1, $2, d.key, d.value,
        CASE WHEN d.value_hash IS NOT NULL THEN d.unique_team_id END,
-       d.value_hash
+       d.value_hash,
+       d.search_text
 FROM unnest(
     $3::text[],
     $4::jsonb[],
     $5::bytea[],
-    $6::text[]
-) AS d(key, value, value_hash, unique_team_id)
+    $6::text[],
+    $7::text[]
+) AS d(key, value, value_hash, unique_team_id, search_text)
 `
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
+
+	// userSearchQuery and userSearchJoin frame the one range of
+	// idx_user_attributes_search a search arm reads: the arm's key and the
+	// bounds of the term go between them. The subquery renames its columns
+	// (see the v2user search columns), so the users filter, the cursor and the
+	// order after the join name columns of either side unqualified. It states
+	// the project itself, so the range does not depend on the planner carrying
+	// the users filter over.
+	userSearchQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at, ` + v2user.SearchTextColumn + `
+FROM zitadel_nextgen.users
+JOIN (SELECT project_id AS ` + v2user.SearchProjectIDColumn + `, user_id AS ` + v2user.SearchUserIDColumn + `, search_text AS ` + v2user.SearchTextColumn + `
+      FROM zitadel_nextgen.user_attributes
+      WHERE search_text IS NOT NULL AND project_id = `
+	userSearchJoin = `) ua ON ua.` + v2user.SearchProjectIDColumn + ` = zitadel_nextgen.users.project_id AND ua.` + v2user.SearchUserIDColumn + ` = zitadel_nextgen.users.id`
 
 	userAttributesTable = "zitadel_nextgen.user_attributes"
 
@@ -188,7 +203,7 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}
-	keys, values, hashes, scopes, err := userAttributeArrays(user.Attributes)
+	keys, values, hashes, scopes, searchTexts, err := userAttributeArrays(user.Attributes)
 	if err != nil {
 		return err
 	}
@@ -208,7 +223,7 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	if initialTeamID != "" {
 		membershipTeamID = initialTeamID
 	}
-	args = append(args, membershipTeamID)
+	args = append(args, membershipTeamID, searchTexts)
 
 	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, userInsertSQL, args...); err != nil {
@@ -221,17 +236,19 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 }
 
 // userAttributeArrays flattens attribute rows into the parallel arrays the
-// bulk insert statements unnest.
-func userAttributeArrays(attrs domain.CreateAttributes) (keys []domain.AttributeKey, values, hashes [][]byte, scopes []string, err error) {
+// bulk insert statements unnest. searchTexts holds nil for an attribute no
+// search reads.
+func userAttributeArrays(attrs domain.CreateAttributes) (keys []domain.AttributeKey, values, hashes [][]byte, scopes []string, searchTexts []*string, err error) {
 	keys = make([]domain.AttributeKey, len(attrs))
 	values = make([][]byte, len(attrs))
 	hashes = make([][]byte, len(attrs))
 	scopes = make([]string, len(attrs))
+	searchTexts = make([]*string, len(attrs))
 
 	for i, a := range attrs {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
 		keys[i] = a.Key
 		values[i] = raw
@@ -242,8 +259,9 @@ func userAttributeArrays(attrs domain.CreateAttributes) (keys []domain.Attribute
 			hashes[i] = append([]byte(nil), sum[:]...)
 		}
 		scopes[i] = uniquenessScopeLiteral(a.UniqueScope)
+		searchTexts[i] = a.SearchText
 	}
-	return keys, values, hashes, scopes, nil
+	return keys, values, hashes, scopes, searchTexts, nil
 }
 
 // PatchUser implements [service.UserStatements] as a full rewrite of the
@@ -256,7 +274,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 	if len(user.UniqueTeamScopes) != len(user.Attributes) {
 		return fmt.Errorf("user patch requires one unique team scope per attribute")
 	}
-	keys, values, hashes, _, err := userAttributeArrays(user.Attributes)
+	keys, values, hashes, _, searchTexts, err := userAttributeArrays(user.Attributes)
 	if err != nil {
 		return err
 	}
@@ -276,7 +294,7 @@ func (us userStatements) PatchUser(ctx context.Context, user *domain.PatchUser) 
 		}
 		if _, err := tx.Exec(ctx, patchUserAttributesSQL,
 			user.ProjectID, user.UserID,
-			keys, values, hashes, user.UniqueTeamScopes,
+			keys, values, hashes, user.UniqueTeamScopes, searchTexts,
 		); err != nil {
 			return wrapError(err)
 		}
@@ -369,7 +387,10 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	if err := authz.RequireManagementListFilter(ctx); err != nil {
 		return nil, err
 	}
-	filter = v2user.EnsureListOptions(filter)
+	filter, err := v2user.ListOptions(filter, opts.Search != nil)
+	if err != nil {
+		return nil, err
+	}
 
 	readFilter, err := v2user.ApplyCursor(userSchema, filter.Filter, filter.Pagination)
 	if err != nil {
@@ -377,6 +398,9 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	}
 
 	users, nextCursor, err := pagination.Page(filter.Pagination, userSchema, func(limit uint32) ([]*domain.User, error) {
+		if opts.Search != nil {
+			return us.searchUsers(ctx, readFilter, filter.Pagination, opts, limit)
+		}
 		var compiler statementCompiler
 		compiler.WriteString(userQuery)
 		if opts.UniqueAttributesOnly {
@@ -426,16 +450,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 				compiler.WriteString("::jsonb AND jsonb_typeof(a.value) IN ('string', 'number', 'boolean'))")
 			}
 		}
-		if opts.MembershipTeamID != nil {
-			writeConjunct(&compiler, &hasWhere)
-			compiler.WriteString("EXISTS (SELECT 1 FROM ")
-			compiler.WriteString(teamMembershipsTable)
-			compiler.WriteString(" m WHERE m.project_id = zitadel_nextgen.users.project_id AND m.user_id = zitadel_nextgen.users.id AND m.team_id = ")
-			compiler.WriteArg(*opts.MembershipTeamID)
-			compiler.WriteString(" AND m.status = ")
-			compiler.WriteArg(domain.MembershipStatusActive.String())
-			compiler.WriteString(")")
-		}
+		writeMembershipConjunct(&compiler, &hasWhere, opts.MembershipTeamID)
 		maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, "zitadel_nextgen.users", "id")
 
 		compileOrderBy(&compiler, filter.Pagination.OrderBy, userSchema)
@@ -462,6 +477,75 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		Items:      users,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// searchUsers runs a search read (see [service.UserSearch]): one statement
+// per arm, each a range of idx_user_attributes_search joined to its users and
+// read in index order, so LIMIT stops it after a page however many users
+// match. The arms' pages are merged into the one order they share.
+func (us userStatements) searchUsers(ctx context.Context, readFilter database.Filter[domain.UserField], page database.Page[domain.UserField], opts service.UserQueryOptions, limit uint32) ([]*domain.User, error) {
+	if opts.UniqueAttributesOnly || len(opts.Attributes) > 0 {
+		return nil, fmt.Errorf("user search cannot be combined with an attribute match")
+	}
+	search := opts.Search
+	lower, upper, bounded := v2user.SearchBounds(search.Prefix)
+	lower, err := v2user.SearchLower(lower, page)
+	if err != nil {
+		return nil, err
+	}
+
+	pages := make([][]*domain.User, 0, len(search.Arms))
+	for _, arm := range search.Arms {
+		var compiler statementCompiler
+		compiler.WriteString(userSearchQuery)
+		compiler.WriteArg(search.ProjectID)
+		compiler.WriteString(" AND key = ")
+		compiler.WriteArg(arm.Key)
+		compiler.WriteString(" AND search_text >= ")
+		compiler.WriteArg(lower)
+		if bounded {
+			compiler.WriteString(" AND search_text < ")
+			compiler.WriteArg(upper)
+		}
+		compiler.WriteString(userSearchJoin)
+
+		hasWhere := false
+		if armFilter := database.And(readFilter, arm.Users); len(armFilter.Filters) > 0 {
+			writeConjunct(&compiler, &hasWhere)
+			compileFilter(&compiler, armFilter, userSchema)
+		}
+		writeMembershipConjunct(&compiler, &hasWhere, opts.MembershipTeamID)
+		maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, "zitadel_nextgen.users", "id")
+
+		compileOrderBy(&compiler, page.OrderBy, userSchema)
+		compileLimit(&compiler, limit)
+
+		rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		found, err := pgx.CollectRows(rows, scanUserSearchHeader)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		pages = append(pages, found)
+	}
+	return v2user.MergeSearchPages(pages, limit), nil
+}
+
+// writeMembershipConjunct requires an active membership of teamID, when set.
+func writeMembershipConjunct(c *statementCompiler, hasWhere *bool, teamID *string) {
+	if teamID == nil {
+		return
+	}
+	writeConjunct(c, hasWhere)
+	c.WriteString("EXISTS (SELECT 1 FROM ")
+	c.WriteString(teamMembershipsTable)
+	c.WriteString(" m WHERE m.project_id = zitadel_nextgen.users.project_id AND m.user_id = zitadel_nextgen.users.id AND m.team_id = ")
+	c.WriteArg(*teamID)
+	c.WriteString(" AND m.status = ")
+	c.WriteArg(domain.MembershipStatusActive.String())
+	c.WriteString(")")
 }
 
 func writeConjunct(c *statementCompiler, hasWhere *bool) {
@@ -538,6 +622,7 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 	// Grouped once and reused: GroupByProject clears Attributes, so a second
 	// pass would wipe the ones this call just hydrated.
 	groups := v2user.GroupByProject(users)
+	defer v2user.FillRepeats(groups)
 
 	for _, group := range groups {
 		rows, err := us.client.Query(ctx, userAttributesByIDsQuery, group.ProjectID, group.IDs, attrKeys)
@@ -654,11 +739,24 @@ func (us userStatements) hydrateUserOwnerTeams(ctx context.Context, groups []v2u
 
 func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {
 	u := new(domain.User)
+	return u, scanUserColumns(row, u)
+}
+
+// scanUserSearchHeader scans a search read's row: the user header, then the
+// text the user matched on.
+func scanUserSearchHeader(row pgx.CollectableRow) (*domain.User, error) {
+	u := new(domain.User)
+	return u, scanUserColumns(row, u, &u.MatchedText)
+}
+
+// scanUserColumns scans the user header columns into u, then the columns a
+// read selects after them into more.
+func scanUserColumns(row pgx.CollectableRow, u *domain.User, more ...any) error {
 	var (
 		lifecycleOwnerTeamID *string
 		status               string
 	)
-	if err := row.Scan(
+	if err := row.Scan(append([]any{
 		&u.ProjectID,
 		&u.SchemaURL,
 		&u.ID,
@@ -666,12 +764,12 @@ func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {
 		&status,
 		&u.Metadata.CreatedAt,
 		&u.Metadata.UpdatedAt,
-	); err != nil {
-		return nil, err
+	}, more...)...); err != nil {
+		return err
 	}
 	u.Metadata.Status = domain.UserStatus(status)
 	u.LifecycleOwnerTeamID = lifecycleOwnerTeamID
-	return u, nil
+	return nil
 }
 
 func uniquenessScopeLiteral(scope domain.AttributeUniqueness) string {

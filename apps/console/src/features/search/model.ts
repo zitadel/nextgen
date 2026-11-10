@@ -23,9 +23,9 @@ export interface SearchAnswer {
 export const NO_ANSWER: SearchAnswer = { term: "", hits: [], incomplete: [] };
 
 /**
- * Users are asked for apart from the rest. Their match reads every identifier
- * of the project and the server answers the types of one request in turn, so
- * in one request the quick types would wait for the slow one.
+ * Users are asked for apart from the rest. They are searched only from
+ * `USER_SEARCH_MIN_LENGTH` characters on, and the server answers the types of
+ * one request in turn, so apart neither answer waits for the other's reads.
  */
 export const USER_TYPES = ["user"] as const satisfies readonly SearchResultType[];
 export const OTHER_TYPES = [

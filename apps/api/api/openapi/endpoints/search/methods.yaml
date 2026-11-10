@@ -11,19 +11,21 @@ post:
     (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
 
     What a type matches on:
-    - `user`: the value they carry as `identifier`, from three characters on
+    - `user`: the start of the value they carry as `identifier` or of a part
+      of their `display` name, from three characters on
     - `team`: its name
     - `schema`: the `title` and the `objectType` of a user schema
     - `flow_definition`: its name
     - `idp`: the `slug` and the `display_name` of an identity provider
       connection
 
-    A match is the text anywhere in that value, ignoring case. A `query` that
-    is the `id` of a resource of a requested type finds that one. A schema and
-    a flow definition are found at their newest revision. `project_id` names
-    the project to search; without it, the credential's own project is
-    searched. A caller with access to part of the project finds only what that
-    access covers.
+    A user matches from the start of the value; every other type matches the
+    text anywhere in it. Matching ignores case. A `query` that is the `id` of
+    a resource of a requested type finds that one. A schema and a flow
+    definition are found at their newest revision. `project_id` names the
+    project to search; without it, the credential's own project is searched. A
+    caller with access to part of the project finds only what that access
+    covers.
 
     A token needs `project.read` and, for each type it asks for, the scope that
     type's own list needs: `user.read`, `team.read`, `schema.read`,

@@ -181,6 +181,7 @@ func buildCreateAttributes(
 		}
 		out = append(out, *attr)
 	}
+	out.MarkSearchable(domain.SearchableAttributeKeys(schema))
 	return out, nil
 }
 
