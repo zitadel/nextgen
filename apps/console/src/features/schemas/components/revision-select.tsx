@@ -1,3 +1,4 @@
+import { VALUE_ROW_TRIGGER } from "@/components/filter-select";
 import { IdText } from "@/components/id-text";
 import { Badge } from "@/components/ui/badge";
 import { SelectItem } from "@/components/ui/select";
@@ -17,9 +18,8 @@ import { cn } from "@/lib/utils";
  */
 export const REVISION_MENU = "w-81 min-w-(--radix-select-trigger-width)";
 
-/** A trigger whose value is a row of pieces: it shrinks to its container, 6px apart. */
-export const REVISION_TRIGGER =
-  "max-w-full min-w-0 gap-1.5 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:gap-1.5";
+/** A trigger whose value is a row of pieces, as a title row's filter is. */
+export const REVISION_TRIGGER = VALUE_ROW_TRIGGER;
 
 /** A minted id's lowercase prefix; a URI or other named `$id` has none. */
 const MINTED_PREFIX = /^[a-z]+_(?=[^/:]*$)/;

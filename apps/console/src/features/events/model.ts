@@ -1,4 +1,4 @@
-import type { ListEvents200DataItem } from "@zitadel/api/generated/model";
+import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/generated/model";
 
 /**
  * One event, as `GET /events` and `GET /events/{id}` return it: an
@@ -62,4 +62,146 @@ export function eventFields(event: LogEvent): EventField[] {
     { label: "Device", value: event.fingerprint, id: true },
   ];
   return fields.filter((field): field is EventField => Boolean(field.value));
+}
+
+/**
+ * The list's three views. The server keeps two kinds of event: the changes
+ * and sign-ins it writes with what they record, which are the project's audit
+ * events, and one per API request, written in batches and dropped under load.
+ * `audit` leaves the requests out, since every screen that is opened adds
+ * some; `requests` is them alone; `all` reads both together, as following one
+ * request through its changes needs.
+ */
+export const LOG_VIEWS = ["audit", "requests", "all"] as const;
+export type LogView = (typeof LOG_VIEWS)[number];
+
+/** What the views call themselves on their tabs. */
+export const VIEW_LABEL: Record<LogView, string> = {
+  audit: "Audit events",
+  requests: "API requests",
+  all: "All",
+};
+
+/**
+ * The audit categories a list can be narrowed to, as the API names them
+ * (`category`). `signal` is an audit category too, and the audit view reads
+ * it, but nothing writes one yet, so it is not offered to narrow to.
+ */
+export const AUDIT_CATEGORIES = ["auth", "session", "admin", "entity"] as const;
+export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
+
+/** Every category the audit view reads: all but `request`. */
+const AUDIT_VIEW_CATEGORIES = [...AUDIT_CATEGORIES, "signal"] as const;
+
+/**
+ * The filters that narrow by one value the event carries. They are set from
+ * an event (a row's menu, the event's page), not typed: the value is an id or
+ * a type nobody knows by heart. `name` is what the value is called in a
+ * sentence: "Only this actor", "Clear the actor filter".
+ */
+export const VALUE_FILTERS = [
+  { key: "type", label: "Type", name: "type" },
+  { key: "actor", label: "Actor", name: "actor" },
+  { key: "resource", label: "Resource", name: "resource" },
+  { key: "request", label: "Request", name: "request" },
+  { key: "session", label: "Session", name: "session" },
+  { key: "flow", label: "Flow", name: "login flow" },
+] as const;
+export type ValueFilter = (typeof VALUE_FILTERS)[number];
+export type ValueFilterKey = ValueFilter["key"];
+
+/** The value of an event each filter matches. */
+const EVENT_VALUE: Record<ValueFilterKey, (event: LogEvent) => string | null | undefined> = {
+  type: (event) => event.event_type,
+  actor: (event) => event.actor_id,
+  resource: (event) => event.entity_id,
+  request: (event) => event.request_id,
+  session: (event) => event.session_id,
+  flow: (event) => event.flow_id,
+};
+
+/** The filters an event can set, each with the value it carries; none for a value it lacks. */
+export function eventFilterValues(event: LogEvent): { filter: ValueFilter; value: string }[] {
+  return VALUE_FILTERS.flatMap((filter) => {
+    const value = EVENT_VALUE[filter.key](event);
+    return value ? [{ filter, value }] : [];
+  });
+}
+
+/**
+ * The list's filters, as the URL holds them: they are server-side, so they
+ * belong to the request the loader makes, are linkable and survive a reload.
+ */
+export type LogsSearch = { view: LogView; category?: AuditCategory } & Partial<
+  Record<ValueFilterKey, string>
+>;
+
+/**
+ * The filters a URL may carry. Anything else is dropped rather than sent:
+ * an unknown view is the default one, and a category has no say among the
+ * requests, which are one category themselves.
+ */
+export function parseLogsSearch(search: Record<string, unknown>): LogsSearch {
+  const view = LOG_VIEWS.find((known) => known === search.view) ?? "audit";
+  const category =
+    view === "requests" ? undefined : AUDIT_CATEGORIES.find((known) => known === search.category);
+  // Every key, even unset: the router lays this over the raw search, so a key
+  // left out would keep the URL's value.
+  const parsed: LogsSearch = { view, category };
+  for (const { key } of VALUE_FILTERS) {
+    const value = search[key];
+    parsed[key] = typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+  }
+  return parsed;
+}
+
+/** Whether anything narrows the view beyond its tab. */
+export function isNarrowed(search: LogsSearch): boolean {
+  return Boolean(search.category) || VALUE_FILTERS.some(({ key }) => search[key]);
+}
+
+/** What `GET /events` is asked for under these filters. */
+export function eventsQuery(
+  search: LogsSearch,
+): Pick<
+  ListEventsParams,
+  "category" | "event_type" | "actor_id" | "entity_id" | "request_id" | "session_id" | "flow_id"
+> {
+  const category: ListEventsParams["category"] =
+    search.view === "requests"
+      ? ["request"]
+      : search.category
+        ? [search.category]
+        : search.view === "audit"
+          ? [...AUDIT_VIEW_CATEGORIES]
+          : undefined;
+  return {
+    category,
+    event_type: search.type ? [search.type] : undefined,
+    actor_id: search.actor,
+    entity_id: search.resource,
+    request_id: search.request,
+    session_id: search.session,
+    flow_id: search.flow,
+  };
+}
+
+/** A request, a session and a login flow each tie audit events to the API requests behind them. */
+const CORRELATES: ReadonlySet<ValueFilterKey> = new Set(["request", "session", "flow"]);
+
+/**
+ * The list narrowed by one more value, on top of what already narrows it.
+ * Following a request, a session or a login flow reads every view: a
+ * request's own event is not an audit event, and it is half of what happened.
+ */
+export function narrowedBy(current: LogsSearch, key: ValueFilterKey, value: string): LogsSearch {
+  return { ...current, view: CORRELATES.has(key) ? "all" : current.view, [key]: value };
+}
+
+/**
+ * The list of everything that shares one value with an event, in every view
+ * and under no other filter: where the event's page leads on to.
+ */
+export function sharing(key: ValueFilterKey, value: string): LogsSearch {
+  return { view: "all", [key]: value };
 }

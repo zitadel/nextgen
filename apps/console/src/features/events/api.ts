@@ -1,7 +1,7 @@
 import { api } from "@/api/zitadel";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
-import type { LogEvent } from "./model";
+import { eventsQuery, type LogEvent, type LogsSearch } from "./model";
 
 /** One page of a project's events, newest first. */
 export interface EventPage {
@@ -10,13 +10,19 @@ export interface EventPage {
 }
 
 /**
- * A page of the project's events, newest first. A project that is not
- * claimed yet answers an empty page: its events are stored but stay hidden
- * until the claim.
+ * A page of the project's events under the list's filters, newest first. A
+ * page token continues the filters it was issued under, so `Load more` sends
+ * the same ones. A project that is not claimed yet answers an empty page: its
+ * events are stored but stay hidden until the claim.
  */
-export async function listProjectEvents(projectId: string, pageToken?: string): Promise<EventPage> {
+export async function listProjectEvents(
+  projectId: string,
+  search: LogsSearch,
+  pageToken?: string,
+): Promise<EventPage> {
   const page = await api.listEvents({
     project_id: projectId,
+    ...eventsQuery(search),
     limit: LIST_PAGE_SIZE,
     page_token: pageToken,
   });

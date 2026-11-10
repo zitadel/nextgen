@@ -20,6 +20,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 const EVENTS_URL = "http://localhost/api/v1/events";
 
 const OCCURRED_AT = "2026-11-10T08:15:43Z";
+const REQUEST_ID = "req_01TESTREQUEST";
 
 /** One entry of `GET /events`: a deleted user unless told otherwise. */
 function event(id: string, overrides: Record<string, unknown> = {}) {
@@ -36,7 +37,7 @@ function event(id: string, overrides: Record<string, unknown> = {}) {
     entity_type: "user",
     entity_id: "user_gone",
     client_id: "",
-    request_id: "0af7651916cd43dd8448eb211c80319c",
+    request_id: REQUEST_ID,
     session_id: null,
     flow_id: null,
     payload: {},
@@ -85,20 +86,36 @@ async function renderAt(path: string) {
   return router;
 }
 
+/** Opens the menu of the row that holds the link `name`, and returns its items' scope. */
+async function openRowMenu(name: string) {
+  const row = (await screen.findByRole("link", { name })).closest("tr") as HTMLElement;
+  await userEvent.click(within(row).getByRole("button", { name: /^Actions for/ }));
+  return within(await screen.findByRole("menu"));
+}
+
 describe("logs", () => {
-  it("shows the empty state when the project has no events", async () => {
+  it("opens on the audit events, and says so when the project has none", async () => {
     const queries = serveEvents({ data: [] });
     await renderAt("/events");
 
     expect(await screen.findByRole("heading", { name: "Logs" })).toBeInTheDocument();
-    expect(screen.getByText("This project has no events.")).toBeInTheDocument();
-    // The selected project's events, a page at a time.
+    expect(screen.getByRole("tab", { name: "Audit events", selected: true })).toBeInTheDocument();
+    expect(screen.getByText("This project has no audit events.")).toBeInTheDocument();
+    // The selected project's events, a page at a time, without the API
+    // requests: every category but theirs.
     expect(queries[0]?.get("project_id")).toBe("proj_test");
     expect(queries[0]?.get("limit")).toBe("25");
+    expect(queries[0]?.getAll("category")).toEqual([
+      "auth",
+      "session",
+      "admin",
+      "entity",
+      "signal",
+    ]);
   });
 
   it("lists each event with its type, what it was about, its actor and its time", async () => {
-    serveEvents({
+    const queries = serveEvents({
       data: [
         request("evt_2"),
         event("evt_1"),
@@ -112,14 +129,16 @@ describe("logs", () => {
         }),
       ],
     });
-    await renderAt("/events");
+    await renderAt("/events?view=all");
 
     const rows = await screen.findAllByRole("row");
     // The header row, then the three events in the server's order, newest first.
     expect(rows).toHaveLength(4);
     const [, requestRow, changeRow, anonymousRow] = rows as HTMLElement[];
+    // Every event: no category is asked for.
+    expect(queries[0]?.has("category")).toBe(false);
 
-    // An API request reads as its method, route and status.
+    // An API request reads as its method, operation and status.
     const first = within(requestRow as HTMLElement);
     expect(first.getByRole("link", { name: "request.api" })).toHaveAttribute(
       "href",
@@ -146,18 +165,21 @@ describe("logs", () => {
     expect(third.getByText("—")).toBeInTheDocument();
   });
 
-  it("appends the next page on Load more", async () => {
+  it("appends the next page on Load more, under the filters the list began with", async () => {
     const queries = serveEvents(
       { data: [event("evt_2")], next_page_token: "page-2" },
       { data: [event("evt_1", { event_type: "user.created" })] },
     );
-    await renderAt("/events");
+    await renderAt("/events?category=entity&actor=user_admin");
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
 
     expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "user.deleted" })).toBeInTheDocument();
+    // A page token answers the question the first page asked.
     expect(queries[1]?.get("page_token")).toBe("page-2");
+    expect(queries[1]?.getAll("category")).toEqual(["entity"]);
+    expect(queries[1]?.get("actor_id")).toBe("user_admin");
     // Absent rather than disabled: its absence says the list is complete.
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
@@ -186,6 +208,156 @@ describe("logs", () => {
     await userEvent.click(await screen.findByRole("link", { name: "user.deleted" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events/evt_1"));
+  });
+});
+
+describe("logs filters", () => {
+  it("lists the API requests alone on their tab, which has no category to narrow by", async () => {
+    const queries = serveEvents({ data: [event("evt_1")] }, { data: [request("evt_2")] });
+    const router = await renderAt("/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+    expect(screen.getByRole("combobox", { name: "Filter by category" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "API requests" }));
+
+    expect(await screen.findByRole("link", { name: "request.api" })).toBeInTheDocument();
+    expect(queries[1]?.getAll("category")).toEqual(["request"]);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ view: "requests" }),
+    );
+    expect(screen.queryByRole("combobox", { name: "Filter by category" })).not.toBeInTheDocument();
+  });
+
+  it("says so when the project has no API requests", async () => {
+    serveEvents({ data: [] });
+    await renderAt("/events?view=requests");
+
+    expect(await screen.findByText("This project has no API requests.")).toBeInTheDocument();
+  });
+
+  it("narrows the audit events to one category, and clears it again", async () => {
+    const queries = serveEvents({ data: [event("evt_1")] });
+    const router = await renderAt("/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by category" }));
+    // The API's own values.
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "auth",
+      "session",
+      "admin",
+      "entity",
+    ]);
+    await userEvent.click(screen.getByRole("option", { name: "auth" }));
+
+    await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["auth"]));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ category: "auth" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear the category filter" }));
+
+    await waitFor(() =>
+      expect(queries.at(-1)?.getAll("category")).toEqual([
+        "auth",
+        "session",
+        "admin",
+        "entity",
+        "signal",
+      ]),
+    );
+    expect(router.state.resolvedLocation?.search.category).toBeUndefined();
+  });
+
+  it("narrows by what an event carries from its row menu, on top of what is set", async () => {
+    const queries = serveEvents({ data: [event("evt_1")] });
+    const router = await renderAt("/events?category=entity");
+
+    const menu = await openRowMenu("user.deleted");
+    // The event's own page, then one item per value it carries; it has no
+    // session and no login flow.
+    expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "View event",
+      "Only this type",
+      "Only this actor",
+      "Only this resource",
+      "Only this request",
+    ]);
+    await userEvent.click(menu.getByRole("menuitem", { name: "Only this actor" }));
+
+    await waitFor(() => expect(queries.at(-1)?.get("actor_id")).toBe("user_admin"));
+    // The category stays: the actor narrows it further.
+    expect(queries.at(-1)?.getAll("category")).toEqual(["entity"]);
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "audit",
+      category: "entity",
+      actor: "user_admin",
+    });
+    // Set, it shows on the title row with its value, and the row no longer
+    // offers it.
+    expect(await screen.findByRole("button", { name: "Clear the actor filter" })).toHaveTextContent(
+      "Actoruser_admin",
+    );
+    const again = await openRowMenu("user.deleted");
+    expect(again.queryByRole("menuitem", { name: "Only this actor" })).not.toBeInTheDocument();
+  });
+
+  it("follows a request through every view, since its own event is not an audit event", async () => {
+    const queries = serveEvents(
+      { data: [event("evt_1")] },
+      { data: [request("evt_2"), event("evt_1")] },
+    );
+    const router = await renderAt("/events");
+
+    const menu = await openRowMenu("user.deleted");
+    await userEvent.click(menu.getByRole("menuitem", { name: "Only this request" }));
+
+    expect(await screen.findByRole("link", { name: "request.api" })).toBeInTheDocument();
+    expect(queries[1]?.get("request_id")).toBe(REQUEST_ID);
+    expect(queries[1]?.has("category")).toBe(false);
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "all",
+      request: REQUEST_ID,
+    });
+    expect(screen.getByRole("tab", { name: "All", selected: true })).toBeInTheDocument();
+  });
+
+  it("sends every filter the URL carries, and clears one from the title row", async () => {
+    const queries = serveEvents({ data: [] });
+    const router = await renderAt(
+      "/events?view=all&type=user.deleted&actor=user_admin&resource=user_gone&session=sess_1&flow=flow_1",
+    );
+
+    // Nothing matches, which is not the project having no events.
+    expect(await screen.findByText("No events match these filters.")).toBeInTheDocument();
+    expect(queries[0]?.getAll("event_type")).toEqual(["user.deleted"]);
+    expect(queries[0]?.get("actor_id")).toBe("user_admin");
+    expect(queries[0]?.get("entity_id")).toBe("user_gone");
+    expect(queries[0]?.get("session_id")).toBe("sess_1");
+    expect(queries[0]?.get("flow_id")).toBe("flow_1");
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear the login flow filter" }));
+
+    await waitFor(() => expect(queries.at(-1)?.has("flow_id")).toBe(false));
+    expect(queries.at(-1)?.get("session_id")).toBe("sess_1");
+    expect(router.state.resolvedLocation?.search.flow).toBeUndefined();
+    expect(
+      screen.queryByRole("button", { name: "Clear the login flow filter" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens on the default view for a view or a category the URL makes up", async () => {
+    const queries = serveEvents({ data: [] });
+    await renderAt("/events?view=everything&category=request");
+
+    expect(
+      await screen.findByRole("tab", { name: "Audit events", selected: true }),
+    ).toBeInTheDocument();
+    expect(queries[0]?.getAll("category")).toEqual([
+      "auth",
+      "session",
+      "admin",
+      "entity",
+      "signal",
+    ]);
   });
 });
 
@@ -226,6 +398,39 @@ describe("event detail", () => {
       screen.getByRole("button", { name: "Copy the event document as JSON" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/deploy your changes/)).not.toBeInTheDocument();
+  });
+
+  it("leads on to the events that share one of its values, in every view", async () => {
+    server.use(http.get(`${EVENTS_URL}/evt_1`, () => HttpResponse.json(event("evt_1"))));
+    const queries = serveEvents({ data: [request("evt_2"), event("evt_1")] });
+    const router = await renderAt("/events/evt_1");
+
+    const related = within(
+      (await screen.findByRole("heading", { name: "Related events" })).closest(
+        "[data-slot='card']",
+      ) as HTMLElement,
+    );
+    // One link per value the event carries: it has no session and no flow.
+    expect(related.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Same type",
+      "Same actor",
+      "Same resource",
+      "Same request",
+    ]);
+
+    await userEvent.click(related.getByRole("link", { name: "Same request" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "all",
+      request: REQUEST_ID,
+      project: "proj_test",
+    });
+    expect(queries[0]?.get("request_id")).toBe(REQUEST_ID);
+    expect(queries[0]?.has("category")).toBe(false);
+    expect(
+      await screen.findByRole("button", { name: "Clear the request filter" }),
+    ).toBeInTheDocument();
   });
 
   it("says the event is gone when the project does not hold it, and leads back to Logs", async () => {

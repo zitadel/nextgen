@@ -1,14 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Logs } from "lucide-react";
 import { Fragment } from "react";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader, DetailRow, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
+import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { getProjectEvent } from "@/features/events/api";
-import { eventFields } from "@/features/events/model";
+import { eventFields, eventFilterValues, sharing } from "@/features/events/model";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { formatTimestamp } from "@/lib/date";
 
@@ -18,8 +19,11 @@ import { formatTimestamp } from "@/lib/date";
  * The header names the event's type, its id and when it happened. Details
  * lists the values its envelope carries: who caused it, through which
  * application, on which record, and the ids that tie it to the other events
- * of the same request, session or login flow. Document is the event as the
- * API returns it, which is also what a webhook receives, so it copies whole.
+ * of the same request, session or login flow. Related events leads on to
+ * those: Logs narrowed to everything that shares one of its values, in every
+ * view, since a request's own event is not an audit event. Document is the
+ * event as the API returns it, which is also what a webhook receives, so it
+ * copies whole.
  *
  * An event is read-only: nothing here edits or removes it.
  */
@@ -33,6 +37,7 @@ export const Route = createFileRoute("/_authed/events/$eventId")({
 function EventDetail() {
   const event = Route.useLoaderData();
   const fields = eventFields(event);
+  const related = eventFilterValues(event);
 
   return (
     <Page>
@@ -69,6 +74,20 @@ function EventDetail() {
               </Fragment>
             ))}
           </div>
+        </DetailSection>
+
+        <DetailSection title="Related events">
+          <ul className="flex flex-wrap gap-2">
+            {related.map(({ filter, value }) => (
+              <li key={filter.key}>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/events" search={sharing(filter.key, value)}>
+                    Same {filter.name}
+                  </Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
         </DetailSection>
 
         <DetailSection title="Document">

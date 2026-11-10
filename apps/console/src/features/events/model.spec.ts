@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { eventFields, eventSubject, type LogEvent } from "./model";
+import {
+  eventFields,
+  eventFilterValues,
+  eventSubject,
+  eventsQuery,
+  isNarrowed,
+  type LogEvent,
+  narrowedBy,
+  parseLogsSearch,
+  sharing,
+} from "./model";
 
 /** An event's envelope, with the type and payload a test names. */
 function event(overrides: Record<string, unknown>): LogEvent {
@@ -85,5 +95,125 @@ describe("eventFields", () => {
       { label: "Resource ID", value: "user_2", id: true },
       { label: "Request ID", value: "0af7651916cd43dd8448eb211c80319c", id: true },
     ]);
+  });
+});
+
+describe("parseLogsSearch", () => {
+  it("opens on the audit events with nothing narrowing them", () => {
+    expect(parseLogsSearch({})).toEqual({
+      view: "audit",
+      category: undefined,
+      type: undefined,
+      actor: undefined,
+      resource: undefined,
+      request: undefined,
+      session: undefined,
+      flow: undefined,
+    });
+  });
+
+  it("keeps what the list can send and drops the rest", () => {
+    const parsed = parseLogsSearch({
+      view: "all",
+      category: "admin",
+      actor: " user_1 ",
+      flow: "",
+      session: 7,
+      unknown: "x",
+    });
+    expect(parsed).toMatchObject({ view: "all", category: "admin", actor: "user_1" });
+    expect(parsed.flow).toBeUndefined();
+    expect(parsed.session).toBeUndefined();
+    expect(parsed).not.toHaveProperty("unknown");
+  });
+
+  it("has no category among the requests, nor one the API does not narrow audit events by", () => {
+    expect(parseLogsSearch({ view: "requests", category: "auth" }).category).toBeUndefined();
+    expect(parseLogsSearch({ category: "request" }).category).toBeUndefined();
+    expect(parseLogsSearch({ view: "nope" }).view).toBe("audit");
+  });
+});
+
+describe("eventsQuery", () => {
+  it("asks for every category but the requests' on the audit view", () => {
+    expect(eventsQuery(parseLogsSearch({})).category).toEqual([
+      "auth",
+      "session",
+      "admin",
+      "entity",
+      "signal",
+    ]);
+  });
+
+  it("asks for the requests alone, or for no category at all", () => {
+    expect(eventsQuery(parseLogsSearch({ view: "requests" })).category).toEqual(["request"]);
+    expect(eventsQuery(parseLogsSearch({ view: "all" })).category).toBeUndefined();
+  });
+
+  it("narrows either view to the one category chosen", () => {
+    expect(eventsQuery(parseLogsSearch({ category: "auth" })).category).toEqual(["auth"]);
+    expect(eventsQuery(parseLogsSearch({ view: "all", category: "auth" })).category).toEqual([
+      "auth",
+    ]);
+  });
+
+  it("names each value filter as the API's parameter", () => {
+    const query = eventsQuery(
+      parseLogsSearch({
+        type: "user.deleted",
+        actor: "user_1",
+        resource: "user_2",
+        request: "req_1",
+        session: "sess_1",
+        flow: "flow_1",
+      }),
+    );
+    expect(query).toMatchObject({
+      event_type: ["user.deleted"],
+      actor_id: "user_1",
+      entity_id: "user_2",
+      request_id: "req_1",
+      session_id: "sess_1",
+      flow_id: "flow_1",
+    });
+  });
+});
+
+describe("narrowing by an event", () => {
+  it("offers a filter per value the event carries", () => {
+    const carried = eventFilterValues(
+      event({ actor_id: "user_1", entity_id: "", request_id: "req_1", session_id: null }),
+    );
+    expect(carried.map(({ filter, value }) => [filter.key, value])).toEqual([
+      ["type", "user.deleted"],
+      ["actor", "user_1"],
+      ["request", "req_1"],
+    ]);
+  });
+
+  it("adds a value to what already narrows the list, and keeps the view", () => {
+    const current = parseLogsSearch({ category: "entity" });
+    expect(narrowedBy(current, "actor", "user_1")).toMatchObject({
+      view: "audit",
+      category: "entity",
+      actor: "user_1",
+    });
+  });
+
+  it("reads every view to follow a request, a session or a login flow", () => {
+    const current = parseLogsSearch({});
+    for (const key of ["request", "session", "flow"] as const) {
+      expect(narrowedBy(current, key, "id_1").view).toBe("all");
+    }
+  });
+
+  it("starts over from one shared value on the event's page", () => {
+    expect(sharing("actor", "user_1")).toEqual({ view: "all", actor: "user_1" });
+  });
+
+  it("knows a narrowed list from a whole view", () => {
+    expect(isNarrowed(parseLogsSearch({ view: "requests" }))).toBe(false);
+    expect(isNarrowed(parseLogsSearch({ category: "auth" }))).toBe(true);
+    expect(isNarrowed(parseLogsSearch({ type: "user.deleted" }))).toBe(true);
   });
 });
