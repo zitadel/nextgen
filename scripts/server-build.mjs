@@ -12,7 +12,16 @@ import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 // package move back into a loud failure at build time.
 export const SERVER_BUILD_PACKAGE = "github.com/zitadel/nextgen/internal/build";
 
+// The Go module (go.mod, main.go, cmd/, internal/, api/), relative to the
+// repository root. Every `go` command for the server runs from here; the
+// binaries and metadata still land under the repository's dist/.
+export const SERVER_MODULE_DIR = "apps/api";
+
 const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
+
+export function serverModuleRoot(repoRoot = defaultRepoRoot) {
+  return join(repoRoot, SERVER_MODULE_DIR);
+}
 
 export async function gitInfo(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
@@ -57,7 +66,7 @@ export async function assertServerBuildPackage(options = {}) {
   const runCaptureFn = options.runCapture ?? runCapture;
   const actual = (
     await runCaptureFn("go", ["list", "-f", "{{.ImportPath}}", "./internal/build"], {
-      cwd: repoRoot,
+      cwd: serverModuleRoot(repoRoot),
     })
   ).stdout.trim();
   if (actual !== SERVER_BUILD_PACKAGE) {
@@ -111,7 +120,7 @@ export async function buildLocalServer(options = {}) {
       output,
       ".",
     ],
-    { cwd: repoRoot, env: { ...process.env, ...(options.env ?? {}) } },
+    { cwd: serverModuleRoot(repoRoot), env: { ...process.env, ...(options.env ?? {}) } },
   );
 
   const metadata = {

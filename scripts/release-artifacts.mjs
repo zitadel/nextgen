@@ -5,13 +5,20 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run, runReplayed } from "./dev-process.mjs";
+import { run, runReplayed } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
   SERVER_PLATFORM_PACKAGES,
+  hostOnlyPackageDirs,
 } from "./release-manifest.mjs";
-import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+import {
+  assertServerBuildPackage,
+  gitInfo,
+  serverLdflags,
+  serverModuleRoot,
+} from "./server-build.mjs";
 
 export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 export { gitInfo } from "./server-build.mjs";
@@ -96,32 +103,36 @@ export async function buildServerBinaries(options = {}) {
 
   // The per-platform builds are independent and the Go build cache is safe
   // under concurrency, so cross-compile all platforms at once.
-  await mapWithConcurrency(platforms, platforms.length, async (platform) => {
-    const dir = platformDir(outDir, platform);
-    const output = join(dir, binaryName(platform.goos));
-    await mkdir(dir, { recursive: true });
-    await runFn(
-      "go",
-      [
-        "build",
-        "-trimpath",
-        "-ldflags",
-        serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
-        "-o",
-        output,
-        ".",
-      ],
-      {
-        cwd: repoRoot,
-        env: {
-          ...baseEnv,
-          CGO_ENABLED: "0",
-          GOOS: platform.goos,
-          GOARCH: platform.goarch,
+  await mapAll(
+    platforms,
+    async (platform) => {
+      const dir = platformDir(outDir, platform);
+      const output = join(dir, binaryName(platform.goos));
+      await mkdir(dir, { recursive: true });
+      await runFn(
+        "go",
+        [
+          "build",
+          "-trimpath",
+          "-ldflags",
+          serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
+          "-o",
+          output,
+          ".",
+        ],
+        {
+          cwd: serverModuleRoot(repoRoot),
+          env: {
+            ...baseEnv,
+            CGO_ENABLED: "0",
+            GOOS: platform.goos,
+            GOARCH: platform.goarch,
+          },
         },
-      },
-    );
-  });
+      );
+    },
+    platforms.length,
+  );
 
   return { outDir, platforms, version, gitInfo: info };
 }
@@ -174,9 +185,8 @@ export async function createArchives(options = {}) {
   // The archives are independent (one platform's binary each, distinct file
   // names) and gzip and zip use one core each, so compress all platforms at
   // once. The results keep platform order, so checksums.txt keeps its order.
-  const archives = await mapWithConcurrency(
+  const archives = await mapAll(
     SERVER_PLATFORMS,
-    SERVER_PLATFORMS.length,
     async (platform) => {
       const name = `nextgen_${version}_${platformName(platform)}`;
       const sourceDir = platformDir(outDir, platform);
@@ -213,6 +223,7 @@ export async function createArchives(options = {}) {
       );
       return archivePath;
     },
+    SERVER_PLATFORMS.length,
   );
 
   const checksumLines = [];
@@ -236,14 +247,18 @@ export async function packPublicPackages(options = {}) {
   // Packs are independent (distinct package dirs, distinct tarball names in a
   // shared destination); cap concurrency so the cli prepack rebuild and the
   // larger packages do not stampede the runner.
-  await mapWithConcurrency(options.dirs ?? PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
-    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
-    await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
-      cwd: repoRoot,
-      env: process.env,
-    });
-  });
+  await mapAll(
+    options.dirs ?? PUBLIC_PACKAGE_DIRS,
+    async (dir) => {
+      const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+      await assertPublishDirectoryReady({ repoRoot, dir, manifest });
+      await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
+        cwd: repoRoot,
+        env: process.env,
+      });
+    },
+    8,
+  );
 
   return tarballsDir;
 }
@@ -394,8 +409,10 @@ export async function verifyLocalArtifacts(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
+  // A host-only snapshot has no archives and packs one server platform.
+  const hostOnly = options.hostOnly ?? false;
   const missing = [];
-  for (const platform of SERVER_PLATFORMS) {
+  for (const platform of hostOnly ? [] : SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
     const archive = join(
       outDir,
@@ -407,11 +424,12 @@ export async function verifyLocalArtifacts(options = {}) {
     }
   }
   const checksumPath = join(outDir, "archives", "checksums.txt");
-  if (!(await exists(checksumPath))) {
+  if (!hostOnly && !(await exists(checksumPath))) {
     missing.push(checksumPath);
   }
   const npmTarballs = (await exists(join(outDir, "npm"))) ? await readdir(join(outDir, "npm")) : [];
-  if (npmTarballs.length < PUBLIC_PACKAGE_DIRS.length) {
+  const packageDirs = hostOnly ? hostOnlyPackageDirs() : PUBLIC_PACKAGE_DIRS;
+  if (npmTarballs.length < packageDirs.length) {
     missing.push(`${join(outDir, "npm")}/*`);
   }
   if (missing.length > 0) {

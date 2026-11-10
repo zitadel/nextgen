@@ -3,6 +3,8 @@
   "pages": [
     "project-team-user",
     "repo-config",
+    "releases-and-deployments",
+    "origins-and-previews",
     "flows-and-schemas",
     "sessions-auth-attempts",
     "databases"

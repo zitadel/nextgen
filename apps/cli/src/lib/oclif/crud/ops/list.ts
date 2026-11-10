@@ -1,43 +1,81 @@
 import { spinner } from "@clack/prompts";
+import { z } from "zod";
 import { Flags } from "@oclif/core";
+import { Paging } from "@/lib/backend/transport";
 
-import { nonBlankString } from "../../flags";
+import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
 
-import type { CommandResult, GlobalOptions } from "../../types";
-import { collectPages } from "../paging";
-import { wireOf } from "../wire";
-import { type ParsedFilter, parseFilter, parseSort } from "../query";
-import { parseOrThrow } from "../shared";
-import { chosenColumns } from "../columns";
-import { shellOption } from "../../../shell";
-import { fieldPaths, itemSchemaOf } from "../paths";
-import { renderRows, renderTable } from "../table";
-import type { Json, ListSpec } from "../types";
+import type { CommandResult } from "@/lib/oclif/types";
+import { plainFlag } from "@/lib/oclif/tabulatable";
+import { wireOf } from "@/lib/oclif/crud/wire";
+import {
+  type ParsedFilter,
+  parseFilter,
+  parseSort,
+  type TypedFilter,
+  type TypedSort,
+} from "@/lib/oclif/crud/query";
+import { parseOrThrow } from "@/lib/oclif/crud/shared";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { Cmd } from "@/lib/cmd";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
 import {
   type OperationDefinition,
   type OperationInput,
   type OperationStatics,
   ResourceCommand,
 } from "./command";
-import { nextCommandsData } from "../../envelope";
+
+type ListFlags = Readonly<{
+  limit?: number;
+  pageToken?: string;
+  all?: boolean;
+  fields?: readonly string[];
+  filter?: readonly TypedFilter[];
+  sort?: TypedSort;
+  plain?: boolean;
+}>;
+
+type ListInput = OperationInput<ListFlags, Json>;
 
 /**
  * `<topic> list`: one page by default, `--all` to drain, `--filter` / `--sort`
  * for query-backed lists or one flag per parameter for GET-backed ones.
  * Emits `{ items, count, next_page_token }` and a column table for humans.
  */
-export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** What a page size the server would refuse is refused for. */
+const LIMIT: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid page size",
+    hint: "Use a whole number from {min} to {max}.",
+  },
+  values: {
+    min: LIMIT_MIN,
+    max: LIMIT_MAX,
+  },
+};
+
+export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
   static describe<Ctx>({
     topic,
+    resource,
     spec,
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
-    const paging = {
-      limit: Flags.integer({
+    const pagingFlags = {
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
         description: "Page size (server default 20, max 100).",
-        min: 1,
-        max: 100,
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
       }),
       "page-token": nonBlankString({
         description: "Continue from a previous page's next_page_token.",
@@ -49,13 +87,18 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       }),
     };
     const presentation = {
-      fields: nonBlankString({
+      fields: Flags.custom<
+        readonly string[],
+        Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
+      >({
+        parse: async (input, _command, flag) => {
+          return readColumns(input, flag.fallback, flag.shape);
+        },
+      })({
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
-      }),
-      plain: Flags.boolean({
-        description:
-          "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+        fallback: resource.columns,
+        shape: fieldPaths(spec.item),
       }),
     };
     const filters = spec.filters ?? [];
@@ -66,8 +109,20 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const specific = {
       ...(filters.length > 0
         ? {
-            filter: nonBlankString({
+            filter: Flags.custom<
+              TypedFilter,
+              Readonly<{ filters: readonly FilterField[]; operations: readonly string[] }>
+            >({
+              parse: async (input, _command, flag) => {
+                return {
+                  raw: input,
+                  ...parseFilter(input, flag.filters, flag.operations),
+                };
+              },
+            })({
               multiple: true,
+              filters,
+              operations: options.operations,
               description: `Filter as field=operation:value (operation defaults to equals). Fields: ${filters
                 .map(
                   (field) =>
@@ -79,7 +134,15 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : {}),
       ...(sorts.length > 0
         ? {
-            sort: nonBlankString({
+            sort: Flags.custom<TypedSort, Readonly<{ sorts: readonly string[] }>>({
+              parse: async (input, _command, flag) => {
+                return {
+                  raw: input,
+                  ...parseSort(input, flag.sorts),
+                };
+              },
+            })({
+              sorts,
               description: `Sort as field:direction (asc|desc). Fields: ${sorts.join(", ")}.`,
             }),
           }
@@ -96,39 +159,39 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ]
           : []),
       ],
-      flags: { ...(paged ? paging : {}), ...presentation, ...specific, ...options.flags },
+      flags: {
+        ...(paged ? pagingFlags : {}),
+        ...presentation,
+        ...specific,
+        ...options.flags,
+        plain: plainFlag,
+      },
       args: {},
     };
   }
 
-  protected override async execute(
-    { flags }: OperationInput,
-    _meta: GlobalOptions,
-  ): Promise<CommandResult> {
+  protected override async operate({ flags }: ListInput): Promise<CommandResult> {
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
-    // With a schema in hand the columns are known before any request, so a
-    // typo fails without contacting the server at all.
-    const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
-    const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
+    const shape = fieldPaths(spec.item);
+    // The pages arrive as the server sent them, cursor included, so a token
+    // goes back exactly as it came. Nothing here spells out what could drive a
+    // terminal, because nothing here prints: a row reaches a person through
+    // `emitList`, whose cells are spelled out as they are read, and reaches a
+    // script through the envelope, which the serialiser escapes.
     const ctx = await this.context();
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
-    const paging = (token?: string): Json =>
+    const pageFields = (token?: string): Json =>
       paged
         ? {
-            ...(typeof flags.limit === "number" && { [wire.limit]: flags.limit }),
+            ...(flags.limit !== undefined && { [wire.limit]: flags.limit }),
             ...(token && { [wire.pageToken]: token }),
           }
         : {};
 
-    // One request per page. Filters are parsed and checked against each
-    // field's own declaration first, so an operation the endpoint does not
-    // offer fails locally with what that field accepts.
-    const given = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
-      parseFilter(String(raw), spec.filters ?? []),
-    );
+    const given = flags.filter ?? [];
     // A field that declares a default contributes it only when the caller did
     // not name that field, so naming it always wins.
     const defaults = (spec.filters ?? []).flatMap((field) =>
@@ -137,8 +200,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : [],
     );
     const parsed = [...given, ...defaults];
-    const sorting =
-      typeof flags.sort === "string" ? parseSort(flags.sort, spec.sorts ?? []) : undefined;
+    const sorting = flags.sort && {
+      field: flags.sort.field,
+      direction: flags.sort.direction,
+    };
 
     // Transport is the only thing that differs: a structured query endpoint
     // takes a validated body, a GET list takes flat parameters. The caller
@@ -150,7 +215,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             parseOrThrow(
               spec.body,
               wire.query({
-                paging: paging(token),
+                paging: pageFields(token),
                 sorting,
                 filters: parsed.map(({ field, operation, value }) => ({
                   field: field.field,
@@ -163,91 +228,71 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ),
           )
         : spec.call(ctx, {
-            ...paging(token),
+            ...pageFields(token),
             ...queryParams(parsed),
             ...(sorting && spec.sortParam ? { [spec.sortParam]: sorting.direction } : {}),
           });
 
     // A resource that drains by default does so only when the caller named no
     // page: asking for one with --limit or --page-token is asking for one.
-    const asked = flags.limit !== undefined || flags["page-token"] !== undefined;
+    const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
     // `--all` is one request per page, so a wide drain would otherwise sit
     // silent. The spinner is terminal-only: no animation reaches a pipe, and
     // `--json` has already silenced everything.
-    const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
+    const progress = all && this.isTTY && !this.isJson ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
-    let fetched = 0;
-    let drained = false;
+    const paging = new Paging({
+      items: (response) => {
+        return spec.items(response);
+      },
+      next: (response) => {
+        return spec.next?.(response);
+      },
+    });
+    const walk = paging.walk(async (token, number) => {
+      // The walk begins at the page --page-token names, if any.
+      const page = await request(token ?? flags.pageToken);
+      progress?.message(`Fetching ${topic} — page ${number}`);
+      return page;
+    });
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const { items, next } = await collectPages(
-      async (token) => {
-        const page = await request(token);
-        fetched += 1;
-        progress?.message(`Fetching ${topic} — page ${fetched}`);
-        return page;
-      },
-      {
-        items: spec.items,
-        all,
-        nextPageToken: wire.nextPageToken,
-        token: paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
-      },
-    )
-      .then((page) => {
-        drained = true;
-        return page;
-      })
-      .finally(() => {
-        if (!drained) {
-          progress?.stop(`Fetching ${topic} failed`);
-        }
-      });
+    const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
+      progress?.stop(`Fetching ${topic} failed`);
+      throw error;
+    });
+    const { items } = collected;
+    const next = collected.next;
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
-    // A terminal gets the aligned table with its header and footer; a pipe (or
-    // `--plain`) gets one tab-separated record per line, which `cut` and `awk`
-    // can split and nothing else has to parse around.
-    const plain = flags.plain === true || !process.stdout.isTTY;
-    const columns = early ?? chosenColumns(flags.fields, resource.columns, items);
-    // A page token is only valid alongside the sorting and filters that issued
-    // it, so the suggested next page repeats the whole invocation rather than
-    // handing back a bare token. `--all` already drained everything, so it
-    // suggests nothing.
-    const nextCommands =
-      next && !all
-        ? [
-            this.suggest(
-              [
-                `${topic} list`,
-                ...repeatedFlags(flags),
-                shellOption("--page-token", next),
-                "--json",
-              ].join(" "),
-            ),
-          ]
-        : [];
-    return {
-      status: "ok",
-      data: {
-        items,
-        count: items.length,
-        [wire.nextPageToken]: next,
-        ...(nextCommands.length > 0 ? nextCommandsData(nextCommands) : {}),
-      },
-      pretty: plain
-        ? renderRows(columns, items)
-        : items.length === 0
-          ? `No ${topic} found.`
-          : [
-              renderTable(columns, items),
-              "",
-              `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
-            ].join("\n"),
+    const rows = items;
+    const columns = chosenColumns(flags.fields, resource.columns, items, shape);
+    const empty = `No ${topic} found.`;
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: `${topic} list`,
+      flags: repeatedFlags(flags),
+      cursorKey: wire.nextPageToken,
     };
+    const extra = {};
+
+    return this.listResult(
+      { plain: flags.plain === true },
+      {
+        columns,
+        rows,
+        items,
+        singular: resource.singular,
+        plural: topic,
+        empty,
+        footer,
+        page,
+        extra,
+      },
+    );
   }
 }
 
@@ -256,12 +301,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  * sorting and filters that produced it, and the page size is part of what the
  * caller asked for. Values are re-emitted exactly as they were typed.
  */
-const repeatedFlags = (flags: Json): readonly string[] => {
-  const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
-  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
-    shellOption("--filter", String(filter)),
-  );
+const repeatedFlags = (flags: ListFlags): readonly string[] => {
+  const limit = flags.limit === undefined ? [] : [`--limit ${flags.limit}`];
+  const sort = flags.sort ? [Cmd.option("--sort", flags.sort.raw)] : [];
+  const filters = (flags.filter ?? []).map((filter) => Cmd.option("--filter", filter.raw));
   return [...limit, ...sort, ...filters];
 };
 

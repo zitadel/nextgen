@@ -5,14 +5,14 @@ import { join } from "node:path";
 import { Plugin } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { COMMAND_GROUPS } from "../../../src/lib/oclif/groups";
-import { cliPackageRoot } from "../../helpers/oclif-build";
+import { COMMAND_GROUPS } from "@/lib/oclif/groups";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import {
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
   stripAnsi,
-} from "../../helpers/run-cli";
+} from "@tests/helpers/run-cli";
 
 /**
  * The root screen, byte for byte. Issue #1248 specified the shape, and #2263 the
@@ -30,6 +30,7 @@ Getting started
   start             Start a local Zitadel server
   status            Summarize the local Zitadel server and project state
   claim             Claim this project to make it permanent
+  skills            Give coding agents the Zitadel skills
 
 Local development
   console           Open the local console, signed in as the local admin
@@ -65,6 +66,7 @@ Configuration and releases
 
 Diagnostics and utilities
   doctor            Verify local runtime and project state
+  upgrade           Upgrade this project to the latest Zitadel release
   api               Call any operation of the Zitadel API
   autocomplete      Display autocomplete installation instructions
   commands          List all zitadel commands
@@ -75,7 +77,7 @@ Diagnostics and utilities
   which             Show which plugin a command is in
 
 Flags
-  --help      Show help for command
+  -h, --help  Show help for command
   --version   Show zitadel version
 
 Examples

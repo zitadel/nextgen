@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { claimDeadline } from "../../../src/commands/claim";
+import { claimDeadline } from "@/commands/claim";
 
 const NOW = Date.parse("2026-08-04T12:00:00.000Z");
 const TEN_MINUTES = 10 * 60 * 1000;

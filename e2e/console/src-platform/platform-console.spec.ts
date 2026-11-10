@@ -1,15 +1,15 @@
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
+import { claimProject } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 
 /**
  * A platform operator in the embedded console (#1300): signed up through the
  * console's own login, so homed in the platform project as a real operator
- * is, and granted admin on the instance's customer project by email. Every
+ * is, and admin of the instance's customer project by claiming it. Every
  * request the browser makes runs on the session cookie alone.
  *
- * The customer project is the only one the operator holds a grant on, so the
+ * The customer project is the only one the operator has access to, so the
  * console selects it on its own (`?project=`, #1299) and every screen below
  * reads it rather than the platform project the operator signed in to. What
  * this pins is that each of them answers for the customer project without an
@@ -29,15 +29,10 @@ test("a platform operator reaches every management screen without an error", asy
   // The account menu, which both the home and a project's screens draw.
   await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
 
-  // Admin on the customer project, by email: the operator lives in the
-  // platform project, which is where a grant resolves an identifier (#1192).
-  // Written with the project's secret from the test process, never the page.
-  await withErrorBody(
-    zitadel.api.createGrant(
-      { user: { identifier: operator.email }, relation: "admin" },
-      { project_id: zitadel.handle.projectId },
-    ),
-  );
+  // Admin on the customer project by claiming it: an unclaimed project
+  // cannot grant a platform user (ADR 054 §4 amendment). The claim starts with
+  // the project's secret from the test process, never the page.
+  await claimProject(zitadel, page);
 
   const selected = new RegExp(`[?&]project=${zitadel.handle.projectId}(&|$)`);
   for (const [path, heading] of [

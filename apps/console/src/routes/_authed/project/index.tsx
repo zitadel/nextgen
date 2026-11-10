@@ -6,15 +6,22 @@ import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
-import { AddAdminButton, ProjectAdmins } from "@/components/project-admins";
-import { ProjectOrigins } from "@/components/project-origins";
-import { type PasswordPolicyRead, ProjectPolicies } from "@/components/project-policies";
-import { ProjectVariables } from "@/components/project-variables";
+import {
+  AddAdminButton,
+  ProjectAdmins,
+} from "@/features/project-settings/components/project-admins";
+import { ProjectOrigins } from "@/features/project-settings/components/project-origins";
+import {
+  type PasswordPolicyRead,
+  ProjectPolicies,
+} from "@/features/project-settings/components/project-policies";
+import { ProjectVariables } from "@/features/project-settings/components/project-variables";
+import { readDeployedPasswordPolicy } from "@/features/project-settings/api";
 import { RenameCard } from "@/components/rename-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { describeError } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 
 /**
  * The selected project's own page: its detail, origins, variables and admins.
@@ -40,13 +47,13 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
  * carries the three divergences for the frames.
  *
  * Overview holds the project's name, its origins, its variables and secrets
- * and its policies; Admins holds the grants (#1238), with the Add button on
- * the tab row. All of it is project-level data, so it lives here rather than
- * under account settings, and the id every request carries is this route's.
- * The origins ride on the project; the grants and the variables are loaded
- * with it, since all three reads are the same viewer check on the same
- * project and succeed or fail as one. The password policy is read beside
- * them but fails on its own: its card only shows it.
+ * and its policies; Admins holds who has access and how (#1238, #1462), with
+ * the Add button on the tab row. All of it is project-level data, so it lives
+ * here rather than under account settings, and the id every request carries is
+ * this route's. The origins ride on the project; the admins, the grants and
+ * the variables are loaded with it, since the four reads are the same viewer
+ * check on the same project and succeed or fail as one. The password policy
+ * is read beside them but fails on its own: its card only shows it.
  */
 export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
@@ -57,27 +64,35 @@ export const Route = createFileRoute("/_authed/project/")({
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [project, grants, variables, policies] = await Promise.all([
+    const [project, admins, grants, variables, policies] = await Promise.all([
       api.getProject(projectId),
-      // One page: a project's admins are a handful. Add paging with the first
-      // project that needs it.
-      api.queryGrants({ limit: 100, expand: ["principal"] }, { project_id: projectId }),
+      // One page each: a project's admins are a handful. Add paging with the
+      // first project that needs it. The people and how they hold access come
+      // from the admins list (#1462); the grants add the rows it leaves out.
+      // Their principal refs carry the names, so nothing is expanded.
+      api.listProjectAdmins(projectId, { limit: 100 }),
+      api.queryGrants({ limit: 100 }, { project_id: projectId }),
       // No kind: every name with its value per kind, which is what the table
       // shows side by side.
       api.getVariables({ project_id: projectId }),
-      // The password policy as its newest revision; a project that never
-      // published one answers an empty list. Read-only, so a failed read
-      // costs the card its row, not the page its editable sections.
-      api
-        .listPolicies({ project_id: projectId, operation: "auth.factor.password.set", limit: 1 })
-        .then(
-          (page): PasswordPolicyRead => ({ config: page.policies[0]?.config }),
-          (cause): PasswordPolicyRead => ({
-            error: describeError(cause, "The password policy could not be read."),
-          }),
-        ),
+      // The password policy the primary origins enforce, which is the one
+      // their release pins rather than the newest published revision.
+      // Read-only, so a failed read costs the card its row, not the page its
+      // editable sections.
+      readDeployedPasswordPolicy(projectId).then(
+        (read): PasswordPolicyRead => read ?? { deployed: false },
+        (cause): PasswordPolicyRead => ({
+          error: describeError(cause, "The password policy could not be read."),
+        }),
+      ),
     ]);
-    return { project, grants: grants.grants, variables, passwordPolicy: policies };
+    return {
+      project,
+      admins: admins.admins,
+      grants: grants.grants,
+      variables,
+      passwordPolicy: policies,
+    };
   },
   component: ProjectDetail,
 });
@@ -85,7 +100,7 @@ export const Route = createFileRoute("/_authed/project/")({
 type Tab = "overview" | "admins";
 
 function ProjectDetail() {
-  const { project, grants, variables, passwordPolicy } = Route.useLoaderData();
+  const { project, admins, grants, variables, passwordPolicy } = Route.useLoaderData();
   const { session } = Route.useRouteContext();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -140,6 +155,7 @@ function ProjectDetail() {
         <TabsContent value="admins">
           <ProjectAdmins
             projectId={project.id}
+            admins={admins}
             grants={grants}
             viewerUserId={session.user_id ?? undefined}
             onChanged={reload}

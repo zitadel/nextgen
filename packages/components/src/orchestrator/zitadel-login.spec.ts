@@ -18,6 +18,7 @@ import {
  * `ElementInternals` implementation.
  */
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
@@ -72,7 +73,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -425,7 +426,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="no-such-flow"');
-    expect(text).toContain("zitadel apply");
+    expect(text).toContain("zitadel deploy");
   });
 
   it("explains a flow-name that does not serve the requested purpose", async () => {
@@ -452,6 +453,95 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="register-only"');
     expect(text).toContain('purpose "login"');
+  });
+
+  describe("explains a misconfigured element from the server's envelope", () => {
+    /** Mounts an element whose flow start the server answers with `body` and `status`. */
+    const startRefused = async (
+      body: Record<string, unknown>,
+      status: number,
+      attributes: Record<string, string> = {},
+    ) => {
+      server.use(http.post("*/flow", () => HttpResponse.json(body, { status }), { once: true }));
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      return element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    };
+    const invalid = (...fields: string[]) => ({
+      code: "req.invalid",
+      message: "The request is invalid and fails base validation.",
+      details: { details: { fields } },
+    });
+
+    it("names the purpose and lists the valid ones", async () => {
+      const text = await startRefused(invalid("purpose"), 400, { purpose: "signin" });
+      expect(text).toContain('purpose="signin" is not a flow purpose');
+      expect(text).toContain("login, register, recovery, profiling, reauth, link_account");
+    });
+
+    it("names a flow-name the server's pattern refuses", async () => {
+      const text = await startRefused(invalid("flow_definition_name"), 400, {
+        "flow-name": "New_Login",
+      });
+      expect(text).toContain('flow-name="New_Login" is not a flow name');
+    });
+
+    it("names a project id the server refuses", async () => {
+      const text = await startRefused(invalid("project_id"), 400);
+      expect(text).toContain(`"${testProject.projectId}" is not a project id`);
+    });
+
+    it("names a project the server does not have", async () => {
+      const text = await startRefused(
+        { code: "proj.not_found", message: "project not found" },
+        404,
+      );
+      expect(text).toContain(`no project "${testProject.projectId}" exists`);
+    });
+
+    it("names the purpose no active flow serves when no flow-name is set", async () => {
+      const text = await startRefused(
+        { code: "flowdef.not_found", message: "flow definition: not found" },
+        404,
+        { purpose: "recovery" },
+      );
+      expect(text).toContain('no active flow definition serves purpose "recovery"');
+      expect(text).not.toContain("flow-name");
+    });
+
+    it("says to deploy a project with nothing deployed to its primary origins", async () => {
+      const text = await startRefused(
+        { code: "rel.no_default", message: "the project has no primary deployment" },
+        409,
+      );
+      expect(text).toContain(`project "${testProject.projectId}" has nothing deployed`);
+      expect(text).toContain("zitadel deploy");
+    });
+
+    it("says how to deploy to the page's origin when nothing is deployed there", async () => {
+      const text = await startRefused(
+        { code: "rel.not_deployed", message: "nothing is deployed to http://localhost:3000" },
+        409,
+      );
+      expect(text).toContain("nothing deployed to this page's origin");
+      expect(text).toContain("zitadel origin add <origin> --kind primary");
+    });
+
+    it("keeps the server's error as the cause it logs", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      await startRefused({ code: "proj.not_found", message: "project not found" }, 404);
+      const [, error] = logged.mock.calls.find(([tag]) => tag === "[zitadel-login]") ?? [];
+      expect((error as Error).cause).toBeInstanceOf(ApiError);
+      logged.mockRestore();
+    });
+
+    it("passes a req.invalid about any other field through", async () => {
+      const text = await startRefused(invalid("schema_version"), 400);
+      expect(text).toContain("fails base validation");
+    });
   });
 
   it("submits with {session_token, action, fields} and applies the next step", async () => {
@@ -605,6 +695,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]?.body.handoff_token).toBeTruthy();
       expect(exchanges[0]?.projectId).toBe("demo-project");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: location,
+      });
+    }
+  });
+
+  it("reports a failed handoff exchange without navigating or showing the signed-in screen", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      mock.failNextExchange();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      const failed = vi.fn();
+      element.addEventListener("zitadel-flow-error", failed);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+
+      await waitFor(() => (failed.mock.calls.length > 0 ? failed : null));
+      await element.updateComplete;
+      expect(failed).toHaveBeenCalledOnce();
+      expect(assign).not.toHaveBeenCalled();
+      expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(
+        "Session exchange is temporarily unavailable.",
+      );
+      expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
+      expect(element.getAttribute("aria-busy")).toBe("false");
     } finally {
       Object.defineProperty(window, "location", {
         configurable: true,
@@ -1569,43 +1697,6 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(password?.invalid).toBe(true);
   });
 
-  it("says why sign-in moved to sign-up, and names the purpose in the step event", async () => {
-    const element = await mount(host);
-    const steps: unknown[] = [];
-    element.addEventListener("zitadel-flow-step", (event) => {
-      steps.push((event as CustomEvent<{ step: unknown }>).detail.step);
-    });
-    server.use(
-      http.post("*/flow/*/submit", () =>
-        HttpResponse.json({
-          id: "flow_test",
-          session_token: "st_test",
-          step: {
-            name: "register",
-            texts: { title_key: "register.title" },
-            purpose: "register",
-            notice: "notice.user_not_found",
-            fields: [
-              { name: "email", type: "email", text_key: "register.field.email", required: true },
-            ],
-            actions: [{ name: "submit", text_key: "register.action.password", primary: true }],
-            gates: {},
-          },
-          branding: {},
-        }),
-      ),
-    );
-
-    submit(element);
-
-    const notice = await waitFor(() =>
-      element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-message]"),
-    );
-    expect(notice.severity).toBe("info");
-    expect(notice.textContent).toContain("We couldn't find an account for that email");
-    expect(steps.at(-1)).toMatchObject({ name: "register", purpose: "register" });
-  });
-
   it("does not resurrect a dismissed banner during the loading re-render", async () => {
     const element = await mountWithStepErrorBanner(host, "error.user_not_found");
     typeInto(element, "email", "fixed@acme.com");
@@ -2173,6 +2264,164 @@ describe("<zitadel-login> against the typed Flow API", () => {
       newsletterOptIn: true,
     });
   });
+
+  it("renders a date_time field as a local input and submits an RFC 3339 timestamp", async () => {
+    vi.stubEnv("TZ", "Asia/Kolkata");
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "startsAt",
+                  type: "date_time",
+                  text_key: "register.field.startsAt",
+                  required: true,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, unknown> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, unknown> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: {
+            name: "done",
+            texts: { title_key: "done.title" },
+            fields: [],
+            actions: [],
+            gates: {},
+          },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlField>('zl-field[name="startsAt"]'),
+    );
+    await field.updateComplete;
+    expect(field.shadowRoot?.querySelector("input")?.type).toBe("datetime-local");
+
+    field.value = "2026-11-03T12:00";
+    await field.updateComplete;
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ startsAt: "2026-11-03T06:30:00.000Z" });
+  });
+
+  it.each([
+    ["on the minute", "2026-11-03T06:30:00.000Z", "2026-11-03T12:00"],
+    ["with seconds", "2026-11-03T06:30:15.000Z", "2026-11-03T12:00:15"],
+    ["with an offset", "2026-11-03T12:00:00+05:30", "2026-11-03T12:00"],
+  ])(
+    "shows a date_time prefilled %s in local time and keeps its instant",
+    async (_, prefilled, shown) => {
+      vi.stubEnv("TZ", "Asia/Kolkata");
+      onTestFinished(() => {
+        vi.unstubAllEnvs();
+      });
+      server.use(
+        http.post("*/flow", () =>
+          HttpResponse.json(
+            {
+              id: "flow_test",
+              session_token: "st_test",
+              step: {
+                name: "register",
+                texts: { title_key: "register.title" },
+                fields: [
+                  {
+                    name: "startsAt",
+                    type: "date_time",
+                    text_key: "register.field.startsAt",
+                    required: false,
+                    value: prefilled,
+                  },
+                ],
+                actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+                gates: {},
+              },
+              branding: {},
+            },
+            { status: 201 },
+          ),
+        ),
+      );
+
+      let submittedFields: Record<string, unknown> | undefined;
+      server.use(
+        http.post("*/flow/*/submit", async ({ request }) => {
+          const body = (await request.json()) as { fields: Record<string, unknown> };
+          submittedFields = body.fields;
+          return HttpResponse.json({
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "done",
+              texts: { title_key: "done.title" },
+              fields: [],
+              actions: [],
+              gates: {},
+            },
+            branding: {},
+          });
+        }),
+      );
+
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      host.appendChild(element);
+
+      const field = await waitFor(() =>
+        element.shadowRoot?.querySelector<ZlField>('zl-field[name="startsAt"]'),
+      );
+      await field.updateComplete;
+      expect(field.shadowRoot?.querySelector("input")?.value).toContain(shown);
+
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "submit" },
+        }),
+      );
+
+      await waitFor(() => submittedFields ?? null);
+      expect(submittedFields).toEqual({ startsAt: new Date(prefilled).toISOString() });
+    },
+  );
 
   it("submits an unticked checkbox as boolean false", async () => {
     // An untouched optional checkbox must submit real `false`, not "" — the

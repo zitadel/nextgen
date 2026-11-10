@@ -1,5 +1,51 @@
 # @zitadel/components
 
+## 0.5.0
+
+### Minor Changes
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+### Patch Changes
+
+- [#2675](https://github.com/zitadel/nextgen/pull/2675) [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560) - `<zitadel-login>`'s error for an unknown `flow-name`, the `@zitadel/components` and `@zitadel/config` READMEs and the branding API reference now name `zitadel deploy` instead of the removed `zitadel apply` and `zitadel plan`.
+
+- [#2677](https://github.com/zitadel/nextgen/pull/2677) [`1420ccb`](https://github.com/zitadel/nextgen/commit/1420ccb257b7acae0d055c81c3886f1e8155a268) - `<zitadel-login>` no longer carries a typed password or one-time code to the next step: after "Use another account", or on any later step that asks for one, the field starts empty. A value the same step refuses is kept so it can be corrected.
+
+- [#2681](https://github.com/zitadel/nextgen/pull/2681) [`f76173b`](https://github.com/zitadel/nextgen/commit/f76173bf6a4de80a8eb0c49692df1e21c1497e61) - `<zitadel-login>` checks a field's minimum and maximum length before submitting. `<zl-field>` shows only the error under a field while it has one, and its help text again once the error clears. A wrong password (`error.invalid_credentials`) now shows on the password field instead of in the form-level alert, so a custom template must render that field's error (`f.name | fieldError: errors`) to show it.
+
+- [#2676](https://github.com/zitadel/nextgen/pull/2676) [`48d8872`](https://github.com/zitadel/nextgen/commit/48d88726409a2e414c5b9d9999d2c5701493788a) - `<zitadel-login>` now says which attribute is wrong when it cannot start a flow: a `purpose` that is not a flow purpose (with the valid ones), a `flow-name` that is not a valid name, a project id the server refuses or does not have, and a purpose no active flow serves.
+
+- [#2553](https://github.com/zitadel/nextgen/pull/2553) [`e7799e9`](https://github.com/zitadel/nextgen/commit/e7799e933cd71dfea188724944d3f8369d952121) - A sign-in runs only what is deployed. `zitadel origin rm` warns that a project with no origins admits no origin except a loopback origin, and the test kit deploys the bootstrapped release to its primary origins, which default to a loopback origin. `zitadel setup --dev-port` deploys the release the old port ran to the new one, and `zitadel doctor --fix` does the same for the issuer it makes primary, or says to deploy. `<zitadel-login>` says to deploy when it cannot start a flow because nothing is deployed.
+  
+  **Breaking:** a project with no origins no longer serves a flow to an arbitrary host. A flow with no `Origin`, or from a console origin the project does not list, needs a primary deployment and otherwise answers `rel.no_default`. A listed origin or a live preview with nothing deployed answers `rel.not_deployed`, and so does a primary origin added since the last deploy. A loopback origin the project does not list is no longer served the newest primary deployment: it answers `rel.not_deployed` until it is added as a primary origin and deployed to. The test kit registers `appOrigins` as primary origins, so each must be an exact URL; a wildcard pattern is refused.
+
+- [#2598](https://github.com/zitadel/nextgen/pull/2598) [`503e27b`](https://github.com/zitadel/nextgen/commit/503e27b9017ac0bbf93e785f94b36c32ba361bfd) - An SSO sign-in whose provider account is linked to a user of a schema the flow does not serve now ends with `flow.sso_user_schema_mismatch` instead of `flow.restart_required`. `<zitadel-login>` shows "This account can't sign in with this provider. Please try another way to sign in, or contact your administrator." in English, Italian and German, rather than asking the visitor to start again, which could never succeed.
+- Updated dependencies [[`6777ed8`](https://github.com/zitadel/nextgen/commit/6777ed8c876124123732efc9f7887c2e5a056c63), [`2e14564`](https://github.com/zitadel/nextgen/commit/2e145640554b0a4ec4de20a7a02f47c01c1d1d90), [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560), [`9b687fe`](https://github.com/zitadel/nextgen/commit/9b687fe88342b80349bea5fecfdce94044fa1799), [`14d27d8`](https://github.com/zitadel/nextgen/commit/14d27d8ede0f092b9a7f2c09b374637cbcbb33e7), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`db8ecc2`](https://github.com/zitadel/nextgen/commit/db8ecc2e5192d43e5042590462eeb7bbde544e31), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede), [`bbc6bc5`](https://github.com/zitadel/nextgen/commit/bbc6bc54255991e59d949553c95fe8ded17a7bd4), [`aa65acf`](https://github.com/zitadel/nextgen/commit/aa65acf7a7f7e8ab7f5d319592d20479e1adb0e7)]:
+  - @zitadel/config@0.5.0
+
+## 0.4.0
+
+### Patch Changes
+
+- [#2500](https://github.com/zitadel/nextgen/pull/2500) [`1ca73bd`](https://github.com/zitadel/nextgen/commit/1ca73bdeb158ad7b9f947e9c0b795cab33d93195) - Repeated clicks on Sign up or Sign in in `<zitadel-login>` no longer follow an empty anchor while a request is pending, avoiding unwanted URL and browser-history changes.
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924)]:
+  - @zitadel/config@0.4.0
+
+## 0.3.0
+
+### Patch Changes
+
+- [#2417](https://github.com/zitadel/nextgen/pull/2417) [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15) - `<zitadel-login>` now shows the project's minimum password length under the password field while someone chooses a password, instead of only after a too-short submit. The designs `zitadel branding eject` copies show it too; a template you ejected earlier gets it by adding `| fieldRuleHint: f` to its `field_help` line. A field's clear button no longer appears while the field is empty.
+- Updated dependencies [[`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894), [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15)]:
+  - @zitadel/config@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

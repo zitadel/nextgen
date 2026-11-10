@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { operatingSystem } from "../../../../../src/lib/telemetry/dimensions/operating-system";
+import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
 
 describe("operatingSystem", () => {
   it("maps platforms to Mixpanel's canonical OS labels", () => {

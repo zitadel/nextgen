@@ -10,7 +10,7 @@ import {
   LOCAL_DEFAULTS,
   loadEnvFiles,
   loadProjectEnv,
-} from "../../../../src/lib/local-server/env-vars";
+} from "@/lib/local-server/env-vars";
 
 async function projectWith(files: Record<string, string>): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-env-test-"));

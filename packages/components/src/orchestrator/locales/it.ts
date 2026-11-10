@@ -191,6 +191,8 @@ export const it: Locale = {
   "error.flow_restart_required": "Non è stato possibile proseguire l'accesso. Ricomincia da capo.",
   "error.passkey_registration_invalid":
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
+  "error.sso_user_schema_mismatch":
+    "Questo account non può accedere con questo provider. Prova un altro metodo di accesso o contatta l'amministratore.",
   "error.sso_unavailable":
     "Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.",
   "error.sso_verified_unique_value_changed":

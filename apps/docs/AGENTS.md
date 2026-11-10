@@ -37,12 +37,86 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Keep `assetPrefix`; never switch to `basePath`, or the URLs in `llms.txt`,
   the Markdown and the MCP answers lose their `/docs`.
 - Link content by full path: `/docs/reference/cli`, not `/reference/cli`.
+- A route that serves text to download (`.md`, `llms-full.txt`,
+  `openapi.json`) passes it through `absoluteDocsLinks` and sends `cdnCached`
+  (`lib/absolute-links.ts`): it then runs per request, so the CDN must keep it.
 - The favicons are the cloud's, which the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in
   `app/global.css`); change the copies together.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
+
+## Content-Security-Policy
+
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.mjs`' scriptless fallback.
+- Never give a page a nonce or `'unsafe-inline'`: pages stay prerendered
+  ([why](../../docs/design/cloud/csp-docs-and-website.md)).
+- `csp-adapter.mjs` copies `apps/website/csp-adapter.mjs` but for the policy:
+  change both. `next dev` keeps only the base policy for its runtime.
+- Load nothing from another origin without widening the enforced policy
+  in the same change; `tests/` fail on a violation or an unhashed script.
+
+## Writing
+
+- Write for developers who know their stack but may be new to authentication
+  or Zitadel: direct, concrete, neutral; no marketing words.
+- Explain an authentication or Zitadel concept at its first use on a page, in
+  a clause or with a link to its page under `concepts/`.
+- Open a page with what the feature is, in plain words.
+- Start with the common task; give edge cases their own section further down.
+- Explain shared behaviour once and link to it; leave exhaustive parameters
+  and errors to the generated operation pages.
+- Aim for sentences under 20 words; split compound clauses.
+- Write procedures in the imperative: "Run `zitadel deploy`".
+- Use sentence case for titles and headings; lead a task heading with its
+  outcome: "Enable passkeys", not "How to configure passkey authentication".
+- State behaviour, defaults, limits and side effects, not adjectives:
+  "Listens on 3000", "Revokes every session of the user".
+- Say how to recover from a failure the reader can cause: name the command or
+  change that fixes it, not only the error.
+- Never write "seamless", "robust", "leverage", "supercharge", "tailored",
+  "successor track", "harness" as a verb, "next-generation" as an adjective.
+- Never open a sentence with "Furthermore", "Moreover", "In summary", "Delve".
+- Make a page work read on its own and as its Markdown (`<page>.md`): never
+  leave an instruction only in a live example, an image or another page.
+- Keep code blocks runnable; mark a placeholder `<like-this>`, never `...`.
+- Install with the npm dist-tag of the release the page documents; check it
+  with `npm view @zitadel/cli dist-tags`.
+
+### Page types
+
+- `concepts/` explains what something is and why it matters; it has no steps.
+- `guides/` leads to one outcome; `get-started/` does the same for a reader
+  new to Zitadel, from nothing to a working sign-in.
+- `reference/` describes the exact contract; operation pages come from the
+  spec ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone)).
+- `sdks/` holds one page per package: install it, wire it up, check it works.
+- In a guide, list prerequisites before the first command, and say where each
+  required input comes from: "the project ID that `zitadel setup` prints".
+- In a guide, show what a step prints or returns, and end with a check that
+  the outcome works.
+- Give a page only the parts it needs; no section is required on every page.
+
+### Terms
+
+Prefer the left term in prose. Keep commands, identifiers, field names and UI
+labels exactly as they are. Use a right-hand word where it means something
+else, such as a customer's backend or a SaaS product's tenants.
+
+| Prefer | Over |
+| --- | --- |
+| sign in, sign out | log in, log out |
+| ID (`id` only as a field name) | id in prose |
+| login component (`<zitadel-login>`) | widget, orchestrator |
+| local runtime | local server, local Zitadel, backend |
+| authentication attempt | auth attempt |
+| identity provider; IdP after first use | IDP |
+| for example | e.g. |
+| console | Console, management console |
+| project | tenant |
+| deploy | apply |
 
 ## Content
 
@@ -55,7 +129,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
-  `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+  `moon run docs:generate` shapes the committed embed into `.generated/openapi.mjs`
+  (run `server:generate` first when the OpenAPI YAML changes).
 - An API tag's page is prose and `<Operations />`, its operations from that
   document; give its folder no `meta.json`, so the sidebar keeps their order.
 - The CLI reference pages come from the CLI's `command-reference.json`
@@ -64,10 +139,10 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
 - The API reference's Errors page comes from the error schemas and each
   operation's error set (`lib/error-reference.ts`): change the server's errors,
-  never the page ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#error-codes)).
+  never the page ([`apps/api/api/openapi/AGENTS.md`](../api/api/openapi/AGENTS.md#error-codes)).
 - An operation's description is its page body; its first sentence is the
   page's description everywhere else (`lib/description.ts`). The spec's side
-  is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
+  is in [`apps/api/api/openapi/AGENTS.md`](../api/api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
 - Render an operation or webhook page through `openapiPageProps`
   (`lib/source.ts`), never `getOpenAPIPageProps()` directly, which hands the
   client component the whole OpenAPI document.
@@ -95,6 +170,8 @@ Fumadocs stories (`components/examples/`).
   once per page: every login on a page walks the same mock flow.
 - Never widen the mock's worker's scope beyond `/docs/`: on the cloud's host
   it would answer for the console.
+- Keep the mock's request guard in `mock.ts`: only same-origin
+  `/docs/mock-api/` calls may reach its handlers; worker scope limits pages, not requests.
 - A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
@@ -115,6 +192,9 @@ moon run docs:e2e     # tests/ against the local build
 CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
 ```
 
+- Try the API playground on `moon run workspace:cloud`: it sends reads to its
+  page's origin with the reader's session, and no API answers on the docs'
+  port 3003.
 - Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
   moon cannot archive the symlinks Vercel's Next.js adapter writes into
   `.next/output`. The build's key holds the deployment's ID, so Vercel never

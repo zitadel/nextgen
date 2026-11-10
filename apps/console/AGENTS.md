@@ -11,8 +11,8 @@ one, update the ADR in the same change.
 - [0002 API access](docs/adrs/0002-console-api-access.md): the console holds
   no script-readable credential. Call the API same-origin through
   `configureZitadel()` / `getApi()`, never a bespoke client. The base is
-  `/api` only under the dev server; never reintroduce an `/api` shim on the
-  server.
+  empty everywhere: the client calls `/api/v1` (root ADR 077), and the dev
+  proxy forwards it unchanged.
 - [0003 Authentication](docs/adrs/0003-console-authentication.md): `/login`
   embeds the login widget, and the pathless `_authed` layout owns the session
   guard and the shell. The session cookie is the operator's credential for the
@@ -26,6 +26,13 @@ one, update the ADR in the same change.
   - An unreadable runtime document is an error, not a mode: keep it apart
     from "no project yet", and never fall back to `standalone` silently.
     Backend-less runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK`.
+- [0007 Code layout](docs/adrs/0007-console-code-layout.md): the layers, what a
+  feature folder holds, what stays in a route file, and where assets go.
+- [0006 Cloud add-on](docs/adrs/0006-cloud-addon.md): put what only the hosted
+  cloud needs (its analytics, sign-up, billing, support) in its add-on,
+  [`apps/cloud-console`](../cloud-console/AGENTS.md), never behind a build flag
+  here. The console reaches it only through `src/addon/contract.ts`; a
+  component an add-on screen needs is exported from `src/addon/ui.ts`.
 
 ## Building UI
 
@@ -50,26 +57,54 @@ between files are the sign the component is missing.
   under `src/routes/_authed/`: loader-fetched data, `$param` detail routes.
 - A screen that acts on one project declares `staticData.scope: "project"`
   and reads the selected project (`?project=`) through
-  `src/lib/project-scope.ts`: `projectScopeDeps` + `requireProjectScope` in
-  loaders, `useRequiredProjectScope` in components.
+  `src/features/projects/project-scope.ts`: `projectScopeDeps` +
+  `requireProjectScope` in loaders, `useRequiredProjectScope` in components.
 - Never scope a management call with `getConsoleProjectId()`: that is the
   project the console signs into, not the one being managed.
-- The sidebar is the project's screens, listed with or without a selection:
-  without one, a screen asks for a project first (Projects with `?next=`,
-  D22). Projects is the home, drawn without the sidebar, behind the logo and
-  the switcher's `All projects` (D24); never give it a `staticData.nav` row.
-- Screens outside every project (account, billing, operators) go in the
-  project switcher or Settings, not the sidebar.
+- The sidebar lists a project's screens, with or without a selection: without
+  one, a screen asks for a project first (Projects with `?next=`, D22).
+- Projects (the home) and `/settings` are above every project: Projects lists
+  the account's screens (`nav.view: "account"`, D27), `/settings` its own pages
+  (`nav.view: "settings"`, D29).
+- Screens outside every project (billing, operators) go in one of those lists,
+  never beside a project's screens; every screen keeps the one frame.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.
 - In specs, assert on `router.state.resolvedLocation`, never
   `router.state.location`: ending on `location` can leave a loader's request
   in flight, which MSW reports as unhandled in a later test.
+- In specs, import `createAppRouter` at the top of the file, never inside a
+  test: the router mock in `src/test-setup.ts` fails a spec that does.
+
+## Content-Security-Policy
+
+- The console's policy allows its bundle and `index.html`'s inline script
+  by hash. A change to that script changes the hash the cloud sends
+  (repo-root `vercel.json`): `internal/staticui/console`'s test names the
+  value to set.
 
 ## Analytics
 
-- Send a custom event only through `src/lib/analytics.ts`, and list it in
+- Send a custom event only through `src/addon/analytics.ts`, and list it in
   [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
+## Code layout
+
+Layers import downward only; `console:lint` fails an upward import
+([ADR 0007](docs/adrs/0007-console-code-layout.md)): `routes/` → `app-shell/` →
+`features/` → `components/`, `hooks/`, `lib/`, `api/`, `auth/`, `runtime/`.
+
+- Put a resource's code in `src/features/<resource>/`: requests in `api.ts`, pure
+  logic in `model.ts`, its components in `components/`.
+- Never add a helper to `lib/` or `hooks/`, or a component to `components/`, that
+  needs a resource's types or the API client; it belongs in a feature.
+- Keep a route file to its definition, its screen and small private rows; move
+  hooks, requests and sign-in logic to the feature.
+- Keep imports between features free of cycles; Biome does not check this one.
+- Put imported files in `src/assets/` and fixed-URL files in `public/`.
+- `app-shell/logo.tsx` and the APK Futural file are copies of the website's;
+  change them together.
+- When a module moves, update the paths comments and docs name for it.
 
 ## Local loop
 

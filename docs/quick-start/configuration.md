@@ -15,7 +15,8 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.generate_master_key` | `NEXTGEN_SERVER_GENERATE_MASTER_KEY` | `true`                                                          | Mint a master key when none is configured and the master key directory is empty; `false` (or `--disable-master-key-generation`) fails the start instead |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
 | `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
-| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. |
+| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. With platform bootstrap on, it is the platform project's one primary origin, so servers sharing a database need the same value. |
+| `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login; signing in to the platform project works only at `server.public_base`. A comma-separated list in the environment. |
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
 
 ## Platform
@@ -108,6 +109,36 @@ session:
   default_ttl: 168h # a week
   max_ttl: 720h
 ```
+
+## Audit event retention
+
+| YAML key                          | Environment                               | Default          | Description                                                    |
+| --------------------------------- | ----------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| `events.retention.enabled`        | `NEXTGEN_EVENTS_RETENTION_ENABLED`        | `true`           | Delete audit events once they are older than the window        |
+| `events.retention.window`         | `NEXTGEN_EVENTS_RETENTION_WINDOW`         | `720h` (30 days) | How long an event is kept after it was stored                  |
+| `events.retention.interval`       | `NEXTGEN_EVENTS_RETENTION_INTERVAL`       | `1h`             | How often the server purges; the first purge runs as it starts |
+| `events.retention.trigger_secret` | `NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET` | (empty)          | Leaves the schedule to a scheduler outside the server (below)  |
+
+The server purges on its own timer. A server that runs only while it serves a
+request, such as a Vercel function, can't keep a timer. Set `trigger_secret`
+to at least 16 printable ASCII characters (`openssl rand -hex 32`), and the
+server stops its timer and purges once per `GET` or `POST` to
+`/cron/events-retention` that carries the secret as a bearer token:
+
+```sh
+curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com/cron/events-retention
+# {"deleted":42}
+```
+
+- A request without the secret gets `401`, and a purge that fails `500`; the
+  server's log says why.
+- A purge that takes longer than 4½ minutes is cancelled and deletes nothing,
+  so give the call that long.
+- A missed call leaves its events to the next. Two calls at once are safe: the
+  second deletes what the first left, or nothing.
+
+The hosted cloud calls it from a Vercel Cron Job
+([runbook](../runbooks/cloud.md#operating)).
 
 ## Logging
 
@@ -254,8 +285,10 @@ never from data. The API's request instruments (`ogen.server.request_count`,
 milliseconds with the SDK's default buckets) carry
 the operation (`oas.operation`), the method (`http.request.method`), the
 route template (`http.route`, as in `/users/{user_id}`) and the status
-(`http.response.status_code`), never the request path. Should an attribute
-ever follow the data anyway, each instrument holds at most 2000 series: past
+(`http.response.status_code`), never the request path. A request that
+reached its operation at the root path rather than under `/api/v1`, which the
+API answers until 1.0.0, also carries `zitadel.api.root_path` (`true`).
+Should an attribute ever follow the data anyway, each instrument holds at most 2000 series: past
 that, new attribute combinations land on one series marked
 `otel.metric.overflow=true` instead of becoming series of their own. The
 limit is the OpenTelemetry SDK's default; `OTEL_GO_X_CARDINALITY_LIMIT`

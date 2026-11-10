@@ -107,6 +107,7 @@
     "E_NOT_FOUND": 4,
     "E_PORT_IN_USE": 5,
     "E_VALIDATION": 3,
+    "E_CONFIRMATION_REQUIRED": 3,
     "E_CREDENTIAL_MISSING": 3,
     "E_NOT_IMPLEMENTED": 2,
     "E_CANCELLED": 130
@@ -121,7 +122,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+          "description": "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
           "type": "boolean"
         },
         {
@@ -346,6 +347,21 @@
       ]
     },
     {
+      "id": "skills add",
+      "group": "Getting started",
+      "description": "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "skills add"
+        },
+        {
+          "command": "skills add --cwd my-app"
+        }
+      ]
+    },
+    {
       "id": "console",
       "group": "Local development",
       "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
@@ -427,7 +443,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Delete the local runtime and its data without the confirmation prompt.",
+          "description": "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -445,7 +461,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Remove the managed files without the confirmation prompt.",
+          "description": "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -459,7 +475,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "(required) The schema that defines the content of `attributes`.",
+          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -626,11 +642,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -640,6 +651,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, id, schema, status, lifecycle_owner_team_id.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -679,7 +695,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "The schema the user follows after this patch.",
+          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -904,11 +920,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), name (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -918,6 +929,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, name, status.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -957,7 +973,7 @@
       "flags": [
         {
           "name": "name",
-          "description": "The name of the team.",
+          "description": "The new name of the team.",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -1015,7 +1031,7 @@
       "flags": [
         {
           "name": "relation",
-          "description": "(required) Catalog relation on `object_type` `project`.",
+          "description": "(required) The role on the project (`object_type` `project`).",
           "type": "option",
           "options": [
             "viewer",
@@ -1210,11 +1226,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), user_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), relation (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), expires_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -1224,6 +1235,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, expires_at, id.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -1263,7 +1279,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1284,7 +1300,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1311,7 +1327,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1332,7 +1348,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1364,7 +1380,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1430,7 +1446,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1460,7 +1476,7 @@
       "flags": [
         {
           "name": "slug",
-          "description": "(required) Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps (sso_providers).",
+          "description": "(required) Stable identifier of the identity provider.",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -1475,7 +1491,7 @@
         },
         {
           "name": "template",
-          "description": "Template hint for rendering the provider (logo, colors).",
+          "description": "A hint for rendering the provider (logo, colors).",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -1487,20 +1503,20 @@
         },
         {
           "name": "subject-claim",
-          "description": "Claim carrying the provider's stable subject identifier.",
+          "description": "The claim (a named piece of user data the provider returns) that carries the provider's stable subject…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
         {
           "name": "claim-mapping",
-          "description": "Repeatable claim_mapping entry: key=value for a string, key:=value for JSON. Maps user-schema property names (keys) to provider claim names (values).",
+          "description": "Repeatable claim_mapping entry: key=value for a string, key:=value for JSON. Maps user schema property names (keys) to provider claim names (values).",
           "type": "option",
           "multiple": true,
           "helpGroup": "OPTIONAL FIELD"
         },
         {
           "name": "verified-claims",
-          "description": "Repeatable verified_claims entry: key=value for a string, key:=value for JSON. Maps a verifiable user-schema property to its verification source: a claim name (read the claim) or the…",
+          "description": "Repeatable verified_claims entry: key=value for a string, key:=value for JSON. Maps a verifiable user schema property to its verification source: a claim name (read the claim) or the…",
           "type": "option",
           "multiple": true,
           "helpGroup": "OPTIONAL FIELD"
@@ -1554,7 +1570,7 @@
         },
         {
           "name": "oidc-client-id",
-          "description": "(required with oidc.*) Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference to a…",
+          "description": "(required with oidc.*) Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a variable, when…",
           "type": "option",
           "helpGroup": "OIDC FIELD"
         },
@@ -1576,14 +1592,14 @@
         },
         {
           "name": "oidc-scopes",
-          "description": "Repeatable, one value each. Must contain `openid` - without it the provider returns no id_token and the connection is not OIDC.",
+          "description": "Repeatable, one value each. Must contain `openid`: without it the provider returns no id_token and the sign-in is not OIDC.",
           "type": "option",
           "multiple": true,
           "helpGroup": "OIDC FIELD"
         },
         {
           "name": "oidc-pkce-enabled",
-          "description": "Send PKCE (code_challenge/code_verifier).",
+          "description": "Send PKCE (`code_challenge` and `code_verifier`), which binds the code exchange to the client that started it.",
           "type": "boolean",
           "allowNo": true,
           "helpGroup": "OIDC FIELD"
@@ -1715,11 +1731,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -1729,6 +1740,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: slug, created_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -1825,11 +1841,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), user_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), state (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -1839,6 +1850,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, user_id.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -1907,9 +1923,15 @@
       "args": [],
       "flags": [
         {
+          "name": "force",
+          "char": "f",
+          "description": "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "message",
           "char": "m",
-          "description": "A short summary of what this release changes.",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
           "type": "option"
         },
         {
@@ -1930,6 +1952,9 @@
         },
         {
           "command": "deploy --dry-run"
+        },
+        {
+          "command": "deploy -m 'move users to the new schema' --force"
         }
       ]
     },
@@ -1947,7 +1972,13 @@
         },
         {
           "name": "ttl",
-          "description": "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
+          "description": "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
+          "type": "option"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
           "type": "option"
         },
         {
@@ -1976,6 +2007,9 @@
         },
         {
           "command": "preview --ttl 24h"
+        },
+        {
+          "command": "preview -m 'add phone_number to human-user'"
         }
       ]
     },
@@ -2255,8 +2289,14 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Roll back without the confirmation prompt. Required when non-interactive.",
+          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this rolls back.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2452,15 +2492,15 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: name (equals), purpose (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -2671,15 +2711,15 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: operation (equals).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -2708,7 +2748,7 @@
     {
       "id": "policies test",
       "group": "Configuration and releases",
-      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "description": "Run the test cases in .zitadel/policies/ against the policies.\n\nA policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.\n\nThe server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.",
       "args": [
         {
           "name": "operation",
@@ -2914,11 +2954,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -2928,6 +2963,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3218,7 +3258,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Revoke without the confirmation prompt. Required when non-interactive.",
+          "description": "Revoke the release without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3313,15 +3353,15 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: object_type (equals), kind (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3591,6 +3631,12 @@
           "type": "boolean"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "image",
           "description": "Container image to check.",
           "type": "option"
@@ -3624,6 +3670,21 @@
       "examples": []
     },
     {
+      "id": "upgrade",
+      "group": "Diagnostics and utilities",
+      "description": "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "upgrade"
+        },
+        {
+          "command": "upgrade --dry-run"
+        }
+      ]
+    },
+    {
       "id": "api",
       "group": "Diagnostics and utilities",
       "description": "Call any operation of the Zitadel API, with this project's server and project secret.",
@@ -3633,6 +3694,7 @@
           "description": "An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one."
         }
       ],
+      "variadic": true,
       "flags": [
         {
           "name": "method",
@@ -3655,6 +3717,12 @@
         {
           "name": "paginate",
           "description": "Follow next_page_token to the last page, and answer with every page's items in one list.",
+          "type": "boolean"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -3694,6 +3762,11 @@
           "name": "tag",
           "description": "Only the operations of this part of the API (Users, Teams, …).",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         }
       ],
       "examples": [
@@ -3782,11 +3855,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), created_at (greater_than_or_equal|less_than).",
           "type": "option",
@@ -3796,6 +3864,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: occurred_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",

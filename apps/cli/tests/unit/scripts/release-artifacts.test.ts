@@ -69,6 +69,7 @@ type ReleaseArtifactsModule = {
     repoRoot: string;
     release: { name: string; version: string; tag: string; prerelease: boolean };
     outDir: string;
+    hostOnly?: boolean;
   }) => Promise<void>;
 };
 
@@ -215,12 +216,14 @@ describe("release artifact helpers", () => {
       await writeFile(join(dir, platform.goos === "windows" ? "nextgen.exe" : "nextgen"), "binary");
     }
 
-    let running = 0;
-    let mostRunning = 0;
-    let everyoneStarted: () => void = () => undefined;
-    const allStarted = new Promise<void>((resolve) => {
-      everyoneStarted = resolve;
-    });
+    const running = new Set<string>();
+    const runningCounts: number[] = [];
+    const startedListeners: Array<() => void> = [];
+    const allStarted = new Promise<void>((resolve) => startedListeners.push(resolve));
+    const everyoneStarted = () =>
+      startedListeners.forEach((resolve) => {
+        resolve();
+      });
     const { archives, checksumPath } = await createArchives({
       repoRoot,
       outDir,
@@ -231,18 +234,18 @@ describe("release artifact helpers", () => {
         if (!archivePath) {
           throw new Error(`no archive path in: ${args.join(" ")}`);
         }
-        running += 1;
-        mostRunning = Math.max(mostRunning, running);
-        if (running === SERVER_PLATFORMS.length) {
+        running.add(archivePath);
+        runningCounts.push(running.size);
+        if (running.size === SERVER_PLATFORMS.length) {
           everyoneStarted();
         }
         await allStarted;
         await writeFile(archivePath, `archive ${basename(archivePath)}`);
-        running -= 1;
+        running.delete(archivePath);
       },
     });
 
-    expect(mostRunning).toBe(SERVER_PLATFORMS.length);
+    expect(Math.max(...runningCounts)).toBe(SERVER_PLATFORMS.length);
     const names = SERVER_PLATFORMS.map(
       (platform) =>
         `nextgen_0.1.0-alpha.6_${platform.goos}_${platform.goarch}.${
@@ -277,6 +280,34 @@ describe("release artifact helpers", () => {
         },
       }),
     ).rejects.toThrow("missing release artifacts");
+  });
+
+  it("accepts a host-only snapshot without archives or the other platforms' packages", async () => {
+    const { verifyLocalArtifacts } = await loadModule();
+    const { hostOnlyPackageDirs } = (await import(
+      new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+    )) as { hostOnlyPackageDirs: () => string[] };
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-host-only-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    await mkdir(join(outDir, "npm"), { recursive: true });
+    for (const [index] of hostOnlyPackageDirs().entries()) {
+      await writeFile(join(outDir, "npm", `package-${index}.tgz`), "tarball");
+    }
+    const release = {
+      name: "@zitadel/server",
+      version: "0.1.0-alpha.6",
+      tag: "v0.1.0-alpha.6",
+      prerelease: true,
+    };
+
+    await expect(
+      verifyLocalArtifacts({ repoRoot, outDir, release, hostOnly: true }),
+    ).resolves.toBeUndefined();
+    // A full snapshot still needs every archive and every package.
+    await expect(verifyLocalArtifacts({ repoRoot, outDir, release })).rejects.toThrow(
+      "missing release artifacts",
+    );
   });
 
   it("rejects packing public packages before release build output exists", async () => {

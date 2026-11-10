@@ -1,0 +1,431 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
+)
+
+const (
+	createAuthzAssignmentStmt = `
+INSERT INTO authz_assignments (
+    id, project_id, catalog_id,
+    principal_type, principal_id, object_type, relation,
+    scope_kind, scope_team_id, scope_resource_id,
+    grantor_type, grantor_id, delegation_id,
+    expires_at, revoked_at, created_at, updated_at
+) VALUES (
+    ?, ?, ?,
+    ?, ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?, ?
+) RETURNING created_at, updated_at`
+
+	getAuthzAssignmentStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = ? AND id = ?`
+
+	listManagedGrantsQuery = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments`
+
+	listActiveAuthzAssignmentsByRelationStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = ? AND object_type = ? AND relation = ?
+  AND revoked_at IS NULL
+ORDER BY created_at, id`
+
+	listAuthzAssignmentsStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = ? AND principal_type = ? AND principal_id = ?
+  AND (? OR revoked_at IS NULL)
+ORDER BY created_at, id`
+
+	revokeAuthzAssignmentStmt = `
+UPDATE authz_assignments
+SET revoked_at = ?, updated_at = ?
+WHERE project_id = ? AND id = ? AND revoked_at IS NULL
+RETURNING revoked_at, updated_at`
+
+	revokeAuthzAssignmentsByPrincipalStmt = `
+UPDATE authz_assignments
+SET revoked_at = ?, updated_at = ?
+WHERE principal_type = ? AND principal_id = ? AND revoked_at IS NULL
+RETURNING id, project_id, catalog_id,
+          principal_type, principal_id, object_type, relation,
+          scope_kind, scope_team_id, scope_resource_id,
+          grantor_type, grantor_id, delegation_id,
+          expires_at, revoked_at, created_at, updated_at`
+
+	getActiveOwningTeamGrantStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = ? AND object_type = 'project' AND relation = 'team'
+  AND revoked_at IS NULL
+ORDER BY created_at, id
+LIMIT 1`
+
+	hasActiveOwningTeamGrantStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM authz_assignments
+    WHERE principal_type = 'team' AND principal_id = ?
+      AND object_type = 'project' AND relation = 'team'
+      AND revoked_at IS NULL
+)`
+
+	listClaimedProjectIDsStmt = `
+SELECT DISTINCT project_id FROM authz_assignments
+WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
+  AND (? = '' OR project_id > ?)
+ORDER BY project_id
+LIMIT ?`
+)
+
+type authzAssignmentStatements struct{ statement }
+
+func newAuthzAssignmentStatements(client queryExecutor) authzAssignmentStatements {
+	return authzAssignmentStatements{statement: statement{client: client}}
+}
+
+// CreateAuthzAssignment implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) CreateAuthzAssignment(ctx context.Context, a *domain.AuthzAssignment) error {
+	if err := authz.ValidateAssignment(a); err != nil {
+		return err
+	}
+	if err := ensureManagedID(&a.ID, domain.PrefixAuthzAssignment); err != nil {
+		return err
+	}
+	now := nowUnixNano()
+	var createdNano, updatedNano int64
+	err := s.client.QueryRow(ctx, createAuthzAssignmentStmt,
+		a.ID, a.ProjectID, a.CatalogID,
+		a.PrincipalType.String(), a.PrincipalID, a.ObjectType, a.Relation,
+		a.ScopeKind.String(), a.ScopeTeamID, a.ScopeResourceID,
+		a.GrantorType, a.GrantorID, a.DelegationID,
+		nullUnixNano(a.ExpiresAt), nullUnixNano(a.RevokedAt), now, now,
+	).Scan(&createdNano, &updatedNano)
+	if err != nil {
+		return wrapError(err)
+	}
+	a.CreatedAt = timeFromUnixNano(createdNano)
+	a.UpdatedAt = timeFromUnixNano(updatedNano)
+	return nil
+}
+
+// GetAuthzAssignment implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, getAuthzAssignmentStmt, projectID, id)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignment, err := collectExactlyOneRow(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignment, nil
+}
+
+// ListAuthzAssignments implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error) {
+	include := 0
+	if includeRevoked {
+		include = 1
+	}
+	rows, err := s.client.Query(ctx, listAuthzAssignmentsStmt, projectID, principalType.String(), principalID, include)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignments, err := collectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
+// ListActiveAuthzAssignmentsByRelation implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, listActiveAuthzAssignmentsByRelationStmt, projectID, objectType, relation)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignments, err := collectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
+// ListManagedGrants implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	filter, err := authz.ScopeManagedGrantList(projectID, filter)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignments, nextCursor, err := pagination.Page(filter.Pagination, authz.AuthzAssignmentSchema, func(limit uint32) ([]*domain.AuthzAssignment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+			return nil, err
+		}
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		assignments, err := collectRows(rows, scanAuthzAssignment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return assignments, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.AuthzAssignment]{
+		Items:      assignments,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
+	now := nowUnixNano()
+	var revokedNano, updatedNano int64
+	err := s.client.QueryRow(ctx, revokeAuthzAssignmentStmt, now, now, projectID, id).Scan(&revokedNano, &updatedNano)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return database.NewNoRowFoundError(nil)
+		}
+		return wrapError(err)
+	}
+	return nil
+}
+
+// RevokeAuthzAssignmentsByPrincipal implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	now := nowUnixNano()
+	rows, err := s.client.Query(ctx, revokeAuthzAssignmentsByPrincipalStmt, now, now, principalType.String(), principalID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignments, err := collectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
+// GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, getActiveOwningTeamGrantStmt, projectID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignment, err := collectExactlyOneRow(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignment, nil
+}
+
+// HasActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
+	var owns bool
+	if err := s.client.QueryRow(ctx, hasActiveOwningTeamGrantStmt, teamID).Scan(&owns); err != nil {
+		return false, wrapError(err)
+	}
+	return owns, nil
+}
+
+// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	if limit == 0 {
+		limit = 500
+	}
+	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, afterID, afterID, int64(limit))
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, wrapError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
+}
+
+// ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	projects, nextCursor, err := pagination.Page(opts.Pagination, projectSchema, func(limit uint32) ([]*domain.Project, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		compiler.WriteString(projectQuery)
+		compiler.WriteString(" WHERE id IN (")
+		authz.WriteAuthorizedProjectIDs(&compiler, sqliteAuthzEnv(), homeProjectID, userID)
+		compiler.WriteString(")")
+		if err := compileWhereRest(&compiler, opts, projectSchema); err != nil {
+			return nil, err
+		}
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		projects, err := collectRows(rows, scanProject)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return projects, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := newProjectStatements(s.client).hydrateOrigins(ctx, projects...); err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Project]{
+		Items:      projects,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+func scanAuthzAssignment(rows *sql.Rows) (*domain.AuthzAssignment, error) {
+	a := new(domain.AuthzAssignment)
+	var (
+		expiresNano, revokedNano sql.NullInt64
+		createdNano, updatedNano int64
+	)
+	if err := rows.Scan(
+		&a.ID, &a.ProjectID, &a.CatalogID,
+		&a.PrincipalType, &a.PrincipalID, &a.ObjectType, &a.Relation,
+		&a.ScopeKind, &a.ScopeTeamID, &a.ScopeResourceID,
+		&a.GrantorType, &a.GrantorID, &a.DelegationID,
+		&expiresNano, &revokedNano, &createdNano, &updatedNano,
+	); err != nil {
+		return nil, err
+	}
+	if expiresNano.Valid {
+		t := timeFromUnixNano(expiresNano.Int64)
+		a.ExpiresAt = &t
+	}
+	if revokedNano.Valid {
+		t := timeFromUnixNano(revokedNano.Int64)
+		a.RevokedAt = &t
+	}
+	a.CreatedAt = timeFromUnixNano(createdNano)
+	a.UpdatedAt = timeFromUnixNano(updatedNano)
+	return a, nil
+}
+
+var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
+
+// ListProjectAdmins implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
+	afterUserID, err := authz.ProjectAdminsCursorUserID(page)
+	if err != nil {
+		return nil, err
+	}
+	admins, next, err := pagination.Page(page, authz.ProjectAdminSchema, func(limit uint32) ([]*domain.ProjectAdminRecord, error) {
+		var c statementCompiler
+		authz.WriteProjectAdminSources(&c, sqliteAuthzEnv(), projectID, viewerUserID, afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
+		rows, err := s.client.Query(ctx, c.String(), c.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		sources, err := collectRows(rows, func(rows *sql.Rows) (authz.ProjectAdminSourceRow, error) {
+			var (
+				source   authz.ProjectAdminSourceRow
+				teamName sql.NullString
+			)
+			err := rows.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
+			source.TeamName = teamName.String
+			return source, err
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return authz.GroupProjectAdminSourcesByUser(sources), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
+}
+
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
+}
+
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
+}
+
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastOwner(&c, sqliteAuthzEnv(), userID)
+	} else {
+		authz.WriteProjectsOwnedThroughMember(&c, sqliteAuthzEnv(), userID)
+	}
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, wrapError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -42,15 +42,47 @@ describe("reset", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["reset", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
-      it("refuses to delete without --force when no one can be asked", async () => {
-        const app = await aSetUpApp();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
 
-        const result = await app.run(["reset", "--json"]);
+          const result = await app.run(["reset", "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toHintAt("--force");
-        expect(result).toSuggest("reset --force");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+
+          const result = await app.run(["reset", "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+
+          const result = await app.run(["reset", "--json"]);
+
+          expect(result).toSuggestExactly(app.againAsRun("reset --force"));
+        });
+
+        it("deletes nothing", async () => {
+          const app = await aSetUpApp();
+          const before = await app.snapshot();
+
+          await app.run(["reset", "--json"]);
+
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
       });
 
       it("succeeds when there is no local runtime to delete", async () => {

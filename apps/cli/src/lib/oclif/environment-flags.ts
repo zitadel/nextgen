@@ -1,8 +1,12 @@
 import { posix } from "node:path";
 
-import { shellOption } from "../shell";
+import { Flags } from "@oclif/core";
+
+import { Cmd } from "@/lib/cmd";
+import { isEnvironmentName } from "@/lib/environment";
 import { nonBlankString } from "./flags";
-import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
+import { refusalError } from "./refusal";
+import { asEnvironmentSelector, type EnvironmentSelector } from "@/lib/suggestion";
 
 /**
  * The flags that choose the environment a command runs against, spread into
@@ -10,8 +14,26 @@ import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
  * Kept as a bag of their own so a test can check them against every other bag
  * for a clashing name or short form.
  */
+const environmentNameFlag = Flags.custom<string>({
+  parse: async (given) => {
+    const input = given.trim();
+    if (!isEnvironmentName(input)) {
+      throw refusalError(
+        {
+          message: '"{value}" is not a usable environment name',
+          hint: 'Use letters, digits, dot, dash and underscore, and no "..", and not `local` or a name ending in `.local`.',
+        },
+        {
+          value: input,
+        },
+      );
+    }
+    return input;
+  },
+});
+
 export const environmentFlags = {
-  env: nonBlankString({
+  env: environmentNameFlag({
     char: "e",
     description:
       "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -23,22 +45,20 @@ export const environmentFlags = {
 };
 
 /**
- * The flags the `preview` command adds on top of the environment ones: which
- * preview URLs to deploy to and for how long. Kept as a bag so `preview` can
- * spread them while `preview list` and `preview rm`, which share the preview
- * credential but take neither, stay free of them.
+ * Every spelling of the options that choose the project a command runs
+ * against: the environment flags above and the base flags `--server` and
+ * `--cwd`, each with its short form. A retry suggestion strips these from the
+ * words as typed, because the run puts its own selector back on.
  */
-export const previewFlags = {
-  origin: nonBlankString({
-    description:
-      "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
-    multiple: true,
-  }),
-  ttl: nonBlankString({
-    description:
-      "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
-  }),
-};
+export const ENVIRONMENT_SELECTOR_OPTIONS: readonly string[] = [
+  "--env",
+  "-e",
+  "--env-file",
+  "--server",
+  "-s",
+  "--cwd",
+  "-c",
+];
 
 /**
  * The `--env`/`--env-file`/`--server` suffix — a leading-space string, or empty
@@ -66,16 +86,16 @@ export function environmentSelectorSuffix(input: {
 }): EnvironmentSelector {
   const parts: string[] = [];
   if (input.envFile !== undefined) {
-    parts.push(shellOption("--env-file", input.envFile));
+    parts.push(Cmd.option("--env-file", input.envFile));
   } else if (input.envName !== undefined) {
-    parts.push(shellOption("--env", input.envName));
+    parts.push(Cmd.option("--env", input.envName));
   }
   if (input.server !== undefined) {
-    parts.push(shellOption("--server", input.server));
+    parts.push(Cmd.option("--server", input.server));
   }
   // Last, as the least interesting part to read; flag order does not matter.
   if (input.cwd !== undefined) {
-    parts.push(shellOption("--cwd", input.cwd));
+    parts.push(Cmd.option("--cwd", input.cwd));
   }
   return asEnvironmentSelector(parts.length === 0 ? "" : ` ${parts.join(" ")}`);
 }

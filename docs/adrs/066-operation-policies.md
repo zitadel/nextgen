@@ -27,8 +27,8 @@ Some work was planned as part of ([zitadel#11596](https://github.com/zitadel/zit
 ### Nextgen
 
 No defined settings / policy model. Some configuration is hard-coded, for example:
-- Password minimum length: [`MinLength: 8`](../../internal/domain/flow_field_resolver_schema.go)
-- Passkey user verification is a fixed [`"preferred"`](../../internal/domain/flow_state_machine.go)
+- Password minimum length: [`MinLength: 8`](../../apps/api/internal/domain/flow_field_resolver_schema.go)
+- Passkey user verification is a fixed [`"preferred"`](../../apps/api/internal/domain/flow_state_machine.go)
 - Failed authentication attempts are recorded "for rate-limiting purposes" with no threshold reading them.
 
 The first priority is to introduce proper password policies ([#898](https://github.com/zitadel/nextgen/issues/898)):
@@ -75,10 +75,12 @@ password length, for one) is a guard in the domain, not a policy.
 
 Decided on 2026-10-15, revising #898's "defaults to 15 characters".
 
-- The product does not teach a project what is best for it. Requirements
-  legitimately differ between projects, so Zitadel enforces what a project
-  configures and does not grade it: no recommended values, no warnings below
-  a threshold, no product floor beyond what the server technically needs.
+- The product does not grade a project's choice. Requirements legitimately
+  differ between projects, so Zitadel enforces what a project configures:
+  no warnings below a threshold, no product floor beyond what the server
+  technically needs. Informing, hinting and recommending while a value is
+  chosen is fine; text that appears or changes tone only for some chosen
+  values grades it.
 - Nothing opinionated is hidden in the server. A value Zitadel chose on the
   project's behalf would be enforced without appearing anywhere the project
   can read or review.
@@ -88,12 +90,17 @@ Decided on 2026-10-15, revising #898's "defaults to 15 characters".
 - Overrides stay simple. A later audience or hierarchy model resolves
   between instances that exist, not between instances and a hidden default.
 
-The CLI follows the same rule. `zitadel setup` writes and publishes the
-`auth.factor.password.set` instance with an empty `config`, and puts a
-minimum length into it only when the developer gives one
-([#1450](https://github.com/zitadel/nextgen/issues/1450)). The file makes the
-policy easy to find and to set; a value the CLI chose on the project's behalf
-would be a default one level up. A project without a `min_length` has no
+The CLI may recommend, since what it writes lands in the project's own file.
+`zitadel setup` writes and publishes the `auth.factor.password.set` instance
+with the minimum length the developer picks: the wizard preselects and
+recommends 15 characters, and a run with nobody to ask writes 15 unless
+`--password-min-length` says otherwise
+([#2371](https://github.com/zitadel/nextgen/pull/2371)). 15 is NIST SP
+800-63B-4's minimum for a password that is the only factor; a password only
+ever used with a second factor needs 8, which the wizard offers too and
+becomes the fitting choice once a project can require multi-factor sign-in. The value is
+visible and reviewable in `.zitadel/policies/`, so it is the project's
+configuration, not a hidden default. A project without a `min_length` has no
 length policy; the domain guards (non-empty, at most 64 code points) still
 apply.
 
@@ -229,7 +236,7 @@ cannot add an operation to it. Templates ship with the server; today's list:
 #### Where the catalog lives and how an operation is added
 
 The catalog is the set of template files embedded in the server binary,
-[`internal/policy/templates/*.json`](../../internal/policy/templates/), plus
+[`internal/policy/templates/*.json`](../../apps/api/internal/policy/templates/), plus
 the index that names each operation's evaluation point,
 [`docs/design/policies/catalog.md`](../design/policies/catalog.md). The two
 must agree; the index is what a reviewer reads, the files are what the
@@ -696,3 +703,13 @@ than the link.
 - The policy itself as a JSON Schema, enforced by validating the context. The most internally consistent option, and it cannot take a bound from another value in the document, so `history_depth` bakes into the schema's shape and a configuration change becomes a schema change.
 - A remote policy server queried per decision. A release cannot determine behaviour if the deciding logic lives somewhere we do not version.
 - Rules inline in the user schema. Re-revisions every schema on a security change.
+
+## Amendment (2026-10-30): a policy comes only from a release
+
+A request gets the policy revision its release pins, and no policy when it pins
+none, whether or not that release pins a flow. Nothing falls back to the newest
+stored revision. A request with no release answers `rel.not_deployed`. A
+password set through the API follows the release
+[ADR 085](085-which-release-serves-a-request.md#amendment-2026-11-05-setuserpassword-follows-its-callers-origin)
+picks for its caller. A release build still reuses only an operation's newest
+revision, so a policy reads back as the config the last build carried.

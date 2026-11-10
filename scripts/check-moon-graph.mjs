@@ -28,6 +28,7 @@ function artifactEdge(project, target) {
   if (project === "server") return target === "console"; // //go:embed of the console dist
   if (project === "testing") return target === "server"; // integration tests boot the binary
   if (project === "bench") return target === "server"; // vet compiles the Go the server's generation writes
+  if (project === "go") return target === "server"; // its api/ package is the server's generation output
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
   if (project === "workspace") return target === "console"; // the local image embeds the console build
   // The e2e suite runs built apps, the server binary and the journey's mock
@@ -41,6 +42,8 @@ function artifactEdge(project, target) {
 // Declared packages no task needs to build first.
 const UNREACHED_ALLOWED = new Set([
   "cli:@zitadel/server", // the runtime wrapper; cli:test lists it as an input
+  "cloud-console:@zitadel/console", // the add-on contract, from source; typecheck lists it as an input
+  "cloud-console:@zitadel/cloud-functions", // the functions' contract, from source; typecheck lists it as an input
   "console:@zitadel/testing", // dev-real only, resolved from source
   "docs:@zitadel/cli", // its committed command-reference.json; docs:generate lists it as an input
 ]);

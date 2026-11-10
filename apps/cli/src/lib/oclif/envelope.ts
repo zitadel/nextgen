@@ -1,5 +1,3 @@
-import type { SuggestedCommand } from "../suggestion";
-
 /**
  * Builders for the `data` of a command's JSON envelope.
  *
@@ -11,29 +9,24 @@ import type { SuggestedCommand } from "../suggestion";
  */
 
 /**
- * The canonical list/collection envelope: `{ items, count, next_page_token }`,
- * plus optional `next_commands`. Every command that returns a collection emits
- * this, so `{ items, count, next_page_token }` reads uniformly across all of
- * them. A single-page endpoint passes `nextPageToken: null` (the default); a
- * paginated one passes the server cursor (or `null` once drained).
+ * The canonical list/collection envelope: `{ items, count, next_page_token }`.
+ * Every command that returns a collection emits this, so it reads uniformly
+ * across all of them. A single-page endpoint passes `nextPageToken: null` (the
+ * default); a paginated one passes the server cursor (or `null` once drained).
  */
-export function listData<T>(
+export function listData<T, K extends string = "next_page_token">(
   items: readonly T[],
-  opts: { nextPageToken?: string | null; nextCommands?: readonly SuggestedCommand[] } = {},
+  opts: { nextPageToken?: string | null; cursorKey?: K } = {},
 ): {
   items: readonly T[];
   count: number;
-  next_page_token: string | null;
-  next_commands?: readonly SuggestedCommand[];
-} {
-  const base = {
+} & Record<K, string | null> {
+  const cursorKey: string = opts.cursorKey ?? "next_page_token";
+  return {
     items,
     count: items.length,
-    next_page_token: opts.nextPageToken ?? null,
-  };
-  return opts.nextCommands && opts.nextCommands.length > 0
-    ? { ...base, next_commands: opts.nextCommands }
-    : base;
+    [cursorKey]: opts.nextPageToken ?? null,
+  } as { items: readonly T[]; count: number } & Record<K, string | null>;
 }
 
 /**
@@ -60,18 +53,4 @@ export function mutatedData<I extends Record<string, string>, V extends string>(
   verb: V,
 ): I & Record<V, true> {
   return { ...identifier, [verb]: true } as I & Record<V, true>;
-}
-
-/**
- * The `next_commands` a command's `data` carries, spread into the data object:
- * `{ ...result, ...nextCommandsData(commands) }`. It takes `SuggestedCommand`s,
- * which only the `lib/suggestion` builders make, so every entry has had its
- * environment selector decided (#1689). A Biome GritQL rule
- * (`biome-plugins/no-raw-next-commands.grit`) rejects a hand-written
- * `next_commands:` key anywhere else.
- */
-export function nextCommandsData(commands: readonly SuggestedCommand[]): {
-  next_commands: readonly SuggestedCommand[];
-} {
-  return { next_commands: commands };
 }

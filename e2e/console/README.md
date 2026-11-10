@@ -44,9 +44,9 @@ grants each test's user admin through the API, and the console authorizes with
 that user's session cookie (#1300). Playwright workers share the instance and seed a
 fresh user per test.
 
-The dev proxy is also this lane's blind spot: it rewrites `/api/*` onto the API
-root, so the console's API base is correct here by construction. That is what
-`console-embedded` is for.
+The dev proxy is also this lane's blind spot: it forwards `/api/v1/*` to the
+server whatever the server does with it, so the console's API base is correct
+here by construction. That is what `console-embedded` is for.
 
 This lane boots the binary with its embedded console off (Vite serves the
 console here; see [`moon.yml`](../moon.yml)). The mux serves
@@ -63,7 +63,7 @@ moon run e2e:console-embedded
 ```
 
 Boots the **built Go binary** and nothing else. It serves the console at
-`/ui/console/` and the API at the origin root — no Vite, no proxy, no rewrite.
+`/ui/console/` and the API under `/api/v1` — no Vite, no proxy, no rewrite.
 This is the only lane that exercises the request path a customer gets, and the
 one that would have caught the console calling `/api/*` at a mux that never
 served it.

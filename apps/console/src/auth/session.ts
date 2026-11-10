@@ -14,7 +14,7 @@ import { getConsoleProjectId } from "@/runtime/runtime";
 /**
  * Console session helpers (Console ADR 0003).
  *
- * The console authenticates with the `__nextgen_session` HttpOnly cookie the
+ * The console authenticates with the HttpOnly session cookie the
  * platform sets after the login widget exchanges its flow `handoff_token`
  * (`POST /sessions/exchange`). These helpers are the only place the console
  * talks to the session endpoints, mirroring the orchestrator's `api-client`
@@ -129,7 +129,7 @@ async function readSession(): Promise<ConsoleSession | null> {
  * session to: the token read, sign-out, and every `/users/me` call. It is the console's, once the runtime document
  * names it, and the server refuses an app's session there too
  * (`403 sess.project_mismatch`). It is not a management scope: those name the
- * selected project (`lib/project-scope.ts`).
+ * selected project (`features/projects/project-scope.ts`).
  */
 export function consoleSessionProject(): { project_id: string } | undefined {
   const projectId = getConsoleProjectId();

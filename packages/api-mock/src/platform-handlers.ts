@@ -57,7 +57,6 @@ import {
   CreateProjectBody,
   CreateReleaseBody,
   CreateReleaseQueryParams,
-  CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
@@ -69,6 +68,8 @@ import {
   GetClaimWindowResponse,
   GetDeploymentByIdParams,
   GetDeploymentByIdQueryParams,
+  GetDeploymentVariablesParams,
+  GetDeploymentVariablesQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
@@ -130,6 +131,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
@@ -415,6 +417,8 @@ type DeploymentRecord = {
   rollbackTo: string | null;
   deployedAt: string;
   seq: number;
+  /** The variables of its kind it froze, keyed by name, in the wire shape. */
+  variables: Record<string, unknown>;
 };
 
 /**
@@ -518,7 +522,7 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
 }
 
 function defaultHumanUserSchema(): GetSchemaById200Schema {
-  return getDefaultHumanUserSchema() as unknown as GetSchemaById200Schema;
+  return getDefaultHumanUserSchema();
 }
 
 function seedDefaultProjectResources(projectID: string, createdAt: string): void {
@@ -647,6 +651,20 @@ function variablesResponse(
     }
   }
   return out;
+}
+
+/** The variables of one kind a deployment freezes, keyed by name. */
+function frozenVariables(
+  variables: Map<string, Map<string, VariableRecord>>,
+  projectId: string,
+  kind: VariableKind,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(variablesResponse(variables, projectId, [kind])).map(([name, byKind]) => [
+      name,
+      byKind[kind],
+    ]),
+  );
 }
 
 /** One connection, in the wire shape every idp endpoint answers with. */
@@ -1380,7 +1398,7 @@ const DEFAULT_PREVIEW_TTL = "P7D";
 
 /** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
 function isoDurationMs(ttl: string): number | undefined {
-  // The same shapes the server's parser takes (internal/api/ogenx): whole days
+  // The same shapes the server's parser takes (packages/go/ogenx): whole days
   // and a time part in hours, minutes or fractional seconds. Weeks, months and
   // years are not among them, so the mock refuses what the server would.
   const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
@@ -1500,18 +1518,44 @@ function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
   return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
 }
 
+/** The project's newest primary deployment, what a deploy or rollback replaces. */
+function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefined {
+  return [...store.deployments.values()]
+    .filter(
+      (deployment) =>
+        deployment.projectId === projectId && deploymentKind(deployment) === "primary",
+    )
+    .sort((a, b) => b.seq - a.seq)[0];
+}
+
 /**
- * Whether the deployment still serves its release: `live` while at least one
- * of its targets is served by it, `inactive` once a later deployment replaced
- * every one, or its previews expired or were removed.
+ * Whether the deployment still serves its release: the newest primary deployment
+ * always does, and a preview deployment while a target is served by it. A later
+ * deployment, or its previews expiring or being removed, makes it `inactive`.
  */
 function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
+  if (deploymentKind(deployment) === "primary") {
+    return newestPrimaryDeployment(deployment.projectId)?.id === deployment.id
+      ? "live"
+      : "inactive";
+  }
   return deployment.targets.some(
     (target) =>
       newestDeploymentForOrigin(deployment.projectId, target.origin)?.id === deployment.id,
   )
     ? "live"
     : "inactive";
+}
+
+/** Whether a deployment has this release and exactly these origins. */
+function repeats(deployment: DeploymentRecord, releaseId: string, origins: string[]): boolean {
+  const named = deployment.targets.map((target) => target.origin).sort();
+  const wanted = [...origins].sort();
+  return (
+    deployment.releaseId === releaseId &&
+    named.length === wanted.length &&
+    named.every((origin, index) => origin === wanted[index])
+  );
 }
 
 /** The wire shape of a deployment, optionally over a restricted target set. */
@@ -1946,8 +1990,8 @@ export function setupPlatformHandlers() {
     // --- deployments -----------------------------------------------------
     // A deployment makes a release live on a set of targets, expanding
     // `primary` to the project's primary origins. It is idempotent on what is
-    // served and append-only; rollback re-applies an earlier one. Variable
-    // freezing arrives with the variables work. The Go handlers are stubs.
+    // served and append-only; rollback re-applies an earlier one. Each one
+    // freezes the variables of its kind; a rollback reuses the restored set.
 
     http.post("*/deployments", async ({ request }) => {
       const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
@@ -1994,41 +2038,36 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
       }
 
-      const requested = data.targets as string[];
-      // The contract's targets are unique items: a repeated one is a malformed
-      // request, not something to fold quietly.
-      if (new Set(requested).size !== requested.length) {
-        return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
+      const requested = data.targets as "primary" | string[];
+      const previewUrls = requested === "primary" ? [] : requested;
+      const sawPreview = requested !== "primary";
+      // The contract's preview URLs are unique items: a repeated one is a
+      // malformed request, not something to fold quietly.
+      if (new Set(previewUrls).size !== previewUrls.length) {
+        return HttpResponse.json(errorBody("req.invalid", "deployment: targets must be unique"), {
           status: 400,
         });
       }
       const primaries = primaryOrigins(project);
-      const resolved = new Set<string>();
-      let sawPreview = false;
-      let sawPrimary = false;
-      for (const target of requested) {
-        if (target === "primary") {
-          if (primaries.length === 0) {
-            return HttpResponse.json(
-              errorBody("dep.invalid", "deployment: the project has no primary origin"),
-              { status: 400 },
-            );
-          }
-          for (const origin of primaries) {
-            resolved.add(origin);
-          }
-          sawPrimary = true;
-          continue;
-        }
+      if (!sawPreview && primaries.length === 0) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: the project has no primary origin"),
+          { status: 400 },
+        );
+      }
+      const resolved = new Set<string>(sawPreview ? [] : primaries);
+      for (const target of previewUrls) {
         if (primaries.includes(target)) {
           return HttpResponse.json(
-            errorBody("dep.invalid", "deployment: deploy primary origins with the primary keyword"),
+            errorBody(
+              "dep.invalid",
+              "deployment: deploy to primary origins with the primary target",
+            ),
             { status: 400 },
           );
         }
         if (matchesPreviewPattern(project, target)) {
           resolved.add(target);
-          sawPreview = true;
           continue;
         }
         return HttpResponse.json(
@@ -2037,12 +2076,6 @@ export function setupPlatformHandlers() {
             `deployment: ${target} is neither a primary origin nor a preview URL of the project`,
           ),
           { status: 403 },
-        );
-      }
-      if (sawPreview && sawPrimary) {
-        return HttpResponse.json(
-          errorBody("dep.invalid", "deployment: primary origins and preview URLs cannot be mixed"),
-          { status: 400 },
         );
       }
       const requestedTtl = typeof data.ttl === "string" ? data.ttl : undefined;
@@ -2064,12 +2097,15 @@ export function setupPlatformHandlers() {
       const targets = [...resolved].sort();
       const expectedId =
         typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
-      // The contract's guard: the newest deployment to any of the targets.
+      // The contract's guard: the newest primary deployment, or the newest
+      // deployment to any of the preview URLs.
       if (expectedId !== undefined) {
-        const newest = targets
-          .map((origin) => newestDeploymentForOrigin(project.id, origin))
-          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
-          .sort((a, b) => b.seq - a.seq)[0];
+        const newest = sawPreview
+          ? targets
+              .map((origin) => newestDeploymentForOrigin(project.id, origin))
+              .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+              .sort((a, b) => b.seq - a.seq)[0]
+          : newestPrimaryDeployment(project.id);
         if (newest && newest.id !== expectedId) {
           return HttpResponse.json(
             errorBody(
@@ -2105,25 +2141,13 @@ export function setupPlatformHandlers() {
         }
       }
 
-      // Idempotent on what is served: when every target already runs this
-      // release, the newest deployment to the targets is returned unchanged.
-      // Never for preview URLs: the contract has a preview deploy always write
-      // a new deployment (201), which is how its expiry is renewed.
-      const alreadyServed = targets.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
-      );
-      if (targets.length > 0 && alreadyServed && !sawPreview) {
-        const newest = [...store.deployments.values()]
-          .filter(
-            (deployment) =>
-              deployment.projectId === project.id &&
-              deployment.releaseId === release.id &&
-              deployment.targets.some((target) => targets.includes(target.origin)),
-          )
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
-        }
+      // Idempotent on what is served: when the newest primary deployment has
+      // this release and these origins it is returned unchanged. Never for
+      // preview URLs: the contract has a preview deploy always write a new
+      // deployment (201), which is how its expiry is renewed.
+      const newestPrimary = newestPrimaryDeployment(project.id);
+      if (!sawPreview && newestPrimary && repeats(newestPrimary, release.id, targets)) {
+        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2138,6 +2162,7 @@ export function setupPlatformHandlers() {
         rollbackTo: null,
         deployedAt: createdAt,
         seq: ++store.lastSeq,
+        variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -2196,6 +2221,14 @@ export function setupPlatformHandlers() {
             .filter((deployment) => deployment.targets.some((t) => t.origin === target))
             .sort((a, b) => b.seq - a.seq)[0];
           if (!newest) {
+            continue;
+          }
+          // A primary origin is served only by the newest primary deployment:
+          // an older one that names it, such as before a rollback, serves nothing.
+          if (
+            deploymentKind(newest) === "primary" &&
+            newest.id !== newestPrimaryDeployment(query.data.project_id)?.id
+          ) {
             continue;
           }
           const row = newest.targets.find((candidate) => candidate.origin === target);
@@ -2297,8 +2330,8 @@ export function setupPlatformHandlers() {
         });
       }
 
-      // Only a deployment to primary origins can be rolled back, and every
-      // target must still be a primary origin of the project.
+      // Only a deployment to primary origins can be rolled back. It restores
+      // the origins it froze, listed or not.
       if (target.targets.some((row) => row.expiresAt !== null)) {
         return HttpResponse.json(
           errorBody(
@@ -2308,17 +2341,6 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const primaries = primaryOrigins(project);
-      const removed = target.targets.find((row) => !primaries.includes(row.origin));
-      if (removed) {
-        return HttpResponse.json(
-          errorBody(
-            "proj.origin_not_allowed",
-            `project: ${removed.origin} is not a primary origin`,
-          ),
-          { status: 403 },
-        );
-      }
       const release = store.releases.get(target.releaseId);
       if (release?.revokedAt) {
         return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
@@ -2326,43 +2348,29 @@ export function setupPlatformHandlers() {
 
       const origins = target.targets.map((row) => row.origin);
       // The optimistic guard: the deployment the caller believes is the newest
-      // one to any of the targets. A mismatch is a deploy that raced in.
+      // primary one. A mismatch is a deploy that raced in.
       const rollbackData = body.data as Record<string, unknown>;
       const expectedRollbackId =
         typeof rollbackData.expected_deployment_id === "string"
           ? rollbackData.expected_deployment_id
           : undefined;
-      if (expectedRollbackId !== undefined) {
-        const newestToTargets = origins
-          .map((origin) => newestDeploymentForOrigin(project.id, origin))
-          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
-          return HttpResponse.json(
-            errorBody(
-              "dep.conflict",
-              "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              { deployment: deploymentResponse(newestToTargets) },
-            ),
-            { status: 409 },
-          );
-        }
+      const newestPrimary = newestPrimaryDeployment(project.id);
+      if (
+        expectedRollbackId !== undefined &&
+        newestPrimary &&
+        newestPrimary.id !== expectedRollbackId
+      ) {
+        return HttpResponse.json(
+          errorBody(
+            "dep.conflict",
+            "deployment: the newest deployment to the targets does not match expected_deployment_id",
+            { deployment: deploymentResponse(newestPrimary) },
+          ),
+          { status: 409 },
+        );
       }
-      const alreadyServed = origins.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
-      );
-      if (alreadyServed) {
-        const newest = [...store.deployments.values()]
-          .filter(
-            (deployment) =>
-              deployment.projectId === project.id &&
-              deployment.releaseId === target.releaseId &&
-              deployment.targets.some((row) => origins.includes(row.origin)),
-          )
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
-        }
+      if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
+        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2379,6 +2387,7 @@ export function setupPlatformHandlers() {
         rollbackTo: target.id,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,
+        variables: target.variables,
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -2690,9 +2699,12 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateSchemaBody, raw, "invalid_schema");
-      if (!body.ok) {
-        return body.response;
+      const issues = schemaFileIssues(raw);
+      if (issues.length > 0) {
+        return HttpResponse.json(
+          errorBody("invalid_schema", "request does not conform to spec", { issues }),
+          { status: 400 },
+        );
       }
 
       const schemaBody = raw as unknown as GetSchemaById200Schema;
@@ -3211,13 +3223,24 @@ export function setupPlatformHandlers() {
     // publishes the client id and secret here, so without them a scaffolded
     // provider has no credentials and sign-in fails at the token endpoint.
 
-    // Registered ahead of `*/variables`, which would otherwise match it. The
-    // server answers 501 until it stores frozen sets, and so does the mock.
-    http.get("*/deployments/:deploymentId/variables", () =>
-      HttpResponse.json(errorBody("not_implemented", "This feature is not implemented yet."), {
-        status: 501,
-      }),
-    ),
+    // Registered ahead of `*/variables`, which would otherwise match it.
+    http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
+      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const deployment = store.deployments.get(path.data.deployment_id);
+      if (!deployment || deployment.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      return HttpResponse.json(deployment.variables);
+    }),
 
     http.get("*/variables", ({ request }) => {
       const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");

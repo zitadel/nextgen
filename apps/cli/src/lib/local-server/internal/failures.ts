@@ -1,8 +1,11 @@
-import { ZitadelError, toZitadelError } from "../../errors";
-import { unscopedCommand } from "../../suggestion";
-import { listenersForPort, type TcpListener } from "../../prober/ports";
-import { dockerRuntimeGuidance, dockerUnavailableMessage } from "../docker-guidance";
-import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "../runtime";
+import { ZitadelError, toZitadelError } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
+import {
+  dockerRuntimeGuidance,
+  dockerUnavailableMessage,
+} from "@/lib/local-server/docker-guidance";
+import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "@/lib/local-server/runtime";
 import { DockerLauncher } from "./docker-launcher";
 import {
   NoFreePortError,
@@ -34,12 +37,14 @@ function startupCleanupFailedError(
     `${startupError.message}; cleanup did not stop the spawned local runtime`,
     {
       hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
-      nextCommands: unique([
-        ...(startupError.nextCommands ?? []),
-        unscopedCommand("stop --all", cliVersion),
-        unscopedCommand("logs", cliVersion),
-        unscopedCommand("reset --force", cliVersion),
-      ]),
+      nextCommands: [
+        ...new Set([
+          ...(startupError.nextCommands ?? []),
+          unscopedCommand("stop --all", cliVersion),
+          unscopedCommand("logs", cliVersion),
+          unscopedCommand("reset --force", cliVersion),
+        ]),
+      ],
       details: {
         startup_error: {
           code: startupError.code,
@@ -57,12 +62,9 @@ function startupCleanupFailedError(
  * answer: better than a start that fails halfway with a raw `docker` error.
  */
 export async function assertDockerAvailable(cliVersion: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
-  try {
-    result = await DockerLauncher.available();
-  } catch (error) {
+  const result = await DockerLauncher.available().catch((error: unknown) => {
     throw dockerUnavailableError(error, cliVersion);
-  }
+  });
   if (result.status !== 0) {
     throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion);
   }
@@ -177,6 +179,3 @@ function serverExitedError(
 }
 
 /** Removes repeats while keeping order, for suggested commands. */
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}

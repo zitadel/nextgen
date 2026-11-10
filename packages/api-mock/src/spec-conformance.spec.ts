@@ -62,6 +62,8 @@ import { PLATFORM_PROJECT_ID, csrfTokenFor, startMockServer } from "./server.js"
 
 const PORT = 4456;
 const BASE = `http://localhost:${PORT}`;
+/** Where the mock serves the API, as the server does: under `/api/v1` (ADR 077). */
+const API = `${BASE}/api/v1`;
 let server: Server;
 
 beforeAll(async () => {
@@ -83,17 +85,17 @@ afterAll(async () => {
 });
 
 /**
- * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * The `zitadel_session` cookie of a session belonging to `project`, active
  * with a verified factor.
  */
 async function sessionCookie(project: string): Promise<string> {
   const handoff = await signHandoffToken({ sub: project, iss: BASE });
-  const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
+  const exchange = await fetch(`${API}/sessions/exchange?project_id=${project}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ handoff_token: handoff }),
   });
-  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
   return setCookie?.split(";")[0] ?? "";
 }
 
@@ -107,7 +109,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
     name: "login-flow",
     status: "active",
     user_schema:
-      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
+      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/apps/api/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each
     // purpose name to its entry-point step (must match a `name` in `steps`).
     // The shape must satisfy the definition-time validator the mock now
@@ -129,7 +131,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
 describe("api-mock spec conformance — responses match orval-generated zod", () => {
   test("POST /sessions/exchange returns body parseable by ExchangeHandoffResponse", async () => {
     const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
-    const res = await fetch(`${BASE}/sessions/exchange?project_id=proj_test`, {
+    const res = await fetch(`${API}/sessions/exchange?project_id=proj_test`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -141,7 +143,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("GET /sessions/me resolves a display for the known demo identities", async () => {
     const handoff = await signHandoffToken({ sub: "ada@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_display`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me_display`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -149,10 +151,10 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
-    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    const res = await fetch(`${API}/sessions/me`, { headers: { cookie: cookie ?? "" } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(() => GetMySessionResponse.parse(body)).not.toThrow();
@@ -163,11 +165,31 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
   });
 
+  // Mirrors the server on loopback http (ADR 083): it sets zitadel_session,
+  // reads it and the canonical name the SDK proxies send upstream, the
+  // canonical one first, and reads no session cookie from before ADR 083.
+  test("GET /sessions/me reads the session under both of its names, and no old one", async () => {
+    const pair = await sessionCookie("proj_me_names");
+    const token = pair.slice(pair.indexOf("=") + 1);
+    expect(pair).toBe(`zitadel_session=${token}`);
+
+    for (const [cookie, status] of [
+      [`zitadel_session=${token}`, 200],
+      [`__Host-zitadel_session=${token}`, 200],
+      [`zitadel_session=deadbeef; __Host-zitadel_session=${token}`, 200],
+      [`__nextgen_session=${token}`, 401],
+      [`__nextgen_session_proj_me_names=${token}`, 401],
+    ] as const) {
+      const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie } });
+      expect({ cookie, status: res.status }).toEqual({ cookie, status });
+    }
+  });
+
   // Mirrors the server: a read that names a project refuses a session of any
   // other project, and serves its own as before.
   test("GET /sessions/me with project_id refuses a session of another project", async () => {
     const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_app`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me_app`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -175,16 +197,16 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
-    const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+    const refused = await fetch(`${API}/sessions/me?project_id=proj_me_other`, {
       headers: { cookie: cookie ?? "" },
     });
     expect(refused.status).toBe(403);
     expect(await refused.json()).toMatchObject({ code: "sess.project_mismatch" });
 
-    const served = await fetch(`${BASE}/sessions/me?project_id=proj_me_app`, {
+    const served = await fetch(`${API}/sessions/me?project_id=proj_me_app`, {
       headers: { cookie: cookie ?? "" },
     });
     expect(served.status).toBe(200);
@@ -193,7 +215,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // Like the server, a project_id outside the project-id pattern is a bad
     // request, not a verdict on the session.
     for (const invalid of ["", "proj%20me"]) {
-      const rejected = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+      const rejected = await fetch(`${API}/sessions/me?project_id=${invalid}`, {
         headers: { cookie: cookie ?? "" },
       });
       expect(rejected.status).toBe(400);
@@ -210,14 +232,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // checked before the project hold and the parameter, as on the server.
     const signOutHeaders = { cookie, "x-zitadel-csrf": csrfTokenFor(cookie.split("=")[1] ?? "") };
 
-    const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
+    const refusedToken = await fetch(`${API}/sessions/me/csrf?project_id=proj_me_other`, {
       headers,
     });
     expect(refusedToken.status).toBe(403);
     expect(refusedToken.headers.get("cache-control")).toBe("private, no-store");
     expect(await refusedToken.json()).toMatchObject({ code: "sess.project_mismatch" });
 
-    const refusedSignOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+    const refusedSignOut = await fetch(`${API}/sessions/me?project_id=proj_me_other`, {
       method: "DELETE",
       headers: signOutHeaders,
     });
@@ -229,41 +251,41 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // object by the query parser too. The server authenticates first, so
     // without a cookie the answer is the 401.
     for (const query of ["project_id=", "project_id=proj%20me", "project_id[toString]=x"]) {
-      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?${query}`, { headers });
+      const rejectedToken = await fetch(`${API}/sessions/me/csrf?${query}`, { headers });
       expect(rejectedToken.status).toBe(400);
-      const rejectedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+      const rejectedSignOut = await fetch(`${API}/sessions/me?${query}`, {
         method: "DELETE",
         headers: signOutHeaders,
       });
       expect(rejectedSignOut.status).toBe(400);
-      const forgedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+      const forgedSignOut = await fetch(`${API}/sessions/me?${query}`, {
         method: "DELETE",
         headers,
       });
       expect(forgedSignOut.status).toBe(403);
-      expect((await fetch(`${BASE}/sessions/me/csrf?${query}`)).status).toBe(401);
-      expect((await fetch(`${BASE}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
+      expect((await fetch(`${API}/sessions/me/csrf?${query}`)).status).toBe(401);
+      expect((await fetch(`${API}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
     }
 
     // The refusals ended nothing: its own project still gets its token and
     // signs it out.
-    const token = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_signout`, {
+    const token = await fetch(`${API}/sessions/me/csrf?project_id=proj_me_signout`, {
       headers,
     });
     expect(token.status).toBe(200);
     expect(await token.json()).toEqual({ csrf_token: csrfTokenFor(cookie.split("=")[1] ?? "") });
 
-    const signedOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_signout`, {
+    const signedOut = await fetch(`${API}/sessions/me?project_id=proj_me_signout`, {
       method: "DELETE",
       headers: signOutHeaders,
     });
     expect(signedOut.status).toBe(204);
-    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(signedOut.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
   });
 
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -271,11 +293,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
     expect(cookie).toBeDefined();
 
-    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    const res = await fetch(`${API}/sessions/me`, { headers: { cookie: cookie ?? "" } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(() => GetMySessionResponse.parse(body)).not.toThrow();
@@ -292,7 +314,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("POST /sessions/exchange without project_id returns 400", async () => {
     const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
-    const res = await fetch(`${BASE}/sessions/exchange`, {
+    const res = await fetch(`${API}/sessions/exchange`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -307,7 +329,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   // with the same 400 (internal/api/integration_test/session_exchange_test.go).
   describe("POST /sessions/exchange refuses a handoff token it will not exchange", () => {
     const exchange = (handoffToken: string) =>
-      fetch(`${BASE}/sessions/exchange?project_id=proj_refused`, {
+      fetch(`${API}/sessions/exchange?project_id=proj_refused`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ handoff_token: handoffToken }),
@@ -344,23 +366,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("DELETE /sessions/me revokes an active session and clears the cookie", async () => {
     const handoff = await signHandoffToken({ sub: "proj_revoke", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_revoke`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_revoke`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
     });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
+    const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
     expect(setCookie).toBeDefined();
     const sessionCookie = setCookie?.split(";")[0] ?? "";
 
     // Session is reachable before revocation.
-    const before = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
+    const before = await fetch(`${API}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(before.status).toBe(200);
 
     // Without the session's CSRF token, sign-out is refused and ends nothing.
-    const forged = await fetch(`${BASE}/sessions/me`, {
+    const forged = await fetch(`${API}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: sessionCookie },
     });
@@ -368,7 +388,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(await forged.json()).toMatchObject({ code: "auth.csrf_invalid" });
     expect(forged.headers.getSetCookie()).toEqual([]);
 
-    const revoke = await fetch(`${BASE}/sessions/me`, {
+    const revoke = await fetch(`${API}/sessions/me`, {
       method: "DELETE",
       headers: {
         cookie: sessionCookie,
@@ -376,10 +396,10 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       },
     });
     expect(revoke.status).toBe(204);
-    expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(revoke.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
 
     // Session is gone after revocation.
-    const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
+    const after = await fetch(`${API}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(after.status).toBe(401);
   });
 
@@ -389,13 +409,13 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("GET /sessions/me/csrf without a session answers a 401 that is not stored", async () => {
-    const res = await fetch(`${BASE}/sessions/me/csrf`);
+    const res = await fetch(`${API}/sessions/me/csrf`);
     expect(res.status).toBe(401);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 
   test("a cross-origin preflight allows the X-Zitadel-CSRF header", async () => {
-    const res = await fetch(`${BASE}/users?project_id=proj_test`, {
+    const res = await fetch(`${API}/users?project_id=proj_test`, {
       method: "OPTIONS",
       headers: {
         origin: "http://localhost:4200",
@@ -409,7 +429,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("DELETE /sessions/me without a session cookie returns 401", async () => {
-    const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
+    const res = await fetch(`${API}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("auth.unauthorized");
@@ -419,9 +439,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   // issued, revoked) or expired before the handler runs, so it answers 401
   // whatever project the request names.
   test("DELETE /sessions/me with an unknown session token returns 401", async () => {
-    const res = await fetch(`${BASE}/sessions/me`, {
+    const res = await fetch(`${API}/sessions/me`, {
       method: "DELETE",
-      headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
+      headers: { cookie: "zitadel_session=deadbeefdeadbeef" },
     });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
@@ -438,7 +458,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         { path: "/sessions/me", method: "DELETE" },
         { path: "/sessions/me/csrf", method: "GET" },
       ]) {
-        const res = await fetch(`${BASE}${route.path}?project_id=proj_me_other`, {
+        const res = await fetch(`${API}${route.path}?project_id=proj_me_other`, {
           method: route.method,
           headers: { cookie },
         });
@@ -448,6 +468,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Like the server until 1.0.0 (ADR 077): an app on an older SDK still calls
+  // the root paths.
+  test.each([
+    ["POST", "/sessions/exchange?project_id=proj_root", 400],
+    ["GET", "/sessions/me", 401],
+    ["GET", "/sessions/me/csrf", 401],
+    ["DELETE", "/sessions/me", 401],
+  ])("answers %s %s at the old root path too", async (method, path, status) => {
+    const prefixed = await fetch(`${API}${path}`, { method });
+    const root = await fetch(`${BASE}${path}`, { method });
+
+    expect(prefixed.status).toBe(status);
+    expect(root.status).toBe(status);
   });
 
   test("GET /console/runtime.json names the project the console signs into", async () => {
@@ -464,7 +499,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /projects returns the spec-defined project shape", async () => {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -483,7 +518,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
-    const create = await fetch(`${BASE}/projects`, {
+    const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -492,7 +527,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/projects/${id}`);
+    const res = await fetch(`${API}/projects/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetProjectResponse.parse(body)).not.toThrow();
@@ -502,14 +537,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /projects/:id/origins adds a pattern and is idempotent for the same kind", async () => {
-    const create = await fetch(`${BASE}/projects`, {
+    const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "origins-app", seed_defaults: false }),
     });
     const { id } = (await create.json()) as { id: string };
 
-    const first = await fetch(`${BASE}/projects/${id}/origins`, {
+    const first = await fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
@@ -521,7 +556,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(firstBody).not.toHaveProperty("check");
     expect(firstBody).not.toHaveProperty("warning");
 
-    const again = await fetch(`${BASE}/projects/${id}/origins`, {
+    const again = await fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
@@ -529,7 +564,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(again.status).toBe(201);
     expect(await again.json()).toEqual({ pattern: "https://app.example.com", kind: "primary" });
 
-    const conflict = await fetch(`${BASE}/projects/${id}/origins`, {
+    const conflict = await fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "preview" }),
@@ -540,7 +575,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /projects/:id/origins/remove is idempotent 204", async () => {
-    const create = await fetch(`${BASE}/projects`, {
+    const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -551,27 +586,27 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await create.json()) as { id: string };
 
-    const remove = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+    const remove = await fetch(`${API}/projects/${id}/origins/remove`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://preview.example.com" }),
     });
     expect(remove.status).toBe(204);
 
-    const again = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+    const again = await fetch(`${API}/projects/${id}/origins/remove`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://preview.example.com" }),
     });
     expect(again.status).toBe(204);
 
-    const get = await fetch(`${BASE}/projects/${id}`);
+    const get = await fetch(`${API}/projects/${id}`);
     const body = await get.json();
     expect(body.origins).toEqual([]);
   });
 
   test("GET /projects/:id on unknown id returns spec-compliant error envelope", async () => {
-    const res = await fetch(`${BASE}/projects/proj-does-not-exist`);
+    const res = await fetch(`${API}/projects/proj-does-not-exist`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("not_found");
@@ -579,7 +614,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /schemas returns 201 with a schema id", async () => {
-    const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -600,7 +635,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("GET and DELETE /schemas/:id look up by id without project_id", async () => {
-    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_owner`, {
+    const create = await fetch(`${API}/schemas?project_id=proj_schema_owner`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -618,12 +653,12 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     // Flat-by-id: OpenAPI dropped the project_id query; ownership is an
     // authz concern on the real server (RSI + Check).
-    const missing = await fetch(`${BASE}/schemas/sch_does_not_exist`);
+    const missing = await fetch(`${API}/schemas/sch_does_not_exist`);
     expect(missing.status).toBe(404);
 
-    const ownerGet = await fetch(`${BASE}/schemas/${id}`);
+    const ownerGet = await fetch(`${API}/schemas/${id}`);
     expect(ownerGet.status).toBe(200);
-    const ownerDelete = await fetch(`${BASE}/schemas/${id}`, {
+    const ownerDelete = await fetch(`${API}/schemas/${id}`, {
       method: "DELETE",
     });
     expect(ownerDelete.status).toBe(204);
@@ -632,7 +667,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
-    // (title, description, custom x-* extensions). The mock must do the same,
+    // (title, description). The mock must do the same,
     // serving the document under `schema` in the {id, schema, metadata}
     // envelope.
     const doc = {
@@ -641,16 +676,16 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
-      "x-custom-extension": { keep: true },
+      description: "Kept verbatim",
     };
-    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_raw`, {
+    const create = await fetch(`${API}/schemas?project_id=proj_schema_raw`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(doc),
     });
     const { id } = (await create.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/schemas/${id}`);
+    const res = await fetch(`${API}/schemas/${id}`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       id: string;
@@ -669,14 +704,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance-list",
       "x-auth-methods": { password: { enabled: true } },
     };
-    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_list`, {
+    const create = await fetch(`${API}/schemas?project_id=proj_schema_list`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(doc),
     });
     const { id } = (await create.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/schemas?project_id=proj_schema_list`);
+    const res = await fetch(`${API}/schemas?project_id=proj_schema_list`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       schemas: Array<{ id: string; schema: unknown; metadata: { created_at: string } }>;
@@ -717,7 +752,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // the mock's own slicing, token emission and continuation are only
     // proven here.
     for (let i = 0; i < 5; i += 1) {
-      const create = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`, {
+      const create = await fetch(`${API}/schemas?project_id=proj_schema_paging`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -731,7 +766,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     }
 
     // The whole set fits in the default limit of 20: no token.
-    const full = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`);
+    const full = await fetch(`${API}/schemas?project_id=proj_schema_paging`);
     expect(full.status).toBe(200);
     const fullBody = (await full.json()) as {
       schemas: Array<{ id: string }>;
@@ -746,7 +781,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const gotIds: string[] = [];
     let token: string | undefined;
     for (const wantSize of [2, 2, 1]) {
-      const url = new URL(`${BASE}/schemas`);
+      const url = new URL(`${API}/schemas`);
       url.searchParams.set("project_id", "proj_schema_paging");
       url.searchParams.set("limit", "2");
       if (token !== undefined) url.searchParams.set("page_token", token);
@@ -764,20 +799,38 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(gotIds).toEqual(wantIds);
 
     // A token the mock never minted is rejected, like the real server.
-    const bad = await fetch(
-      `${BASE}/schemas?project_id=proj_schema_paging&page_token=not-a-cursor`,
-    );
+    const bad = await fetch(`${API}/schemas?project_id=proj_schema_paging&page_token=not-a-cursor`);
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
 
     // An out-of-range limit is rejected by the generated query schema, not
     // silently clamped.
-    const oversized = await fetch(`${BASE}/schemas?project_id=proj_schema_paging&limit=101`);
+    const oversized = await fetch(`${API}/schemas?project_id=proj_schema_paging&limit=101`);
     expect(oversized.status).toBe(400);
   });
 
+  test("POST /schemas refuses a key the user meta-schema does not allow, as the server does", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { firstName: { type: "string", minimumLength: 3 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
+    expect(body.code).toBe("invalid_schema");
+    expect(body.details.issues).toContainEqual(
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    );
+  });
+
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
-    const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind: "not-a-real-kind" }),
@@ -788,7 +841,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /flow_definitions returns a body matching GetFlowDefinitionResponse (envelope is identical)", async () => {
-    const res = await fetch(`${BASE}/flow_definitions`, {
+    const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -804,7 +857,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
-    const schema = await fetch(`${BASE}/schemas?project_id=proj_conformance_handle`, {
+    const schema = await fetch(`${API}/schemas?project_id=proj_conformance_handle`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -817,7 +870,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await schema.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/flow_definitions`, {
+    const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -832,10 +885,18 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
     const flowDefinition = validFlowDefinitionBody();
-    // Wire register as a purpose without the flip transition — the exact
-    // class of definition the real server rejects at apply time.
-    flowDefinition.purposes = { login: "identifier", register: "identifier" };
-    const res = await fetch(`${BASE}/flow_definitions`, {
+    // A transition to a step the definition does not have — the exact class
+    // of definition the real server rejects at apply time.
+    flowDefinition.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
+        transitions: { submit: { target: "missing" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ project_id: "proj_conformance", flow_definition: flowDefinition }),
@@ -844,12 +905,12 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const body = (await res.json()) as { code: string; message: string; details: string };
     expect(body.code).toBe("flowdef.invalid");
     expect(body.message).toBe("flow definition: invalid");
-    expect(body.details).toContain('must wire "user_not_found" transition');
+    expect(body.details).toContain('targets unknown step "missing"');
   });
 
   test("POST /flow_definitions with a repeated name publishes a new revision", async () => {
     const publish = async () => {
-      const res = await fetch(`${BASE}/flow_definitions`, {
+      const res = await fetch(`${API}/flow_definitions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -868,21 +929,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     // The name filter lists that flow's revisions, newest first.
     const res = await fetch(
-      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=login-flow`,
+      `${API}/flow_definitions?project_id=proj_conformance_revisions&name=login-flow`,
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { flow_definitions: { id: string }[] };
     expect(body.flow_definitions.map((entry) => entry.id)).toEqual([second, first]);
 
     const none = await fetch(
-      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=no-such-flow`,
+      `${API}/flow_definitions?project_id=proj_conformance_revisions&name=no-such-flow`,
     );
     expect(((await none.json()) as { flow_definitions: unknown[] }).flow_definitions).toEqual([]);
   });
 
   test("GET /flow_definitions?revisions=latest keeps one revision per name and honours purpose", async () => {
     const publish = async (overrides: Record<string, unknown>) => {
-      const res = await fetch(`${BASE}/flow_definitions`, {
+      const res = await fetch(`${API}/flow_definitions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -902,7 +963,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     const list = async (params: string) => {
       const res = await fetch(
-        `${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`,
+        `${API}/flow_definitions?project_id=proj_conformance_latest${params}`,
       );
       expect(res.status).toBe(200);
       const body = (await res.json()) as { flow_definitions: { id: string }[] };
@@ -920,7 +981,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
-    const create = await fetch(`${BASE}/flow_definitions`, {
+    const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -930,7 +991,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await create.json()) as { id: string };
     // Spec: `ListFlowDefinitionsQueryParams` requires `project_id`.
-    const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_list`);
+    const res = await fetch(`${API}/flow_definitions?project_id=proj_conformance_list`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ListFlowDefinitionsResponse.parse(body)).not.toThrow();
@@ -940,12 +1001,12 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const row = (body as { flow_definitions: { id: string }[] }).flow_definitions.find(
       (entry) => entry.id === id,
     );
-    const detail = await (await fetch(`${BASE}/flow_definitions/${id}`)).json();
+    const detail = await (await fetch(`${API}/flow_definitions/${id}`)).json();
     expect(row).toEqual(detail);
   });
 
   test("GET /flow_definitions/:id matches GetFlowDefinitionResponse", async () => {
-    const create = await fetch(`${BASE}/flow_definitions`, {
+    const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -954,7 +1015,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}`);
+    const res = await fetch(`${API}/flow_definitions/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
@@ -963,7 +1024,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
 describe("api-mock claim lifecycle — init / status / complete conformance", () => {
   async function createProject(name: string): Promise<{ id: string; projectSecret: string }> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -973,7 +1034,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   }
 
   async function initClaim(projectId: string, secret: string): Promise<Response> {
-    return fetch(`${BASE}/projects/${projectId}/claim/init`, {
+    return fetch(`${API}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${secret}` },
     });
@@ -985,7 +1046,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     secret: string,
   ): Promise<Response> {
     return fetch(
-      `${BASE}/projects/${projectId}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
+      `${API}/projects/${projectId}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
       { headers: { authorization: `Bearer ${secret}` } },
     );
   }
@@ -1002,7 +1063,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
    * refuses first anyway.
    */
   async function claimHeaders(cookie: string): Promise<Record<string, string>> {
-    const me = await fetch(`${BASE}/sessions/me/csrf`, { headers: { cookie } });
+    const me = await fetch(`${API}/sessions/me/csrf`, { headers: { cookie } });
     const token = me.ok ? (((await me.json()) as { csrf_token?: string }).csrf_token ?? "") : "";
     return { "content-type": "application/json", cookie, "x-zitadel-csrf": token };
   }
@@ -1064,7 +1125,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1093,7 +1154,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
-    await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1119,7 +1180,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(statusBody.code).toBe("proj.claim_expired");
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1150,7 +1211,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(statusBody.code).toBe("proj.claim_window_expired");
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1167,7 +1228,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(((await bothStatus.json()) as Record<string, unknown>).code).toBe(
       "proj.claim_window_expired",
     );
-    const bothComplete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const bothComplete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1183,7 +1244,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ challenge_id }),
@@ -1199,7 +1260,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({ challenge_id }),
@@ -1212,7 +1273,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete with an unknown challenge returns 404", async () => {
     const project = await createProject("claim-complete-unknown");
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id: "ch_doesnotexist" }),
@@ -1223,7 +1284,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete without challenge_id returns 400", async () => {
     const project = await createProject("claim-complete-missing-id");
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({}),
@@ -1246,7 +1307,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await fetch(
-      `${BASE}/projects/${project.id}/claim/status?challenge_id=${encodeURIComponent(challenge_id)}`,
+      `${API}/projects/${project.id}/claim/status?challenge_id=${encodeURIComponent(challenge_id)}`,
     );
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
@@ -1261,7 +1322,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     // A session for the customer project, not the platform project, must not
     // be able to claim (ADR 046 §2).
     const cookie = await sessionCookie(project.id);
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1278,7 +1339,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${other.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${other.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1291,7 +1352,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
-    const url = `${BASE}/projects/${project.id}/claim/complete`;
+    const url = `${API}/projects/${project.id}/claim/complete`;
     const body = JSON.stringify({ challenge_id });
     const headers = await claimHeaders(cookie);
 
@@ -1313,7 +1374,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1340,7 +1401,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id: winner }),
@@ -1379,7 +1440,7 @@ describe("api-mock idp connections and variables", () => {
   });
 
   async function newProject(name: string): Promise<string> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1660,7 +1721,7 @@ describe("api-mock idp and variable contract details", () => {
   };
 
   async function newProject(name: string): Promise<string> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1795,15 +1856,15 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
-  test("answers not_implemented for a deployment's variables", async () => {
+  test("answers not found for the variables of a deployment the project does not hold", async () => {
     const projectId = await newProject("vars-deployment");
 
     const res = await fetch(
       `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
     );
 
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("dep.not_found");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1828,7 +1889,7 @@ describe("api-mock idp and variable contract details", () => {
 });
 describe("api-mock releases and deployments", () => {
   async function newProject(name: string): Promise<{ id: string; secret: string }> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1838,7 +1899,7 @@ describe("api-mock releases and deployments", () => {
   }
 
   const addPrimary = (id: string, secret: string, pattern: string) =>
-    fetch(`${BASE}/projects/${id}/origins`, {
+    fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify({ pattern, kind: "primary" }),
@@ -1867,6 +1928,78 @@ describe("api-mock releases and deployments", () => {
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify(body),
     });
+
+  test("freezes the variables of the deployment's kind, untouched by later writes", async () => {
+    const project = await newProject("deployment-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const variables = `${BASE}/variables?project_id=${project.id}`;
+    const write = (kind: string, payload: object) =>
+      fetch(`${variables}&kind=${kind}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    await write("primary", { HOST: "app.acme.com", TOKEN: { value: "s3cr3t", secret: true } });
+    await write("preview", { HOST: "preview.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await write("primary", { HOST: "changed.acme.com" });
+
+    const res = await fetch(
+      `${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ HOST: "app.acme.com", TOKEN: { secret: true } });
+  });
+
+  test("reuses the restored deployment's frozen variables on rollback", async () => {
+    const project = await newProject("rollback-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const write = (payload: object) =>
+      fetch(`${BASE}/variables?project_id=${project.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    const deploy = async (body: object) => {
+      const release = (await (await createRelease(project.id, project.secret, body)).json()) as {
+        id: string;
+      };
+      return (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: "primary",
+        })
+      ).json()) as { id: string };
+    };
+    await write({ HOST: "first.acme.com" });
+    const first = await deploy(rel1);
+    await write({ HOST: "second.acme.com" });
+    await deploy(rel2);
+    const rolledBack = (await (
+      await fetch(`${BASE}/deployments/${first.id}/rollback?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { id: string };
+
+    const res = await fetch(
+      `${BASE}/deployments/${rolledBack.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(await res.json()).toEqual({ HOST: "first.acme.com" });
+  });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
     const project = await newProject("release-build-idps");
@@ -2166,7 +2299,7 @@ describe("api-mock releases and deployments", () => {
 
     const first = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(first.status).toBe(201);
     const deployment = (await first.json()) as {
@@ -2177,7 +2310,7 @@ describe("api-mock releases and deployments", () => {
 
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(again.status).toBe(200);
   });
@@ -2190,7 +2323,7 @@ describe("api-mock releases and deployments", () => {
 
     const noPrimary = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(noPrimary.status).toBe(400);
     expect(((await noPrimary.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2215,13 +2348,13 @@ describe("api-mock releases and deployments", () => {
 
     const live = await createDeployment(project.id, project.secret, {
       release_id: first.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
 
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const history = (await (
@@ -2249,7 +2382,7 @@ describe("api-mock releases and deployments", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({
       code: "dep.invalid",
-      message: "deployment: deploy primary origins with the primary keyword",
+      message: "deployment: deploy to primary origins with the primary target",
     });
   });
 
@@ -2262,7 +2395,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
@@ -2270,7 +2403,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2297,7 +2430,7 @@ describe("api-mock releases and deployments", () => {
 
     const deployed = await createDeployment(second.id, second.secret, {
       content_hash: own.content_hash,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     expect(deployed.status).toBe(201);
@@ -2305,7 +2438,7 @@ describe("api-mock releases and deployments", () => {
 
   test("writes a new preview deployment for a release the URL already serves", async () => {
     const project = await newProject("deploy-preview-renewal");
-    await fetch(`${BASE}/projects/${project.id}/origins`, {
+    await fetch(`${API}/projects/${project.id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
@@ -2323,7 +2456,7 @@ describe("api-mock releases and deployments", () => {
 
   test("gives a preview deployment without a ttl the project's default expiry", async () => {
     const project = await newProject("deploy-preview-default-ttl");
-    await fetch(`${BASE}/projects/${project.id}/origins`, {
+    await fetch(`${API}/projects/${project.id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
@@ -2342,7 +2475,7 @@ describe("api-mock releases and deployments", () => {
     expect(deployed.targets[0]?.expires_at).not.toBeNull();
   });
 
-  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+  test("a rollback keeps the origins it froze when one is no longer primary", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
     await addPrimary(project.id, project.secret, "https://www.acme.com");
@@ -2352,10 +2485,10 @@ describe("api-mock releases and deployments", () => {
     const deployment = (await (
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
-    await fetch(`${BASE}/projects/${project.id}/origins/remove`, {
+    await fetch(`${API}/projects/${project.id}/origins/remove`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ pattern: "https://www.acme.com" }),
@@ -2370,8 +2503,46 @@ describe("api-mock releases and deployments", () => {
       },
     );
 
-    expect(rollback.status).toBe(403);
-    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+    expect(rollback.status).toBe(200);
+    const restored = (await rollback.json()) as { targets: { origin: string }[] };
+    expect(restored.targets.map((target) => target.origin)).toEqual([
+      "https://app.acme.com",
+      "https://www.acme.com",
+    ]);
+  });
+
+  test("a live read leaves out an origin the newest primary deployment does not name", async () => {
+    const project = await newProject("deploy-rollback-narrower");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const narrow = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+    });
+    await fetch(`${BASE}/deployments/${narrow.id}/rollback?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ message: "revert" }),
+    });
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { targets: { origin: string }[] }[] };
+
+    expect(
+      live.deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+    ).toEqual(["https://app.acme.com"]);
   });
 
   test("rolls back to an earlier deployment, reversing the live release", async () => {
@@ -2383,7 +2554,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
 
@@ -2392,7 +2563,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2472,7 +2643,7 @@ describe("api-mock releases and deployments", () => {
     // carries one is refused, even though an omitted ttl on a preview defaults.
     const withTtl = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
       ttl: "PT168H",
     });
     expect(withTtl.status).toBe(400);
@@ -2667,7 +2838,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: served.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
@@ -2682,7 +2853,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: next.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {

@@ -7,6 +7,11 @@
 > lifecycle owner team #1071), grants (#1192), deployments (`release`, #1213)
 > and flow definitions (`user_schema`, #1079). The open questions stay out of
 > scope.
+>
+> **Amendment (2026-11-03):** expanding a grant principal needs read on the
+> principal's home project; `project.write` on the protected project no longer
+> satisfies it, and a user-bound session is not exempt (zitadel/nextgen#2653,
+> see [Grant expansion](#grant-expansion)).
 > **Context:** List responses that would otherwise force a request per item
 > **Builds on:** [ADR 027](027-cursor-based-pagination.md), [ADR 031](031-openapi-querying.md)
 
@@ -163,11 +168,29 @@ When expand was asked and the person cannot be loaded, `user` / `team`
 stay the degraded ref (`user_id` / `team_id` only) — the same shape as not
 expanding a missing principal.
 
-GET-by-id takes the same `expand` query param as the list. The dual
-`user.read` **and** `team.read` gate stays: both are checked on the whole
-request before the assignment is loaded (operator `project.write` still
-satisfies both). A mixed page of user and team grants is the common case, so
-the two permissions are not split per row.
+GET-by-id takes the same `expand` query param as the list.
+
+### Amendment (2026-11-03): expanding needs read on the home project
+
+Expanding a grant principal requires read on the principal's **home
+project**, decided by the same resolver check that decides reading that
+project's users. The check runs once per home project on the request, before
+any principal row is loaded. User read and team read on a project resolve to
+the same project relation, so one check per home covers a mixed page of user
+and team grants.
+
+`project.write` on the protected project does not satisfy the check, and a
+user-bound session is not exempt from it. A caller who asks for `expand` and
+fails the check gets `403 user.permission_denied`; the extras are never
+dropped silently. Without `expand`, a grant reader still sees the label that
+[ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project)
+allows. The degraded-ref rule for a principal that cannot be loaded is
+unchanged.
+
+This replaces the dual `user.read` and `team.read` check on the protected
+project. Every `project.write` secret passed it, so a project secret could
+read the schema, attributes and metadata of a platform user it had granted
+(zitadel/nextgen#2653).
 
 ## Open questions
 

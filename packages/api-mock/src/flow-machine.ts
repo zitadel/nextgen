@@ -17,17 +17,22 @@
  *
  *   idle --START(login)----> identifier (email only)
  *                                       --SUBMIT(submit)--> password
+ *                                       --SUBMIT(submit, user_not_found)--> register
  *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso)-----> sso-redirect
  *                            password   --SUBMIT(submit)--> done
- *                                       --SUBMIT(back)----> identifier
+ *                                       --SUBMIT(back)----> the step that handed off to it
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso)-----> sso-redirect
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
+ *                                     --SUBMIT(submit, user_already_exists)--> password
  *                                     --SUBMIT(sign_in)--> identifier
  *                                     --SUBMIT(sso)-----> sso-redirect
+ *
+ *   The `user_*` outcomes are the email lookup the handlers make when
+ *   `setupMockHandlers({ accounts })` opts in; without it no submit carries one.
  *
  *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
  *               longer routes through them (passkey registration is offered
@@ -89,6 +94,11 @@ export type FlowMachineContext = {
   ssoProviderId: string | null;
   /** The step the provider button was pressed on, which decides where a return from it goes. */
   ssoOrigin: SsoOrigin | null;
+  /**
+   * The step that handed off to `password`, where its `back` returns. The
+   * engine pops its back stack there, restoring that step's purpose too.
+   */
+  passwordFrom: "identifier" | "register";
 };
 
 export type FlowMachineEvent =
@@ -98,6 +108,7 @@ export type FlowMachineEvent =
       action: string;
       fields: Record<string, string>;
       sso_provider_id?: string | null;
+      outcome?: "user_not_found" | "user_already_exists";
     }
   | {
       // The provider sending the browser back to the callback. It is not a
@@ -116,6 +127,7 @@ const initialContext = {
   capturedFields: {},
   ssoProviderId: null,
   ssoOrigin: null,
+  passwordFrom: "identifier",
 } satisfies FlowMachineContext;
 
 const rotateToken = assign<
@@ -200,6 +212,16 @@ const setPurpose = assign<
   purpose: ({ event }) => event.purpose,
 });
 
+const changePurpose = (purpose: CreateFlowBodyPurpose) =>
+  assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
+    purpose: () => purpose,
+  });
+
+const handOffToPassword = (from: FlowMachineContext["passwordFrom"]) =>
+  assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
+    passwordFrom: () => from,
+  });
+
 export const flowMachine = createMachine({
   types: {} as {
     context: FlowMachineContext;
@@ -235,9 +257,12 @@ export const flowMachine = createMachine({
         SUBMIT: [
           chooseProviderOn("identifier"),
           {
-            guard: ({ event }) => event.action === "register",
+            // The visitor's own switch, or the engine's for an unknown email.
+            guard: ({ event }) =>
+              event.action === "register" ||
+              (event.action === "submit" && event.outcome === "user_not_found"),
             target: "register",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("register"), rotateToken],
           },
           {
             guard: ({ event }) => event.action === "passkey",
@@ -253,7 +278,7 @@ export const flowMachine = createMachine({
             // Default `submit`: hand off to the password step, as the real
             // flow's `submit -> password` transition does.
             target: "password",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, handOffToPassword("identifier"), rotateToken],
           },
         ],
       },
@@ -265,7 +290,18 @@ export const flowMachine = createMachine({
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("login"), rotateToken],
+          },
+          {
+            guard: ({ event }) =>
+              event.action === "submit" && event.outcome === "user_already_exists",
+            target: "password",
+            actions: [
+              captureFields,
+              changePurpose("login"),
+              handOffToPassword("register"),
+              rotateToken,
+            ],
           },
           {
             target: "register-password",
@@ -297,7 +333,14 @@ export const flowMachine = createMachine({
           chooseProviderOn("password"),
           {
             // ADR 022 back-navigation: the engine injects a `back` action on
-            // any step that has a predecessor.
+            // any step that has a predecessor. After the switch from sign-up,
+            // that is `register`, and going back is signing up again.
+            guard: ({ event, context }) =>
+              event.action === "back" && context.passwordFrom === "register",
+            target: "register",
+            actions: [changePurpose("register"), rotateToken],
+          },
+          {
             guard: ({ event }) => event.action === "back",
             target: "identifier",
             actions: [rotateToken],
@@ -369,14 +412,16 @@ export const flowMachine = createMachine({
             actions: [rotateToken],
           },
           {
+            // Both outcomes move the purpose as the engine's implicit flip
+            // does: a new identity signs up, a colliding one signs in.
             guard: ({ event }) => event.outcome === "sso_user_not_found",
             target: "register-sso",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("register"), rotateToken],
           },
           {
             guard: ({ event }) => event.outcome === "user_already_exists",
             target: "sso-conflict",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("login"), rotateToken],
           },
           {
             // `sso_authenticated`: a subject already linked to an account, so the round
@@ -391,7 +436,7 @@ export const flowMachine = createMachine({
             // could not tell who came back" is to sign someone in, so an
             // unresolved return registers instead.
             target: "register-sso",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("register"), rotateToken],
           },
         ],
       },
@@ -406,7 +451,7 @@ export const flowMachine = createMachine({
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
-            actions: [rotateToken],
+            actions: [changePurpose("login"), rotateToken],
           },
           { target: "done", actions: [captureFields, rotateToken] },
         ],
@@ -425,9 +470,10 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
+            // The scaffold declares `purpose: login` on this transition.
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
-            actions: [rotateToken],
+            actions: [changePurpose("login"), rotateToken],
           },
           { target: "done", actions: [captureFields, rotateToken] },
         ],

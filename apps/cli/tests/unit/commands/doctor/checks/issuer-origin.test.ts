@@ -1,96 +1,146 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
-import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
-import { createZitadelClient } from "../../../../../src/lib/api-client";
-import { createOrca } from "../../../../../src/lib/orca";
-
-const SERVER = "https://api.zitadel.example";
-const ISSUER = "http://localhost:3000";
-const server = setupServer(...setupPlatformHandlers());
-const tempDirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-type Origin = { pattern: string; kind: "primary" | "preview" };
-type Project = { id: string; project_secret: string; cwd: string };
+import { IssuerOriginCheck } from "@/commands/doctor/checks";
+import { createZitadelClient } from "@/lib/backend";
+import { takeReportedWarnings } from "@/lib/warnings";
+import { aCheckContext, declined, forced } from "@tests/helpers/check-context";
+import { it } from "@tests/helpers/fixtures";
+import { write } from "@tests/helpers/git-repo";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
- * A project on the mock holding `origins`, with the files setup writes for it:
- * `zitadel.json`, `.env.local` with the issuer, and a `.zitadel/secret` that
- * records `recorded` (the server's origins unless given).
+ * The server the projects live on.
  */
-async function aProject(origins: Origin[], recorded: Origin[] = origins): Promise<Project> {
-  const response = await fetch(`${SERVER}/projects`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "demo", origins }),
+const SERVER = "https://api.zitadel.example";
+
+/**
+ * The issuer the app's environment names.
+ */
+const ISSUER = "http://localhost:3000";
+
+/**
+ * Where the mock serves one project.
+ */
+const PROJECT_ROUTE = `${SERVER}/api/v1/projects/:project_id`;
+
+/**
+ * The issuer held as a preview origin, as `zitadel setup` 0.1.0 left it.
+ */
+const AS_PREVIEW = [{ pattern: ISSUER, kind: "preview" as const }];
+
+/**
+ * The issuer held as a primary origin.
+ */
+const AS_PRIMARY = [{ pattern: ISSUER, kind: "primary" as const }];
+
+const { server } = usePlatformServer();
+
+/**
+ * An origin of a project.
+ */
+type Origin = { pattern: string; kind: "primary" | "preview" };
+
+/**
+ * A project on the mock, and the directory bound to it.
+ */
+type Project = { id: string; secret: string; cwd: string };
+
+/**
+ * Creates a project holding `origins` on the mock, and fills `cwd` with the
+ * files setup writes for it: `zitadel.json`, `.env.local` with the issuer, and
+ * a `.zitadel/secret` recording `recorded`.
+ *
+ * @param cwd - The directory to bind to the project.
+ * @param origins - The origins the server holds.
+ * @param recorded - The origins the secret records; the server's unless given.
+ * @returns The project.
+ */
+async function aProject(
+  cwd: string,
+  origins: Origin[],
+  recorded: Origin[] = origins,
+): Promise<Project> {
+  const client = createZitadelClient({
+    signal: new AbortController().signal,
+    baseUrl: SERVER,
+    token: undefined,
   });
-  const project = (await response.json()) as { id: string; project_secret: string };
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-issuer-origin-"));
-  tempDirs.push(cwd);
-  await mkdir(join(cwd, ".zitadel"), { recursive: true });
-  await writeFile(
-    join(cwd, "zitadel.json"),
-    JSON.stringify({ project: project.id, server: SERVER, framework: { id: "next" } }),
-  );
-  await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=${ISSUER}\n`);
-  await writeFile(
-    join(cwd, ".zitadel/secret"),
-    JSON.stringify({
-      project_id: project.id,
-      project_secret: project.project_secret,
+  const created = await client.createProject({ name: "demo", origins });
+  await write(cwd, {
+    "zitadel.json": JSON.stringify({
+      project: created.id,
+      server: SERVER,
+      framework: { id: "next" },
+    }),
+    ".env.local": `ZITADEL_ISSUER=${ISSUER}\n`,
+    ".zitadel/secret": JSON.stringify({
+      project_id: created.id,
+      project_secret: created.project_secret,
       preview_secret: "sk_preview",
-      primary_origins: recorded.filter((o) => o.kind === "primary").map((o) => o.pattern),
-      preview_origins: recorded.filter((o) => o.kind === "preview").map((o) => o.pattern),
+      primary_origins: patternsOf(recorded, "primary"),
+      preview_origins: patternsOf(recorded, "preview"),
       created_at: "2026-10-01T00:00:00.000Z",
     }),
-  );
-  return { ...project, cwd };
+  });
+  return { id: created.id, secret: created.project_secret, cwd };
 }
 
-/** A project as `zitadel setup` 0.1.0 left it: its issuer a preview origin, nothing primary. */
-function aProjectFrom010(): Promise<Project> {
-  return aProject([{ pattern: ISSUER, kind: "preview" }]);
+/**
+ * The patterns of the origins of one kind.
+ *
+ * @param origins - The origins.
+ * @param kind - The kind to take.
+ * @returns Their patterns.
+ */
+function patternsOf(origins: readonly Origin[], kind: Origin["kind"]): string[] {
+  return origins
+    .filter((origin) => {
+      return origin.kind === kind;
+    })
+    .map((origin) => {
+      return origin.pattern;
+    });
 }
 
-function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.2.0", dryRun };
-}
-
+/**
+ * The origins the server holds for the project.
+ *
+ * @param project - The project.
+ * @returns Its origins.
+ */
 async function serverOrigins(project: Project) {
-  const client = createZitadelClient({ baseUrl: SERVER, token: project.project_secret });
+  const client = createZitadelClient({
+    signal: new AbortController().signal,
+    baseUrl: SERVER,
+    token: project.secret,
+  });
   return (await client.getProject(project.id)).origins;
 }
 
-async function recordedSecret(project: Project) {
-  return JSON.parse(await readFile(join(project.cwd, ".zitadel/secret"), "utf8")) as {
-    primary_origins: string[];
-    preview_origins: string[];
-  };
+/**
+ * What the project's `.zitadel/secret` records.
+ *
+ * @param project - The project.
+ * @returns The parsed secret.
+ */
+async function recordedSecret(project: Project): Promise<unknown> {
+  return JSON.parse(await readFile(join(project.cwd, ".zitadel/secret"), "utf8"));
 }
 
-/** Fails every request that would add `pattern` as primary; any other passes on to the mock. */
+/**
+ * Makes the server fail every request that adds an origin as primary; any
+ * other request passes on to the mock.
+ */
 function refusePrimaryAdds(): void {
   server.use(
-    http.post(`${SERVER}/projects/:project_id/origins`, async ({ request }) => {
-      const body = (await request.clone().json()) as { kind?: string };
-      if (body.kind === "primary") {
+    http.post(`${SERVER}/api/v1/projects/:project_id/origins`, async ({ request }) => {
+      const body: unknown = await request.clone().json();
+      if (typeof body === "object" && body !== null && "kind" in body && body.kind === "primary") {
         return HttpResponse.json({ code: "unavailable", message: "try again" }, { status: 503 });
       }
       return undefined;
@@ -98,34 +148,60 @@ function refusePrimaryAdds(): void {
   );
 }
 
-describe("IssuerOriginCheck", () => {
+/**
+ * Makes the project's own route answer `answer`.
+ *
+ * @param answer - How the server answers.
+ */
+function projectAnswers(answer: () => Response): void {
+  server.use(http.get(PROJECT_ROUTE, answer));
+}
+
+beforeEach(() => {
+  takeReportedWarnings();
+});
+
+describe("IssuerOriginCheck.run", () => {
   const check = new IssuerOriginCheck();
 
-  it("warns when the project holds its issuer as a preview origin and none as primary", async () => {
-    const project = await aProjectFrom010();
+  describe("when the project holds its issuer as a preview origin and none as primary", () => {
+    it("warns, naming the issuer and the server", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
 
-    const outcome = await check.run(ctxFor(project.cwd));
+      const outcome = await check.run(aCheckContext(dir));
 
-    expect(outcome).toMatchObject({
-      name: "issuer-origin",
-      status: "warn",
-      details: { pattern: ISSUER, server: SERVER },
+      expect(outcome).toMatchObject({
+        name: "issuer-origin",
+        status: "warn",
+        details: { pattern: ISSUER, server: SERVER },
+      });
+    });
+
+    it("names doctor --fix", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.message).toContain("zitadel doctor --fix");
+    });
+
+    it("matches an issuer written with a trailing slash", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await write(dir, { ".env.local": `ZITADEL_ISSUER=${ISSUER}/\n` });
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("warn");
     });
   });
 
-  it("names doctor --fix in the warning", async () => {
-    const project = await aProjectFrom010();
+  it("asks no server when .zitadel/secret records the issuer as primary", async ({ dir }) => {
+    await aProject(dir, AS_PRIMARY);
+    projectAnswers(() => {
+      return HttpResponse.error();
+    });
 
-    const outcome = await check.run(ctxFor(project.cwd));
-
-    expect(outcome.message).toContain("zitadel doctor --fix");
-  });
-
-  it("asks no server when .zitadel/secret records the issuer as primary", async () => {
-    const project = await aProject([{ pattern: ISSUER, kind: "primary" }]);
-    server.use(http.get(`${SERVER}/projects/:project_id`, () => HttpResponse.error()));
-
-    const outcome = await check.run(ctxFor(project.cwd));
+    const outcome = await check.run(aCheckContext(dir));
 
     expect(outcome).toMatchObject({
       status: "pass",
@@ -133,13 +209,12 @@ describe("IssuerOriginCheck", () => {
     });
   });
 
-  it("passes a project made primary by hand that .zitadel/secret still records as preview", async () => {
-    const project = await aProject(
-      [{ pattern: ISSUER, kind: "primary" }],
-      [{ pattern: ISSUER, kind: "preview" }],
-    );
+  it("passes a project made primary by hand that .zitadel/secret still records as preview", async ({
+    dir,
+  }) => {
+    await aProject(dir, AS_PRIMARY, AS_PREVIEW);
 
-    const outcome = await check.run(ctxFor(project.cwd));
+    const outcome = await check.run(aCheckContext(dir));
 
     expect(outcome).toMatchObject({
       status: "pass",
@@ -147,61 +222,71 @@ describe("IssuerOriginCheck", () => {
     });
   });
 
-  it("matches an issuer written with a trailing slash", async () => {
-    const project = await aProjectFrom010();
-    await writeFile(join(project.cwd, ".env.local"), `ZITADEL_ISSUER=${ISSUER}/\n`);
+  describe("when it cannot tell", () => {
+    it.for([
+      [
+        "the server cannot be reached",
+        () => {
+          return HttpResponse.error();
+        },
+      ],
+      [
+        "the server answers with JSON null",
+        () => {
+          return HttpResponse.json(null);
+        },
+      ],
+    ] as const)("skips, passing, when %s", async ([, answer], { dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      projectAnswers(answer);
 
-    const outcome = await check.run(ctxFor(project.cwd));
+      const outcome = await check.run(aCheckContext(dir));
 
-    expect(outcome.status).toBe("warn");
-  });
-
-  it("skips, passing, when the server cannot be reached", async () => {
-    const project = await aProjectFrom010();
-    server.use(http.get(`${SERVER}/projects/:project_id`, () => HttpResponse.error()));
-
-    const outcome = await check.run(ctxFor(project.cwd));
-
-    expect(outcome).toMatchObject({
-      status: "pass",
-      message: expect.stringContaining("Skipped: could not read the project's origins"),
-    });
-  });
-
-  it("skips, passing, when no file sets ZITADEL_ISSUER", async () => {
-    const project = await aProjectFrom010();
-    await rm(join(project.cwd, ".env.local"));
-
-    const outcome = await check.run(ctxFor(project.cwd));
-
-    expect(outcome).toMatchObject({
-      status: "pass",
-      message: "Skipped: no file sets ZITADEL_ISSUER",
-    });
-  });
-
-  it("skips, passing, when .zitadel/secret cannot be read", async () => {
-    const project = await aProjectFrom010();
-    await rm(join(project.cwd, ".zitadel/secret"));
-
-    const outcome = await check.run(ctxFor(project.cwd));
-
-    expect(outcome.status).toBe("pass");
-  });
-
-  describe("fix", () => {
-    it("makes the issuer a primary origin on the server", async () => {
-      const project = await aProjectFrom010();
-
-      await check.fix(ctxFor(project.cwd));
-
-      expect(await serverOrigins(project)).toEqual([{ pattern: ISSUER, kind: "primary" }]);
+      expect(outcome).toMatchObject({
+        status: "pass",
+        message: expect.stringContaining("Skipped: could not read the project's origins"),
+      });
     });
 
-    it("records the issuer as primary in .zitadel/secret", async () => {
-      const project = await aProjectFrom010();
+    it("skips, passing, when no file sets ZITADEL_ISSUER", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await rm(join(dir, ".env.local"));
 
-      await check.fix(ctxFor(project.cwd));
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        message: "Skipped: no file sets ZITADEL_ISSUER",
+      });
+    });
+
+    it("skips, passing, when .zitadel/secret cannot be read", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await rm(join(dir, ".zitadel/secret"));
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+  });
+});
+
+describe("IssuerOriginCheck.fix", () => {
+  const check = new IssuerOriginCheck();
+
+  describe("with consent", () => {
+    it("makes the issuer a primary origin on the server", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
+
+      await check.fix(aCheckContext(dir, { consent: forced() }));
+
+      expect(await serverOrigins(project)).toEqual(AS_PRIMARY);
+    });
+
+    it("records the issuer as primary in .zitadel/secret", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
+
+      await check.fix(aCheckContext(dir, { consent: forced() }));
 
       expect(await recordedSecret(project)).toMatchObject({
         primary_origins: [ISSUER],
@@ -209,36 +294,88 @@ describe("IssuerOriginCheck", () => {
       });
     });
 
-    it("leaves the check passing", async () => {
-      const project = await aProjectFrom010();
+    it("leaves the check passing", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
 
-      await check.fix(ctxFor(project.cwd));
+      await check.fix(aCheckContext(dir, { consent: forced() }));
 
-      expect((await check.run(ctxFor(project.cwd))).status).toBe("pass");
+      expect((await check.run(aCheckContext(dir))).status).toBe("pass");
     });
 
-    it("changes nothing under dryRun", async () => {
-      const project = await aProjectFrom010();
+    it("says to deploy, as nothing is deployed to the origin it made primary", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
 
-      await check.fix(ctxFor(project.cwd, true));
+      await check.fix(aCheckContext(dir, { consent: forced() }));
 
-      expect(await serverOrigins(project)).toEqual([{ pattern: ISSUER, kind: "preview" }]);
+      expect(takeReportedWarnings()).toEqual([
+        `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: run \`zitadel deploy\` in the app.`,
+      ]);
+    });
+  });
+
+  describe("when the replacement is declined", () => {
+    it("asks to replace the preview origin", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      const consent = vi.fn(declined);
+
+      await check.fix(aCheckContext(dir, { consent }));
+
+      expect(consent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: `Make ${ISSUER} a primary origin? It is removed and added back as primary.`,
+        }),
+      );
     });
 
-    it("puts the preview origin back when the server refuses it as primary", async () => {
-      const project = await aProjectFrom010();
+    it("changes nothing", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
+
+      await check.fix(aCheckContext(dir, { consent: declined }));
+
+      expect(await serverOrigins(project)).toEqual(AS_PREVIEW);
+    });
+  });
+
+  describe("with a dry run", () => {
+    it("changes nothing", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
+
+      await check.fix(aCheckContext(dir, { dryRun: true, consent: forced(true) }));
+
+      expect(await serverOrigins(project)).toEqual(AS_PREVIEW);
+    });
+  });
+
+  describe("when the server refuses the issuer as primary", () => {
+    it("fails the repair", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
       refusePrimaryAdds();
 
-      await expect(check.fix(ctxFor(project.cwd))).rejects.toThrow();
+      const error = await rejectionOf(() => {
+        return check.fix(aCheckContext(dir, { consent: forced() }));
+      });
 
-      expect(await serverOrigins(project)).toEqual([{ pattern: ISSUER, kind: "preview" }]);
+      expect(error).toBeInstanceOf(Error);
     });
 
-    it("leaves .zitadel/secret alone when the server refuses it as primary", async () => {
-      const project = await aProjectFrom010();
+    it("puts the preview origin back", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
       refusePrimaryAdds();
 
-      await check.fix(ctxFor(project.cwd)).catch(() => undefined);
+      await rejectionOf(() => {
+        return check.fix(aCheckContext(dir, { consent: forced() }));
+      });
+
+      expect(await serverOrigins(project)).toEqual(AS_PREVIEW);
+    });
+
+    it("leaves .zitadel/secret alone", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
+      refusePrimaryAdds();
+
+      await rejectionOf(() => {
+        return check.fix(aCheckContext(dir, { consent: forced() }));
+      });
 
       expect(await recordedSecret(project)).toMatchObject({
         primary_origins: [],

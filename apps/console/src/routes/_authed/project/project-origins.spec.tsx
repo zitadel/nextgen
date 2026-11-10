@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -19,7 +21,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * after which the page re-reads the record.
  */
 const PROJECT_ID = "proj_1";
-const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
+const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
 const ORIGINS_URL = `${PROJECT_URL}/origins`;
 
 interface Origin {
@@ -34,12 +36,15 @@ const PREVIEW: Origin = { pattern: "https://*-acmeinc.vercel.app", kind: "previe
 // these tests about the origins.
 beforeEach(() =>
   server.use(
-    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/policies", () =>
-      HttpResponse.json({ policies: [], next_page_token: null }),
+    http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/v1/projects/:id/admins", () =>
+      HttpResponse.json({ admins: [] }),
     ),
-    http.get("http://localhost/api/users/me/projects", () =>
+    http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/deployments", () =>
+      HttpResponse.json({ deployments: [], next_page_token: null }),
+    ),
+    http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
   ),
@@ -61,10 +66,6 @@ function stubProject(origins: Origin[]) {
 }
 
 async function renderProject() {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath("/project", PROJECT_ID)] }),
   });
@@ -109,11 +110,11 @@ describe("project origins", () => {
     expect(section.getByRole("button", { name: `Copy ${PREVIEW.pattern}` })).toBeInTheDocument();
   });
 
-  it("says that every origin is admitted while the list is empty", async () => {
+  it("says that only a loopback origin is admitted while the list is empty", async () => {
     stubProject([]);
     await renderProject();
 
-    expect((await origins()).getByText(/every origin is admitted/i)).toBeInTheDocument();
+    expect((await origins()).getByText(/only a loopback origin is admitted/i)).toBeInTheDocument();
   });
 
   it("adds a primary origin to the route's project and re-reads it", async () => {
@@ -219,7 +220,7 @@ describe("project origins", () => {
     );
   });
 
-  it("says that removing the only origin admits every origin", async () => {
+  it("says that removing the only origin admits only a loopback origin", async () => {
     stubProject([PRIMARY]);
     await renderProject();
 

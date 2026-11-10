@@ -74,6 +74,14 @@
   background-color: var(--sidebar);
 }
 
+/* The layout centres the page and its table of contents together, and only a
+   page with headings renders one (`#nd-toc` sets --fd-toc-width). Keep its
+   width on a page without, so every page's text starts at the same place. A
+   `full` page (an API operation) has no table of contents column at all. */
+#fd-spacious-layout:not(:has(#nd-toc, article[data-full="true"])) {
+  --fd-toc-width: calc(var(--spacing) * 76);
+}
+
 /* The logo (components/logo.tsx) plays as on the website once a hover on it
    or its link sets data-playing, to the end even when the pointer leaves; it
    never moves on its own. A copy of apps/website/app/globals.css's: change

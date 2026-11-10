@@ -20,6 +20,7 @@ import {
   POLICY_FILE_SCHEMA_REF,
   POLICY_TEST_FILE_SCHEMA_REF,
   PROJECT_FILE_SCHEMA_REF,
+  schemaFileIssues,
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -343,6 +344,26 @@ describe("meta-schemas", () => {
         },
         true,
       ],
+      [
+        "transition with a purpose and no target",
+        { fields: ["email"], transitions: { submit: { purpose: "register" } } },
+        true,
+      ],
+      [
+        "transition with neither a target nor a purpose",
+        { fields: ["email"], transitions: { submit: {} } },
+        false,
+      ],
+      [
+        "transition with an empty target and a purpose",
+        { fields: ["email"], transitions: { submit: { target: "", purpose: "register" } } },
+        false,
+      ],
+      [
+        "transition with a null purpose and no target",
+        { fields: ["email"], transitions: { submit: { purpose: null } } },
+        false,
+      ],
     ];
     for (const [name, step, valid] of cases) {
       expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);
@@ -522,5 +543,96 @@ describe("meta-schemas", () => {
       expect(validateUserSchema.errors ?? [], `${file} violates user-schema.json`).toEqual([]);
       expect(valid).toBe(true);
     });
+  });
+});
+
+describe("schemaFileIssues", () => {
+  const userSchema = (properties: object, root: object = {}) => ({
+    kind: "user-schema",
+    metaSchema: "https://example.test/user-schema.json",
+    objectType: "human-user",
+    "x-auth-methods": { password: { enabled: true } },
+    properties,
+    ...root,
+  });
+
+  it("is empty for a valid schema, whose attributes may be named like keywords", () => {
+    expect(
+      schemaFileIssues(
+        userSchema(
+          {
+            email: { type: "string", "x-unique": "project", "x-claim": "email", "x-audit": true },
+            minimumLength: { type: "integer", minimum: 0 },
+          },
+          { "x-identifier": "email", "x-display": ["email"] },
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it("names every key the meta-schema refuses, at the root and at any property depth", () => {
+    const issues = schemaFileIssues(
+      userSchema(
+        {
+          firstName: { type: "string", minimumLength: 3 },
+          address: { type: "object", properties: { zip: { maxLenght: 5 } } },
+          email: { type: "string", "x-identifier": "email" },
+        },
+        { "x-team-note": "kept" },
+      ),
+    );
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        { path: "", key: "x-team-note", message: "x-team-note is not an allowed key" },
+        {
+          path: "properties.firstName",
+          key: "minimumLength",
+          message: "minimumLength is not an allowed key. Did you mean minLength?",
+        },
+        {
+          path: "properties.address.properties.zip",
+          key: "maxLenght",
+          message: "maxLenght is not an allowed key. Did you mean maxLength?",
+        },
+        {
+          path: "properties.email",
+          key: "x-identifier",
+          message: "x-identifier is not an allowed key",
+        },
+      ]),
+    );
+    expect(issues).toHaveLength(4);
+  });
+
+  it("names an attribute name the server refuses", () => {
+    expect(schemaFileIssues(userSchema({ "address.street": { type: "string" } }))).toEqual([
+      {
+        path: "properties",
+        key: "address.street",
+        message: "address.street is not an allowed key",
+      },
+    ]);
+  });
+
+  it("names refused keys beside a Zod issue, so one round shows them all", () => {
+    const issues = schemaFileIssues({
+      ...userSchema({ firstName: { minimumLength: 3 } }),
+      "x-auth-methods": { password: { enabled: "yes" } },
+    });
+
+    expect(issues).toEqual([
+      {
+        path: "x-auth-methods.password.enabled",
+        message: "Invalid input: expected boolean, received string",
+      },
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    ]);
+  });
+
+  it("checks a schema-url reference only for its shape", () => {
+    expect(schemaFileIssues({ kind: "schema-url", url: "https://example.test/user.json" })).toEqual(
+      [],
+    );
   });
 });

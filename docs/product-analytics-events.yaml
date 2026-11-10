@@ -83,6 +83,26 @@ properties:
     values: [quickstart, github]
     description: Where a link leads, as a stable name, never a URL.
 
+  # Attribution
+  utm_source:
+    type: string
+    description: >-
+      The `utm_source` of the link that led to a sign-up, as the sign-up
+      page's address carried it, or the page its login returns to; at most
+      100 characters and never one holding `@`. Nothing keeps it on the device,
+      so a journey through other pages or the terminal loses it.
+  utm_medium:
+    type: string
+    description: The link's `utm_medium`, under `utm_source`'s rules.
+  utm_campaign:
+    type: string
+    description: The link's `utm_campaign`, under `utm_source`'s rules.
+  referrer_host:
+    type: string
+    description: >-
+      The host of the page that linked to the sign-up page, ours included;
+      never its path or query.
+
   # Calls to action
   snippet:
     type: string
@@ -563,7 +583,7 @@ components:
   console:
     source: apps/console
     automatic:
-      - Vercel Web Analytics page views and Speed Insights, in the cloud build only (`CONSOLE_VERCEL_INSIGHTS=1`).
+      - Vercel Web Analytics page views and Speed Insights, in the cloud build only (its add-on, `apps/cloud-console`).
     events:
       copied_command:
         status: emitted
@@ -572,6 +592,18 @@ components:
           cloud build sends it, like the page views.
         destinations: [vercel]
         properties: [page, snippet]
+      signup_completed:
+        status: emitted
+        trigger: >-
+          The sign-in widget finished a flow whose last step before the end
+          created the user (the platform flow's `on_success: create_user`), on
+          `/signup`, `/login` or the CLI's `/claim`; `page` names which, so a
+          claim is a sign-up that started in the CLI. Only the cloud build
+          sends it, from the browser like the page views, with the source the
+          page's address carries (root ADR 084 §3). Its 8 properties are Web
+          Analytics Plus's limit.
+        destinations: [vercel]
+        properties: [page, utm_source, utm_medium, utm_campaign, referrer_host]
       viewed_page:
         status: planned
         plan: "#2233"

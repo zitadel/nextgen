@@ -5,13 +5,15 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   vercelEventKeys,
-} from "../../../../src/lib/oclif/command-telemetry";
-import type { GlobalOptions } from "../../../../src/lib/oclif/types";
-import { VERCEL_ENDPOINT, vercelEventBody } from "../../../../src/lib/telemetry/vercel";
+} from "@/lib/oclif/command-telemetry";
+import type { GlobalOptions } from "@/lib/oclif/types";
+import { VERCEL_ENDPOINT, vercelEventBody } from "@/lib/telemetry/vercel";
 
 function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
   return {
     cwd: "/work/app",
+    colored: false,
+    json: false,
     nonInteractive: true,
     dryRun: false,
     force: false,

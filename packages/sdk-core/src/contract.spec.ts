@@ -537,6 +537,8 @@ describe("widget loading ↔ SDK packages", () => {
   const appsDir = `${resolve(process.cwd(), "../..")}/apps/`;
   const demoDirs = readdirSync(appsDir).filter((dir) => dir.startsWith("demo-"));
   const SKIPPED_DIRS = /^(node_modules|dist|\.output|\.next.*|\.nuxt.*)$/;
+  // Next's own file, which `next build` and `next dev` write: no test input.
+  const SKIPPED_FILES = /^next-env\.d\.ts$/;
   const SOURCE_FILE = /\.(?:[cm]?[jt]sx?|vue|svelte|astro)$/;
   const SDK_OWNED_IMPORT =
     /(?:from|import|require)\s*\(?\s*["'](@zitadel\/(?:components|api|design-tokens))(?:\/[^"']*)?["']/;
@@ -546,7 +548,9 @@ describe("widget loading ↔ SDK packages", () => {
       if (entry.isDirectory()) {
         return SKIPPED_DIRS.test(entry.name) ? [] : sourceFiles(`${dir}/${entry.name}`);
       }
-      return SOURCE_FILE.test(entry.name) ? [`${dir}/${entry.name}`] : [];
+      return SOURCE_FILE.test(entry.name) && !SKIPPED_FILES.test(entry.name)
+        ? [`${dir}/${entry.name}`]
+        : [];
     });
 
   // The checks above read files outside this package, so both runners must list
@@ -1035,12 +1039,15 @@ describe("server SDK test titles", () => {
     "forwards upstream Set-Cookie headers",
     "passes cookies through to the backend when no project is configured",
     "names a proxied session cookie for this app's project",
+    "names a proxied session cookie for this app's project over https",
     "sends this project's session cookie upstream under the server's name",
     "keeps other projects' session cookies from the backend",
+    "drops the Set-Cookie of a session cookie from before ADR 083",
     "sends the shared session cookie only to this project's session probe",
     "copies this project's session out of the shared cookie on the session probe",
     "ends and clears a session of this project kept under the shared name on sign-out",
     "leaves the Console's session of another project under the shared name on sign-out",
+    "ends this app's session over https on sign-out",
     "forwards an upstream Location %s onto this app as %s",
     "keeps a caller-supplied credential on the handoff exchange",
     "appends the client IP to an existing X-Forwarded-For chain",
@@ -1070,6 +1077,8 @@ describe("server SDK test titles", () => {
     "keeps the cookie of another project's session",
     "reads the session from this project's cookie before the shared one",
     "ignores the session cookie of another project's app",
+    "reads no session from a cookie from before ADR 083",
+    "reads no unprefixed session cookie over https",
     "copies this project's session out of the shared cookie",
     "keeps a page that sets a session cookie out of shared caches",
     "copies with Secure behind a TLS proxy that talks to the app over loopback",

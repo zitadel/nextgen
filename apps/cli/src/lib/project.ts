@@ -1,7 +1,8 @@
-import { readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "./errors";
+import { isErrno, ZitadelError } from "./errors";
+import { pathExistsStrict } from "./fs";
 import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
@@ -12,7 +13,7 @@ import { unscopedCommand } from "./suggestion";
  * `zitadel.json` exists. Used to decide whether setup should run or skip.
  */
 export async function hasZitadelConfig(cwd: string): Promise<boolean> {
-  return exists(join(cwd, "zitadel.json"));
+  return pathExistsStrict(join(cwd, "zitadel.json"));
 }
 
 /**
@@ -20,19 +21,7 @@ export async function hasZitadelConfig(cwd: string): Promise<boolean> {
  * commands that need credentials, and signals that secrets were already pulled.
  */
 export async function hasZitadelSecret(cwd: string): Promise<boolean> {
-  return exists(join(cwd, ".zitadel/secret"));
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isNotFound(error)) {
-      return false;
-    }
-    throw error;
-  }
+  return pathExistsStrict(join(cwd, ".zitadel/secret"));
 }
 
 /**
@@ -69,7 +58,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
   try {
     return parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Run `zitadel setup` first.",
         nextCommands: [unscopedCommand("setup")],
@@ -111,7 +100,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     }
     return secret as ZitadelSecret;
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
         nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
@@ -185,13 +174,4 @@ export function readUseCase(config: Record<string, unknown>): string | undefined
  */
 export function readProjectServer(config: Record<string, unknown>): string {
   return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
-}
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "ENOENT"
-  );
 }

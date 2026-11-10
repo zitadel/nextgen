@@ -1,0 +1,18 @@
+language js
+
+// Whether a run's output is coloured is one decision, made in `toMeta`
+// (apps/cli/src/lib/oclif/base.ts) and read as `this.isColored`. A command that
+// consults the colour variables itself answers the same question differently —
+// `env add` came to ignore `--no-color` and `FORCE_COLOR` that way — and no
+// test here catches it, because the colour libraries decide when they load,
+// before a test can set a variable or patch a stream.
+or {
+  `process.env.NO_COLOR`,
+  `process.env.FORCE_COLOR`,
+  `process.env["NO_COLOR"]`,
+  `process.env["FORCE_COLOR"]`
+} as $read where {
+  $filename <: r".*/apps/cli/src/.*",
+  $filename <: not r".*/lib/oclif/base\.ts$",
+  register_diagnostic(span=$read, message="Read whether this run is coloured as `this.isColored`; the decision is made once in toMeta.", severity="error")
+}

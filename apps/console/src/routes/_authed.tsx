@@ -7,25 +7,24 @@ import {
 } from "@tanstack/react-router";
 
 import { fetchSession, signOut } from "@/auth/session";
-import { AppShell } from "@/components/app-shell/app-shell";
-import { routerRelativeHref } from "@/lib/base-path";
+import { AppShell } from "@/app-shell/app-shell";
+import { routerRelativeHref, withoutTrailingSlash } from "@/lib/base-path";
 import {
   PROJECT_SCOPE_PARAM,
   resolveDefaultProjectScope,
   validateProjectScopeSearch,
-  withoutTrailingSlash,
-} from "@/lib/project-scope";
+} from "@/features/projects/project-scope";
 
 /**
  * Pathless layout route owning console authentication (Console ADR 0003).
  *
  * Every console screen lives under this layout, so the guard below runs
- * before any of them load: `fetchSession()` confirms the `__nextgen_session`
+ * before any of them load: `fetchSession()` confirms the session
  * cookie against `GET /sessions/me`, and an unauthenticated visitor is
  * redirected to `/login` with the originally requested path in `?next=` so
  * deep links survive the round trip.
  *
- * It also owns the selected project (`src/lib/project-scope.ts`): `?project=`
+ * It also owns the selected project (`src/features/projects/project-scope.ts`): `?project=`
  * is validated here and retained on every navigation beneath the layout, so a
  * sidebar link or a row link keeps the selection without naming it. Any
  * screen opened without a selection is redirected to itself with the default

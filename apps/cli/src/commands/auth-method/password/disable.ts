@@ -1,6 +1,7 @@
+import { AuthMethodCommand } from "@/commands/auth-method/command";
 import { Flags } from "@oclif/core";
 
-import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
+import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 
 /** `auth-method password disable` (ADR 070). */
 export default class AuthMethodPasswordDisable extends AuthMethodCommand {
@@ -21,8 +22,17 @@ export default class AuthMethodPasswordDisable extends AuthMethodCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(AuthMethodPasswordDisable);
-    return this.toggle(flags, "password", false);
+  /**
+   * Turn the method on or off for the schema `--schema` names.
+   *
+   * @param input - The run's `--schema` and `--cwd`.
+   * @returns The result.
+   * @throws {@link ZitadelError} When the schema cannot be chosen, or the change
+   *   would leave no way to sign in and nobody agreed to it.
+   */
+  protected async execute(
+    input: Admitted<typeof AuthMethodPasswordDisable>,
+  ): Promise<JsonEnvelope> {
+    return this.toggle(input.flags, "password", false);
   }
 }

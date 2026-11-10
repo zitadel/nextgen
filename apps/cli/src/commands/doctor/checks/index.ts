@@ -36,6 +36,7 @@ export { MetaSchemasCheck } from "./meta-schemas";
 export { ProjectMatchCheck } from "./project-match";
 export { IssuerOriginCheck } from "./issuer-origin";
 export { ClaimCheck } from "./claim";
+export { checkCliVersion } from "./cli-version";
 
 /** Every diagnostic the `doctor` command runs, in display order. */
 export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [

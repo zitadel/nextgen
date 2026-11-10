@@ -1,0 +1,34 @@
+get:
+  operationId: getSchemaById
+  x-zitadel-cli: schemas get
+  summary: Get a schema by ID
+  description: |
+    Returns a schema by ID. A schema ID identifies one immutable revision, so
+    this returns exactly that revision. To find the current revision of an
+    object type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.
+
+    Schema IDs are unique within a project, not across projects (the seeded
+    default schema carries the same `$id` in every project). A console
+    session that manages more than one project names the project with
+    `project_id`; without it, the ID is resolved in the credential's own
+    project when it is ambiguous. A project secret always resolves in its
+    own project and ignores `project_id`.
+  tags:
+    - Schemas
+  security:
+    - oauth2:
+        - schema.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/schema-id.yaml
+    - $ref: ../../../components/parameters/team-id.yaml
+    - $ref: ../../../components/parameters/project-id-query.yaml
+  responses:
+    '200':
+      description: The schema.
+      content:
+        application/json:
+          schema:
+            $ref: ../schema.yaml
+    default:
+      $ref: getSchemaById-error-response.yaml

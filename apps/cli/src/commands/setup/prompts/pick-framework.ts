@@ -1,6 +1,6 @@
 import { intro } from "@clack/prompts";
 
-import type { Asker } from "../../../lib/input";
+import type { Asker } from "@/lib/input";
 
 /**
  * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.

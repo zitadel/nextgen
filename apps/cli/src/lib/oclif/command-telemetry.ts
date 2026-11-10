@@ -1,10 +1,10 @@
-import type { Properties } from "../telemetry";
-import { ciFlag } from "../telemetry/dimensions/ci-flag";
-import { ciProvider } from "../telemetry/dimensions/ci-provider";
-import { country } from "../telemetry/dimensions/country";
-import { hostAgent } from "../telemetry/dimensions/host-agent";
-import { invocationChannel } from "../telemetry/dimensions/invocation-channel";
-import { operatingSystem } from "../telemetry/dimensions/operating-system";
+import type { Properties } from "@/lib/telemetry";
+import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
+import { ciProvider } from "@/lib/telemetry/dimensions/ci-provider";
+import { country } from "@/lib/telemetry/dimensions/country";
+import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
+import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
+import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
 import { serverKind } from "./server-kind";
 import type { GlobalOptions } from "./types";
 

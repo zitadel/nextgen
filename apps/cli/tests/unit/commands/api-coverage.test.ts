@@ -2,9 +2,12 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { destructiveOperations } from "@zitadel/api/generated/operations";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { RESOURCES } from "../../../src/commands/resources";
+import { RESOURCES } from "@/commands/resources";
 
 /**
  * The registry is hand-maintained, so an operation the API gains is invisible
@@ -120,7 +123,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
   evaluatePolicy:
-    "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
+    "a dry run `policies test` sends per case from commands/policies/test.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
@@ -145,12 +148,13 @@ type ClientOperations = ReadonlyMap<string, string>;
  * arguments and taking the first path segment, so a sub-resource
  * (`/users/{id}/passkeys`) counts against its parent.
  */
-/** The path an operation addresses, with placeholder path parameters. */
+/** The spec's path of an operation, with placeholder path parameters and without the API prefix. */
 const urlOf = (operation: string): string => {
   const module = endpoints as unknown as Record<string, unknown>;
   const build = module[`get${capitalize(operation)}Url`];
   expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
-  return String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  const url = String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  return url.startsWith(`${API_PREFIX}/`) ? url.slice(API_PREFIX.length) : url;
 };
 
 const clientOperations = (): ClientOperations => {
@@ -197,13 +201,13 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   releases: ["deploy", "release/create", "release/revoke"],
   // A deployment is an act, not a file: `deploy` and `deployment create` make a
   // release live, `deployment list`/`get` read the history, `deployment
-  // rollback` re-applies one. The operations live in the `lib/release` wrappers
+  // rollback` re-applies one. The operations live in the `lib/backend` wrappers
   // these commands call, which {@link standaloneOperations} scans too.
   deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
   // A preview is written by a preview deployment, not created directly: `preview`
   // deploys to the preview URLs, `preview list` reads the live ones and
   // `preview rm` removes one. `preview` reaches the release/deployment
-  // operations through the `lib/release` wrappers scanned above.
+  // operations through the `lib/backend` wrappers scanned above.
   previews: ["preview/index", "preview/list", "preview/rm"],
 };
 
@@ -214,37 +218,81 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
  * is for the registry.
  */
 const PIPELINE_SOURCES: readonly string[] = [
-  "lib/release/release.ts",
-  "lib/release/deployment.ts",
-  "lib/release/steps/diff.ts",
-  "lib/release/steps/idp-checks.ts",
+  "lib/backend/services/release.ts",
+  "lib/backend/services/deployment.ts",
+  "lib/backend/services/origin.ts",
+  "lib/publish/steps/diff.ts",
+  "lib/publish/steps/idp-checks.ts",
 ];
 
 /**
  * The client operations each standalone command calls, read from its source
  * and keyed by its command (`variables set`). The registry's evidence is which
- * client properties its verbs touch; a `client.<operation>(` call site is the
- * same evidence, so a command that stops calling an operation leaves that
+ * client properties its verbs touch; a `client.<operation>(` call site, or a
+ * destructive one's `consent.unlock(client).<operation>(`, is the same evidence, so a command that stops calling an operation leaves that
  * operation unaccounted and this test fails. The release and deployment
  * commands reach their operations through the pipeline modules above.
  */
 const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
-  const callsIn = async (path: string): Promise<string[]> =>
-    [...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+  const callsIn = async (path: string): Promise<string[]> => {
+    const source = await readFile(path, "utf8");
+    return [...source.matchAll(/\bclient\)?\s*\.(\w+)(?:\.(?:all|items|pages))?\(/g)].map(
+      (m) => m[1] as string,
+    );
+  };
+  /**
+   * Every call a command makes: its own file, and for a command that owns a
+   * directory, the flags, rules and requirements beside its index, which call
+   * the client too. A single-file command reads only its file, so a sibling
+   * command's calls are never counted as its own.
+   */
+  const callsInCommand = async (command: string): Promise<string[]> => {
+    const owned = command.replace(/\/index$/, "");
+    const base = join(import.meta.dirname, "../../../src/commands", owned);
+    try {
+      return await callsIn(`${base}.ts`);
+    } catch {
+      const beside = await Promise.all(
+        ["flags", "args", "rules", "requirements"].map(async (part) => {
+          const dir = join(base, part);
+          try {
+            const files = await readdir(dir, { recursive: true });
+            return (
+              await Promise.all(
+                files
+                  .filter((file) => file.endsWith(".ts"))
+                  .map((file) => callsIn(join(dir, file))),
+              )
+            ).flat();
+          } catch {
+            return [];
+          }
+        }),
+      );
+      return [...(await callsIn(join(base, "index.ts"))), ...beside.flat()];
+    }
+  };
   const pipeline = (
     await Promise.all(
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
     )
   ).flat();
+  const serviceCalls = async (file: string): Promise<string[]> =>
+    callsIn(join(import.meta.dirname, "../../../src/lib/backend", file));
+  /** The services a group of commands reaches the API through, instead of calling it themselves. */
+  const SERVICES: Readonly<Record<string, readonly string[]>> = {
+    origin: ["services/origin.ts"],
+    variables: ["services/variable.ts", "services/deployment.ts", "services/origin.ts"],
+    previews: ["services/preview.ts", "services/origin.ts"],
+  };
   return new Map(
     await Promise.all(
       Object.entries(STANDALONE).flatMap(([group, commands]) =>
         commands.map(async (command): Promise<[string, ReadonlySet<string>]> => {
-          const own = await callsIn(
-            join(import.meta.dirname, "../../../src/commands", `${command}.ts`),
-          );
+          const own = await callsInCommand(command);
           const viaPipeline = group === "releases" || group === "deployments" ? pipeline : [];
-          return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline])];
+          const viaService = (await Promise.all((SERVICES[group] ?? []).map(serviceCalls))).flat();
+          return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline, ...viaService])];
         }),
       ),
     ),
@@ -280,8 +328,10 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
       // client call behind the untaken one would look unused. The recording
       // client resolves `{}`, so a call that inspects its response throws;
       // only the property that was reached matters, so the throw is discarded.
+      // A delete reaches the client through its consent, which hands it back.
+      const consent = { unlock: (unlocked: unknown) => unlocked };
       for (const ref of REFS) {
-        await spec.call(context, ref as never, {} as never).catch(() => undefined);
+        await spec.call(context, ref as never, consent as never).catch(() => undefined);
       }
       // A delete may be named after what it does instead (`deactivate`).
       operations.set(`${topic} ${verb === "delete" ? (spec.verb ?? verb) : verb}`, called);
@@ -294,7 +344,7 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
 const calledOperations = async (): Promise<ReadonlySet<string>> =>
   new Set([...(await verbOperations()).values()].flatMap((called) => [...called]));
 
-const SPEC_ENDPOINTS = join(import.meta.dirname, "../../../../../api/openapi/endpoints");
+const SPEC_ENDPOINTS = join(import.meta.dirname, "../../../../../apps/api/api/openapi/endpoints");
 
 /**
  * The command the spec names for each client operation: the `x-zitadel-cli`
@@ -499,5 +549,221 @@ describe("the spec names the command behind each operation", () => {
       `The spec names commands that do not run these operations: ${wrong.join("; ")}. ` +
         "Correct the command, or remove the line from the operation.",
     ).toEqual([]);
+  });
+});
+
+/**
+ * Every operation the CLI reaches with consent, read from its source: the ones
+ * called straight off `consent.unlock(client)`, and the destructive ones the
+ * backend services call on the client a command builds them on after unlocking
+ * it (`consent.unlock(client)` is passed to the service, which calls
+ * `this.client.<operation>(`).
+ */
+const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
+  const src = join(import.meta.dirname, "../../../src");
+  const files = (await readdir(src, { recursive: true })).filter((file) => file.endsWith(".ts"));
+  const called = await Promise.all(
+    files.map(async (file) => {
+      const source = await readFile(join(src, file), "utf8");
+      const direct = [...source.matchAll(/unlock\([\w.]+\)\s*\.(\w+)\(/g)].map(
+        (match) => match[1] as string,
+      );
+      const viaService = file.startsWith("lib/backend/")
+        ? [...source.matchAll(/\bclient\s*\.(\w+)\(/g)]
+            .map((match) => match[1] as string)
+            .filter((operation) => (destructiveOperations as readonly string[]).includes(operation))
+        : [];
+      return [...direct, ...viaService];
+    }),
+  );
+  return new Set(called.flat());
+};
+
+/**
+ * Each backend service method whose body reaches a destructive operation, by
+ * the class that declares it.
+ *
+ * @remarks
+ * Read from the source, so a service that starts calling one is covered
+ * without this test being edited, and read as syntax rather than as text: a
+ * destructive operation named in a comment or a string is not a call, a method
+ * owns the body the parser gives it rather than the one indentation suggests,
+ * and a class is found however it is declared. The rule is a syntactic one and
+ * would otherwise belong in `biome-plugins/`, but a plugin would have to spell
+ * the destructive methods out, which is the list this derives.
+ */
+const destructiveServiceMethods = async (): Promise<ReadonlyMap<string, readonly string[]>> => {
+  const services = join(import.meta.dirname, "../../../src/lib/backend/services");
+  const files = (await readdir(services)).filter((file) => {
+    return file.endsWith(".ts");
+  });
+  const found = new Map<string, readonly string[]>();
+  for (const file of files) {
+    const parsed = ts.createSourceFile(
+      file,
+      await readFile(join(services, file), "utf8"),
+      ts.ScriptTarget.ESNext,
+      true,
+    );
+    for (const statement of parsed.statements) {
+      if (!ts.isClassDeclaration(statement) || statement.name === undefined) {
+        continue;
+      }
+      const reaching = statement.members.filter((member) => {
+        return ts.isMethodDeclaration(member) && callsADestructiveOperation(member);
+      });
+      if (reaching.length > 0) {
+        found.set(
+          statement.name.text,
+          reaching.map((member) => {
+            return member.name?.getText(parsed) ?? "";
+          }),
+        );
+      }
+    }
+  }
+  return found;
+};
+
+/**
+ * Whether a service method sends one of the spec's destructive operations.
+ *
+ * Read from the syntax rather than the text, so a mention in a comment or a
+ * string is not a call, a method is attributed by the body it owns rather than
+ * by how far it happens to be indented, and the call has to be on the client
+ * rather than on anything that shares a name with an operation.
+ *
+ * @param method - The method to look through.
+ * @returns True when it calls a destructive operation on its client.
+ */
+/**
+ * Whether a call's receiver is the service's own client, so a local helper or a
+ * double that happens to share a name with a destructive operation is not
+ * mistaken for one.
+ *
+ * @param receiver - What the method was called on.
+ * @returns True for `client` or `this.client`.
+ */
+function onTheClient(receiver: ts.Expression): boolean {
+  if (ts.isIdentifier(receiver)) {
+    return receiver.text === "client";
+  }
+  return ts.isPropertyAccessExpression(receiver) && receiver.name.text === "client";
+}
+
+function callsADestructiveOperation(method: ts.MethodDeclaration): boolean {
+  const destructive: readonly string[] = destructiveOperations;
+  const calls = (node: ts.Node): boolean => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      destructive.includes(node.expression.name.text) &&
+      onTheClient(node.expression.expression)
+    ) {
+      return true;
+    }
+    return node.getChildren().some((child) => {
+      return calls(child);
+    });
+  };
+  return method.body === undefined ? false : calls(method.body);
+}
+
+/**
+ * Every name a file calls as a method, and every service it constructs, read
+ * from the syntax so a comment or a string cannot stand in for a call.
+ *
+ * @param source - The file to read.
+ * @returns What it constructs, what it calls, and whether it unlocks a client.
+ */
+function reachesOf(source: string): {
+  constructs: ReadonlySet<string>;
+  calls: ReadonlySet<string>;
+  unlocks: boolean;
+} {
+  const parsed = ts.createSourceFile("file.ts", source, ts.ScriptTarget.ESNext, true);
+  const constructs = new Set<string>();
+  const calls = new Set<string>();
+  const walk = (node: ts.Node): void => {
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+      constructs.add(node.expression.text);
+    }
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      calls.add(node.expression.name.text);
+    }
+    for (const child of node.getChildren()) {
+      walk(child);
+    }
+  };
+  walk(parsed);
+  return {
+    constructs,
+    calls,
+    unlocks: calls.has("unlock"),
+  };
+}
+
+describe("the CLI reaches a destructive service method only with consent", () => {
+  /**
+   * What this proves and what it does not: every file that builds one of these
+   * services and calls a destructive method on it also unlocks a client. It is
+   * per file, not per value, so it cannot prove the unlocked client is the one
+   * the service was built on — the compiler stopped proving that when the
+   * services stopped taking a Consent. What it does catch is the regression
+   * that change made possible: a command that reaches a destructive operation
+   * having never asked for consent at all.
+   */
+  it("unlocks a client in every file that calls one", async () => {
+    const methods = await destructiveServiceMethods();
+    const src = join(import.meta.dirname, "../../../src");
+    const files = (await readdir(src, { recursive: true })).filter((file) => {
+      return file.endsWith(".ts") && !file.startsWith(join("lib", "backend"));
+    });
+
+    const unconsented = (
+      await Promise.all(
+        files.map(async (file) => {
+          const reaches = reachesOf(await readFile(join(src, file), "utf8"));
+          const reached = [...methods].flatMap(([service, names]) => {
+            return reaches.constructs.has(service)
+              ? names
+                  .filter((name) => {
+                    return reaches.calls.has(name);
+                  })
+                  .map((name) => {
+                    return `${file}: ${service}.${name}`;
+                  })
+              : [];
+          });
+          return reaches.unlocks ? [] : reached;
+        }),
+      )
+    ).flat();
+
+    expect(
+      unconsented,
+      "Build the service on `consent.unlock(client)` inside confirmed(), as the other destructive commands do.",
+    ).toEqual([]);
+  });
+
+  it("finds the destructive service methods to hold the commands to", async () => {
+    expect((await destructiveServiceMethods()).size).toBeGreaterThan(3);
+  });
+});
+
+describe("the spec marks what the CLI confirms as destructive", () => {
+  it("marks every operation the CLI calls only with consent", async () => {
+    const unmarked = [...(await unlockedOperations())].filter(
+      (operation) => !(destructiveOperations as readonly string[]).includes(operation),
+    );
+
+    expect(
+      unmarked,
+      "Give each in api/openapi/endpoints an `x-zitadel-destructive: true` line after its x-zitadel-cli, or stop asking for consent to run it.",
+    ).toEqual([]);
+  });
+
+  it("finds the operations the CLI calls with consent", async () => {
+    expect((await unlockedOperations()).size).toBeGreaterThan(5);
   });
 });

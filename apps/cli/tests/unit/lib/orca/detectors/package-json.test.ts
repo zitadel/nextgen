@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/helpers/fixtures";
 
 import {
   dependencySpecProvablyBelow,
@@ -12,20 +13,10 @@ import {
   installedVersionBelow,
   readPackageJson,
   type PackageJson,
-} from "../../../../../src/lib/orca/detectors/package-json";
-
-let dir: string;
-
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-package-json-"));
-});
-
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
-});
+} from "@/lib/orca/detectors/package-json";
 
 describe("readPackageJson", () => {
-  it("reads and parses a valid package.json", async () => {
+  it("reads and parses a valid package.json", async ({ dir }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { next: "14.0.0" } }),
@@ -35,11 +26,11 @@ describe("readPackageJson", () => {
     expect(pkg.dependencies?.next).toBe("14.0.0");
   });
 
-  it("rejects when package.json is missing", async () => {
+  it("rejects when package.json is missing", async ({ dir }) => {
     await expect(readPackageJson(dir)).rejects.toThrow();
   });
 
-  it("rejects when package.json is malformed", async () => {
+  it("rejects when package.json is malformed", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), "{not json");
     await expect(readPackageJson(dir)).rejects.toThrow();
   });
@@ -178,13 +169,13 @@ async function install(root: string, name: string, manifest: string): Promise<vo
 }
 
 describe("installedVersion", () => {
-  it("reads the version installed in the app's node_modules", async () => {
+  it("reads the version installed in the app's node_modules", async ({ dir }) => {
     await install(dir, "next", JSON.stringify({ name: "next", version: "15.2.2" }));
 
     expect(await installedVersion(dir, "next")).toBe("15.2.2");
   });
 
-  it("finds a version hoisted to a parent's node_modules", async () => {
+  it("finds a version hoisted to a parent's node_modules", async ({ dir }) => {
     const app = join(dir, "apps", "web");
     await mkdir(app, { recursive: true });
     await install(dir, "next", JSON.stringify({ name: "next", version: "15.1.7" }));
@@ -192,7 +183,7 @@ describe("installedVersion", () => {
     expect(await installedVersion(app, "next")).toBe("15.1.7");
   });
 
-  it("walks the real parents of a symlinked app directory", async () => {
+  it("walks the real parents of a symlinked app directory", async ({ dir }) => {
     const workspace = join(dir, "workspace");
     const app = join(workspace, "apps", "web");
     await mkdir(app, { recursive: true });
@@ -203,7 +194,7 @@ describe("installedVersion", () => {
     expect(await installedVersion(link, "next")).toBe("15.2.2");
   });
 
-  it("prefers the app's own install over a hoisted one", async () => {
+  it("prefers the app's own install over a hoisted one", async ({ dir }) => {
     const app = join(dir, "apps", "web");
     await install(dir, "next", JSON.stringify({ name: "next", version: "15.1.7" }));
     await install(app, "next", JSON.stringify({ name: "next", version: "15.3.0" }));
@@ -211,11 +202,11 @@ describe("installedVersion", () => {
     expect(await installedVersion(app, "next")).toBe("15.3.0");
   });
 
-  it("reports nothing when the package is not installed", async () => {
+  it("reports nothing when the package is not installed", async ({ dir }) => {
     expect(await installedVersion(dir, "zitadel-not-installed-anywhere")).toBeUndefined();
   });
 
-  it("does not look above a pnpm workspace root", async () => {
+  it("does not look above a pnpm workspace root", async ({ dir }) => {
     const root = join(dir, "repo");
     const app = join(root, "apps", "web");
     await mkdir(app, { recursive: true });
@@ -225,7 +216,7 @@ describe("installedVersion", () => {
     expect(await installedVersion(app, "next")).toBeUndefined();
   });
 
-  it("does not look above a package.json workspaces root", async () => {
+  it("does not look above a package.json workspaces root", async ({ dir }) => {
     const root = join(dir, "repo");
     const app = join(root, "apps", "web");
     await mkdir(app, { recursive: true });
@@ -235,7 +226,7 @@ describe("installedVersion", () => {
     expect(await installedVersion(app, "next")).toBeUndefined();
   });
 
-  it("still finds a version hoisted to the workspace root itself", async () => {
+  it("still finds a version hoisted to the workspace root itself", async ({ dir }) => {
     const root = join(dir, "repo");
     const app = join(root, "apps", "web");
     await mkdir(app, { recursive: true });
@@ -245,11 +236,11 @@ describe("installedVersion", () => {
     expect(await installedVersion(app, "next")).toBe("15.1.7");
   });
 
-  it.each([
+  it.for<[string, string]>([
     ["no version", JSON.stringify({ name: "next" })],
     ["an invalid version", JSON.stringify({ name: "next", version: "fifteen" })],
     ["malformed JSON", "{"],
-  ])("reports nothing for a manifest with %s", async (_case, manifest) => {
+  ])("reports nothing for a manifest with %s", async ([_case, manifest], { dir }) => {
     await install(dir, "next", manifest);
 
     expect(await installedVersion(dir, "next")).toBeUndefined();
@@ -257,7 +248,9 @@ describe("installedVersion", () => {
 });
 
 describe("installedVersionBelow", () => {
-  it("returns an installed version below the minimum with the manifest it read", async () => {
+  it("returns an installed version below the minimum with the manifest it read", async ({
+    dir,
+  }) => {
     await install(dir, "next", JSON.stringify({ version: "15.2.2" }));
 
     expect(await installedVersionBelow(dir, "next", "15.2.3")).toEqual({
@@ -266,7 +259,9 @@ describe("installedVersionBelow", () => {
     });
   });
 
-  it("returns a prerelease of a patch-level minimum, which predates the release", async () => {
+  it("returns a prerelease of a patch-level minimum, which predates the release", async ({
+    dir,
+  }) => {
     await install(dir, "next", JSON.stringify({ version: "15.2.3-canary.1" }));
 
     expect(await installedVersionBelow(dir, "next", "15.2.3")).toMatchObject({
@@ -274,19 +269,22 @@ describe("installedVersionBelow", () => {
     });
   });
 
-  it("passes a prerelease of a major-only minimum as at-floor", async () => {
+  it("passes a prerelease of a major-only minimum as at-floor", async ({ dir }) => {
     await install(dir, "react", JSON.stringify({ version: "18.0.0-rc.0" }));
 
     expect(await installedVersionBelow(dir, "react", "18")).toBeUndefined();
   });
 
-  it.each(["15.2.3", "15.3.0-canary.1", "16.0.0"])("passes %s installed", async (version) => {
-    await install(dir, "next", JSON.stringify({ version }));
+  it.for(["15.2.3", "15.3.0-canary.1", "16.0.0"])(
+    "passes %s installed",
+    async (version, { dir }) => {
+      await install(dir, "next", JSON.stringify({ version }));
 
-    expect(await installedVersionBelow(dir, "next", "15.2.3")).toBeUndefined();
-  });
+      expect(await installedVersionBelow(dir, "next", "15.2.3")).toBeUndefined();
+    },
+  );
 
-  it("judges an installed beta against a prerelease minimum as written", async () => {
+  it("judges an installed beta against a prerelease minimum as written", async ({ dir }) => {
     await install(dir, "qwik", JSON.stringify({ version: "2.0.0-beta.12" }));
     expect(await installedVersionBelow(dir, "qwik", "2.0.0-beta.45")).toMatchObject({
       version: "2.0.0-beta.12",
@@ -296,7 +294,7 @@ describe("installedVersionBelow", () => {
     expect(await installedVersionBelow(dir, "qwik", "2.0.0-beta.45")).toBeUndefined();
   });
 
-  it("passes when nothing is installed", async () => {
+  it("passes when nothing is installed", async ({ dir }) => {
     expect(
       await installedVersionBelow(dir, "zitadel-not-installed-anywhere", "15.2.3"),
     ).toBeUndefined();

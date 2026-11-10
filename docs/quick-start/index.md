@@ -78,7 +78,7 @@ The table shows port 8080; use the port `zitadel start` printed if your director
 
 | Surface | URL |
 | ------- | --- |
-| API | http://localhost:8080 |
+| API | http://localhost:8080/api/v1 |
 | Management console | http://localhost:8080/ui/console/ |
 | Liveness probe | http://localhost:8080/livez |
 | Readiness probe (checks the database) | http://localhost:8080/readyz |

@@ -49,7 +49,7 @@ describe("session checks in the Next.js middleware", () => {
   it("asks nothing about a session on a public page, and auth() signs its user in", async () => {
     const calls = sessionsMe();
     const request = new NextRequest("http://localhost:3000/cart", {
-      headers: { cookie: `__nextgen_session_${PROJECT}=opaque-session-token` },
+      headers: { cookie: `zitadel_session_${PROJECT}=opaque-session-token` },
     });
 
     const response = await nextgenMiddleware(request, OPTIONS);
@@ -60,6 +60,6 @@ describe("session checks in the Next.js middleware", () => {
 
     mockHeaders.set("x-nextgen-auth-token", token ?? "");
     expect(await auth(OPTIONS)).toMatchObject({ isAuthenticated: true, session: { userId: "u1" } });
-    expect(calls).toEqual([`http://localhost:4000/sessions/me?project_id=${PROJECT}`]);
+    expect(calls).toEqual([`http://localhost:4000/api/v1/sessions/me?project_id=${PROJECT}`]);
   });
 });

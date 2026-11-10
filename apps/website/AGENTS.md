@@ -1,7 +1,8 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/` and its changelog at `/changelog`, with
-a page per entry and a feed under it.
+The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
+page per entry and a feed under it, and the guide to choosing it or Zitadel v4
+at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -16,6 +17,19 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   `app/globals.css` (`bg-background`, `text-foreground`, `text-accent`).
 - It does not use `@zitadel/design-tokens`; only the login previews paint with
   them, on the login's own atoms.
+
+## Content-Security-Policy
+
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.ts`' scriptless fallback.
+- Never give a page a nonce or `'unsafe-inline'`: pages, the changelog too,
+  stay prerendered ([why](../../docs/design/cloud/csp-docs-and-website.md)).
+- `csp-adapter.mjs` copies `apps/docs/csp-adapter.mjs` but for the policy:
+  change both.
+- Load nothing from another origin without widening the enforced policy
+  in the same change.
+- The cloud's deployment checks (`e2e/console/src-deployment/routes.spec.ts`)
+  fail a page with an unhashed inline script.
 
 ## The fonts
 
@@ -48,9 +62,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
   with `autoplay` it also plays now and then by itself (the header's and the
   footer's); never for reduced motion. Give each copy its own `id`.
-- `apps/docs/components/logo.tsx` is a copy; change the copies together.
-- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the
-  console and the docs link the same set, so a change here reaches them. A single `/favicon.ico` cannot replace the light/dark set.
+- `apps/docs/components/logo.tsx` and `apps/console/src/app-shell/logo.tsx` are
+  copies; change the copies together.
+- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
+  link the same set, so a change here reaches them. `apps/console/public/favicons/`
+  is a copy; change the copies together. A single `/favicon.ico` cannot replace
+  the light/dark set.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
@@ -93,21 +110,29 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   elements and never as HTML: this origin also serves the console's session.
   The feed carries each entry's plain-text summary instead.
 - Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
-  of `npx skills add zitadel/nextgen --full-depth`, the users' install.
+  of the users' installs, `zitadel skills add` and
+  `npx skills add zitadel/nextgen --full-depth`.
 
 ## Analytics
 
 - Send a custom event only through `app/analytics.ts`, and list it in
   [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
 
+## Choose a version
+
+- `app/choose-version/features.ts` holds every row, the guide above them
+  (`CHOOSE`) and the date shown (`UPDATED`). Change all three when a feature
+  ships or changes.
+
 ## Routing
 
-The cloud routes only `/`, `/changelog`, `/changelog/*`, `/llms.txt`,
-`/_next/*`, `/favicon.ico` and `/favicons/*` here (repo-root
-[`vercel.json`](../../vercel.json)).
+The cloud routes every path no other service claims here (repo-root
+[`vercel.json`](../../vercel.json)), so `app/not-found.tsx` answers what
+nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.md) §4).
 
-- A new page or `public/` file outside `/changelog/` needs a rewrite of its own
-  in `vercel.json`, or the server answers it with a 404.
+- A new page needs no rewrite, but must keep off the paths other services
+  claim: `/api/`, `/console/`, `/docs`, `/cloud/`, `/schemas/v1/`, the
+  server's root paths and the API's resource names (`vercel.json`).
 - Load every other asset from `/_next/`: fonts through `next/font`, images as
   imports. Never use Next's metadata files (`app/icon.svg`, `opengraph-image`),
   which Next serves at the root.

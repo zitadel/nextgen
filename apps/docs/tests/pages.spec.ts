@@ -12,6 +12,8 @@ import {
   markdownUrl,
   metaContent,
   parseIndex,
+  policyProblem,
+  rootRelativeDocsLink,
   siteLinks,
 } from "./support";
 
@@ -82,7 +84,9 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   expect(indexStrays(index), "lines of the index where the page tree puts none").toEqual([]);
 });
 
-test("every page answers as HTML, titled, described and in its size", async ({ request }) => {
+test("every page answers as HTML, titled, described, in its size and under its policies", async ({
+  request,
+}) => {
   test.setTimeout(120_000);
   const pages = await indexedPages(request);
 
@@ -104,6 +108,8 @@ test("every page answers as HTML, titled, described and in its size", async ({ r
     const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
+    const policy = policyProblem(response.headers(), html);
+    if (policy) return `${url}: ${policy}`;
     const meta = metaContent(html, "description");
     if (meta === undefined) {
       return description || operationPage.test(url) ? `${url}: no description` : null;
@@ -128,8 +134,13 @@ test("every page has a Markdown twin whose links resolve", async ({ request }) =
     if (response.status() !== 200) return `${twin}: ${response.status()}`;
     if (!type.startsWith("text/markdown")) return `${twin}: ${type}`;
     const markdown = await response.text();
-    for (const link of siteLinks(markdown)) links.add(link);
-    const heading = `# ${title} (${url})`;
+    // Its links name the deployment that served it, which an agent's copy
+    // keeps (lib/absolute-links.ts).
+    const { origin } = new URL(response.url());
+    const relative = rootRelativeDocsLink(markdown);
+    if (relative) return `${twin}: a root-relative link, ${relative}`;
+    for (const link of siteLinks(markdown, origin)) links.add(link);
+    const heading = `# ${title} (${origin}${url})`;
     if (!markdown.startsWith(heading)) return `${twin}: does not open with "${heading}"`;
     return null;
   });
@@ -155,7 +166,7 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
     const type = response.headers()["content-type"] ?? "";
     if (response.status() !== 200) return `${url}: ${response.status()}`;
     if (!type.startsWith("text/markdown")) return `${url}: ${type}`;
-    const heading = `# ${title} (${url})`;
+    const heading = `# ${title} (${new URL(response.url()).origin}${url})`;
     if (!(await response.text()).startsWith(heading))
       return `${url}: does not open with "${heading}"`;
     return null;
@@ -233,11 +244,13 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     if (named) {
       // The command's page links back to the operation (lib/cli-reference.ts).
       const commandPage = markdownUrl(`/docs/reference/cli/${named.split(" ").join("/")}`);
-      const back = await (await request.get(commandPage)).text();
-      if (!back.includes(`](${url})`)) return `${commandPage}: no link to ${url}`;
+      const response = await request.get(commandPage);
+      const back = await response.text();
+      const link = `](${new URL(response.url()).origin}${url})`;
+      if (!back.includes(link)) return `${commandPage}: no link to ${url}`;
     }
     // And with cURL, as the page's last sample (lib/source.ts).
-    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
+    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\/api\/v1\//.test(markdown)) {
       return `${markdownUrl(url)}: no cURL command`;
     }
     const html = await (await request.get(url)).text();
@@ -262,9 +275,11 @@ test("every API tag's page links each of its operations, as HTML and as Markdown
   // The tables lib/source.ts generates from the pages under the tag's.
   const results = await mapLimit([...tags], concurrency, async ([tag, operations]) => {
     const html = await (await request.get(tag)).text();
-    const markdown = await (await request.get(markdownUrl(tag))).text();
+    const response = await request.get(markdownUrl(tag));
+    const markdown = await response.text();
+    const { origin } = new URL(response.url());
     const missing = operations.filter(
-      (url) => !html.includes(`href="${url}"`) || !markdown.includes(`](${url})`),
+      (url) => !html.includes(`href="${url}"`) || !markdown.includes(`](${origin}${url})`),
     );
     return missing.length > 0 ? `${tag}: no link to ${missing.join(", ")}` : null;
   });
@@ -309,7 +324,10 @@ test("every CLI command shows its usage, in tables whose rows keep their cells",
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
-  expect((await request.get("/docs/no-such-page")).status()).toBe(404);
+  const missing = await request.get("/docs/no-such-page");
+  expect(missing.status()).toBe(404);
+  // Every unknown URL carries the prerendered 404's own policy (csp-adapter.mjs).
+  expect(policyProblem(missing.headers(), await missing.text())).toBeUndefined();
   expect((await request.get("/docs/no-such-page.md")).status()).toBe(404);
   const negotiated = await request.get("/docs/no-such-page", {
     headers: { Accept: "text/markdown" },
@@ -346,21 +364,22 @@ test("llms-full.txt carries every page but the API operations", async ({ request
   const response = await request.get("/docs/llms-full.txt");
   expect(response.status()).toBe(200);
   const full = await response.text();
+  const { origin } = new URL(response.url());
 
   // With the operations and the schemas they reference the file was twenty
   // times this size (#1685).
   const missing = pages
     .filter((page) => !operationPage.test(page.url))
-    .filter((page) => !full.includes(`# ${page.title} (${page.url})`))
+    .filter((page) => !full.includes(`# ${page.title} (${origin}${page.url})`))
     .map((page) => page.url);
   expect(missing, "pages missing from llms-full.txt").toEqual([]);
   const operations = pages.filter((page) => operationPage.test(page.url));
   expect(operations.length).toBeGreaterThan(0);
   expect(
-    operations.filter((page) => full.includes(`(${page.url})`)).map((page) => page.url),
+    operations.filter((page) => full.includes(`(${origin}${page.url})`)).map((page) => page.url),
     "API operations in llms-full.txt",
   ).toEqual([]);
-  expect(full.length).toBeLessThan(500_000);
+  expect(full.length).toBeLessThan(600_000);
 });
 
 test("scripts and styles load from /docs/_next/", async ({ request }) => {

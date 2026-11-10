@@ -9,8 +9,8 @@ import {
   tryLock,
   UNWRITTEN_LOCK_MS,
   withStartLock,
-} from "../../../../../src/lib/local-server/internal/start-lock";
-import { ManualClock } from "../../../../helpers/clock";
+} from "@/lib/local-server/internal/start-lock";
+import { ManualClock } from "@tests/helpers/clock";
 
 const dirs: string[] = [];
 
@@ -195,17 +195,13 @@ describe("withStartLock", () => {
   it("makes a second start wait until the first has finished", async () => {
     const lock = await lockPath();
     const events: string[] = [];
-    let begun!: () => void;
-    const firstHasBegun = new Promise<void>((resolve) => {
-      begun = resolve;
-    });
-    let finish!: () => void;
-    const firstMayFinish = new Promise<void>((resolve) => {
-      finish = resolve;
-    });
+    const begun: (() => void)[] = [];
+    const firstHasBegun = new Promise<void>((resolve) => begun.push(resolve));
+    const finish: (() => void)[] = [];
+    const firstMayFinish = new Promise<void>((resolve) => finish.push(resolve));
     const first = withStartLock(lock, async () => {
       events.push("first begins");
-      begun();
+      begun[0]?.();
       await firstMayFinish;
       events.push("first ends");
     });
@@ -216,7 +212,7 @@ describe("withStartLock", () => {
       async () => {
         events.push("second begins");
       },
-      { clock: new ManualClock(finish) },
+      { clock: new ManualClock(() => finish[0]?.()) },
     );
     await Promise.all([first, second]);
 

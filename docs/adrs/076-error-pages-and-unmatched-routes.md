@@ -13,6 +13,13 @@
 > `req.not_found` and `req.method_not_allowed` codes, the request ID header,
 > and the docs and console error pages); the console shows the failed
 > request's ID since #2301.
+>
+> **Amendment (2026-10-31):** with the API under `/api/v1`
+> ([ADR 077](077-api-path-prefix.md)), the hosted cloud routes the server
+> only its own paths, and a path no service claims reaches the website's 404
+> instead (§2). Routing by name, rejected below, works now: one rule covers
+> the API, and the root names of its resources that released clients call
+> are a fixed list.
 
 ## Context
 
@@ -60,10 +67,14 @@ Vercel's.
 - The server's page (`internal/errorpage`) inlines the `--zl-*` tokens it embeds
   from `@zitadel/design-tokens`, reflects nothing from the request, and prints
   the request ID to quote. The sign-in callback's failure is the same page.
-- On the hosted cloud every path no other service answers still reaches the
-  server through `vercel.json`'s catch-all, so the server answers people and
-  programs there exactly as it does self-hosted. The docs and the console
-  answer their own paths, in their own chrome.
+- On the hosted cloud `vercel.json` sends the server its own paths: the API
+  under `/api/v1`, the few paths it answers at the root and, until 1.0.0, the
+  root paths of the API's resources (ADR 077 §4). There it answers people and
+  programs exactly as it does self-hosted. Every other path is the website's,
+  whose 404 draws §4's page for everyone: no path outside the server's is an
+  API URL, so a program has no envelope to look for there, and a scanner's
+  request never starts the server's function. The docs and the console answer
+  their own paths, in their own chrome.
 
 ### 3. One request ID, the proxy's when there is one
 
@@ -113,7 +124,8 @@ Every error page a person sees shows, in this order:
 
 Each surface draws it with its own stack: the docs in Next.js inside their
 layout, with search (`app/docs/not-found.tsx`), the console in shadcn
-(`src/components/boundaries.tsx`), the server in `internal/errorpage`. This
+(`src/components/boundaries.tsx`), the server in `internal/errorpage`, the
+website in its own layout (`apps/website/app/not-found.tsx`). This
 table is the one home of the copy; an implementation names this ADR instead of restating it.
 
 ### 5. No new error package
@@ -143,13 +155,20 @@ logic a second frontend needs moves there, not into a new package.
   developers who want its JSON.
 - **Every unmatched path to the website, programs too**: rejected. A client
   would get HTML for an operation its server lacks and could no longer tell it
-  from a server that is not Zitadel.
+  from a server that is not Zitadel. Adopted for the paths outside the server's
+  once ADR 077 put the API under a prefix: an operation the server lacks still
+  gets the envelope there.
 - **Route the server's paths by name in `vercel.json` and send browsers on
   any other path to the website's 404**: tried and rejected. Every new API
   path needs a rewrite, a missed one breaks browser navigations to it in
   production only, and the `has` condition on `Accept` that tells browsers
   from programs is dropped by `vercel dev`, so no local run shows it. The
   website's header and footer are not worth that; the server's page answers.
+  Taken up once ADR 077 moved the API under `/api/v1`: one rule covers every
+  API path, the root alias's resource names are a fixed list, a launcher test
+  (`apps/cloud/launcher`) resolves each of the server's paths through
+  `vercel.json` so a missed rule fails in CI, and no `Accept` condition is
+  needed, because the website's 404 answers programs too.
 - **Show the proxy's ID beside the server's**: rejected. Two references on one
   page, and logs that still need a mapping between them; one ID everywhere is
   the point.

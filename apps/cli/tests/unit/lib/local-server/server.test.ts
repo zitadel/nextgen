@@ -5,23 +5,20 @@ import { join } from "node:path";
 
 import { createServer, type Server } from "node:net";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
-import { BinaryLauncher } from "../../../../src/lib/local-server/internal/binary-launcher";
-import { DockerLauncher } from "../../../../src/lib/local-server/internal/docker-launcher";
+import { BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
+import { DockerLauncher } from "@/lib/local-server/internal/docker-launcher";
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
   writeRuntimeMetadata,
-} from "../../../../src/lib/local-server/runtime";
-import { LocalServer } from "../../../../src/lib/local-server/server";
-import {
-  aFakeServerBinary,
-  trackLocalServer,
-  useLocalServers,
-} from "../../../helpers/local-server";
-import { nextPort } from "../../../helpers/ports";
-import { aBinaryRecord, aDockerRecord } from "../../../helpers/runtime-record";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { aFakeServerBinary, trackLocalServer, useLocalServers } from "@tests/helpers/local-server";
+import { forcedConsent } from "@tests/helpers/consent";
+import { it } from "@tests/helpers/fixtures";
+import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 
 const dirs: string[] = [];
 const children: ChildProcess[] = [];
@@ -30,9 +27,6 @@ const held: Server[] = [];
 useLocalServers();
 
 afterEach(async () => {
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
   for (const server of held.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -175,10 +169,19 @@ describe("LocalServer", () => {
     it("deletes the data and the record, even when the recorded process is gone", async () => {
       const cwd = await directoryWithAGoneServer();
 
-      await at(cwd).reset();
+      await at(cwd).reset(await forcedConsent());
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("refuses without consent, and deletes nothing", async () => {
+      const cwd = await directoryWithAGoneServer();
+
+      await expect(at(cwd).reset({} as never)).rejects.toThrow(
+        "A destructive operation ran without consent",
+      );
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
   });
 
@@ -403,8 +406,8 @@ describe("LocalServer", () => {
       });
     }
 
-    it("leaves it running when the port it is asked to move to is held", async () => {
-      const cwd = await directoryRecordingContainer(nextPort());
+    it("leaves it running when the port it is asked to move to is held", async ({ port }) => {
+      const cwd = await directoryRecordingContainer(port);
       const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
 
       await expect(
@@ -414,8 +417,7 @@ describe("LocalServer", () => {
       expect(remove).not.toHaveBeenCalled();
     });
 
-    it("keeps the port the directory had", async () => {
-      const port = nextPort();
+    it("keeps the port the directory had", async ({ port }) => {
       const cwd = await directoryRecordingContainer(port);
       vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));

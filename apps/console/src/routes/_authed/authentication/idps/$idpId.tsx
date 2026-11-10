@@ -11,10 +11,16 @@ import { SECTION_HEADING } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
-import { fetchAllFlows, flowDisplayName } from "@/lib/flow-definition";
-import { flowsUsingIdp, type IdpReference, idpClientId, schemasUsingIdp } from "@/lib/idp";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { fetchAllSchemas } from "@/lib/schema";
+import { fetchAllFlows } from "@/features/flow-definitions/api";
+import { flowDisplayName } from "@/features/flow-definitions/model";
+import {
+  flowsUsingIdp,
+  type IdpReference,
+  idpClientId,
+  schemasUsingIdp,
+} from "@/features/authentication/model";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { fetchAllSchemas } from "@/features/schemas/api";
 
 export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
   staticData: { scope: "project", resource: "identity provider" },

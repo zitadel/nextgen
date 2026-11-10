@@ -1,27 +1,21 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { QwikScaffolder } from "../../../../../src/lib/orca/scaffolders/qwik";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { QwikScaffolder } from "@/lib/orca/scaffolders/qwik";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
-vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
+vi.mock("execa", () => ({ execaSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn(), readFile: vi.fn(), writeFile: vi.fn() }));
-const mockSpawn = vi.mocked(spawnSync);
+const mockSpawn = vi.mocked(execaSync);
 const mockRm = vi.mocked(rm);
 const mockReadFile = vi.mocked(readFile);
 const mockWriteFile = vi.mocked(writeFile);
 
-function spawnOk(): ReturnType<typeof spawnSync> {
-  return { status: 0, stderr: "", stdout: "", pid: 1, output: [], signal: null } as ReturnType<
-    typeof spawnSync
-  >;
+function spawnOk(): ReturnType<typeof execaSync> {
+  return { exitCode: 0, failed: false, stderr: "", stdout: "" } as ReturnType<typeof execaSync>;
 }
 
 // What create-vite's `qwik-ts` template emits today: Qwik 1 in `dependencies`

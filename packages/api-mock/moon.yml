@@ -34,7 +34,7 @@ tasks:
     inputs:
       - "**/*"
       # The server's fixture the redirect-target spec checks the mock against.
-      - "/internal/httputil/testdata/redirect_targets.json"
+      - "/apps/api/internal/httputil/testdata/redirect_targets.json"
     options:
       # Retry a failed browser suite in CI, as a safety net. It was added for
       # "Failed to fetch dynamically imported module": Chromium aborting module

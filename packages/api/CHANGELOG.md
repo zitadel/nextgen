@@ -1,5 +1,83 @@
 # @zitadel/api
 
+## 0.5.0
+
+### Minor Changes
+
+- [#2613](https://github.com/zitadel/nextgen/pull/2613) [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0) - `@zitadel/api/runtime/paging` now exports one class, `Paging`: build one from a list's page readers, or with `Paging.byField()` from the names of its fields, then `walk()` its pages and `collect()` them.
+  
+  It replaces `pages()`, `nextToken()` and `itemsOf()`: use `new Paging({ items, next }).walk(fetch)`, `paging.next(page)` and `Paging.byField(field).items(page)`. A fetch function now also receives the page number as a second argument.
+  
+  A client function's `all()` no longer throws a `RangeError` on a very large page.
+
+- [#2698](https://github.com/zitadel/nextgen/pull/2698) [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6) - `createZitadelClient` now takes a `userAgent`, which it sends on every request it makes. The CLI sets its own `User-Agent` through that option instead of replacing the process-wide undici dispatcher, so a request made by anything else in the process keeps the agent it chose.
+
+- [#2568](https://github.com/zitadel/nextgen/pull/2568) [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99) - Every CLI command that deletes, revokes or rolls back something now asks first, and needs `--force` when nobody can be asked. When nobody can be asked and `--force` is missing, the command fails with `E_CONFIRMATION_REQUIRED` (exit 3) and puts the question it would have asked in `details.question`, so a coding agent asks the user before it runs the `--force` retry in `next_commands`. `@zitadel/api`'s operation list marks those operations with a new `destructive` field and a `destructiveOperations` list.
+  
+  **Breaking:** A destructive command refused for want of `--force` now fails with `E_CONFIRMATION_REQUIRED` instead of `E_VALIDATION`; the exit code stays 3. `zitadel api` now asks before an operation that deletes, revokes or rolls back, and refuses it without `--force` when non-interactive. `doctor --fix` asks before making a preview issuer origin primary; when non-interactive it skips that repair with a warning unless its new `--force` is passed. `setup --dev-port` asks before removing the app's previous origin; without `--force` in a non-interactive run it keeps the old origin and warns.
+
+- [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a) - **Breaking:** `targets` on `POST /deployments` is `"primary"` or a list of preview URLs. `["primary"]`, which CLIs and test kits released before this send, still deploys to every primary origin until 1.0.0, and its answer carries a `Deprecation` header.
+  
+  **Breaking:** a `--dry-run --json` from `zitadel deploy` and `zitadel deployment create` prints `data.targets` as the request sends it: `"primary"`, not `["primary"]`.
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+### Patch Changes
+
+- [#2627](https://github.com/zitadel/nextgen/pull/2627) [`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c) - The `@zitadel/api` JSDoc links to docs pages by full URL, on
+  `https://preview.zitadel.com`, so they open from an editor. The OpenAPI
+  document the docs serve at `/docs/openapi.json` links them on the host that
+  served it.
+
+- [#2454](https://github.com/zitadel/nextgen/pull/2454) [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b) - The API reference explains each operation for developers new to Zitadel: where
+  each required ID comes from, what else a call changes, and how to recover from
+  a refusal, in short sentences with consistent terms. An operation it names
+  carries its method and path, such as `createRelease` (`POST /releases`). The `@zitadel/api` JSDoc
+  and the `zitadel` CLI's flag help, which come from the same descriptions,
+  follow.
+
+- [#2693](https://github.com/zitadel/nextgen/pull/2693) [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede) - Update dependencies that have published security advisories. `@zitadel/cli` now
+  requires `undici` 7.30.1 or later, which fixes TLS certificate validation being
+  skipped, cache poisoning across redirects and several denial-of-service bugs.
+  `@zitadel/cli`, `@zitadel/api` and `@zitadel/config` require `zod` 4.6.6 or
+  later, which stops oversized collections from exhausting memory during
+  validation. The console embedded in the server picks up the `seroval` and `zod`
+  fixes.
+
+## 0.4.0
+
+### Minor Changes
+
+- [#2527](https://github.com/zitadel/nextgen/pull/2527) [`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924) - Every paged list method of the [`@zitadel/api` client](https://preview.zitadel.com/docs/sdks/api-client) now has `items()`, `pages()` and `all()`, which follow the cursor for you, and `createZitadelClient` takes `onResponse` and `onError` hooks; `@zitadel/api/client` exports `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page. The CLI no longer stops `--all`, the resource list commands or `zitadel api --paginate` when a server sends the same page cursor twice: that is a server bug, and the client trusts the paging contract. `deploy`, `preview`, `release create` and `setup`'s first deploy check the release body against the API's own schema before sending it, and name each field it refuses. `@zitadel/testing` no longer re-checks the ids the server answers its bootstrap and seeding with, and types `BootstrappedProject.previewSecret` as always present, as the server always issues one. `@zitadel/config`'s `getDefaultHumanUserSchema` is typed as the user schema document it returns, `$id` included, and exports that type as `UserSchemaDocument`; `getDefaultHumanUserSchemaBody` returns it without `$id`, as an inline schema in a release bundle must be.
+
+- [#2357](https://github.com/zitadel/nextgen/pull/2357) [`79d8dd0`](https://github.com/zitadel/nextgen/commit/79d8dd01660b5bb7a2d936aa330c3d591a8d3954) - The server SDKs' `/__nextgen` proxies and the dev proxies `zitadel setup` writes for single-page apps now recognize the session calls under `/api/v1` as well as at their current paths, so sign-in keeps working once the API moves under `/api/v1`. `zitadel doctor` warns about a dev proxy an earlier `zitadel setup` wrote, and `zitadel doctor --fix` updates it. If you wrote your own production proxy for a single-page app, have it add the project secret to `POST /api/v1/sessions/exchange` as well as `POST /sessions/exchange`. `@zitadel/api` exports `API_PREFIX`, the path the API moves to.
+
+- [#2359](https://github.com/zitadel/nextgen/pull/2359) [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a) - The SDKs, the login components, the console and the `zitadel` CLI now call the API under `/api/v1`, where the server serves it. `@zitadel/api`'s client puts `/api/v1` after the proxy path or server origin it is given, and keeps a single prefix when the origin already ends in it. `zitadel api` takes a path with or without the prefix and shows the full URL with it. A call the server knows no operation for now says the server may be older than the client.
+  
+  **Breaking:** clients from this release need a server that serves `/api/v1`, so upgrade a self-hosted server before the apps that call it. In a single-page app set up by an earlier `zitadel setup`, run `zitadel doctor --fix`: the dev proxy it wrote adds the project secret only to the old path of the session exchange, so sign-in fails until it is updated, and `zitadel doctor` now fails on it. A production proxy you wrote for a single-page app must add the project secret to `POST /api/v1/sessions/exchange`. Until 1.0.0 the server also answers every operation at its old path, with a `Deprecation` header.
+
+- [#2398](https://github.com/zitadel/nextgen/pull/2398) [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10) - Deleting a user who is the last active member of a project's owning team now fails with `409 proj.last_owner` and changes nothing. The message names the projects and says to add another member to that team, then retry. `details.details.project_ids` lists the same ids. Admin grants stay freely revocable, suspending or deactivating a user is still allowed, and a project whose owning team already has no active member is left alone.
+
+- [#2477](https://github.com/zitadel/nextgen/pull/2477) [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b) - `POST /teams/query` now accepts an omitted `project_id` and defaults to the credential's project, matching `POST /users/query`; explicit project IDs still use the existing authorization checks.
+
+### Patch Changes
+
+- [#2503](https://github.com/zitadel/nextgen/pull/2503) [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15) - Fix sign-in behind a compressing edge failing with "got no response" after a successful exchange: the SDK proxies no longer forward `content-encoding` for a body `fetch` has already decoded, nor the browser's `accept-encoding`. A response whose body cannot be read now fails as a `NetworkError` with reason `unreadable` and says which status arrived, instead of claiming the server never answered.
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
+## 0.3.0
+
+### Minor Changes
+
+- [#2129](https://github.com/zitadel/nextgen/pull/2129) [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3) - `POST /users/query` can find the users still on an older revision of a schema. The new `schema_object_type` filter field matches the object type every revision of a schema shares, with `equals`, `not_equals` and `contains`, and `schema` now accepts `not_equals`, so `schema_object_type` `equals` a type together with `schema` `not_equals` its newest revision lists the users left to migrate. `zitadel users list --filter` accepts `schema_object_type`.
+
+- [#2129](https://github.com/zitadel/nextgen/pull/2129) [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3) - `GET /schemas` accepts `expand=in_use`, which adds `metadata.in_use` to each listed revision: whether any user of the project is on it. The flag is absent unless asked for, and needs read on the whole project, plus `user.read` for a token. Users are now indexed by schema, so the check and the `schema` filter on `POST /users/query` no longer read every user of the project.
+
 ## 0.2.0
 
 ### Minor Changes

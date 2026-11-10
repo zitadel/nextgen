@@ -2,11 +2,11 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // Bundles api/openapi into .generated/, which lib/openapi.ts imports,
-    // applying the repo's Redocly config, with its error codes, which
-    // lib/error-reference.ts imports, and the CLI's command reference, which
-    // its reference test writes and lib/cli-reference.ts imports, with the
-    // CLI's release notes, which Changesets writes on every release.
+    // Turns the committed OpenAPI embed and its error YAML into .generated/,
+    // which lib/openapi.ts and lib/error-reference.ts import, plus the CLI's
+    // command reference (its reference test) and release notes (Changesets).
+    // Regenerate the embed (server:generate) before this when the OpenAPI
+    // YAML changes.
     //
     // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
     // and on Vercel each deployment brings its own: NEXT_DEPLOYMENT_ID (see
@@ -18,8 +18,9 @@
       "env": ["!NEXT_*"],
       "inputs": [
         "$TURBO_EXTENDS$",
-        "$TURBO_ROOT$/api/openapi/**/*.yaml",
-        "$TURBO_ROOT$/redocly.yaml",
+        "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
+        "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**/*.yaml",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
         "$TURBO_ROOT$/apps/cli/command-reference.json",
         "$TURBO_ROOT$/apps/cli/CHANGELOG.md"
       ],
@@ -46,7 +47,7 @@
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
       ],
-      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/api/src/**", "!$TURBO_ROOT$/packages/api/src/generated/**"]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/api/src/**", "!$TURBO_ROOT$/packages/api/src/generated/**", "!$TURBO_ROOT$/packages/vitest-config/**"]
     },
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.
@@ -65,7 +66,8 @@
     // Insights sample rate is read at build time (next.config.mjs,
     // app/layout.tsx), and strict mode would hide it.
     "build": {
-      "env": ["VERCEL_DEPLOYMENT_ID", "DOCS_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": ["NODE_ENV", "VERCEL_DEPLOYMENT_ID", "DOCS_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "inputs": ["$TURBO_EXTENDS$", ".env*"],
       "dependsOn": [
         "typecheck",
         "generate",

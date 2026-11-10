@@ -44,7 +44,10 @@ async function prepareTeam(page: Page, name: string) {
 function teamWrites(page: Page): Response[] {
   const seen: Response[] = [];
   page.on("response", (response) => {
-    if (new URL(response.url()).pathname === "/teams" && response.request().method() === "POST") {
+    if (
+      new URL(response.url()).pathname === "/api/v1/teams" &&
+      response.request().method() === "POST"
+    ) {
       seen.push(response);
     }
   });

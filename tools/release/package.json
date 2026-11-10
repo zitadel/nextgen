@@ -8,7 +8,6 @@
     "lint": "biome check . --no-errors-on-unmatched",
     "changesets": "cd ../.. && node scripts/check-changesets-status.mjs",
     "check-graph": "cd ../.. && node scripts/check-release-graph.mjs",
-    "build-public-packages": "node -e 0",
     "version": "cd ../.. && node scripts/release.mjs version",
     "pack": "cd ../.. && node scripts/release.mjs pack",
     "snapshot": "cd ../.. && node scripts/release.mjs snapshot",

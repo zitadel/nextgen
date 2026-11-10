@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp, PASSWORD_POLICY } from "../helpers/project";
-import { pressCtrlC } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp, PASSWORD_POLICY } from "@tests/helpers/project";
+import { pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -91,6 +91,14 @@ describe("resources", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["resources"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("lists what the CLI manages before the project is set up", async () => {
         const app = await anApp();
@@ -111,18 +119,39 @@ describe("resources", () => {
         );
       });
 
-      it.each([
-        ["users", "delete", "user_1"],
-        ["teams", "deactivate", "team_1"],
-        ["sessions", "revoke", "sess_1"],
-      ])("refuses %s %s without --force when no one can be asked", async (topic, verb, id) => {
-        const app = await aSetUpApp();
+      describe("without --force when no one can be asked", () => {
+        const DESTRUCTIVE = [
+          ["users", "delete", "user_1"],
+          ["teams", "deactivate", "team_1"],
+          ["sessions", "revoke", "sess_1"],
+        ];
 
-        const result = await app.run([topic, verb, id, "--json"]);
+        it.each(DESTRUCTIVE)("is refused for %s %s", async (topic, verb, id) => {
+          const app = await aSetUpApp();
 
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toHintAt("--force");
-        expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+          const result = await app.run([topic, verb, id, "--json"]);
+
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+        });
+
+        it.each(DESTRUCTIVE)("says to pass --force for %s %s", async (topic, verb, id) => {
+          const app = await aSetUpApp();
+
+          const result = await app.run([topic, verb, id, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it.each(DESTRUCTIVE)(
+          "suggests running %s %s again with --force",
+          async (topic, verb, id) => {
+            const app = await aSetUpApp();
+
+            const result = await app.run([topic, verb, id, "--json"]);
+
+            expect(result).toSuggestExactly(app.againAsRun(`${topic} ${verb} ${id} --force`));
+          },
+        );
       });
 
       it("registers a connection made from its nested fields", async () => {
@@ -152,6 +181,31 @@ describe("resources", () => {
         for (const row of data.items) {
           expect(row.verbs ?? [], `${row.topic} lists no verbs`).not.toEqual([]);
         }
+      });
+    });
+
+    describe("a paged list", () => {
+      // The cursor is the server's text, and a list names it twice for a
+      // person: in its footer and in the command that reads the next page.
+      // The envelope keeps it as it came, so paging with it still works.
+      it("spells out an escape sequence the server put in the page cursor", async () => {
+        const app = await aSetUpApp();
+        platform.pagesWithAHostileCursor();
+
+        const result = await app.run(["users", "list"]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each topic as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["resources", "--plain"]);
+
+        expect(result).toPrintPlainRow("users", /.+/, /.*/);
       });
     });
   });

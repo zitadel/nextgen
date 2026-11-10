@@ -13,6 +13,11 @@
 > **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 010](010-session-auth-attempt-check-model.md), [ADR 011](011-resource-identifiers.md), [ADR 047](047-dialect-id-generation.md), [ADR 008](008-users-eav-store.md), [ADR 033](033-internal-permission-management.md), [ADR 046](046-claim-lifecycle-v2.md), [oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
 > **Related:** [ADR 049](049-events-api-retention-export.md) (API, retention, export)
 >
+> **Amended by:** [ADR 049's amendment of 2026-10-30](049-events-api-retention-export.md#amendment-2026-10-30-no-cursor-skips-a-late-commit):
+> how each dialect stamps `created_at`, so that no cursor skips a late commit.
+> Postgres stamps `clock_timestamp()`, not `now()`, and Spanner the commit
+> timestamp.
+>
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
 > if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
@@ -39,13 +44,13 @@ like:
 - Which admin changed this flow definition?
 
 OpenTelemetry distributed tracing solves **latency debugging across services**,
-not business-dimension queries. Operational logs via [`zlog`](../../internal/instrumentation/zlog/)
+not business-dimension queries. Operational logs via [`zlog`](../../apps/api/internal/instrumentation/zlog/)
 are ephemeral and not tenant-queryable. We need a first-class, append-only,
 queryable audit stream stored in the database.
 
 **Scope boundary:** Event emission is defined on **v2 `AllStatements` / statement
-TX only** ([`internal/storage/`](../../internal/storage/),
-[`internal/service/statement.go`](../../internal/service/statement.go)). The v1
+TX only** ([`internal/storage/`](../../apps/api/internal/storage/),
+[`internal/service/statement.go`](../../apps/api/internal/service/statement.go)). The v1
 repository and dialect tree under `internal/storage/database/` is **retired**
 ([ADR 028](028-storage-v2-statements-and-dialects.md)). Product persistence is
 fully on `AllStatements`. Mutating statement methods that need an audit record
@@ -245,7 +250,7 @@ flowchart TB
 #### Path A — Request-wide events (`project_id` known)
 
 Extend the existing request-ID middleware
-([`internal/api/middleware/request_id.go`](../../internal/api/middleware/request_id.go))
+([`internal/api/middleware/request_id.go`](../../apps/api/internal/api/middleware/request_id.go))
 into a **RequestContext** middleware:
 
 - Extract or generate `request_id` (W3C traceparent-compatible 128-bit hex).
@@ -255,7 +260,7 @@ into a **RequestContext** middleware:
   - `fingerprint` — server-derived device binding when available; otherwise omit
     (empty string)
 - Optional `X-SDK-Name` and `X-SDK-Version` headers may be read for operational
-  logging ([`zlog`](../../internal/instrumentation/zlog/)) and OTEL Tier 3
+  logging ([`zlog`](../../apps/api/internal/instrumentation/zlog/)) and OTEL Tier 3
   export — they are **not persisted** on audit event rows.
 - Client headers named `session_id`, `flow_id`, or `fingerprint`, if accepted at
   all, go into `metadata.client_hints` as untrusted hints only.
@@ -320,14 +325,14 @@ VALUES (..., now() - $wait_interval, now(), ...);
 8. Domain events (Path B) stay **in-TX with the mutation** — only
    `category=request` is batched.
 
-[`zlog`](../../internal/instrumentation/zlog/) masking
+[`zlog`](../../apps/api/internal/instrumentation/zlog/) masking
 ([ADR 030](030-error-model-mapping-and-reporting.md)) remains acceptable for
 operational logs only — not for audit durability. A durable outbox + worker is
 a future optimization beyond this in-process buffer.
 
 #### Path B — Domain events on statement mutations
 
-Add to [`internal/service/statement.go`](../../internal/service/statement.go):
+Add to [`internal/service/statement.go`](../../apps/api/internal/service/statement.go):
 
 ```go
 type EventStatements interface {
@@ -339,7 +344,7 @@ type EventStatements interface {
 interfaces.
 
 - `InsertEvent` executes on the same `queryExecutor` / transaction as entity SQL
-  ([`internal/storage/dialect/postgres/tx.go`](../../internal/storage/dialect/postgres/tx.go)).
+  ([`internal/storage/dialect/postgres/tx.go`](../../apps/api/internal/storage/dialect/postgres/tx.go)).
 - Each `statement_<entity>.go` method that **mutates state** and needs an audit
   record calls `InsertEvent` with a **semantic** `event_type` (e.g.
   `project.created`, `user.deactivated`) — not row diffs or generic `UPDATE`
@@ -489,7 +494,7 @@ payloads use a **deny-by-default** model:
    input masking, and config normalize still use it. These mechanisms are
    complementary, not replacements. See
    [user-schema.md](../design/flowengine/user-schema.md).
-5. **Not log masking:** [`zlog`](../../internal/instrumentation/zlog/) /
+5. **Not log masking:** [`zlog`](../../apps/api/internal/instrumentation/zlog/) /
    [ADR 030](030-error-model-mapping-and-reporting.md) MaskConfig redacts
    operational log attributes; it does **not** define audit allowlists.
 
@@ -529,8 +534,8 @@ Wide Event (internal)  ──→  OTEL Span (Tier 3 export)
 - Internal model uses `request_id`, not `trace_id`.
 - `span_id` and `parent_span_id` live in `metadata` JSON for OTEL export
   projection only.
-- [`zlog`](../../internal/instrumentation/zlog/) and
-  [`zotel`](../../internal/instrumentation/zotel/) remain operational telemetry
+- [`zlog`](../../apps/api/internal/instrumentation/zlog/) and
+  [`zotel`](../../apps/api/internal/instrumentation/zotel/) remain operational telemetry
   separate from the audit stream. SDK name/version headers may appear in
   operational logs but not in the `events` table.
 

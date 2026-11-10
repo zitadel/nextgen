@@ -158,18 +158,20 @@ root `//#test`; until they move, `cli#test` lists what they read.
   the console).
 - Every `turbo run` in `ci-turbo.yml` takes `--affected` from
   `TURBO_SCM_BASE`: a merge group's `base_sha`, a pull request's base, or the
-  commit a push to main replaced. The e2e lanes run in one `turbo run
-  --affected`, side by side as moon's `e2e:all` runs them; the two demo-next
+  commit a push to main replaced. Each job is a role that runs one task
+  list: a role the change does not reach runs nothing after its setup. The
+  e2e lanes but the journey's run in one `turbo run --affected` in a role of
+  their own, side by side as moon's `e2e:all` runs them; the two demo-next
   lanes, which both serve the demo on :3002, take turns through their
-  `demo-next-app` mutex. The database lanes keep steps of their own before
-  them, as in ci.yml.
-- The setup only some lanes need is a step gated by `turbo query affected
-  --tasks … --exit-code`, which exits 1 when one of the named tasks is
-  affected, 0 when none is and 2 on an error, which counts as affected:
-  Playwright's browsers for the browser lanes, the release snapshot and the
-  journey's registry cache for `journey-local`. The snapshot runs without
+  `demo-next-app` mutex. The database lanes and `check-generate-pruned` have
+  roles of their own too.
+- The journey's role alone asks first: `turbo query affected --tasks
+  journey-local --exit-code` exits 1 when the lane is affected, 0 when it is
+  not and 2 on an error, which counts as affected. The answer gates the
+  release snapshot. The snapshot runs without
   `--affected`: the journey needs it whenever it runs, and a change to the
-  journey's own specs reaches no release task.
+  journey's own specs reaches no release task. Playwright's browsers come
+  through each lane's `install-browsers`.
 - The journey runs its framework matrix in full when `@zitadel/e2e#journey`
   (the by-hand lane, which reads the journey's files and depends on the CLI,
   the test kit and the mock OIDC provider) or an SDK's `build` is affected,
@@ -197,12 +199,12 @@ root `//#test`; until they move, `cli#test` lists what they read.
 
 Nothing before a merge: a file a task reads but does not list neither
 selects the task nor misses its cache. Every night, and by hand with
-`force`, ci-turbo.yml runs the gate and the generated-files check with
-`TURBO_FORCE`, so every cacheable task runs once without reading the cache
-and writes its result, and then every lane without `--affected`, whose
-prerequisites come from what the gate just built. A failure there, on a main
-whose merge groups passed, is a read the inputs miss or a change no task
-reads (a workflow) that broke something: it shows a day late, not never.
+`force`, ci-turbo.yml runs every job with `TURBO_FORCE` and without
+`--affected`, so every cacheable task runs without reading the cache and
+writes its result, and every lane runs on prerequisites its own job built.
+A failure there, on a main whose merge groups passed, is a read the inputs
+miss or a change no task reads (a workflow) that broke something: it shows
+a day late, not never.
 
 Two checks of our own found the reads below and were dropped again: a
 static one that scanned each task's code for the files it opens (imports,

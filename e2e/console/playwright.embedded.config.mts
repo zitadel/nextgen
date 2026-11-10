@@ -20,11 +20,11 @@ import {
  *   - `playwright.config.mts` runs `vite preview` with no backend at all, so
  *     every API call fails identically whatever base it targeted;
  *   - `playwright.real.config.mts` runs the Vite dev server, whose proxy
- *     rewrites `/api/*` to the API root — precisely the layer production does
- *     not have.
+ *     forwards `/api/v1/*` to the server — precisely the layer production
+ *     does not have.
  *
  * This config boots the built binary and nothing else: it embeds the console
- * (`internal/staticui/console`), serves the ogen API at the origin root, and
+ * (`internal/staticui/console`), serves the ogen API under `/api/v1`, and
  * the browser visits that one origin. That makes it the
  * only lane where the console's API base and the mux's routing table have to
  * agree — the disagreement that shipped as "POST /api/flow returned 404".

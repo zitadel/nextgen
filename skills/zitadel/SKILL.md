@@ -15,16 +15,18 @@ description: >-
 # Zitadel
 
 This is the entry point for Zitadel work. The full set of Zitadel skills
-installs together with `npx skills add zitadel/nextgen --full-depth`; this
-router then points you at the right one for the task. If a skill named below is
-not actually installed, the set was added without `--full-depth` — install it
-that way to get the CLI and per-framework skills alongside this router.
+installs together, with `npx @zitadel/cli@latest skills add` in the project
+(the set of that CLI version) or `npx skills add zitadel/nextgen --full-depth`;
+this router then points you at the right one for the task. If a skill named
+below is not actually installed, the set was added without `--full-depth` —
+run the CLI's `skills add` to get the CLI and per-framework skills alongside
+this router.
 
 ## Route by what you are doing
 
 - **Create a project, scaffold a new app, change config, deploy, or run a local
   Zitadel server** → use **`zitadel-cli`**. It drives the `zitadel` CLI
-  (`setup`, `plan`, `apply`, resource commands). It can scaffold a fresh app for
+  (`setup`, `deploy`, resource commands). It can scaffold a fresh app for
   any framework below and integrate an **existing** app on any of them.
 
 - **Integrate the auth UI into an app** → use the SDK skill for that framework:
@@ -73,7 +75,7 @@ The docs are organised into these sections:
 | Section       | What it covers                                                              |
 | ------------- | --------------------------------------------------------------------------- |
 | Get started   | The quickstart, an existing app, and driving the CLI as an agent            |
-| Guides        | Local runtime, `plan`/`apply`, social sign-in, login design and copy        |
+| Guides        | Local runtime, `deploy`, social sign-in, login design and copy              |
 | Concepts      | Projects, teams, users, config as code, flows, schemas, sessions, databases |
 | SDKs          | One page per framework SDK, the SDK proxy, the API client, components       |
 | CLI reference | Every `zitadel` command with its flags and examples, by command group       |

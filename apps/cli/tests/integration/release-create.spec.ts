@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -33,17 +33,25 @@ describe("release create", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["release", "create", "-m", "in every rendering"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("builds a release from the config without deploying it", async () => {
         const app = await aSetUpApp();
+        const before = await app.liveDeploymentCount();
 
         const result = await createRelease(app);
 
         expect(result).toSucceed();
         const data = app.envelopeOf<Release>(result).data;
         expect(data.content_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
-        const listed = await app.run(["deployment", "list", "--json"]);
-        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
+        expect(await app.liveDeploymentCount()).toBe(before);
       });
 
       it("registers a new sign-in provider the release names", async () => {
@@ -60,6 +68,11 @@ describe("release create", () => {
 
       it("refuses content that builds back to a revoked release", async () => {
         const app = await aSetUpApp();
+        // Setup deployed the scaffolded config, and a release in use cannot be
+        // revoked, so this one builds content of its own.
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
         const first = await createRelease(app);
         await app.run([
           "release",

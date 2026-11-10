@@ -3,24 +3,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
-import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import { it } from "@tests/helpers/fixtures";
+
+import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
-const server = setupServer();
 
 type Origin = { pattern: string; kind: string };
-let origins: Origin[] = [];
+const origins: Origin[] = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-beforeEach(() => {
-  origins = [];
+it.beforeEach(({ server }) => {
+  origins.length = 0;
   server.use(
-    http.get(`${SERVER}/projects/:id`, ({ params }) =>
+    http.get(`${SERVER}/api/v1/projects/:id`, ({ params }) =>
       HttpResponse.json({
         id: String(params.id),
         name: "demo",
@@ -31,8 +29,6 @@ beforeEach(() => {
     ),
   );
 });
-
-afterEach(() => server.resetHandlers());
 
 const dirs: string[] = [];
 
@@ -65,20 +61,10 @@ function list(cwd: string, extra: string[] = []) {
 }
 
 /** Runs `run` with stdout reporting as a terminal, so the aligned table renders. */
-async function onATerminal<T>(run: () => Promise<T>): Promise<T> {
-  const original = process.stdout.isTTY;
-  process.stdout.isTTY = true;
-  try {
-    return await run();
-  } finally {
-    process.stdout.isTTY = original;
-  }
-}
-
 describe("origin list", () => {
   it("returns the origins in the --json envelope", async () => {
     const cwd = await anAppDir();
-    origins = [{ pattern: "https://app.acme.com", kind: "primary" }];
+    origins.push({ pattern: "https://app.acme.com", kind: "primary" });
 
     const result = await list(cwd, ["--json"]);
 
@@ -89,9 +75,9 @@ describe("origin list", () => {
 
   it("renders a pattern/kind table on a terminal", async () => {
     const cwd = await anAppDir();
-    origins = [{ pattern: "https://app.acme.com", kind: "primary" }];
+    origins.push({ pattern: "https://app.acme.com", kind: "primary" });
 
-    const result = await onATerminal(() => list(cwd));
+    const result = await asTerminal(() => list(cwd));
 
     const text = stripAnsi(result.stdout);
     expect(text).toContain("pattern");
@@ -103,14 +89,14 @@ describe("origin list", () => {
   it("says the project has no origins when the list is empty", async () => {
     const cwd = await anAppDir();
 
-    const result = await onATerminal(() => list(cwd));
+    const result = await asTerminal(() => list(cwd));
 
     expect(stripAnsi(result.stdout)).toContain("No origins on the project.");
   });
 
   it("prints tab-separated rows with no header when piped", async () => {
     const cwd = await anAppDir();
-    origins = [{ pattern: "https://app.acme.com", kind: "primary" }];
+    origins.push({ pattern: "https://app.acme.com", kind: "primary" });
 
     const result = await list(cwd, ["--plain"]);
 

@@ -3,27 +3,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { it } from "@tests/helpers/fixtures";
+
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
-const server = setupServer();
 
-let removed: Array<Record<string, unknown>> = [];
+const removed: Array<Record<string, unknown>> = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-beforeEach(() => {
-  removed = [];
+it.beforeEach(({ server }) => {
+  removed.length = 0;
   server.use(
-    http.post(`${SERVER}/projects/:id/origins/remove`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects/:id/origins/remove`, async ({ request }) => {
       removed.push((await request.json()) as Record<string, unknown>);
       return new HttpResponse(null, { status: 204 });
     }),
-    http.get(`${SERVER}/projects/:id`, ({ params }) =>
+    http.get(`${SERVER}/api/v1/projects/:id`, ({ params }) =>
       HttpResponse.json({
         id: params.id,
         origins: [{ pattern: "https://other.acme.com", kind: "primary" }],
@@ -31,8 +28,6 @@ beforeEach(() => {
     ),
   );
 });
-
-afterEach(() => server.resetHandlers());
 
 const dirs: string[] = [];
 
@@ -87,10 +82,10 @@ describe("origin rm", () => {
     });
   });
 
-  it("still reports the removal when the remaining origins cannot be read", async () => {
+  it("still reports the removal when the remaining origins cannot be read", async ({ server }) => {
     const cwd = await anAppDir();
     server.use(
-      http.get(`${SERVER}/projects/:id`, () =>
+      http.get(`${SERVER}/api/v1/projects/:id`, () =>
         HttpResponse.json({ code: "internal" }, { status: 500 }),
       ),
     );
@@ -109,7 +104,7 @@ describe("origin rm", () => {
 
     const result = await remove(cwd);
 
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_CONFIRMATION_REQUIRED");
     expect(removed).toEqual([]);
   });
 
@@ -132,18 +127,20 @@ describe("origin rm", () => {
     const result = await remove(cwd, ["--env", "production"]);
 
     const envelope = parseJson(result.stdout) as { code: string; next_commands?: string[] };
-    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(envelope.next_commands?.[0]).toContain("--env production");
   });
 
-  it("names the environment the last origin was removed from in how to add one back", async () => {
+  it("names the environment the last origin was removed from in how to add one back", async ({
+    server,
+  }) => {
     const cwd = await anAppDir();
     await writeFile(
       join(cwd, ".env.production.local"),
       "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
     );
     server.use(
-      http.get(`${SERVER}/projects/:id`, ({ params }) =>
+      http.get(`${SERVER}/api/v1/projects/:id`, ({ params }) =>
         HttpResponse.json({ id: params.id, origins: [] }),
       ),
     );

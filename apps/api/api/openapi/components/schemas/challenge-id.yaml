@@ -1,0 +1,5 @@
+type: string
+pattern: '^ch_[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be a challenge ID: ch_ followed by letters, digits, _ or -"
+example: ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
+description: The unique identifier of this challenge, an opaque string with a `ch_` prefix.

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { CreateSchemaBody as CreateSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
@@ -23,8 +25,9 @@ export {
   policiesReadmeContent,
   schemasReadmeContent,
 } from "./readmes.js";
+import { DEFAULT_BUILTIN_SCHEMA_BASE } from "./builtin-schema-base.js";
 
-export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://zitadel.com/schemas/v1";
+export { DEFAULT_BUILTIN_SCHEMA_BASE };
 export const DEFAULT_FLOW_SCHEMA_URI = `${DEFAULT_BUILTIN_SCHEMA_BASE}/flow-definition.json`;
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
@@ -285,9 +288,18 @@ export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SC
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 
+/** A user schema document, as the create body carries one rather than a URL. */
+export type UserSchemaDocument = Extract<CreateSchemaBody, { kind: "user-schema" }>;
+
+/**
+ * The default human user schema: a create body, plus the template's `$id`, the
+ * document URI that names the schema in a file. An inline schema in a release
+ * bundle must not declare one; {@link getDefaultHumanUserSchemaBody} leaves it
+ * off.
+ */
 export function getDefaultHumanUserSchema(
   options: DefaultConfigRenderOptions = {},
-): CreateSchemaBody {
+): UserSchemaDocument & { $id: string } {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
@@ -295,10 +307,44 @@ export function getDefaultHumanUserSchema(
     SERVER_URL: builtinSchemaBase,
     USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as Record<string, unknown>;
-  return applyUseCaseToSchema(
-    rendered,
-    options.useCase ?? DEFAULT_SETUP_USE_CASE,
-  ) as CreateSchemaBody;
+  const schema = applyUseCaseToSchema(rendered, options.useCase ?? DEFAULT_SETUP_USE_CASE);
+  assertUserSchemaDocument(schema);
+  return schema;
+}
+
+/**
+ * Holds a rendered template to the user schema document the create body takes,
+ * with the `$id` it names itself by, so a template edit that breaks it fails
+ * here rather than when the server refuses the create.
+ */
+function assertUserSchemaDocument(
+  schema: Record<string, unknown>,
+): asserts schema is UserSchemaDocument & { $id: string } {
+  const checked = CreateSchemaBodySchema.safeParse(schema);
+  if (!checked.success || schema.kind !== "user-schema" || typeof schema.$id !== "string") {
+    throw new Error(
+      `the default human user schema template is not a user schema document: ${
+        checked.success
+          ? "it needs kind user-schema and a $id"
+          : checked.error.issues
+              .map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`)
+              .join("; ")
+      }`,
+    );
+  }
+}
+
+/**
+ * The default human user schema without the template's `$id`: as an inline
+ * schema in a release bundle must be, and as a schema created with a URI the
+ * server assigns.
+ */
+export function getDefaultHumanUserSchemaBody(
+  options: DefaultConfigRenderOptions = {},
+): UserSchemaDocument {
+  const { $id: _templateId, ...body } = getDefaultHumanUserSchema(options);
+  void _templateId;
+  return body;
 }
 
 /** The flow names its user schema by `objectType`, so no schema URL renders into it. */

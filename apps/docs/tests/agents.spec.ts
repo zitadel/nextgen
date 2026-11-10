@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
-import { jsonRpcMessage } from "./support";
+import { jsonRpcMessage, rootRelativeDocsLink } from "./support";
 
 /**
  * What agents use besides the pages: the search the site's own dialog calls,
@@ -61,6 +61,17 @@ test("the routes that are not pages answer an agent that asks for text", async (
   }
 });
 
+test("the live examples' service worker may pass on any request its pages make", async ({
+  request,
+}) => {
+  // A worker's policy comes from its own script's response, and MSW's
+  // fetch()es the requests it does not mock (next.config.mjs).
+  const response = await request.get("/docs/mock-service-worker.js");
+  const policy = response.headers()["content-security-policy"] ?? "";
+  expect(policy).toContain("frame-ancestors 'none'");
+  expect(policy).not.toMatch(/(^|; )(default|connect|script)-src /);
+});
+
 test("the whole OpenAPI document is served as JSON, and llms.txt links it", async ({ request }) => {
   const response = await request.get("/docs/openapi.json");
   expect(response.status()).toBe(200);
@@ -73,7 +84,7 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
   expect(document.openapi).toMatch(/^3\.1\./);
   expect(document.info.title).not.toBe("");
   expect(Object.keys(document.paths).length).toBeGreaterThan(0);
-  // Bundled (scripts/bundle-openapi.mjs): every reference points into the
+  // From the committed OpenAPI embed (scripts/bundle-openapi.mjs): every reference points into the
   // document itself, at something there.
   const refs = [...JSON.stringify(document).matchAll(/"\$ref":"([^"]*)"/g)].map(
     ([, ref = ""]) => ref,
@@ -92,9 +103,36 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
     [...new Set(refs)].filter((ref) => !ref.startsWith("#/") || target(ref) === undefined),
     "references that do not resolve inside the document",
   ).toEqual([]);
+  // Its links to docs pages are absolute, on the deployment that served it.
+  const text = JSON.stringify(document);
+  expect(text).not.toContain("](/docs/");
+  expect(text).toContain(`](${new URL(response.url()).origin}/docs/concepts/`);
 
   const index = await (await request.get("/docs/llms.txt")).text();
   expect(index).toContain("](/docs/openapi.json)");
+});
+
+/**
+ * An agent's or a tool's copy of these keeps no URL to resolve a root-relative
+ * link against, so the docs make each link absolute on the origin that served
+ * it (lib/absolute-links.ts). A function answers each request for that, and
+ * the CDN keeps its answer, as it kept the prerendered one.
+ */
+test("the documents agents download link docs pages on the deployment that served them", async ({
+  request,
+}) => {
+  for (const route of [
+    "/docs/openapi.json",
+    "/docs/llms-full.txt",
+    "/docs/get-started/quickstart.md",
+  ]) {
+    const response = await request.get(route);
+    expect(response.status(), route).toBe(200);
+    const text = await response.text();
+    expect(rootRelativeDocsLink(text), route).toBeUndefined();
+    expect(text, route).toContain(`](${new URL(response.url()).origin}/docs/`);
+    expect(response.headers()["cdn-cache-control"], route).toMatch(/\bmax-age=[1-9]/);
+  }
 });
 
 test("a page advertises its Open Graph image, and the image renders", async ({ request }) => {

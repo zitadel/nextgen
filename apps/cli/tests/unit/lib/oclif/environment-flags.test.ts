@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS } from "../../../../src/index";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { COMMANDS } from "@/index";
+import { BaseCommand } from "@/lib/oclif/base";
 import {
   environmentFlags,
   environmentSelectorSuffix,
   projectEnvFile,
-} from "../../../../src/lib/oclif/environment-flags";
+} from "@/lib/oclif/environment-flags";
+import { parseFlag } from "@tests/helpers/inputs";
 
 /** `[name, char]` for every flag in a bag. */
 const entries = (bag: Record<string, { char?: string }>): Array<[string, string | undefined]> =>
@@ -72,6 +73,21 @@ describe("clashes", () => {
     expect(clashes({ env: { char: "e" } }, { extra: { char: "e" } })).toEqual([
       "-e is shared by --env and --extra",
     ]);
+  });
+});
+
+describe("--env", () => {
+  it("takes the name a shell padded with spaces, as the argument does", async () => {
+    await expect(parseFlag(environmentFlags.env, " production ", "env")).resolves.toBe(
+      "production",
+    );
+  });
+
+  it("refuses a name no .env.<name>.local file can be called", async () => {
+    await expect(parseFlag(environmentFlags.env, "../escape", "env")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: '"../escape" is not a usable environment name',
+    });
   });
 });
 

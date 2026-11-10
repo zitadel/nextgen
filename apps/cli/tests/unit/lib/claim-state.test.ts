@@ -7,8 +7,8 @@ import {
   claimWindowClosedAction,
   claimWindowDeadline,
   isAttached,
-} from "../../../src/lib/claim-state";
-import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
+} from "@/lib/claim-state";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 
 /** A run that named no environment, so its suggestions carry no selector. */
 const NO_SELECTOR = environmentSelectorSuffix({});

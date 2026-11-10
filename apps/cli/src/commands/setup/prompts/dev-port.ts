@@ -1,6 +1,5 @@
-import type { Parsed } from "@zitadel/config/idp";
-
-import { LocalServer } from "../../../lib/local-server/server";
+import { LocalServer } from "@/lib/local-server/server";
+import { readPort } from "@/commands/setup/index";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -34,12 +33,7 @@ export class DevPortPrompt implements SetupPrompt {
       message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
       placeholder: suggested,
       initialValue: suggested,
-      parse: (value): Parsed<number> => {
-        const port = Number.parseInt(value, 10);
-        return Number.isFinite(port) && port > 0 && port < 65536
-          ? { ok: true, value: port }
-          : { ok: false, problem: "Must be a port number" };
-      },
+      parse: readPort,
     });
     return { ...answers, devPort };
   }

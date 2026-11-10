@@ -1,3 +1,4 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -6,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { avatarVars } from "@/components/user-avatar";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -15,11 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const ME_URL = "http://localhost/api/users/me";
-const SCHEMA_URL = "*/api/users/me/schema";
-const PASSKEYS_URL = "*/api/users/me/passkeys";
-const PASSWORD_URL = "*/api/users/me/password";
-const LINKS_URL = "*/api/users/me/identity_links";
+const ME_URL = "http://localhost/api/v1/users/me";
+const SCHEMA_URL = "*/api/v1/users/me/schema";
+const PASSKEYS_URL = "*/api/v1/users/me/passkeys";
+const PASSWORD_URL = "*/api/v1/users/me/password";
+const LINKS_URL = "*/api/v1/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {
@@ -50,10 +52,6 @@ function me(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
   });
@@ -67,7 +65,7 @@ describe("settings profile", () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
 
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     const email = screen.getByLabelText("Email");
     expect(email).toHaveValue("maya@example.com");
     expect(email).toBeDisabled();
@@ -79,7 +77,7 @@ describe("settings profile", () => {
     // field shown cannot change, so the screen has no Save.
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
-    await screen.findByRole("heading", { name: "Settings" });
+    await screen.findByRole("heading", { name: "Profile" });
 
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByDisplayValue("Maya")).not.toBeInTheDocument();
@@ -105,15 +103,16 @@ describe("settings profile", () => {
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("marks Settings, the account nav's only row", async () => {
+  it("marks Profile in the Settings list, under the heading that leads back", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
-    await screen.findByRole("heading", { name: "Settings" });
+    await screen.findByRole("heading", { name: "Profile" });
 
-    const nav = screen.getByRole("navigation", { name: "Account settings" });
+    const nav = screen.getByRole("navigation", { name: "Settings" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Settings"]);
-    expect(links[0]).toHaveAttribute("aria-current", "page");
+    expect(links.map((link) => link.textContent)).toEqual(["Settings", "Profile"]);
+    expect(links[1]).toHaveAttribute("aria-current", "page");
+    expect(links[0]).not.toHaveAttribute("aria-current");
   });
 
   it("offers the name the schema designates for display, and saves it", async () => {
@@ -240,6 +239,67 @@ describe("settings profile, generated from the schema", () => {
     expect(profile?.style.getPropertyValue("--zl-avatar-base")).toBe(vars["--zl-avatar-base"]);
   });
 
+  it("keeps what a text input cannot round-trip read-only, whatever the forms can write", async () => {
+    // Add user and the user detail edit these through their own controls; the
+    // Profile stays a row of text inputs (D16).
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          active: { type: ["boolean", "null"] },
+          plan: { type: "string", enum: ["free", "paid"] },
+          tags: { type: "array", items: { type: "string" } },
+          address: { type: "object", properties: { city: { type: "string" } } },
+        },
+      }),
+      http.get(ME_URL, () =>
+        HttpResponse.json(
+          me({ attributes: { username: "maya", tags: ["a"], address: { city: "Bern" } } }),
+        ),
+      ),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByLabelText("Username")).toBeDisabled();
+    expect(screen.getByLabelText("Active")).toBeDisabled();
+    expect(screen.getByLabelText("Tags")).toBeDisabled();
+    // An enum stays the text input it was here.
+    expect(screen.getByLabelText("Plan")).toBeEnabled();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    // An object still has no row.
+    expect(screen.queryByLabelText("City")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Address")).not.toBeInTheDocument();
+  });
+
+  it("saves a composed number as a number, as its own type says", async () => {
+    let patched: unknown;
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          seats: { type: "integer", allOf: [{ minimum: 1 }] },
+        },
+      }),
+      http.get(ME_URL, () => HttpResponse.json(me({ attributes: { username: "maya", seats: 1 } }))),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { username: "maya", seats: 42 } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const seats = await screen.findByLabelText("Seats");
+    expect(seats).toBeEnabled();
+    await userEvent.clear(seats);
+    await userEvent.type(seats, "42");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patched).toEqual({ attributes: { seats: 42 } }));
+  });
+
   it("shows a boolean read-only, and saves a name beside a required one", async () => {
     let patched: unknown;
     server.use(
@@ -310,7 +370,7 @@ describe("settings profile, generated from the schema", () => {
     );
     await renderAt("/settings/profile");
 
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     expect(screen.getByText("Could not be loaded")).toBeInTheDocument();
     expect(screen.getByText("No identity provider account is linked to you.")).toBeInTheDocument();
   });

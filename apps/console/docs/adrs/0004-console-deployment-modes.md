@@ -40,6 +40,13 @@
 > missing from §2 is the server-discovered seed contract for membership and
 > owner assignment, not the initial user. This note records the drift; the
 > body is unchanged.
+>
+> **Proposed amendment (2026-10-29) — [Console ADR 0006](0006-cloud-addon.md):**
+> what only the hosted cloud needs is no longer in the artifact the server
+> embeds. The cloud's console build compiles in an add-on, so §5's Billing
+> example and the first consequence (one Console artifact for cloud and
+> self-host) hold only for the surfaces both builds share. Those still render
+> from effective permissions.
 
 ## Context
 

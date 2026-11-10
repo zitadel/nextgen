@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -69,6 +69,14 @@ describe("env add", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["env", "add", "staging"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("binds the environment to a project it creates", async () => {
         const app = await aSetUpApp();
@@ -209,12 +217,25 @@ describe("env add", () => {
         expect(result).toPrint("Pipeline secret store");
       });
 
-      it("says the environment serves the server's defaults until it is deployed to", async () => {
+      it("says the environment refuses sign-in until it is deployed to", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run(["env", "add", "production", "--non-interactive"]);
 
         expect(result).toPrint("Nothing is deployed to production yet");
+      });
+
+      // The step that names the project it created prints what the server
+      // answered, and that never goes through the result envelope, so the
+      // escaping has to hold for the narration too.
+      it("spells out an escape sequence the server put in the project id", async () => {
+        const app = await aSetUpApp();
+        platform.mintsAHostileProjectId();
+
+        const result = await app.run(["env", "add", "production", "--non-interactive"]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
       });
 
       it("never prints a secret", async () => {

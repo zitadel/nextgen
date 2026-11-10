@@ -1,0 +1,156 @@
+package audit
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/zitadel/nextgen/api/client"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/events"
+)
+
+// Untrusted header persist caps (Go's default header limit is ~1 MiB).
+const (
+	maxEventUserAgentBytes = 1024
+	maxEventOriginBytes    = 512
+)
+
+type statusCapturingWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusCapturingWriter) WriteHeader(code int) {
+	if w.status == 0 {
+		w.status = code
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusCapturingWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *statusCapturingWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func (w *statusCapturingWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// WithRequestEventMiddleware enqueues Path A request.api events after the
+// handler when project_id is known (authenticated API, public login/flow, or
+// POST /projects after the new id is stamped). Probes (livez, readyz) leave
+// project_id empty and are skipped.
+func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ctx := WithActorSlot(r.Context())
+		r = r.WithContext(ctx)
+		sw := &statusCapturingWriter{ResponseWriter: w}
+		next.ServeHTTP(sw, r)
+
+		if buf == nil {
+			return
+		}
+		ac, ok := ActorSlotFromContext(r.Context())
+		if !ok || ac == nil || ac.ProjectID == "" {
+			return
+		}
+		// This middleware runs outside the server span, so the enqueue span
+		// starts as its child from the span context the ogen tracer or the IdP
+		// callback handler stored in the holder WithLogging planted, after the
+		// server span has ended.
+		if server := middleware.GetServerSpanContext(ctx); server.IsSampled() {
+			var span trace.Span
+			ctx, span = tracer.Start(trace.ContextWithSpanContext(ctx, server), "audit.EnqueueRequestEvent")
+			defer span.End()
+		}
+		status := sw.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		operationID, _ := middleware.GetOperationIDContext(r.Context())
+		// The operation names the route, never the raw path, which leaks
+		// resource ids. The API answers under client.PathPrefix and, until
+		// 1.0.0, at the root (ADR 077), so a ServeMux pattern there names only
+		// the mount: a request the server refused before the operation ran
+		// records no route. A path of its own (the IdP callback) records its
+		// pattern.
+		route := operationID
+		if route == "" && !isAPIMount(r.Pattern) {
+			route = r.Pattern
+		}
+		payload, err := events.MarshalPayload(domain.RequestAPIPayload{
+			OperationID:   operationID,
+			Method:        r.Method,
+			RouteTemplate: route,
+			Status:        status,
+			DurationMs:    time.Since(start).Milliseconds(),
+		})
+		if err != nil {
+			return
+		}
+		ev := FromContext(WithActorContext(r.Context(), *ac), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
+		ev.ProjectID = ac.ProjectID
+		ev.Payload = payload
+		if c := clientFromRequest(r); c != nil {
+			if meta, err := withClient(ev.Metadata, c); err == nil {
+				ev.Metadata = meta
+			}
+		}
+		buf.EnqueueSince(ctx, ev, start)
+	})
+}
+
+// isAPIMount reports a ServeMux pattern the API is mounted at: the prefix,
+// bare and as a subtree, and the root alias.
+func isAPIMount(pattern string) bool {
+	return pattern == "/" || pattern == client.PathPrefix || pattern == client.PathPrefix+"/"
+}
+
+// withClient merges the requestor context into the metadata FromContext wrote,
+// so every metadata field has one writer.
+func withClient(raw json.RawMessage, client *domain.EventClientMetadata) (json.RawMessage, error) {
+	var meta domain.EventMetadata
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return nil, err
+	}
+	meta.Client = client
+	return events.MarshalPayload(meta)
+}
+
+func clientFromRequest(r *http.Request) *domain.EventClientMetadata {
+	var c domain.EventClientMetadata
+	if ua, ok := middleware.UserAgentFromContext(r.Context()); ok {
+		c.IP = ua.IP
+	}
+	c.UserAgent = boundHeader(r.UserAgent(), maxEventUserAgentBytes)
+	c.Origin = boundHeader(r.Header.Get("Origin"), maxEventOriginBytes)
+	if c == (domain.EventClientMetadata{}) {
+		return nil
+	}
+	return &c
+}
+
+func boundHeader(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	for max > 0 && !utf8.RuneStart(s[max]) {
+		max--
+	}
+	return strings.Clone(s[:max])
+}

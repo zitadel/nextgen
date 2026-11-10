@@ -1,5 +1,17 @@
 # @zitadel/server-darwin-arm64
 
+## 0.5.0
+
+No changes in this release.
+
+## 0.4.0
+
+No changes in this release.
+
+## 0.3.0
+
+No changes in this release.
+
 ## 0.2.0
 
 No changes in this release.

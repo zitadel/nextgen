@@ -1,15 +1,17 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
+
+import { it } from "@tests/helpers/fixtures";
 
 import {
   readBoundEnvironments,
   requireValue,
   requireValueInteractive,
   resolveEnvironment,
-} from "../../../src/lib/environment";
+} from "@/lib/environment";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /** The answer the mocked clack prompt returns; set per test. */
 const promptAnswer: { value: string | symbol } = { value: "" };
@@ -20,27 +22,17 @@ vi.mock("@clack/prompts", () => ({
   cancel: vi.fn(),
 }));
 
-let dir: string;
-
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-environment-"));
-});
-
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
-});
-
 function dotenv(values: Record<string, string>): string {
   return `${Object.entries(values)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n")}\n`;
 }
 
-async function write(file: string, values: Record<string, string>): Promise<void> {
+async function write(dir: string, file: string, values: Record<string, string>): Promise<void> {
   await writeFile(join(dir, file), dotenv(values));
 }
 
-async function writeSecret(): Promise<void> {
+async function writeSecret(dir: string): Promise<void> {
   await mkdir(join(dir, ".zitadel"), { recursive: true });
   await writeFile(
     join(dir, ".zitadel/secret"),
@@ -54,27 +46,26 @@ async function writeSecret(): Promise<void> {
   );
 }
 
-const resolve = (input: Partial<Parameters<typeof resolveEnvironment>[0]> = {}) =>
+const resolve = (dir: string, input: Partial<Parameters<typeof resolveEnvironment>[0]> = {}) =>
   resolveEnvironment({ cwd: dir, env: {}, ...input });
 
 /** {@link resolve} from a shell in `dir`, the directory a relative `--env-file` is read from. */
-async function resolveFromDir(input: Partial<Parameters<typeof resolveEnvironment>[0]>) {
-  const shell = vi.spyOn(process, "cwd").mockReturnValue(dir);
-  try {
-    return await resolve(input);
-  } finally {
-    shell.mockRestore();
-  }
+async function resolveFromDir(
+  dir: string,
+  input: Partial<Parameters<typeof resolveEnvironment>[0]>,
+) {
+  vi.spyOn(process, "cwd").mockReturnValue(dir);
+  return resolve(dir, input);
 }
 
 describe("resolveEnvironment", () => {
   describe("the environment's name", () => {
-    it("is development by default", async () => {
-      expect((await resolve()).name).toEqual({ value: "development", source: "default" });
+    it("is development by default", async ({ dir }) => {
+      expect((await resolve(dir)).name).toEqual({ value: "development", source: "default" });
     });
 
-    it("prefers --env to everything else", async () => {
-      const environment = await resolve({
+    it("prefers --env to everything else", async ({ dir }) => {
+      const environment = await resolve(dir, {
         envName: "staging",
         env: { ZITADEL_ENV: "production", VERCEL_ENV: "preview" },
       });
@@ -82,50 +73,52 @@ describe("resolveEnvironment", () => {
       expect(environment.name).toEqual({ value: "staging", source: "--env" });
     });
 
-    it("reads ZITADEL_ENV before a platform's signal", async () => {
-      const environment = await resolve({
+    it("reads ZITADEL_ENV before a platform's signal", async ({ dir }) => {
+      const environment = await resolve(dir, {
         env: { ZITADEL_ENV: "production", VERCEL_ENV: "preview" },
       });
 
       expect(environment.name).toEqual({ value: "production", source: "ZITADEL_ENV" });
     });
 
-    it("ignores a CONTEXT that no Netlify build set", async () => {
-      expect((await resolve({ env: { CONTEXT: "staging" } })).name).toEqual({
+    it("ignores a CONTEXT that no Netlify build set", async ({ dir }) => {
+      expect((await resolve(dir, { env: { CONTEXT: "staging" } })).name).toEqual({
         value: "development",
         source: "default",
       });
     });
 
-    it("reads VERCEL_ENV", async () => {
-      expect((await resolve({ env: { VERCEL_ENV: "production" } })).name).toEqual({
+    it("reads VERCEL_ENV", async ({ dir }) => {
+      expect((await resolve(dir, { env: { VERCEL_ENV: "production" } })).name).toEqual({
         value: "production",
         source: "VERCEL_ENV",
       });
     });
 
-    it.each([
+    it.for([
       ["deploy-preview", "preview"],
       ["branch-deploy", "preview"],
       ["dev", "development"],
       ["production", "production"],
-    ])("reads CONTEXT=%s as %s", async (context, name) => {
-      expect((await resolve({ env: { CONTEXT: context, NETLIFY: "true" } })).name).toEqual({
+    ])("reads CONTEXT=%s as %s", async ([context, name], { dir }) => {
+      expect((await resolve(dir, { env: { CONTEXT: context, NETLIFY: "true" } })).name).toEqual({
         value: name,
         source: "CONTEXT",
       });
     });
 
-    it("ignores NODE_ENV, which platforms set to production for every build", async () => {
-      expect((await resolve({ env: { NODE_ENV: "production" } })).name.value).toBe("development");
+    it("ignores NODE_ENV, which platforms set to production for every build", async ({ dir }) => {
+      expect((await resolve(dir, { env: { NODE_ENV: "production" } })).name.value).toBe(
+        "development",
+      );
     });
   });
 
   describe("the chain", () => {
-    it("takes --server over every other source", async () => {
-      await write(".env.development.local", { ZITADEL_URL: "https://file.example" });
+    it("takes --server over every other source", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_URL: "https://file.example" });
 
-      const environment = await resolve({
+      const environment = await resolve(dir, {
         serverFlag: "https://flag.example",
         env: { ZITADEL_URL: "https://process.example" },
       });
@@ -136,11 +129,11 @@ describe("resolveEnvironment", () => {
       });
     });
 
-    it("takes the values of --env-file over the process environment", async () => {
+    it("takes the values of --env-file over the process environment", async ({ dir }) => {
       const file = join(dir, "staging.env");
       await writeFile(file, dotenv({ ZITADEL_PROJECT_ID: "proj_file" }));
 
-      const environment = await resolve({
+      const environment = await resolve(dir, {
         envFile: file,
         env: { ZITADEL_PROJECT_ID: "proj_process" },
       });
@@ -148,25 +141,25 @@ describe("resolveEnvironment", () => {
       expect(environment.values.ZITADEL_PROJECT_ID?.value).toBe("proj_file");
     });
 
-    it("reads a relative --env-file from the shell's directory, not --cwd", async () => {
+    it("reads a relative --env-file from the shell's directory, not --cwd", async ({ dir }) => {
       await mkdir(join(dir, "app"));
-      await write("staging.env", { ZITADEL_PROJECT_ID: "proj_shell" });
-      await write("app/staging.env", { ZITADEL_PROJECT_ID: "proj_app" });
-      const shell = vi.spyOn(process, "cwd").mockReturnValue(dir);
+      await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_shell" });
+      await write(dir, "app/staging.env", { ZITADEL_PROJECT_ID: "proj_app" });
+      vi.spyOn(process, "cwd").mockReturnValue(dir);
 
       const environment = await resolveEnvironment({
         cwd: join(dir, "app"),
         env: {},
         envFile: "staging.env",
-      }).finally(() => shell.mockRestore());
+      });
 
       expect(environment.values.ZITADEL_PROJECT_ID?.value).toBe("proj_shell");
     });
 
-    it("takes the process environment over every .env file", async () => {
-      await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
+    it("takes the process environment over every .env file", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
 
-      const environment = await resolve({ env: { ZITADEL_PROJECT_ID: "proj_process" } });
+      const environment = await resolve(dir, { env: { ZITADEL_PROJECT_ID: "proj_process" } });
 
       expect(environment.values.ZITADEL_PROJECT_ID).toEqual({
         value: "proj_process",
@@ -174,77 +167,79 @@ describe("resolveEnvironment", () => {
       });
     });
 
-    it("walks .env.<env>.local, .env.local, .env.<env>, .env in that order", async () => {
-      await write(".env", { ZITADEL_PROJECT_ID: "from-env" });
-      await write(".env.development", { ZITADEL_PROJECT_ID: "from-env-development" });
-      await write(".env.local", { ZITADEL_PROJECT_ID: "from-env-local" });
-      await write(".env.development.local", { ZITADEL_PROJECT_ID: "from-env-development-local" });
+    it("walks .env.<env>.local, .env.local, .env.<env>, .env in that order", async ({ dir }) => {
+      await write(dir, ".env", { ZITADEL_PROJECT_ID: "from-env" });
+      await write(dir, ".env.development", { ZITADEL_PROJECT_ID: "from-env-development" });
+      await write(dir, ".env.local", { ZITADEL_PROJECT_ID: "from-env-local" });
+      await write(dir, ".env.development.local", {
+        ZITADEL_PROJECT_ID: "from-env-development-local",
+      });
       const order: string[] = [];
 
       for (const file of [".env.development.local", ".env.local", ".env.development", ".env"]) {
-        order.push((await resolve()).values.ZITADEL_PROJECT_ID?.source ?? "");
+        order.push((await resolve(dir)).values.ZITADEL_PROJECT_ID?.source ?? "");
         await rm(join(dir, file));
       }
 
       expect(order).toEqual([".env.development.local", ".env.local", ".env.development", ".env"]);
     });
 
-    it("skips .env.local for the test environment", async () => {
-      await write(".env.local", { ZITADEL_PROJECT_ID: "from-env-local" });
-      await write(".env.test", { ZITADEL_PROJECT_ID: "from-env-test" });
+    it("skips .env.local for the test environment", async ({ dir }) => {
+      await write(dir, ".env.local", { ZITADEL_PROJECT_ID: "from-env-local" });
+      await write(dir, ".env.test", { ZITADEL_PROJECT_ID: "from-env-test" });
 
-      const environment = await resolve({ envName: "test" });
+      const environment = await resolve(dir, { envName: "test" });
 
       expect(environment.values.ZITADEL_PROJECT_ID?.source).toBe(".env.test");
     });
 
-    it("never takes another environment's project from .env.local", async () => {
-      await write(".env.local", { ZITADEL_PROJECT_ID: "proj_development" });
+    it("never takes another environment's project from .env.local", async ({ dir }) => {
+      await write(dir, ".env.local", { ZITADEL_PROJECT_ID: "proj_development" });
 
-      const environment = await resolve({ envName: "production" });
+      const environment = await resolve(dir, { envName: "production" });
 
       expect(environment.values.ZITADEL_PROJECT_ID).toBeUndefined();
     });
 
-    it("never takes another environment's credential from .zitadel/secret", async () => {
-      await writeSecret();
+    it("never takes another environment's credential from .zitadel/secret", async ({ dir }) => {
+      await writeSecret(dir);
 
-      const environment = await resolve({ envName: "production" });
+      const environment = await resolve(dir, { envName: "production" });
 
       expect(environment.values.ZITADEL_PROJECT_SECRET).toBeUndefined();
     });
 
-    it("never fills an --env-file's gaps from .env.local", async () => {
-      await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
-      await write(".env.local", { ZITADEL_URL: "https://dev.example" });
+    it("never fills an --env-file's gaps from .env.local", async ({ dir }) => {
+      await write(dir, "ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
+      await write(dir, ".env.local", { ZITADEL_URL: "https://dev.example" });
 
-      const environment = await resolveFromDir({ envFile: "ci.env" });
+      const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
       expect(environment.values.ZITADEL_URL).toBeUndefined();
     });
 
-    it("never fills an --env-file's gaps from .zitadel/secret", async () => {
-      await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
-      await writeSecret();
+    it("never fills an --env-file's gaps from .zitadel/secret", async ({ dir }) => {
+      await write(dir, "ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
+      await writeSecret(dir);
 
-      const environment = await resolveFromDir({ envFile: "ci.env" });
-
-      expect(environment.values.ZITADEL_PROJECT_SECRET).toBeUndefined();
-    });
-
-    it("never fills an --env-file's gaps from .env.development.local", async () => {
-      await write("prod.env", { ZITADEL_URL: "https://prod.example" });
-      await write(".env.development.local", { ZITADEL_PROJECT_SECRET: "sk_development" });
-
-      const environment = await resolveFromDir({ envFile: "prod.env" });
+      const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
       expect(environment.values.ZITADEL_PROJECT_SECRET).toBeUndefined();
     });
 
-    it("falls back to .zitadel/secret for the project and its credentials", async () => {
-      await writeSecret();
+    it("never fills an --env-file's gaps from .env.development.local", async ({ dir }) => {
+      await write(dir, "prod.env", { ZITADEL_URL: "https://prod.example" });
+      await write(dir, ".env.development.local", { ZITADEL_PROJECT_SECRET: "sk_development" });
 
-      const { values } = await resolve();
+      const environment = await resolveFromDir(dir, { envFile: "prod.env" });
+
+      expect(environment.values.ZITADEL_PROJECT_SECRET).toBeUndefined();
+    });
+
+    it("falls back to .zitadel/secret for the project and its credentials", async ({ dir }) => {
+      await writeSecret(dir);
+
+      const { values } = await resolve(dir);
 
       expect(values).toMatchObject({
         ZITADEL_PROJECT_ID: { value: "proj_secret_file", source: ".zitadel/secret" },
@@ -253,20 +248,20 @@ describe("resolveEnvironment", () => {
       });
     });
 
-    it("prefers a file in the chain to .zitadel/secret", async () => {
-      await writeSecret();
-      await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
+    it("prefers a file in the chain to .zitadel/secret", async ({ dir }) => {
+      await writeSecret(dir);
+      await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
 
-      const { values } = await resolve();
+      const { values } = await resolve(dir);
 
       expect(values.ZITADEL_PROJECT_ID?.value).toBe("proj_file");
     });
 
-    it("resolves each value on its own", async () => {
-      await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
-      await write(".env", { ZITADEL_URL: "https://dotenv.example" });
+    it("resolves each value on its own", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
+      await write(dir, ".env", { ZITADEL_URL: "https://dotenv.example" });
 
-      const { values } = await resolve({ env: { ZITADEL_PROJECT_SECRET: "sk_process" } });
+      const { values } = await resolve(dir, { env: { ZITADEL_PROJECT_SECRET: "sk_process" } });
 
       expect(
         Object.fromEntries(Object.entries(values).map(([key, entry]) => [key, entry.source])),
@@ -277,92 +272,98 @@ describe("resolveEnvironment", () => {
       });
     });
 
-    it("never takes ZITADEL_API_BASE or the server in zitadel.json", async () => {
+    it("never takes ZITADEL_API_BASE or the server in zitadel.json", async ({ dir }) => {
       await writeFile(
         join(dir, "zitadel.json"),
         JSON.stringify({ server: "https://config.example" }),
       );
 
-      const { values } = await resolve({ env: { ZITADEL_API_BASE: "https://base.example" } });
+      const { values } = await resolve(dir, { env: { ZITADEL_API_BASE: "https://base.example" } });
 
       expect(values.ZITADEL_URL).toBeUndefined();
     });
 
-    it("normalises the server to its origin", async () => {
-      await write(".env.development.local", { ZITADEL_URL: "https://file.example/some/path" });
+    it("normalises the server to its origin", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_URL: "https://file.example/some/path" });
 
-      expect((await resolve()).values.ZITADEL_URL?.value).toBe("https://file.example");
+      expect((await resolve(dir)).values.ZITADEL_URL?.value).toBe("https://file.example");
     });
 
-    it("refuses a server that is not an http(s) URL", async () => {
-      await write(".env.development.local", { ZITADEL_URL: "ftp://file.example" });
+    it("refuses a server that is not an http(s) URL", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_URL: "ftp://file.example" });
 
-      await expect(resolve()).rejects.toMatchObject({ code: "E_VALIDATION" });
+      await expect(resolve(dir)).rejects.toMatchObject({ code: "E_VALIDATION" });
     });
 
-    it("names the file a malformed server came from", async () => {
-      await write(".env", { ZITADEL_URL: "localhost:8080" });
+    it("names the file a malformed server came from", async ({ dir }) => {
+      await write(dir, ".env", { ZITADEL_URL: "localhost:8080" });
 
-      await expect(resolve()).rejects.toMatchObject({
+      await expect(resolve(dir)).rejects.toMatchObject({
         message: expect.stringContaining("ZITADEL_URL from .env"),
       });
     });
 
-    it("ignores an empty value", async () => {
-      await write(".env.development.local", { ZITADEL_PROJECT_ID: "" });
-      await write(".env", { ZITADEL_PROJECT_ID: "proj_dotenv" });
+    it("ignores an empty value", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "" });
+      await write(dir, ".env", { ZITADEL_PROJECT_ID: "proj_dotenv" });
 
-      expect((await resolve()).values.ZITADEL_PROJECT_ID?.source).toBe(".env");
+      expect((await resolve(dir)).values.ZITADEL_PROJECT_ID?.source).toBe(".env");
     });
   });
 
   describe("what it refuses", () => {
-    it("refuses --env together with --env-file", async () => {
-      await write("staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
+    it("refuses --env together with --env-file", async ({ dir }) => {
+      await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
 
-      await expect(resolve({ envName: "staging", envFile: "staging.env" })).rejects.toMatchObject({
+      await expect(
+        resolve(dir, { envName: "staging", envFile: "staging.env" }),
+      ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("--env-file"),
       });
     });
 
-    it("refuses an --env-file that does not exist", async () => {
-      await expect(resolve({ envFile: "missing.env" })).rejects.toMatchObject({
+    it("refuses an --env-file that does not exist", async ({ dir }) => {
+      await expect(resolve(dir, { envFile: "missing.env" })).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("missing.env"),
       });
     });
 
-    it("refuses an environment name that would escape the project directory", async () => {
-      await expect(resolve({ envName: "../evil" })).rejects.toMatchObject({
+    it("refuses an environment name that would escape the project directory", async ({ dir }) => {
+      await expect(resolve(dir, { envName: "../evil" })).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("valid environment name"),
       });
-      await expect(resolve({ env: { ZITADEL_ENV: "a/b" } })).rejects.toMatchObject({
+      await expect(resolve(dir, { env: { ZITADEL_ENV: "a/b" } })).rejects.toMatchObject({
         code: "E_VALIDATION",
       });
-      await expect(resolve({ envName: "a..b" })).rejects.toMatchObject({ code: "E_VALIDATION" });
+      await expect(resolve(dir, { envName: "a..b" })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
     });
 
-    it.each(["local", "staging.local"])(
+    it.for(["local", "staging.local"])(
       "refuses %s, whose files are another environment's",
-      async (name) => {
-        await expect(resolve({ envName: name })).rejects.toMatchObject({ code: "E_VALIDATION" });
+      async (name, { dir }) => {
+        await expect(resolve(dir, { envName: name })).rejects.toMatchObject({
+          code: "E_VALIDATION",
+        });
       },
     );
 
-    it("accepts a name of letters, digits, dot, dash and underscore", async () => {
+    it("accepts a name of letters, digits, dot, dash and underscore", async ({ dir }) => {
       for (const name of ["staging", "preview-1", "feature.branch", "env_2"]) {
-        expect((await resolve({ envName: name })).name.value).toBe(name);
+        expect((await resolve(dir, { envName: name })).name.value).toBe(name);
       }
     });
   });
 
   describe("what it reports", () => {
-    it("lists every source it looked in, in order, with what each supplied", async () => {
-      await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
+    it("lists every source it looked in, in order, with what each supplied", async ({ dir }) => {
+      await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
 
-      const { consulted } = await resolve();
+      const { consulted } = await resolve(dir);
 
       expect(consulted).toEqual([
         { source: "--server", present: false, supplied: [] },
@@ -375,10 +376,10 @@ describe("resolveEnvironment", () => {
       ]);
     });
 
-    it("lists the --env-file between --server and the process environment", async () => {
-      await write("staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
+    it("lists the --env-file between --server and the process environment", async ({ dir }) => {
+      await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
 
-      const { consulted } = await resolveFromDir({ envFile: "staging.env" });
+      const { consulted } = await resolveFromDir(dir, { envFile: "staging.env" });
 
       expect(consulted.slice(0, 3).map((entry) => entry.source)).toEqual([
         "--server",
@@ -390,15 +391,10 @@ describe("resolveEnvironment", () => {
 });
 
 describe("requireValue", () => {
-  it("names the environment, the variable and every source consulted", async () => {
-    const environment = await resolve({ envName: "production" });
+  it("names the environment, the variable and every source consulted", async ({ dir }) => {
+    const environment = await resolve(dir, { envName: "production" });
 
-    let thrown: unknown;
-    try {
-      requireValue(environment, "ZITADEL_PROJECT_ID");
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = thrownBy(() => requireValue(environment, "ZITADEL_PROJECT_ID"));
 
     expect(thrown).toMatchObject({ code: "E_VALIDATION" });
     expect((thrown as Error).message).toBe(
@@ -415,9 +411,9 @@ describe("requireValue", () => {
     }
   });
 
-  it("points a development environment at setup and any other at env add", async () => {
-    const development = await resolve();
-    const production = await resolve({ envName: "production" });
+  it("points a development environment at setup and any other at env add", async ({ dir }) => {
+    const development = await resolve(dir);
+    const production = await resolve(dir, { envName: "production" });
 
     expect(() => requireValue(development, "ZITADEL_URL")).toThrow(
       expect.objectContaining({ nextCommands: [`zitadel setup --cwd ${dir}`] }),
@@ -427,9 +423,9 @@ describe("requireValue", () => {
     );
   });
 
-  it("points an --env-file run at that file", async () => {
-    await write("ci.env", { ZITADEL_URL: "https://ci.example" });
-    const environment = await resolveFromDir({ envFile: "ci.env" });
+  it("points an --env-file run at that file", async ({ dir }) => {
+    await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
+    const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
     expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
       expect.objectContaining({
@@ -438,18 +434,20 @@ describe("requireValue", () => {
     );
   });
 
-  it("never sends an --env-file run to setup, which would create a new project", async () => {
-    await write("ci.env", { ZITADEL_URL: "https://ci.example" });
-    const environment = await resolveFromDir({ envFile: "ci.env" });
+  it("never sends an --env-file run to setup, which would create a new project", async ({
+    dir,
+  }) => {
+    await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
+    const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
     expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
       expect.objectContaining({ nextCommands: undefined }),
     );
   });
 
-  it("points an environment env add already bound at its own file", async () => {
-    await write(".env.production.local", { ZITADEL_PROJECT_ID: "proj_production" });
-    const environment = await resolve({ envName: "production" });
+  it("points an environment env add already bound at its own file", async ({ dir }) => {
+    await write(dir, ".env.production.local", { ZITADEL_PROJECT_ID: "proj_production" });
+    const environment = await resolve(dir, { envName: "production" });
 
     expect(() => requireValue(environment, "ZITADEL_PROJECT_SECRET")).toThrow(
       expect.objectContaining({
@@ -459,8 +457,10 @@ describe("requireValue", () => {
     );
   });
 
-  it("sends no one to env add when the process environment already names the project", async () => {
-    const environment = await resolve({
+  it("sends no one to env add when the process environment already names the project", async ({
+    dir,
+  }) => {
+    const environment = await resolve(dir, {
       envName: "production",
       env: { ZITADEL_PROJECT_ID: "proj_ci" },
     });
@@ -470,25 +470,25 @@ describe("requireValue", () => {
     );
   });
 
-  it("runs the env add it suggests in the directory this run addressed", async () => {
-    const environment = await resolve({ envName: "staging" });
+  it("runs the env add it suggests in the directory this run addressed", async ({ dir }) => {
+    const environment = await resolve(dir, { envName: "staging" });
 
     expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
       expect.objectContaining({ nextCommands: [`zitadel env add staging --cwd ${dir}`] }),
     );
   });
 
-  it("returns the value when it resolved", async () => {
-    await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
+  it("returns the value when it resolved", async ({ dir }) => {
+    await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
 
-    expect(requireValue(await resolve(), "ZITADEL_PROJECT_ID")).toBe("proj_file");
+    expect(requireValue(await resolve(dir), "ZITADEL_PROJECT_ID")).toBe("proj_file");
   });
 });
 
 describe("requireValueInteractive", () => {
-  it("throws without prompting when non-interactive", async () => {
+  it("throws without prompting when non-interactive", async ({ dir }) => {
     const { text } = await import("@clack/prompts");
-    const environment = await resolve({ envName: "production" });
+    const environment = await resolve(dir, { envName: "production" });
 
     await expect(
       requireValueInteractive(environment, "ZITADEL_PROJECT_ID", { cwd: dir, interactive: false }),
@@ -496,9 +496,9 @@ describe("requireValueInteractive", () => {
     expect(text).not.toHaveBeenCalled();
   });
 
-  it("prompts for a missing value and persists it to .env.<name>.local", async () => {
+  it("prompts for a missing value and persists it to .env.<name>.local", async ({ dir }) => {
     promptAnswer.value = "proj_prompted";
-    const environment = await resolve({ envName: "production" });
+    const environment = await resolve(dir, { envName: "production" });
 
     const value = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", {
       cwd: dir,
@@ -511,10 +511,10 @@ describe("requireValueInteractive", () => {
     );
   });
 
-  it("keeps a value typed for an --env-file run out of .env.<name>.local", async () => {
+  it("keeps a value typed for an --env-file run out of .env.<name>.local", async ({ dir }) => {
     promptAnswer.value = "sk_typed";
-    await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
-    const environment = await resolveFromDir({ envFile: "ci.env" });
+    await write(dir, "ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
+    const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
     await requireValueInteractive(environment, "ZITADEL_PROJECT_SECRET", {
       cwd: dir,
@@ -526,14 +526,14 @@ describe("requireValueInteractive", () => {
 });
 
 describe("readBoundEnvironments", () => {
-  it("lists the .env.<name>.local files that hold a project id, by name", async () => {
-    await write(".env.production.local", {
+  it("lists the .env.<name>.local files that hold a project id, by name", async ({ dir }) => {
+    await write(dir, ".env.production.local", {
       ZITADEL_PROJECT_ID: "proj_prod",
       ZITADEL_URL: "https://a.example",
     });
-    await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_dev" });
-    await write(".env.scratch.local", { ZITADEL_URL: "https://b.example" });
-    await write(".env.local", { ZITADEL_PROJECT_ID: "proj_local" });
+    await write(dir, ".env.development.local", { ZITADEL_PROJECT_ID: "proj_dev" });
+    await write(dir, ".env.scratch.local", { ZITADEL_URL: "https://b.example" });
+    await write(dir, ".env.local", { ZITADEL_PROJECT_ID: "proj_local" });
 
     const bound = await readBoundEnvironments(dir);
 

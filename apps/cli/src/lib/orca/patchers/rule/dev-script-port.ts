@@ -1,6 +1,6 @@
-import { ZitadelError } from "../../../errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../json";
-import { extractPort, portFromIssuer, withDevPort } from "../../detectors/port";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
+import { extractPort, portFromIssuer, withDevPort } from "@/lib/orca/detectors/port";
 import type { FileOp } from "./file-writer/types";
 
 /** Options for {@link devScriptPortEdit}. */

@@ -47,13 +47,23 @@ test("a name that is no built-in schema is a 404 of the schemas service", async 
   expect(response.status()).toBe(404);
 });
 
-test("the API keeps /schemas and /schemas/{id}", async ({ request }) => {
-  // The schemas service takes what lies below /schemas/v1/ only; a schema id
-  // never holds a slash, so /schemas and /schemas/<id> (here the id "v1") stay
-  // the server's. Signed out, it answers them with its JSON error.
-  for (const route of ["/schemas", path]) {
+test("the API answers /schemas and /schemas/{id} under /api/v1, and at the root until 1.0.0", async ({
+  request,
+}) => {
+  // The API lives under /api/v1 (ADR 077), and until 1.0.0 also answers its
+  // root paths, with a Deprecation header. The schemas service takes what
+  // lies below /schemas/v1/ only; a schema id never holds a slash, so
+  // /schemas and /schemas/<id> (here the id "v1") stay the server's on both
+  // spellings. Signed out, it answers them with its JSON error.
+  for (const route of ["/api/v1/schemas", `/api/v1${path}`, "/schemas", path]) {
     const response = await request.get(route);
     expect(response.headers()["content-type"], route).toContain("application/json");
     expect(await response.json(), route).toMatchObject({ code: expect.any(String) });
+    const deprecation = response.headers().deprecation;
+    if (route.startsWith("/api/v1/")) {
+      expect(deprecation, route).toBeUndefined();
+    } else {
+      expect(deprecation, route).toMatch(/^@\d+$/);
+    }
   }
 });

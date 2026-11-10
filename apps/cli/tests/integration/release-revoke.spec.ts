@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
 /** Build a release and return its id. */
 async function aRelease(app: ScaffoldedApp): Promise<string> {
+  // Setup deployed the scaffolded config, so the release is built from an
+  // edit of it: one nothing serves.
+  await app.editUserSchema((schema) => {
+    schema.properties.company = { type: "string" };
+  });
   const result = await app.run(["release", "create", "--non-interactive", "--json"]);
   expect(result, "arranging a release should have succeeded").toSucceed();
   return app.envelopeOf<{ release_id: string }>(result).data.release_id;
@@ -34,6 +39,14 @@ describe("release revoke", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["release", "revoke", await aRelease(app), "--force"];
+      platform.revokesAHostileReleaseId();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("revokes a release nothing serves", async () => {
         const app = await aSetUpApp();
@@ -52,6 +65,24 @@ describe("release revoke", () => {
         expect(
           app.envelopeOf<{ revoked_at: string | null }>(result).data.revoked_at,
         ).not.toBeNull();
+      });
+
+      // The confirmation names the id the server answered with.
+      it("spells out an escape sequence the server put in the release id", async () => {
+        const app = await aSetUpApp();
+        const releaseId = await aRelease(app);
+        platform.revokesAHostileReleaseId();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          releaseId,
+          "--force",
+          "--non-interactive",
+        ]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
       });
 
       it("confirms the revoke the way every revoke does", async () => {
@@ -119,19 +150,45 @@ describe("release revoke", () => {
         expect(result).toFailWith("E_CONFLICT");
       });
 
-      it("requires --force when non-interactive", async () => {
-        const app = await aSetUpApp();
-        const releaseId = await aRelease(app);
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aRelease(app);
 
-        const result = await app.run([
-          "release",
-          "revoke",
-          releaseId,
-          "--non-interactive",
-          "--json",
-        ]);
+          const result = await app.run(["release", "revoke", releaseId, "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aRelease(app);
+
+          const result = await app.run(["release", "revoke", releaseId, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aRelease(app);
+
+          const result = await app.run(["release", "revoke", releaseId, "--json"]);
+
+          expect(result).toSuggestExactly(app.againAsRun(`release revoke ${releaseId} --force`));
+        });
+
+        it("revokes nothing", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const releaseId = await aRelease(app);
+
+          await app.run(["release", "revoke", releaseId, "--json"]);
+
+          expect(
+            await app.run(["deployment", "create", "--release", releaseId, "--json"]),
+          ).toSucceed();
+        });
       });
     });
   });

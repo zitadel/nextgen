@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
-import { CREDENTIALS, PREVIEW_CREDENTIAL } from "../../src/lib/oclif";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,13 @@ describe("preview rm", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["preview", "rm", "https://wiped\u001b[2J.preview.example.com", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();
@@ -108,12 +115,39 @@ describe("preview rm", () => {
         expect(result).toSuggest("preview list");
       });
 
-      it("requires --force when non-interactive", async () => {
-        const app = await anAppWithAPreview();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await anAppWithAPreview();
 
-        const result = await app.run(["preview", "rm", PREVIEW_URL, "--non-interactive", "--json"]);
+          const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await anAppWithAPreview();
+
+          const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await anAppWithAPreview();
+
+          const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
+
+          expect(result).toSuggestExactly(app.againAsRun(`preview rm ${PREVIEW_URL} --force`));
+        });
+
+        it("removes nothing", async () => {
+          const app = await anAppWithAPreview();
+
+          await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
+
+          const listed = await app.run(["preview", "list", "--json"]);
+          expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).not.toEqual([]);
+        });
       });
     });
 

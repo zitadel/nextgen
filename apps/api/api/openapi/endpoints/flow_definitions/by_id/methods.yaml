@@ -1,0 +1,25 @@
+get:
+  operationId: getFlowDefinition
+  x-zitadel-cli: flow-definitions get
+  summary: Get a flow definition by ID
+  description: |
+    Returns one flow definition revision. Pass the `id` that
+    `createFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definition.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+  responses:
+    '200':
+      description: The flow definition.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-definition-response.yaml
+    default:
+      $ref: getFlowDefinition-error-response.yaml
+

@@ -1,8 +1,8 @@
-import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { isObject } from "../../../json";
-import { MANAGED_MARKER } from "../../../paths";
+import { pathExists } from "@/lib/fs";
+import { readPackageJson } from "@/lib/npm";
+import { MANAGED_MARKER } from "@/lib/paths";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
 /**
@@ -58,7 +58,7 @@ export async function withoutExistingTargets(
   const kept: FileOp[] = [];
   for (const op of ops) {
     if (op.kind === "write") {
-      if (!(await exists(join(cwd, op.path)))) {
+      if (!(await pathExists(join(cwd, op.path)))) {
         kept.push(op);
       }
       continue;
@@ -66,7 +66,7 @@ export async function withoutExistingTargets(
     if (op.kind === "edit" && op.overwrites) {
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
       const present = await Promise.all(
-        candidates.map((candidate) => exists(join(cwd, candidate))),
+        candidates.map((candidate) => pathExists(join(cwd, candidate))),
       );
       if (!present.includes(true)) {
         kept.push(op);
@@ -91,29 +91,6 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  let contents: string;
-  try {
-    contents = await readFile(join(cwd, "package.json"), "utf8");
-  } catch {
-    return false;
-  }
-  try {
-    const pkg = JSON.parse(contents) as unknown;
-    if (!isObject(pkg)) {
-      return false;
-    }
-    const declared = (key: string): boolean => isObject(pkg[key]) && name in (pkg[key] as object);
-    return declared("dependencies") || declared("devDependencies");
-  } catch {
-    return false;
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
+  const pkg = await readPackageJson(cwd).catch(() => undefined);
+  return pkg?.dependencies?.[name] !== undefined || pkg?.devDependencies?.[name] !== undefined;
 }

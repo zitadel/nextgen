@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -37,6 +37,12 @@
       "identifier": "COMMANDS"
     },
     "helpClass": "./dist/lib/oclif/help",
+    "hooks": {
+      "finally": "./dist/hooks/version-notice"
+    },
+    "additionalHelpFlags": [
+      "-h"
+    ],
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",
@@ -113,6 +119,9 @@
       },
       "api": {
         "description": "Call any operation of the Zitadel API."
+      },
+      "skills": {
+        "description": "Give coding agents the Zitadel skills."
       }
     }
   },
@@ -140,18 +149,30 @@
     "@oclif/plugin-search": "catalog:",
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
+    "@oclif/table": "catalog:",
     "@zitadel/api": "workspace:*",
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
+    "escape-string-regexp": "catalog:",
+    "execa": "catalog:",
+    "fastest-levenshtein": "catalog:",
+    "is-wsl": "catalog:",
+    "jsonc-parser": "catalog:",
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
+    "open": "catalog:",
+    "p-reduce": "catalog:",
+    "p-retry": "catalog:",
+    "p-timeout": "catalog:",
+    "p-wait-for": "catalog:",
     "picocolors": "^1.1.1",
     "rosie-skills": "catalog:",
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
-    "undici": "^7.29.1",
+    "sort-keys": "catalog:",
+    "undici": "^7.30.1",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:"
   },
@@ -166,6 +187,7 @@
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",
+    "type-fest": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",

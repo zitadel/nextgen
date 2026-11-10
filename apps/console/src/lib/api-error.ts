@@ -33,6 +33,12 @@ export function describeError(cause: unknown, fallback: string): string {
   return cause instanceof Error ? cause.message : fallback;
 }
 
+/** The fields a failed request names, as {@link describeError} lists them. */
+export function errorFieldNames(cause: unknown): string[] {
+  const body = cause instanceof ApiError ? errorBody(cause) : undefined;
+  return body ? namedFields(body) : [];
+}
+
 /** The error payload of a failed request, when it carried one. */
 function errorBody(cause: ApiError): Record<string, unknown> | undefined {
   const body = cause.body;

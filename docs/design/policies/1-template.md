@@ -1,7 +1,7 @@
 # Template
 
 One template per operation, defined by Zitadel and shipped with the server
-([`internal/policy/templates/`](../../../internal/policy/templates/)). A
+([`internal/policy/templates/`](../../../apps/api/internal/policy/templates/)). A
 template has four parts: `config`, the settings an instance may set;
 `config_rules`, how those settings relate to each other; `context`, the
 values the rules receive; `rules`, the named boolean CEL expressions that must

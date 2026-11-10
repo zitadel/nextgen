@@ -43,7 +43,7 @@ The customer's other apps, third-party apps and MCP clients
 ([#375](https://github.com/zitadel/nextgen/issues/375)) need a sign-in they
 can redirect to. The server has no OIDC endpoint yet, and the widget never
 sends the `auth_request_id` that `POST /flow` stores
-([`flow.go`](../../internal/api/flow.go)). Apps keep generated files and
+([`flow.go`](../../apps/api/internal/api/flow.go)). Apps keep generated files and
 pinned packages for months, and Next.js reads its generated `matcher` at
 build time
 ([`next/index.ts`](../../apps/cli/src/lib/orca/patchers/rule/next/index.ts)),
@@ -132,8 +132,9 @@ one login app share a relying-party ID.
 ### 6. One namespace on the server
 
 A project's authorization server lives under `/oauth/{project_id}/` on the
-server, outside the resource API; the cloud's catch-all already receives it
-(ADR 076). Two paths under it are fixed now:
+server, outside the resource API; the cloud routes it to the server with a
+`vercel.json` rule of its own when it ships, as it does the server's other root
+paths (ADR 076, amended). Two paths under it are fixed now:
 `.well-known/openid-configuration`
 ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
 and `.well-known/oauth-authorization-server`
@@ -290,7 +291,7 @@ screen. On the wire they are ordinary steps with reserved names,
 `account_choice` and `consent`, which the flow-definition meta-schema lists
 as reserved and the validator refuses, as it refuses the engine-injected
 `back` action
-([`flow_definition_validator.go`](../../internal/domain/flow_definition_validator.go)).
+([`flow_definition_validator.go`](../../apps/api/internal/domain/flow_definition_validator.go)).
 Their payload is documented with the step: the app's name, logo and redirect
 host (§8), the requested scopes with their text keys (ADR 082 §5), the
 accounts to choose from, and accept and deny actions. A widget template or a
@@ -571,3 +572,11 @@ On implementation: the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK and
 components READMEs, the API spec's `hint.login_name` description, and the
 [compose quick start](../quick-start/docker-compose.md).
+
+## Amendment (2026-10-31): §10, no project default target
+
+There is no project default target: a caller with no `Origin` is served the
+project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). The rest of §10 stands: the
+code carries the deployment for an authorization code grant, and a refresh and
+userinfo resolve the newest deployment to the token's issuer.

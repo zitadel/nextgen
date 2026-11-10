@@ -11,9 +11,9 @@ import { EYEBROW } from "./typography";
  * what a detail screen shows: stacked below `sm`, where the rule becomes a tick
  * on its own row, and in a row above it.
  *
- * A resource (user, team) draws the card. A configuration screen (schema,
- * login flow, identity provider, release) passes `bordered={false}` and sets
- * the values on the page with no border or fill.
+ * A resource (user, team) draws the card. A configuration screen (login flow,
+ * identity provider, release) passes `bordered={false}` and sets the values on
+ * the page with no border or fill.
  *
  * `max-w-full` + `overflow-x-auto`: its width is set by the id, which is never
  * truncated, so a narrow screen scrolls the card rather than the page.

@@ -23,6 +23,13 @@ tasks:
   build:
     deps:
       - "sdk-next:build"
+    inputs:
+      - "**/*"
+      # Every public agent skill, which the build copies into dist/skills
+      # (src/lib/skills/bundle.ts) for `zitadel skills add`.
+      - "/skills/**/*"
+      - "/apps/*/skills/**/*"
+      - "/packages/*/skills/**/*"
 
   build-release:
     script: |
@@ -56,16 +63,19 @@ tasks:
       - "/apps/server/bin/**/*"
       # The spec files whose `x-zitadel-cli` names the api-coverage test checks
       # against the commands.
-      - "/api/openapi/endpoints/**/methods.yaml"
+      - "/apps/api/api/openapi/endpoints/**/methods.yaml"
       # The product analytics catalog the catalog test checks telemetry against.
       - "/docs/product-analytics-events.yaml"
       # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
       - "/vercel.json"
       # tests/unit/scripts tests the root scripts and the journey scripts they
-      # import; the release manifest's test reads the Changesets config, the
-      # moon workspace and every package's package.json and moon.yml.
+      # import, never their own tests; the release manifest's test reads the
+      # Changesets config, the moon workspace and every package's package.json
+      # and moon.yml.
       - "/scripts/**/*.mjs"
       - "/e2e/journey/scripts/*.mjs"
+      - "!/scripts/**/*.test.mjs"
+      - "!/e2e/journey/scripts/*.test.mjs"
       - "/.changeset/config.json"
       - "/.moon/workspace.yml"
       - "/apps/*/package.json"
@@ -78,6 +88,8 @@ tasks:
       - "/.github/semantic.yml"
       - "/Dockerfile"
       - "/docs/design/idp/schemas/**/*"
+      # The bundle's test checks every skill it ships is under an MIT path.
+      - "/LICENSING.md"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite
@@ -89,6 +101,14 @@ tasks:
 
   check-advisories:
     command: "corepack pnpm run check-advisories"
+    deps:
+      # The scaffolders import `@zitadel/api`'s source, which loads its
+      # generated client.
+      - "api:generate"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
     options:
       # It asks the npm advisory database about the package versions the
       # scaffolders pin, so it needs the network, and its answer changes when

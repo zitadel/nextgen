@@ -1,5 +1,5 @@
-import { ZitadelError } from "../../../errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../json";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import type { FileOp } from "./file-writer/types";
 
 /**
@@ -65,22 +65,14 @@ export function replaceOrigin(
   previous: string,
   next: string,
 ): unknown[] {
-  const out: unknown[] = [];
-  let placed = false;
-  for (const pattern of patterns) {
-    if (pattern === previous || pattern === next) {
-      if (!placed) {
-        out.push(next);
-        placed = true;
-      }
-      continue;
-    }
-    out.push(pattern);
+  const isOrigin = (pattern: unknown) => pattern === previous || pattern === next;
+  const first = patterns.findIndex(isOrigin);
+  if (first === -1) {
+    return [...patterns, next];
   }
-  if (!placed) {
-    out.push(next);
-  }
-  return out;
+  return patterns.flatMap((pattern, index) =>
+    isOrigin(pattern) ? (index === first ? [next] : []) : [pattern],
+  );
 }
 
 /** The `.env.local` op that points the app's `ZITADEL_ISSUER` at its new origin. */

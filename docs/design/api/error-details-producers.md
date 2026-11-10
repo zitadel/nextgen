@@ -25,13 +25,13 @@ Human-readable explanation that is not structured data belongs in `Message` (`Wi
 
 ## Wire shape
 
-The API nests producer payloads under `details.details` (legacy shape). Use [`marshalErrorDetails`](../../../internal/api/error_handler.go) when composing the envelope. Test-only `FullErrorInResponse` may also attach `details.parent`; that path is not part of the public contract and must not be asserted by API integration tests.
+The API nests producer payloads under `details.details` (legacy shape). Use [`marshalErrorDetails`](../../../apps/api/internal/api/error_handler.go) when composing the envelope. Test-only `FullErrorInResponse` may also attach `details.parent`; that path is not part of the public contract and must not be asserted by API integration tests.
 
 ## Reference producers
 
 ### Request field validation — `RequestInvalidFieldDetails`
 
-Flow `Fields` value decode failures attach `{field}` only (no parser text, no payload fragments). See [`SubmitFlowStep`](../../../internal/api/flow.go) and [`flowFieldDecodeError`](../../../internal/api/flow.go).
+Flow `Fields` value decode failures attach `{field}` only (no parser text, no payload fragments). See [`SubmitFlowStep`](../../../apps/api/internal/api/flow.go) and [`flowFieldDecodeError`](../../../apps/api/internal/api/flow.go).
 
 ## Inventory (fix / defer)
 
@@ -46,6 +46,7 @@ Flow `Fields` value decode failures attach `{field}` only (no parser text, no pa
 | `domain/policy.go` `PolicyInvalidDetails` | typed `{violations: [{setting} \| {config_rule, settings}]}` | **Reference** — every setting and config rule a published policy fails, by name, never a value |
 | `service/auth_attempt.go` unsupported proof | was string `WithDetails` | **Fixed** — moved to `Message` |
 | `domain/deployment.go` `ErrDeploymentInvalid` | explanation | **Fixed** — callers set it with `WithMessage` |
+| `domain/project.go` `ErrProjectLastOwner` | typed `{project_ids}` | **Reference** — the projects whose owning team would be left without an active member; the message names the same ids |
 | `deployment.go` `deploymentConflictResponse` | typed `{deployment}` | **Reference** — hand-built typed 409, so `details.deployment` is flat and in the API's deployment shape |
 | `service/list.go`, `service/project.go`, `service/team.go` filter/sort strings | string `WithDetails` | **Deferred** — inventory only this PR |
 | crypto / token / signing / encryption `WithDetails` | strings or maps | **Deferred** — often internal; review before promoting to public details |

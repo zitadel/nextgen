@@ -1,7 +1,7 @@
 import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/core";
 
-import { exploreAllCommands } from "../journey-guidance";
-import { showSkillsHint } from "../skills-hint";
+import { exploreAllCommands } from "@/lib/journey-guidance";
+import { showSkillsHint } from "@/lib/skills-hint";
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
@@ -44,7 +44,7 @@ export default class ZitadelHelp extends Help {
       ...groups.map(([group, rows]) => this.section(group, list(rows))),
       this.section(
         "Flags",
-        ["--help      Show help for command", `--version   Show ${bin} version`].join("\n"),
+        ["-h, --help  Show help for command", `--version   Show ${bin} version`].join("\n"),
       ),
       this.section(
         "Examples",
@@ -56,6 +56,7 @@ export default class ZitadelHelp extends Help {
       await showSkillsHint({
         env: process.env,
         interactive: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.config.version,
       });
     }
     this.log(sections.join("\n\n"));

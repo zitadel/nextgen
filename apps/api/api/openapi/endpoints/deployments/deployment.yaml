@@ -1,0 +1,69 @@
+title: Deployment
+description: |
+  An immutable record of a release made live on a set of origins. A release
+  is a snapshot of the project's configuration, and a deployment freezes the
+  project's variable values with it. Deploying and rolling back each append
+  one, so the history is the audit trail.
+
+  A primary origin serves the project's newest primary deployment if that
+  deployment names it, so one added later serves nothing until the next
+  deployment to `primary`. Requests with no origin get the same deployment. A
+  preview URL serves the newest deployment to it while its preview is live.
+
+  Every field is fixed at creation except `status`, which is read as of now.
+type: object
+required:
+  - id
+  - project_id
+  - release_id
+  - kind
+  - targets
+  - status
+  - deployed_at
+  - metadata
+properties:
+  id:
+    readOnly: true
+    description: The deployment ID, opaque and immutable, assigned at creation.
+    $ref: ../../components/schemas/deployment-id.yaml
+  project_id:
+    readOnly: true
+    description: The project this deployment belongs to.
+    $ref: ../../components/schemas/project-id.yaml
+  release_id:
+    readOnly: true
+    description: |
+      The release this deployment made live. Always the release ID, also
+      when the request named the release by `content_hash`.
+    $ref: ../../components/schemas/release-id.yaml
+  kind:
+    readOnly: true
+    $ref: deployment-kind.yaml
+  targets:
+    readOnly: true
+    type: array
+    minItems: 1
+    description: |
+      The resolved origins, sorted. For `primary`, the project's primary
+      origins at creation. The live view lists only the targets still served.
+    items:
+      $ref: deployment-target.yaml
+  status:
+    readOnly: true
+    $ref: deployment-status.yaml
+  deployed_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: When the deployment was created.
+    example: '2026-10-02T14:52:00Z'
+  metadata:
+    readOnly: true
+    $ref: deployment-metadata.yaml
+  release:
+    readOnly: true
+    description: |
+      The release named by `release_id`, present only when the request asked
+      for it with `expand: ["release"]`, in the same representation
+      `GET /releases/{release_id}` serves. Absent means it was not requested.
+    $ref: ../releases/release.yaml

@@ -6,8 +6,8 @@ import {
   readmeGuidanceSection,
   removeGuidanceSection,
   upsertGuidanceSection,
-} from "../../../../../../src/lib/orca/patchers/rule/guidance";
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
+} from "@/lib/orca/patchers/rule/guidance";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 
 const ctx: PatchContext = {
   framework: { id: "next", devPort: 3000, url: "http://localhost:3000" },
@@ -98,13 +98,13 @@ describe("removeGuidanceSection", () => {
 });
 
 describe("guidance content", () => {
-  it("opens /login on the exact origin and warns off 127.0.0.1", () => {
+  it("opens /register on the exact origin and warns off 127.0.0.1", () => {
     const agents = agentsGuidanceSection(ctx);
-    // /login, not the bare origin: only freshly scaffolded apps redirect /
-    // there — a pre-existing app keeps its homepage.
-    expect(agents).toContain("http://localhost:3000/login");
+    // A first run has no user yet, so it starts at sign-up; a named path, not
+    // the bare origin, because only freshly scaffolded apps redirect /.
+    expect(agents).toContain("http://localhost:3000/register");
     expect(agents).toContain("not 127.0.0.1");
-    expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/login");
+    expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/register");
   });
 
   it("points agents at the dialect meta-schemas and the deploy loop", () => {
@@ -171,7 +171,7 @@ describe("guidance content", () => {
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
-    expect(reactAgents).toContain("/__nextgen/sessions/me?project_id=");
+    expect(reactAgents).toContain("/__nextgen/api/v1/sessions/me?project_id=");
     expect(reactAgents).toContain('cache: "no-store"');
     expect(reactAgents).toContain("401/auth.unauthorized");
     expect(reactAgents).toContain("403/sess.project_mismatch");

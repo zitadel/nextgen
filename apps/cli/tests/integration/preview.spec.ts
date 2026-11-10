@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
-import { CREDENTIALS, PREVIEW_CREDENTIAL } from "../../src/lib/oclif";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
 
 const platform = usePlatformMock();
 
@@ -10,6 +10,8 @@ const PREVIEW_PATTERN = "https://*-acme.vercel.app";
 const PREVIEW_URL = "https://x-acme.vercel.app";
 
 type Published = {
+  release_id: string;
+  deployment_id: string;
   content_hash: string;
   previews: { url: string; expires_at: string | null }[];
   release_env: string;
@@ -67,6 +69,13 @@ describe("preview", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await anAppAdmittingPreviews();
+      const args = ["preview", "--origin", PREVIEW_URL];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("deploys to the preview URL it is given", async () => {
         const app = await anAppAdmittingPreviews();
@@ -96,6 +105,40 @@ describe("preview", () => {
         expect(app.envelopeOf<Published>(result).data.release_env).toMatch(
           /^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/,
         );
+      });
+
+      it("records -m on the release and the deployment", async () => {
+        const app = await anAppAdmittingPreviews();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+
+        const result = await app.run([
+          "preview",
+          "--origin",
+          PREVIEW_URL,
+          "-m",
+          "add company",
+          "--json",
+        ]);
+
+        const data = app.envelopeOf<Published>(result).data;
+        expect(await app.releaseMessage(data.release_id)).toBe("add company");
+        expect(await app.deploymentMessage(data.deployment_id)).toBe("add company");
+      });
+
+      it("records the commit subject when -m is omitted", async () => {
+        const app = await anAppAdmittingPreviews();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.commit();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        const data = app.envelopeOf<Published>(result).data;
+        expect(await app.releaseMessage(data.release_id)).toBe("wip");
+        expect(await app.deploymentMessage(data.deployment_id)).toBe("wip");
       });
 
       it.each(["30s", "366d"])("refuses a ttl of %s, outside the 60s..365d range", async (ttl) => {
@@ -135,6 +178,18 @@ describe("preview", () => {
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
 
         expect(result).toSucceed();
+      });
+
+      // A refusal of permission is tolerated above, because the server decides
+      // what the preview token may deploy to. A credential the server does not
+      // accept at all is a different answer and must not be read as one.
+      it("fails when the preview token is not accepted at all", async () => {
+        const app = await anAppAdmittingPreviews();
+        platform.rejectsTheCredential();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(result).toFailWith("E_AUTH");
       });
 
       it("gives the preview an expiry when --ttl is omitted", async () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
-import { CREDENTIALS, PREVIEW_CREDENTIAL } from "../../src/lib/oclif";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
 
 const platform = usePlatformMock();
 
@@ -52,6 +52,15 @@ describe("preview list", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["preview", "list"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();
@@ -115,6 +124,25 @@ describe("preview list", () => {
         const result = await app.run(["preview", "list", "--limit", "1", "--json"]);
 
         expect(result).toSuggest("preview list --limit 1 --page-token");
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each preview as a tab-separated record", async () => {
+        const app = await anAppWithAPreview();
+
+        const result = await app.run(["preview", "list", "--plain"]);
+
+        expect(result).toPrintPlainRows([PREVIEW_URL, /.+/, /.+/]);
+      });
+
+      it("prints nothing on a project with no previews", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "list", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
       });
     });
   });

@@ -1,18 +1,19 @@
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/api-client";
-import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { type Environment, resolveEnvironment } from "../../lib/environment";
-import { ZitadelError } from "../../lib/errors";
-import { serverLogAction } from "../../lib/journey-guidance";
+import { createZitadelClient } from "@/lib/backend";
+import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
+import { resolveEnvironment } from "@/lib/environment";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { serverLogAction } from "@/lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
-} from "../../lib/local-server/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
+} from "@/lib/local-server/docker-guidance";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   LOCAL_RUNTIME_FILE,
@@ -23,27 +24,40 @@ import {
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
+  resolveRuntimeBackend,
+  RUNTIME_BACKENDS,
   type RuntimeMetadata,
-} from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { startedServer } from "@/commands/local-server/started";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
+import { isRefusal } from "@/lib/consent";
+import { reportWarning } from "@/lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
   projectEnvFile,
-} from "../../lib/oclif/environment-flags";
-import { createOrca } from "../../lib/orca";
-import { resolveCwd } from "../../lib/paths";
+} from "@/lib/oclif/environment-flags";
+import { createOrca } from "@/lib/orca";
+import { isLoopbackUrl } from "@/lib/server";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
-} from "../../lib/project";
-import { listenersForPort } from "../../lib/prober/ports";
-import { isLoopbackUrl } from "../../lib/server";
-import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+} from "@/lib/project";
+import { listenersForPort } from "@/lib/prober/ports";
+import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+import { renderDoctorReport, withCategories } from "./report";
 import {
   type EnvironmentSelector,
   portableSuggestions,
@@ -51,8 +65,10 @@ import {
   shellCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
+} from "@/lib/suggestion";
+import { asStepsShown, type NextSteps, nextStepsData } from "@/lib/oclif/next-steps";
+import { painted } from "@/lib/oclif/rendering";
+import { userAgent } from "@/lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -77,57 +93,111 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  * level and skipped, not propagated — the post-fix re-verify still reports
  * whatever remains broken.
  */
-export default class Doctor extends BaseCommand {
+const MIN_PORT = 1;
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+const PORT: Refused<number> = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+};
+
+/** What doctor is about, worked out once however many times it is asked for. */
+/**
+ * What doctor reads off the run to decide which server it is about. Named for
+ * itself rather than taken from the command, so neither `sourceOf`, which is
+ * handed the flags before the run has a context, nor `execute` has to assert
+ * what the other one has.
+ */
+type Asked = Readonly<{
+  port?: number;
+  runtime?: string;
+  image?: string;
+}>;
+
+type Checking = Readonly<{
+  cwd: string;
+  port: number;
+  hostedServer: string | undefined;
+}>;
+
+export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+      dependsOn: ["fix"],
+    }),
     image: nonBlankString({ description: "Container image to check." }),
-    port: Flags.integer({
+    port: Flags.custom<number>({
+      parse: reads(PORT),
+    })({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
     }),
-    runtime: Flags.string({
+    runtime: Flags.option({
       description: "Local runtime backend.",
-      options: ["binary", "docker"],
-    }),
+      options: RUNTIME_BACKENDS,
+    })(),
     // Doctor's local-runtime checks are about the machine, but with `--env` /
     // `--env-file` it also verifies the environment a command would connect to:
     // the same flags every EnvironmentCommand takes, resolved the same way.
     ...environmentFlags,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Doctor);
-    // The local server this directory uses: the one `zitadel start` ran here,
-    // or in the nearest parent, as setup and `console` find it. An unreadable
-    // record only costs the port hint; the read below reports it.
-    const startDir = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const hint = await readNearestRuntimeMetadata(startDir).catch(() => undefined);
-    const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
-    const hostedServer = await hostedServerWithoutLocalRuntime(startDir, flags);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: hostedServer ?? localServerUrl(port),
-    });
-    const { cwd, dryRun } = this.meta;
-    const nearest = await readNearestRuntimeMetadata(cwd);
+  static override meta = {
+    resolveServer: false,
+  };
+
+  /**
+   * What doctor is about, worked out once: the port it checks and the hosted
+   * server of a project that runs no local one. It is resolved before the
+   * context is built, so the run's first event names the same server as its
+   * last, and `execute` reads what was found rather than asking again.
+   */
+  private readonly started = startedServer(readNearestRuntimeMetadata);
+
+  private readonly checking = new Map<string, Promise<Checking>>();
+
+  protected override async sourceOf(flags: Asked, cwd: string): Promise<string> {
+    const { port, hostedServer } = await this.checks(flags, cwd);
+    return hostedServer ?? localServerUrl(port);
+  }
+
+  protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
+    const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
+    const nearest = await this.started.of(cwd);
     const existingRuntime = nearest?.runtime;
-    const parentRuntimeDir = nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined;
+    const parentRuntimeDir =
+      nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,
-      envImage: this.meta.env.ZITADEL_LOCAL_IMAGE,
+      envImage: this.env.ZITADEL_LOCAL_IMAGE,
       existingRuntime,
     });
     const image =
       flags.image ??
-      this.meta.env.ZITADEL_LOCAL_IMAGE ??
-      defaultLocalServerImageForCliVersion(this.meta.cliVersion);
+      this.env.ZITADEL_LOCAL_IMAGE ??
+      defaultLocalServerImageForCliVersion(this.cliVersion);
     const runtimeChecks =
       hostedServer === undefined
         ? await runLocalRuntimeChecks(
-            nearest?.dir ?? cwd,
+            nearest?.dir ?? this.cwd,
             existingRuntime,
             runtimeBackend,
             image,
@@ -136,8 +206,15 @@ export default class Doctor extends BaseCommand {
             parentRuntimeDir,
           )
         : [];
-    const hasConfig = await hasZitadelConfig(cwd);
-    const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
+    const hasConfig = await hasZitadelConfig(this.cwd);
+    const ctx: CheckContext = {
+      cwd: this.cwd,
+      orca: createOrca(),
+      cliVersion: this.cliVersion,
+      dryRun: this.dryRun,
+      signal: this.signal,
+      consent: (gate) => this.consent(gate),
+    };
 
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
@@ -150,6 +227,16 @@ export default class Doctor extends BaseCommand {
         try {
           await check.fix(ctx);
         } catch (error) {
+          // Ctrl-C stops the run. A repair refused for want of --force is the
+          // person's to approve, not one that failed: it is said, the other
+          // repairs still run, and the check below still reports what is left.
+          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
+            throw error;
+          }
+          if (isRefusal(error) && error instanceof ZitadelError) {
+            reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
+            continue;
+          }
           consola.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }
@@ -159,25 +246,29 @@ export default class Doctor extends BaseCommand {
       ? await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)))
       : [];
     const environmentChecks = await runEnvironmentChecks({
-      cwd,
-      env: this.meta.env,
-      envName: typeof flags.env === "string" ? flags.env : undefined,
-      envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
-      serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      cwd: this.cwd,
+      env: this.env,
+      envName: flags.env,
+      envFile: flags.envFile,
+      serverFlag: flags.server,
+      signal: this.signal,
     });
-    const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
+    const versionCheck = await checkCliVersion({
+      cliVersion: this.cliVersion,
+      env: this.env,
+      typedCwd: flags.cwd,
+    });
+    const checks = [versionCheck, ...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
     // to check a chosen environment, so a suggested rerun of a failed check has
     // to carry that same selection or it would check the default project.
-    const cwdFlag = typeof flags.cwd === "string" ? flags.cwd : undefined;
-    const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const selector = environmentSelectorSuffix({
-      cwd: cwdFlag,
-      envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
-      envName: typeof flags.env === "string" ? flags.env : undefined,
-      server: typeof flags.server === "string" ? flags.server : undefined,
+      cwd: flags.cwd,
+      envFile: flags.envFile,
+      envName: flags.env,
+      server: flags.server,
     });
     // The claim check reads the local `.zitadel/secret`, which is setup's
     // project, so a claim is suggested only pinned to the file setup wrote for
@@ -187,38 +278,33 @@ export default class Doctor extends BaseCommand {
     // names that very project nothing a command can carry selects it, so the
     // advice says so instead. The server is the project's own, from
     // `zitadel.json` where the claim check read it, not this run's `--server`.
-    const projectId = await secretProjectId(cwd);
+    const projectId = await secretProjectId(this.cwd);
     // A `zitadel.json` that does not parse is the config check's to report,
     // not a reason for doctor itself to fail before it reports anything.
     const projectServer = hasConfig
-      ? await readZitadelConfig(cwd).then(readProjectServer, () => serverFlag)
-      : serverFlag;
+      ? await readZitadelConfig(this.cwd).then(readProjectServer, () => flags.server)
+      : flags.server;
     // A bare claim resolves as this shell does, so it is offered unpinned only
     // when that resolution lands on the very project the check read.
     const bareResolves =
       projectId !== undefined &&
-      (await resolveEnvironment({ cwd, env: this.meta.env }).then(
+      (await resolveEnvironment({ cwd: this.cwd, env: this.env }).then(
         (environment) => environment.values.ZITADEL_PROJECT_ID?.value === projectId,
         () => false,
       ));
     const claimSelector = (await namesProject(
-      join(cwd, ".env.development.local"),
+      join(this.cwd, ".env.development.local"),
       Promise.resolve(projectId),
     ))
       ? environmentSelectorSuffix({
-          cwd: cwdFlag,
-          envFile: projectEnvFile(cwdFlag, ".env.development.local"),
+          cwd: flags.cwd,
+          envFile: projectEnvFile(flags.cwd, ".env.development.local"),
           server: projectServer,
         })
       : bareResolves
-        ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
+        ? environmentSelectorSuffix({ cwd: flags.cwd, server: projectServer })
         : undefined;
-    const warningAdvice = advisoryForWarnings(
-      warnings,
-      this.meta.cliVersion,
-      claimSelector,
-      selector,
-    );
+    const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =
@@ -226,7 +312,7 @@ export default class Doctor extends BaseCommand {
       runtimeChecks.find((check) => check.name === "runtime")?.status === "pass";
     const nextActions = [
       ...(warningAdvice?.nextActions ?? []),
-      ...(serving ? [serverLogAction(this.meta.cliVersion)] : []),
+      ...(serving ? [serverLogAction(this.cliVersion)] : []),
     ];
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -249,25 +335,45 @@ export default class Doctor extends BaseCommand {
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
-      checks,
-      ...(nextActions.length > 0 ? { next_actions: nextActions } : {}),
-      ...(warningAdvice ? nextCommandsData(warningAdvice.nextCommands) : {}),
+      checks: withCategories(checks),
     };
+    const next: NextSteps<SuggestedCommand> = {
+      ...(nextActions.length > 0 ? { actions: nextActions } : {}),
+      ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
+    };
+    const pretty = renderDoctorReport({
+      checks,
+      cliVersion: this.cliVersion,
+      typedCwd: flags.cwd,
+      projectConfigured: hasConfig,
+      hostedServer,
+      runtime: runtimeBackend,
+      port,
+      next,
+      fixes: warningAdvice?.fixes ?? [],
+      verbose: this.meta.verbose,
+      columns: this.isOnScreen ? process.stdout.columns : undefined,
+    });
 
     if (failed.length > 0) {
+      // The error block says only what to do next; which checks failed is here.
+      this.log(pretty);
+      this.log("");
       const advice = failureAdvice(
         failed,
         image,
         port,
-        this.meta.cliVersion,
+        this.cliVersion,
         selector,
         parentRuntimeDir,
-        cwdFlag,
+        flags.cwd,
       );
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
-      // branch on it. The port check keeps its dedicated code first.
+      // branch on it. The port check keeps its dedicated code first. The
+      // details are the report a passing run would emit, next steps included.
+      const report = { ...data, ...nextStepsData(next) };
       const code = failed.some((check) => check.name === "port")
         ? "E_PORT_IN_USE"
         : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
@@ -276,19 +382,81 @@ export default class Doctor extends BaseCommand {
         nextCommands: advice.nextCommands,
         details:
           advice.suggestedArgs === undefined
-            ? data
-            : { ...data, suggested_args: advice.suggestedArgs },
+            ? report
+            : { ...report, suggested_args: advice.suggestedArgs },
       });
     }
 
     return this.emit({
       status: "ok",
       data,
+      next,
+      nextShown: asStepsShown(),
+      // Painted, because the report is a coloured one the CLI drew; every
+      // value it names was spelled out where it was read.
+      pretty: painted(pretty),
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
+      warningsShown: true,
     });
+  }
+
+  private checks(flags: Asked, cwd: string): Promise<Checking> {
+    // What was asked for as well as where, because the answer is read from
+    // both: the same directory with another port named is another answer.
+    const asked = `${cwd}\u0000${flags.port ?? ""}\u0000${flags.runtime ?? ""}\u0000${flags.image ?? ""}`;
+    const already = this.checking.get(asked);
+    if (already !== undefined) {
+      return already;
+    }
+    const working = (async () => {
+      // An unreadable record only costs the port hint; the read below reports it.
+      const hint = await this.started.of(cwd).catch(() => {
+        return undefined;
+      });
+      return {
+        cwd,
+        port: flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
+        hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
+      };
+    })();
+    this.checking.set(asked, working);
+    return working;
+  }
+
+  /**
+   * The server of a project set up against a hosted server, for which doctor
+   * checks no local runtime: no local server runs for it, so the runtime says
+   * nothing about it, and a port another app holds would fail it. `undefined`
+   * (check the runtime) before setup, for a project on a local server or with
+   * a `zitadel.json` that does not parse, where a server was started in the
+   * directory or a parent, and when a flag asks about the runtime.
+   */
+  private async hostedServerWithoutLocalRuntime(
+    flags: Asked,
+    cwd: string = this.cwd,
+  ): Promise<string | undefined> {
+    if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
+      return undefined;
+    }
+    if (
+      (await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
+      !(await hasZitadelConfig(cwd))
+    ) {
+      return undefined;
+    }
+    const server = await readZitadelConfig(cwd).then(readProjectServer, () => {
+      return undefined;
+    });
+    return server === undefined || isLoopbackUrl(server) ? undefined : server;
   }
 }
 
+/**
+ * What to do about the checks that failed: the hint doctor prints and the
+ * commands it suggests. The checks are weighed in the order a reader would fix
+ * them — the machine before the project — so one run advises on the first
+ * failure that blocks the others rather than on all of them at once.
+ */
 export function failureAdvice(
   failed: CheckOutcome[],
   image: string,
@@ -415,10 +583,15 @@ export function failureAdvice(
   };
 }
 
+/** A warning's one repair: what it does, and the command that does it, for the check it repairs. */
+export type WarningFix = { check: string; action: string; command: SuggestedCommand };
+
 /**
  * The follow-ups doctor offers for its warnings: the Docker guidance, the claim
- * nudge, the managed-runtime review, a dependency remedy, the primary issuer
- * origin and the meta-schema refresh.
+ * nudge, the managed-runtime review, an upgrade or dependency remedy, the
+ * primary issuer origin and the meta-schema refresh. A follow-up that is one
+ * command for one check is also a `fix`, which the report shows under that
+ * check's row instead of among the next steps.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
@@ -430,9 +603,15 @@ export function advisoryForWarnings(
   local: EnvironmentSelector | undefined,
   /** This run's selection, which a suggested rerun of doctor carries. */
   selector: EnvironmentSelector,
-): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
+): { nextActions: string[]; nextCommands: SuggestedCommand[]; fixes: WarningFix[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
+  const fixes: WarningFix[] = [];
+  const fix = (check: string, action: string, command: SuggestedCommand): void => {
+    nextActions.push(action);
+    nextCommands.push(command);
+    fixes.push({ check, action, command });
+  };
   if (warnings.some((check) => check.name === "docker-cli")) {
     const advice = dockerRuntimeGuidance("doctor", cliVersion);
     nextActions.push(...advice.nextActions);
@@ -452,12 +631,13 @@ export function advisoryForWarnings(
         "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.",
       );
     } else {
-      nextActions.push(
+      fix(
+        "claim",
         claimWindowClosed(claimWarning)
           ? claimWindowClosedAction(cliVersion, local)
           : claimAction(cliVersion, undefined, local),
+        claimCommand(cliVersion, local),
       );
-      nextCommands.push(claimCommand(cliVersion, local));
     }
   }
 
@@ -465,40 +645,60 @@ export function advisoryForWarnings(
     (check) => check.name === "managed-runtime-processes",
   );
   if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
-    nextActions.push(
-      "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
+    fix(
+      "managed-runtime-processes",
+      "Check the other local Zitadel servers before starting another; stop --all stops every one.",
+      unscopedCommand("stop --all", cliVersion),
     );
-    nextCommands.push(unscopedCommand("stop --all", cliVersion));
+  }
+
+  const upgrade = remedyCommandOf(warnings.find((check) => check.name === "cli-version"));
+  if (upgrade !== undefined) {
+    fix(
+      "cli-version",
+      "Upgrade to the latest release; this moves the exactly-pinned @zitadel/* dependencies with it and refreshes generated files.",
+      upgrade,
+    );
   }
 
   const dependencyRemedy = remedyCommandOf(
     warnings.find((check) => check.name === "dependency-version"),
   );
-  if (dependencyRemedy !== undefined) {
-    nextActions.push(
+  // `upgrade` already moves the pins; aligning them with this older CLI as well
+  // would send them backwards from where it leaves them.
+  if (dependencyRemedy !== undefined && upgrade === undefined) {
+    fix(
+      "dependency-version",
       "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
+      dependencyRemedy,
     );
-    nextCommands.push(dependencyRemedy);
   }
 
   if (warnings.some((check) => check.name === "issuer-origin")) {
-    nextActions.push(
+    // The repair removes the origin and adds it back, which needs consent.
+    fix(
+      "issuer-origin",
       "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
+      projectCommand("doctor --fix --force", selector, cliVersion),
     );
-    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }
 
   if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {
-    nextActions.push(
+    fix(
+      "meta-schemas",
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
+      projectCommand("doctor --fix", selector, cliVersion),
     );
-    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }
 
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
-  return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
+  return {
+    nextActions: [...new Set(nextActions)],
+    nextCommands: [...new Set(nextCommands)],
+    fixes,
+  };
 }
 
 /**
@@ -519,28 +719,31 @@ async function runEnvironmentChecks(input: {
   envName?: string;
   envFile?: string;
   serverFlag?: string;
+  signal: AbortSignal;
 }): Promise<CheckOutcome[]> {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  let environment: Environment;
-  try {
-    environment = await resolveEnvironment({
-      cwd: input.cwd,
-      env: input.env,
-      envName: input.envName,
-      envFile: input.envFile,
-      serverFlag: input.serverFlag,
-    });
-  } catch (error) {
+  const resolved = await resolveEnvironment({
+    cwd: input.cwd,
+    env: input.env,
+    envName: input.envName,
+    envFile: input.envFile,
+    serverFlag: input.serverFlag,
+  }).then(
+    (environment) => ({ environment }),
+    (error: unknown) => ({ failure: error }),
+  );
+  if ("failure" in resolved) {
     return [
       {
         name: "environment",
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(resolved.failure),
       },
     ];
   }
+  const { environment } = resolved;
   const name = environment.name.value;
   return [
     await check(`environment`, `Resolved ${name} environment connects`, async () => {
@@ -557,35 +760,18 @@ async function runEnvironmentChecks(input: {
           `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
         );
       }
-      const project = await createZitadelClient({ baseUrl: server, token }).getProject(projectId);
+      const project = await createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token,
+        signal: input.signal,
+      }).getProject(projectId);
       if (project.id !== projectId) {
         throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
       }
       return `${server} is reachable and project ${projectId} matches`;
     }),
   ];
-}
-
-/**
- * The server of a project set up against a hosted server, for which doctor
- * checks no local runtime: no local server runs for it, so the runtime says
- * nothing about it, and a port another app holds would fail it. `undefined`
- * (check the runtime) before setup, for a project on a local server or with a
- * `zitadel.json` that does not parse, where a server was started in the
- * directory or a parent, and when a flag asks about the runtime.
- */
-async function hostedServerWithoutLocalRuntime(
-  cwd: string,
-  flags: { port?: number; runtime?: string; image?: string },
-): Promise<string | undefined> {
-  if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
-    return undefined;
-  }
-  if ((await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined || !(await hasZitadelConfig(cwd))) {
-    return undefined;
-  }
-  const server = await readZitadelConfig(cwd).then(readProjectServer, () => undefined);
-  return server === undefined || isLoopbackUrl(server) ? undefined : server;
 }
 
 /**
@@ -632,12 +818,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
-      try {
-        result = await LocalServer.dockerReachable();
-      } catch (error) {
+      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
-      }
+      });
       if (result.status !== 0) {
         throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
       }
@@ -731,7 +914,7 @@ async function checkManagedRuntimeProcesses(
     return {
       name: "managed-runtime-processes",
       status: "warn",
-      message: "Managed local runtime process discovery is unavailable.",
+      message: "Could not look for other local Zitadel servers on this machine.",
       details: { supported: false, error: discovery.error },
     };
   }
@@ -740,14 +923,17 @@ async function checkManagedRuntimeProcesses(
     return {
       name: "managed-runtime-processes",
       status: "pass",
-      message: "No additional host-wide managed local runtime processes found.",
+      message: "No other local Zitadel server is running on this machine.",
       details: { supported: true, scope: "host", processes: [] },
     };
   }
   return {
     name: "managed-runtime-processes",
     status: "warn",
-    message: `${String(processes.length)} other host-wide managed local runtime process${processes.length === 1 ? "" : "es"} found.`,
+    message:
+      processes.length === 1
+        ? "1 other local Zitadel server is running on this machine."
+        : `${String(processes.length)} other local Zitadel servers are running on this machine.`,
     details: { supported: true, scope: "host", processes },
   };
 }
@@ -865,28 +1051,6 @@ function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
   );
 }
 
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}
-
-function resolveRuntimeBackend(input: {
-  runtime: unknown;
-  image: string | undefined;
-  envImage: string | undefined;
-  existingRuntime: { backend: RuntimeBackend } | undefined;
-}): RuntimeBackend {
-  if (input.runtime === "binary" || input.runtime === "docker") {
-    return input.runtime;
-  }
-  if (input.existingRuntime) {
-    return input.existingRuntime.backend;
-  }
-  if (input.image || input.envImage) {
-    return "docker";
-  }
-  return "binary";
-}
-
 async function check(
   name: string,
   fallback: string,
@@ -917,7 +1081,7 @@ async function check(
 }
 
 function imageUnavailableMessage(image: string, error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
 }

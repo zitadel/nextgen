@@ -1,0 +1,73 @@
+post:
+  operationId: createTeam
+  x-zitadel-cli: teams create
+  summary: Create a team
+  description: |
+    Creates a team in the project, with a name no other team in the project has.
+
+    A team groups users inside a project and can represent a customer. A taken
+    name is refused with `409 team.already_exists`: choose another name. The
+    new team has no members yet.
+  tags:
+    - Teams
+  security:
+    - oauth2:
+        - team.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-team-request.yaml
+  responses:
+    '201':
+      description: The created team.
+      content:
+        application/json:
+          schema:
+            $ref: team-response.yaml
+    '400':
+      description: The provided parameters were not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        A team with the given name already exists in this project. Choose
+        another name.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '429':
+      description: |
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createTeam-error-response.yaml

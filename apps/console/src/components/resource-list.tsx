@@ -2,6 +2,7 @@ import { Ellipsis, type LucideIcon } from "lucide-react";
 import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { FormError } from "@/components/form-error";
+import { IdText } from "@/components/id-text";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import {
@@ -59,14 +60,33 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 
 /**
  * The title row of a list screen: the heading with, where the screen has one,
- * its primary action beside it at every width (D19). 36px tall with or without
- * the button (`PAGE_TITLE_ROW`).
+ * its primary action beside it at every width (D19), and any filter beside
+ * that. 36px tall (`PAGE_TITLE_ROW`), except on a phone with a filter, where
+ * the filter takes a second row under the title.
  */
-export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function ResourceTitle({
+  children,
+  action,
+  filter,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  /**
+   * Controls that narrow the list, beside the action and 8px from it. On a
+   * phone they drop to their own row under the title while the action keeps
+   * the title row (D19).
+   */
+  filter?: ReactNode;
+}) {
   return (
-    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
+    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {action}
+      {filter && (
+        <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+          {filter}
+        </div>
+      )}
+      <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
     </div>
   );
 }
@@ -125,17 +145,15 @@ const ROW_COPY =
 
 /**
  * A row's ID cell. It takes whatever width the other columns leave
- * (`w-full max-w-0`) and truncates inside it, so a table of a few short
- * columns fits a 1024px window without scrolling. The tooltip keeps the whole
+ * (`w-full max-w-0`) and is cut in the middle inside it (`IdText`), so a
+ * table of a few short columns fits a 1024px window without scrolling. The tooltip keeps the whole
  * id, and the copy button copies it however much of it shows.
  */
 export function ResourceIdCell({ id, name }: { id: string; name: string }) {
   return (
     <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
       <span className="flex items-center gap-1">
-        <span className="text-foreground min-w-0 truncate text-sm" title={id}>
-          {id}
-        </span>
+        <IdText id={id} title={id} className="text-foreground text-sm" />
         <CopyButton value={id} label={`Copy the ID of ${name}`} className={ROW_COPY} />
       </span>
     </TableCell>

@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { NuxtPatcher } from "../../../../../../../src/lib/orca/patchers/rule/nuxt";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { NuxtPatcher } from "@/lib/orca/patchers/rule/nuxt";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function ctx(appDir = "app", scaffoldedFramework = true): PatchContext {
   return {

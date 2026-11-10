@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { invocationChannel } from "../../../../../src/lib/telemetry/dimensions/invocation-channel";
+import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
 
 describe("invocationChannel", () => {
   it("derives the package manager from its user-agent (pnpm wins over the npm substring)", () => {

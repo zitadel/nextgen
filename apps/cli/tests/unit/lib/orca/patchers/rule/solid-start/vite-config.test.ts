@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { solidStartConfigEdit } from "../../../../../../../src/lib/orca/patchers/rule/solid-start/vite-config";
+import { solidStartConfigEdit } from "@/lib/orca/patchers/rule/solid-start/vite-config";
 
 const edit = solidStartConfigEdit();
 
@@ -53,6 +53,33 @@ describe("solidStartConfigEdit", () => {
     expect(out).toContain('middleware: "./src/middleware.ts"');
     expect(out).toContain("/* don't ( [ close */");
     expect(out).toContain("nitro()");
+  });
+
+  it("ignores a closing paren inside a string in the solidStart() options", () => {
+    const source = BARE.replace("solidStart()", 'solidStart({ banner: ")" })');
+    expect(edit(source)).toContain(
+      'solidStart({ middleware: "./src/middleware.ts", banner: ")" })',
+    );
+  });
+
+  it("throws E_VALIDATION when the solidStart() call never closes", () => {
+    const source = "export default { plugins: [solidStart({ ssr: true }";
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
+  it("throws E_VALIDATION when an unterminated comment swallows the closing paren", () => {
+    const source = BARE.replace("solidStart()", "solidStart({ ssr: true } /* ) ");
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
+  it("throws E_VALIDATION when an unterminated string swallows the closing paren", () => {
+    const source = BARE.replace("solidStart()", 'solidStart({ banner: "oops })');
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
+  it("throws E_VALIDATION when a trailing backslash leaves a string unterminated", () => {
+    const source = 'export default { plugins: [solidStart({ banner: "oops })\\';
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
   });
 
   it("is idempotent — re-running over its own output changes nothing", () => {

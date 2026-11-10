@@ -3,8 +3,8 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
-import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-server/processes";
-import { publicCliCommand } from "../../src/lib/public-cli";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
+import { publicCliCommand } from "@/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
 export const cliVersion = JSON.parse(
@@ -29,15 +29,21 @@ export async function runCliForTest(
   root: string = cliPackageRoot,
   machine: LocalServers = aMachineRunning(),
 ) {
+  // The patched stream writers below append to these as the command prints.
   let stdout = "";
   let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
-  const overlaid = Object.keys(env);
+  // Colour is settled for the run rather than inherited: whether the runner
+  // was started with `FORCE_COLOR` set, or under a terminal, is nothing to do
+  // with the output being asserted. A test that is about colour overlays them
+  // itself, and wins.
+  const settled: NodeJS.ProcessEnv = { FORCE_COLOR: "", NO_COLOR: "", ...env };
+  const overlaid = Object.keys(settled);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, env);
+  Object.assign(process.env, settled);
 
   // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.
@@ -56,26 +62,23 @@ export async function runCliForTest(
     stderr += `${format(...args)}\n`;
   };
 
-  let exitCode = 0;
-  try {
-    const command = await commandSeeing(argv[0], machine);
-    await (command ? command.run(argv.slice(1), root) : run(argv, root));
-  } catch (error) {
-    exitCode = exitCodeOf(error);
-  } finally {
-    process.stdout.write = originalOut;
-    process.stderr.write = originalErr;
-    console.log = originalLog;
-    console.error = originalConsoleError;
-    for (const key of overlaid) {
-      const prior = previous.get(key);
-      if (prior === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = prior;
+  const exitCode = await commandSeeing(argv[0], machine)
+    .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
+    .then(() => 0, exitCodeOf)
+    .finally(() => {
+      process.stdout.write = originalOut;
+      process.stderr.write = originalErr;
+      console.log = originalLog;
+      console.error = originalConsoleError;
+      for (const key of overlaid) {
+        const prior = previous.get(key);
+        if (prior === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = prior;
+        }
       }
-    }
-  }
+    });
 
   return { exitCode, stdout, stderr };
 }
@@ -101,7 +104,7 @@ async function commandSeeing(
   // Loaded here, not at the top: this module is loaded by the test setup, ahead
   // of any test's mocks, and the commands must not be.
   if (name === "doctor") {
-    const { default: Doctor } = await import("../../src/commands/doctor");
+    const { default: Doctor } = await import("@/commands/doctor");
     return class extends Doctor {
       protected override localServers(): LocalServers {
         return machine;
@@ -109,7 +112,7 @@ async function commandSeeing(
     };
   }
   if (name === "stop") {
-    const { default: Stop } = await import("../../src/commands/stop");
+    const { default: Stop } = await import("@/commands/stop");
     return class extends Stop {
       protected override localServers(): LocalServers {
         return machine;
