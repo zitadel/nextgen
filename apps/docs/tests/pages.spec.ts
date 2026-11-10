@@ -238,8 +238,15 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     // call without one with `zitadel api` (lib/cli-sample.ts).
     const named = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
     const command = named ?? apiCommand(operationOf(markdown));
-    if (command && !markdown.includes(`npx @zitadel/cli@latest ${command}`)) {
+    // A command that cannot carry the request (lib/cli-sample.ts) leaves the
+    // call to `zitadel api`, which names the operation instead.
+    const fallback = apiCommand(operationOf(markdown));
+    const shown = (name: string) => markdown.includes(`npx @zitadel/cli@latest ${name}`);
+    if (command && !shown(command) && !(fallback && shown(fallback))) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
+    if (markdown.includes("npx @zitadel/cli@latest variables ")) {
+      return `${markdownUrl(url)}: a \`variables\` command, which the CLI does not have`;
     }
     if (named) {
       // The command's page links back to the operation (lib/cli-reference.ts).

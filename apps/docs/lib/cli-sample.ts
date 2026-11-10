@@ -146,11 +146,10 @@ function variables(
     return undefined;
   }
 
-  // `resolve` reads the live deployment's frozen variables for an origin
-  // (`--origin`, optional); it takes no positional, so the deployment id the
-  // operation's path names is not an argument.
+  // `resolve` takes the origin, not the deployment id the operation's path
+  // names, so a CLI sample would drop the id the request carries.
   if (verb === "resolve") {
-    return `${context}\n${line([`${cli} variable resolve`], [])}`;
+    return undefined;
   }
 
   if (verb !== "set") {
