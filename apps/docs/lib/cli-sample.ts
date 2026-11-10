@@ -12,7 +12,9 @@ import { authentication, operationParameters, pathParameterNames } from "./sdk-s
 //
 // The CLI acts on the project its directory was set up for, so `project_id`
 // never appears. The path parameter is the command's positional, a write's
-// body goes in `--data`, and a list's query becomes its flags.
+// body goes in `--data`, and a list's query becomes its flags. The variable
+// commands are shown only for a request they do exactly (`variables` below);
+// any other variable request is the `zitadel api` call.
 
 export const cli = "npx @zitadel/cli@latest";
 
@@ -60,7 +62,10 @@ export function cliSample(
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
   if (topic === "variable") {
-    return variables(verb, positionals, request) ?? apiSample(operation, path, request, true);
+    return (
+      variables(verb, positionals, request) ??
+      apiSample(operation, path, request, { body: "input" })
+    );
   }
 
   const flags: string[] = [];
@@ -77,30 +82,31 @@ export function cliSample(
 // and top-level body field is a `--field`, typed by the operation's schema, and
 // an object, a list or `null` is JSON after `:=`. A body whose keys are the
 // caller's own, such as a variables map, is piped in as JSON instead
-// (`--input -`): a key named `kind` or `project_id` as a `--field` is a query
-// parameter, and a bare number or boolean would reach the API as a string.
+// (`body: "input"`, `--input -`): a key named `kind` or `project_id` as a
+// `--field` is a query parameter, and a bare number or boolean would reach the
+// API as a string. `printf` writes it, as `echo` reads a backslash in the JSON
+// as an escape in some shells.
 function apiSample(
   operation: OperationObject,
   path: string,
   request: RequestData,
-  bodyAsInput = false,
+  options: { body: "fields" | "input" } = { body: "fields" },
 ): string {
   const names = pathParameterNames(path);
   const positionals = names
     .filter((name, index) => name !== "project_id" || index < names.length - 1)
     .map((name) => word(request.path[name]?.value ?? ""));
+  const body = record(request.body);
+  const piped = options.body === "input" && Object.keys(body).length > 0;
   const fields = [
+    ...(piped ? ["--input -"] : []),
     ...Object.entries(request.query)
       .filter(([name]) => name !== "project_id")
       .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
-    ...(bodyAsInput
-      ? []
-      : Object.entries(record(request.body)).map(([name, value]) => field(name, value))),
+    ...(options.body === "fields"
+      ? Object.entries(body).map(([name, value]) => field(name, value))
+      : []),
   ];
-  const piped = bodyAsInput && Object.keys(record(request.body)).length > 0;
-  if (piped) {
-    fields.unshift("--input -");
-  }
   // An operation that needs no credential runs anywhere, unless the CLI is
   // to fill in its project.
   const project =
@@ -108,7 +114,7 @@ function apiSample(
     names.includes("project_id") ||
     "project_id" in request.query;
   const run = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
-  const call = piped ? `echo ${quote(JSON.stringify(request.body))} | ${run}` : run;
+  const call = piped ? `printf '%s' ${quote(JSON.stringify(body))} | ${run}` : run;
   return project ? `${context}\n${call}` : call;
 }
 
