@@ -27,6 +27,22 @@ silently at runtime: an unknown property is dropped, not rejected.
   (`scripts/openapi-casing-rules.test.mjs`) that fail when a rule silently
   stops matching. Keep the fixtures in step with the rules.
 
+## Patterns say what a valid value looks like
+
+- Give every `pattern` in the OpenAPI spec an `x-zitadel-pattern-message` beside it: the sentence
+  that follows the field's name when a value fails it (`must be a user ID:
+  user_ followed by letters, digits, _ or -`). orval's zod output carries no
+  message of its own, so `moon run api:generate` adds this one
+  (`packages/api/scripts/pattern-messages.ts`).
+- A message belongs to the pattern's text, so fields that share a regex share
+  its wording. Generation fails when a pattern has no message, or when the same
+  pattern carries two different ones.
+- Say the whole rule, not one part of it: a pattern that also refuses an empty
+  value or a bad character after a prefix says so.
+- A pattern only in a server-side schema that the spec does not reach, such as
+  the `verified_claims` branch of `endpoints/schemas/idp-connection.yaml`, takes
+  no message: the mirror test there pins it exactly.
+
 ## Error codes
 
 Errors are `{ code, message, details? }`
