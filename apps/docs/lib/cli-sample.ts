@@ -75,15 +75,13 @@ export function cliSample(
   return `${context}\n${line([`${cli} ${command}`, ...positionals], flags)}`;
 }
 
-/**
- * `zitadel api <operationId>`: the path parameters are its arguments, except a
- * trailing `project_id`, which the CLI fills in; each query parameter and, for
- * `bodyAs: "fields"`, each top-level body field is a `--field`, typed by the
- * operation's schema. A body with keys of its own, such as a variables map,
- * goes in as `bodyAs: "input"`: JSON on stdin, because a key named `kind` as a
- * `--field` is a query parameter and a bare number reaches the API as a string.
- * `printf` writes it, as `echo` reads a backslash in the JSON as an escape.
- */
+// `zitadel api <operationId>`: the path parameters are its arguments, but a
+// trailing `project_id`, which the CLI fills in itself; each query parameter
+// and top-level body field is a `--field`, typed by the operation's schema, and
+// an object, a list or `null` is JSON after `:=`. With `bodyAs: "input"` the
+// body is JSON on stdin instead, written by `printf` because `echo` reads a
+// backslash as an escape: a variables map has keys of its own, and one named
+// `kind` as a `--field` would be the query parameter.
 function apiSample(
   operation: OperationObject,
   path: string,
@@ -103,6 +101,8 @@ function apiSample(
       .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
     ...(bodyAs === "fields" ? Object.entries(body).map(([name, value]) => field(name, value)) : []),
   ];
+  // An operation that needs no credential runs anywhere, unless the CLI is
+  // to fill in its project.
   const project =
     authentication(operation) === "secret" ||
     names.includes("project_id") ||
@@ -139,12 +139,10 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-/**
- * Whether `variable <verb>` does what the request does for its `kind`. The
- * commands act on both kinds, or on the preview value with `--preview`, so a
- * `get` must name a kind and the rest must not ask for `primary` alone.
- * `resolve` takes an origin, not the deployment id the path names.
- */
+// Whether `variable <verb>` does what the request does for its `kind`. The
+// commands act on both kinds, or on the preview value with `--preview`, so a
+// `get` must name a kind and the rest must not ask for `primary` alone.
+// `resolve` takes an origin, not the deployment id the path names.
 function variableRunsAs(verb: string | undefined, kind: string | undefined): boolean {
   switch (verb) {
     case "get":
@@ -158,12 +156,10 @@ function variableRunsAs(verb: string | undefined, kind: string | undefined): boo
   }
 }
 
-/**
- * The `variable` command for a request it does exactly; `undefined` for any
- * other, which the caller shows as the `zitadel api` call. A `set` prompts for
- * the value, or reads it from stdin, so a credential stays out of the shell's
- * history.
- */
+// The `variable` command for a request it does exactly; `undefined` for any
+// other, which the caller shows as the `zitadel api` call. A `set` prompts for
+// the value, or reads it from stdin, so a credential stays out of the shell's
+// history.
 function variableCommand(
   verb: string | undefined,
   positionals: string[],
@@ -180,13 +176,11 @@ function variableCommand(
   return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], flags)}`;
 }
 
-/**
- * `variable set` for a body of one variable it can store. Several variables
- * are one atomic request, a `null` removes a name that may not exist, and
- * `--secret` refuses `--as number` and `--as boolean`. A plain `--preview`
- * value is refused for a name whose primary value is a secret, which the
- * generator cannot know, so only a secret is shown with it.
- */
+// `variable set` for a body of one variable it can store. Several variables
+// are one atomic request, a `null` removes a name that may not exist, and
+// `--secret` refuses `--as number` and `--as boolean`. A plain `--preview`
+// value is refused for a name whose primary value is a secret, which the
+// generator cannot know, so only a secret is shown with it.
 function variableSet(body: unknown, preview: boolean): string | undefined {
   const entries = Object.entries(record(body));
   const [name, value] = entries[0] ?? ["NAME", ""];
