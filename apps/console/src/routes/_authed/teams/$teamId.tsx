@@ -19,8 +19,8 @@ import { Members, fetchMembers } from "@/features/teams/components/team-members"
  *
  * The header's identity line carries `Team ID` and `Created`. The design draws
  * a third value, `Primary Domain`, which is deliberately not built: a domain
- * that discovers and claims a team is security-relevant, so it needs its own model — verification,
- * and more than one domain per team — rather than a string on `team-response`.
+ * that discovers and claims a team is security-relevant, so it needs its own model (verification,
+ * and more than one domain per team) rather than a string on `team-response`.
  * That model is not defined yet, so the value is left out rather than shown
  * empty.
  */

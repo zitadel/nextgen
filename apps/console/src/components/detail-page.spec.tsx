@@ -58,6 +58,21 @@ describe("detail header", () => {
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("leaves out an item without a value", () => {
+    renderHeader({
+      meta: [
+        { label: "User ID", value: "user_01", copyable: true },
+        { label: "Created", value: undefined },
+      ],
+    });
+    expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(["User ID"]);
+  });
+
+  it("draws no identity line when there are no values", () => {
+    const { container } = render(<DetailHeader title="Engineering" meta={[]} />);
+    expect(container.querySelector("dl")).toBeNull();
+  });
+
   it("puts the action after the title", () => {
     renderHeader({ action: <button type="button">Actions</button> });
     const action = screen.getByRole("button", { name: "Actions" });

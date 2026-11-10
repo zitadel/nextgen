@@ -73,6 +73,7 @@ function FlowDefinitionDetail() {
     <Page>
       <DetailHeader
         title={name}
+        // The design draws a third value, `Expires at`; nothing backs it.
         meta={[
           { label: "Flow ID", value: definitionId, copyable: true },
           { label: "Created", value: formatDate(createdAt) },

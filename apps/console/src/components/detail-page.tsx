@@ -274,6 +274,7 @@ export function DetailRows({
 
 /** One value on a detail header's identity line. */
 export interface DetailMetaItem {
+  /** Unique on the line: it names the value and keys it. */
   label: string;
   /** Left out of the line when there is none, as a user's unread created date. */
   value?: string;
@@ -315,13 +316,14 @@ export function DetailHeader({
   return (
     <header className="flex items-start justify-between gap-4 px-2">
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex min-w-0 items-start gap-2">
-            {Icon && (
-              <span className={ICON_PLATE}>
-                <Icon className="size-4" strokeWidth={1.5} aria-hidden />
-              </span>
-            )}
+        <div className="flex min-w-0 items-start gap-2">
+          {Icon && (
+            <span className={ICON_PLATE}>
+              <Icon className="size-4" strokeWidth={1.5} aria-hidden />
+            </span>
+          )}
+          {/* The subtitle shares the title's left edge, not the tile's. */}
+          <div className="flex min-w-0 flex-col gap-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
                   flex item's minimum width, so a title with no break point (a
@@ -330,8 +332,8 @@ export function DetailHeader({
               <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
               {status}
             </div>
+            {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
           </div>
-          {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
         </div>
         {items.length > 0 && (
           // One line from `sm`, never wrapped: a long id is cut in the middle
