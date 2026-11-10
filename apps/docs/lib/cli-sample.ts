@@ -13,7 +13,7 @@ import { authentication, operationParameters, pathParameterNames } from "./sdk-s
 // The CLI acts on the project its directory was set up for, so `project_id`
 // never appears. The path parameter is the command's positional, a write's
 // body goes in `--data`, and a list's query becomes its flags. The variable
-// commands are shown only for a request they do exactly (`variables` below);
+// commands are shown only for a request they do exactly (`variableCommand`);
 // any other variable request is the `zitadel api` call.
 
 export const cli = "npx @zitadel/cli@latest";
@@ -63,7 +63,7 @@ export function cliSample(
 
   if (topic === "variable") {
     return (
-      variables(verb, positionals, request) ??
+      variableCommand(verb, positionals, request) ??
       apiSample(operation, path, request, { body: "input" })
     );
   }
@@ -145,71 +145,72 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-// The variable commands act on the project the directory was set up for.
-// `set` takes no value on the command line here: it prompts for it, or reads
-// it from stdin, so a credential stays out of the shell's history. A command
-// stands for a request only when it does exactly what the request does, and
-// where none does, the `zitadel api` call stands in (`undefined` here):
-// - `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` take.
-// - `get` always reads one kind, so a request that names none, which returns
-//   both, has no command; `list` without `--preview` is every name, so a
-//   primary-only list has none either.
-// - A write or a removal without `--preview` also changes the preview value
-//   (a secret write clears it), so `kind=primary` has none for those.
-// - `variable set --preview` refuses a plain value for a name whose primary
-//   value is a secret, which the API accepts and the generator cannot know, so
-//   a plain preview write has none; a secret preview write is exact.
-// - A body that sets several variables is one atomic request, and a `null`
-//   removes a name that may not exist, which `variable rm` refuses, so only a
-//   body that sets one variable is a command.
-// - `variable set` refuses `--secret --as number` and `--as boolean`.
-// - `resolve` takes the origin, not the deployment id the path names.
-function variables(
+/**
+ * Whether `variable <verb>` does what the request does for its `kind`. It
+ * reads one kind when it is given `--preview` or none, so a `get` that names
+ * no kind (both) and a `list` or a write or removal for `primary` alone differ
+ * from it. `resolve` takes an origin, not the deployment id the path names.
+ */
+function variableRunsAs(verb: string | undefined, kind: string | undefined): boolean {
+  switch (verb) {
+    case "get":
+      return kind !== undefined;
+    case "list":
+    case "set":
+    case "rm":
+      return kind !== "primary";
+    default:
+      return false;
+  }
+}
+
+/**
+ * The `variable` command for a request it does exactly, else `undefined`, and
+ * the sample is the `zitadel api` call. A `set` prompts for the value, or reads
+ * it from stdin, so a credential stays out of the shell's history.
+ */
+function variableCommand(
   verb: string | undefined,
   positionals: string[],
   request: RequestData,
 ): string | undefined {
   const kind = request.query.kind?.values[0];
-  const preview = kind === "preview" ? ["--preview"] : [];
+  if (!variableRunsAs(verb, kind)) {
+    return undefined;
+  }
+  if (verb === "set") {
+    return variableSet(request.body, kind === "preview");
+  }
+  const flags = kind === "preview" ? ["--preview"] : [];
+  return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], flags)}`;
+}
 
-  if (verb === "resolve") {
-    return undefined;
-  }
-  if (verb === "get" && kind === undefined) {
-    return undefined;
-  }
-  if (verb === "list" && kind === "primary") {
-    return undefined;
-  }
-  if (kind === "primary" && (verb === "set" || verb === "rm")) {
-    return undefined;
-  }
-
-  if (verb !== "set") {
-    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
-  }
-
-  const entries: [string, unknown][] = Object.entries(record(request.body));
-  if (entries.length > 1 || entries.some(([, value]) => value === null)) {
-    return undefined;
-  }
+/**
+ * `variable set` for a body of one variable it can store. Several variables
+ * are one atomic request, a `null` removes a name that may not exist, and
+ * `--secret` refuses `--as number` and `--as boolean`. A plain `--preview`
+ * value is refused for a name whose primary value is a secret, which the
+ * generator cannot know, so only a secret is shown with it.
+ */
+function variableSet(body: unknown, preview: boolean): string | undefined {
+  const entries = Object.entries(record(body));
   const [name, value] = entries[0] ?? ["NAME", ""];
   const { secret, value: scalar } = record(value);
-  if (secret === true && typeof scalar !== "string") {
-    return undefined;
-  }
-  if (kind === "preview" && secret !== true) {
+  const refused =
+    entries.length > 1 ||
+    value === null ||
+    (secret === true && typeof scalar !== "string") ||
+    (preview && secret !== true);
+  if (refused) {
     return undefined;
   }
   const type = typeof (scalar ?? value);
-  const command = line(
-    [`${cli} variable set`, word(name)],
-    [
-      ...(secret === true ? ["--secret"] : []),
-      ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
-      ...preview,
-    ],
-  );
+  const flags = [
+    ...(secret === true ? ["--secret"] : []),
+    ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
+    ...(preview ? ["--preview"] : []),
+  ];
+  const command = line([`${cli} variable set`, word(name)], flags);
   return [context, "# The set prompts for the value, or reads it from stdin.", command].join("\n");
 }
 
