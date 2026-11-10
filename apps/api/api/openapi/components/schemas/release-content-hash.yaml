@@ -36,6 +36,7 @@ description: |
   so by name: the `content_hash` filter of `GET /releases`, and
   `content_hash` in place of `release_id` on `POST /deployments`.
 pattern: '^sha256:[0-9a-f]{64}$'
+x-zitadel-pattern-message: "must be sha256: followed by 64 lowercase hex digits"
 minLength: 71
 maxLength: 71
 example: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f

@@ -553,7 +553,7 @@ func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	assert.Equal(t, ownerID, userFactor.UserID)
 }
 
-// The registry key has no schema, so a user of another schema can own the
+// The unique index has no schema column, so a user of another schema can own the
 // claimed value. The flow cannot continue with that user: it restarts, and
 // nothing is bound, linked or created.
 func TestSSOResolutionCollisionWithOtherSchemaOwnerReturns409(t *testing.T) {

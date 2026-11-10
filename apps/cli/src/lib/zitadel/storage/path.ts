@@ -1,5 +1,6 @@
-import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
+
+import type { FileSystem } from "@/lib/zitadel/storage/types";
 
 /**
  * An absolute, normalised filesystem path, as a value: every operation returns
@@ -11,7 +12,7 @@ import { dirname, relative, resolve, sep } from "node:path";
  * `path-scurry`, the one widely used object-oriented API (glob's), is a
  * filesystem walker whose path objects are mutable and cache what they find on
  * disk, so they go stale under a store that writes, and it has no notion of
- * one path containing another. Everything here but {@link Path.real} is pure.
+ * one path containing another. Everything here but {@link Path.resolveReal} is pure.
  */
 export class Path {
   /**
@@ -113,19 +114,20 @@ export class Path {
   /**
    * Resolve this path with every symlink on it, symlinked parent directories
    * included, even when its last segments do not exist yet. Unlike the rest of
-   * the class, this reads the disk.
+   * the class, this reads a filesystem.
    *
+   * @param fs - The filesystem the path is in.
    * @returns The real path, or `undefined` when a segment is a symlink that
    *   resolves nowhere, since what it names could be anywhere.
    */
-  resolveReal(): Path | undefined {
+  resolveReal(fs: Pick<FileSystem, "existsSync" | "lstatSync" | "realpathSync">): Path | undefined {
     const lineage = [this, ...this.ancestors];
     const missing = lineage.filter((path) => {
-      return !existsSync(path.value);
+      return !fs.existsSync(path.value);
     });
     const dangling = missing.some((path) => {
       try {
-        return lstatSync(path.value).isSymbolicLink();
+        return fs.lstatSync(path.value).isSymbolicLink();
       } catch {
         // Nothing there, or a file where a directory would be: no link either way.
         return false;
@@ -137,7 +139,7 @@ export class Path {
     // Whatever exists, exists from the root down, so the first one that is
     // not missing is the nearest; the filesystem root always is.
     const nearest = lineage[missing.length] ?? this;
-    return Path.of(realpathSync(nearest.value), this.relativeTo(nearest));
+    return Path.of(fs.realpathSync(nearest.value).toString(), this.relativeTo(nearest));
   }
 
   /**

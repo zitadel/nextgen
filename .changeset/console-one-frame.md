@@ -2,4 +2,4 @@
 "@zitadel/server": minor
 ---
 
-The console keeps its sidebar and top bar on Projects and Settings. There the sidebar lists Projects, Settings and, on the hosted cloud, Billing, Support and Email, and the project switcher reads "All projects". Search moves to the top of the sidebar. Settings has no "Back to dashboard" row: the switcher returns to a project.
+The console keeps its sidebar and top bar on Projects and Settings. On Projects the sidebar lists Projects and Settings, and the project switcher reads "All projects". Settings opens its own list: Profile and, on the hosted cloud, Billing, Support and Email, under a heading that leads back to Projects. Search moves to the top of the sidebar.

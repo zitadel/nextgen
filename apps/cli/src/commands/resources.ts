@@ -24,6 +24,9 @@ import {
   UpdateTeamBody,
 } from "@/lib/backend/schemas";
 import {
+  GetReleaseByIdParams,
+  GetSessionParams,
+  GetUserByIDParams,
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
@@ -313,6 +316,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndTeams,
     groupOrder: 1,
     singular: "user",
+    idSchema: GetUserByIDParams.shape.user_id,
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
     // schema); the schema URL it replaced is identical on every row.
@@ -397,6 +401,7 @@ export const RESOURCES = {
   sessions: resource({
     group: CommandGroups.authentication,
     singular: "session",
+    idSchema: GetSessionParams.shape.session_id,
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
     heading: "session_id",
@@ -638,6 +643,7 @@ export const RESOURCES = {
   release: resource({
     group: CommandGroups.configuration,
     singular: "release",
+    idSchema: GetReleaseByIdParams.shape.release_id,
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",

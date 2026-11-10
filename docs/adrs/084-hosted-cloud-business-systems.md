@@ -243,11 +243,13 @@ website's catch-all.
 - The add-on contract gains `signInApiBase`: where the sign-in widget (login,
   sign-up, claim) sends its calls. The cloud's add-on sets it to
   `/cloud/zitadel`, and starts BotID's client to protect the widget's two
-  flow writes, `POST /flow` and `POST /flow/{id}/submit`, beneath that base.
+  flow writes, `POST /flow` and `POST /flow/{id}/submit`, beneath that base
+  and the API's prefix (`/cloud/zitadel/api/v1/flow`).
   Every other console call stays direct.
-- `cloud-functions` forwards everything beneath `/cloud/zitadel/` to the
-  server unchanged (cookies, `Origin`, body), after `checkBotId()` on those
-  two writes. This is the JavaScript function in front of the Go service that
+- `cloud-functions` forwards the API's paths beneath `/cloud/zitadel/`
+  (`/cloud/zitadel/api/v1/…`) to the server unchanged (cookies, `Origin`,
+  body), after `checkBotId()` on those two writes, and answers 404 to every
+  other path: the server's origin is every other service's too. This is the JavaScript function in front of the Go service that
   ADR 078 §5 leaves open, and the edge signal of ADR 019: the cloud's console
   is a customer app on Vercel.
 - **A bad verdict** (`isBot` and not a verified bot) is refused with `403

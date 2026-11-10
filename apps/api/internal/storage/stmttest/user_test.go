@@ -18,7 +18,7 @@ import (
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
-func ensureUserTestProject(t *testing.T, stmts service.AllStatements) (projectID, schemaURL string) {
+func ensureUserTestProject(t testing.TB, stmts service.AllStatements) (projectID, schemaURL string) {
 	t.Helper()
 
 	project := newTestProject(uniqueProjectID(t))
@@ -550,7 +550,7 @@ func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name
 	return user
 }
 
-func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
+func newTestUser(t testing.TB, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
 	t.Helper()
 
 	emailAttr, err := domain.NewCreateAttribute("email", email, domain.AttributeUniquenessProject)
@@ -599,7 +599,7 @@ func getUserByID(t *testing.T, stmts service.AllStatements, projectID, userID st
 }
 
 // patchStateOf builds the post-merge state a patch writes, guarded by the
-// given user's current updated_at, with registry scopes resolved from the
+// given user's current updated_at, with unique team scopes resolved from the
 // stored rows the same way the service does.
 func patchStateOf(t *testing.T, stmts service.AllStatements, user *domain.User, attrs ...domain.CreateAttribute) *domain.PatchUser {
 	t.Helper()
@@ -611,13 +611,12 @@ func patchStateOf(t *testing.T, stmts service.AllStatements, user *domain.User, 
 	stored, err := stmts.GetUserUniqueAttributeScopes(t.Context(), user.ProjectID, user.ID)
 	require.NoError(t, err)
 	return &domain.PatchUser{
-		ProjectID:          user.ProjectID,
-		UserID:             user.ID,
-		SchemaURL:          user.SchemaURL,
-		ExpectedUpdatedAt:  user.Metadata.UpdatedAt,
-		Attributes:         attrs,
-		AttributeTeamScope: teamScope,
-		RegistryTeamScopes: domain.CreateAttributes(attrs).RegistryTeamScopes(stored, teamScope),
+		ProjectID:         user.ProjectID,
+		UserID:            user.ID,
+		SchemaURL:         user.SchemaURL,
+		ExpectedUpdatedAt: user.Metadata.UpdatedAt,
+		Attributes:        attrs,
+		UniqueTeamScopes:  domain.CreateAttributes(attrs).UniqueTeamScopes(stored, teamScope),
 	}
 }
 
@@ -824,7 +823,7 @@ func TestUserStatements_PatchUser(t *testing.T) {
 				Attributes: domain.CreateAttributes{
 					mustAttr("email", "missing@example.com", domain.AttributeUniquenessProject),
 				},
-				RegistryTeamScopes: []string{""},
+				UniqueTeamScopes: []string{""},
 			})
 			var noRow *database.NoRowFoundError
 			require.ErrorAs(t, err, &noRow)
@@ -892,10 +891,10 @@ func TestUserStatements_UniqueAttributes_CaseInsensitive(t *testing.T) {
 	})
 }
 
-// A team-scoped registry row for the same value is legal next to a
-// project-scoped one (the registry key includes team_id), so a lookup for a
+// A team-scoped claim on the same value is legal next to a project-scoped one
+// (the unique index includes unique_team_id), so a lookup for a
 // project-scoped owner must not see it.
-func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
+func TestUserStatements_GetUser_UniqueTeamIDFiltersUniqueClaims(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 
@@ -922,7 +921,7 @@ func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
 			Attributes:           attrs,
 			UniqueAttributesOnly: true,
 		})
-		require.Error(t, err, "without a team filter both registry rows match")
+		require.Error(t, err, "without a team filter both claims match")
 
 		projectScope := ""
 		got, err := d.stmts.GetUser(t.Context(), projectFilter, service.UserQueryOptions{
