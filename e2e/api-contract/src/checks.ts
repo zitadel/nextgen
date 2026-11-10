@@ -42,10 +42,17 @@ export const CHECKS = [
  * with the plain error body. Declaring both shapes would turn the response
  * into a sum type in the generated server and client, so the response schema
  * check is off for this one operation until the two are reconciled.
+ *
+ * `rollbackDeployment` takes only a deployment id and a project, both of which
+ * the stateful phase fills in from earlier responses. A "negative" request
+ * therefore comes out identical to a valid one, and `negative_data_rejection`
+ * flags the server for accepting what the spec does not call invalid. There is
+ * no invalid input to send, so the check is off for this one operation.
  */
 const EXEMPTIONS: readonly Exemption[] = [
   { operationId: "getTeam", check: "use_after_free" },
   { operationId: "submitFlowStep", check: "response_schema_conformance" },
+  { operationId: "rollbackDeployment", check: "negative_data_rejection" },
 ];
 
 export interface Exemption {

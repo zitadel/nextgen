@@ -83,7 +83,12 @@ export class SchemathesisCommand {
 
   /** The environment holding every header line and scheme credential. */
   environment(): Record<string, string> {
-    const environment: Record<string, string> = { SCHEMATHESIS_HOOKS: HOOKS_PATH };
+    // Python would otherwise write hooks.pyc into the mounted work directory as
+    // root, and the run could not delete it afterwards.
+    const environment: Record<string, string> = {
+      SCHEMATHESIS_HOOKS: HOOKS_PATH,
+      PYTHONDONTWRITEBYTECODE: "1",
+    };
     Object.entries(this.input.headers).forEach(([name, value], index) => {
       environment[`HEADER_${String(index)}`] = `${name}: ${value}`;
     });

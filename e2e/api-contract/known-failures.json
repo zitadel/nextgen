@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "operation": "POST /branding",
+    "check": "API accepted schema-violating request"
+  },
+  {
+    "operation": "POST /branding",
+    "check": "Response violates schema"
+  },
+  {
+    "operation": "Stateful tests (management)",
+    "check": "Response violates schema"
+  }
+]
