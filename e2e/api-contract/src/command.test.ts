@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import { EXIT_MARKER, HOOKS_PATH, MAX_EXAMPLES, SchemathesisCommand, SEED } from "./command";
 
-/** The hooks the lane loads into every run: it keeps a made-up page token out of the requests. */
-const HOOKS_ENVIRONMENT = { SCHEMATHESIS_HOOKS: HOOKS_PATH };
+/** The hooks the lane loads into every run (it keeps a made-up page token out of the requests), and no bytecode written beside them. */
+const HOOKS_ENVIRONMENT = { SCHEMATHESIS_HOOKS: HOOKS_PATH, PYTHONDONTWRITEBYTECODE: "1" };
 
 const CHECKS_TABLE =
   "[checks]\nenabled = false\n\n" +

@@ -4,12 +4,24 @@
     "check": "API rejected schema-compliant request"
   },
   {
+    "operation": "PATCH /users/me",
+    "check": "Server error"
+  },
+  {
     "operation": "POST /auth_attempts",
     "check": "API rejected schema-compliant request"
   },
   {
     "operation": "POST /auth_attempts/{attempt_id}/challenges",
     "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /branding",
+    "check": "API accepted schema-violating request"
+  },
+  {
+    "operation": "POST /branding",
+    "check": "Response violates schema"
   },
   {
     "operation": "POST /deployments",
@@ -54,9 +66,5 @@
   {
     "operation": "POST /users/query",
     "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "PATCH /users/me",
-    "check": "Server error"
   }
 ]
