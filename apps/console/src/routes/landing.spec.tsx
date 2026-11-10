@@ -188,7 +188,9 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
-    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Create your first project" }),
+    ).toBeInTheDocument();
   });
 
   it("selects nothing when the person's projects cannot be read", async () => {
