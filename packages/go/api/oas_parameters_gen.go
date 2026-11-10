@@ -24,6 +24,17 @@ type BuildReleaseParams struct {
 	ProjectID ProjectID
 }
 
+// CancelInvitationParams is parameters of cancelInvitation operation.
+type CancelInvitationParams struct {
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
+	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	ID InvitationID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
 // CompleteClaimParams is parameters of completeClaim operation.
 type CompleteClaimParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
@@ -77,6 +88,14 @@ type CreateHandoffParams struct {
 
 // CreateIdpParams is parameters of createIdp operation.
 type CreateIdpParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
+// CreateInvitationParams is parameters of createInvitation operation.
+type CreateInvitationParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -320,6 +339,17 @@ type GetIdpRevisionByIdParams struct {
 	// The revision ID: the `revision_id` that `createIdp` (`POST /idps`) returns, or that
 	// `listIdpRevisions` (`GET /idps/{id}/revisions`) lists.
 	RevisionID string
+}
+
+// GetInvitationParams is parameters of getInvitation operation.
+type GetInvitationParams struct {
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
+	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	ID InvitationID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 }
 
 // GetMyPasswordStateParams is parameters of getMyPasswordState operation.
@@ -653,6 +683,25 @@ type ListIdpRevisionsParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
+// ListInvitationsParams is parameters of listInvitations operation.
+type ListInvitationsParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// Only invitations with this status.
+	Status OptInvitationStatus `json:",omitempty,omitzero"`
+	// Only invitations of this type.
+	Type OptListInvitationsType `json:",omitempty,omitzero"`
+}
+
 // ListMyIdentityLinksParams is parameters of listMyIdentityLinks operation.
 type ListMyIdentityLinksParams struct {
 	// Maximum number of items to return.
@@ -812,6 +861,22 @@ type ListProjectAdminsParams struct {
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	ProjectID ProjectID
+}
+
+// ListProjectMembersParams is parameters of listProjectMembers operation.
+type ListProjectMembersParams struct {
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+	ProjectID ProjectID
+	// Only members whose strongest role is at least this relation.
+	// `admin` beats `editor` beats `viewer`, so `relation=admin` lists
+	// administrators only.
+	Relation OptListProjectMembersRelation `json:",omitempty,omitzero"`
 }
 
 // ListReleasesParams is parameters of listReleases operation.

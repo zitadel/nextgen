@@ -13,6 +13,24 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// AcceptInvitation implements acceptInvitation operation.
+//
+// Accepts a pending invitation for the signed-in user and returns the updated
+// invitation.
+// Send the plaintext token from the invitation link fragment. Acceptance
+// grants the invitation's role (a project grant for `project_member`) when
+// the invitation is pending and unexpired, the project is active and claimed,
+// and the creator still holds `admin` unless `created_by` is null. The
+// inviter cannot accept their own invitation. Every unknown or finished token
+// answers the same opaque `404`.
+// Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+//
+// POST /invitations/accept
+func (UnimplementedHandler) AcceptInvitation(ctx context.Context, req *InvitationTokenRequest) (r AcceptInvitationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // AddOrigin implements addOrigin operation.
 //
 // Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
@@ -88,6 +106,21 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 //
 // POST /releases/build
 func (UnimplementedHandler) BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (r BuildReleaseRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CancelInvitation implements cancelInvitation operation.
+//
+// Cancels a pending invitation and clears its metadata. The row stays with
+// status `cancelled`; its link can no longer be redeemed.
+// Only a `pending` invitation can be cancelled. A finished invitation answers
+// the same as a miss. Authenticate with a project secret (`oauth2`) or a
+// console session cookie (`sessionCookie`). Cancelling needs the same project
+// `admin` check as `createGrant` (`POST /grants`). Cookie requests follow that
+// scheme's CSRF rules.
+//
+// DELETE /invitations/{id}
+func (UnimplementedHandler) CancelInvitation(ctx context.Context, params CancelInvitationParams) (r CancelInvitationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -377,6 +410,30 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 //
 // POST /idps
 func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (r CreateIdpRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateInvitation implements createInvitation operation.
+//
+// Creates an invitation for a project, or replaces an existing one, and
+// returns the invitation and its one-shot link.
+// Send `type` and the object named after it. `project_member` takes
+// `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
+// and `role`, and answers `501` `not_implemented` until team invitations
+// ship. Optional `metadata.name` labels who the link is for. Optional
+// `replaces_invitation_id` replaces that invitation: the new row keeps the
+// original's `journey_id`, and a pending original becomes `cancelled`.
+// The `link` appears only in this response. Share it out of band; whoever
+// opens it and is signed in can redeem the role. It expires in 72 hours.
+// Refused for an unclaimed project, on a server without a platform project,
+// and when the project's pending-invitation cap is reached.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Creation needs the same project `admin` check as
+// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+// rules.
+//
+// POST /invitations
+func (UnimplementedHandler) CreateInvitation(ctx context.Context, req CreateInvitationRequest, params CreateInvitationParams) (r CreateInvitationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -826,6 +883,19 @@ func (UnimplementedHandler) GetIdpRevisionById(ctx context.Context, params GetId
 	return r, ht.ErrNotImplemented
 }
 
+// GetInvitation implements getInvitation operation.
+//
+// Returns one invitation by ID for the project named by `project_id`.
+// The response never includes the redeem token or the create-time `link`.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Reading needs the same project `admin` check as
+// `createGrant` (`POST /grants`).
+//
+// GET /invitations/{id}
+func (UnimplementedHandler) GetInvitation(ctx context.Context, params GetInvitationParams) (r GetInvitationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetLive implements getLive operation.
 //
 // Answers `ok` while the server process serves HTTP, and checks nothing
@@ -1199,6 +1269,20 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 	return r, ht.ErrNotImplemented
 }
 
+// ListInvitations implements listInvitations operation.
+//
+// Lists a project's invitations, newest first, in any status, paginated with
+// `limit` and `page_token`.
+// Optional `status` and `type` filters narrow the page. `expired` is derived
+// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+// a console session cookie (`sessionCookie`). Listing needs the same project
+// `admin` check as `createGrant` (`POST /grants`).
+//
+// GET /invitations
+func (UnimplementedHandler) ListInvitations(ctx context.Context, params ListInvitationsParams) (r ListInvitationsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListMyIdentityLinks implements listMyIdentityLinks operation.
 //
 // Lists the identity provider accounts a sign-in linked to the signed-in user,
@@ -1333,6 +1417,30 @@ func (UnimplementedHandler) ListProjectAdmins(ctx context.Context, params ListPr
 	return r, ht.ErrNotImplemented
 }
 
+// ListProjectMembers implements listProjectMembers operation.
+//
+// Lists everyone with a role on a project, with each person's strongest
+// `relation` and its `sources`.
+// This is today's `listProjectAdmins` (`GET /projects/{project_id}/admins`)
+// widened from `admin` to every relation. A person appears once. Optional
+// `relation` means at least that role, so `relation=admin` gives the admins
+// view (`admin` beats `editor` beats `viewer`). Owning-team membership always
+// contributes `admin`.
+// A person who left a team, or whose team or user was deactivated, is not
+// listed through that source. Expired grants are left out. A person whose
+// access comes only through teams the caller is not a member of is left out;
+// a team the caller is not in is named by `team_id` only.
+// The list is ordered by `user_id` and paginated with `page_token`.
+// Authenticate with a project secret (`oauth2`), or with the session cookie
+// (`sessionCookie`) of a signed-in person who can read the project. It needs
+// `project.write` or a session, never `project.read`, which the browser-plane
+// preview secret carries.
+//
+// GET /projects/{project_id}/members
+func (UnimplementedHandler) ListProjectMembers(ctx context.Context, params ListProjectMembersParams) (r ListProjectMembersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first. A release is a snapshot of the
@@ -1401,6 +1509,20 @@ func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUse
 //
 // GET /users/{user_id}/teams
 func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTeamsParams) (r ListUserTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// LookupInvitation implements lookupInvitation operation.
+//
+// Returns a lean view of the invitation for the signed-in accept page:
+// project, role, inviter and expiry.
+// Send the plaintext token from the invitation link fragment. Every unknown
+// or finished token answers the same opaque `404`. Authenticate with a
+// platform-project user session cookie (`sessionCookie`). The call is
+// rate-limited.
+//
+// POST /invitations/lookup
+func (UnimplementedHandler) LookupInvitation(ctx context.Context, req *InvitationTokenRequest) (r LookupInvitationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1566,6 +1688,20 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 //
 // POST /users/query
 func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (r QueryUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RejectInvitation implements rejectInvitation operation.
+//
+// Declines a pending invitation for the signed-in user and returns the
+// updated invitation with status `rejected`.
+// Send the plaintext token from the invitation link fragment. Metadata is
+// cleared. Every unknown or finished token answers the same opaque `404`.
+// Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+//
+// POST /invitations/reject
+func (UnimplementedHandler) RejectInvitation(ctx context.Context, req *InvitationTokenRequest) (r RejectInvitationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

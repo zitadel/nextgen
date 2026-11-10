@@ -10,6 +10,20 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
+func encodeAcceptInvitationRequest(
+	req *InvitationTokenRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeAddOriginRequest(
 	req *ProjectOrigin,
 	r *http.Request,
@@ -164,6 +178,20 @@ func encodeCreateIdpRequest(
 	return nil
 }
 
+func encodeCreateInvitationRequest(
+	req CreateInvitationRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateProjectRequest(
 	req *CreateProjectRequest,
 	r *http.Request,
@@ -304,6 +332,20 @@ func encodeIssueChallengeRequest(
 	return nil
 }
 
+func encodeLookupInvitationRequest(
+	req *InvitationTokenRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodePatchMyUserRequest(
 	req *PatchMyUserRequest,
 	r *http.Request,
@@ -432,6 +474,20 @@ func encodeQueryTeamsRequest(
 
 func encodeQueryUsersRequest(
 	req *QueryUsersRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeRejectInvitationRequest(
+	req *InvitationTokenRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

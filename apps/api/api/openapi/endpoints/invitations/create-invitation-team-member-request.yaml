@@ -1,0 +1,36 @@
+title: CreateTeamMemberInvitationRequest
+description: |
+  Creates a team-member invitation. Declared now; creating one answers `501`
+  `not_implemented` until team invitations ship.
+type: object
+required:
+  - type
+  - team_member
+properties:
+  type:
+    type: string
+    enum:
+      - team_member
+  team_member:
+    type: object
+    required:
+      - team_id
+      - role
+    properties:
+      team_id:
+        $ref: ../../components/schemas/team-id.yaml
+      role:
+        type: string
+        enum:
+          - member
+        description: The team role the accepter receives.
+  metadata:
+    description: Optional label for who the link is for. Displayed only; never matched.
+    $ref: invitation-metadata.yaml
+  replaces_invitation_id:
+    description: |
+      When set, this create replaces that invitation: the new invitation keeps
+      the original's `journey_id`, and a pending original becomes `cancelled` in
+      the same transaction. Use the `id` that `createInvitation`
+      (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+    $ref: ../../components/schemas/invitation-id.yaml

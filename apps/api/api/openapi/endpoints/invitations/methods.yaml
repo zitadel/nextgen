@@ -1,0 +1,155 @@
+post:
+  operationId: createInvitation
+  summary: Create an invitation
+  description: |
+    Creates an invitation for a project, or replaces an existing one, and
+    returns the invitation and its one-shot link.
+
+    Send `type` and the object named after it. `project_member` takes
+    `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
+    and `role`, and answers `501` `not_implemented` until team invitations
+    ship. Optional `metadata.name` labels who the link is for. Optional
+    `replaces_invitation_id` replaces that invitation: the new row keeps the
+    original's `journey_id`, and a pending original becomes `cancelled`.
+
+    The `link` appears only in this response. Share it out of band; whoever
+    opens it and is signed in can redeem the role. It expires in 72 hours.
+    Refused for an unclaimed project, on a server without a platform project,
+    and when the project's pending-invitation cap is reached.
+
+    Authenticate with a project secret (`oauth2`) or a console session cookie
+    (`sessionCookie`). Creation needs the same project `admin` check as
+    `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+    rules.
+  tags:
+    - Invitations
+  security:
+    - oauth2:
+        - project.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-invitation-request.yaml
+  responses:
+    '201':
+      description: The invitation was created, with its one-shot link.
+      content:
+        application/json:
+          schema:
+            $ref: create-invitation-response.yaml
+    '400':
+      description: The request body or parameters were not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: The caller is not a project administrator.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found, or the invitation to replace was not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        The project cannot accept invitations yet (unclaimed), the pending
+        invitation cap was reached, or the server has no platform project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '501':
+      description: |
+        `type` is `team_member`, which is declared but not implemented yet.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/schemas/errors/not_implemented.yaml
+    default:
+      $ref: createInvitation-error-response.yaml
+
+get:
+  operationId: listInvitations
+  summary: List invitations
+  description: |
+    Lists a project's invitations, newest first, in any status, paginated with
+    `limit` and `page_token`.
+
+    Optional `status` and `type` filters narrow the page. `expired` is derived
+    on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+    a console session cookie (`sessionCookie`). Listing needs the same project
+    `admin` check as `createGrant` (`POST /grants`).
+  tags:
+    - Invitations
+  security:
+    - oauth2:
+        - project.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+    - name: status
+      in: query
+      required: false
+      description: Only invitations with this status.
+      schema:
+        $ref: invitation-status.yaml
+    - name: type
+      in: query
+      required: false
+      description: Only invitations of this type.
+      schema:
+        type: string
+        enum:
+          - project_member
+          - team_member
+  responses:
+    '200':
+      description: A page of the project's invitations.
+      content:
+        application/json:
+          schema:
+            $ref: list-invitations-response.yaml
+    '400':
+      description: The page token is not valid. Send the `next_page_token` from the previous response unchanged.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: The caller is not a project administrator.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: listInvitations-error-response.yaml

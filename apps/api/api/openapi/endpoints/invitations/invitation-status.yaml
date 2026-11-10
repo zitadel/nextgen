@@ -1,0 +1,11 @@
+title: InvitationStatus
+type: string
+enum:
+  - pending
+  - accepted
+  - rejected
+  - cancelled
+  - expired
+description: |
+  Lifecycle status of the invitation. `expired` is derived on read from
+  `expires_at`; every other non-`pending` status is final.

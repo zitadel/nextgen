@@ -15,8 +15,8 @@ allOf:
           claimed.
 
           The team lives in the platform project, so treat this ID as opaque.
-          `GET /projects/{project_id}/admins` lists the people who administer
-          the project through it.
+          `GET /projects/{project_id}/members` lists the people who hold a role
+          on the project through it (including administrators).
         oneOf:
           - $ref: ../../components/schemas/team-id.yaml
           - type: 'null'

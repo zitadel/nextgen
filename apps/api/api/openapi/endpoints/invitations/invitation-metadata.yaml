@@ -1,0 +1,15 @@
+title: InvitationMetadata
+description: |
+  What the administrator entered at creation, so other administrators know who
+  the link is for. It is only displayed, never matched. Null once the
+  invitation is accepted, declined or cancelled.
+type: object
+required:
+  - name
+properties:
+  name:
+    type: string
+    minLength: 1
+    maxLength: 200
+    description: A display name for who the invitation is intended for.
+    example: John Doe

@@ -1,0 +1,93 @@
+get:
+  operationId: getInvitation
+  summary: Get an invitation
+  description: |
+    Returns one invitation by ID for the project named by `project_id`.
+
+    The response never includes the redeem token or the create-time `link`.
+    Authenticate with a project secret (`oauth2`) or a console session cookie
+    (`sessionCookie`). Reading needs the same project `admin` check as
+    `createGrant` (`POST /grants`).
+  tags:
+    - Invitations
+  security:
+    - oauth2:
+        - project.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/invitation-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: The invitation.
+      content:
+        application/json:
+          schema:
+            $ref: ../invitation.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The caller is not a project administrator.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Invitation or project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getInvitation-error-response.yaml
+
+delete:
+  operationId: cancelInvitation
+  summary: Cancel an invitation
+  description: |
+    Cancels a pending invitation and clears its metadata. The row stays with
+    status `cancelled`; its link can no longer be redeemed.
+
+    Only a `pending` invitation can be cancelled. A finished invitation answers
+    the same as a miss. Authenticate with a project secret (`oauth2`) or a
+    console session cookie (`sessionCookie`). Cancelling needs the same project
+    `admin` check as `createGrant` (`POST /grants`). Cookie requests follow that
+    scheme's CSRF rules.
+  tags:
+    - Invitations
+  security:
+    - oauth2:
+        - project.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/invitation-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '204':
+      description: The invitation was cancelled.
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The caller is not a project administrator.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        Invitation or project not found, or the invitation is no longer
+        pending.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: cancelInvitation-error-response.yaml
