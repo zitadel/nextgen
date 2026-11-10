@@ -378,6 +378,21 @@ describe("logs view", () => {
     expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
   });
 
+  it("slides Logs' list in from the right, and the project's back in from the left", async () => {
+    renderShell();
+    const primary = await screen.findByRole("navigation", { name: "Primary" });
+    // The first list drawn stays still.
+    expect(primary.parentElement).not.toHaveClass("animate-in");
+
+    await userEvent.click(within(primary).getByRole("link", { name: "Logs" }));
+    const logs = await screen.findByRole("navigation", { name: "Logs" });
+    expect(logs.parentElement).toHaveClass("animate-in", "slide-in-from-right-4");
+
+    await userEvent.click(within(logs).getByRole("link", { name: "Logs: back to the project" }));
+    const back = await screen.findByRole("navigation", { name: "Primary" });
+    expect(back.parentElement).toHaveClass("animate-in", "slide-in-from-left-4");
+  });
+
   it("keeps the pill on the project, which Logs is inside", async () => {
     renderShell("/events");
     await screen.findByRole("navigation", { name: "Logs" });
