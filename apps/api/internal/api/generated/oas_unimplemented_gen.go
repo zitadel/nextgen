@@ -1713,6 +1713,8 @@ func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollb
 // that one. `project_id` names the project to search; without it, the
 // credential's own project is searched. A caller with access to part of the
 // project finds only what that access covers.
+// A token needs `project.read` and, for each type it asks for, the scope that
+// type's own list needs: `user.read` for `user` and `team.read` for `team`.
 // Results come best match first, at most `limit_per_type` of each type, and
 // types can be mixed in the order. `incomplete_types` lists the types that
 // have more to show: page those with the type's query operation, `queryUsers`
