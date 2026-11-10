@@ -1423,25 +1423,32 @@ type Handler interface {
 	RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
 	// Search implements search operation.
 	//
-	// Finds the users and teams of a project that match a text.
+	// Finds the resources of a project that match a text, across resource types.
 	// `query` is what the person typed and `types` names the kinds of result to
 	// look for; only those are searched. Each result is a reference: its `type`,
 	// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
-	// with the type's own operation, `GetUserByID` (`GET /users/{user_id}`) or
-	// `getTeam` (`GET /teams/{team_id}`).
-	// A user matches when the value they carry as `identifier` contains the text,
-	// from three characters on. A team matches when its name contains it.
-	// Matching ignores case. A `query` that is the `id` of a user or a team finds
-	// that one. `project_id` names the project to search; without it, the
-	// credential's own project is searched. A caller with access to part of the
-	// project finds only what that access covers.
+	// with the type's own operation, for example `GetUserByID`
+	// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
+	// What a type matches on:
+	// - `user`: the value they carry as `identifier`, from three characters on
+	// - `team`: its name
+	// - `schema`: the `title` and the `objectType` of a user schema
+	// - `flow_definition`: its name
+	// - `idp`: the `slug` and the `display_name` of an identity provider
+	// connection
+	// A match is the text anywhere in that value, ignoring case. A `query` that
+	// is the `id` of a resource of a requested type finds that one. A schema and
+	// a flow definition are found at their newest revision. `project_id` names
+	// the project to search; without it, the credential's own project is
+	// searched. A caller with access to part of the project finds only what that
+	// access covers.
 	// Results come best match first, at most `limit_per_type` of each type, and
 	// types can be mixed in the order. `incomplete_types` lists the types that
-	// have more to show: page those with the type's query operation, `queryUsers`
-	// (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+	// have more to show: page those with the type's own list, such as
+	// `queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
 	// How text is matched and ranked can change, and later versions can match
 	// more of a resource. Treat the results as suggestions; to filter by an exact
-	// rule, use a query operation.
+	// rule, use the type's own list.
 	//
 	// POST /search
 	Search(ctx context.Context, req *SearchRequest, params SearchParams) (SearchRes, error)

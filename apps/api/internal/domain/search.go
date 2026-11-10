@@ -11,8 +11,11 @@ import (
 type SearchResultType string
 
 const (
-	SearchResultTypeUser SearchResultType = "user"
-	SearchResultTypeTeam SearchResultType = "team"
+	SearchResultTypeUser           SearchResultType = "user"
+	SearchResultTypeTeam           SearchResultType = "team"
+	SearchResultTypeSchema         SearchResultType = "schema"
+	SearchResultTypeFlowDefinition SearchResultType = "flow_definition"
+	SearchResultTypeIDP            SearchResultType = "idp"
 )
 
 const (

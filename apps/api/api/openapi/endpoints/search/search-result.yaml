@@ -12,7 +12,9 @@ properties:
     $ref: search-result-type.yaml
   id:
     type: string
-    description: The resource's `id`, as its type's own operations take it.
+    description: |
+      The resource's `id`, as its type's own operations take it. For a schema
+      and a flow definition, the `id` of the newest revision.
     example: user_01KWH3B72K7M7F0N9WD3P2E4YM
   project_id:
     $ref: ../../components/schemas/project-id.yaml
@@ -20,12 +22,21 @@ properties:
   title:
     type: string
     description: |
-      What to call the resource. For a user, their `display`, else their
-      `identifier`, else their `id`. For a team, its name.
+      What to call the resource:
+      - a user: their `display`, else their `identifier`, else their `id`
+      - a team: its name
+      - a schema: its `title`, else its `objectType`, else its `id`
+      - a flow definition: its name
+      - an identity provider connection: its `display_name`, else its `slug`
     example: Ann Lee
   subtitle:
     type: string
     description: |
-      A second line that tells two titles apart. For a user shown by their
-      `display`, their `identifier`. Absent when there is nothing to add.
+      A second line that tells two titles apart, absent when there is nothing
+      to add:
+      - a user shown by their `display`: their `identifier`
+      - a schema shown by its `title`: its `objectType`
+      - a flow definition: the purposes it handles
+      - an identity provider connection shown by its `display_name`: its
+        `slug`
     example: ann@example.com

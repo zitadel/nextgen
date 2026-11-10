@@ -86,10 +86,14 @@ What the first version does:
 | --- | --- | --- | --- |
 | `user` | the designated identifier, as a substring, from three characters | the display, else the identifier, else the id | the identifier, under a display |
 | `team` | the name, as a substring | the name | none |
+| `schema` | a user schema's `title` and `objectType`, as a substring | the title, else the object type, else the id | the object type, under a title |
+| `flow_definition` | the name, as a substring | the name | the purposes it handles |
+| `idp` | a connection's `slug` and `display_name`, as a substring | the display name, else the slug | the slug, under a display name |
 
-- Text that is an id of a searched type (`user_…`, `team_…`) is looked up as
-  that id instead of as text.
+- Text that is the id of a resource of a searched type is found as that id.
 - Matching ignores case.
+- A schema and a flow definition are found at their newest revision, and the
+  result carries that revision's id.
 - Each type contributes its best matches among the rows it read: a whole-value
   match, then a prefix, then a substring.
 
@@ -99,6 +103,13 @@ It adds no table, index or statement. Each requested type costs one access
 check and one read through that type's list, run one after another, so a
 caller sees exactly what that type's own list would show them. The user match
 scans the identifiers of the project's users.
+
+The lists of schemas, flow definitions and identity providers cannot filter on
+the text a person knows them by: a schema's title and a connection's display
+name live inside their documents, and a flow's name matches only whole. Search
+reads one page of each (100 rows, newest revisions only) and matches it in the
+server. A project holds a handful of each; one with more than a page is
+reported in `incomplete_types`.
 
 ## Consequences
 
@@ -115,8 +126,8 @@ scans the identifiers of the project's users.
 
 Each is an addition under this contract:
 
-- More types: user schemas, flow definitions and identity providers next, then
-  applications once they can be listed.
+- More types: applications once they can be listed, then releases and
+  deployments.
 - A user's exact identifier through the unique index, and a user's display
   name.
 - Search across the projects a person can act on, by leaving out `project_id`

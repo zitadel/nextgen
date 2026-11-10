@@ -262,7 +262,7 @@ func TestSearchSessionCaller(t *testing.T) {
 
 // A grant scoped to one team narrows each type as it narrows that type's own
 // list (TestListAuthzTeamScopedOnlyPartialView): that team is found, the
-// other is not, and no user is.
+// other is not, and neither is a user or a schema.
 //
 // Serial for the reason that test gives: the list predicate is slow on the
 // Spanner emulator beside everything a parallel run has accumulated.
@@ -277,6 +277,20 @@ func TestSearchTeamScopedPartialView(t *testing.T) {
 	outOfScope, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "Partial Out"})
 	require.NoError(t, err)
 	seedSearchUser(t, project.ID, "", map[string]any{"email": "partial@search.example.com"})
+	// Configuration belongs to no team, so a team's grant does not reach it.
+	harness.CreateUserSchema(t, project, `{
+		"title": "Partial Staff",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://search.example.com/schemas/partial-staff.json",
+		"kind": "user-schema",
+		"objectType": "partial-user",
+		"type": "object",
+		"x-identifier": "email",
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project"}
+		}
+	}`)
 
 	// Replace the project secret's project-wide role with a viewer grant on
 	// one team.
@@ -304,7 +318,13 @@ func TestSearchTeamScopedPartialView(t *testing.T) {
 
 	got := searchResults(t, client, &api.SearchRequest{
 		Query: "partial",
-		Types: []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam},
+		Types: []api.SearchResultType{
+			api.SearchResultTypeUser,
+			api.SearchResultTypeTeam,
+			api.SearchResultTypeSchema,
+			api.SearchResultTypeFlowDefinition,
+			api.SearchResultTypeIdp,
+		},
 	}, api.SearchParams{})
 	assert.Equal(t, []string{inScope.ID}, searchResultIDs(got.Results))
 
@@ -314,4 +334,110 @@ func TestSearchTeamScopedPartialView(t *testing.T) {
 		Types: []api.SearchResultType{api.SearchResultTypeTeam},
 	}, api.SearchParams{})
 	assert.Empty(t, got.Results)
+}
+
+// Configuration is found by the names a person knows it by: a schema's title
+// or object type, a flow's name, a connection's slug or display name. Their
+// lists filter on none of those, so this also proves the search matches the
+// page it reads.
+func TestSearchConfiguration(t *testing.T) {
+	t.Parallel()
+
+	f := newIdpFixture(t)
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), f.project.ID)
+	})
+
+	schemaID := harness.CreateUserSchema(t, f.project, `{
+		"title": "Partner Staff",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://search.example.com/schemas/partner-staff.json",
+		"kind": "user-schema",
+		"objectType": "partner-user",
+		"type": "object",
+		"x-identifier": "email",
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project"}
+		}
+	}`)
+
+	flowSchema := harness.CreateUserSchema(t, f.project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+	flowResp, err := f.client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(
+		f.projectID(), newFlowDefinitionFixture("partner-sign-in", flowSchema)))
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, flowResp, helpers.MustMarshal(t, flowResp))
+	flowID := flowResp.(*api.FlowDefinitionResponse).ID
+
+	connection := helpers.OIDCConnection("partner-sso")
+	connection.DisplayName = "Partner Portal"
+	idpID := f.create(t, connection).ID
+
+	config := []api.SearchResultType{
+		api.SearchResultTypeSchema,
+		api.SearchResultTypeFlowDefinition,
+		api.SearchResultTypeIdp,
+	}
+	search := func(t *testing.T, req *api.SearchRequest) *api.SearchResponse {
+		t.Helper()
+		return searchResults(t, f.client, req, api.SearchParams{ProjectID: api.NewOptProjectID(f.projectID())})
+	}
+
+	t.Run("finds a schema, a flow and a connection by what they are called", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "PARTNER", Types: config})
+
+		// Three prefixes, so the order is the order of the types.
+		require.Equal(t, []string{schemaID, flowID, idpID}, searchResultIDs(got.Results))
+		assert.Empty(t, got.IncompleteTypes)
+		assert.Equal(t, api.SearchResult{
+			Type:      api.SearchResultTypeSchema,
+			ID:        schemaID,
+			ProjectID: f.projectID(),
+			Title:     "Partner Staff",
+			Subtitle:  api.NewOptString("partner-user"),
+		}, got.Results[0])
+		assert.Equal(t, api.SearchResult{
+			Type:      api.SearchResultTypeFlowDefinition,
+			ID:        flowID,
+			ProjectID: f.projectID(),
+			Title:     "partner-sign-in",
+			Subtitle:  api.NewOptString("login"),
+		}, got.Results[1])
+		assert.Equal(t, api.SearchResult{
+			Type:      api.SearchResultTypeIdp,
+			ID:        idpID,
+			ProjectID: f.projectID(),
+			Title:     "Partner Portal",
+			Subtitle:  api.NewOptString("partner-sso"),
+		}, got.Results[2])
+	})
+
+	t.Run("matches inside a document, not only a column", func(t *testing.T) {
+		t.Parallel()
+		// "Staff" is only in the schema's title and "Portal" only in the
+		// connection's display name.
+		got := search(t, &api.SearchRequest{Query: "staff", Types: config})
+		assert.Equal(t, []string{schemaID}, searchResultIDs(got.Results))
+
+		got = search(t, &api.SearchRequest{Query: "portal", Types: config})
+		assert.Equal(t, []string{idpID}, searchResultIDs(got.Results))
+	})
+
+	t.Run("an id finds its resource", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range []string{schemaID, flowID, idpID} {
+			got := search(t, &api.SearchRequest{Query: id, Types: config})
+			assert.Equal(t, []string{id}, searchResultIDs(got.Results), id)
+		}
+	})
+
+	t.Run("configuration stays out of a search for other types", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{
+			Query: "partner",
+			Types: []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam},
+		})
+		assert.Empty(t, got.Results)
+	})
 }

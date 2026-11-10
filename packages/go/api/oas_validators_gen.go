@@ -14599,6 +14599,12 @@ func (s SearchResultType) Validate() error {
 		return nil
 	case "team":
 		return nil
+	case "schema":
+		return nil
+	case "flow_definition":
+		return nil
+	case "idp":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

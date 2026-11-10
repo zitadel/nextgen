@@ -276,6 +276,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	SearchOperation: []string{
 		"user.read",
 		"team.read",
+		"schema.read",
+		"flow_definition.read",
+		"idp.read",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
