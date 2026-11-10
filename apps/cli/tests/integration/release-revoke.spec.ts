@@ -213,6 +213,38 @@ describe("release revoke", () => {
         },
       );
 
+      describe("on a release only a preview serves", () => {
+        const PREVIEW_URL = "https://x-acme.vercel.app";
+
+        /** A release built and served by a preview of an edit nothing else serves. */
+        async function aPreviewedRelease(app: ScaffoldedApp): Promise<string> {
+          await app.addOrigin("https://*-acme.vercel.app", "preview");
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+          const previewed = await app.previewData(PREVIEW_URL);
+          return String(previewed.release_id);
+        }
+
+        it("suggests removing the preview", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aPreviewedRelease(app);
+
+          const result = await app.run(["release", "revoke", releaseId, "--force", "--json"]);
+
+          expect(result).toSuggest(`preview rm ${PREVIEW_URL}`);
+        });
+
+        it("does not suggest a deploy or a rollback, which leave the preview serving it", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aPreviewedRelease(app);
+
+          const result = await app.run(["release", "revoke", releaseId, "--force", "--json"]);
+
+          expect(result).not.toSuggest("deployment rollback");
+        });
+      });
+
       describe("without --force when no one can be asked", () => {
         it("is refused", async () => {
           const app = await aSetUpApp();

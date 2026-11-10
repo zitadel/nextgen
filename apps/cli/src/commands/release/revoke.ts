@@ -4,6 +4,7 @@ import { z } from "zod";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { ReleaseService } from "@/lib/backend";
+import type { ServingOrigin } from "@/lib/backend/services/release";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -31,8 +32,8 @@ const RELEASE_ID: Refused<string> = {
 const IN_USE_REFUSAL: Refusal = {
   code: "E_CONFLICT",
   message: "{release} is still served by {served}",
-  hint: "Deploy another release there, or roll the deployment back, then revoke it.",
-  next: [DEPLOY_ARGS, "deployment rollback"],
+  hint: "{steps}, then revoke it.",
+  next: ["{next}"],
   details: {
     release_id: "{release}",
     origins: "{origins}",
@@ -90,12 +91,15 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             const served = revoked.origins.map((one) => {
               return `${one.origin} (${one.deployment_id})`;
             });
+            const { steps, next } = freeing(revoked.origins);
             throw refusalError(
               IN_USE_REFUSAL,
               {
                 release: args.releaseId,
                 served: served.length > 0 ? served.join(", ") : "an origin",
                 origins: revoked.origins,
+                steps,
+                next,
               },
               (command) => {
                 return this.suggest(command);
@@ -115,4 +119,32 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
       }),
     );
   }
+}
+
+/**
+ * What frees the origins that serve a release: a preview is removed, while a
+ * primary origin takes another deploy or a rollback. An origin whose kind could
+ * not be read is treated as primary, the steps that apply to most projects.
+ */
+function freeing(origins: readonly ServingOrigin[]): { steps: string; next: string[] } {
+  const previews = origins.filter((one) => {
+    return one.kind === "preview";
+  });
+  const primary = previews.length < origins.length || origins.length === 0;
+  const remove = previews.length === 1 ? "Remove the preview" : "Remove the previews";
+  const steps =
+    previews.length === 0
+      ? "Deploy another release to the primary origins, or roll the deployment back"
+      : primary
+        ? `${remove}, and deploy another release to the primary origins or roll the deployment back`
+        : remove;
+  return {
+    steps,
+    next: [
+      ...previews.map((one) => {
+        return `preview rm ${one.origin}`;
+      }),
+      ...(primary ? [DEPLOY_ARGS, "deployment rollback"] : []),
+    ],
+  };
 }

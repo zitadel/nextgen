@@ -7,9 +7,10 @@ import type {
   GetReleaseById200PointersItemKind,
   RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "@/lib/backend/client";
+import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
 import { ConflictError } from "@/lib/backend/errors";
+import { type Origins, OriginService } from "./origin";
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;
@@ -30,7 +31,12 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
 /** An origin that still serves a release, and the deployment that pins it there. */
-export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
+export type ServingOrigin = Readonly<
+  RevokeRelease409DetailsOriginsItem & {
+    /** What the origin is to the project; `unknown` when its origins could not be read. */
+    kind: ReturnType<Origins["kindOf"]>;
+  }
+>;
 
 /**
  * What revoking a release came to: `revoked`, or `in-use` when origins still
@@ -134,9 +140,22 @@ export class ReleaseService extends ApiService {
       if (!(error instanceof ConflictError) || error.serverCode !== "rel.in_use") {
         throw error;
       }
+      const served = servingOrigins(error.body);
+      // The kinds only shape what to do next; a read that fails here leaves
+      // them unknown rather than replacing the refusal with its own error.
+      const origins = await new OriginService(this.client, this.projectId)
+        .list()
+        .catch((cause: unknown): undefined => {
+          if (isCancelled(this.client)) {
+            throw cause;
+          }
+          return undefined;
+        });
       return {
         outcome: "in-use",
-        origins: servingOrigins(error.body),
+        origins: served.map((one) => {
+          return { ...one, kind: origins?.kindOf(one.origin) ?? "unknown" };
+        }),
       };
     }
   }
@@ -146,12 +165,12 @@ export class ReleaseService extends ApiService {
  * The origins a `rel.in_use` refusal names. The server nests them in the
  * envelope's `details.details`, the contract in `details`, so both are read.
  */
-function servingOrigins(body: unknown): ServingOrigin[] {
+function servingOrigins(body: unknown): RevokeRelease409DetailsOriginsItem[] {
   let node: unknown = body;
   for (let depth = 0; depth < 3 && isObject(node); depth += 1) {
     const { origins } = node;
     if (Array.isArray(origins)) {
-      return origins.filter((item): item is ServingOrigin => {
+      return origins.filter((item): item is RevokeRelease409DetailsOriginsItem => {
         return (
           isObject(item) &&
           typeof item.origin === "string" &&
