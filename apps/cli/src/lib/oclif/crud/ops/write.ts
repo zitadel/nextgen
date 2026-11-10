@@ -141,7 +141,7 @@ const describeWrite = <
       `${command} --file ${exampleFile(resource.singular)}`,
     ],
     flags: { ...bodyFieldFlags(fields), ...rawBodyFlags(document, fields), ...options.flags },
-    args: verb === "create" ? {} : idArg(resource),
+    args: verb === "create" ? {} : idArg(resource, topic),
   };
 };
 

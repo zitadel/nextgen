@@ -57,7 +57,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
         }),
         ...options.flags,
       },
-      args: idArg(resource),
+      args: idArg(resource, topic),
     };
   }
 

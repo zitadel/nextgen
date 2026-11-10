@@ -279,6 +279,13 @@ describe("the CLI names itself once in human output", () => {
     ...(line.match(/`(?:[^`\\\n]|\\.)*`/g) ?? []),
   ];
 
+  /**
+   * A failure's `hint:`. It may quote a command in backticks: the base command
+   * spells every hint out on its way to the terminal (`spellOutCommands`), so
+   * the backticks never reach a person.
+   */
+  const HINT = /\bhint:/;
+
   /** A path as a failure names it, with forward slashes on every platform. */
   const asWritten = (file: string): string =>
     relative(join(COMMANDS, ".."), file).split(sep).join("/");
@@ -292,7 +299,9 @@ describe("the CLI names itself once in human output", () => {
           return [];
         }
         const lines = blankComments(await readFile(file, "utf8")).split("\n");
-        return lines.flatMap((line, index) => (offends(line) ? [`${name}:${index + 1}`] : []));
+        return lines.flatMap((line, index) => {
+          return !HINT.test(line) && offends(line) ? [`${name}:${index + 1}`] : [];
+        });
       }),
     );
     return found.flat().sort();
