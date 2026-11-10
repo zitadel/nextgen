@@ -783,7 +783,7 @@ func mergeSSOClaim(collected, kept any) any {
 
 // ssoVerifiedClaimRejected reports whether a unique leaf of a verified claim
 // fails its own property. A leaf is unique by its own x-unique, as the
-// registry reads it ([CreateAttributes]). Keys the schema does not define are
+// unique claims read it ([CreateAttributes]). Keys the schema does not define are
 // skipped: the collection step leaves them out.
 func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) bool {
 	var rejected func(prop schemaReader, value any) bool
@@ -840,10 +840,10 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 	return probe, unique
 }
 
-// ssoUniqueLeaves returns the path of each value the creation would record in
-// the unique registry, walked as [CreateAttributes] flattens a user: an object
+// ssoUniqueLeaves returns the path of each value the creation would record as
+// a unique claim, walked as [CreateAttributes] flattens a user: an object
 // descends, and any other value is a leaf, an array included. The new user
-// has no team, so each of its registry rows has team scope "", whatever the
+// has no team, so each of its unique claims has team scope "", whatever the
 // leaf's x-unique scope, and collides with any row of the same scope.
 func ssoUniqueLeaves(parent schemaReader, prefix AttributeKey, values map[string]any) []string {
 	var out []string
@@ -1928,7 +1928,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 // not, so the candidate list keys on FlowField.Unique — the designated
 // identifier alone would miss an undesignated unique attribute (a taken
 // username beside a fresh email). The lookup behind SubmitIdentifier goes
-// through the unique-attributes registry, so probing any unique attribute
+// through the unique claims, so probing any unique attribute
 // is well-defined regardless of designation.
 func uniqueFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields) [][2]string {
 	var out [][2]string

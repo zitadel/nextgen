@@ -133,6 +133,7 @@ describe("zitadel resources", () => {
       "not_equals",
       "contains",
     ]);
+    expect(find("users", "identifier")?.operations).toEqual(["starts_with"]);
     expect(find("events", "category")?.combine).toBe("or");
     expect(find("schemas", "revisions")?.values).toEqual(["all", "latest"]);
 

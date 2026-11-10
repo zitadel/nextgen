@@ -272,7 +272,9 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // does — an id in the empty line, the origins a footer names — so they
       // are spelled out here, where the cells and the cursor already are.
       if (view.rows.length === 0) {
-        return escapeControlCharacters(view.empty);
+        // A page can be empty while more remain: the events list matches some
+        // filters over a bounded number of events per request.
+        return [escapeControlCharacters(view.empty), ...more].join("\n");
       }
       const plural = view.plural ?? `${view.singular}s`;
       const count = `${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`;

@@ -27,6 +27,12 @@ const (
     payload, metadata
 FROM events`
 
+	// eventScanSelect and eventScanFrom are ScanEvents' statement, around the
+	// expression that says whether a row matched.
+	eventScanSelect = `SELECT id, created_at, `
+	eventScanFrom   = `
+FROM events`
+
 	deleteEventsOlderThanStmt = `
 DELETE FROM events
 WHERE created_at < @p1`
@@ -182,6 +188,42 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 		Items:      items,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// ScanEvents implements [service.EventStatements]. It reads the rows of one
+// index range, within, in its order and no further than its limit, and says
+// of each whether it satisfies match. match is not part of the WHERE: the
+// database then has nothing to choose another index by, so the read is the
+// range and stops at the limit, whatever the data. A nil match matches every
+// row.
+func (e eventStatements) ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error) {
+	var compiler statementCompiler
+	compiler.WriteString(eventScanSelect)
+	if match == nil {
+		compiler.WriteString("TRUE")
+	} else {
+		compiler.WriteString("CASE WHEN ")
+		compileFilter(&compiler, match, events.Schema)
+		compiler.WriteString(" THEN TRUE ELSE FALSE END")
+	}
+	if err := compileRead(&compiler, eventScanFrom, within, events.Schema); err != nil {
+		return nil, err
+	}
+	var scanned []events.Scanned
+	err := e.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		scanned, err = collectRows(iter, func(row *spanner.Row) (events.Scanned, error) {
+			var s events.Scanned
+			err := row.Columns(&s.ID, &s.CreatedAt, &s.Matched)
+			s.CreatedAt = s.CreatedAt.UTC()
+			return s, err
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return scanned, nil
 }
 
 // DeleteEventsOlderThan implements [service.EventStatements].
