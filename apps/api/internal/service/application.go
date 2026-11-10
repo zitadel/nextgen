@@ -6,6 +6,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -104,7 +105,13 @@ func (s *applicationService) create(ctx context.Context, projectID string, next 
 		return nil, err
 	}
 	entity := &domain.Application{ProjectID: projectID, Slug: next.Slug, Document: document}
-	err = s.v2Pool.Statements().CreateApplication(ctx, entity, clients)
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		if err := stmts.CreateApplication(ctx, entity, clients); err != nil {
+			return err
+		}
+		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationCreated, entity, domain.ApplicationPayloadSnapshot(entity, next, clients))
+	})
 	if err == nil {
 		return &CreateApplicationOutput{Application: entity, Secrets: clientSecrets(clients, plain), Created: true}, nil
 	}
@@ -172,7 +179,10 @@ func (s *applicationService) revise(ctx context.Context, existing *domain.Applic
 			Document:  document,
 			CreatedAt: current.CreatedAt,
 		}
-		return stmts.ReviseApplication(ctx, entity, clients)
+		if err := stmts.ReviseApplication(ctx, entity, clients); err != nil {
+			return err
+		}
+		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationUpdated, entity, domain.ApplicationPayloadDelta(stored, next, entity, clients))
 	})
 	if err == nil {
 		return &CreateApplicationOutput{Application: entity, Secrets: clientSecrets(clients, plain)}, nil
@@ -231,6 +241,17 @@ func (s *applicationService) clientIDTaken(ctx context.Context, clients []*domai
 		}
 	}
 	return nil
+}
+
+func emitApplicationEvent(ctx context.Context, stmts AllStatements, eventType domain.EventType, entity *domain.Application, payload domain.ApplicationPayload) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       eventType,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "application",
+		EntityID:   entity.ID,
+		Payload:    payload,
+	})
 }
 
 func (s *applicationService) get(ctx context.Context, projectID string, field domain.ApplicationField, value string) (*domain.Application, error) {

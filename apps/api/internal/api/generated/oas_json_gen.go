@@ -22598,6 +22598,22 @@ func (s CreateApplicationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -22709,6 +22725,9 @@ func (s *CreateApplicationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateApplicationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateApplicationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateApplicationErrorResponse
 					found = true
@@ -22761,6 +22780,10 @@ func (s *CreateApplicationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedCreateApplicationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateApplicationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateApplicationErrorResponse:

@@ -33588,6 +33588,9 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -33610,6 +33613,7 @@
                   "application.permission_denied": "#/components/schemas/application-permission_denied",
                   "application.revision_conflict": "#/components/schemas/application-revision_conflict",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -33638,6 +33642,9 @@
               },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"

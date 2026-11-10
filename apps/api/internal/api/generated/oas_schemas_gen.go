@@ -13517,6 +13517,7 @@ type CreateApplicationErrorResponse struct {
 	ApplicationPermissionDenied ApplicationPermissionDenied
 	ApplicationRevisionConflict ApplicationRevisionConflict
 	AuthUnauthorized            AuthUnauthorized
+	EvtInvalid                  EvtInvalid
 	Internal                    Internal
 	NotImplemented              NotImplemented
 	ReqInvalid                  ReqInvalid
@@ -13535,6 +13536,7 @@ const (
 	ApplicationPermissionDeniedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "application.permission_denied"
 	ApplicationRevisionConflictCreateApplicationErrorResponse CreateApplicationErrorResponseType = "application.revision_conflict"
 	AuthUnauthorizedCreateApplicationErrorResponse            CreateApplicationErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateApplicationErrorResponse                  CreateApplicationErrorResponseType = "evt.invalid"
 	InternalCreateApplicationErrorResponse                    CreateApplicationErrorResponseType = "internal"
 	NotImplementedCreateApplicationErrorResponse              CreateApplicationErrorResponseType = "not_implemented"
 	ReqInvalidCreateApplicationErrorResponse                  CreateApplicationErrorResponseType = "req.invalid"
@@ -13574,6 +13576,11 @@ func (s CreateApplicationErrorResponse) IsApplicationRevisionConflict() bool {
 // IsAuthUnauthorized reports whether CreateApplicationErrorResponse is AuthUnauthorized.
 func (s CreateApplicationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateApplicationErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateApplicationErrorResponse is EvtInvalid.
+func (s CreateApplicationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateApplicationErrorResponse
 }
 
 // IsInternal reports whether CreateApplicationErrorResponse is Internal.
@@ -13740,6 +13747,27 @@ func (s CreateApplicationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorize
 func NewAuthUnauthorizedCreateApplicationErrorResponse(v AuthUnauthorized) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateApplicationErrorResponse to EvtInvalid.
+func (s *CreateApplicationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateApplicationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateApplicationErrorResponse is EvtInvalid.
+func (s CreateApplicationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateApplicationErrorResponse(v EvtInvalid) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 

@@ -11,6 +11,7 @@ content:
         - $ref: '../../components/schemas/errors/application-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/application-revision_conflict.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
@@ -25,6 +26,7 @@ content:
           application.permission_denied: '../../components/schemas/errors/application-permission_denied.yaml'
           application.revision_conflict: '../../components/schemas/errors/application-revision_conflict.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
@@ -44,6 +46,8 @@ content:
         $ref: '../../components/examples/errors/application-revision_conflict.yaml'
       auth.unauthorized:
         $ref: '../../components/examples/errors/auth-unauthorized.yaml'
+      evt.invalid:
+        $ref: '../../components/examples/errors/evt-invalid.yaml'
       internal:
         $ref: '../../components/examples/errors/internal.yaml'
       not_implemented:
