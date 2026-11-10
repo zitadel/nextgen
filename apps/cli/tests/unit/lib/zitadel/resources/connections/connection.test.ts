@@ -10,7 +10,7 @@ import {
   UnusableSettingError,
 } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
-import { MemoryStore } from "@/lib/zitadel/storage";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { aFile, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { anAcmeSsoProvider, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
 import { issuer } from "@tests/helpers/idp-values";

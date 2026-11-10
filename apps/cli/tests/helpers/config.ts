@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
 
 import {
@@ -5,11 +7,13 @@ import {
   type ConfigFile,
   type ConfigKind,
   type ConfigOptions,
+  isJsonObject,
+  isJsonValue,
   type JsonObject,
-  MemoryStore,
   type PolicyOperation,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 
 /**
  * The documents of one kind, by file name under that kind's directory.
@@ -107,7 +111,54 @@ export function aStore(
   assets: Readonly<Record<string, string>> = {},
 ): MemoryStore {
   const files = Object.values(configFiles(documents)).flat();
-  return new MemoryStore(files, assets);
+  return aStoreHolding(files, assets);
+}
+
+/**
+ * A store holding the files given, written into its in-memory filesystem the
+ * way they would be on disk.
+ *
+ * @param files - The configuration files, by path and body.
+ * @param texts - Other files, by project-relative path, as text: one a `$file`
+ *   reference names, or a configuration file as it would be on disk, such as
+ *   one that is not valid JSON.
+ * @returns The store.
+ */
+export function aStoreHolding(
+  files: readonly ConfigFile[] = [],
+  texts: Readonly<Record<string, string>> = {},
+): MemoryStore {
+  const store = new MemoryStore();
+  const held = [
+    ...files.map((file) => {
+      return [file.path, MemoryStore.render(file.body)] as const;
+    }),
+    ...Object.entries(texts),
+  ];
+  for (const [path, text] of held) {
+    const target = join(MemoryStore.ROOT, path);
+    store.volume.mkdirSync(dirname(target), { recursive: true });
+    store.volume.writeFileSync(target, text);
+  }
+  return store;
+}
+
+/**
+ * The body a store holds at a path, for a test to assert on.
+ *
+ * @param store - The store.
+ * @param path - The project-relative path.
+ * @returns The body, or `undefined` when nothing is there or the file there is
+ *   not a JSON object.
+ */
+export function bodyAt(store: MemoryStore, path: string): JsonObject | undefined {
+  let body: unknown;
+  try {
+    body = JSON.parse(store.volume.readFileSync(join(MemoryStore.ROOT, path), "utf8").toString());
+  } catch {
+    return undefined;
+  }
+  return isJsonValue(body) && isJsonObject(body) ? body : undefined;
 }
 
 /**

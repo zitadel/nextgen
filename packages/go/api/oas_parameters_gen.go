@@ -35,6 +35,18 @@ type CompleteClaimParams struct {
 	ProjectID ProjectID
 }
 
+// CreateApplicationParams is parameters of createApplication operation.
+type CreateApplicationParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
+}
+
 // CreateBrandingParams is parameters of createBranding operation.
 type CreateBrandingParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
@@ -198,6 +210,16 @@ type FinishUserPasskeyRegistrationParams struct {
 	// The `registration_id` that `beginUserPasskeyRegistration` (`POST
 	// /users/{user_id}/passkeys/registrations`) returns.
 	RegistrationID string
+}
+
+// GetApplicationByIdParams is parameters of getApplicationById operation.
+type GetApplicationByIdParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The application ID: the `id` that `createApplication` (`POST /applications`) returns.
+	ID string
 }
 
 // GetAuthAttemptParams is parameters of getAuthAttempt operation.

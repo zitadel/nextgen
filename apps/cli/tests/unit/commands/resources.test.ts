@@ -45,6 +45,8 @@ import {
   update,
 } from "@/commands/resources";
 import { COMMANDS } from "@/index";
+import { idArg } from "@/lib/oclif/crud/shared";
+import { parseArg } from "@tests/helpers/inputs";
 import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
@@ -2597,5 +2599,71 @@ describe("the paged resources' lists", () => {
     const list = RESOURCES[topic].list;
 
     expect([list?.items, list?.next]).toEqual([readers.items, readers.next]);
+  });
+});
+
+describe("the id of a resource whose id has a format", () => {
+  const IDS = {
+    users: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a user"],
+    sessions: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a session"],
+    release: ["rel_01M6KPFXAE68N6G2X1HN5XD29R", "a release"],
+  } as const;
+  const TOPICS = Object.keys(IDS) as Array<keyof typeof IDS>;
+
+  /**
+   * The positional a resource's verbs take for its id.
+   *
+   * @param topic - The resource the positional belongs to.
+   * @returns The positional as the resource declares it.
+   */
+  function positional(topic: keyof typeof IDS) {
+    const arg = idArg(RESOURCES[topic], topic).id;
+    if (arg === undefined) {
+      throw new Error(`${topic} declares no id positional`);
+    }
+    return arg;
+  }
+
+  it.each(TOPICS)("takes a %s id, trimmed", async (topic) => {
+    const [id] = IDS[topic];
+
+    await expect(parseArg(positional(topic), ` ${id}\n`, "id")).resolves.toBe(id);
+  });
+
+  it.each(
+    TOPICS.flatMap((topic) => {
+      const prefix = IDS[topic][0].split("_")[0];
+      const others = TOPICS.filter((other) => {
+        return other !== topic;
+      }).map((other) => {
+        return [topic, `a ${other} id`, IDS[other][0]] as const;
+      });
+      return [
+        ...others,
+        [topic, "a blank", "   "] as const,
+        [topic, "a prefix alone", `${prefix}_`] as const,
+        [topic, "a space inside", `${prefix}_has space`] as const,
+      ];
+    }),
+  )("%s refuses %s, saying what its id is", async (topic, _, value) => {
+    await expect(parseArg(positional(topic), value, "id")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining(`must be ${IDS[topic][1]} ID`),
+      hint: `Find one with \`zitadel ${topic} list\`.`,
+    });
+  });
+
+  it.each(TOPICS)("%s gives every verb that takes an id the list hint", async (topic) => {
+    const positionals = Object.entries(COMMANDS).flatMap(([id, command]) => {
+      const arg = command.args?.id;
+      return id.startsWith(`${topic}:`) && arg !== undefined ? [arg] : [];
+    });
+
+    expect(positionals.length).toBeGreaterThan(0);
+    for (const arg of positionals) {
+      await expect(parseArg(arg, "nope", "id")).rejects.toMatchObject({
+        hint: `Find one with \`zitadel ${topic} list\`.`,
+      });
+    }
   });
 });

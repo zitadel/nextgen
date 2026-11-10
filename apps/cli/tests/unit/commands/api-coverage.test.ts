@@ -57,6 +57,9 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // A report of counts the server keeps, not a resource to create or edit;
   // no command reads it yet (ADR 087).
   usage: "a project's usage report, read by the console; no `zitadel usage` command yet",
+  // Registered applications are written through the API by other systems,
+  // not from `.zitadel/`; the CLI has no command for them yet (#2788).
+  applications: "registered applications are written through the API, not the CLI (#2788)",
 };
 
 /**
