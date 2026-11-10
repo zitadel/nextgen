@@ -67,9 +67,10 @@ type ProjectService interface {
 	List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error)
 
 	// ListAuthorized returns the projects the session user holds an active
-	// grant on, directly or through a team (ADR 053 §6), ordered by project id
-	// and paginated with an opaque cursor. Unlike List it spans projects: the
-	// grants are the scope, not the caller's own project.
+	// grant on, directly or through a team (ADR 053 §6), ordered by project id,
+	// or by creation time when the request names an order, and paginated with
+	// an opaque cursor. Unlike List it spans projects: the grants are the
+	// scope, not the caller's own project.
 	//
 	// The session user must be active in its home project; deactivated users are
 	// refused even if their session outlives the deactivation (#553).
@@ -584,8 +585,12 @@ type ListAuthorizedProjectsRequest struct {
 	// authorization, so a search reaches every project the user can act on.
 	// Empty lists them all.
 	NameContains string
-	Limit        int
-	PageToken    string
+	// Order sorts the listing by creation time and then id: "desc" is newest
+	// first, "asc" oldest first. Empty lists by id alone, which carries no
+	// creation order on every dialect (ADR 047).
+	Order     string
+	Limit     int
+	PageToken string
 }
 
 func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
@@ -607,9 +612,9 @@ func (s *projectService) ListEveryProject(ctx context.Context, req ListAuthorize
 }
 
 // listForSessionUser is what ListAuthorized and ListEveryProject share: it
-// refuses a session whose user is missing or inactive, then pages list by
-// project id, narrowed by the name search when there is one. The two differ
-// only in which projects list reads.
+// refuses a session whose user is missing or inactive, then pages list in the
+// requested order, narrowed by the name search when there is one. The two
+// differ only in which projects list reads.
 func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthorizedProjectsRequest, list func(*database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) (*ListProjectsResponse, error) {
 	// Fail closed: an empty id would bind an empty string into the grant
 	// predicate instead of narrowing it, so there is no safe default here.
@@ -624,14 +629,15 @@ func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthori
 		return nil, err
 	}
 
+	orderBy, err := sessionUserProjectsOrderBy(req.Order)
+	if err != nil {
+		return nil, err
+	}
 	opts := &database.ListOptions[domain.ProjectField]{
 		Pagination: database.Page[domain.ProjectField]{
-			Limit: uint32(normalizeLimit(req.Limit)),
-			OrderBy: database.OrderBy[domain.ProjectField]{
-				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
-				Direction: database.OrderAsc,
-			},
-			Cursor: []byte(req.PageToken),
+			Limit:   uint32(normalizeLimit(req.Limit)),
+			OrderBy: orderBy,
+			Cursor:  []byte(req.PageToken),
 		},
 	}
 	if req.NameContains != "" {
@@ -646,6 +652,20 @@ func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthori
 		Projects:      result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+// sessionUserProjectsOrderBy is the sort of a session user's project listing.
+// No order is by id alone. An order is by creation time in that direction,
+// with id breaking ties (listOrderBy). The page token names its sort columns
+// and direction, so storage refuses one issued under another order.
+func sessionUserProjectsOrderBy(order string) (database.OrderBy[domain.ProjectField], error) {
+	if order == "" {
+		return database.OrderBy[domain.ProjectField]{
+			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+			Direction: database.OrderAsc,
+		}, nil
+	}
+	return listOrderBy(&Sorting{Field: projectFieldCreatedAt, Direction: order}, domain.ProjectFieldCreatedAt, database.OrderAsc, projectField, domain.ProjectFieldID)
 }
 
 // requireActiveSessionUser refuses a session whose user is gone or no longer

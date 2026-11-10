@@ -1,17 +1,17 @@
-import { Flags } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { z } from "zod";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { reads, type Refused } from "@/lib/oclif/flags";
-import { DeploymentService, ReleaseService, type ReleasePointer } from "@/lib/backend";
+import { reads, type Refused, taken } from "@/lib/oclif/flags";
+import { RollbackDeploymentParams } from "@/lib/backend/schemas";
+import {
+  DeploymentService,
+  ReleaseService,
+  type ReleasePointer,
+  type ZitadelClient,
+} from "@/lib/backend";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isCancellation, toZitadelError } from "@/lib/errors";
@@ -29,6 +29,22 @@ const NOTHING_EARLIER_REFUSAL: Refusal = {
   message: "There is no earlier deployment to roll back to",
   hint: "Name a deployment to re-apply, or check `zitadel deployment list`.",
   next: ["deployment list"],
+};
+
+/**
+ * The deployment `deployment rollback` re-applies. The schema is the API spec's own, so a value that is not one is
+ * refused before anything is asked or called, and says what one looks like.
+ */
+const DEPLOYMENT_ID: Refused<string> = {
+  schema: z.string().trim().pipe(RollbackDeploymentParams.shape.deployment_id),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Find one with `zitadel deployment list`, or omit it to undo the last deploy.",
+    next: ["deployment list"],
+    details: {
+      argument: "{input}",
+    },
+  },
 };
 
 /**
@@ -72,7 +88,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     "<%= config.bin %> deployment rollback --force",
   ];
   static override args = {
-    deployment_id: nonBlankArg({
+    deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
       required: false,
       description: "The deployment to re-apply. Omit to undo the last deploy.",
     }),
@@ -110,12 +126,19 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         break;
     }
     const { target } = plan;
+    const changes = await originChanges(client, deploymentService, projectId, target.id);
+    const dropped = changes?.dropped ?? [];
+    const restored = changes?.restored ?? [];
 
     return this.emit(
       await this.confirmed({
         verb: "rollback",
         name: `re-apply ${target.id}`,
-        message: `Re-apply ${target.id}? Its release goes live again.`,
+        message: `Re-apply ${target.id}? Its release goes live again.${
+          dropped.length === 0
+            ? ""
+            : ` ${dropped.join(", ")} will refuse sign-in until the next deploy.`
+        }${restored.length === 0 ? "" : ` ${restored.join(", ")} will serve it again.`}`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.
         arguments: [target.id],
@@ -166,6 +189,16 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             pointers === undefined
               ? undefined
               : await this.tabulate(["kind", "handle", "revision_id"], pointers);
+          if (dropped.length > 0) {
+            reportWarning(
+              `Rolled back to origins that leave out ${dropped.join(", ")}: they refuse sign-in until the next deploy.`,
+            );
+          }
+          if (restored.length > 0) {
+            reportWarning(
+              `Rolled back to origins that include ${restored.join(", ")}: they serve ${deployment.release_id} again.`,
+            );
+          }
           return {
             status: "ok",
             data: {
@@ -173,6 +206,14 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               release_id: deployment.release_id,
               rolled_back_to: deployment.metadata.rollback_to,
               origins: deployment.origins,
+              // Left out when the check failed: an empty list would claim it passed.
+              ...(changes === undefined
+                ? {}
+                : {
+                    dropped_origins: changes.dropped,
+                    restored_origins: changes.restored,
+                    unserved_origins: changes.unserved,
+                  }),
               ...(pointers === undefined ? {} : { pointers }),
             },
             // Painted, because the pointers below are a table the CLI
@@ -193,4 +234,44 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       }),
     );
   }
+}
+
+/**
+ * What a rollback to a deployment does to the project's origins, since it
+ * restores the origins that deployment froze. `dropped` are listed but left
+ * out, so they refuse; `restored` are listed, left out by the live deployment
+ * and served again; `unserved` are named but no longer listed. Undefined when
+ * the check could not run.
+ */
+async function originChanges(
+  client: ZitadelClient,
+  deployments: DeploymentService,
+  projectId: string,
+  deploymentId: string,
+): Promise<{ dropped: string[]; restored: string[]; unserved: string[] } | undefined> {
+  // Only a warning hangs on this, so a failed read says so and rolls back.
+  const read = await Promise.all([
+    client.getDeploymentById(deploymentId, { project_id: projectId }),
+    client.getProject(projectId),
+    deployments.newestPrimary(),
+  ]).catch((error: unknown) => {
+    reportWarning(
+      `Could not check which origins rolling back to ${deploymentId} changes: ${toZitadelError(error).message}`,
+    );
+    return undefined;
+  });
+  if (read === undefined) {
+    return undefined;
+  }
+  const [deployment, project, live] = read;
+  const frozen = deployment.targets.map((target) => target.origin);
+  const listed = (project.origins ?? [])
+    .filter((origin) => origin.kind === "primary")
+    .map((origin) => origin.pattern);
+  const served = live?.origins ?? [];
+  return {
+    dropped: listed.filter((origin) => !frozen.includes(origin)),
+    restored: frozen.filter((origin) => listed.includes(origin) && !served.includes(origin)),
+    unserved: frozen.filter((origin) => !listed.includes(origin)),
+  };
 }

@@ -140,6 +140,11 @@ contributor scripts build through moon, or through turbo with
   (`$TURBO_ROOT$/**/*.go`, `//#lint`'s) names the ignored trees it would
   otherwise walk: `node_modules`, build output, `.claude/`, and `.vercel/`,
   where Vercel's builds keep the Go toolchain and module cache.
+- `$TURBO_DEFAULT$` still hashes a `.gitignore` that ignores itself (`*`),
+  as some generated folders carry: the package's tasks leave such a folder
+  out (`apps/cloud-functions/turbo.json`). Run the gate twice to find one:
+  the second run must hit every cached task, and `--summarize` lists each
+  task's inputs to compare.
 - A task does not list what its dependencies write (the server's build and
   the console's dist): the dependency's hash covers it, and turbo hashes a
   run's inputs before the run starts, so those files would change the task's
@@ -168,8 +173,9 @@ contributor scripts build through moon, or through turbo with
   Generation stays cached: go.mod pins its toolchain, and nothing it writes
   depends on the host or the commit.
 - `moon run workspace:test` probes both real graphs in an isolated fixture:
-  source/test invalidation, shared config scope, release ordering and ignored
-  dotenv changes. CI runs these tests through each runner's `test` task.
+  source/test invalidation, shared config scope, release ordering, ignored
+  dotenv changes and the ignored files builds write. CI runs these tests
+  through each runner's `test` task.
 
 ## Environment
 
@@ -231,6 +237,7 @@ packages calls Vitest without the guard, so no suite retries under both.
 | | |
 |---|---|
 | the default gate | `turbo run lint typecheck build test` |
+| an agent's or a script's run | add `--output-logs=errors-only` |
 | only what a branch changed | `TURBO_SCM_BASE=origin/main turbo run lint typecheck build test --affected` |
 | one task | `turbo run test --filter=@zitadel/cli` |
 | pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
@@ -241,33 +248,41 @@ packages calls Vitest without the guard, so no suite retries under both.
 | a run summary (per-task exit codes) | `--summarize` → `.turbo/runs/<id>.json` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 
+The default output replays every task's log, cached ones included: about
+25,000 lines for a gate in which every task hits. `--output-logs=errors-only`
+prints the run's summary and each failed task's whole log. No environment
+variable sets it.
+
 Arguments after `--` reach only the named task, but turbo puts them into the
 cache key of every task in the run
 ([vercel/turborepo#14770](https://github.com/vercel/turborepo/issues/14770),
 by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
 environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
-for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
+and `RELEASE_HOST_ONLY=1` for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
 runner (`e2e/journey/README.md`).
 
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
-ci-turbo.yml runs three jobs side by side, each on a runner of its own: the
-gate, with the Go database lanes in its `turbo run`; the journey, the release
-snapshot and then its lane; and the other e2e lanes. On its own runner the
-snapshot rewrites no `dist/` the gate or the other lanes read, so the journey
-does not wait for the gate. The jobs share results through the remote cache:
-a cached task two jobs need, such as the CLI's tests in the snapshot's graph,
-runs in the job that reaches it first and is restored in the other, unless
-both start it at once. Native Go tasks run in each job, using Go's own cache. Each job first asks `turbo query
-affected --exit-code` about its own tasks, before it installs anything, and
-skips its other steps when none is affected; within a job, `--affected` from
-the pull request's base, the merge group's or the commit a push to main
-replaced picks the tasks the change reaches. A change no task reads, such as
-a workflow edit, runs nothing there. `full-pr-turbo` needs the three jobs:
-it is the one check name to require. Nightly every job runs every task and
-lane with `TURBO_FORCE` instead.
+ci-turbo.yml runs one job per role, side by side, each on a runner of its
+own: `checks` (lint, typecheck and the repository checks), `build-test`,
+`go-db` (the Go database lanes), `generated` (`check-generate-pruned`),
+`e2e` (the e2e lanes but the journey's) and `journey` (the release snapshot,
+then its lane); a version PR runs `release` instead. A role is a task list,
+`turbo run $TASKS --affected`, so the graph stays in `turbo.json`: add a
+task to a role's list, never a step or a condition to the workflow. The
+journey is the one role with steps of its own, because its snapshot
+rewrites the `dist/` its lane's dependencies write. Roles share results
+through the remote cache: a cached task two roles need runs in the one that
+reaches it first and is restored in the other, unless both start it at
+once. Native Go tasks run in each role, using Go's own cache, one entry per
+role, which only a forced run saves (the nightly, or `force` by hand). `--affected` from the pull
+request's base, the merge group's or the commit a push to main replaced
+picks the tasks the change reaches; a change no task reads, such as a
+workflow edit, runs nothing there. `full-pr-turbo` needs every role: it is
+the one check name to require. Nightly every role runs every task and lane
+with `TURBO_FORCE` instead.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
 GitHub Actions turbo groups each task's log and annotates every failed task
 itself (`::error::`), so no script reads the run summary.

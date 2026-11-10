@@ -1,32 +1,56 @@
 ---
 title: Add social sign-in
-description: Let users sign in with Google or any OpenID Connect provider, set up with the zitadel CLI.
+description:
+  Let users sign in with Google or any OpenID Connect provider, set up with the
+  zitadel CLI.
 ---
 
-A social sign-in provider, such as "Sign in with Google", is one more sign-in method on a user schema. The provider is an identity provider (IdP): a service that signs the user in for you, here over OpenID Connect (OIDC). `auth-method sso enable` writes the connection, turns it on in the schema and login flow, and stores the provider's credentials on the project. `deploy` then publishes it.
+A social sign-in provider, such as "Sign in with Google", is one more sign-in
+method on a user schema. The provider is an identity provider (IdP): a service
+that signs the user in for you, here over OpenID Connect (OIDC).
+`auth-method sso enable` writes the connection, turns it on in the schema and
+login flow, and stores the provider's credentials on the project. `deploy` then
+publishes it.
 
 ## Before you start
 
-- **An app and project from `zitadel setup`.** Follow the [Quickstart](/docs/get-started/quickstart). Run the commands below in that directory.
-- **A primary origin.** `deploy` needs one, and setup registers your dev origin ([Deploy](/docs/guides/deploy#before-you-start)).
-- **An account with the provider**, where you create an OAuth client. An OAuth client is the app registration that gives you a client ID and a client secret.
+- **An app and project from `zitadel setup`.** Follow the
+  [Quickstart](/docs/get-started/quickstart). Run the commands below in that
+  directory.
+- **A primary origin.** `deploy` needs one, and setup registers your dev origin
+  ([Deploy](/docs/guides/deploy#before-you-start)).
+- **An account with the provider**, where you create an OAuth client. An OAuth
+  client is the app registration that gives you a client ID and a client secret.
 
-To check the first two, run `npx @zitadel/cli@latest doctor` and `npx @zitadel/cli@latest origin list`.
+To check the first two, run `npx @zitadel/cli@latest doctor` and
+`npx @zitadel/cli@latest origin list`.
 
 ## Create the OAuth client and get credentials
 
-Create an OAuth client at the provider. For Google, that is a "Web application" client in the Google Cloud console. Keep its client ID and client secret. These are the credentials `sso enable` asks for.
+Create an OAuth client at the provider. For Google, that is a "Web application"
+client in the Google Cloud console. Keep its client ID and client secret. These
+are the credentials `sso enable` asks for.
 
-In a new Google Cloud project, Google asks for the OAuth consent screen before it lets you create the client:
+In a new Google Cloud project, Google asks for the OAuth consent screen before
+it lets you create the client:
 
-1. In the Google Cloud console, open Google Auth platform and choose Get started.
-2. Fill in the app information (the app name and a support email), choose External as the audience, add a contact email, and accept the user data policy.
-3. Open the Audience page. In Testing mode, an External app admits only the test users you list when it asks for a scope beyond `openid`, `email` and `profile`. The default Google connection asks for exactly those three, so you only need to add your Google account here once you add more scopes.
+1. In the Google Cloud console, open Google Auth platform and choose Get
+   started.
+2. Fill in the app information (the app name and a support email), choose
+   External as the audience, add a contact email, and accept the user data
+   policy.
+3. Open the Audience page. In Testing mode, an External app admits only the test
+   users you list when it asks for a scope beyond `openid`, `email` and
+   `profile`. The default Google connection asks for exactly those three, so you
+   only need to add your Google account here once you add more scopes.
 4. Create the "Web application" client from the Clients page.
 
-Google can take a few minutes to apply these changes. If sign-in fails with a Google error right after, wait and try again.
+Google can take a few minutes to apply these changes. If sign-in fails with a
+Google error right after, wait and try again.
 
-The provider asks for a redirect URI, also called the callback URI: the address it sends the user back to after sign-in. Each connection has its own, on your app's origin, ending in the connection's slug:
+The provider asks for a redirect URI, also called the callback URI: the address
+it sends the user back to after sign-in. Each connection has its own, on your
+app's origin, ending in the connection's slug:
 
 ```text
 <app origin>/__nextgen/idp/<slug>/callback
@@ -38,7 +62,10 @@ Locally, for Google, it is:
 http://localhost:3000/__nextgen/idp/google/callback
 ```
 
-Register it with the provider exactly as written. A URI from another connection doesn't work. In a terminal, `sso enable` prints the callback URI and where to create the client before it asks for the credentials. Its JSON result carries the same value as `callback_uri`.
+Register it with the provider exactly as written. A URI from another connection
+doesn't work. In a terminal, `sso enable` prints the callback URI and where to
+create the client before it asks for the credentials. Its JSON result carries
+the same value as `callback_uri`.
 
 ## Enable Google
 
@@ -46,7 +73,9 @@ Register it with the provider exactly as written. A URI from another connection 
 npx @zitadel/cli@latest auth-method sso enable --provider google
 ```
 
-The command prompts for the client ID and the client secret. In a script or an agent, pass the client ID as a flag and pipe the secret in on stdin. The secret never goes in a flag:
+The command prompts for the client ID and the client secret. In a script or an
+agent, pass the client ID as a flag and pipe the secret in on stdin. The secret
+never goes in a flag:
 
 ```sh
 npx @zitadel/cli@latest auth-method sso enable --provider google \
@@ -54,7 +83,10 @@ npx @zitadel/cli@latest auth-method sso enable --provider google \
   --non-interactive --json < secret.txt
 ```
 
-Pass `--schema <name>` when the project has more than one user schema, with the schema's file name or its `objectType`. The JSON result names what it did. `changed` lists the files it wrote, and `published` says whether each credential reached the project (`stored`, `deferred` or `failed`):
+Pass `--schema <name>` when the project has more than one user schema, with the
+schema's file name or its `objectType`. The JSON result names what it did.
+`changed` lists the files it wrote, and `published` says whether each credential
+reached the project (`stored`, `deferred` or `failed`):
 
 ```json
 {
@@ -71,40 +103,128 @@ Pass `--schema <name>` when the project has more than one user schema, with the 
 
 ## Deploy the connection
 
-`sso enable` changes local files only, apart from storing the credentials. The provider is configured, not live, until you deploy ([Deploy](/docs/guides/deploy)):
+`sso enable` changes local files only, apart from storing the credentials. The
+provider is configured, not live, until you deploy
+([Deploy](/docs/guides/deploy)):
 
 ```sh
 npx @zitadel/cli@latest deploy --dry-run
 npx @zitadel/cli@latest deploy
 ```
 
-`--dry-run` prints the diff of the files `sso enable` wrote, and `deploy` prints `Deployed sha256:<digest>`. Only deploy once the provider's OAuth client exists. Reload the app: the sign-in, registration and password steps show a "Continue with Google" button.
+`--dry-run` prints the diff of the files `sso enable` wrote, and `deploy` prints
+`Deployed sha256:<digest>`. Only deploy once the provider's OAuth client exists.
+Reload the app: the sign-in, registration and password steps show a "Continue
+with Google" button.
 
 ## Test the sign-in
 
 1. Open your app's sign-in page and choose "Continue with Google".
-2. Sign in at the provider. The provider sends you back to the callback URI, and your app shows you signed in.
+2. Sign in at the provider. The provider sends you back to the callback URI, and
+   your app shows you signed in.
 3. Check that the user exists with `npx @zitadel/cli@latest users list`.
 
-If the button is missing, check that you ran `deploy`, not only `deploy --dry-run`, and reload. If the sign-in fails, keep `npx @zitadel/cli@latest logs --level warn --follow` open in a second terminal: the login only shows a generic message, and the runtime's log has the cause ([Run Zitadel locally](/docs/guides/local-runtime#read-the-runtimes-log)).
+If the button is missing, check that you ran `deploy`, not only
+`deploy --dry-run`, and reload. If the sign-in fails, keep
+`npx @zitadel/cli@latest logs --level warn --follow` open in a second terminal:
+the login only shows a generic message, and the runtime's log has the cause
+([Run Zitadel locally](/docs/guides/local-runtime#read-the-runtimes-log)).
 
 ## First sign-in and registration
 
-A person who has no account yet is registered by their first sign-in with the provider. The flow takes the `register-sso` step, which creates the user. When the provider's claims fill every required property of the user schema, the user is created without showing the step. Otherwise the step shows a form, prefilled with the claims, that asks for the rest. A required property with a uniqueness rule (`x-unique`) must also arrive verified. To create no users from a provider, set `provisioning.creation` to `disabled` in its connection file; the default is `auto`. The next section explains claims.
+A person who has no account yet is registered by their first sign-in with the
+provider. The flow takes the `register-sso` step, which creates the user. When
+the provider's claims fill every required property of the user schema, the user
+is created without showing the step. Otherwise the step shows a form, prefilled
+with the claims, that asks for the rest. A required property with a uniqueness
+rule (`x-unique`) must also arrive verified. To create no users from a provider,
+set `provisioning.creation` to `disabled` in its connection file; the default is
+`auto`. The next section explains claims.
 
 ## Map provider claims to user attributes
 
-A claim is a named piece of user data the provider returns, such as `email`. The connection file maps claims to the properties of your user schema:
+A claim is a named piece of user data the provider returns, such as `email`. The
+connection file maps claims to the properties of your user schema:
 
-- `claim_mapping` maps each user schema property (the key) to the claim that fills it (the value). A value is an exact top-level claim name: nested claims are not addressable yet. For Google it maps `email`, `givenName` and `familyName` from `email`, `given_name` and `family_name`.
-- `verified_claims` names where a property's verification comes from. A claim name, such as `email` from `email_verified`, trusts the property only when the provider says so. The value `true` trusts the provider always. For Google, `email` is verified by `email_verified`.
-- `subject_claim` is the claim that identifies the person at the provider. It defaults to `sub`.
+- `claim_mapping` maps each user schema property (the key) to the claim that
+  fills it (the value). A value is an exact top-level claim name: nested claims
+  are not addressable yet. For Google it maps `email`, `givenName` and
+  `familyName` from `email`, `given_name` and `family_name`.
+- `verified_claims` names where a property's verification comes from. A claim
+  name, such as `email` from `email_verified`, trusts the property only when the
+  provider says so. The value `true` trusts the provider always. For Google,
+  `email` is verified by `email_verified`.
+- `subject_claim` is the claim that identifies the person at the provider. It
+  defaults to `sub`.
 
-For a custom provider, the text output of `sso enable` prints the mappings and the file to edit them in. `--json` does not carry them, so read `.zitadel/idps/<slug>.json`. If the provider returns other claims, edit the mappings there, then deploy. `sso enable` warns when the user schema defines none of the properties the connection maps by default. The file then has no `claim_mapping`, and no sign-in can fill a user. Add the properties your provider returns.
+On every sign-in, the server exchanges the one-time code the provider sent
+back for tokens, and then reads the claims from the provider's userinfo
+endpoint. With `oidc.id_token_mapping` set to `true`, the server reads them
+from the ID token instead and calls no userinfo endpoint. Use that setting
+when the provider has no userinfo endpoint, or issues the claims you map only
+in the ID token. Some claims arrive only when the sign-in requests their
+scope, such as a `groups` scope. Add each such scope to `oidc.scopes`.
+
+Claims fill a user at registration only. A user who signed in before keeps their
+attributes, whatever the provider returns on a later sign-in.
+
+For a custom provider, `sso enable` prints the mappings and the file to edit
+them in. With `--json` the same summary is an `info` entry in `data.notices`.
+If the provider returns other claims, edit the
+mappings there, then deploy. `sso enable` warns when the user schema defines
+none of the properties the connection maps by default. The file then has no
+`claim_mapping`, and no sign-in can fill a user. Add the properties your
+provider returns.
+
+### Map a claim to a property you add
+
+This example fills a new property `staffNumber` from a claim the provider calls
+`employee_id`.
+
+1. Add the property to the user schema, `.zitadel/schemas/<schema>.json`, under
+   `properties`:
+
+   ```json
+   "staffNumber": { "type": "string" }
+   ```
+
+2. Add the mapping to `claim_mapping` in `.zitadel/idps/<slug>.json`. The key is
+   the property, the value the claim:
+
+   ```json
+   "staffNumber": "employee_id"
+   ```
+
+3. Run `npx @zitadel/cli@latest deploy --dry-run`, then
+   `npx @zitadel/cli@latest deploy`. The dry run fails when `staffNumber` is
+   not a property of a schema that lists the provider
+   ([What deploy checks](/docs/concepts/repo-config#what-deploy-checks)):
+
+   ```
+   Error E_VALIDATION: Configuration validation failed (1 issue):
+     - .zitadel/idps/<slug>.json: claim_mapping target "staffNumber" is not a property of any schema that lists "<slug>" in sso.providers. Fix the name, or remove the row.
+   ```
+
+   Make the key in `claim_mapping` match a property of the schema, then run
+   the dry run again.
+
+4. Sign in through the provider with an account that has not signed in to
+   your app before. The first sign-in registers the user from the claims. Find
+   its ID with `npx @zitadel/cli@latest users list`, then
+   `npx @zitadel/cli@latest users get <user_id> --json` prints the user, with
+   `staffNumber` under `data.attributes`.
+
+   A property the provider did not return is left out. To let the person type
+   it instead, list `staffNumber` in the `fields` of the `register-sso` step
+   and deploy the flow
+   ([Collect a new field at sign-up](/docs/guides/edit-login-flow#collect-a-new-field-at-sign-up)).
+   The step shows only its own fields: a required property that the provider
+   omits and the step does not list fails the sign-in.
 
 ## Connect any other OpenID Connect provider
 
-`--provider custom` connects any provider that publishes OIDC discovery (`<issuer>/.well-known/openid-configuration`):
+`--provider custom` connects any provider that publishes OIDC discovery
+(`<issuer>/.well-known/openid-configuration`):
 
 ```sh
 npx @zitadel/cli@latest auth-method sso enable --provider custom \
@@ -114,16 +234,22 @@ npx @zitadel/cli@latest auth-method sso enable --provider custom \
   --client-id abc123 --non-interactive < secret.txt
 ```
 
-- `--slug` names the connection. Schemas and flows refer to it by this name, and it is part of the callback URI (`/__nextgen/idp/acme-sso/callback`).
+- `--slug` names the connection. Schemas and flows refer to it by this name, and
+  it is part of the callback URI (`/__nextgen/idp/acme-sso/callback`).
 - `--display-name` is the text on the sign-in button.
-- `--issuer` is the provider's issuer URL; the server finds its endpoints by discovery.
-- `--scopes` is optional, separated by spaces or commas, and must include `openid`. The default is `openid profile email`.
+- `--issuer` is the provider's issuer URL; the server finds its endpoints by
+  discovery.
+- `--scopes` is optional, separated by spaces or commas, and must include
+  `openid`. The default is `openid profile email`.
 
-The credentials are stored as `<SLUG>_CLIENT_ID` and `<SLUG>_CLIENT_SECRET`, for example `ACME_SSO_CLIENT_ID`.
+The credentials are stored as `<SLUG>_CLIENT_ID` and `<SLUG>_CLIENT_SECRET`, for
+example `ACME_SSO_CLIENT_ID`.
 
 ## Add a provider during setup
 
-`setup` takes the same provider while it scaffolds the app, so a new app starts with social sign-in. The OAuth client must already exist. Pipe its secret in on stdin:
+`setup` takes the same provider while it scaffolds the app, so a new app starts
+with social sign-in. The OAuth client must already exist. Pipe its secret in on
+stdin:
 
 ```sh
 npx @zitadel/cli@latest setup --server local --framework next \
@@ -131,37 +257,68 @@ npx @zitadel/cli@latest setup --server local --framework next \
   --non-interactive --json < secret.txt
 ```
 
-For a custom provider, use `--sso custom` with `--sso-slug`, `--sso-display-name`, `--sso-issuer` and optionally `--sso-scopes`. Setup reports each connection under `data.sso[]`, with its `callback_uri` to register.
+For a custom provider, use `--sso custom` with `--sso-slug`,
+`--sso-display-name`, `--sso-issuer` and optionally `--sso-scopes`. Setup
+reports each connection under `data.sso[]`, with its `callback_uri` to register.
 
 ## What the command writes
 
-- **`.zitadel/idps/<slug>.json`**, the connection: protocol, issuer, scopes, claim mapping, and the credentials as references, `${{ GOOGLE_CLIENT_ID }}` and `${{ GOOGLE_CLIENT_SECRET }}`. The file holds no secret, so commit it.
-- **The user schema**, `.zitadel/schemas/<schema>.json`: the slug is added to `x-auth-methods.sso.providers`, and `x-auth-methods.sso.enabled` is set to `true`.
-- **The login flow**, `.zitadel/flows/<flow>.json`: the slug is added to `sso_providers` on the steps that offer sign-in, and two steps are added. `register-sso` creates the user on a first sign-in with the provider. `sso-conflict` handles a provider account whose email already belongs to a user ([Sign in with an email that already has an account](#sign-in-with-an-email-that-already-has-an-account)).
-- **Two project variables**, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the secret encrypted). They live on the project, not in `.env.local`: the server exchanges the code with the provider, so the app never needs the secret.
+- **`.zitadel/idps/<slug>.json`**, the connection: protocol, issuer, scopes,
+  claim mapping, and the credentials as references, `${{ GOOGLE_CLIENT_ID }}`
+  and `${{ GOOGLE_CLIENT_SECRET }}`. The file holds no secret, so commit it.
+- **The user schema**, `.zitadel/schemas/<schema>.json`: the slug is added to
+  `x-auth-methods.sso.providers`, and `x-auth-methods.sso.enabled` is set to
+  `true`.
+- **The login flow**, `.zitadel/flows/<flow>.json`: the slug is added to
+  `sso_providers` on the steps that offer sign-in, and two steps are added.
+  `register-sso` creates the user on a first sign-in with the provider.
+  `sso-conflict` handles a provider account whose email already belongs to a
+  user
+  ([Sign in with an email that already has an account](#sign-in-with-an-email-that-already-has-an-account)).
+- **Two project variables**, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the
+  secret encrypted). They live on the project, not in `.env.local`: the server
+  exchanges the code with the provider, so the app never needs the secret.
 
-The variables are the one thing `sso enable` publishes before `deploy`. When a credential did not reach the project, for example because the secret was not piped in or the server refused it, `published` is `deferred` or `failed`. Then `next_commands` starts with the `variable set` command that stores it:
+The variables are the one thing `sso enable` publishes before `deploy`. When a
+credential did not reach the project, for example because the secret was not
+piped in or the server refused it, `published` is `deferred` or `failed`. Then
+`next_commands` starts with the `variable set` command that stores it:
 
 ```sh
 npx @zitadel/cli@latest variable set GOOGLE_CLIENT_SECRET --secret < secret.txt
 ```
 
-To remove a provider, run `auth-method sso disable --provider google`. Name a custom one by its slug, as in `--provider acme-sso`. Then run `deploy --dry-run` and `deploy`.
+To remove a provider, run `auth-method sso disable --provider google`. Name a
+custom one by its slug, as in `--provider acme-sso`. Then run `deploy --dry-run`
+and `deploy`.
 
-The command removes the provider from the user schema and its login flows. It keeps the rest and says so:
+The command removes the provider from the user schema and its login flows. It
+keeps the rest and says so:
 
-- The connection file `.zitadel/idps/google.json` and the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` variables. Enabling the provider again then doesn't ask for its credentials.
-- The `register-sso` and `sso-conflict` steps. Other steps still route to them, and enabling a provider again reuses them.
+- The connection file `.zitadel/idps/google.json` and the `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET` variables. Enabling the provider again then doesn't ask
+  for its credentials.
+- The `register-sso` and `sso-conflict` steps. Other steps still route to them,
+  and enabling a provider again reuses them.
 
-Every deploy still publishes the connection. Deleting a connection from the server isn't supported yet. The connection and the sign-ins linked to it stay there either way.
+Every deploy still publishes the connection. Deleting a connection from the
+server isn't supported yet. The connection and the sign-ins linked to it stay
+there either way.
 
-To stop publishing the connection, delete its file before you deploy. Once that deploy is live, run `variable rm GOOGLE_CLIENT_ID` and `variable rm GOOGLE_CLIENT_SECRET`. Removing the variables first breaks the live release, and `deploy` then refuses the connection. Keep the file while another user schema or flow still offers the provider.
+To stop publishing the connection, delete its file before you deploy. Once that
+deploy is live, run `variable rm GOOGLE_CLIENT_ID` and
+`variable rm GOOGLE_CLIENT_SECRET`. Removing the variables first breaks the live
+release, and `deploy` then refuses the connection. Keep the file while another
+user schema or flow still offers the provider.
 
-Password and passkey sign-in are switched with `auth-method password` and `auth-method passkey` ([Turn password and passkey sign-in on and off](/docs/guides/sign-in-methods)).
+Password and passkey sign-in are switched with `auth-method password` and
+`auth-method passkey`
+([Turn password and passkey sign-in on and off](/docs/guides/sign-in-methods)).
 
 ## Fields that can't change after the first deploy
 
-Once a connection has been deployed, these fields identify it and the users who signed in through it, and can't change:
+Once a connection has been deployed, these fields identify it and the users who
+signed in through it, and can't change:
 
 - `slug`: a file with another slug is another connection
 - `protocol`
@@ -174,32 +331,55 @@ Once a connection has been deployed, these fields identify it and the users who 
 Error E_VALIDATION: .zitadel/idps/google.json: subject_claim of the connection "google" cannot be edited
 ```
 
-Restore the stored value, or add a new connection file with its own slug. Everything else in the file, such as `display_name` or `scopes`, can be edited and deployed.
+Restore the stored value, or add a new connection file with its own slug.
+Everything else in the file, such as `display_name` or `scopes`, can be edited
+and deployed.
 
 ## Test against an OIDC provider on localhost
 
-A provider running on your machine, such as a Keycloak or Dex container on `localhost`, works with the local runtime `zitadel start` runs. A server refuses outgoing requests to loopback addresses unless `NEXTGEN_HTTPCLIENT_ALLOW_LIST` allows them. `start` sets it to `localhost,127.0.0.0/8,::1/128` unless `.env.local`, `.env` or your shell already sets it. `data.runtime.env.injected` in `start --json` lists the variable.
+A provider running on your machine, such as a Keycloak or Dex container on
+`localhost`, works with the local runtime `zitadel start` runs. A server refuses
+outgoing requests to loopback addresses unless `NEXTGEN_HTTPCLIENT_ALLOW_LIST`
+allows them. `start` sets it to `localhost,127.0.0.0/8,::1/128` unless
+`.env.local`, `.env` or your shell already sets it. `data.runtime.env.injected`
+in `start --json` lists the variable.
 
 Two cases still can't reach the provider, and `sso enable` warns about both:
 
-- **The Docker runtime.** Inside the container, `localhost` is the container itself. Start the runtime with `zitadel start --runtime binary` instead.
-- **Any other server**, or a local one with `NEXTGEN_HTTPCLIENT_ALLOW_LIST=` set empty, which turns the default off.
+- **The Docker runtime.** Inside the container, `localhost` is the container
+  itself. Start the runtime with `zitadel start --runtime binary` instead.
+- **Any other server**, or a local one with `NEXTGEN_HTTPCLIENT_ALLOW_LIST=` set
+  empty, which turns the default off.
 
-`setup --sso custom` doesn't know yet which server will run, so it warns about any `localhost` issuer.
+`setup --sso custom` doesn't know yet which server will run, so it warns about
+any `localhost` issuer.
 
-When the server can't reach the provider, the login only says "This sign-in provider is not available right now". `zitadel logs --level warn` then shows a `sso provider unavailable` warning with `idp.discovery_failed` and `address is denied by 'localhost'`. After changing the variable in `.env.local`, stop the runtime and start it again: `start` alone keeps a running server as it is.
+When the server can't reach the provider, the login only says "This sign-in
+provider is not available right now". `zitadel logs --level warn` then shows a
+`sso provider unavailable` warning with `idp.discovery_failed` and
+`address is denied by 'localhost'`. After changing the variable in `.env.local`,
+stop the runtime and start it again: `start` alone keeps a running server as it
+is.
 
 ```sh
 npx @zitadel/cli@latest stop
 npx @zitadel/cli@latest start
 ```
 
-Only allow loopback on your machine. A deployed server must not reach its own network on a URL that a project can configure.
+Only allow loopback on your machine. A deployed server must not reach its own
+network on a URL that a project can configure.
 
 ## Sign in with an email that already has an account
 
-Account linking is not available yet: a provider account is never linked to an existing user. When someone who registered with a password signs in with Google using the same email, the flow lands on the `sso-conflict` step. It asks them to sign in with their password or passkey instead. That happens on every Google sign-in, because the two accounts stay separate. A user who started with Google signs in with Google.
+Account linking is not available yet: a provider account is never linked to an
+existing user. When someone who registered with a password signs in with Google
+using the same email, the flow lands on the `sso-conflict` step. It asks them to
+sign in with their password or passkey instead. That happens on every Google
+sign-in, because the two accounts stay separate. A user who started with Google
+signs in with Google.
 
 ## Limits
 
-- **OpenID Connect only.** The CLI knows Google by name. Any other provider needs `--provider custom` and an issuer with OIDC discovery. A plain OAuth 2.0 provider, such as GitHub, can't be connected yet.
+- **OpenID Connect only.** The CLI knows Google by name. Any other provider
+  needs `--provider custom` and an issuer with OIDC discovery. A plain OAuth 2.0
+  provider, such as GitHub, can't be connected yet.

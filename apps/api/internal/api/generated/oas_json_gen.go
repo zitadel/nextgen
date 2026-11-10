@@ -42763,6 +42763,8 @@ func (s *FieldType) Decode(d *jx.Decoder) error {
 		*s = FieldTypeURL
 	case FieldTypeDate:
 		*s = FieldTypeDate
+	case FieldTypeDateTime:
+		*s = FieldTypeDateTime
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
 	case FieldTypeCheckbox:
@@ -88215,6 +88217,39 @@ func (s *OptSessionProofToken) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SortDirection as json.
+func (o OptSortDirection) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes SortDirection from json.
+func (o *OptSortDirection) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptSortDirection to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptSortDirection) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptSortDirection) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes StepTexts as json.
 func (o OptStepTexts) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -118450,22 +118485,6 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.origin_not_allowed")
-		{
-			s := s.ProjOriginNotAllowed
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -118608,9 +118627,6 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.not_found":
 					s.Type = ProjNotFoundRollbackDeploymentErrorResponse
 					found = true
-				case "proj.origin_not_allowed":
-					s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
-					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundRollbackDeploymentErrorResponse
 					found = true
@@ -118686,10 +118702,6 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjNotFoundRollbackDeploymentErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
-		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
