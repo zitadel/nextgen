@@ -402,3 +402,24 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   (`platform.bootstrap_project`); the link is the only delivery.
 - v4 migration docs: v4 project members map to grants; v4 invite codes don't
   carry over.
+
+## Amendment (2026-11-10): `invitation_cancelled`
+
+§9 sends no event when a pending invitation is cancelled. Cancel deletes the
+row, so a cancelled journey ends at `invitation_created` and counts against
+the 72-hour acceptance rate as an invitation nobody opened, the same error
+`invitation_rejected` was added to avoid.
+
+| Event | Sent by | When |
+|---|---|---|
+| `invitation_cancelled` | the console's invitations list; `zitadel invitation cancel` | after the API confirms the cancel |
+
+- It carries `role` and `invitation_journey_id`, like the other three.
+- A replace sends no `invitation_cancelled`: the new invitation keeps the
+  journey, so the journey goes on.
+- The cancel answers `204` with no body, so `zitadel invitation cancel
+  <invitation_id>` reads the invitation before it asks to confirm. The
+  question names who the invitation is for and its role, and the event takes
+  its role and journey from that read. A cancel with no id picks from the
+  pending list, which it has already read.
+- The 72-hour acceptance rate leaves out cancelled journeys.

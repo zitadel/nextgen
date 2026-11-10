@@ -5,6 +5,7 @@ import {
   type CreatedInvitation,
   type InvitationRelation,
   InvitationService,
+  invitationGrant,
   invitationRole,
 } from "@/lib/backend";
 import { GetInvitationParams } from "@/lib/backend/schemas";
@@ -108,7 +109,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
       replaces: flags.replaces,
     });
     this.trackEvent(INVITATION_CREATED, {
-      role: analyticsRole(invitation),
+      role: invitationGrant(invitation),
       invitation_journey_id: invitation.journey_id,
     });
 
@@ -194,16 +195,6 @@ function parseAnsweredName(value: string): Parsed<string> {
   return parsed.success
     ? { ok: true, value: parsed.data }
     : { ok: false, problem: parsed.error.issues[0]?.message ?? "it is not valid" };
-}
-
-/**
- * The role as product analytics names it: the type and its role combined, so
- * `project_viewer`, and `team_member` once team invitations ship.
- */
-function analyticsRole(invitation: CreatedInvitation): string {
-  return invitation.type === "project_member"
-    ? `project_${invitation.project_member.relation}`
-    : "team_member";
 }
 
 /**

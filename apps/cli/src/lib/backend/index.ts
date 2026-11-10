@@ -67,6 +67,7 @@ export {
 export { IdpService, type IdpSummary } from "./services/idp";
 export {
   InvitationService,
+  invitationGrant,
   invitationRole,
   type CreatedInvitation,
   type Invitation,

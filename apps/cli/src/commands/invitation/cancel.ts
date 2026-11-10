@@ -1,7 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Invitation, InvitationService } from "@/lib/backend";
+import { type Invitation, InvitationService, invitationGrant, invitationRole } from "@/lib/backend";
 import { GetInvitationParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
@@ -22,6 +22,16 @@ const INVITATION_ID: Refused<string> = {
       argument: "{input}",
     },
   },
+};
+
+/** The product event a cancel sends once the API confirms it (ADR 086, amended). */
+const INVITATION_CANCELLED = "invitation_cancelled";
+
+/** How a cancel of an invitation that has already finished is refused. */
+const NOT_PENDING_REFUSAL: Refusal = {
+  message: "{id} is {status}, so there is nothing to cancel",
+  hint: "Only a pending invitation can be cancelled.",
+  next: ["invitation list --status pending"],
 };
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
@@ -59,34 +69,40 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
-    const invitationId = args.invitationId ?? (await this.pickPending());
+    const { client, projectId } = await this.connect();
+    const invitationService = new InvitationService(client, projectId);
+    const invitation =
+      args.invitationId === undefined
+        ? await this.pickPending(invitationService)
+        : await this.readPending(invitationService, args.invitationId);
 
     return this.emit(
       await this.confirmed({
         verb: "cancel",
-        name: `cancel ${invitationId}`,
-        message: `Cancel ${invitationId}? Its link stops working.`,
+        name: `cancel ${invitation.id}`,
+        message: `Cancel ${describe(invitation)}? Its link stops working.`,
         // A bare cancel picked its invitation, which a retry must name.
-        arguments: [invitationId],
+        arguments: [invitation.id],
         preview: () => {
           return dryRunResult({
             verb: "cancel",
             topic: "invitation",
-            id: invitationId,
+            id: invitation.id,
           });
         },
-        prepare: () => {
-          return this.connect();
-        },
-        apply: async (consent, { client, projectId }) => {
+        apply: async (consent) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
-          await unlocked.cancel(invitationId);
+          await unlocked.cancel(invitation.id);
+          this.trackEvent(INVITATION_CANCELLED, {
+            role: invitationGrant(invitation),
+            invitation_journey_id: invitation.journey_id,
+          });
           return {
             status: "ok",
             data: deletedData({
-              id: invitationId,
+              id: invitation.id,
             }),
-            pretty: prose(`Cancelled ${invitationId}; its link no longer works`),
+            pretty: prose(`Cancelled ${invitation.id}; its link no longer works`),
           };
         },
       }),
@@ -97,9 +113,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
    * The pending invitation a person picks when the command line named none.
    * A script is told to name one instead.
    */
-  private async pickPending(): Promise<string> {
-    const { client, projectId } = await this.connect();
-    const invitationService = new InvitationService(client, projectId);
+  private async pickPending(invitationService: InvitationService): Promise<Invitation> {
     const pending = await invitationService.pending();
     if (pending.length === 0) {
       throw refusalError(NOTHING_PENDING_REFUSAL, {}, (command) => {
@@ -112,12 +126,45 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
       message: "Which invitation would you like to cancel?",
       retry: this.suggest("invitation list --status pending"),
       options: pending.map((invitation) => ({
-        value: invitation.id,
+        value: invitation,
         label: invitation.id,
         hint: pendingHint(invitation),
       })),
     });
   }
+
+  /**
+   * The invitation the command line named, read before anyone is asked, so
+   * the question can name it and one that is no longer pending is refused.
+   */
+  private async readPending(
+    invitationService: InvitationService,
+    invitationId: string,
+  ): Promise<Invitation> {
+    const invitation = await invitationService.get(invitationId);
+    if (invitation.status !== "pending") {
+      throw refusalError(
+        NOT_PENDING_REFUSAL,
+        {
+          id: invitation.id,
+          status: invitation.status,
+        },
+        (command) => {
+          return this.suggest(command);
+        },
+      );
+    }
+    return invitation;
+  }
+}
+
+/** The invitation as the question names it: its id, who it is for, and the role. */
+function describe(invitation: Invitation): string {
+  const whom = invitation.metadata?.name;
+  const role = invitationRole(invitation);
+  return whom === undefined
+    ? `${invitation.id} (${role})`
+    : `${invitation.id} for ${whom} (${role})`;
 }
 
 /** Who a pending invitation is for and when it expires, beside its id in the picker. */

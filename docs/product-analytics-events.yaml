@@ -512,6 +512,14 @@ components:
           journey.
         destinations: [mixpanel, vercel]
         properties: [role, invitation_journey_id]
+      invitation_cancelled:
+        status: emitted
+        trigger: >-
+          `invitation cancel`, after the API confirms the cancel (ADR 086's
+          amendment). The Vercel copy keeps only the header's keys, never the
+          journey.
+        destinations: [mixpanel, vercel]
+        properties: [role, invitation_journey_id]
       flow_started:
         status: planned
         plan: "#2200"
@@ -638,6 +646,12 @@ components:
         status: planned
         plan: "#2859"
         trigger: The invitation page's decline, after the API confirms it.
+        destinations: [mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_cancelled:
+        status: planned
+        plan: "#2859"
+        trigger: The invitations list's cancel, after the API confirms it.
         destinations: [mixpanel]
         properties: [role, invitation_journey_id]
       viewed_page:

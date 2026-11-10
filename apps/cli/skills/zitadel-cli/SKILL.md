@@ -185,7 +185,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   nothing and needs `--relation`. `invitation list [--status …] [--type …]`
   and `invitation get <invitation_id>` read them; `invitation cancel
   <invitation_id>` stops a pending link and needs `--force` when
-  non-interactive. A project nobody has claimed refuses invitations until it is
+  non-interactive; one already accepted, declined or expired fails with
+  `E_VALIDATION` before anything is asked. A project nobody has claimed refuses invitations until it is
   claimed (`zitadel claim`). Existing members are read with `grants list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
