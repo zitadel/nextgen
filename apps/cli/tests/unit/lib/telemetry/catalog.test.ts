@@ -167,6 +167,55 @@ async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   return recorded;
 }
 
+/** A product event a command sends with `trackEvent`, and the keys it names. */
+type TrackedEvent = Readonly<{ command: string; event: string; keys: string[] }>;
+
+/**
+ * The event a `trackEvent` call names: a string literal, or a `const` in the
+ * same file that holds one.
+ */
+function eventName(node: ts.Expression | undefined, source: ts.SourceFile): string | undefined {
+  if (node && ts.isStringLiteral(node)) {
+    return node.text;
+  }
+  if (!node || !ts.isIdentifier(node)) {
+    return undefined;
+  }
+  let found: string | undefined;
+  const visit = (child: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(child) &&
+      ts.isIdentifier(child.name) &&
+      child.name.text === node.text &&
+      child.initializer &&
+      ts.isStringLiteral(child.initializer)
+    ) {
+      found = child.initializer.text;
+    }
+    ts.forEachChild(child, visit);
+  };
+  visit(source);
+  return found;
+}
+
+/** Every product event the commands send, by the command that sends it. */
+async function trackedEvents(): Promise<TrackedEvent[]> {
+  const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
+    file.endsWith(".ts"),
+  );
+  const tracked: TrackedEvent[] = [];
+  for (const file of files) {
+    for (const call of await callsIn(join(commandsDir, file), calls("trackEvent"))) {
+      const event = eventName(call.arguments[0], call.getSourceFile());
+      if (event === undefined) {
+        throw new Error(`${file}: trackEvent names its event with neither a literal nor a const`);
+      }
+      tracked.push({ command: commandId(file), event, keys: literalKeys(call.arguments[1]) });
+    }
+  }
+  return tracked;
+}
+
 /** Each lifecycle event, by the constant `BaseCommand` tracks it with. */
 const LIFECYCLE_EVENTS = [
   ["CLI_COMMAND_STARTED", CLI_COMMAND_STARTED],
@@ -336,6 +385,24 @@ describe("product analytics catalog", () => {
 });
 
 describe("CLI telemetry against the catalog", () => {
+  it("sends exactly the properties the catalog lists on each product event", async () => {
+    const catalog = await loadCatalog();
+    const { events } = cliOf(catalog);
+    const base = [...Object.keys(commandEventProperties(meta(), "invocation-1")), ...STAMPED];
+    for (const { command, event, keys } of await trackedEvents()) {
+      const definition = events[event];
+      expect(definition?.status, `${command} sends ${event}, not in the catalog as emitted`).toBe(
+        "emitted",
+      );
+      if (!definition) {
+        continue;
+      }
+      expect(new Set(eventProperties(catalog, "cli", definition)), event).toEqual(
+        new Set([...base, ...keys]),
+      );
+    }
+  });
+
   it("emits only lifecycle events the catalog lists as emitted", async () => {
     const { events } = cliOf(await loadCatalog());
     for (const [, event] of LIFECYCLE_EVENTS) {

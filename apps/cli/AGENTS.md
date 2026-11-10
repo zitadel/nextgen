@@ -204,7 +204,10 @@ paused.
 ### Adding a dimension
 
 `cli_command_started`, `cli_command_completed` and `cli_command_failed` fire
-from `BaseCommand` for every command. Add a dimension rather than an event:
+from `BaseCommand` for every command. Send a product event of its own
+(`this.trackEvent`) only where an ADR names one, as ADR 086 does
+`invitation_created`; `catalog.test.ts` holds its properties to the catalog.
+Otherwise add a dimension rather than an event:
 
 1. Record it with `this.recordTelemetry({ … })`. It reaches the events fired
    after it, so not `started`. Never fetch data just to record it.

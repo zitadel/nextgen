@@ -14,6 +14,9 @@ import { Promptable } from "@/lib/oclif/promptable";
 import { prose } from "@/lib/oclif/rendering";
 import type { Parsed } from "@zitadel/config/idp";
 
+/** The product event a create or replace sends once the API confirms it (ADR 086 §9). */
+const INVITATION_CREATED = "invitation_created";
+
 /** The project roles an invitation can grant, least first. */
 const RELATIONS = ["viewer", "editor", "admin"] as const satisfies readonly InvitationRelation[];
 
@@ -104,9 +107,9 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
       name,
       replaces: flags.replaces,
     });
-    this.recordTelemetry({
-      role: `project_${invitationRole(invitation)}`,
-      is_replace: flags.replaces !== undefined,
+    this.trackEvent(INVITATION_CREATED, {
+      role: analyticsRole(invitation),
+      invitation_journey_id: invitation.journey_id,
     });
 
     return this.emit({
@@ -191,6 +194,16 @@ function parseAnsweredName(value: string): Parsed<string> {
   return parsed.success
     ? { ok: true, value: parsed.data }
     : { ok: false, problem: parsed.error.issues[0]?.message ?? "it is not valid" };
+}
+
+/**
+ * The role as product analytics names it: the type and its role combined, so
+ * `project_viewer`, and `team_member` once team invitations ship.
+ */
+function analyticsRole(invitation: CreatedInvitation): string {
+  return invitation.type === "project_member"
+    ? `project_${invitation.project_member.relation}`
+    : "team_member";
 }
 
 /**
