@@ -32,7 +32,7 @@ describe("the sign-in widget's calls", () => {
     },
   );
 
-  it("refuses a flow write under the API prefix from a bot, without forwarding it", async () => {
+  it("refuses a flow write from a bot in the server's error envelope, without forwarding it", async () => {
     const upstream = vi.fn();
     vi.stubGlobal("fetch", upstream);
     const answer = await forwardSignIn(
@@ -40,17 +40,6 @@ describe("the sign-in widget's calls", () => {
         method: "POST",
         body: "{}",
       }),
-      bot,
-    );
-    expect(answer.status).toBe(403);
-    expect(upstream).not.toHaveBeenCalled();
-  });
-
-  it("refuses a flow write from a bot in the server's error envelope, without forwarding it", async () => {
-    const upstream = vi.fn();
-    vi.stubGlobal("fetch", upstream);
-    const answer = await forwardSignIn(
-      new Request("https://cloud.example/cloud/zitadel/flow", { method: "POST", body: "{}" }),
       bot,
     );
     expect(answer.status).toBe(403);
@@ -82,11 +71,36 @@ describe("the sign-in widget's calls", () => {
   });
 
   it.each([
-    "/cloud/zitadel/%66low",
-    "/cloud/zitadel/flow/flw_1/%73ubmit",
-    "/cloud/zitadel/flow/",
-    "/cloud/zitadel//flow",
+    "/cloud/zitadel/api/v1/%66low",
+    "/cloud/zitadel/api/v1/flow/flw_1/%73ubmit",
+    "/cloud/zitadel/api/v1/flow/",
+    "/cloud/zitadel/api/v1//flow",
   ])("refuses %s, a spelling the server could route to a flow write unchecked", async (path) => {
+    const verdict = vi.fn(human);
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const answer = await forwardSignIn(
+      new Request(`https://cloud.example${path}`, { method: "POST", body: "{}" }),
+      verdict,
+    );
+    expect(answer.status).toBe(404);
+    expect(await answer.json()).toMatchObject({ code: "req.not_found" });
+    expect(verdict).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  // The server's origin is every other service's too (repo-root vercel.json).
+  it.each([
+    "/cloud/zitadel",
+    "/cloud/zitadel/flow",
+    "/cloud/zitadel/docs",
+    "/cloud/zitadel/cron/events-retention",
+    "/cloud/zitadel/cloud/api/account/ensure",
+    "/cloud/zitadel/cloud/zitadel/api/v1/flow",
+    "/cloud/zitadel/api/v1",
+    "/cloud/zitadel/api/v2/flow",
+    "/cloud/zitadel/api/v1flow",
+  ])("refuses %s, which is no path of the server's API", async (path) => {
     const verdict = vi.fn(human);
     const upstream = vi.fn();
     vi.stubGlobal("fetch", upstream);
@@ -106,10 +120,13 @@ describe("the sign-in widget's calls", () => {
     const upstream = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", upstream);
     await forwardSignIn(
-      new Request("http://localhost:5180/cloud/zitadel/flow", { method: "POST", body: "{}" }),
+      new Request("http://localhost:5180/cloud/zitadel/api/v1/flow", {
+        method: "POST",
+        body: "{}",
+      }),
       human,
     );
     const [url] = upstream.mock.calls[0] as unknown as [URL];
-    expect(url.href).toBe("http://localhost:8094/flow");
+    expect(url.href).toBe("http://localhost:8094/api/v1/flow");
   });
 });

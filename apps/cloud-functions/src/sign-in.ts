@@ -29,6 +29,16 @@ export function isFlowWrite(method: string, path: string): boolean {
  */
 const PLAIN_PATH = /^(\/[A-Za-z0-9._~-]+)+$/;
 
+/**
+ * Whether the server's API answers the path. The widget calls nothing else
+ * (`apiBaseUrl`), and the server's origin is every other service's too: an
+ * open path would fetch the docs, the website or these functions again, each
+ * `/cloud/zitadel` in it one more invocation, with a preview's bypass secret.
+ */
+function isApiPath(path: string): boolean {
+  return PLAIN_PATH.test(path) && path.startsWith(`${API_PREFIX}/`);
+}
+
 /** Headers that describe one hop, never the request itself. */
 const HOP_HEADERS = [
   "connection",
@@ -58,7 +68,7 @@ export async function forwardSignIn(
 ): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.slice(SIGN_IN_PREFIX.length) || "/";
-  if (!PLAIN_PATH.test(path)) {
+  if (!isApiPath(path)) {
     // The server's own answer to a path it does not serve (ADR 076).
     return Response.json(
       { code: "req.not_found", message: "No API operation matches this path." },
