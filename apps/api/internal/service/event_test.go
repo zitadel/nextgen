@@ -129,6 +129,91 @@ func TestEventService_List_readsEachCategoryOnItsOwn(t *testing.T) {
 	assert.NotEmpty(t, resp.NextPageToken, "a fourth event is left behind the page")
 }
 
+// Each list is planned onto the index that serves it in order: one read where
+// one range holds the page, a read per category or per type where none does
+// (events.ListEach).
+func TestEventService_List_plansEachReadOntoAnIndex(t *testing.T) {
+	project := database.Equal(database.Col(domain.EventFieldProjectID), "proj_1")
+	equal := func(field domain.EventField, value string) database.Filter[domain.EventField] {
+		return database.Equal(database.Col(field), value)
+	}
+	// One read per value of field, each with the request's other filters.
+	each := func(field domain.EventField, values []string, rest ...database.Filter[domain.EventField]) []database.Filter[domain.EventField] {
+		reads := make([]database.Filter[domain.EventField], len(values))
+		for i, value := range values {
+			reads[i] = database.And(database.And(append([]database.Filter[domain.EventField]{project}, rest...)...), equal(field, value))
+		}
+		return reads
+	}
+	one := func(filters ...database.Filter[domain.EventField]) []database.Filter[domain.EventField] {
+		return []database.Filter[domain.EventField]{database.And(append([]database.Filter[domain.EventField]{project}, filters...)...)}
+	}
+	everyCategory := []string{"request", "auth", "session", "admin", "entity", "signal"}
+	anyCategory := func(categories ...string) database.Filter[domain.EventField] {
+		ors := make([]database.Filter[domain.EventField], len(categories))
+		for i, category := range categories {
+			ors[i] = equal(domain.EventFieldCategory, category)
+		}
+		return database.Or(ors...)
+	}
+
+	for name, tc := range map[string]struct {
+		req   service.ListEventsRequest
+		reads []database.Filter[domain.EventField]
+	}{
+		"one actor, every category: the actor index is by category": {
+			req:   service.ListEventsRequest{ActorID: "user_1"},
+			reads: each(domain.EventFieldCategory, everyCategory, equal(domain.EventFieldActorID, "user_1")),
+		},
+		"one actor, some categories": {
+			req:   service.ListEventsRequest{ActorID: "user_1", Categories: []string{"auth", "admin"}},
+			reads: each(domain.EventFieldCategory, []string{"auth", "admin"}, equal(domain.EventFieldActorID, "user_1")),
+		},
+		"one actor, one category: one range": {
+			req:   service.ListEventsRequest{ActorID: "user_1", Categories: []string{"admin"}},
+			reads: one(equal(domain.EventFieldCategory, "admin"), equal(domain.EventFieldActorID, "user_1")),
+		},
+		"one type: one range": {
+			req:   service.ListEventsRequest{EventTypes: []string{"user.created"}},
+			reads: one(equal(domain.EventFieldEventType, "user.created")),
+		},
+		"several types": {
+			req:   service.ListEventsRequest{EventTypes: []string{"user.created", "user.deleted"}},
+			reads: each(domain.EventFieldEventType, []string{"user.created", "user.deleted"}),
+		},
+		"a session holds few events, so its index finds them whatever the categories": {
+			req:   service.ListEventsRequest{SessionID: "sess_1", Categories: []string{"auth", "admin"}},
+			reads: one(anyCategory("auth", "admin"), equal(domain.EventFieldSessionID, "sess_1")),
+		},
+		"a resource holds few events, so its index finds them whoever the actor": {
+			req:   service.ListEventsRequest{EntityID: "user_2", ActorID: "user_1"},
+			reads: one(equal(domain.EventFieldActorID, "user_1"), equal(domain.EventFieldEntityID, "user_2")),
+		},
+		"a type beside a category is one read, in no index's order": {
+			req:   service.ListEventsRequest{EventTypes: []string{"user.created"}, Categories: []string{"entity", "admin"}},
+			reads: one(anyCategory("entity", "admin"), equal(domain.EventFieldEventType, "user.created")),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, stmts := newMockedEventService(t)
+			stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+			stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
+
+			var reads []database.Filter[domain.EventField]
+			stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).Times(len(tc.reads)).
+				DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
+					reads = append(reads, opts.Filter)
+					return &database.ListResult[*domain.Event]{}, nil
+				})
+
+			tc.req.ProjectID = "proj_1"
+			_, err := svc.List(context.Background(), tc.req)
+			require.NoError(t, err)
+			assert.Equal(t, tc.reads, reads)
+		})
+	}
+}
+
 // Paging forward, a token passes every event before its page, so an ascending
 // list ends where the project's events are still settling: an event that
 // commits behind a page would be skipped for good.

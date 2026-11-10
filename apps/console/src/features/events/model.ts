@@ -75,7 +75,7 @@ export function eventFields(event: LogEvent): EventField[] {
 export const LOG_VIEWS = ["audit", "requests", "all"] as const;
 export type LogView = (typeof LOG_VIEWS)[number];
 
-/** What the views call themselves on their tabs. */
+/** What the views call themselves in the Logs list of the sidebar. */
 export const VIEW_LABEL: Record<LogView, string> = {
   audit: "Audit events",
   requests: "API requests",
@@ -94,27 +94,59 @@ export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 const AUDIT_VIEW_CATEGORIES = [...AUDIT_CATEGORIES, "signal"] as const;
 
 /**
- * The filters that narrow by one value the event carries. They are set from
- * an event (a row's menu, the event's page), not typed: the value is an id
- * nobody knows by heart. `name` is what the value is called in a sentence:
- * "Only this request", "Clear the request filter".
+ * How far back the list reads, in hours: the last hour, day or week. Unset,
+ * it reads everything the server still retains.
+ */
+export const TIME_RANGES = ["1h", "24h", "7d"] as const;
+export type TimeRange = (typeof TIME_RANGES)[number];
+
+export const TIME_RANGE_LABEL: Record<TimeRange, string> = {
+  "1h": "Last hour",
+  "24h": "Last 24 hours",
+  "7d": "Last 7 days",
+};
+
+const TIME_RANGE_HOURS: Record<TimeRange, number> = { "1h": 1, "24h": 24, "7d": 168 };
+
+/**
+ * The moment a time range starts at, as `created_after` takes it. A list
+ * computes it once when it loads and sends the same moment with every further
+ * page: a range that moved between pages would drop the rows it slid past.
+ */
+export function rangeStart(range: TimeRange | undefined, now: Date): string | undefined {
+  if (!range) return undefined;
+  return new Date(now.getTime() - TIME_RANGE_HOURS[range] * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * The filters that narrow by one value the event carries: typed or pasted
+ * into the Logs list of the sidebar or the search above the table, or set
+ * from an event (a row's menu, the event's page). `name` is what the value is
+ * called in a sentence: "Only this actor", "Clear the actor filter".
  *
- * These three, the category and the views are every filter the list offers,
- * because they are the ones an index serves on the server. `GET /events`
- * also filters by type, actor and resource, but reads every event of the
- * project to do it, so the console does not send those until they have an
- * index of their own.
+ * These, the category, the time range and the views are every filter the
+ * list offers, because they are the ones an index serves on the server.
  */
 export const VALUE_FILTERS = [
-  { key: "request", label: "Request", name: "request" },
-  { key: "session", label: "Session", name: "session" },
-  { key: "flow", label: "Flow", name: "login flow" },
+  { key: "type", label: "Type", name: "type", placeholder: "user.created" },
+  { key: "actor", label: "Actor", name: "actor", placeholder: "user_…" },
+  { key: "resource", label: "Resource", name: "resource", placeholder: "user_…, team_…" },
+  { key: "request", label: "Request", name: "request", placeholder: "req_…" },
+  { key: "session", label: "Session", name: "session", placeholder: "sess_…" },
+  { key: "flow", label: "Login flow", name: "login flow", placeholder: "flow_…" },
 ] as const;
 export type ValueFilter = (typeof VALUE_FILTERS)[number];
 export type ValueFilterKey = ValueFilter["key"];
 
+const FILTER_BY_KEY = Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.key, filter])) as {
+  [K in ValueFilterKey]: Extract<ValueFilter, { key: K }>;
+};
+
 /** The value of an event each filter matches. */
 const EVENT_VALUE: Record<ValueFilterKey, (event: LogEvent) => string | null | undefined> = {
+  type: (event) => event.event_type,
+  actor: (event) => event.actor_id,
+  resource: (event) => event.entity_id,
   request: (event) => event.request_id,
   session: (event) => event.session_id,
   flow: (event) => event.flow_id,
@@ -132,62 +164,145 @@ export function eventFilterValues(event: LogEvent): { filter: ValueFilter; value
  * The list's filters, as the URL holds them: they are server-side, so they
  * belong to the request the loader makes, are linkable and survive a reload.
  */
-export type LogsSearch = { view: LogView; category?: AuditCategory } & Partial<
+export type LogsSearch = { view: LogView; category?: AuditCategory; since?: TimeRange } & Partial<
   Record<ValueFilterKey, string>
 >;
 
 /**
- * The filters a URL may carry. Anything else is dropped rather than sent:
- * an unknown view is the default one, and a category has no say among the
- * requests, which are one category themselves.
+ * Filters brought to a combination an index serves on the server, in order
+ * and a page at a time. Every way into a list goes through here (the URL, a
+ * click, the request itself), so no combination that would read every event
+ * of the project can be asked for:
+ *
+ * - A type is a category of its own and has its own index, which holds no
+ *   category and no actor. So a type reads the All view, and takes neither a
+ *   category nor an actor beside it.
+ * - The requests are one category themselves, so they take no other.
+ *
+ * Everything else combines: an actor with any view and category, and a
+ * request, session, login flow or resource with anything, since each of those
+ * holds few events. The time range bounds every one of them.
+ */
+export function servedSearch(search: LogsSearch): LogsSearch {
+  if (search.type) {
+    return { ...search, view: "all", category: undefined, actor: undefined };
+  }
+  if (search.view === "requests") return { ...search, category: undefined };
+  return search;
+}
+
+/**
+ * The filters a URL may carry. Anything else is dropped rather than sent: an
+ * unknown view is the default one, and what does not combine gives way
+ * ({@link servedSearch}).
  */
 export function parseLogsSearch(search: Record<string, unknown>): LogsSearch {
-  const view = LOG_VIEWS.find((known) => known === search.view) ?? "audit";
-  const category =
-    view === "requests" ? undefined : AUDIT_CATEGORIES.find((known) => known === search.category);
   // Every key, even unset: the router lays this over the raw search, so a key
   // left out would keep the URL's value.
-  const parsed: LogsSearch = { view, category };
+  const parsed: LogsSearch = {
+    view: LOG_VIEWS.find((known) => known === search.view) ?? "audit",
+    category: AUDIT_CATEGORIES.find((known) => known === search.category),
+    since: TIME_RANGES.find((known) => known === search.since),
+  };
   for (const { key } of VALUE_FILTERS) {
     const value = search[key];
     parsed[key] = typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
   }
-  return parsed;
+  return servedSearch(parsed);
 }
 
-/** Whether anything narrows the view beyond its tab. */
+/** How many filters narrow the view beyond the view itself. */
+export function filterCount(search: LogsSearch): number {
+  return (
+    Number(Boolean(search.category)) +
+    Number(Boolean(search.since)) +
+    VALUE_FILTERS.filter(({ key }) => search[key]).length
+  );
+}
+
+/** Whether anything narrows the view beyond the view itself. */
 export function isNarrowed(search: LogsSearch): boolean {
-  return Boolean(search.category) || VALUE_FILTERS.some(({ key }) => search[key]);
+  return filterCount(search) > 0;
 }
 
-/** What `GET /events` is asked for under these filters. */
+/**
+ * What `GET /events` is asked for under these filters. `createdAfter` is the
+ * start of the time range, which the list computed when it loaded
+ * ({@link rangeStart}).
+ */
 export function eventsQuery(
   search: LogsSearch,
-): Pick<ListEventsParams, "category" | "request_id" | "session_id" | "flow_id"> {
+  createdAfter?: string,
+): Pick<
+  ListEventsParams,
+  | "category"
+  | "event_type"
+  | "actor_id"
+  | "entity_id"
+  | "request_id"
+  | "session_id"
+  | "flow_id"
+  | "created_after"
+> {
+  const served = servedSearch(search);
   const category: ListEventsParams["category"] =
-    search.view === "requests"
+    served.view === "requests"
       ? ["request"]
-      : search.category
-        ? [search.category]
-        : search.view === "audit"
+      : served.category
+        ? [served.category]
+        : served.view === "audit"
           ? [...AUDIT_VIEW_CATEGORIES]
           : undefined;
   return {
     category,
-    request_id: search.request,
-    session_id: search.session,
-    flow_id: search.flow,
+    event_type: served.type ? [served.type] : undefined,
+    actor_id: served.actor,
+    entity_id: served.resource,
+    request_id: served.request,
+    session_id: served.session,
+    flow_id: served.flow,
+    created_after: createdAfter,
   };
 }
 
+/** The list in another view. Only the All view holds a type. */
+export function withView(current: LogsSearch, view: LogView): LogsSearch {
+  return servedSearch({ ...current, view, type: view === "all" ? current.type : undefined });
+}
+
+/** The list narrowed to one category, or to none. A category takes no type beside it. */
+export function withCategory(current: LogsSearch, category: AuditCategory | undefined): LogsSearch {
+  return servedSearch({ ...current, category, type: category ? undefined : current.type });
+}
+
+/** The list over another time range, or over everything retained. */
+export function withTimeRange(current: LogsSearch, since: TimeRange | undefined): LogsSearch {
+  return { ...current, since };
+}
+
 /**
- * The list narrowed by one more value, on top of what already narrows it.
- * Following a request, a session or a login flow reads every view: each ties
- * audit events to the API requests behind them, and a request's own event is
- * not an audit event.
+ * The list with one value filter set, on top of what already narrows it, or
+ * cleared when `value` is empty.
+ *
+ * - An actor and a resource keep the view and the category: "what did this
+ *   person change" is the audit view by one actor, "what happened to this
+ *   user" the audit view by one resource. An actor replaces a type, which it
+ *   does not combine with.
+ * - A request, a session and a login flow read every view: they tie audit
+ *   events to the API requests behind them, and a request's own event is not
+ *   an audit event.
+ * - A type reads every view too, with no category and no actor beside it
+ *   ({@link servedSearch}).
  */
-export function narrowedBy(current: LogsSearch, key: ValueFilterKey, value: string): LogsSearch {
-  return { ...current, view: "all", [key]: value };
+export function narrowedBy(
+  current: LogsSearch,
+  key: ValueFilterKey,
+  value: string | undefined,
+): LogsSearch {
+  if (!value) return { ...current, [key]: undefined };
+  if (key === "actor") return servedSearch({ ...current, type: undefined, actor: value });
+  if (key === "resource") return servedSearch({ ...current, resource: value });
+  return servedSearch({ ...current, view: "all", [key]: value });
 }
 
 /**
@@ -196,4 +311,44 @@ export function narrowedBy(current: LogsSearch, key: ValueFilterKey, value: stri
  */
 export function sharing(key: ValueFilterKey, value: string): LogsSearch {
   return { view: "all", [key]: value };
+}
+
+/** What a pasted or typed term can mean to the list. */
+export type SearchMeaning =
+  | { kind: "event"; id: string }
+  | { kind: "filter"; filter: ValueFilter; value: string };
+
+/** An event type: lowercase words joined by dots, as `auth.check.failed`. */
+const EVENT_TYPE = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/;
+/** A request id as a W3C trace id: 32 hex digits. */
+const TRACE_ID = /^[0-9a-f]{32}$/i;
+
+/**
+ * What a term in the search above the table means: the filters it could set,
+ * or the event it names. The list is searched by exact value on a field the
+ * server indexes, never by text, so a term is read by its shape:
+ *
+ * - `evt_…` is an event, and opens it.
+ * - `req_…` (or a 32-digit trace id), `sess_…` and `flow_…` are a request, a
+ *   session and a login flow.
+ * - Words joined by dots are an event type.
+ * - Any other id may be who did something or what it was done to, so it
+ *   means both an actor and a resource, and the person says which.
+ *
+ * A term with a space in it, or none, means nothing.
+ */
+export function searchMeanings(term: string): SearchMeaning[] {
+  const value = term.trim();
+  if (!value || /\s/.test(value)) return [];
+  const filter = (key: ValueFilterKey): SearchMeaning => ({
+    kind: "filter",
+    filter: FILTER_BY_KEY[key],
+    value,
+  });
+  if (value.startsWith("evt_")) return [{ kind: "event", id: value }];
+  if (value.startsWith("req_") || TRACE_ID.test(value)) return [filter("request")];
+  if (value.startsWith("sess_")) return [filter("session")];
+  if (value.startsWith("flow_")) return [filter("flow")];
+  if (EVENT_TYPE.test(value)) return [filter("type")];
+  return [filter("actor"), filter("resource")];
 }

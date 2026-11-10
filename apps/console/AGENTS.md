@@ -68,6 +68,10 @@ between files are the sign the component is missing.
   (`nav.view: "settings"`, D29).
 - Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
+- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): its
+  rows are views and filters the events feature draws, not `nav` routes.
+- Logs sends only filters an index serves (root ADR 048): add or combine one
+  in `servedSearch` (`src/features/events/model.ts`) with its index, never alone.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.
 - In specs, assert on `router.state.resolvedLocation`, never

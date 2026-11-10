@@ -21,7 +21,7 @@
 
 -- Serves the list by one category, newest or oldest first: a btree scans
 -- backward, so one definition covers both directions. Several categories are
--- read one at a time and merged (events.ListEachCategory).
+-- read one at a time and merged (events.ListEach).
 DROP INDEX IF EXISTS zitadel_nextgen.idx_events_project_category;
 CREATE INDEX CONCURRENTLY idx_events_project_category
     ON zitadel_nextgen.events (project_id, category, created_at, id);
