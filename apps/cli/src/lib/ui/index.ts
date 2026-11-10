@@ -29,9 +29,10 @@
  *
  * A normal command's, which is every other command's:
  *
- *     Remove GREETING from the project? [y/N] y           ← a question, answered on its line
+ *     ◇  Remove GREETING from the project?                 ← a question, with no guide beside it
+ *     Yes                                                  ← the answer, under it
  *     Removed GREETING from the project · project proj-1 on localhost:8111
- *                                                         ↑ the answer, then one dim footer
+ *                                                         ↑ what the command did, then one dim footer
  *
  * The parts, in the order a command meets them:
  *

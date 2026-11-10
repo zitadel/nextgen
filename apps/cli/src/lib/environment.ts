@@ -379,8 +379,8 @@ export async function requireValueInteractive(
     },
   };
   // The command's own asker, so the question is drawn the way that command
-  // draws everything: a plain line for a normal command, a prompt inside the
-  // chain for a wizard. Minting one here drew a gutter for a chain that was
+  // draws everything: a prompt without the guide for a normal command, a prompt
+  // inside the chain for a wizard. Minting one here drew a gutter for a chain that was
   // never opened. A credential is never echoed, so which method asks it is
   // the question's own property rather than a flag passed to one method.
   const value = SECRET_KEYS.has(key)

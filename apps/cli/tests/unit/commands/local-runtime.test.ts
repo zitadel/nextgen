@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as prompts from "@clack/prompts";
 import { afterEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
@@ -26,7 +27,8 @@ import {
   runCliForTest,
 } from "@tests/helpers/run-cli";
 import { it } from "@tests/helpers/fixtures";
-import { asOneLine, asTerminalTyping } from "@tests/helpers/terminal";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -950,16 +952,16 @@ describe("local runtime commands", () => {
   });
 
   describe("reset asked on a terminal", () => {
-    // `reset` is a normal command, so its question is one plain line with the
-    // answer typed on it. The built CLI bundles its own prompts, so it can only
-    // be answered by running the command from source.
-    const resetting = async (answers: string[]) => {
+    // The built CLI bundles its own prompts, so it can only be answered by
+    // running the command from source.
+    const resetting = async (answers: unknown[]) => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
       await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
-      const { result: outcome, shown } = await asTerminalTyping(answers, () =>
+      const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+      const outcome = await asTerminal(() =>
         Reset.run(["--cwd", cwd]).then(
           (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
           (error: unknown) => ({ error }),
@@ -968,7 +970,7 @@ describe("local runtime commands", () => {
       return {
         cwd,
         outcome,
-        shown,
+        asked: talk.asked(),
         kept: await stat(paths.dataDir).then(
           () => true,
           () => false,
@@ -981,7 +983,7 @@ describe("local runtime commands", () => {
     });
 
     it("is skipped, deleting nothing, when the answer is no", async () => {
-      const { outcome, kept } = await resetting(["n"]);
+      const { outcome, kept } = await resetting([false]);
 
       expect(outcome).toMatchObject({
         envelope: { status: "skipped", reason: "reset-cancelled" },
@@ -993,7 +995,7 @@ describe("local runtime commands", () => {
       const fake = await fakeDocker();
       vi.stubEnv("PATH", `${fake.binDir}:${process.env.PATH ?? ""}`);
       vi.stubEnv("DOCKER_LOG", fake.logPath);
-      const { outcome, kept, cwd } = await resetting(["y"]);
+      const { outcome, kept, cwd } = await resetting([true]);
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
       expect(kept).toBe(false);
@@ -1002,9 +1004,9 @@ describe("local runtime commands", () => {
     });
 
     it("names the directory and data it deletes, that it cannot be undone, and the admin file it keeps", async () => {
-      const { cwd, shown } = await resetting(["n"]);
+      const { cwd, asked } = await resetting([false]);
 
-      const message = asOneLine(shown);
+      const message = asOneLine(asked.join("\n"));
       expect(message).toContain(localRuntimePaths(cwd).dataDir);
       expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
       expect(message).toContain("every organization, user, application and setting");

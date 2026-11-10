@@ -128,9 +128,11 @@
   elsewhere and on a `kind:` question outside the engine.
 - A command draws one of two shapes, and the shape is the command's, never
   inferred from how a run went (`src/lib/ui/presentation.ts`). A wizard sets
-  `static override wizard = true` and gets the chain, the drawn prompts and
-  the summary box; every other command draws neither chain nor box, asks on a
-  plain line, and ends on its answer and one dim footer. Adding a question, a
+  `static override wizard = true` and gets the chain, the guide beside its
+  prompts and the summary box; every other command draws neither chain nor
+  box, asks the same clack prompts without the guide (`withGuide: false`), and
+  ends on its answer and one dim footer. Nothing else reads a line from the
+  terminal: a unit test fails on a `readline` import. Adding a question, a
   warning or a `--force` to a command must not change its shape.
   - The shape holds off a terminal: a run nothing can be drawn into has its
     ending written out in the same words (`Ui.written`), so only the gutter

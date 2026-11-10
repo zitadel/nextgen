@@ -2,13 +2,17 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import * as prompts from "@clack/prompts";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Eject from "@/commands/eject";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asTerminalTyping } from "@tests/helpers/terminal";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asTerminal } from "@tests/helpers/terminal";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { stripAnsi } from "@tests/helpers/run-cli";
+
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -297,25 +301,34 @@ describe("eject command", () => {
 });
 
 describe("eject asked on a terminal", () => {
-  /** The question eject asks, as a person sees it with the answer typed after it. */
-  const QUESTION = "Remove the managed files and local Zitadel state? [y/N] ";
+  /** Runs eject in `cwd` with a person at the terminal giving `answers`. */
+  const ejecting = async (cwd: string, ...answers: unknown[]) => {
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+    const written: string[] = [];
+    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      const result = await asTerminal(() => Eject.run(["--cwd", cwd]));
+      return { result, shown: written.join(""), talk };
+    } finally {
+      capture.mockRestore();
+    }
+  };
 
-  /** Runs eject in `cwd` with a person at the terminal typing `answers`. */
-  const ejecting = (cwd: string, ...answers: string[]) =>
-    asTerminalTyping(answers, () => Eject.run(["--cwd", cwd]));
-
-  it("asks plainly, with the answer typed on the question's own line", async () => {
+  it("asks whether to remove the managed files and local state", async () => {
     const cwd = await makeManagedProject();
 
-    const { shown } = await ejecting(cwd, "n");
+    const { talk } = await ejecting(cwd, false);
 
-    expect(stripAnsi(shown).startsWith(QUESTION)).toBe(true);
+    expect(talk.asked()).toEqual(["Remove the managed files and local Zitadel state?"]);
   });
 
   it("is skipped, removing nothing, when the answer is no", async () => {
     const cwd = await makeManagedProject();
 
-    const { result } = await ejecting(cwd, "n");
+    const { result } = await ejecting(cwd, false);
 
     expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
@@ -327,7 +340,7 @@ describe("eject asked on a terminal", () => {
   it("removes the managed files when the answer is yes", async () => {
     const cwd = await makeManagedProject();
 
-    const { result } = await ejecting(cwd, "y");
+    const { result } = await ejecting(cwd, true);
 
     expect(JSON.parse(JSON.stringify(result))).toMatchObject({ status: "ok" });
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(false);
@@ -338,7 +351,7 @@ describe("eject asked on a terminal", () => {
   it("says what a declined run left in place", async () => {
     const cwd = await makeManagedProject();
 
-    const { shown } = await ejecting(cwd, "n");
+    const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown)).toContain("Nothing was removed. Zitadel is still set up in this app.");
   });
@@ -346,7 +359,7 @@ describe("eject asked on a terminal", () => {
   it("offers the eject command again when the answer is no", async () => {
     const cwd = await makeManagedProject();
 
-    const { shown } = await ejecting(cwd, "n");
+    const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown)).toContain("Remove it whenever you like:");
     expect(stripAnsi(shown)).toMatch(/\$ .* eject --cwd /);
@@ -355,7 +368,7 @@ describe("eject asked on a terminal", () => {
   it("ends a declined run on the one dim footer", async () => {
     const cwd = await makeManagedProject();
 
-    const { shown } = await ejecting(cwd, "n");
+    const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown).trimEnd().split("\n").at(-1)).toBe("Cancelled, nothing was removed");
   });
@@ -363,7 +376,7 @@ describe("eject asked on a terminal", () => {
   it("never shows a person the reason the envelope carries", async () => {
     const cwd = await makeManagedProject();
 
-    const { shown } = await ejecting(cwd, "n");
+    const { shown } = await ejecting(cwd, false);
 
     expect(stripAnsi(shown)).not.toContain("eject-cancelled");
   });
@@ -372,7 +385,7 @@ describe("eject asked on a terminal", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
     tempDirs.push(cwd);
 
-    const { shown } = await ejecting(cwd, "y");
+    const { shown } = await ejecting(cwd, true);
 
     expect(stripAnsi(shown)).toContain(
       "Zitadel is not set up in this app, so nothing was removed.",
@@ -383,7 +396,7 @@ describe("eject asked on a terminal", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
     tempDirs.push(cwd);
 
-    const { shown } = await ejecting(cwd, "y");
+    const { shown } = await ejecting(cwd, true);
 
     expect(stripAnsi(shown)).toContain("Set it up whenever you like:");
   });
@@ -391,9 +404,11 @@ describe("eject asked on a terminal", () => {
   it("does not ask on a dry run, which removes nothing", async () => {
     const cwd = await makeManagedProject();
 
-    const { shown } = await asTerminalTyping([], () => Eject.run(["--cwd", cwd, "--dry-run"]));
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>);
 
-    expect(stripAnsi(shown)).not.toContain("[y/N]");
+    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
+
+    expect(talk.asked()).toEqual([]);
   });
 
   it("fails, removing nothing, when the person walks away", async () => {

@@ -8,6 +8,7 @@ import {
   expireClaimWindow,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
+import * as prompts from "@clack/prompts";
 import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
@@ -20,10 +21,13 @@ import {
 } from "@/lib/local-server/runtime";
 import Claim from "@/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
-import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminalTyping } from "@tests/helpers/terminal";
+import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asTerminal } from "@tests/helpers/terminal";
 
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
+
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim
@@ -509,16 +513,15 @@ describe("claim", () => {
 
     // The built CLI bundles its own prompts, so a prompt can only be answered
     // by running the command from source, where `input` is the one module asked.
-    const [{ shown }] = await Promise.all([
-      asTerminalTyping([envProject.id], () =>
-        Claim.run(["--cwd", cwd, "--no-open", "--env", "production"]),
-      ),
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, envProject.id);
+    await Promise.all([
+      asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
     ]);
 
-    expect(stripAnsi(shown)).toContain(
-      "What is the value of ZITADEL_PROJECT_ID for the production environment? ",
-    );
+    expect(talk.asked()).toEqual([
+      "What is the value of ZITADEL_PROJECT_ID for the production environment?",
+    ]);
 
     expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
       `ZITADEL_PROJECT_ID=${envProject.id}`,

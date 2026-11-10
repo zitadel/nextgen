@@ -106,6 +106,23 @@ describe("the UI package", () => {
   });
 });
 
+describe("asking a person", () => {
+  // Every question is a clack prompt asked through `lib/input.ts`. A module
+  // that opens a line reader of its own would ask in a second way, with its
+  // own look, its own echo and its own idea of Ctrl-C.
+  it("is done with clack alone, so no module reads a line from the terminal itself", async () => {
+    const readers: string[] = [];
+    for (const file of await sourceFiles(SRC)) {
+      const source = await readFile(file, "utf8");
+      if (/["'](?:node:)?readline(?:\/promises)?["']/.test(source)) {
+        readers.push(asWritten(file));
+      }
+    }
+
+    expect(readers).toEqual([]);
+  });
+});
+
 describe("the boundary scan", () => {
   it.each([
     ["a clack import", 'import { note } from "@clack/prompts";', ["imports @clack/prompts"]],

@@ -2,15 +2,16 @@ import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
-import { select } from "@clack/prompts";
+import * as prompts from "@clack/prompts";
 import { Config } from "@oclif/core";
 
 import Api from "@/commands/api/index";
 import { it } from "@tests/helpers/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { answering, type clackDouble } from "@tests/helpers/clack";
 import { stripAnsi } from "@tests/helpers/run-cli";
-import { type Answer, asTerminalTyping } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/helpers/terminal";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
@@ -38,31 +39,25 @@ beforeEach(() => {
 afterEach(() => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
-  vi.mocked(select).mockReset();
+  vi.mocked(prompts.select).mockReset();
   vi.restoreAllMocks();
 });
 
 /**
- * Run `zitadel api` from source in a project written to `dir`, with a person typing
- * `answers` at the plain questions it asks, and give back what it wrote.
+ * Run `zitadel api` from source in a project written to `dir`, with a person giving
+ * `answers` at the prompts it draws, and give back the result and what was asked.
  */
-async function asking(dir: string, answers: Answer[], ...argv: string[]) {
+async function asking(dir: string, answers: unknown[], ...argv: string[]) {
   const cwd = await makeProject(dir, { linked: true });
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   const config = await Config.load({ root: cliPackageRoot });
-  return asTerminalTyping(answers, () =>
+  const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+  const result = await asTerminal(() =>
     Api.run(["--cwd", cwd, "--no-telemetry", "--server", "http://localhost:8080", ...argv], config),
   );
+  return { result, talk };
 }
-
-/** Types the number the listing gave the choice whose line holds `label`. */
-const picking =
-  (label: string): Answer =>
-  (shown: string) => {
-    const line = shown.split("\n").find((one) => /^\s*\d+\)/.test(one) && one.includes(label));
-    return /^\s*(\d+)\)/.exec(line ?? "")?.[1] ?? "";
-  };
 
 /**
  * Run `zitadel api` from source in a linked project written to `dir`, with its
@@ -101,11 +96,7 @@ describe("zitadel api help", () => {
 });
 
 describe("zitadel api without an operation, at a terminal", () => {
-  const choosingRevokeSession: Answer[] = [
-    picking("Sessions"),
-    picking("DELETE /sessions/{session_id}"),
-    "sess_1",
-  ];
+  const choosingRevokeSession = ["Sessions", "revokeSession", "sess_1"];
 
   it("asks for the part of the API, the operation and its path parameters", async ({ dir }) => {
     const { result } = await asking(dir, choosingRevokeSession, "--dry-run");
@@ -117,27 +108,21 @@ describe("zitadel api without an operation, at a terminal", () => {
   });
 
   it("words each of its three questions as a question", async ({ dir }) => {
-    const { shown } = await asking(dir, choosingRevokeSession, "--dry-run");
+    const { talk } = await asking(dir, choosingRevokeSession, "--dry-run");
 
-    expect(stripAnsi(shown)).toContain("Which part of the API would you like to use?");
-    expect(stripAnsi(shown)).toContain("Which operation would you like to run?");
-    expect(stripAnsi(shown)).toContain("What is the value of session_id? ");
-  });
-
-  // `api` is a normal command, so it asks plainly: numbered choices, with no
-  // chain drawn around them.
-  it("numbers its choices rather than drawing a prompt", async ({ dir }) => {
-    const { shown } = await asking(dir, choosingRevokeSession, "--dry-run");
-
-    expect(select).not.toHaveBeenCalled();
-    expect(stripAnsi(shown)).toMatch(/^ {2}\d+\) {2}Sessions$/m);
+    expect(talk.asked()).toEqual([
+      "Which part of the API would you like to use?",
+      "Which operation would you like to run?",
+      "What is the value of session_id?",
+    ]);
   });
 
   it("offers only what the CLI can call", async ({ dir }) => {
-    const { shown } = await asking(dir, choosingRevokeSession, "--dry-run");
+    const { talk } = await asking(dir, choosingRevokeSession, "--dry-run");
 
-    expect(stripAnsi(shown)).toContain("GET /sessions/{session_id}");
-    expect(stripAnsi(shown)).not.toContain("GET /sessions/me");
+    const operations = JSON.stringify(talk.options()[1]);
+    expect(operations).toContain("GET /sessions/{session_id}");
+    expect(operations).not.toContain("GET /sessions/me");
   });
 });
 

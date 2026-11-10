@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
+import * as prompts from "@clack/prompts";
 import { confirm, isCancel } from "@clack/prompts";
 
 import VariableRm from "@/commands/variable/rm";
@@ -17,7 +18,7 @@ import { DEFAULT_SERVER } from "@/lib/server";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
-import { asTerminalTyping } from "@tests/helpers/terminal";
+import { answering, type clackDouble } from "@tests/helpers/clack";
 
 const { server } = usePlatformServer();
 
@@ -999,10 +1000,22 @@ describe("variable set --as", () => {
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const removing = (cwd: string, ...answers: string[]) =>
-    asTerminalTyping(answers, () =>
-      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
-    );
+  const removing = async (cwd: string, ...answers: unknown[]) => {
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+    const written: string[] = [];
+    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      const result = await asPerson(() =>
+        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+      );
+      return { result, shown: written.join(""), talk };
+    } finally {
+      capture.mockRestore();
+    }
+  };
   const watchingDeletes = () => {
     const seen = { deleted: false };
     server.use(
@@ -1020,36 +1033,53 @@ describe("variable rm asked on a terminal", () => {
     vi.mocked(isCancel).mockReturnValue(false);
   });
 
-  it("asks plainly, with the answer typed on the question's own line", async () => {
+  it("asks whether to remove the variable from the project", async () => {
     const cwd = await makeProject();
     watchingDeletes();
 
-    const { shown } = await removing(cwd, "y");
+    const { talk } = await removing(cwd, true);
 
-    expect(stripAnsi(shown)).toMatch(/^Remove SUPPORT_EMAIL from the project\? \[y\/N\] /);
+    expect(talk.asked()).toEqual(["Remove SUPPORT_EMAIL from the project?"]);
   });
 
-  // --force only removes the question. The line the command ends on is the
-  // same one, so the command looks the same either way.
+  it("asks nothing when forced", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>);
+
+    await asPerson(() =>
+      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
+    );
+
+    expect(talk.asked()).toEqual([]);
+  });
+
   it("ends on the same line forced as it does answering", async () => {
     const cwd = await makeProject();
     watchingDeletes();
 
-    const answered = await removing(cwd, "y");
-    const forced = await asTerminalTyping([], () =>
-      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
-    );
+    const answered = await removing(cwd, true);
+    const written: string[] = [];
+    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      await asPerson(() =>
+        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
+      );
+    } finally {
+      capture.mockRestore();
+    }
 
-    expect(stripAnsi(answered.shown)).toBe(
-      `Remove SUPPORT_EMAIL from the project? [y/N] ${stripAnsi(forced.shown)}`,
-    );
+    expect(stripAnsi(answered.shown)).toBe(stripAnsi(written.join("")));
   });
 
   it("is skipped, removing nothing, when the answer is no", async () => {
     const cwd = await makeProject();
     const seen = watchingDeletes();
 
-    const { result } = await removing(cwd, "n");
+    const { result } = await removing(cwd, false);
 
     expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
@@ -1071,12 +1101,16 @@ describe("variable rm asked on a terminal", () => {
 describe("variable set asked on a terminal", () => {
   it("asks what the value should be, as a question", async () => {
     const cwd = await makeProject();
+    const talk = answering(
+      prompts as unknown as ReturnType<typeof clackDouble>,
+      "support@acme.example",
+    );
 
-    const { shown } = await asTerminalTyping(["support@acme.example"], () =>
+    await asPerson(() =>
       VariableSet.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
     );
 
-    expect(shown).toContain("What should the value of SUPPORT_EMAIL be? ");
+    expect(talk.asked()).toEqual(["What should the value of SUPPORT_EMAIL be?"]);
   });
 });
 

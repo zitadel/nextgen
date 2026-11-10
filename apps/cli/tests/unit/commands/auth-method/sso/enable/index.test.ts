@@ -2,11 +2,18 @@ import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Errors } from "@oclif/core";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => {
+  return (await import("@tests/helpers/clack")).clackDouble();
+});
+
+import * as prompts from "@clack/prompts";
 
 import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/zitadel";
+import { answering, type clackDouble } from "@tests/helpers/clack";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
 import { anOidcConnection, type DocumentsByName } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -23,7 +30,7 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asOneLine, asTerminalTyping } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -97,50 +104,80 @@ function customArgs(cwd: string, ...flags: string[]): string[] {
 }
 
 /**
+ * The mocked `@clack/prompts`, which is a {@link clackDouble}, for `answering` to script.
+ */
+const clack = () => prompts as unknown as ReturnType<typeof clackDouble>;
+
+/**
+ * A question a text prompt asks, as far as the person's answer is concerned.
+ */
+interface TextPrompt {
+  message: string;
+  validate?: (value: string) => string | undefined;
+}
+
+/**
+ * Makes the text prompts of `double` do what the drawn prompt does with an
+ * answer its question refuses: say why, and ask again.
+ *
+ * @param double - The mocked `@clack/prompts`, already scripted by `answering`.
+ * @returns What the prompts said in refusing, as the run goes on.
+ */
+function refusingWhatTheQuestionRefuses(double: ReturnType<typeof clackDouble>): string[] {
+  const refusals: string[] = [];
+  const answer = double.text.getMockImplementation();
+  double.text.mockImplementation(async (prompt: TextPrompt) => {
+    for (;;) {
+      const value = await answer?.(prompt);
+      const problem = typeof value === "string" ? prompt.validate?.(value) : undefined;
+      if (problem === undefined) {
+        return value;
+      }
+      refusals.push(problem);
+    }
+  });
+  return refusals;
+}
+
+/**
  * `auth-method sso enable --provider custom` run by a person at a terminal who
- * types `answers` in the order the questions come. A run that is refused does
- * not throw out of here: its failure is handed back beside everything the
- * person was shown, so a test can say what had been asked before the refusal.
+ * answers the questions in the order they come. A run that is refused does not
+ * throw out of here: its failure is handed back beside the questions the person
+ * was asked and everything else the run wrote, so a test can say what had been
+ * asked before the refusal.
  *
  * @param cwd - The Project.
- * @param answers - What the person types, one answer to each question.
+ * @param answers - What the person answers, one answer to each question.
  * @param flags - The flags the person typed.
- * @returns The failure, when the run was refused, and what the person was shown.
+ * @returns The failure, when the run was refused, the questions asked and what else was shown.
  */
 async function enterCustom(
   cwd: string,
   answers: readonly string[],
   ...flags: string[]
-): Promise<{ failure: unknown; shown: string }> {
-  let failure: unknown;
-  const { shown } = await asTerminalTyping(answers, async () => {
-    failure = await rejectionOf(() => {
-      return AuthMethodSsoEnable.run(customArgs(cwd, ...flags));
-    });
+): Promise<{ failure: unknown; shown: string; asked: string[] }> {
+  const talk = answering(clack(), ...answers);
+  const refusals = refusingWhatTheQuestionRefuses(clack());
+  const write = vi.spyOn(process.stdout, "write").mockImplementation(() => {
+    return true;
   });
-  return { failure, shown: stripAnsi(shown) };
-}
-
-/**
- * Every question `shown` holds, in the order it was asked and each once.
- *
- * @param shown - Everything the person was shown.
- * @returns The questions.
- */
-function asked(shown: string): string[] {
-  return Object.values(QUESTION)
-    .map((question) => {
-      return { question, at: shown.indexOf(question) };
-    })
-    .filter(({ at }) => {
-      return at >= 0;
-    })
-    .sort((a, b) => {
-      return a.at - b.at;
-    })
-    .map(({ question }) => {
-      return question;
+  let failure: unknown;
+  try {
+    await asTerminal(async () => {
+      failure = await rejectionOf(() => {
+        return AuthMethodSsoEnable.run(customArgs(cwd, ...flags));
+      });
     });
+    const shown = [
+      ...write.mock.calls.map((call) => {
+        return String(call[0]);
+      }),
+      ...refusals,
+    ].join("");
+    return { failure, shown: stripAnsi(shown), asked: talk.asked() };
+  } finally {
+    write.mockRestore();
+  }
 }
 
 /**
@@ -205,7 +242,7 @@ describe("auth-method sso enable", () => {
     it("asks for the connection's settings, then for its credentials", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(cwd, [
+      const { asked } = await enterCustom(cwd, [
         ACME.slug,
         ACME.displayName,
         ACME.issuer,
@@ -214,7 +251,7 @@ describe("auth-method sso enable", () => {
         ACME.secret,
       ]);
 
-      expect(asked(shown)).toEqual([
+      expect(asked).toEqual([
         QUESTION.slug,
         QUESTION.displayName,
         QUESTION.issuer,
@@ -245,7 +282,7 @@ describe("auth-method sso enable", () => {
     it("asks only for what the flags left out", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(
+      const { asked } = await enterCustom(
         cwd,
         [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret],
         "--slug",
@@ -254,7 +291,7 @@ describe("auth-method sso enable", () => {
         ACME.issuer,
       );
 
-      expect(asked(shown)).toEqual([
+      expect(asked).toEqual([
         QUESTION.displayName,
         QUESTION.scopes,
         QUESTION.clientId,
@@ -280,7 +317,7 @@ describe("auth-method sso enable", () => {
     it("asks only for the credentials when the flags gave every setting", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(
+      const { asked } = await enterCustom(
         cwd,
         [ACME.clientId, ACME.secret],
         "--slug",
@@ -293,7 +330,7 @@ describe("auth-method sso enable", () => {
         ACME.scopes,
       );
 
-      expect(asked(shown)).toEqual([QUESTION.clientId, QUESTION.secret]);
+      expect(asked).toEqual([QUESTION.clientId, QUESTION.secret]);
     });
   });
 
@@ -310,9 +347,9 @@ describe("auth-method sso enable", () => {
     it("asks nothing first", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(cwd, [], "--issuer", "not a url");
+      const { asked } = await enterCustom(cwd, [], "--issuer", "not a url");
 
-      expect(asked(shown)).toEqual([]);
+      expect(asked).toEqual([]);
     });
   });
 
@@ -328,9 +365,13 @@ describe("auth-method sso enable", () => {
     it("asks for the slug again", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(cwd, ["google"]);
+      const { asked } = await enterCustom(cwd, ["google"]);
 
-      expect(shown.split(QUESTION.slug)).toHaveLength(3);
+      expect(
+        asked.filter((question) => {
+          return question === QUESTION.slug;
+        }),
+      ).toHaveLength(2);
     });
 
     it("ends the run when nobody answers again", async ({ dir }) => {
@@ -345,9 +386,9 @@ describe("auth-method sso enable", () => {
     it("asks nothing after the slug", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(cwd, ["google"]);
+      const { asked } = await enterCustom(cwd, ["google"]);
 
-      expect(asked(shown)).toEqual([QUESTION.slug]);
+      expect([...new Set(asked)]).toEqual([QUESTION.slug]);
     });
   });
 
@@ -364,9 +405,9 @@ describe("auth-method sso enable", () => {
     it("asks no question, so nobody answers for nothing", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(cwd, [], "--schema", "nope");
+      const { asked } = await enterCustom(cwd, [], "--schema", "nope");
 
-      expect(asked(shown)).toEqual([]);
+      expect(asked).toEqual([]);
     });
   });
 
@@ -416,9 +457,9 @@ describe("auth-method sso enable", () => {
         "default-human-user-login": loginFlow("default-human-user"),
       });
 
-      const { shown } = await enterCustom(cwd, []);
+      const { asked } = await enterCustom(cwd, []);
 
-      expect(asked(shown)).not.toContain(QUESTION.slug);
+      expect(asked).not.toContain(QUESTION.slug);
     });
   });
 
@@ -477,9 +518,9 @@ describe("auth-method sso enable", () => {
         linked: true,
       });
 
-      const { shown } = await enterCustom(cwd, [ACME.slug]);
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked(shown)).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
@@ -500,9 +541,9 @@ describe("auth-method sso enable", () => {
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
       await writeJson(cwd, ACME.file, ANOTHER_CONNECTION);
 
-      const { shown } = await enterCustom(cwd, [ACME.slug]);
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked(shown)).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
@@ -519,9 +560,9 @@ describe("auth-method sso enable", () => {
     it("asks nothing", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { shown } = await enterCustom(cwd, [], "--dry-run");
+      const { asked } = await enterCustom(cwd, [], "--dry-run");
 
-      expect(asked(shown)).toEqual([]);
+      expect(asked).toEqual([]);
     });
   });
 
@@ -529,9 +570,9 @@ describe("auth-method sso enable", () => {
     it("asks for the slug first", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
 
-      const { shown } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
+      const { asked } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
-      expect(asked(shown)[0]).toBe(QUESTION.slug);
+      expect(asked[0]).toBe(QUESTION.slug);
     });
 
     it.for([
@@ -541,9 +582,9 @@ describe("auth-method sso enable", () => {
     ] as const)("does not ask for the %s the file holds", async ([_, question], { dir }) => {
       const cwd = await aProjectWithAcme(dir);
 
-      const { shown } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
+      const { asked } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
-      expect(asked(shown)).not.toContain(question);
+      expect(asked).not.toContain(question);
     });
 
     it("writes no other connection file", async ({ dir }) => {
@@ -578,14 +619,14 @@ describe("auth-method sso enable", () => {
     }) => {
       const cwd = await aProjectWithAcme(dir, { display_name: "   " });
 
-      const { shown } = await enterCustom(
+      const { asked } = await enterCustom(
         cwd,
         SLUG_AND_CREDENTIALS,
         "--display-name",
         ACME.displayName,
       );
 
-      expect(asked(shown)).not.toContain(QUESTION.displayName);
+      expect(asked).not.toContain(QUESTION.displayName);
     });
 
     it("does not ask for stored scopes the rules refuse, since reuse never applies them", async ({
@@ -593,9 +634,9 @@ describe("auth-method sso enable", () => {
     }) => {
       const cwd = await aProjectWithAcme(dir, { oidc: { scopes: ["profile"] } });
 
-      const { shown } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
+      const { asked } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
-      expect(asked(shown)).not.toContain(QUESTION.scopes);
+      expect(asked).not.toContain(QUESTION.scopes);
     });
   });
 
@@ -615,9 +656,9 @@ describe("auth-method sso enable", () => {
     it("asks nothing after the slug", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, overrides);
 
-      const { shown } = await enterCustom(cwd, [ACME.slug]);
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked(shown)).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
@@ -634,9 +675,9 @@ describe("auth-method sso enable", () => {
     it("asks nothing", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, { oidc: { issuer: "not a url" } });
 
-      const { shown } = await enterCustom(cwd, [ACME.slug]);
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked(shown)).toEqual([]);
+      expect(asked).toEqual([]);
     });
   });
 
@@ -658,14 +699,14 @@ describe("auth-method sso enable", () => {
     it("refuses it before asking anything after the slug", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
 
-      const { shown } = await enterCustom(
+      const { asked } = await enterCustom(
         cwd,
         [ACME.slug],
         "--issuer",
         "https://elsewhere.example",
       );
 
-      expect(asked(shown)).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 

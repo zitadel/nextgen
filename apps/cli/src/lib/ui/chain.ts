@@ -3,7 +3,7 @@ import { consola } from "consola";
 import pc from "picocolors";
 
 import { CANCELLED, PromptCancelled, ZitadelError } from "../errors";
-import { asker, plainAsker } from "../input";
+import { asker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
@@ -222,8 +222,8 @@ export class Chain implements Drawing, Narratable {
   /**
    * The questions, asked the way this command presents itself. A wizard's
    * are drawn in its chain: each one opens the chain before its prompt and
-   * leaves the blank guide line it needs after it. A normal command's are
-   * plain lines, which open nothing and space nothing.
+   * leaves the blank guide line it needs after it. A normal command's are the
+   * same prompts without the guide, which open nothing and space nothing.
    *
    * The command's `--force` reaches only the destructive confirmation
    * ({@link Confirmer}); every other question is asked.
@@ -236,7 +236,7 @@ export class Chain implements Drawing, Narratable {
       force: audience.force,
     };
     return this.presentation === "plain"
-      ? plainAsker(session)
+      ? asker({ ...session, guide: false })
       : asker({ ...session, before: () => this.open(), after: () => this.answered() });
   }
 

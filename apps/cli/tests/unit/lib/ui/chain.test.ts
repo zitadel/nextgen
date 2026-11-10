@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
-import { intro, log, note, outro, spinner } from "@clack/prompts";
+import * as prompts from "@clack/prompts";
+import { confirm, intro, log, note, outro, spinner } from "@clack/prompts";
 
 import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
 import { Chain } from "../../../../src/lib/ui/chain";
 import { GUIDE } from "../../../../src/lib/ui/marks";
-import { asTerminalTyping } from "../../../helpers/terminal";
+import { answering, type clackDouble } from "../../../helpers/clack";
+import { asTerminal } from "../../../helpers/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
 const normally = () => new Chain({ interactive: true, force: false }, "plain");
@@ -30,6 +32,9 @@ afterEach(() => {
 });
 
 const printed = () => written.join("");
+
+/** The mocked `@clack/prompts`, which is a {@link clackDouble}, for `answering` to script. */
+const clack = () => prompts as unknown as ReturnType<typeof clackDouble>;
 
 describe("Chain", () => {
   it("draws nothing at all when nobody is watching", () => {
@@ -311,6 +316,7 @@ describe("a normal command's chain, which is no chain at all", () => {
   // to what a person sees is that the question is absent.
   it("looks the same forced as it does answering, but for the question", async () => {
     const run = (force: boolean) => async () => {
+      written = [];
       const chain = new Chain({ interactive: true, force }, "plain");
       removing(chain);
       await chain.questions().confirm({
@@ -318,17 +324,45 @@ describe("a normal command's chain, which is no chain at all", () => {
         message: "Remove B from the project?",
       });
       chain.finish(removed);
+      return printed();
     };
 
-    const forced = await asTerminalTyping([], run(true));
-    const answered = await asTerminalTyping(["y"], run(false));
+    const forced = await asTerminal(run(true));
+    const asked = vi.mocked(confirm).mock.calls.length;
+    answering(clack(), true);
+    const answered = await asTerminal(run(false));
 
-    expect(stripAnsi(forced.shown)).toBe(
-      "Removed B from the project · project proj-1 on localhost:8111\n",
+    expect(forced).toBe("Removed B from the project · project proj-1 on localhost:8111\n");
+    expect(answered).toBe(forced);
+    expect(asked).toBe(0);
+  });
+
+  it("asks its questions without the guide a wizard draws", async () => {
+    answering(clack(), true);
+
+    await asTerminal(() =>
+      normally().questions().confirm({
+        name: "remove the variable",
+        message: "Remove B from the project?",
+      }),
     );
-    expect(stripAnsi(answered.shown)).toBe(
-      `Remove B from the project? [y/N] ${stripAnsi(forced.shown)}`,
+
+    expect(vi.mocked(confirm)).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Remove B from the project?", withGuide: false }),
     );
+  });
+
+  it("asks a wizard's questions with the guide", async () => {
+    answering(clack(), true);
+
+    await asTerminal(() =>
+      watching().questions().confirm({
+        name: "remove the variable",
+        message: "Remove B from the project?",
+      }),
+    );
+
+    expect(vi.mocked(confirm)).toHaveBeenCalledWith(expect.objectContaining({ withGuide: true }));
   });
 
   // A run nothing can be drawn into used to fall through to a third rendering

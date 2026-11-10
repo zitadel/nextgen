@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import * as prompts from "@clack/prompts";
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
@@ -16,7 +17,13 @@ import {
   runCliForTest,
   stripAnsi,
 } from "@tests/helpers/run-cli";
-import { asOneLine, asTerminalTyping } from "@tests/helpers/terminal";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+
+const personAnswering = (...answers: unknown[]) =>
+  answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
 
 const SERVER = "https://api.zitadel.example";
 
@@ -742,60 +749,65 @@ describe("env add asked on a terminal", () => {
     );
   }
 
-  /** The offer to deploy, as a person reads it with the answer typed after it. */
-  const OFFER = "Would you like to deploy .zitadel/ to it now? [Y/n] ";
+  const OFFER = "Would you like to deploy .zitadel/ to it now?";
 
-  /** Adds `staging` with a person at the terminal typing `answers`. */
-  const adding = async (cwd: string, answers: readonly string[], ...extra: string[]) => {
-    const { result, shown } = await asTerminalTyping(answers, () =>
-      EnvAdd.run([
-        "staging",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--app-url",
-        "https://app.acme.com",
-        ...extra,
-      ]),
-    );
-    return { envelope: result, shown: stripAnsi(shown) };
+  /** Adds `staging` with a person at the terminal giving `answers`. */
+  const adding = async (cwd: string, answers: readonly unknown[], ...extra: string[]) => {
+    const talk = personAnswering(...answers);
+    const written: string[] = [];
+    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    try {
+      const result = await asTerminal(() =>
+        EnvAdd.run([
+          "staging",
+          "--cwd",
+          cwd,
+          "--server",
+          SERVER,
+          "--app-url",
+          "https://app.acme.com",
+          ...extra,
+        ]),
+      );
+      return { envelope: result, shown: stripAnsi(written.join("")), asked: talk.asked() };
+    } finally {
+      capture.mockRestore();
+    }
   };
 
   it("deploys the project when the offer is accepted", async ({ server }) => {
     const cwd = await makeDeployableProject();
     platformDeploys(server);
 
-    const { envelope, shown } = await adding(cwd, ["y"]);
+    const { envelope, asked } = await adding(cwd, [true]);
 
     expect((envelope as { data: { deployment: unknown } }).data.deployment).toMatchObject({
       release_id: "rel_1",
       deployment_id: "dep_1",
       origins: ["https://app.acme.com"],
     });
-    expect(shown).toContain(OFFER);
+    expect(asked).toContain(OFFER);
   });
 
   it("asks where the server and the app are, as questions", async () => {
     const cwd = await makeDeployableProject();
+    const talk = personAnswering(SERVER, "");
 
-    const { shown } = await asTerminalTyping([SERVER, ""], () =>
-      EnvAdd.run(["staging", "--cwd", cwd]),
-    );
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd]));
 
-    const text = stripAnsi(shown);
-    const server = text.indexOf("What is the URL of your Zitadel server?");
-    const app = text.indexOf(
+    expect(talk.asked()).toEqual([
+      "What is the URL of your Zitadel server?",
       "What URL is your app served from? You can leave this empty to skip it.",
-    );
-    expect(server).toBeGreaterThanOrEqual(0);
-    expect(app).toBeGreaterThan(server);
+    ]);
   });
 
   it("deploys nothing when the offer is declined", async () => {
     const cwd = await makeDeployableProject();
 
-    const { envelope } = await adding(cwd, ["n"]);
+    const { envelope } = await adding(cwd, [false]);
 
     expect((envelope as { data: { deployment: unknown } }).data.deployment).toBeNull();
   });
@@ -803,7 +815,7 @@ describe("env add asked on a terminal", () => {
   it("still names the deploy after the offer is declined", async () => {
     const cwd = await makeDeployableProject();
 
-    const { envelope } = await adding(cwd, ["n"]);
+    const { envelope } = await adding(cwd, [false]);
 
     expect(
       (envelope as { data: { next_commands: string[] } }).data.next_commands.some((command) =>
@@ -816,7 +828,7 @@ describe("env add asked on a terminal", () => {
     const cwd = await makeDeployableProject();
     platformRefusesTheRelease(server);
 
-    const { envelope } = await adding(cwd, ["y"]);
+    const { envelope } = await adding(cwd, [true]);
 
     expect((envelope as { status: string }).status).toBe("ok");
     expect((envelope as { data: { deployment: unknown } }).data.deployment).toBeNull();
@@ -826,7 +838,7 @@ describe("env add asked on a terminal", () => {
     const cwd = await makeDeployableProject();
     platformRefusesTheRelease(server);
 
-    const { envelope } = await adding(cwd, ["y"]);
+    const { envelope } = await adding(cwd, [true]);
 
     expect((envelope as { warnings: string[] }).warnings.join("\n")).toContain("deploy -m");
   });
@@ -834,25 +846,25 @@ describe("env add asked on a terminal", () => {
   it("never asks for a project it only bound", async () => {
     const cwd = await makeDeployableProject();
 
-    const { shown } = await adding(cwd, [], "--project", "proj_existing");
+    const { asked } = await adding(cwd, [], "--project", "proj_existing");
 
-    expect(shown).not.toContain(OFFER);
+    expect(asked).not.toContain(OFFER);
   });
 
   it("never asks when the environment has no origin for a deploy to land on", async () => {
     const cwd = await makeDeployableProject();
 
-    const { shown } = await asTerminalTyping([""], () =>
-      EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]),
-    );
+    const talk = personAnswering("");
 
-    expect(stripAnsi(shown)).not.toContain(OFFER);
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]));
+
+    expect(talk.asked()).not.toContain(OFFER);
   });
 
   it("ends on one footer saying which project it created, and on which server", async () => {
     const cwd = await makeDeployableProject();
 
-    const { shown } = await adding(cwd, ["n"]);
+    const { shown } = await adding(cwd, [false]);
 
     const footer = shown.trimEnd().split("\n").at(-1);
     expect(footer).toContain("Added the staging environment");

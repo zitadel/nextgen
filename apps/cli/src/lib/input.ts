@@ -1,6 +1,3 @@
-import { createInterface } from "node:readline/promises";
-import { Writable } from "node:stream";
-
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 
 import type { Parsed } from "@zitadel/config/idp";
@@ -57,8 +54,12 @@ export type Session = {
   force: boolean;
   /** The stream piped input is read from. Defaults to the process's stdin. */
   stdin?: NodeJS.ReadableStream & { isTTY?: boolean };
-  /** The stream a plainly asked question is written to. Defaults to the process's stdout. */
-  stdout?: NodeJS.WritableStream;
+  /**
+   * Whether a prompt is drawn with clack's guide, the gray `│` down its left
+   * side. A wizard's questions sit inside its chain and carry it; a normal
+   * command's are the same prompts with nothing beside them.
+   */
+  guide?: boolean;
   /** Called just before a prompt is drawn, so the caller can open the chain it belongs to. */
   before?: () => void;
   /** Called when a prompt has been answered, so the caller can space what follows it. */
@@ -90,11 +91,19 @@ interface Prompter {
 }
 
 /**
- * Clack's prompts, which a wizard draws inside its chain: the question against
- * a mark, the answer in the gutter under it, and `└  Cancelled.` when the
- * person walks away.
+ * Clack's prompts, the only ones the CLI draws. A wizard draws them inside its
+ * chain: the question against a mark, the answer in the guide under it, and
+ * `└  Cancelled.` when the person walks away. A normal command draws the same
+ * prompts without the guide and has no chain to close, so a cancel is left
+ * for the run to report as it reports any other.
  */
 class DrawnPrompter implements Prompter {
+  private readonly guide: boolean;
+
+  constructor(guide: boolean) {
+    this.guide = guide;
+  }
+
   async text(question: AnyQuestion, validate: Validate): Promise<string> {
     return this.answered(
       await text({
@@ -102,12 +111,15 @@ class DrawnPrompter implements Prompter {
         validate,
         initialValue: question.initialValue as string | undefined,
         placeholder: question.placeholder,
+        withGuide: this.guide,
       }),
     );
   }
 
   async secret(question: AnyQuestion, validate: Validate): Promise<string> {
-    return this.answered(await password({ message: question.message, validate }));
+    return this.answered(
+      await password({ message: question.message, validate, withGuide: this.guide }),
+    );
   }
 
   async select(question: AnyQuestion): Promise<unknown> {
@@ -116,6 +128,7 @@ class DrawnPrompter implements Prompter {
         message: question.message,
         options: question.options ?? [],
         initialValue: question.initialValue,
+        withGuide: this.guide,
       }),
     );
   }
@@ -126,6 +139,7 @@ class DrawnPrompter implements Prompter {
         message: question.message,
         options: question.options ?? [],
         required: question.required,
+        withGuide: this.guide,
       }),
     ) as unknown[];
   }
@@ -135,6 +149,7 @@ class DrawnPrompter implements Prompter {
       await confirm({
         message: question.message,
         initialValue: (question.initialValue as boolean | undefined) ?? false,
+        withGuide: this.guide,
       }),
     ) as boolean;
   }
@@ -142,6 +157,9 @@ class DrawnPrompter implements Prompter {
   /** A cancelled prompt closes the chain itself, which is all a person is shown. */
   private chosen<T>(answer: T | symbol): T {
     if (isCancel(answer)) {
+      if (!this.guide) {
+        throw new ZitadelError("E_CANCELLED", "Cancelled by user");
+      }
       cancel(CANCELLED);
       throw cancelledByUser();
     }
@@ -150,219 +168,6 @@ class DrawnPrompter implements Prompter {
 
   private answered(typed: string | symbol): string {
     return String(this.chosen(typed) ?? "");
-  }
-}
-
-/**
- * A question asked plainly, which is how a normal command asks: the question,
- * a space, and the answer typed on the same line. No frame, no gutter and no
- * mark — a normal command's output is its answer, and a question it happened
- * to ask must not turn that into a wizard.
- *
- * `node:readline` reads the line without taking the terminal over, so the tty
- * echoes what is typed and Ctrl-C is the interrupt it is everywhere else. A
- * choice is numbered, since a list that cannot be arrowed through has to be
- * one a person can name, and an answer that does not parse is said to be
- * wrong and asked for again, exactly as the drawn prompt refuses one.
- */
-class PlainPrompter implements Prompter {
-  private readonly session: Session;
-
-  constructor(session: Session) {
-    this.session = session;
-  }
-
-  async text(question: AnyQuestion, validate: Validate): Promise<string> {
-    const initial = question.initialValue as string | undefined;
-    const suffix = initial === undefined ? "" : ` [${initial}]`;
-    for (;;) {
-      const typed = await this.read(`${question.message}${suffix} `);
-      const answer = typed.trim() === "" && initial !== undefined ? initial : typed;
-      const problem = validate(answer);
-      if (problem === undefined) {
-        return answer;
-      }
-      this.say(problem);
-    }
-  }
-
-  async secret(question: AnyQuestion, validate: Validate): Promise<string> {
-    for (;;) {
-      const typed = await this.read(`${question.message} `, true);
-      const problem = validate(typed);
-      if (problem === undefined) {
-        return typed;
-      }
-      this.say(problem);
-    }
-  }
-
-  async select(question: AnyQuestion): Promise<unknown> {
-    const choices = this.list(question);
-    const initial = choices.findIndex((choice) => choice.value === question.initialValue);
-    const prompt = `[1-${choices.length}]${initial < 0 ? "" : ` (${initial + 1})`} `;
-    for (;;) {
-      const typed = (await this.read(prompt)).trim();
-      if (typed === "" && initial >= 0) {
-        return choices[initial]?.value;
-      }
-      const picked = this.pick(typed, choices.length);
-      if (picked !== undefined) {
-        return choices[picked]?.value;
-      }
-      this.say(`Please answer with a number between 1 and ${choices.length}.`);
-    }
-  }
-
-  async multiselect(question: AnyQuestion): Promise<unknown[]> {
-    const choices = this.list(question);
-    const prompt = `[1-${choices.length}, separated by commas] `;
-    for (;;) {
-      const typed = (await this.read(prompt)).trim();
-      if (typed === "") {
-        if (question.required === false) {
-          return [];
-        }
-        this.say("Please answer with at least one number.");
-        continue;
-      }
-      const picked = typed.split(",").map((part) => this.pick(part.trim(), choices.length));
-      if (picked.every((at) => at !== undefined)) {
-        // A number named twice is one choice, as it is in the drawn prompt.
-        return [...new Set(picked)].map((at) => choices[at]?.value);
-      }
-      this.say(`Please answer with numbers between 1 and ${choices.length}, separated by commas.`);
-    }
-  }
-
-  async confirm(question: AnyQuestion): Promise<boolean> {
-    const initial = question.initialValue === true;
-    for (;;) {
-      const typed = (await this.read(`${question.message} ${initial ? "[Y/n]" : "[y/N]"} `))
-        .trim()
-        .toLowerCase();
-      if (typed === "") {
-        return initial;
-      }
-      if (typed === "y" || typed === "yes") {
-        return true;
-      }
-      if (typed === "n" || typed === "no") {
-        return false;
-      }
-      this.say("Please answer yes or no.");
-    }
-  }
-
-  /**
-   * The choices a person can name, numbered from one in the order the question
-   * put them. A disabled one is shown with its hint, so a choice that exists
-   * but is not available yet still reads as a choice, and is left unnumbered
-   * so there is no number that answers it.
-   */
-  private list(question: AnyQuestion): Choice<unknown>[] {
-    const options = question.options ?? [];
-    const choosable = options.filter((option) => option.disabled !== true);
-    if (choosable.length === 0) {
-      // Nothing is numbered, so no answer can satisfy the prompt and asking
-      // would loop for ever. It is refused the way an unanswerable question
-      // is refused everywhere else, by the question's own name.
-      throw new ZitadelError("E_VALIDATION", `No ${question.name} to choose from`, {
-        hint: "Every option is unavailable.",
-      });
-    }
-    this.say(question.message);
-    for (const option of options) {
-      const at = choosable.indexOf(option);
-      const hint = option.hint === undefined ? "" : ` — ${option.hint}`;
-      this.say(`  ${at < 0 ? "-" : at + 1})  ${option.label}${hint}`);
-    }
-    return choosable;
-  }
-
-  /** The option `typed` names, as an index, or nothing when it names none. */
-  private pick(typed: string, count: number): number | undefined {
-    const at = /^\d+$/.test(typed) ? Number(typed) - 1 : -1;
-    return at >= 0 && at < count ? at : undefined;
-  }
-
-  /** One line of our own: the question's own listing, or why an answer was refused. */
-  private say(text_: string): void {
-    (this.session.stdout ?? process.stdout).write(`${text_}\n`);
-  }
-
-  /**
-   * Writes `query` and gives back the line that was typed after it.
-   *
-   * Nothing is masked unless it has to be: the terminal is left in its own
-   * mode, so it echoes the answer beside the question and a Ctrl-C is the
-   * interrupt it would be at a shell prompt. A secret cannot be echoed, so
-   * that one line is read with the terminal taken over and everything after
-   * the question swallowed. Either way, an input that ends without an answer
-   * is the person walking away, not an empty answer.
-   *
-   * Both ways of ending the question therefore have to close the interface,
-   * and they come from different places. Readline raises `SIGINT` itself only
-   * when it holds the terminal, which is the masked question alone; an
-   * unmasked one leaves the signal with the process, so the question listens
-   * for it there. Without that the Ctrl-C settled nothing: the question went
-   * on waiting, the interrupt's grace lapsed a second later and the run was
-   * killed where it stood, with no word for the person and no `finally` for
-   * the command.
-   */
-  private async read(query: string, masked = false): Promise<string> {
-    const input = this.session.stdin ?? process.stdin;
-    const out = this.session.stdout ?? process.stdout;
-    const rl = createInterface({
-      input,
-      output: masked ? new Swallowing(out, query) : out,
-      terminal: masked,
-    });
-    const stop = (): void => rl.close();
-    rl.on("SIGINT", stop);
-    if (!masked) {
-      process.on("SIGINT", stop);
-    }
-    try {
-      return await new Promise<string>((resolve, reject) => {
-        rl.once("close", () => reject(cancelledByUser()));
-        rl.question(query).then(resolve, reject);
-      });
-    } finally {
-      process.off("SIGINT", stop);
-      rl.close();
-      if (masked) {
-        out.write("\n");
-      }
-    }
-  }
-}
-
-/**
- * The output of a masked question: the question goes through once, and every
- * keystroke the line editor would echo after it goes nowhere.
- *
- * Exported for its own test: what it does cannot be seen from outside, since
- * a line editor fed programmatically echoes nothing to begin with, so a test
- * driving a whole question could not tell masking from its absence.
- */
-export class Swallowing extends Writable {
-  private readonly target: NodeJS.WritableStream;
-  private readonly query: string;
-  private asked = false;
-
-  constructor(target: NodeJS.WritableStream, query: string) {
-    super();
-    this.target = target;
-    this.query = query;
-  }
-
-  override _write(_chunk: unknown, _encoding: unknown, done: (error?: Error | null) => void): void {
-    if (!this.asked) {
-      this.asked = true;
-      this.target.write(this.query);
-    }
-    done();
   }
 }
 
@@ -381,7 +186,8 @@ export class Swallowing extends Writable {
  *    parse is a script that piped nothing, and counts as no pipe.
  * 3. **A prompt**, only when the session is `interactive`. Which prompt is
  *    the command's presentation, not the question's: a wizard's is drawn in
- *    its chain and a normal command's is one plain line ({@link Prompter}).
+ *    its chain, with the guide beside it, and a normal command's is the same
+ *    prompt without ({@link Prompter}).
  * 4. **Otherwise an `E_VALIDATION` error**: "No <name> supplied", with a hint
  *    built from the question's `flag`, whether stdin is accepted and, as an
  *    example, its `retry`; and `retry` as `nextCommands` for an agent to run.
@@ -586,16 +392,5 @@ class SessionQuestions implements Questions, Confirmer {
  * });
  */
 export function asker(session: Session): Questions & Confirmer {
-  return new SessionQuestions(session, new DrawnPrompter());
-}
-
-/**
- * The same questions as a normal command asks them: one plain line with
- * the answer typed on it. Everything but the prompt itself is the same rule —
- * a flag answers first, then a pipe, then the person, and a run with nobody to
- * ask refuses by the question's own name — so a command's code is identical
- * whichever of the two it is handed.
- */
-export function plainAsker(session: Session): Questions & Confirmer {
-  return new SessionQuestions(session, new PlainPrompter(session));
+  return new SessionQuestions(session, new DrawnPrompter(session.guide ?? true));
 }

@@ -2,7 +2,8 @@ import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import * as prompts from "@clack/prompts";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
@@ -10,7 +11,10 @@ import BrandingEject from "@/commands/branding/eject";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asTerminal, asTerminalTyping } from "@tests/helpers/terminal";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asTerminal } from "@tests/helpers/terminal";
+
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 const tempDirs: string[] = [];
 
@@ -225,33 +229,43 @@ describe("branding eject", () => {
 describe("branding eject asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const ejecting = (cwd: string, ...answers: string[]) =>
-    asTerminalTyping(answers, () => BrandingEject.run(["--cwd", cwd]));
+  const ejecting = (cwd: string, ...answers: unknown[]) => {
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+    return {
+      talk,
+      done: asTerminal(() => BrandingEject.run(["--cwd", cwd])),
+    };
+  };
 
-  it("asks plainly, numbering the designs and taking the answer on the same line", async () => {
+  it("asks which design to start from, offering each design", async () => {
     const cwd = await makeProject();
 
-    const { shown } = await ejecting(cwd, "2");
+    const { talk, done } = ejecting(cwd, "minimal");
+    await done;
 
-    expect(shown).toMatch(
-      /^Which design would you like to start from\?\n {2}1\) {2}Default card.*\n {2}2\) {2}Minimal.*\n\[1-2\] \(1\) /,
+    expect(talk.asked()).toEqual(["Which design would you like to start from?"]);
+    expect(talk.options()[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: "centered" }),
+        expect.objectContaining({ value: "minimal" }),
+      ]),
     );
   });
 
   it("scaffolds the design that was chosen", async () => {
     const cwd = await makeProject();
 
-    await ejecting(cwd, "2");
+    await ejecting(cwd, "minimal").done;
 
     expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
       getDefaultBrandingConfig("minimal").template,
     );
   });
 
-  it("scaffolds the default design when the answer is empty", async () => {
+  it("scaffolds the default design when it is the one chosen", async () => {
     const cwd = await makeProject();
 
-    await ejecting(cwd, "");
+    await ejecting(cwd, "centered").done;
 
     expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
       getDefaultBrandingConfig("centered").template,
@@ -278,7 +292,7 @@ describe("branding eject asked on a terminal", () => {
   it("fails, scaffolding nothing, when the person walks away", async () => {
     const cwd = await makeProject();
 
-    await expect(ejecting(cwd)).rejects.toThrow();
+    await expect(ejecting(cwd).done).rejects.toThrow();
 
     await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
