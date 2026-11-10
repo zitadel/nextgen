@@ -273,6 +273,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	RollbackDeploymentOperation: []string{
 		"deployment.write",
 	},
+	SearchOperation: []string{
+		"user.read",
+		"team.read",
+	},
 	SetUserPasswordOperation: []string{
 		"user.write",
 	},
@@ -367,6 +371,7 @@ var operationRolesSessionCookie = map[string][]string{
 	RevokeMySessionOperation:       []string{},
 	RevokeReleaseOperation:         []string{},
 	RollbackDeploymentOperation:    []string{},
+	SearchOperation:                []string{},
 	UpdateTeamOperation:            []string{},
 }
 

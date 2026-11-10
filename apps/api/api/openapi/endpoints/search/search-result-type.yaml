@@ -1,0 +1,8 @@
+type: string
+description: |
+  A type of result `search` (`POST /search`) finds:
+  - `user`: a user, matched on the value they carry as `identifier`
+  - `team`: a team, matched on its name
+enum:
+  - user
+  - team

@@ -22,6 +22,7 @@
     "projects",
     "teams",
     "users",
+    "search",
     "grants",
     "events",
     "event-webhooks",

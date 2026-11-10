@@ -97,6 +97,7 @@ const (
 	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	RollbackDeploymentOperation            OperationName = "RollbackDeployment"
+	SearchOperation                        OperationName = "Search"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
 	UpdateTeamOperation                    OperationName = "UpdateTeam"
