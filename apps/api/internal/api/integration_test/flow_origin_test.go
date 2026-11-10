@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -7,13 +7,18 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/api/client"
+	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -35,6 +40,7 @@ func TestFlowOrigins(t *testing.T) {
 	project, ok := created.(*api.CreateProjectResponse)
 	require.True(t, ok, helpers.MustMarshal(t, created))
 	harness.CleanupProject(t, project.ID)
+	deployPrimary(t, string(project.ID))
 
 	t.Run("an origin the project does not list cannot open a flow", func(t *testing.T) {
 		resp, body := openFlow(t, project.ID, "https://evil.example.test")
@@ -66,6 +72,114 @@ func TestFlowOrigins(t *testing.T) {
 	})
 }
 
+// TestNoOriginServesNewestPrimaryDeployment serves a caller with no Origin, and
+// one from a console origin the project does not list, from the newest primary
+// deployment.
+func TestNoOriginServesNewestPrimaryDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	assertFlowCode(t, fixture.project, "", domain.ErrReleaseNoDefault().Code)
+	assertFlowCode(t, fixture.project, helpers.ConsoleOrigin, domain.ErrReleaseNoDefault().Code)
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  fixture.project,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "no-default@example.com"),
+	})
+	require.NoError(t, err)
+	password, err := fixture.client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "a-long-enough-password"}, api.SetUserPasswordParams{UserID: api.UserID(user.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.SetUserPasswordErrorResponseStatusCode{}, password, helpers.MustMarshal(t, password))
+	assert.Equal(t, http.StatusConflict, password.(*api.SetUserPasswordErrorResponseStatusCode).StatusCode)
+	attempt, err := fixture.client.CreateAuthAttempt(t.Context(), &api.CreateAuthAttemptRequest{ProjectID: api.ProjectID(fixture.project)})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateAuthAttemptErrorResponseStatusCode{}, attempt, helpers.MustMarshal(t, attempt))
+	assert.Equal(t, http.StatusConflict, attempt.(*api.CreateAuthAttemptErrorResponseStatusCode).StatusCode)
+
+	listResp, err := fixture.client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+		ProjectID: api.ProjectID(fixture.project),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, listResp, helpers.MustMarshal(t, listResp))
+	pointers := fixture.pointers()
+	pinned := map[string]bool{fixture.flowdefID: true}
+	for _, definition := range listResp.(*api.FlowDefinitionListResponse).FlowDefinitions {
+		if pinned[definition.ID] {
+			continue
+		}
+		pointers = append(pointers, api.CreateReleasePointer{
+			Kind:       api.ReleasePointerKindFlowDefinition,
+			RevisionID: definition.ID,
+		})
+		pinned[definition.ID] = true
+	}
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: pointers})
+	deployed := fixture.deploy(t, releaseID(t, created))
+	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+	assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(deployed.(*api.CreateDeploymentCreated).Targets))
+
+	for _, origin := range []string{"", helpers.ConsoleOrigin, appOrigin} {
+		resp, body := openFlow(t, fixture.project, origin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
+	}
+}
+
+// TestDeploymentFreezesOrigins serves a primary origin only while the newest
+// primary deployment names it and the project lists it. An origin added since
+// waits for a deploy, one removed stops at once, and once a deploy has left it
+// out it stays out when it comes back.
+func TestDeploymentFreezesOrigins(t *testing.T) {
+	t.Parallel()
+
+	const added = "https://added.acme.com"
+	assertOpens := func(t *testing.T, projectID, origin string) {
+		t.Helper()
+		resp, body := openFlow(t, projectID, origin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
+	}
+	fixture := newDeploymentFixture(t)
+	deployPrimary(t, fixture.project)
+	assertOpens(t, fixture.project, appOrigin)
+
+	fixture.addOrigin(t, domain.Origin{Pattern: added, Kind: domain.OriginKindPrimary})
+	assertFlowCode(t, fixture.project, added, domain.ErrReleaseNotDeployed(nil).Code)
+	deployPrimary(t, fixture.project)
+	assertOpens(t, fixture.project, added)
+
+	require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, appOrigin))
+	resp, body := openFlow(t, fixture.project, appOrigin)
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode, string(body))
+	assert.Equal(t, domain.ErrProjectOriginNotAllowed(nil).Code, errorCode(body))
+
+	deployPrimary(t, fixture.project)
+	fixture.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+}
+
+// releaseID is the id of a created release. The same pointer set answers 200
+// with the release that already pins it.
+func releaseID(t *testing.T, resp api.CreateReleaseRes) api.ReleaseID {
+	t.Helper()
+	switch created := resp.(type) {
+	case *api.CreateReleaseCreated:
+		return created.ID
+	case *api.CreateReleaseOK:
+		return created.ID
+	default:
+		require.FailNow(t, "create release refused", helpers.MustMarshal(t, resp))
+		return ""
+	}
+}
+
+func assertFlowCode(t *testing.T, projectID, origin, code string) {
+	t.Helper()
+	resp, body := openFlow(t, projectID, origin)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode, "Origin %q: %s", origin, body)
+	assert.Equal(t, code, errorCode(body), "Origin %q: %s", origin, body)
+}
+
 // TestFlowSubmitFromLivePreview pins that submit admits a live preview Origin
 // through Gate (not primary-only validation). Primary-only would answer
 // req.invalid for a preview URL; Gate reaches the step when a preview row is live.
@@ -87,6 +201,57 @@ func TestFlowSubmitFromLivePreview(t *testing.T) {
 	assert.Less(t, resp.StatusCode, http.StatusBadRequest, "Origin %s: %s", previewOrigin, body)
 	var answered api.FlowResponse
 	require.NoError(t, answered.UnmarshalJSON(body), string(body))
+}
+
+// TestOriginlessFlowContinues opens a flow with no Origin, as a native app or a
+// backend does, and submits its first step on a server reached at a host the
+// project does not list. The harness's server leaves out the production
+// request-host middleware the host fallback comes from, so this one runs
+// behind it.
+func TestOriginlessFlowContinues(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	internalapi.MountAPI(mux, internalapi.WithRequestHostMiddleware, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	base := server.URL + client.PathPrefix
+	const host = "auth.acme.test"
+	fixture := newDeploymentFixture(t)
+	deployPrimary(t, fixture.project)
+
+	body, err := json.Marshal(map[string]string{"project_id": fixture.project, "purpose": "login"})
+	require.NoError(t, err)
+	resp, body := postFlowAtHost(t, base+"/flow", body, host, nil)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
+	var opened api.FlowResponse
+	require.NoError(t, opened.UnmarshalJSON(body), string(body))
+
+	body, err = json.Marshal(map[string]any{
+		"action": "submit",
+		"fields": map[string]string{"email": "nobody@example.test"},
+	})
+	require.NoError(t, err)
+	resp, body = postFlowAtHost(t, base+"/flow/"+opened.ID+"/submit", body, host, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
+	assert.Less(t, resp.StatusCode, http.StatusBadRequest, string(body))
+}
+
+// postFlowAtHost posts to url with no Origin, as a request to host.
+func postFlowAtHost(t *testing.T, url string, body []byte, host string, cookie *http.Cookie) (*http.Response, []byte) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Host = host
+	req.Header.Set("Content-Type", "application/json")
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp, respBody
 }
 
 // openFlow starts a login flow the way a browser on origin does. Sent raw:

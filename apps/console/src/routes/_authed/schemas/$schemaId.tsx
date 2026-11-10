@@ -5,7 +5,7 @@ import { api } from "@/api/zitadel";
 import { DETAIL_BODY, DetailSection, DetailTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
+import { SchemaFieldsPanel } from "@/features/schemas/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
 import {
@@ -13,20 +13,19 @@ import {
   REVISION_TRIGGER,
   RevisionItems,
   RevisionValue,
-} from "@/components/revision-select";
+} from "@/features/schemas/components/revision-select";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { field } from "@/lib/record";
+import { fetchLatestSchemaId, fetchSchemaRevisions } from "@/features/schemas/api";
 import {
   type SchemaRevision,
   type UserSchema,
-  fetchLatestSchemaId,
-  fetchSchemaRevisions,
   schemaAuthMethods,
   schemaDisplayName,
-} from "@/lib/schema";
+} from "@/features/schemas/model";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   staticData: { scope: "project", resource: "user schema" },

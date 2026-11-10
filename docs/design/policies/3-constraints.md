@@ -102,8 +102,7 @@ Four properties of that endpoint are load-bearing:
   bug, not an unconfigured project.
 - It is cacheable on the release. Constraints change only when a release
   is deployed, so the response carries its `release` id and that id is the
-  `ETag`. This waits for release-pinned resolution; today the newest stored
-  revision applies.
+  `ETag`.
 - It is scoped like any other public read, resolving the project the same
   way the rest of the unauthenticated surface does, and reading from that
   environment's active release.

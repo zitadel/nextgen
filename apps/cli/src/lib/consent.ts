@@ -12,6 +12,7 @@ export type Verb =
   | "call"
   | "deactivate"
   | "delete"
+  | "deploy"
   | "disable"
   | "eject"
   | "remove"
@@ -41,6 +42,7 @@ export type Gate = Readonly<{
   /**
    * Refuses in place of the default "Cannot … without --force" when nobody
    * can be asked and `--force` was not given, for a refusal that says more.
+   * It throws an `E_CONFIRMATION_REQUIRED` too, or {@link isRefusal} misses it.
    */
   refuse?: () => never;
 }>;
@@ -83,7 +85,8 @@ export class Consent {
 
   /**
    * Ask for consent. `--force` gives it without asking; with nobody to ask
-   * and no `--force` the gate refuses (an `E_VALIDATION` naming `--force`);
+   * and no `--force` the gate refuses (an `E_CONFIRMATION_REQUIRED` naming
+   * `--force`, which only a person may agree to);
    * otherwise the person is asked, and `undefined` is their no. Ctrl-C
    * throws `E_CANCELLED`, as every prompt does.
    *
@@ -111,7 +114,7 @@ export class Consent {
       granted.add(consent);
       return consent;
     } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_VALIDATION") {
+      if (error instanceof ZitadelError && error.code === "E_CONFIRMATION_REQUIRED") {
         refusals.add(error);
       }
       throw error;

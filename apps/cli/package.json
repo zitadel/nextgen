@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -184,6 +184,7 @@
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
+    "memfs": "catalog:",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",

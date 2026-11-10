@@ -608,6 +608,384 @@ func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseD
 	return m
 }
 
+// An application that authenticates its users via Zitadel, with its OAuth
+// clients. The document is the `application` field of the `createApplication`
+// (`POST /applications`) body.
+// Ref: #
+type Application struct {
+	// Editor affordance: path or URL of this schema so editors validate and autocomplete the file.
+	// Ignored by the platform.
+	Schema OptString `json:"$schema"`
+	// Stable identifier of the application, unique within the project and
+	// fixed for its life. Flows and other documents reference it.
+	Slug string `json:"slug"`
+	// The application's name, shown to the user when consent is asked.
+	Name string `json:"name"`
+	// The application's OAuth clients. Each slug is unique within the application.
+	Clients []ApplicationClient `json:"clients"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *Application) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetSlug returns the value of Slug.
+func (s *Application) GetSlug() string {
+	return s.Slug
+}
+
+// GetName returns the value of Name.
+func (s *Application) GetName() string {
+	return s.Name
+}
+
+// GetClients returns the value of Clients.
+func (s *Application) GetClients() []ApplicationClient {
+	return s.Clients
+}
+
+// SetSchema sets the value of Schema.
+func (s *Application) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *Application) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetName sets the value of Name.
+func (s *Application) SetName(val string) {
+	s.Name = val
+}
+
+// SetClients sets the value of Clients.
+func (s *Application) SetClients(val []ApplicationClient) {
+	s.Clients = val
+}
+
+// One OAuth client of the application: one way it talks to Zitadel, such as
+// its web backend. Its `redirect_uris` and `grant_types` are its OAuth
+// settings. OpenID Connect is OAuth plus the `openid` scope, so one shape
+// serves both.
+// Ref: #
+type ApplicationClient struct {
+	// Stable identifier of the client, unique among the application's clients
+	// and fixed for the client's life. A revision matches each client to the
+	// stored one by its slug, which is how a client keeps its `client_id`.
+	// Other documents refer to it as `<application>/<client>`.
+	Slug string `json:"slug"`
+	// Shown to the user in place of the application's name. Optional.
+	Name OptString `json:"name"`
+	// The `client_id` the client presents. Leave it out and the server
+	// generates one the first time the client is written and fills it into
+	// the stored document. Set it to keep an id the client already has: one
+	// a Zitadel v4 issued (`<id>@<project>`), or one the CLI generated before
+	// any deploy. Once set, the id never changes: a later revision may leave it
+	// out, but may not provide a different one. No two clients in the project
+	// share an id, and an id is never reused once a client has held it. A
+	// new client may not supply an id that starts with `client_` or `dcr_`:
+	// those prefixes mark ids the server generates. A server-generated id
+	// sent back unchanged in a revision is accepted.
+	ClientID OptString `json:"client_id"`
+	// A `confidential` client runs where a secret can be kept, such as a web
+	// app's backend, and authenticates with one at the token endpoint. Public
+	// clients, which hold no secret, are not available yet.
+	Type ApplicationClientType `json:"type"`
+	// The grant types the client may use, named as in RFC 7591.
+	// `authorization_code` signs a user in and needs `redirect_uris`.
+	// `refresh_token` lets the client renew its access tokens without a new
+	// sign-in; a refresh token is issued on sign-in, so it is only valid
+	// together with `authorization_code`.
+	GrantTypes []ApplicationClientGrantTypesItem `json:"grant_types"`
+	// Where the authorization endpoint may send the user back. Required with
+	// `authorization_code`; omit it otherwise, an empty list is refused. Each
+	// is an `https` URL, or an `http` URL on a loopback host for local
+	// development: `localhost`, a name under `.localhost`, or a loopback IP
+	// such as `127.0.0.1` or `[::1]`. A URI is written as the client will
+	// send it, with a lowercase host and no fragment, since it is matched
+	// exactly; a loopback URI matches on any port (RFC 8252 §7.3).
+	RedirectUris []string `json:"redirect_uris"`
+	// A first-party client belongs to the project's own product and skips
+	// consent unless the request asks for it. An application registered
+	// through the API is third-party unless this says otherwise.
+	FirstParty OptBool `json:"first_party"`
+}
+
+// GetSlug returns the value of Slug.
+func (s *ApplicationClient) GetSlug() string {
+	return s.Slug
+}
+
+// GetName returns the value of Name.
+func (s *ApplicationClient) GetName() OptString {
+	return s.Name
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationClient) GetClientID() OptString {
+	return s.ClientID
+}
+
+// GetType returns the value of Type.
+func (s *ApplicationClient) GetType() ApplicationClientType {
+	return s.Type
+}
+
+// GetGrantTypes returns the value of GrantTypes.
+func (s *ApplicationClient) GetGrantTypes() []ApplicationClientGrantTypesItem {
+	return s.GrantTypes
+}
+
+// GetRedirectUris returns the value of RedirectUris.
+func (s *ApplicationClient) GetRedirectUris() []string {
+	return s.RedirectUris
+}
+
+// GetFirstParty returns the value of FirstParty.
+func (s *ApplicationClient) GetFirstParty() OptBool {
+	return s.FirstParty
+}
+
+// SetSlug sets the value of Slug.
+func (s *ApplicationClient) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetName sets the value of Name.
+func (s *ApplicationClient) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationClient) SetClientID(val OptString) {
+	s.ClientID = val
+}
+
+// SetType sets the value of Type.
+func (s *ApplicationClient) SetType(val ApplicationClientType) {
+	s.Type = val
+}
+
+// SetGrantTypes sets the value of GrantTypes.
+func (s *ApplicationClient) SetGrantTypes(val []ApplicationClientGrantTypesItem) {
+	s.GrantTypes = val
+}
+
+// SetRedirectUris sets the value of RedirectUris.
+func (s *ApplicationClient) SetRedirectUris(val []string) {
+	s.RedirectUris = val
+}
+
+// SetFirstParty sets the value of FirstParty.
+func (s *ApplicationClient) SetFirstParty(val OptBool) {
+	s.FirstParty = val
+}
+
+type ApplicationClientGrantTypesItem string
+
+const (
+	ApplicationClientGrantTypesItemAuthorizationCode ApplicationClientGrantTypesItem = "authorization_code"
+	ApplicationClientGrantTypesItemRefreshToken      ApplicationClientGrantTypesItem = "refresh_token"
+)
+
+// AllValues returns all ApplicationClientGrantTypesItem values.
+func (ApplicationClientGrantTypesItem) AllValues() []ApplicationClientGrantTypesItem {
+	return []ApplicationClientGrantTypesItem{
+		ApplicationClientGrantTypesItemAuthorizationCode,
+		ApplicationClientGrantTypesItemRefreshToken,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientGrantTypesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientGrantTypesItemAuthorizationCode:
+		return []byte(s), nil
+	case ApplicationClientGrantTypesItemRefreshToken:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientGrantTypesItem) UnmarshalText(data []byte) error {
+	switch ApplicationClientGrantTypesItem(data) {
+	case ApplicationClientGrantTypesItemAuthorizationCode:
+		*s = ApplicationClientGrantTypesItemAuthorizationCode
+		return nil
+	case ApplicationClientGrantTypesItemRefreshToken:
+		*s = ApplicationClientGrantTypesItemRefreshToken
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A client secret the server generated, returned once.
+// Ref: #
+type ApplicationClientSecret struct {
+	// The slug of the client the secret belongs to.
+	Client string `json:"client"`
+	// The `client_id` the client presents together with the secret.
+	ClientID string `json:"client_id"`
+	// The secret, shown only in this response. Save it securely: the server cannot return it again.
+	Secret string `json:"secret"`
+}
+
+// GetClient returns the value of Client.
+func (s *ApplicationClientSecret) GetClient() string {
+	return s.Client
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationClientSecret) GetClientID() string {
+	return s.ClientID
+}
+
+// GetSecret returns the value of Secret.
+func (s *ApplicationClientSecret) GetSecret() string {
+	return s.Secret
+}
+
+// SetClient sets the value of Client.
+func (s *ApplicationClientSecret) SetClient(val string) {
+	s.Client = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationClientSecret) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *ApplicationClientSecret) SetSecret(val string) {
+	s.Secret = val
+}
+
+// A `confidential` client runs where a secret can be kept, such as a web
+// app's backend, and authenticates with one at the token endpoint. Public
+// clients, which hold no secret, are not available yet.
+type ApplicationClientType string
+
+const (
+	ApplicationClientTypeConfidential ApplicationClientType = "confidential"
+)
+
+// AllValues returns all ApplicationClientType values.
+func (ApplicationClientType) AllValues() []ApplicationClientType {
+	return []ApplicationClientType{
+		ApplicationClientTypeConfidential,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientTypeConfidential:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientType) UnmarshalText(data []byte) error {
+	switch ApplicationClientType(data) {
+	case ApplicationClientTypeConfidential:
+		*s = ApplicationClientTypeConfidential
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An application at its newest revision, with its document as `definition`.
+// It never carries a client secret.
+// Ref: #
+type ApplicationResponse struct {
+	// A unique ID, generated when the application is created and shared by
+	// every revision.
+	ID string `json:"id"`
+	// The ID of the revision this entry holds. `getApplicationById`
+	// (`GET /applications/{id}`) returns the newest one.
+	RevisionID string `json:"revision_id"`
+	// The identifier by which other documents reference the application.
+	// Fixed for the life of the application.
+	Slug string `json:"slug"`
+	// When the application was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was created. On the newest revision, that is when
+	// the application was last revised.
+	UpdatedAt time.Time `json:"updated_at"`
+	// The stored application document, with each client's `client_id`.
+	Definition Application `json:"definition"`
+}
+
+// GetID returns the value of ID.
+func (s *ApplicationResponse) GetID() string {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *ApplicationResponse) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetSlug returns the value of Slug.
+func (s *ApplicationResponse) GetSlug() string {
+	return s.Slug
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *ApplicationResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetDefinition returns the value of Definition.
+func (s *ApplicationResponse) GetDefinition() Application {
+	return s.Definition
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *ApplicationResponse) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *ApplicationResponse) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *ApplicationResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetDefinition sets the value of Definition.
+func (s *ApplicationResponse) SetDefinition(val Application) {
+	s.Definition = val
+}
+
+func (*ApplicationResponse) getApplicationByIdRes() {}
+
 // Merged schema.
 // Ref: #
 type AttAlreadyHandedOff struct {
@@ -7929,7 +8307,7 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // template. It has one shape in two places: the request body of
 // `createBranding` (`POST /branding`), which publishes it as a new immutable
 // revision, and a read-only copy on flow responses, which carries the
-// project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+// revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
 // that `zitadel deploy` publishes.
 // Every field is optional. An omitted key uses Zitadel's default, so a
 // revision carrying one color is as valid as one carrying the whole object.
@@ -12146,19 +12524,350 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	return s
 }
 
+type CreateApplicationBadRequest ErrorDetails
+
+func (*CreateApplicationBadRequest) createApplicationRes() {}
+
+type CreateApplicationConflict ErrorDetails
+
+func (*CreateApplicationConflict) createApplicationRes() {}
+
+type CreateApplicationCreated CreateApplicationResponse
+
+func (*CreateApplicationCreated) createApplicationRes() {}
+
+// CreateApplicationErrorResponse represents sum type.
+type CreateApplicationErrorResponse struct {
+	Type             CreateApplicationErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// CreateApplicationErrorResponseType is oneOf type of CreateApplicationErrorResponse.
+type CreateApplicationErrorResponseType string
+
+// Possible values for CreateApplicationErrorResponseType.
+const (
+	AuthUnauthorizedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "auth.unauthorized"
+	InternalCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "internal"
+	NotImplementedCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "not_implemented"
+	ReqInvalidCreateApplicationErrorResponse       CreateApplicationErrorResponseType = "req.invalid"
+	UnavailableCreateApplicationErrorResponse      CreateApplicationErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether CreateApplicationErrorResponse is AuthUnauthorized.
+func (s CreateApplicationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateApplicationErrorResponse
+}
+
+// IsInternal reports whether CreateApplicationErrorResponse is Internal.
+func (s CreateApplicationErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateApplicationErrorResponse
+}
+
+// IsNotImplemented reports whether CreateApplicationErrorResponse is NotImplemented.
+func (s CreateApplicationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateApplicationErrorResponse
+}
+
+// IsReqInvalid reports whether CreateApplicationErrorResponse is ReqInvalid.
+func (s CreateApplicationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateApplicationErrorResponse
+}
+
+// IsUnavailable reports whether CreateApplicationErrorResponse is Unavailable.
+func (s CreateApplicationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateApplicationErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateApplicationErrorResponse to AuthUnauthorized.
+func (s *CreateApplicationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateApplicationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateApplicationErrorResponse is AuthUnauthorized.
+func (s CreateApplicationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateApplicationErrorResponse(v AuthUnauthorized) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateApplicationErrorResponse to Internal.
+func (s *CreateApplicationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateApplicationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateApplicationErrorResponse is Internal.
+func (s CreateApplicationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from Internal.
+func NewInternalCreateApplicationErrorResponse(v Internal) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CreateApplicationErrorResponse to NotImplemented.
+func (s *CreateApplicationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateApplicationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateApplicationErrorResponse is NotImplemented.
+func (s CreateApplicationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from NotImplemented.
+func NewNotImplementedCreateApplicationErrorResponse(v NotImplemented) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets CreateApplicationErrorResponse to ReqInvalid.
+func (s *CreateApplicationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateApplicationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateApplicationErrorResponse is ReqInvalid.
+func (s CreateApplicationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ReqInvalid.
+func NewReqInvalidCreateApplicationErrorResponse(v ReqInvalid) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateApplicationErrorResponse to Unavailable.
+func (s *CreateApplicationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateApplicationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateApplicationErrorResponse is Unavailable.
+func (s CreateApplicationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from Unavailable.
+func NewUnavailableCreateApplicationErrorResponse(v Unavailable) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// CreateApplicationErrorResponseStatusCode wraps CreateApplicationErrorResponse with StatusCode.
+type CreateApplicationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateApplicationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateApplicationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateApplicationErrorResponseStatusCode) GetResponse() CreateApplicationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateApplicationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateApplicationErrorResponseStatusCode) SetResponse(val CreateApplicationErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateApplicationErrorResponseStatusCode) createApplicationRes() {}
+
+type CreateApplicationForbidden ErrorDetails
+
+func (*CreateApplicationForbidden) createApplicationRes() {}
+
+type CreateApplicationNotFound ErrorDetails
+
+func (*CreateApplicationNotFound) createApplicationRes() {}
+
+type CreateApplicationOK CreateApplicationResponse
+
+func (*CreateApplicationOK) createApplicationRes() {}
+
+// The request body for creating or revising a registered application.
+// Ref: #
+type CreateApplicationRequest struct {
+	// The application document. If its slug does not already exist in the
+	// project, a new application is created. If one with that
+	// slug already exists, this becomes a new revision of it. The document is
+	// validated against the `application.json` schema, and returned as the
+	// `definition` in the response with each client's `client_id` filled in.
+	Application Application `json:"application"`
+}
+
+// GetApplication returns the value of Application.
+func (s *CreateApplicationRequest) GetApplication() Application {
+	return s.Application
+}
+
+// SetApplication sets the value of Application.
+func (s *CreateApplicationRequest) SetApplication(val Application) {
+	s.Application = val
+}
+
+// Merged schema.
+// Ref: #
+type CreateApplicationResponse struct {
+	// A unique ID, generated when the application is created and shared by
+	// every revision.
+	ID string `json:"id"`
+	// The ID of the revision this entry holds. `getApplicationById`
+	// (`GET /applications/{id}`) returns the newest one.
+	RevisionID string `json:"revision_id"`
+	// The identifier by which other documents reference the application.
+	// Fixed for the life of the application.
+	Slug string `json:"slug"`
+	// When the application was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was created. On the newest revision, that is when
+	// the application was last revised.
+	UpdatedAt time.Time `json:"updated_at"`
+	// The stored application document, with each client's `client_id`.
+	Definition Application `json:"definition"`
+	// The secrets this write generated, one for each client it created,
+	// each with the client's `client_id`. Absent when the write created
+	// no client. Each secret is shown only once.
+	ClientSecrets []ApplicationClientSecret `json:"client_secrets"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateApplicationResponse) GetID() string {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *CreateApplicationResponse) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetSlug returns the value of Slug.
+func (s *CreateApplicationResponse) GetSlug() string {
+	return s.Slug
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateApplicationResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *CreateApplicationResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetDefinition returns the value of Definition.
+func (s *CreateApplicationResponse) GetDefinition() Application {
+	return s.Definition
+}
+
+// GetClientSecrets returns the value of ClientSecrets.
+func (s *CreateApplicationResponse) GetClientSecrets() []ApplicationClientSecret {
+	return s.ClientSecrets
+}
+
+// SetID sets the value of ID.
+func (s *CreateApplicationResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *CreateApplicationResponse) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *CreateApplicationResponse) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateApplicationResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *CreateApplicationResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetDefinition sets the value of Definition.
+func (s *CreateApplicationResponse) SetDefinition(val Application) {
+	s.Definition = val
+}
+
+// SetClientSecrets sets the value of ClientSecrets.
+func (s *CreateApplicationResponse) SetClientSecrets(val []ApplicationClientSecret) {
+	s.ClientSecrets = val
+}
+
+type CreateApplicationUnauthorized ErrorDetails
+
+func (*CreateApplicationUnauthorized) createApplicationRes() {}
+
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
-	Type                CreateAuthAttemptErrorResponseType // switch on this field
-	AttInvalidRequest   AttInvalidRequest
-	AuthUnauthorized    AuthUnauthorized
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjMismatch        ProjMismatch
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
+	Type                 CreateAuthAttemptErrorResponseType // switch on this field
+	AttInvalidRequest    AttInvalidRequest
+	AuthUnauthorized     AuthUnauthorized
+	EncKeyDecryptFailed  EncKeyDecryptFailed
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjMismatch         ProjMismatch
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	ProjPreviewNotLive   ProjPreviewNotLive
+	RelNoDefault         RelNoDefault
+	RelNotDeployed       RelNotDeployed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	EncKeyUnknownAlg     EncKeyUnknownAlg
+	Unavailable          Unavailable
 }
 
 // CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
@@ -12166,16 +12875,23 @@ type CreateAuthAttemptErrorResponseType string
 
 // Possible values for CreateAuthAttemptErrorResponseType.
 const (
-	AttInvalidRequestCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "att.invalid_request"
-	AuthUnauthorizedCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "auth.unauthorized"
-	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
-	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
-	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
-	NotImplementedCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "not_implemented"
-	ProjMismatchCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "proj.mismatch"
-	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
-	UnavailableCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "unavailable"
+	AttInvalidRequestCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "att.invalid_request"
+	AuthUnauthorizedCreateAuthAttemptErrorResponse     CreateAuthAttemptErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateAuthAttemptErrorResponse  CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
+	EvtInvalidCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "evt.invalid"
+	InternalCreateAuthAttemptErrorResponse             CreateAuthAttemptErrorResponseType = "internal"
+	NotImplementedCreateAuthAttemptErrorResponse       CreateAuthAttemptErrorResponseType = "not_implemented"
+	ProjMismatchCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "proj.mismatch"
+	ProjNotFoundCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "rel.no_default"
+	RelNotDeployedCreateAuthAttemptErrorResponse       CreateAuthAttemptErrorResponseType = "rel.not_deployed"
+	RelNotFoundCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "rel.not_found"
+	RelRevokedCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "rel.revoked"
+	ReqInvalidCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateAuthAttemptErrorResponse     CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "unavailable"
 )
 
 // IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
@@ -12211,6 +12927,41 @@ func (s CreateAuthAttemptErrorResponse) IsNotImplemented() bool {
 // IsProjMismatch reports whether CreateAuthAttemptErrorResponse is ProjMismatch.
 func (s CreateAuthAttemptErrorResponse) IsProjMismatch() bool {
 	return s.Type == ProjMismatchCreateAuthAttemptErrorResponse
+}
+
+// IsProjNotFound reports whether CreateAuthAttemptErrorResponse is ProjNotFound.
+func (s CreateAuthAttemptErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateAuthAttemptErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateAuthAttemptErrorResponse is ProjOriginNotAllowed.
+func (s CreateAuthAttemptErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether CreateAuthAttemptErrorResponse is ProjPreviewNotLive.
+func (s CreateAuthAttemptErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+}
+
+// IsRelNoDefault reports whether CreateAuthAttemptErrorResponse is RelNoDefault.
+func (s CreateAuthAttemptErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultCreateAuthAttemptErrorResponse
+}
+
+// IsRelNotDeployed reports whether CreateAuthAttemptErrorResponse is RelNotDeployed.
+func (s CreateAuthAttemptErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedCreateAuthAttemptErrorResponse
+}
+
+// IsRelNotFound reports whether CreateAuthAttemptErrorResponse is RelNotFound.
+func (s CreateAuthAttemptErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateAuthAttemptErrorResponse
+}
+
+// IsRelRevoked reports whether CreateAuthAttemptErrorResponse is RelRevoked.
+func (s CreateAuthAttemptErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
@@ -12372,6 +13123,153 @@ func (s CreateAuthAttemptErrorResponse) GetProjMismatch() (v ProjMismatch, ok bo
 func NewProjMismatchCreateAuthAttemptErrorResponse(v ProjMismatch) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetProjMismatch(v)
+	return s
+}
+
+// SetProjNotFound sets CreateAuthAttemptErrorResponse to ProjNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateAuthAttemptErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateAuthAttemptErrorResponse is ProjNotFound.
+func (s CreateAuthAttemptErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateAuthAttemptErrorResponse(v ProjNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateAuthAttemptErrorResponse to ProjOriginNotAllowed.
+func (s *CreateAuthAttemptErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateAuthAttemptErrorResponse is ProjOriginNotAllowed.
+func (s CreateAuthAttemptErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateAuthAttemptErrorResponse(v ProjOriginNotAllowed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets CreateAuthAttemptErrorResponse to ProjPreviewNotLive.
+func (s *CreateAuthAttemptErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if CreateAuthAttemptErrorResponse is ProjPreviewNotLive.
+func (s CreateAuthAttemptErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveCreateAuthAttemptErrorResponse(v ProjPreviewNotLive) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets CreateAuthAttemptErrorResponse to RelNoDefault.
+func (s *CreateAuthAttemptErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultCreateAuthAttemptErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if CreateAuthAttemptErrorResponse is RelNoDefault.
+func (s CreateAuthAttemptErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNoDefault.
+func NewRelNoDefaultCreateAuthAttemptErrorResponse(v RelNoDefault) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNoDefault(v)
+	return s
+}
+
+// SetRelNotDeployed sets CreateAuthAttemptErrorResponse to RelNotDeployed.
+func (s *CreateAuthAttemptErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedCreateAuthAttemptErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if CreateAuthAttemptErrorResponse is RelNotDeployed.
+func (s CreateAuthAttemptErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNotDeployed.
+func NewRelNotDeployedCreateAuthAttemptErrorResponse(v RelNotDeployed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets CreateAuthAttemptErrorResponse to RelNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateAuthAttemptErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateAuthAttemptErrorResponse is RelNotFound.
+func (s CreateAuthAttemptErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNotFound.
+func NewRelNotFoundCreateAuthAttemptErrorResponse(v RelNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateAuthAttemptErrorResponse to RelRevoked.
+func (s *CreateAuthAttemptErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateAuthAttemptErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateAuthAttemptErrorResponse is RelRevoked.
+func (s CreateAuthAttemptErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelRevoked.
+func NewRelRevokedCreateAuthAttemptErrorResponse(v RelRevoked) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -14037,6 +14935,7 @@ type CreateFlowErrorResponse struct {
 	ProjNotFound           ProjNotFound
 	ProjOriginNotAllowed   ProjOriginNotAllowed
 	ProjPreviewNotLive     ProjPreviewNotLive
+	RelNoDefault           RelNoDefault
 	RelNotDeployed         RelNotDeployed
 	RelNotFound            RelNotFound
 	RelRevoked             RelRevoked
@@ -14066,6 +14965,7 @@ const (
 	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
 	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultCreateFlowErrorResponse           CreateFlowErrorResponseType = "rel.no_default"
 	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
@@ -14150,6 +15050,11 @@ func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether CreateFlowErrorResponse is ProjPreviewNotLive.
 func (s CreateFlowErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveCreateFlowErrorResponse
+}
+
+// IsRelNoDefault reports whether CreateFlowErrorResponse is RelNoDefault.
+func (s CreateFlowErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultCreateFlowErrorResponse
 }
 
 // IsRelNotDeployed reports whether CreateFlowErrorResponse is RelNotDeployed.
@@ -14515,6 +15420,27 @@ func (s CreateFlowErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, 
 func NewProjPreviewNotLiveCreateFlowErrorResponse(v ProjPreviewNotLive) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets CreateFlowErrorResponse to RelNoDefault.
+func (s *CreateFlowErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultCreateFlowErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if CreateFlowErrorResponse is RelNoDefault.
+func (s CreateFlowErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNoDefault.
+func NewRelNoDefaultCreateFlowErrorResponse(v RelNoDefault) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNoDefault(v)
 	return s
 }
 
@@ -16604,9 +17530,8 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// The origins the project starts with. An omitted or empty list admits
-	// every origin until the first pattern is added. Loopback origins are
-	// admitted without a pattern.
+	// The origins the project starts with. An omitted or empty list admits no
+	// origin except a loopback origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// Whether the server creates a default user schema and flow for the project.
 	// CLI-managed projects set this to `false` and upload their local `.zitadel/`
@@ -16656,8 +17581,8 @@ type CreateProjectResponse struct {
 	// The secret that authenticates previewing and testing the project. Only
 	// this response returns it.
 	PreviewSecret string `json:"preview_secret"`
-	// The project's origins. An empty list admits every origin until the
-	// first pattern is added. Loopback origins are admitted without a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -20640,8 +21565,9 @@ func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 // is a snapshot of the project's configuration, and a deployment freezes the
 // project's variable values with it. Deploying and rolling back each append
 // one, so the history is the audit trail.
-// All primary origins serve the project's newest primary deployment. An origin
-// added after it serves nothing until the next deployment to `primary`. A
+// A primary origin serves the project's newest primary deployment if that
+// deployment names it, so one added later serves nothing until the next
+// deployment to `primary`. Requests with no origin get the same deployment. A
 // preview URL serves the newest deployment to it while its preview is live.
 // Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
@@ -21605,6 +22531,44 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
+type DeploymentPreviewUrls []string
+
+// Every primary origin of the project, and every request with no `Origin`.
+// Ref: #
+type DeploymentPrimaryTarget string
+
+const (
+	DeploymentPrimaryTargetPrimary DeploymentPrimaryTarget = "primary"
+)
+
+// AllValues returns all DeploymentPrimaryTarget values.
+func (DeploymentPrimaryTarget) AllValues() []DeploymentPrimaryTarget {
+	return []DeploymentPrimaryTarget{
+		DeploymentPrimaryTargetPrimary,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentPrimaryTarget) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentPrimaryTargetPrimary:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentPrimaryTarget) UnmarshalText(data []byte) error {
+	switch DeploymentPrimaryTarget(data) {
+	case DeploymentPrimaryTargetPrimary:
+		*s = DeploymentPrimaryTargetPrimary
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Why the deployment was created: `deploy`, or `rollback` when an earlier
 // release goes live again. The rollback operation always records `rollback`;
 // `POST /deployments` may too, and then `rollback_to` is null.
@@ -21651,9 +22615,10 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 }
 
 // Whether the deployment serves its release now.
-// - `live`: at least one of its targets serves it now.
-// - `inactive`: none does, because a later deployment replaced it or its
-// previews expired or were removed.
+// - `live`: the project's newest primary deployment, or a preview deployment
+// that one of its preview URLs still serves.
+// - `inactive`: a later deployment replaced it, or its previews expired or
+// were removed.
 // Ref: #
 type DeploymentStatus string
 
@@ -21725,7 +22690,76 @@ func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
 	s.ExpiresAt = val
 }
 
-type DeploymentTargetsRequest []string
+// Where the release goes live: `primary`, every primary origin of the project,
+// or a list of preview URLs.
+// Ref: #
+// DeploymentTargetsRequest represents sum type.
+type DeploymentTargetsRequest struct {
+	Type                    DeploymentTargetsRequestType // switch on this field
+	DeploymentPrimaryTarget DeploymentPrimaryTarget
+	DeploymentPreviewUrls   DeploymentPreviewUrls
+}
+
+// DeploymentTargetsRequestType is oneOf type of DeploymentTargetsRequest.
+type DeploymentTargetsRequestType string
+
+// Possible values for DeploymentTargetsRequestType.
+const (
+	DeploymentPrimaryTargetDeploymentTargetsRequest DeploymentTargetsRequestType = "DeploymentPrimaryTarget"
+	DeploymentPreviewUrlsDeploymentTargetsRequest   DeploymentTargetsRequestType = "DeploymentPreviewUrls"
+)
+
+// IsDeploymentPrimaryTarget reports whether DeploymentTargetsRequest is DeploymentPrimaryTarget.
+func (s DeploymentTargetsRequest) IsDeploymentPrimaryTarget() bool {
+	return s.Type == DeploymentPrimaryTargetDeploymentTargetsRequest
+}
+
+// IsDeploymentPreviewUrls reports whether DeploymentTargetsRequest is DeploymentPreviewUrls.
+func (s DeploymentTargetsRequest) IsDeploymentPreviewUrls() bool {
+	return s.Type == DeploymentPreviewUrlsDeploymentTargetsRequest
+}
+
+// SetDeploymentPrimaryTarget sets DeploymentTargetsRequest to DeploymentPrimaryTarget.
+func (s *DeploymentTargetsRequest) SetDeploymentPrimaryTarget(v DeploymentPrimaryTarget) {
+	s.Type = DeploymentPrimaryTargetDeploymentTargetsRequest
+	s.DeploymentPrimaryTarget = v
+}
+
+// GetDeploymentPrimaryTarget returns DeploymentPrimaryTarget and true boolean if DeploymentTargetsRequest is DeploymentPrimaryTarget.
+func (s DeploymentTargetsRequest) GetDeploymentPrimaryTarget() (v DeploymentPrimaryTarget, ok bool) {
+	if !s.IsDeploymentPrimaryTarget() {
+		return v, false
+	}
+	return s.DeploymentPrimaryTarget, true
+}
+
+// NewDeploymentPrimaryTargetDeploymentTargetsRequest returns new DeploymentTargetsRequest from DeploymentPrimaryTarget.
+func NewDeploymentPrimaryTargetDeploymentTargetsRequest(v DeploymentPrimaryTarget) DeploymentTargetsRequest {
+	var s DeploymentTargetsRequest
+	s.SetDeploymentPrimaryTarget(v)
+	return s
+}
+
+// SetDeploymentPreviewUrls sets DeploymentTargetsRequest to DeploymentPreviewUrls.
+func (s *DeploymentTargetsRequest) SetDeploymentPreviewUrls(v DeploymentPreviewUrls) {
+	s.Type = DeploymentPreviewUrlsDeploymentTargetsRequest
+	s.DeploymentPreviewUrls = v
+}
+
+// GetDeploymentPreviewUrls returns DeploymentPreviewUrls and true boolean if DeploymentTargetsRequest is DeploymentPreviewUrls.
+func (s DeploymentTargetsRequest) GetDeploymentPreviewUrls() (v DeploymentPreviewUrls, ok bool) {
+	if !s.IsDeploymentPreviewUrls() {
+		return v, false
+	}
+	return s.DeploymentPreviewUrls, true
+}
+
+// NewDeploymentPreviewUrlsDeploymentTargetsRequest returns new DeploymentTargetsRequest from DeploymentPreviewUrls.
+func NewDeploymentPreviewUrlsDeploymentTargetsRequest(v DeploymentPreviewUrls) DeploymentTargetsRequest {
+	var s DeploymentTargetsRequest
+	s.SetDeploymentPreviewUrls(v)
+	return s
+}
 
 // The release references variables the project holds no value for.
 // Ref: #
@@ -24746,9 +25780,12 @@ type Field struct {
 	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
-	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-	// `select` from a closed `enum`. For other formats (for example uuid) the
-	// type is `text` and `validation.format` carries the rule.
+	// `date`, `date_time` come from `format`; `checkbox` from JSON
+	// `type: boolean`; `select` from a closed `enum`. For other formats (for
+	// example uuid) the type is `text` and `validation.format` carries the
+	// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+	// submitted, which a `datetime-local` input neither shows nor produces on
+	// its own.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -24875,9 +25912,12 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 
 // The input kind the client should render. Encodes the formats and
 // JSON types that map to a familiar HTML input: `email`, `url`,
-// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-// `select` from a closed `enum`. For other formats (for example uuid) the
-// type is `text` and `validation.format` carries the rule.
+// `date`, `date_time` come from `format`; `checkbox` from JSON
+// `type: boolean`; `select` from a closed `enum`. For other formats (for
+// example uuid) the type is `text` and `validation.format` carries the
+// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+// submitted, which a `datetime-local` input neither shows nor produces on
+// its own.
 type FieldType string
 
 const (
@@ -24888,6 +25928,7 @@ const (
 	FieldTypeNumber   FieldType = "number"
 	FieldTypeURL      FieldType = "url"
 	FieldTypeDate     FieldType = "date"
+	FieldTypeDateTime FieldType = "date_time"
 	FieldTypeHidden   FieldType = "hidden"
 	FieldTypeCheckbox FieldType = "checkbox"
 	FieldTypeSelect   FieldType = "select"
@@ -24903,6 +25944,7 @@ func (FieldType) AllValues() []FieldType {
 		FieldTypeNumber,
 		FieldTypeURL,
 		FieldTypeDate,
+		FieldTypeDateTime,
 		FieldTypeHidden,
 		FieldTypeCheckbox,
 		FieldTypeSelect,
@@ -24925,6 +25967,8 @@ func (s FieldType) MarshalText() ([]byte, error) {
 	case FieldTypeURL:
 		return []byte(s), nil
 	case FieldTypeDate:
+		return []byte(s), nil
+	case FieldTypeDateTime:
 		return []byte(s), nil
 	case FieldTypeHidden:
 		return []byte(s), nil
@@ -24960,6 +26004,9 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 		return nil
 	case FieldTypeDate:
 		*s = FieldTypeDate
+		return nil
+	case FieldTypeDateTime:
+		*s = FieldTypeDateTime
 		return nil
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
@@ -26242,7 +27289,7 @@ type FlowDefinition struct {
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
 	// The user schema this flow operates on, named by its `objectType`. The
-	// flow runs against the project's newest revision of that schema, so
+	// flow runs against the revision of that schema its release pins, so
 	// publishing a schema revision needs no change to the flow. A schema ID
 	// as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
 	// schema's `objectType`; reading the definition back returns the
@@ -30400,6 +31447,198 @@ func (s *GateKind) UnmarshalText(data []byte) error {
 	}
 }
 
+// GetApplicationByIdErrorResponse represents sum type.
+type GetApplicationByIdErrorResponse struct {
+	Type             GetApplicationByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// GetApplicationByIdErrorResponseType is oneOf type of GetApplicationByIdErrorResponse.
+type GetApplicationByIdErrorResponseType string
+
+// Possible values for GetApplicationByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "internal"
+	NotImplementedGetApplicationByIdErrorResponse   GetApplicationByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationByIdErrorResponse       GetApplicationByIdErrorResponseType = "req.invalid"
+	UnavailableGetApplicationByIdErrorResponse      GetApplicationByIdErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetApplicationByIdErrorResponse is AuthUnauthorized.
+func (s GetApplicationByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetApplicationByIdErrorResponse
+}
+
+// IsInternal reports whether GetApplicationByIdErrorResponse is Internal.
+func (s GetApplicationByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetApplicationByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetApplicationByIdErrorResponse is NotImplemented.
+func (s GetApplicationByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetApplicationByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetApplicationByIdErrorResponse is ReqInvalid.
+func (s GetApplicationByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetApplicationByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetApplicationByIdErrorResponse is Unavailable.
+func (s GetApplicationByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetApplicationByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetApplicationByIdErrorResponse to AuthUnauthorized.
+func (s *GetApplicationByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetApplicationByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetApplicationByIdErrorResponse is AuthUnauthorized.
+func (s GetApplicationByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetApplicationByIdErrorResponse(v AuthUnauthorized) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetApplicationByIdErrorResponse to Internal.
+func (s *GetApplicationByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetApplicationByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetApplicationByIdErrorResponse is Internal.
+func (s GetApplicationByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from Internal.
+func NewInternalGetApplicationByIdErrorResponse(v Internal) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetApplicationByIdErrorResponse to NotImplemented.
+func (s *GetApplicationByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetApplicationByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetApplicationByIdErrorResponse is NotImplemented.
+func (s GetApplicationByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetApplicationByIdErrorResponse(v NotImplemented) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetApplicationByIdErrorResponse to ReqInvalid.
+func (s *GetApplicationByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetApplicationByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetApplicationByIdErrorResponse is ReqInvalid.
+func (s GetApplicationByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetApplicationByIdErrorResponse(v ReqInvalid) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetApplicationByIdErrorResponse to Unavailable.
+func (s *GetApplicationByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetApplicationByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetApplicationByIdErrorResponse is Unavailable.
+func (s GetApplicationByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from Unavailable.
+func NewUnavailableGetApplicationByIdErrorResponse(v Unavailable) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetApplicationByIdErrorResponseStatusCode wraps GetApplicationByIdErrorResponse with StatusCode.
+type GetApplicationByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetApplicationByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetApplicationByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetApplicationByIdErrorResponseStatusCode) GetResponse() GetApplicationByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetApplicationByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetApplicationByIdErrorResponseStatusCode) SetResponse(val GetApplicationByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetApplicationByIdErrorResponseStatusCode) getApplicationByIdRes() {}
+
+type GetApplicationByIdForbidden ErrorDetails
+
+func (*GetApplicationByIdForbidden) getApplicationByIdRes() {}
+
+type GetApplicationByIdNotFound ErrorDetails
+
+func (*GetApplicationByIdNotFound) getApplicationByIdRes() {}
+
+type GetApplicationByIdUnauthorized ErrorDetails
+
+func (*GetApplicationByIdUnauthorized) getApplicationByIdRes() {}
+
 // GetAuthAttemptErrorResponse represents sum type.
 type GetAuthAttemptErrorResponse struct {
 	Type             GetAuthAttemptErrorResponseType // switch on this field
@@ -32502,6 +33741,7 @@ type GetFlowStepErrorResponse struct {
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
 	ProjLastOwner               ProjLastOwner
+	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -32548,6 +33788,7 @@ const (
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
 	ProjLastOwnerGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_owner"
+	RelNotDeployedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "rel.not_deployed"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
@@ -32695,6 +33936,11 @@ func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 // IsProjLastOwner reports whether GetFlowStepErrorResponse is ProjLastOwner.
 func (s GetFlowStepErrorResponse) IsProjLastOwner() bool {
 	return s.Type == ProjLastOwnerGetFlowStepErrorResponse
+}
+
+// IsRelNotDeployed reports whether GetFlowStepErrorResponse is RelNotDeployed.
+func (s GetFlowStepErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedGetFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
@@ -33321,6 +34567,27 @@ func (s GetFlowStepErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) 
 func NewProjLastOwnerGetFlowStepErrorResponse(v ProjLastOwner) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetProjLastOwner(v)
+	return s
+}
+
+// SetRelNotDeployed sets GetFlowStepErrorResponse to RelNotDeployed.
+func (s *GetFlowStepErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedGetFlowStepErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if GetFlowStepErrorResponse is RelNotDeployed.
+func (s GetFlowStepErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelNotDeployed.
+func NewRelNotDeployedGetFlowStepErrorResponse(v RelNotDeployed) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelNotDeployed(v)
 	return s
 }
 
@@ -61455,6 +62722,52 @@ func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
 	return d
 }
 
+// NewOptRelNoDefaultDetails returns new OptRelNoDefaultDetails with value set to v.
+func NewOptRelNoDefaultDetails(v RelNoDefaultDetails) OptRelNoDefaultDetails {
+	return OptRelNoDefaultDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelNoDefaultDetails is optional RelNoDefaultDetails.
+type OptRelNoDefaultDetails struct {
+	Value RelNoDefaultDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelNoDefaultDetails was set.
+func (o OptRelNoDefaultDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelNoDefaultDetails) Reset() {
+	var v RelNoDefaultDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelNoDefaultDetails) SetTo(v RelNoDefaultDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelNoDefaultDetails) Get() (v RelNoDefaultDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelNoDefaultDetails) Or(d RelNoDefaultDetails) RelNoDefaultDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelNotDeployedDetails returns new OptRelNotDeployedDetails with value set to v.
 func NewOptRelNotDeployedDetails(v RelNotDeployedDetails) OptRelNotDeployedDetails {
 	return OptRelNotDeployedDetails{
@@ -63243,6 +64556,52 @@ func (o OptSessionProofToken) Get() (v SessionProofToken, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessionProofToken) Or(d SessionProofToken) SessionProofToken {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSortDirection returns new OptSortDirection with value set to v.
+func NewOptSortDirection(v SortDirection) OptSortDirection {
+	return OptSortDirection{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSortDirection is optional SortDirection.
+type OptSortDirection struct {
+	Value SortDirection
+	Set   bool
+}
+
+// IsSet returns true if OptSortDirection was set.
+func (o OptSortDirection) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSortDirection) Reset() {
+	var v SortDirection
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSortDirection) SetTo(v SortDirection) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSortDirection) Get() (v SortDirection, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSortDirection) Or(d SortDirection) SortDirection {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -69287,6 +70646,12 @@ type PatchUserRequest struct {
 	// current schema. The schema must already be registered and be a revision
 	// of the user's current schema.
 	Schema OptString `json:"schema"`
+	// Set to `true` to check the patch without applying it. The response is
+	// what the real request would answer now; a `200` holds the user as the
+	// patch would leave them, with `metadata.updated_at` unchanged. Leave it
+	// out to apply the patch. A server from before this field refuses the
+	// request with `400` and changes nothing.
+	DryRun OptBool `json:"dry_run"`
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.
 	Attributes OptPatchUserRequestAttributes `json:"attributes"`
@@ -69297,6 +70662,11 @@ func (s *PatchUserRequest) GetSchema() OptString {
 	return s.Schema
 }
 
+// GetDryRun returns the value of DryRun.
+func (s *PatchUserRequest) GetDryRun() OptBool {
+	return s.DryRun
+}
+
 // GetAttributes returns the value of Attributes.
 func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
 	return s.Attributes
@@ -69305,6 +70675,11 @@ func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
 // SetSchema sets the value of Schema.
 func (s *PatchUserRequest) SetSchema(val OptString) {
 	s.Schema = val
+}
+
+// SetDryRun sets the value of DryRun.
+func (s *PatchUserRequest) SetDryRun(val OptBool) {
+	s.DryRun = val
 }
 
 // SetAttributes sets the value of Attributes.
@@ -72860,8 +74235,8 @@ type ProjectDetailResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list admits every origin until the
-	// first pattern is added. Loopback origins are admitted without a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -72960,8 +74335,11 @@ type ProjectID string
 // preview deploy may register. It may include at most one `*` inside a single
 // host label; `*` matches one or more characters, none of them a dot. A
 // literal beats a wildcard. Unknown hosts are accepted as written.
-// An empty list admits every origin until the first pattern is added.
-// Loopback origins are admitted without a pattern.
+// An empty list admits no origin except a loopback origin, which is admitted
+// without a pattern.
+// A loopback origin is on the local machine: `localhost`, a name under
+// `.localhost`, or a loopback IP such as `127.0.0.1` or `[::1]`, on any port
+// and over `http` or `https`. It is never a preview URL.
 // Ref: #
 type ProjectOrigin struct {
 	// The origin pattern: an exact origin for `primary`, or an origin with at
@@ -73084,8 +74462,8 @@ type ProjectResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list admits every origin until the
-	// first pattern is added. Loopback origins are admitted without a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -76734,6 +78112,59 @@ func (s *RelInvalid) SetDetails(val OptRelInvalidDetails) {
 type RelInvalidDetails map[string]jx.Raw
 
 func (s *RelInvalidDetails) init() RelInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelNoDefault struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelNoDefaultDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelNoDefault) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelNoDefault) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelNoDefault) GetDetails() OptRelNoDefaultDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelNoDefault) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelNoDefault) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelNoDefault) SetDetails(val OptRelNoDefaultDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelNoDefaultDetails map[string]jx.Raw
+
+func (s *RelNoDefaultDetails) init() RelNoDefaultDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -80988,25 +82419,24 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
-	Type                 RollbackDeploymentErrorResponseType // switch on this field
-	AuthCsrfInvalid      AuthCsrfInvalid
-	AuthUnauthorized     AuthUnauthorized
-	DepConflict          DepConflict
-	DepInvalid           DepInvalid
-	DepNotFound          DepNotFound
-	DepPermissionDenied  DepPermissionDenied
-	DepVariablesMissing  DepVariablesMissing
-	EnvProjectNotFound   EnvProjectNotFound
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	NotImplemented       NotImplemented
-	ProjNotFound         ProjNotFound
-	ProjOriginNotAllowed ProjOriginNotAllowed
-	RelNotFound          RelNotFound
-	RelRevoked           RelRevoked
-	ReqInvalid           ReqInvalid
-	Unavailable          Unavailable
-	VarDocumentTooDeep   VarDocumentTooDeep
+	Type                RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	DepVariablesMissing DepVariablesMissing
+	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+	VarDocumentTooDeep  VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -81014,24 +82444,23 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	DepVariablesMissingRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.variables_missing"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "proj.not_found"
-	ProjOriginNotAllowedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "proj.origin_not_allowed"
-	RelNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
-	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
-	VarDocumentTooDeepRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.document_too_deep"
+	AuthCsrfInvalidRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_missing"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
+	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -81092,11 +82521,6 @@ func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
 func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
-}
-
-// IsProjOriginNotAllowed reports whether RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
-	return s.Type == ProjOriginNotAllowedRollbackDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
@@ -81373,27 +82797,6 @@ func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok b
 func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetProjNotFound(v)
-	return s
-}
-
-// SetProjOriginNotAllowed sets RollbackDeploymentErrorResponse to ProjOriginNotAllowed.
-func (s *RollbackDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
-	s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
-	s.ProjOriginNotAllowed = v
-}
-
-// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
-	if !s.IsProjOriginNotAllowed() {
-		return v, false
-	}
-	return s.ProjOriginNotAllowed, true
-}
-
-// NewProjOriginNotAllowedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjOriginNotAllowed.
-func NewProjOriginNotAllowedRollbackDeploymentErrorResponse(v ProjOriginNotAllowed) RollbackDeploymentErrorResponse {
-	var s RollbackDeploymentErrorResponse
-	s.SetProjOriginNotAllowed(v)
 	return s
 }
 
@@ -84804,6 +86207,13 @@ type SetUserPasswordErrorResponse struct {
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
 	NotImplemented              NotImplemented
+	ProjNotFound                ProjNotFound
+	ProjOriginNotAllowed        ProjOriginNotAllowed
+	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNoDefault                RelNoDefault
+	RelNotDeployed              RelNotDeployed
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	Unavailable                 Unavailable
 	UserConflict                UserConflict
@@ -84824,6 +86234,13 @@ const (
 	EvtInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "evt.invalid"
 	InternalSetUserPasswordErrorResponse                    SetUserPasswordErrorResponseType = "internal"
 	NotImplementedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "not_implemented"
+	ProjNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "rel.no_default"
+	RelNotDeployedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "rel.not_deployed"
+	RelNotFoundSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "rel.not_found"
+	RelRevokedSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "rel.revoked"
 	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
 	UnavailableSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "unavailable"
 	UserConflictSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.conflict"
@@ -84853,6 +86270,41 @@ func (s SetUserPasswordErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether SetUserPasswordErrorResponse is NotImplemented.
 func (s SetUserPasswordErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSetUserPasswordErrorResponse
+}
+
+// IsProjNotFound reports whether SetUserPasswordErrorResponse is ProjNotFound.
+func (s SetUserPasswordErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundSetUserPasswordErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether SetUserPasswordErrorResponse is ProjOriginNotAllowed.
+func (s SetUserPasswordErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedSetUserPasswordErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether SetUserPasswordErrorResponse is ProjPreviewNotLive.
+func (s SetUserPasswordErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveSetUserPasswordErrorResponse
+}
+
+// IsRelNoDefault reports whether SetUserPasswordErrorResponse is RelNoDefault.
+func (s SetUserPasswordErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultSetUserPasswordErrorResponse
+}
+
+// IsRelNotDeployed reports whether SetUserPasswordErrorResponse is RelNotDeployed.
+func (s SetUserPasswordErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedSetUserPasswordErrorResponse
+}
+
+// IsRelNotFound reports whether SetUserPasswordErrorResponse is RelNotFound.
+func (s SetUserPasswordErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundSetUserPasswordErrorResponse
+}
+
+// IsRelRevoked reports whether SetUserPasswordErrorResponse is RelRevoked.
+func (s SetUserPasswordErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedSetUserPasswordErrorResponse
 }
 
 // IsReqInvalid reports whether SetUserPasswordErrorResponse is ReqInvalid.
@@ -84981,6 +86433,153 @@ func (s SetUserPasswordErrorResponse) GetNotImplemented() (v NotImplemented, ok 
 func NewNotImplementedSetUserPasswordErrorResponse(v NotImplemented) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets SetUserPasswordErrorResponse to ProjNotFound.
+func (s *SetUserPasswordErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundSetUserPasswordErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if SetUserPasswordErrorResponse is ProjNotFound.
+func (s SetUserPasswordErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjNotFound.
+func NewProjNotFoundSetUserPasswordErrorResponse(v ProjNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets SetUserPasswordErrorResponse to ProjOriginNotAllowed.
+func (s *SetUserPasswordErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedSetUserPasswordErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if SetUserPasswordErrorResponse is ProjOriginNotAllowed.
+func (s SetUserPasswordErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedSetUserPasswordErrorResponse(v ProjOriginNotAllowed) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets SetUserPasswordErrorResponse to ProjPreviewNotLive.
+func (s *SetUserPasswordErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveSetUserPasswordErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if SetUserPasswordErrorResponse is ProjPreviewNotLive.
+func (s SetUserPasswordErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveSetUserPasswordErrorResponse(v ProjPreviewNotLive) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets SetUserPasswordErrorResponse to RelNoDefault.
+func (s *SetUserPasswordErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultSetUserPasswordErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if SetUserPasswordErrorResponse is RelNoDefault.
+func (s SetUserPasswordErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNoDefault.
+func NewRelNoDefaultSetUserPasswordErrorResponse(v RelNoDefault) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNoDefault(v)
+	return s
+}
+
+// SetRelNotDeployed sets SetUserPasswordErrorResponse to RelNotDeployed.
+func (s *SetUserPasswordErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedSetUserPasswordErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if SetUserPasswordErrorResponse is RelNotDeployed.
+func (s SetUserPasswordErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNotDeployed.
+func NewRelNotDeployedSetUserPasswordErrorResponse(v RelNotDeployed) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets SetUserPasswordErrorResponse to RelNotFound.
+func (s *SetUserPasswordErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundSetUserPasswordErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if SetUserPasswordErrorResponse is RelNotFound.
+func (s SetUserPasswordErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNotFound.
+func NewRelNotFoundSetUserPasswordErrorResponse(v RelNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets SetUserPasswordErrorResponse to RelRevoked.
+func (s *SetUserPasswordErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedSetUserPasswordErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if SetUserPasswordErrorResponse is RelRevoked.
+func (s SetUserPasswordErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelRevoked.
+func NewRelRevokedSetUserPasswordErrorResponse(v RelRevoked) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -85478,6 +87077,7 @@ type SubmitFlowStepErrorResponse struct {
 	ProjLastOwner               ProjLastOwner
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -85526,6 +87126,7 @@ const (
 	ProjLastOwnerSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_owner"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
+	RelNotDeployedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "rel.not_deployed"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
@@ -85683,6 +87284,11 @@ func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether SubmitFlowStepErrorResponse is ProjPreviewNotLive.
 func (s SubmitFlowStepErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveSubmitFlowStepErrorResponse
+}
+
+// IsRelNotDeployed reports whether SubmitFlowStepErrorResponse is RelNotDeployed.
+func (s SubmitFlowStepErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedSubmitFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether SubmitFlowStepErrorResponse is RelNotFound.
@@ -86351,6 +87957,27 @@ func (s SubmitFlowStepErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLi
 func NewProjPreviewNotLiveSubmitFlowStepErrorResponse(v ProjPreviewNotLive) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotDeployed sets SubmitFlowStepErrorResponse to RelNotDeployed.
+func (s *SubmitFlowStepErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedSubmitFlowStepErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if SubmitFlowStepErrorResponse is RelNotDeployed.
+func (s SubmitFlowStepErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelNotDeployed.
+func NewRelNotDeployedSubmitFlowStepErrorResponse(v RelNotDeployed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelNotDeployed(v)
 	return s
 }
 
@@ -92095,9 +93722,13 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // The meta-schema that one property of a user schema is validated against.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
-// are accepted without being listed below. `writeOnly: true` is reserved for a
+// are accepted without being listed below. Any other key is refused, unless it
+// is one of the annotations listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
+// `format` is enforced on user writes for the standard JSON Schema names, such
+// as `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as
+// `phone`, is only an annotation; use `pattern` to enforce one.
 // Ref: #
 type UserProperty struct {
 	// The scope in which this property's value must be unique, if applicable. `unspecified` enforces no

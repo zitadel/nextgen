@@ -33,6 +33,7 @@ content:
         - $ref: '../../../components/schemas/errors/proj-last_owner.yaml'
         - $ref: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_deployed.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
@@ -77,6 +78,7 @@ content:
           proj.last_owner: '../../../components/schemas/errors/proj-last_owner.yaml'
           proj.origin_not_allowed: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
           proj.preview_not_live: '../../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.not_deployed: '../../../components/schemas/errors/rel-not_deployed.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
@@ -148,6 +150,8 @@ content:
         $ref: '../../../components/examples/errors/proj-origin_not_allowed.yaml'
       proj.preview_not_live:
         $ref: '../../../components/examples/errors/proj-preview_not_live.yaml'
+      rel.not_deployed:
+        $ref: '../../../components/examples/errors/rel-not_deployed.yaml'
       rel.not_found:
         $ref: '../../../components/examples/errors/rel-not_found.yaml'
       rel.revoked:

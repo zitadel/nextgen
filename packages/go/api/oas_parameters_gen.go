@@ -31,6 +31,18 @@ type CompleteClaimParams struct {
 	ProjectID ProjectID
 }
 
+// CreateApplicationParams is parameters of createApplication operation.
+type CreateApplicationParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
+}
+
 // CreateBrandingParams is parameters of createBranding operation.
 type CreateBrandingParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
@@ -51,7 +63,7 @@ type CreateDeploymentParams struct {
 type CreateFlowParams struct {
 	// Standard browser `Origin` header. Selects the deployment that serves
 	// this attempt: matched against the project's origin patterns and live
-	// previews, then against the newest deployment to that exact origin.
+	// previews, then against the deployment that origin serves.
 	// Browsers send it automatically; no client action is required. Absent
 	// when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
@@ -194,6 +206,16 @@ type FinishUserPasskeyRegistrationParams struct {
 	// The `registration_id` that `beginUserPasskeyRegistration` (`POST
 	// /users/{user_id}/passkeys/registrations`) returns.
 	RegistrationID string
+}
+
+// GetApplicationByIdParams is parameters of getApplicationById operation.
+type GetApplicationByIdParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The application ID: the `id` that `createApplication` (`POST /applications`) returns.
+	ID string
 }
 
 // GetAuthAttemptParams is parameters of getAuthAttempt operation.
@@ -712,6 +734,13 @@ type ListMyProjectsParams struct {
 	// returns: a token continues the list it came from. An empty value
 	// lists every project, as leaving it out does.
 	NameContains OptString `json:",omitempty,omitzero"`
+	// Sorts the list by `created_at` and then `id`: `desc` lists the newest
+	// project first, `asc` the oldest first. Leave it out to list by
+	// project ID, which says nothing about when a project was created. Send
+	// the same value with every `page_token` the list returns: a token
+	// continues the list it came from, and under another order it is
+	// refused with `400`.
+	Order OptSortDirection `json:",omitempty,omitzero"`
 	// The project the caller signs its users in to. The cookie's session is used
 	// only when it belongs to this project; a session of any other project answers
 	// `403` with `sess.project_mismatch`.
@@ -1048,6 +1077,10 @@ type SetUserPasswordParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
+	// Standard browser `Origin` header. Selects the deployment whose password
+	// policy applies. Browsers send it automatically; no client action is
+	// required. Absent when the caller is not a browser.
+	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 // SubmitFlowStepParams is parameters of submitFlowStep operation.

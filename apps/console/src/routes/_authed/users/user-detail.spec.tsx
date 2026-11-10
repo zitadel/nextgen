@@ -109,6 +109,68 @@ function stubSchema(properties: Record<string, unknown>, required: string[] = ["
 }
 
 /**
+ * Serves `sch_business` as an older revision of a schema with history: the user's
+ * own document and the target's, by id, and the latest-of-type and history reads.
+ */
+function stubRevisions({
+  user: [userRevision] = ["sch_business"],
+  history = ["sch_business_2", "sch_business"],
+  latest = history[0],
+  target = BUSINESS,
+  current = BUSINESS,
+  attributes = { email: "maya@acme.com", companyName: "Acme" },
+  refused = [],
+}: {
+  user?: [string];
+  history?: string[];
+  latest?: string;
+  target?: Record<string, unknown>;
+  current?: Record<string, unknown>;
+  attributes?: Record<string, unknown>;
+  /** What the server's dry run of a move names, as the API names it. */
+  refused?: string[];
+} = {}) {
+  stub({
+    user: {
+      id: USER_ID,
+      schema: userRevision,
+      identifier: "maya@acme.com",
+      identifier_property: "email",
+      attributes,
+      metadata: { status: "active", created_at: "2026-07-12T09:00:00Z" },
+    },
+  });
+  const documentOf = (id: string) => ({
+    id,
+    schema: { ...(id === userRevision ? current : target), objectType: "business" },
+    metadata: { created_at: "2026-07-01T00:00:00Z" },
+  });
+  server.use(
+    http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      if (!(await isDryRun(request))) return undefined;
+      if (refused.length === 0) return HttpResponse.json({ id: USER_ID });
+      return HttpResponse.json(
+        {
+          code: "req.invalid",
+          message: "Check the fields.",
+          details: { details: { fields: refused.map((name) => `attributes.${name}`) } },
+        },
+        { status: 400 },
+      );
+    }),
+    http.get(`${SCHEMAS_URL}/:schemaId`, ({ params }) =>
+      HttpResponse.json(documentOf(String(params.schemaId))),
+    ),
+    http.get(SCHEMAS_URL, ({ request }) => {
+      const onlyLatest = new URL(request.url).searchParams.get("revisions") === "latest";
+      return HttpResponse.json({
+        schemas: (onlyLatest ? [latest ?? ""] : history).map(documentOf),
+      });
+    }),
+  );
+}
+
+/**
  * One native `input` event on a date field, as a browser fires it per edit.
  * jsdom has no date widget, so `validity.badInput` (the field shows a partial
  * date its `value` cannot express) is stubbed.
@@ -126,11 +188,18 @@ async function waitForSaveToSettle(label: string) {
   await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
 }
 
-/** Accepts every `PATCH /users/{id}` and records its body. */
+/** Whether a `PATCH /users/{id}` asks for a dry run, which the body says. */
+async function isDryRun(request: Request): Promise<boolean> {
+  const body: unknown = await request.clone().json();
+  return typeof body === "object" && body !== null && "dry_run" in body && body.dry_run === true;
+}
+
+/** Accepts every real `PATCH /users/{id}` and records its body; a dry run writes nothing. */
 function capturePatches(): unknown[] {
   const bodies: unknown[] = [];
   server.use(
     http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      if (await isDryRun(request)) return undefined;
       bodies.push(await request.json());
       return HttpResponse.json({ id: USER_ID });
     }),
@@ -231,10 +300,10 @@ describe("user detail", () => {
       scopedPath("/schemas/sch_business"),
     );
     // One row: the newest revision of the type, not its whole history.
-    expect(lists).toHaveLength(1);
-    expect(lists[0]?.get("object_type")).toBe("business");
-    expect(lists[0]?.get("revisions")).toBe("latest");
-    expect(lists[0]?.get("limit")).toBe("1");
+    const latest = lists.filter((params) => params.get("revisions") === "latest");
+    expect(latest).toHaveLength(1);
+    expect(latest[0]?.get("object_type")).toBe("business");
+    expect(latest[0]?.get("limit")).toBe("1");
   });
 
   it("opens the user's own revision from the name when the history cannot be read", async () => {
@@ -303,14 +372,328 @@ describe("user detail", () => {
     expect(panel.queryByText(/could not be read/)).not.toBeInTheDocument();
   });
 
-  it("does not rank the revision as latest or outdated", async () => {
-    // A user's revision is shown as a fact; no marker says how it compares.
+  it("says nothing about revisions while the user is on the newest", async () => {
+    stubRevisions({ user: ["sch_business"], history: ["sch_business"] });
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+    await panel.findByRole("link", { name: "Business sch_business" });
+
+    expect(panel.queryByText("New revision available")).not.toBeInTheDocument();
+    // Nothing to move to.
+    expect(panel.queryByRole("button", { name: /revision|update/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).not.toHaveTextContent(/outdated/i);
+  });
+
+  it("labels the newest revision, and offers moving back from it", async () => {
+    stubRevisions({ user: ["sch_business_2"], history: ["sch_business_2", "sch_business"] });
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+
+    expect(await panel.findByRole("button", { name: "Change revision" })).toBeInTheDocument();
+    expect(panel.getByText("Latest")).toBeVisible();
+    expect(panel.queryByText("New revision available")).not.toBeInTheDocument();
+  });
+
+  it("says in the sheet when the move goes to an older revision", async () => {
+    stubRevisions({ user: ["sch_business_2"], history: ["sch_business_2", "sch_business"] });
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+    await userEvent.click(await panel.findByRole("button", { name: "Change revision" }));
+
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(await sheet.findByText("This is an older revision")).toBeVisible();
+  });
+
+  it("says nothing of an older revision when the move goes to a newer one", async () => {
+    stubRevisions();
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+    await userEvent.click(await panel.findByRole("button", { name: "Review update" }));
+
+    const sheet = within(await screen.findByRole("dialog"));
+    await sheet.findByRole("button", { name: "Update user" });
+    await waitFor(() => expect(sheet.queryByText("Loading revision…")).not.toBeInTheDocument());
+    expect(sheet.queryByText("This is an older revision")).not.toBeInTheDocument();
+  });
+
+  it("marks a user a newer revision is available for", async () => {
+    stubRevisions();
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+
+    expect(await panel.findByText("New revision available")).toBeVisible();
+    expect(panel.getByRole("button", { name: "Review update" })).toBeInTheDocument();
+    expect(panel.queryByText("Latest")).not.toBeInTheDocument();
+  });
+
+  it("marks nothing for a schema without an object type, a revision of nothing", async () => {
     stub();
     await renderDetail();
-    const panel = await screen.findByRole("tabpanel");
-    await within(panel).findByRole("link", { name: "Business sch_business" });
+    const panel = within(await screen.findByRole("tabpanel"));
+    await panel.findByRole("link", { name: "Business sch_business" });
 
-    expect(panel).not.toHaveTextContent(/latest|outdated/i);
+    expect(panel.queryByText("New revision available")).not.toBeInTheDocument();
+    expect(panel.queryByRole("button", { name: "Review update" })).not.toBeInTheDocument();
+  });
+
+  describe("updating the schema revision", () => {
+    async function openSheet() {
+      const router = await renderDetail();
+      const panel = within(await screen.findByRole("tabpanel"));
+      await userEvent.click(await panel.findByRole("button", { name: "Review update" }));
+      return { router, sheet: within(await screen.findByRole("dialog")) };
+    }
+
+    it("moves a user whose values fit with the revision alone", async () => {
+      stubRevisions({
+        target: {
+          ...BUSINESS,
+          properties: { ...BUSINESS.properties, nickname: { type: "string" } },
+        },
+      });
+      const bodies = capturePatches();
+      await openSheet();
+
+      const sheet = within(await screen.findByRole("dialog"));
+      expect(await sheet.findByText(/No changes needed/)).toBeVisible();
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() => expect(bodies).toEqual([{ schema: "sch_business_2" }]));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
+    it("asks for a newly required value and sends it with the move", async () => {
+      stubRevisions({
+        target: {
+          ...BUSINESS,
+          required: ["email", "country"],
+          properties: { ...BUSINESS.properties, country: { type: "string", title: "Country" } },
+        },
+        refused: ["country"],
+      });
+      const bodies = capturePatches();
+      const { sheet } = await openSheet();
+
+      // Refused by the form while it is empty: no request is sent for it.
+      await userEvent.click(await sheet.findByRole("button", { name: "Update user" }));
+      expect(await sheet.findByText("This field is required.")).toBeVisible();
+      expect(bodies).toEqual([]);
+
+      await userEvent.type(sheet.getByRole("textbox", { name: "Country" }), "CH");
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() =>
+        expect(bodies).toEqual([{ schema: "sch_business_2", attributes: { country: "CH" } }]),
+      );
+    });
+
+    it("carries a rename inside an object", async () => {
+      const address = (properties: Record<string, unknown>, closed = false) => ({
+        ...BUSINESS,
+        properties: {
+          email: BUSINESS.properties.email,
+          address: {
+            type: "object",
+            title: "Address",
+            ...(closed ? { additionalProperties: false } : {}),
+            properties,
+          },
+        },
+      });
+      stubRevisions({
+        current: address({ surname: { type: "string", title: "Surname" } }),
+        target: address({ lastName: { type: "string", title: "Last name" } }, true),
+        attributes: { email: "maya@acme.com", address: { surname: "Lovelace" } },
+        refused: ["address.surname"],
+      });
+      const bodies = capturePatches();
+      const { sheet } = await openSheet();
+
+      await userEvent.click(
+        await sheet.findByRole("button", { name: "Use “Lovelace” from address.surname" }),
+      );
+      expect(sheet.getByRole("textbox", { name: /Last name/ })).toHaveValue("Lovelace");
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() =>
+        expect(bodies).toEqual([
+          {
+            schema: "sch_business_2",
+            attributes: { address: { lastName: "Lovelace", surname: null } },
+          },
+        ]),
+      );
+    });
+
+    it("carries a rename with the value it suggests, and removes the old one", async () => {
+      stubRevisions({
+        target: {
+          ...BUSINESS,
+          additionalProperties: false,
+          properties: {
+            email: BUSINESS.properties.email,
+            organization: { type: "string", title: "Organization" },
+          },
+        },
+        refused: ["companyName"],
+      });
+      const bodies = capturePatches();
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("Will be removed")).toBeVisible();
+      await userEvent.click(sheet.getByRole("button", { name: "Use “Acme” from companyName" }));
+      expect(sheet.getByRole("textbox", { name: /Organization/ })).toHaveValue("Acme");
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() =>
+        expect(bodies).toEqual([
+          { schema: "sch_business_2", attributes: { organization: "Acme", companyName: null } },
+        ]),
+      );
+    });
+
+    it("keeps what an open revision no longer declares unless asked to remove it", async () => {
+      stubRevisions({
+        target: { ...BUSINESS, properties: { email: BUSINESS.properties.email } },
+      });
+      const bodies = capturePatches();
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("Not declared by this revision")).toBeVisible();
+      await userEvent.click(sheet.getByRole("switch", { name: "Remove companyName" }));
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() =>
+        expect(bodies).toEqual([{ schema: "sch_business_2", attributes: { companyName: null } }]),
+      );
+    });
+
+    it("brings in a field a refusal names, and says nothing changed", async () => {
+      // The dry run took it; the real request came later, and things had changed.
+      stubRevisions();
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+          if (await isDryRun(request)) return undefined;
+          return HttpResponse.json(
+            {
+              code: "req.invalid",
+              message: "Check the fields.",
+              details: { details: { fields: ["attributes.companyName"] } },
+            },
+            { status: 400 },
+          );
+        }),
+      );
+      const { sheet } = await openSheet();
+
+      await sheet.findByText(/No changes needed/);
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      expect(await sheet.findByText(/Check the fields\..*Nothing was changed\./)).toBeVisible();
+      expect(sheet.getByRole("textbox", { name: "Company name" })).toHaveValue("Acme");
+      expect(sheet.getByText("The server refused this value.")).toBeVisible();
+    });
+
+    it("asks the server about the move before anything is written", async () => {
+      stubRevisions();
+      const dryRuns: unknown[] = [];
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+          dryRuns.push(await request.json());
+          return HttpResponse.json({ id: USER_ID });
+        }),
+      );
+      const { sheet } = await openSheet();
+
+      await sheet.findByText(/No changes needed/);
+      expect(dryRuns).toEqual([{ schema: "sch_business_2", dry_run: true }]);
+    });
+
+    it("asks only for what the server refused, showing the stored value", async () => {
+      stubRevisions({
+        target: {
+          ...BUSINESS,
+          properties: { ...BUSINESS.properties, companyName: { type: "integer", title: "Size" } },
+        },
+        refused: ["companyName"],
+      });
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("Set these attributes")).toBeVisible();
+      expect(sheet.getByText(/Currently "Acme"/)).toBeVisible();
+      expect(sheet.queryByRole("textbox", { name: /Email/ })).not.toBeInTheDocument();
+    });
+
+    it("says why when the dry run can't answer, and offers no move", async () => {
+      stubRevisions();
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, () =>
+          HttpResponse.json({ code: "forbidden", message: "Not allowed." }, { status: 403 }),
+        ),
+      );
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("Not allowed.")).toBeVisible();
+      expect(sheet.getByRole("button", { name: "Update user" })).toBeDisabled();
+    });
+
+    it("shows a unique value another user holds, and still lets the move be tried", async () => {
+      stubRevisions();
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+          if (!(await isDryRun(request))) return undefined;
+          return HttpResponse.json(
+            {
+              code: "user.already_exists",
+              message: "This value is taken.",
+              details: { details: { fields: ["attributes.email"] } },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText(/This value is taken\./)).toBeVisible();
+      expect(await sheet.findByRole("textbox", { name: /Email/ })).toBeVisible();
+      expect(sheet.getByRole("button", { name: "Update user" })).toBeEnabled();
+    });
+
+    it("warns when the revision changes how users sign in", async () => {
+      stubRevisions({ target: { ...BUSINESS, "x-identifier": "companyName" } });
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("This revision changes how users sign in")).toBeVisible();
+      expect(sheet.getByText(/the sign-in identifier/)).toBeVisible();
+    });
+
+    it("warns that a move discards unsaved edits", async () => {
+      stubRevisions();
+      await renderDetail();
+      const panel = within(await screen.findByRole("tabpanel"));
+      await userEvent.type(await panel.findByLabelText("Company name"), " Inc");
+      await userEvent.click(panel.getByRole("button", { name: "Review update" }));
+
+      const sheet = within(await screen.findByRole("dialog"));
+      expect(await sheet.findByText(/unsaved changes/)).toBeVisible();
+    });
+
+    it("loads and sends the revision picked from the history", async () => {
+      stubRevisions({
+        user: ["sch_business"],
+        history: ["sch_business_3", "sch_business_2", "sch_business"],
+        latest: "sch_business_3",
+      });
+      const bodies = capturePatches();
+      const { sheet } = await openSheet();
+
+      await userEvent.click(await sheet.findByRole("combobox", { name: "Move to" }));
+      await userEvent.click(await screen.findByRole("option", { name: /sch_business_2/ }));
+      await sheet.findByText(/No changes needed/);
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() => expect(bodies).toEqual([{ schema: "sch_business_2" }]));
+    });
   });
 
   it("titles the profile card as the user's schema", async () => {

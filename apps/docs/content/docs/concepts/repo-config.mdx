@@ -3,7 +3,7 @@ title: Configuration as code
 description: How your project's auth configuration lives in repo files, is deployed as a release, and becomes revisions.
 ---
 
-Configuration as code means your project's auth configuration lives in files in your repository. Repo files describe configuration; server APIs own runtime resources. Your project's user schemas, login flows, branding, and sign-in connections are files you review like code. `zitadel deploy` publishes them to the project as a release, an immutable snapshot of those files. [Deploy](/docs/guides/deploy) walks through a change, and its [releases section](/docs/guides/deploy#releases-deployments-and-rollback) explains releases, deployments and rollback.
+Configuration as code means your project's auth configuration lives in files in your repository. Repo files describe configuration; server APIs own runtime resources. Your project's user schemas, login flows, branding, and sign-in connections are files you review like code. `zitadel deploy` publishes them to the project as a release, an immutable snapshot of those files. The [deploy guide](/docs/guides/deploy) walks through a change, and [Releases and deployments](/docs/concepts/releases-and-deployments) explains releases, deployments and rollback.
 
 ## What the CLI writes
 
@@ -16,14 +16,33 @@ Configuration as code means your project's auth configuration lives in files in 
 
 ## What stays out of source control
 
-Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zitadel/secret` hold the project secret, and `.zitadel/local/**` is a local runtime's data, not product configuration. Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.
+Commit `zitadel.json` and `.zitadel/**`, except:
+
+- `.env.local` and `.zitadel/secret`, which hold the project secret;
+- `.zitadel/local/**`, the local runtime's data.
+
+Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`, and `start` adds `.zitadel/local/`.
+
+## Variables
+
+Some values do not belong in your repository: secrets, and values that differ between production and previews. Store them on the project as variables, and reference them from configuration as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one. Set a value with `zitadel variable set NAME <value>`. For a secret, run `zitadel variable set NAME --secret`: it prompts for the value and stores it encrypted, so it is never read back.
+
+A variable can hold a separate value for [previews](/docs/concepts/origins-and-previews#previews) (`--preview`), so a preview never runs with a production secret. Each deployment keeps the values it was created with: a changed variable reaches users on the next `zitadel deploy`, or the next `zitadel preview` for a preview value, and a rollback brings back the old values.
+
+## Environments
+
+Your app can run against more than one environment, such as `development` on the [local runtime](/docs/guides/local-runtime) and `production` on a hosted server. Give each environment its own project, on a local or remote server. Separate projects never share users, sessions or any other data. What they share is your configuration: you deploy the same `.zitadel/` files to each of them.
+
+The CLI keeps each environment's server and project in `.env.<name>.local`. `zitadel env add <name>` binds an environment, creating a project for it if needed, and `zitadel env list` shows the ones this directory has. A command picks the environment from `--env`, then `ZITADEL_ENV`, then the hosting platform (`VERCEL_ENV`, or Netlify's `CONTEXT`), and uses `development` otherwise. `zitadel env` shows which server and project resolved.
+
+A preview is not an environment. It runs on a URL of an existing project and shares that project's data ([Origins and previews](/docs/concepts/origins-and-previews#previews)).
 
 ## What deploy checks
 
 `zitadel deploy --dry-run` validates local configuration and shows what would change without mutating files or platform state. `zitadel deploy` builds a release from it and makes the release live. [How publishing works](/docs/guides/deploy#what-deploy-checks-before-it-publishes) covers the rest of the process. These are the checks that fail a deploy before it uploads anything:
 
-- **Flows are validated at deploy time** against the same rules the platform enforces: transition wiring, step reachability, schema field references, and cross-purpose invariants. For example, a purpose switch must go to a purpose the flow serves. A violation fails `deploy` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance shows up as `# warning:` lines in the dry run. If the pre-flight ever disagrees with your server version, set `ZITADEL_SKIP_FLOW_VALIDATION=1` to skip it and let the server decide.
-- **Sign-in connections are checked across files at deploy time.** A connection file, `.zitadel/idps/<slug>.json`, configures one external identity provider ([social sign-in](/docs/guides/social-sign-in)). `deploy` reads your user schemas, login flows and connection files together. It stops, before it changes anything, when they disagree. One error names every problem with the file, the step and the name at fault. `deploy` stops on any of these:
+- **Flows are validated at deploy time** against the same rules the platform enforces: transition wiring, step reachability, schema field references, and cross-purpose invariants. For example, a purpose switch must go to a purpose the flow serves. A violation fails `deploy` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance shows up as warnings that name the file.
+- **Sign-in connections are checked across files at deploy time.** A connection file, `.zitadel/idps/<slug>.json`, configures one external identity provider ([social sign-in](/docs/guides/social-sign-in)). `deploy` reads your user schemas, login flows and connection files together. It stops, before it changes anything, when they disagree. One `E_VALIDATION`, "Configuration validation failed", names every problem with the file, the step and the name at fault; with `--json`, `details.issues` lists each as `{rule, path, steps?, message}`. `deploy` stops on any of these:
   - a step offers a provider its schema does not list (or SSO is off);
   - a schema lists a provider with no connection file;
   - a step offers providers without routing every outcome (a `user_already_exists` route that carries an action does not count);
@@ -31,13 +50,11 @@ Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zi
   - a `verified_claims` key has no `claim_mapping` row;
   - a mapping or `verified_claims` key names a property no schema has (a top-level property name, not a dotted path);
   - two connection files share a slug or a project variable, which is checked across all of them.
-
-  Setting `ZITADEL_SKIP_FLOW_VALIDATION` turns this check off along with flow validation.
-- **A connection's `oidc` block names no endpoint, or every one it needs.** With none, the endpoints come from the issuer's discovery document. Otherwise it names `authorization_endpoint`, `jwks_uri`, `token_endpoint`, and `userinfo_endpoint` unless `id_token_mapping` is true. The server refuses a block in between (`idp.endpoints_partial`), so `deploy` refuses it first with `E_VALIDATION`, naming the file and the missing endpoints, and a deploy never stops part-way. `ZITADEL_SKIP_FLOW_VALIDATION` does not skip this.
-- **Connection files are also checked against the platform, and that check is never skipped.** `ZITADEL_SKIP_FLOW_VALIDATION` does not turn these off. When a `client_id` or `client_secret` names a project variable, it must exist (`E_CREDENTIAL_MISSING` when it does not). The id must be a plain variable and the secret a secret one, and one variable may not serve both (`E_VALIDATION`). The `slug`, `protocol`, `oidc.issuer`, and `subject_claim` (an absent one reads as `sub`) of a connection that was deployed cannot be edited (`E_VALIDATION`). If the platform cannot be read, the deploy stops instead of skipping them.
+- **A connection's `oidc` block names no endpoint, or every one it needs.** With none, the endpoints come from the issuer's discovery document. Otherwise it names `authorization_endpoint`, `jwks_uri`, `token_endpoint`, and `userinfo_endpoint` unless `id_token_mapping` is true. The server refuses a block in between (`idp.endpoints_partial`), so `deploy` refuses it first with `E_VALIDATION`, naming the file and the missing endpoints, and a deploy never stops part-way.
+- **Connection files are also checked against the platform, and that check is never skipped.** When a `client_id` or `client_secret` names a project variable, it must exist (`E_CREDENTIAL_MISSING` when it does not). The id must be a plain variable and the secret a secret one, and one variable may not serve both (`E_VALIDATION`). The `slug`, `protocol`, `oidc.issuer`, and `subject_claim` (an absent one reads as `sub`) of a connection that was deployed cannot be edited (`E_VALIDATION`). If the platform cannot be read, the deploy stops instead of skipping them.
 
 ## Revisions
 
-- Schemas and flows are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one. Existing users keep validating against the schema revision they were created with. Older flow revisions stay active; a login that names a flow runs its newest active revision.
-- Flows name their schema by its `objectType` in `user_schema` and run against its newest revision, so a schema edit needs no change to `user_schema`. If the edit removes or renames a property a step collects, update that step's `fields`: `deploy` only checks the flows it publishes. [Flows and schemas](/docs/concepts/flows-and-schemas) explains the relationship.
+- Schemas and flows are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one. Existing users keep validating against the schema revision they were created with. A login that names a flow runs the revision of it the deployed release pins.
+- Flows name their schema by its `objectType` in `user_schema` and run against the revision the deployed release pins, so a schema edit needs no change to `user_schema` and reaches sign-in with the next deploy. If the edit removes or renames a property a step collects, update that step's `fields`: `deploy` only checks the flows it publishes. [Flows and schemas](/docs/concepts/flows-and-schemas) explains the relationship.
 - Flow files carry `"$schema": "../meta/flow-definition.json"`, a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only: the platform ignores it, and a deploy never treats it as a change.

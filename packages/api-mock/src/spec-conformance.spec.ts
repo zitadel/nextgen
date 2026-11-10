@@ -667,7 +667,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
-    // (title, description, custom x-* extensions). The mock must do the same,
+    // (title, description). The mock must do the same,
     // serving the document under `schema` in the {id, schema, metadata}
     // envelope.
     const doc = {
@@ -676,7 +676,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
-      "x-custom-extension": { keep: true },
+      description: "Kept verbatim",
     };
     const create = await fetch(`${API}/schemas?project_id=proj_schema_raw`, {
       method: "POST",
@@ -807,6 +807,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // silently clamped.
     const oversized = await fetch(`${API}/schemas?project_id=proj_schema_paging&limit=101`);
     expect(oversized.status).toBe(400);
+  });
+
+  test("POST /schemas refuses a key the user meta-schema does not allow, as the server does", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { firstName: { type: "string", minimumLength: 3 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
+    expect(body.code).toBe("invalid_schema");
+    expect(body.details.issues).toContainEqual(
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    );
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
@@ -1927,7 +1947,7 @@ describe("api-mock releases and deployments", () => {
     const deployment = (await (
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     await write("primary", { HOST: "changed.acme.com" });
@@ -1957,7 +1977,7 @@ describe("api-mock releases and deployments", () => {
       return (await (
         await createDeployment(project.id, project.secret, {
           release_id: release.id,
-          targets: ["primary"],
+          targets: "primary",
         })
       ).json()) as { id: string };
     };
@@ -2279,7 +2299,7 @@ describe("api-mock releases and deployments", () => {
 
     const first = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(first.status).toBe(201);
     const deployment = (await first.json()) as {
@@ -2290,7 +2310,7 @@ describe("api-mock releases and deployments", () => {
 
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(again.status).toBe(200);
   });
@@ -2303,7 +2323,7 @@ describe("api-mock releases and deployments", () => {
 
     const noPrimary = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(noPrimary.status).toBe(400);
     expect(((await noPrimary.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2328,13 +2348,13 @@ describe("api-mock releases and deployments", () => {
 
     const live = await createDeployment(project.id, project.secret, {
       release_id: first.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
 
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const history = (await (
@@ -2362,7 +2382,7 @@ describe("api-mock releases and deployments", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({
       code: "dep.invalid",
-      message: "deployment: deploy primary origins with the primary keyword",
+      message: "deployment: deploy to primary origins with the primary target",
     });
   });
 
@@ -2375,7 +2395,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
@@ -2383,7 +2403,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2410,7 +2430,7 @@ describe("api-mock releases and deployments", () => {
 
     const deployed = await createDeployment(second.id, second.secret, {
       content_hash: own.content_hash,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     expect(deployed.status).toBe(201);
@@ -2455,7 +2475,7 @@ describe("api-mock releases and deployments", () => {
     expect(deployed.targets[0]?.expires_at).not.toBeNull();
   });
 
-  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+  test("a rollback keeps the origins it froze when one is no longer primary", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
     await addPrimary(project.id, project.secret, "https://www.acme.com");
@@ -2465,7 +2485,7 @@ describe("api-mock releases and deployments", () => {
     const deployment = (await (
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     await fetch(`${API}/projects/${project.id}/origins/remove`, {
@@ -2483,8 +2503,46 @@ describe("api-mock releases and deployments", () => {
       },
     );
 
-    expect(rollback.status).toBe(403);
-    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+    expect(rollback.status).toBe(200);
+    const restored = (await rollback.json()) as { targets: { origin: string }[] };
+    expect(restored.targets.map((target) => target.origin)).toEqual([
+      "https://app.acme.com",
+      "https://www.acme.com",
+    ]);
+  });
+
+  test("a live read leaves out an origin the newest primary deployment does not name", async () => {
+    const project = await newProject("deploy-rollback-narrower");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const narrow = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+    });
+    await fetch(`${BASE}/deployments/${narrow.id}/rollback?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ message: "revert" }),
+    });
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { targets: { origin: string }[] }[] };
+
+    expect(
+      live.deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+    ).toEqual(["https://app.acme.com"]);
   });
 
   test("rolls back to an earlier deployment, reversing the live release", async () => {
@@ -2496,7 +2554,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
 
@@ -2505,7 +2563,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2585,7 +2643,7 @@ describe("api-mock releases and deployments", () => {
     // carries one is refused, even though an omitted ttl on a preview defaults.
     const withTtl = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
       ttl: "PT168H",
     });
     expect(withTtl.status).toBe(400);
@@ -2780,7 +2838,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: served.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
@@ -2795,7 +2853,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: next.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {

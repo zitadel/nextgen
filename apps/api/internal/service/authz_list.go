@@ -21,7 +21,7 @@ func WithAuthzListFilter(ctx context.Context, filter AuthzListFilter) context.Co
 
 // AuthzListFilterFromContext returns the list authz filter when present.
 // An unrestricted wrap wins over an inherited filter so nested uniqueness /
-// resolve / GetLatest queries are not EXISTS-narrowed to the outer kind.
+// resolve queries are not EXISTS-narrowed to the outer kind.
 func AuthzListFilterFromContext(ctx context.Context) (AuthzListFilter, bool) {
 	if AuthzListUnrestricted(ctx) {
 		return AuthzListFilter{}, false
@@ -44,7 +44,7 @@ type authzListSkipOnce struct {
 var ErrListFilterRequired = errors.New("authz list filter missing")
 
 // WithAuthzListUnrestricted marks a nested non-HTTP list (create uniqueness,
-// login Resolve, branding GetLatest, stmttest). It skips the #838 tripwire
+// login Resolve, stmttest). It skips the #838 tripwire
 // and ignores an inherited AuthzListFilter so a nested query cannot see zero
 // rows from the outer kind's EXISTS.
 func WithAuthzListUnrestricted(ctx context.Context) context.Context {

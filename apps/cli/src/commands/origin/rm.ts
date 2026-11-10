@@ -78,13 +78,13 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               // Named in the text, not as a next command: the URL is the developer's
               // to fill in, and a `<url>` placeholder is a shell redirection.
               reportWarning(
-                `${removal.pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+                `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
               );
               return {
                 status: "ok",
                 data,
                 pretty: prose(
-                  `Removed ${removal.pattern}; the project has no origins left and admits every origin`,
+                  `Removed ${removal.pattern}; the project has no origins left and admits no origin except a loopback origin`,
                 ),
               };
             }

@@ -104,7 +104,7 @@ describe("origin rm", () => {
 
     const result = await remove(cwd);
 
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_CONFIRMATION_REQUIRED");
     expect(removed).toEqual([]);
   });
 
@@ -127,7 +127,7 @@ describe("origin rm", () => {
     const result = await remove(cwd, ["--env", "production"]);
 
     const envelope = parseJson(result.stdout) as { code: string; next_commands?: string[] };
-    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(envelope.next_commands?.[0]).toContain("--env production");
   });
 

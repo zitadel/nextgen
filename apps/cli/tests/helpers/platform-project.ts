@@ -6,25 +6,47 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/pla
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
+import { z } from "zod";
 
 import { DEFAULT_SERVER } from "@/lib/server";
+import type { JsonObject } from "@/lib/zitadel/types";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 
 /** The platform the unit tests' msw server answers for. */
 export const PLATFORM_URL = DEFAULT_SERVER;
 
-/** POSTs to the mock platform as a project's secret, and returns the parsed body. */
+/**
+ * POSTs to the mock platform as a project's secret, and returns the parsed
+ * body.
+ *
+ * @param path - The API path, from the platform's root.
+ * @param secret - The project secret to send as the bearer token, or `""`.
+ * @param body - The request body, sent as JSON.
+ * @returns The JSON object the platform answered with.
+ */
 export async function callPlatform(
   path: string,
   secret: string,
   body: object,
-): Promise<Record<string, unknown>> {
+): Promise<JsonObject> {
   const response = await fetch(`${PLATFORM_URL}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
     body: JSON.stringify(body),
   });
-  return (await response.json()) as Record<string, unknown>;
+  return toJsonObject(await response.json(), `The platform's answer to POST ${path}`);
 }
+
+/** What the platform answers a new project with, as far as these helpers read it. */
+const CreatedProject = z.object({
+  id: z.string(),
+  project_secret: z.string(),
+});
+
+/** What the platform answers a new release or deployment with: its id. */
+const Created = z.object({
+  id: z.string(),
+});
 
 /**
  * A Next.js app directory bound to a project through `.zitadel/secret`. The
@@ -53,31 +75,39 @@ export async function aProjectDirectory(
 /**
  * A project on the mock with two deploys to one primary origin, its
  * directory, and the second deployment's id. The caller removes the directory.
+ *
+ * @param prefix - The project's name, and the prefix of its directory.
+ * @returns The directory, and the id of the deployment a rollback would undo.
  */
 export async function aProjectWithTwoDeploys(
   prefix: string,
 ): Promise<{ cwd: string; undone: string }> {
-  const project = await callPlatform("/projects", "", { name: prefix });
-  const id = project.id as string;
-  const secret = project.project_secret as string;
+  const { id, project_secret: secret } = CreatedProject.parse(
+    await callPlatform("/projects", "", { name: prefix }),
+  );
   await callPlatform(`/projects/${id}/origins`, secret, {
     pattern: "https://app.acme.com",
     kind: "primary",
   });
-  const deploymentIds: string[] = [];
-  for (const revision of ["sch_a", "sch_b"]) {
-    const release = await callPlatform(`/releases?project_id=${id}`, secret, {
-      pointers: [{ kind: "schema", revision_id: revision }],
-    });
-    const deployment = await callPlatform(`/deployments?project_id=${id}`, secret, {
-      release_id: release.id,
-      targets: ["primary"],
-    });
-    deploymentIds.push(deployment.id as string);
-  }
+  const deploy = async (revision: string): Promise<string> => {
+    const release = Created.parse(
+      await callPlatform(`/releases?project_id=${id}`, secret, {
+        pointers: [{ kind: "schema", revision_id: revision }],
+      }),
+    );
+    const deployment = Created.parse(
+      await callPlatform(`/deployments?project_id=${id}`, secret, {
+        release_id: release.id,
+        targets: "primary",
+      }),
+    );
+    return deployment.id;
+  };
+  await deploy("sch_a");
+  const undone = await deploy("sch_b");
   return {
     cwd: await aProjectDirectory(prefix, { id, secret }),
-    undone: deploymentIds[deploymentIds.length - 1] as string,
+    undone,
   };
 }
 

@@ -46,6 +46,32 @@ describe("Git", () => {
     expect(await git(cwd, ["diff", "--cached", "--name-only"])).toBe("app/[id].tsx\n");
   });
 
+  it("takes in what a glob matches, but not below a further /", async () => {
+    const cwd = await scratch.committed({ "p/a.json": "", "p/b.md": "", "p/sub/c.json": "" });
+
+    expect(await git(cwd, ["ls-files", "--", Git.glob("p/*.json")])).toBe("p/a.json\n");
+  });
+
+  it("leaves out only the path an excluded literal names", async () => {
+    const cwd = await scratch.committed({ "app/[id].tsx": "", "app/i.tsx": "" });
+
+    expect(await git(cwd, ["ls-files", "--", ".", Git.excludedLiteral("app/[id].tsx")])).toBe(
+      "app/i.tsx\n",
+    );
+  });
+
+  it("leaves out what an excluded glob matches, but not below a further /", async () => {
+    const cwd = await scratch.committed({
+      "p/a.json": "",
+      "p/a.test.json": "",
+      "p/sub/b.test.json": "",
+    });
+
+    expect(await git(cwd, ["ls-files", "--", ".", Git.excluded("p/*.test.json")])).toBe(
+      "p/a.json\np/sub/b.test.json\n",
+    );
+  });
+
   it("acts on the repository an inherited GIT_DIR names, as git does", async () => {
     const other = await scratch.repository();
     const cwd = await scratch.repository();

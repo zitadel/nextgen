@@ -1,98 +1,120 @@
-import { execFile } from "node:child_process";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
-
 import { deployMessage } from "@/lib/publish/message";
+import { it } from "@tests/helpers/fixtures";
+import { commitAll, git, write } from "@tests/helpers/git-repo";
 
-const run = promisify(execFile);
+/**
+ * The subject of a merge commit, which says nothing about the change.
+ */
+const MERGE_SUBJECT = "Merge 1a2b into 3c4d";
 
-/** A temp git repo whose one clean commit has `subject`. */
+/**
+ * Makes `dir` a repository whose one clean commit has `subject`.
+ *
+ * @param dir - The directory to make a repository of.
+ * @param subject - The commit's subject.
+ * @returns The directory.
+ */
 async function aRepo(dir: string, subject = "add company"): Promise<string> {
-  const git = (args: string[]): Promise<unknown> => run("git", args, { cwd: dir });
-  await git(["init", "-q"]);
-  await git(["config", "user.email", "test@example.com"]);
-  await git(["config", "user.name", "Test"]);
-  await writeFile(join(dir, "README.md"), "# app\n");
-  await git(["add", "."]);
-  await git(["commit", "-q", "-m", subject]);
+  await git(dir, "init", "--quiet");
+  await write(dir, { "README.md": "# app\n" });
+  await commitAll(dir, subject);
   return dir;
-}
-
-/** A GitHub pull_request event payload on disk, as the runner writes it. */
-async function aPullRequestEvent(dir: string, title: string): Promise<string> {
-  const path = join(dir, "event.json");
-  await writeFile(path, JSON.stringify({ pull_request: { title } }));
-  return path;
 }
 
 describe("deployMessage", () => {
   it("takes -m over everything else", async ({ dir }) => {
     const cwd = await aRepo(dir);
 
-    expect(await deployMessage("fix sign-up", cwd, {})).toBe("fix sign-up");
+    const message = await deployMessage("fix sign-up", cwd, {});
+
+    expect(message).toBe("fix sign-up");
   });
 
-  it("falls back to the commit subject on a clean worktree", async ({ dir }) => {
-    const cwd = await aRepo(dir);
-
-    expect(await deployMessage(undefined, cwd, {})).toBe("add company");
-  });
-
-  it("records nothing for a dirty worktree", async ({ dir }) => {
-    const cwd = await aRepo(dir);
-    await writeFile(join(cwd, "README.md"), "# edited\n");
-
-    expect(await deployMessage(undefined, cwd, {})).toBeUndefined();
-  });
-
-  it("records nothing outside a git repository", async ({ dir }) => {
-    expect(await deployMessage(undefined, dir, {})).toBeUndefined();
-  });
-
-  it("takes a GitHub pull request's title over the merge commit's subject", async ({ dir }) => {
-    const cwd = await aRepo(dir, "Merge 1a2b into 3c4d");
-    const event = await aPullRequestEvent(cwd, "feat: add company");
-
-    expect(
-      await deployMessage(undefined, cwd, {
-        GITHUB_EVENT_NAME: "pull_request",
-        GITHUB_EVENT_PATH: event,
-      }),
-    ).toBe("feat: add company");
-  });
-
-  it("records nothing for a GitHub pull request whose event cannot be read", async ({ dir }) => {
-    const cwd = await aRepo(dir, "Merge 1a2b into 3c4d");
-
-    expect(
-      await deployMessage(undefined, cwd, {
-        GITHUB_EVENT_NAME: "pull_request",
-        GITHUB_EVENT_PATH: join(cwd, "missing.json"),
-      }),
-    ).toBeUndefined();
-  });
-
-  it("takes the first line of Vercel's commit message", async ({ dir }) => {
-    const cwd = await aRepo(dir);
-
-    expect(
-      await deployMessage(undefined, cwd, {
-        VERCEL_GIT_COMMIT_MESSAGE: "feat: add company\n\nCo-authored-by: someone",
-      }),
-    ).toBe("feat: add company");
-  });
-
-  it("cuts a long subject by code points, never splitting one", async ({ dir }) => {
+  it("cuts a long subject to 1024 code points", async ({ dir }) => {
     const cwd = await aRepo(dir, `${"x".repeat(1023)}😀😀`);
 
     const message = await deployMessage(undefined, cwd, {});
 
     expect(Array.from(message ?? "")).toHaveLength(1024);
+  });
+
+  it("cuts a long subject without splitting a code point", async ({ dir }) => {
+    const cwd = await aRepo(dir, `${"x".repeat(1023)}😀😀`);
+
+    const message = await deployMessage(undefined, cwd, {});
+
     expect(message?.endsWith("😀")).toBe(true);
+  });
+
+  describe("with a clean worktree", () => {
+    it("falls back to the commit subject", async ({ dir }) => {
+      const cwd = await aRepo(dir);
+
+      const message = await deployMessage(undefined, cwd, {});
+
+      expect(message).toBe("add company");
+    });
+  });
+
+  describe("with a dirty worktree", () => {
+    it("records nothing", async ({ dir }) => {
+      const cwd = await aRepo(dir);
+      await write(cwd, { "README.md": "# edited\n" });
+
+      const message = await deployMessage(undefined, cwd, {});
+
+      expect(message).toBeUndefined();
+    });
+  });
+
+  describe("outside a git repository", () => {
+    it("records nothing", async ({ dir }) => {
+      const message = await deployMessage(undefined, dir, {});
+
+      expect(message).toBeUndefined();
+    });
+  });
+
+  describe("when a GitHub pull request runs it", () => {
+    it("takes the pull request's title over the merge commit's subject", async ({ dir }) => {
+      const cwd = await aRepo(dir, MERGE_SUBJECT);
+      await write(cwd, {
+        "event.json": JSON.stringify({ pull_request: { title: "feat: add company" } }),
+      });
+
+      const message = await deployMessage(undefined, cwd, {
+        GITHUB_EVENT_NAME: "pull_request",
+        GITHUB_EVENT_PATH: join(cwd, "event.json"),
+      });
+
+      expect(message).toBe("feat: add company");
+    });
+
+    it("records nothing when its event cannot be read", async ({ dir }) => {
+      const cwd = await aRepo(dir, MERGE_SUBJECT);
+
+      const message = await deployMessage(undefined, cwd, {
+        GITHUB_EVENT_NAME: "pull_request",
+        GITHUB_EVENT_PATH: join(cwd, "missing.json"),
+      });
+
+      expect(message).toBeUndefined();
+    });
+  });
+
+  describe("when Vercel builds it", () => {
+    it("takes the first line of the commit message", async ({ dir }) => {
+      const cwd = await aRepo(dir);
+
+      const message = await deployMessage(undefined, cwd, {
+        VERCEL_GIT_COMMIT_MESSAGE: "feat: add company\n\nCo-authored-by: someone",
+      });
+
+      expect(message).toBe("feat: add company");
+    });
   });
 });

@@ -55,11 +55,15 @@
     },
     {
       "name": "Branding",
-      "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins, or the newest one when the\nrelease pins no flow.\n"
+      "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins.\n"
     },
     {
       "name": "Identity Providers",
       "description": "Identity providers are the external login providers a project offers.\nEach is published as a revisioned connection document and referenced by\nits slug from user schemas and flow definitions. These operations create\nor revise a connection, query connections, read one by ID, and read its\nrevisions. A slug resolves through the query.\n"
+    },
+    {
+      "name": "Applications",
+      "description": "Applications authenticate their users via Zitadel, each through its\nOAuth clients. A registered application is written through the API as\none revisioned document. These operations create or revise a registered\napplication and read one by ID.\n"
     },
     {
       "name": "Policies",
@@ -240,7 +244,7 @@
             }
           },
           "400": {
-            "description": "The provided input was not valid.\n\nAttributes that fail the user schema answer `req.invalid`, the same\nway a malformed body does: `details.details.fields` lists the dotted\npath of every failing field from the request body, such as\n`attributes.country` or `attributes.address.zip`. Only the field\nnames are reported, never the rejected values.\n",
+            "description": "The provided input was not valid.\n\nAttributes that fail the user schema answer `req.invalid`, the same\nway a malformed body does: `details.details.fields` lists the dotted\npath of every failing field from the request body, such as\n`attributes.country` or `attributes.address.zip`, and a failure inside\nan array item by the item's index, such as `attributes.phones.0.fax`.\nOnly the field names are reported, never the rejected values.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -449,7 +453,7 @@
         "operationId": "PatchUserByID",
         "x-zitadel-cli": "users update",
         "summary": "Update a user by ID",
-        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n",
+        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `\"dry_run\": true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n\n`dry_run` is a body field so that a server from before it refuses the\nrequest as malformed (`400 req.invalid`) instead of applying the patch.\n",
         "tags": [
           "Users"
         ],
@@ -481,7 +485,7 @@
         },
         "responses": {
           "200": {
-            "description": "The updated user.",
+            "description": "The updated user, or with `dry_run` the user as the patch would leave them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -491,7 +495,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, unknown schema, or merged attributes\nfailing schema validation.\n\nMerged attributes that fail the target schema answer `req.invalid`,\nthe same way a malformed body does and the same way a create does:\n`details.details.fields` lists the dotted path of every failing field\nfrom the request body, such as `attributes.country` or\n`attributes.address.zip`. A field the patch did not touch is named\ntoo when the merged document fails on it, as after a move to a schema\nthat requires it. Only the field names are reported, never the\nrejected values. Fix the fields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, unknown schema, or merged attributes\nfailing schema validation.\n\nMerged attributes that fail the target schema answer `req.invalid`,\nthe same way a malformed body does and the same way a create does:\n`details.details.fields` lists the dotted path of every failing field\nfrom the request body, such as `attributes.country` or\n`attributes.address.zip`, and a failure inside an array item by the\nitem's index, such as `attributes.phones.0.fax`. A field the patch did\nnot touch is named too when the merged document fails on it, as after a move to a schema\nthat requires it. Only the field names are reported, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1084,13 +1088,24 @@
       "put": {
         "operationId": "setUserPassword",
         "summary": "Set a user's password",
-        "description": "Sets a user's password, hashed with the project's current password hashing\npolicy.\n\nThe new password replaces the current one, and setting it emits\n`auth.factor.password.set`. A password the project's password policy\nrefuses answers `user.password_policy_violation`; send one that meets the\npolicy.\n",
+        "description": "Sets a user's password, hashed with the project's current password hashing\npolicy.\n\nThe new password replaces the current one, and setting it emits\n`auth.factor.password.set`. A password the project's password policy\nrefuses answers `user.password_policy_violation`; send one that meets the\npolicy.\n\nThe password policy is the one in the release that serves the caller's\n`Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a\npreview URL gets that preview's policy, and one on a primary origin the\nnewest primary deployment's. A request with no `Origin`, or from the\nconsole when the project does not list the console's origin, gets the\nproject's newest primary deployment.\n\nIf the request is refused:\n- `403 proj.origin_not_allowed`: the project admits no such origin. Add it\n  with `zitadel origin add`.\n- `403 proj.preview_not_live`: the origin matches a preview pattern but has\n  no live preview. Run `zitadel preview` on the branch.\n- `409 rel.not_deployed`: nothing is deployed to the origin. Run\n  `zitadel deploy`.\n- `409 rel.no_default`: the request names no origin and the project has no\n  primary deployment. Run `zitadel deploy`.\n- `409 rel.revoked`: the release that serves the origin is revoked.\n",
         "tags": [
           "Users"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/user-id"
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Standard browser `Origin` header. Selects the deployment whose password\npolicy applies. Browsers send it automatically; no client action is\nrequired. Absent when the caller is not a browser.\n",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "example": "https://www.acme.com"
+            }
           }
         ],
         "security": [
@@ -1351,7 +1366,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip`, never the rejected values. Fix the\nfields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip` or `attributes.phones.0.fax`, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1622,7 +1637,7 @@
       "get": {
         "operationId": "listMyProjects",
         "summary": "List the projects I can act on",
-        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
+        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
         "tags": [
           "Projects"
         ],
@@ -1649,6 +1664,16 @@
             "example": "acme"
           },
           {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sorts the list by `created_at` and then `id`: `desc` lists the newest\nproject first, `asc` the oldest first. Leave it out to list by\nproject ID, which says nothing about when a project was created. Send\nthe same value with every `page_token` the list returns: a token\ncontinues the list it came from, and under another order it is\nrefused with `400`.\n",
+            "schema": {
+              "$ref": "#/components/schemas/sort-direction"
+            },
+            "example": "desc"
+          },
+          {
             "$ref": "#/components/parameters/session-project-id"
           }
         ],
@@ -1669,7 +1694,7 @@
             }
           },
           "400": {
-            "description": "The page token or limit was not valid.",
+            "description": "The page token or limit was not valid, or the token was issued under another `order`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1864,7 +1889,7 @@
       "post": {
         "operationId": "createFlow",
         "summary": "Start a flow",
-        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the newest deployment to that exact origin is the target. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to the target answers `409` with `rel.not_deployed`.\n  Run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check and still needs a deployment\ntarget. A loopback origin passes it too, and so does the server's own\norigin, from which its console previews a project's login. A step\nsubmitted from the server's own origin is still refused unless the project\nlists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flow/{id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
+        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flow/{id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
         "tags": [
           "Flows"
         ],
@@ -1874,7 +1899,7 @@
             "name": "Origin",
             "in": "header",
             "required": false,
-            "description": "Standard browser `Origin` header. Selects the deployment that serves\nthis attempt: matched against the project's origin patterns and live\npreviews, then against the newest deployment to that exact origin.\nBrowsers send it automatically; no client action is required. Absent\nwhen the caller is not a browser.\n",
+            "description": "Standard browser `Origin` header. Selects the deployment that serves\nthis attempt: matched against the project's origin patterns and live\npreviews, then against the deployment that origin serves.\nBrowsers send it automatically; no client action is required. Absent\nwhen the caller is not a browser.\n",
             "schema": {
               "type": "string",
               "format": "uri",
@@ -1948,7 +1973,7 @@
             }
           },
           "409": {
-            "description": "Nothing is deployed to the resolved target (`rel.not_deployed`), or the\nrelease of that deployment is revoked (`rel.revoked`).\n",
+            "description": "Nothing is deployed to the resolved target (`rel.not_deployed`), the\nrequest needs a primary deployment and the project has none\n(`rel.no_default`), or the release of that deployment is revoked\n(`rel.revoked`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1960,6 +1985,13 @@
                     "value": {
                       "code": "rel.not_deployed",
                       "message": "nothing is deployed to https://www.acme.com"
+                    }
+                  },
+                  "no_default": {
+                    "summary": "No primary deployment",
+                    "value": {
+                      "code": "rel.no_default",
+                      "message": "the project has no primary deployment"
                     }
                   },
                   "revoked": {
@@ -2164,7 +2196,7 @@
       "post": {
         "operationId": "createAuthAttempt",
         "summary": "Create an authentication attempt",
-        "description": "Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.\n\nAn authentication attempt collects the proofs for one sign-in and ends in a\nhandoff token. A handoff token is the short-lived, single-use credential that\na completed attempt hands to the session exchange. A client makes these calls\nin order:\n\n1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.\n2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as\n   `identifier`, `password` or `passkey`.\n3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the\n   credential, code or assertion. Repeat steps 2 and 3 until\n   `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in\n   `required_factors` is verified.\n4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.\n5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token\n   for the session and its `session_token`.\n\nThe body takes a `project_id` and a `challenge_nonce` (from\n`POST /bootstrap/challenge`). For step-up authentication, which adds factors\nto an existing session, also send that session's `session_id` and its\n`session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.\nThe attempt's `attempt_id` in the response is the ID every later call takes.\n\nThe project comes from the project secret. A body `project_id` that names\nanother project answers `403` with `proj.mismatch`: send the credential's own\nproject. This operation does not refuse a revoked release. A release is the\nconfiguration that `zitadel deploy` publishes, and `exchangeHandoff` refuses a\nrevoked one.\n",
+        "description": "Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.\n\nAn authentication attempt collects the proofs for one sign-in and ends in a\nhandoff token. A handoff token is the short-lived, single-use credential that\na completed attempt hands to the session exchange. A client makes these calls\nin order:\n\n1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.\n2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as\n   `identifier`, `password` or `passkey`.\n3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the\n   credential, code or assertion. Repeat steps 2 and 3 until\n   `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in\n   `required_factors` is verified.\n4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.\n5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token\n   for the session and its `session_token`.\n\nThe body takes a `project_id` and a `challenge_nonce` (from\n`POST /bootstrap/challenge`). For step-up authentication, which adds factors\nto an existing session, also send that session's `session_id` and its\n`session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.\nThe attempt's `attempt_id` in the response is the ID every later call takes.\n\nThe project comes from the project secret. A body `project_id` that names\nanother project answers `403` with `proj.mismatch`: send the credential's own\nproject. The attempt seals the project's newest primary deployment, whatever\nthe caller's `Origin`. With none it answers `409` with `rel.no_default`, and a\nrevoked release answers `409` with `rel.revoked`.\n",
         "tags": [
           "Authentication Attempts"
         ],
@@ -3187,7 +3219,7 @@
         "operationId": "addOrigin",
         "x-zitadel-cli": "origin add",
         "summary": "Add an origin pattern",
-        "description": "Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.\n\nAn origin pattern says which web origins the project accepts. A `primary`\npattern must be an exact URL with no wildcard. A `preview` pattern may\ninclude a single DNS-label wildcard.\n\nWhile the project has no patterns, it admits every origin, so the first\npattern you add restricts it to the origins that pattern matches.\nAdding a pattern that already exists with the same kind is idempotent and\nanswers `201` with the stored origin. If the pattern exists with the other\nkind, the request is refused with `origin.kind_conflict`: remove it with\n`removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.\n",
+        "description": "Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.\n\nAn origin pattern says which web origins the project accepts. A `primary`\npattern must be an exact URL with no wildcard. A `preview` pattern may\ninclude a single DNS-label wildcard.\n\nWhile the project has no patterns, it admits no origin except a loopback\norigin, so the first pattern you add opens it to the origins that\npattern matches. Admitting an origin is not serving it: a new `primary`\norigin answers `rel.not_deployed` until the next deploy to primary\n(`zitadel deploy`).\n\nAdding a pattern that already exists with the same kind is idempotent and\nanswers `201` with the stored origin. If the pattern exists with the other\nkind, the request is refused with `origin.kind_conflict`: remove it with\n`removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.\n",
         "tags": [
           "Projects"
         ],
@@ -3239,7 +3271,7 @@
         "x-zitadel-cli": "origin rm",
         "x-zitadel-destructive": true,
         "summary": "Remove an origin pattern",
-        "description": "Removes one origin pattern from the project's origins.\n\nRequests from URLs only that pattern admitted are refused from then on.\nLive previews and deployment history are untouched. Removing the last\npattern leaves an empty list, which admits every origin again.\nRemoving a pattern that is already absent is idempotent and answers `204`.\n\nThe body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.\n",
+        "description": "Removes one origin pattern from the project's origins.\n\nRequests from URLs only that pattern admitted are refused from then on.\nLive previews and deployment history are untouched. Removing the last\npattern leaves an empty list, which admits no origin except a loopback\norigin.\nRemoving a pattern that is already absent is idempotent and answers `204`.\n\nThe body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.\n",
         "tags": [
           "Projects"
         ],
@@ -5024,7 +5056,8 @@
             "description": "The flow name to filter by. Every revision of a flow shares its\n`name`, so the result is that flow's revisions, newest by creation\ntime first.\n",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z][a-z0-9-]*$"
+              "pattern": "^[a-z][a-z0-9-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -"
             }
           },
           {
@@ -5568,7 +5601,7 @@
       "post": {
         "operationId": "createBranding",
         "summary": "Publish a branding revision",
-        "description": "Publishes a new immutable branding revision for the project, and records a\n`branding.created` event. Branding revisions cannot be updated or deleted.\nEvery edit publishes a new revision. When the deployed release pins a\nflow, flow responses carry the branding revision that release pins.\nOtherwise they carry the newest revision.\n\nThe `id` of the new revision is the revision ID a release pins for\n`kind: branding`.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime, in `zitadel deploy` and `zitadel deploy --dry-run`.\n",
+        "description": "Publishes a new immutable branding revision for the project, and records a\n`branding.created` event. Branding revisions cannot be updated or deleted.\nEvery edit publishes a new revision. Flow responses carry the branding\nrevision the request's release pins.\n\nThe `id` of the new revision is the revision ID a release pins for\n`kind: branding`.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime, in `zitadel deploy` and `zitadel deploy --dry-run`.\n",
         "tags": [
           "Branding"
         ],
@@ -5624,7 +5657,7 @@
         "operationId": "listBranding",
         "x-zitadel-cli": "branding list",
         "summary": "List branding revisions",
-        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision, which\nflow responses carry when the deployed release pins no flow.\n\nThe `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and\nthat a release pins for `kind: branding`.\n",
+        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision.\n\nThe `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and\nthat a release pins for `kind: branding`.\n",
         "tags": [
           "Branding"
         ],
@@ -6633,6 +6666,355 @@
         }
       }
     },
+    "/applications": {
+      "post": {
+        "operationId": "createApplication",
+        "summary": "Create or revise a registered application",
+        "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`application.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`application.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `application.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `application.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
+        "tags": [
+          "Applications"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "application.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency-key",
+            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `client_secrets` included,\ninstead of creating another revision. Without it, a retry after a\nlost response finds the clients already stored and returns no\nsecret.\n"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create-application-request"
+              },
+              "examples": {
+                "shop": {
+                  "summary": "A web application with one confidential client",
+                  "description": "The client leaves `client_id` out, so the server generates one.\n",
+                  "value": {
+                    "application": {
+                      "slug": "shop",
+                      "name": "Shop",
+                      "clients": [
+                        {
+                          "slug": "web",
+                          "type": "confidential",
+                          "grant_types": [
+                            "authorization_code",
+                            "refresh_token"
+                          ],
+                          "redirect_uris": [
+                            "https://shop.example.com/callback",
+                            "http://localhost:3000/callback"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "imported": {
+                  "summary": "A client that keeps the id a Zitadel v4 issued",
+                  "value": {
+                    "application": {
+                      "slug": "shop",
+                      "name": "Shop",
+                      "clients": [
+                        {
+                          "slug": "web",
+                          "client_id": "289374592837459283@shop",
+                          "type": "confidential",
+                          "grant_types": [
+                            "authorization_code"
+                          ],
+                          "redirect_uris": [
+                            "https://shop.example.com/callback"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The revised application.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create-application-response"
+                },
+                "examples": {
+                  "revised": {
+                    "summary": "The application after a revision that added a client",
+                    "description": "`id` is the one allocated when the application was created,\n`revision_id` is new, and `updated_at` has moved past\n`created_at`. The new client `jobs` got a generated `client_id`\nand a secret; the kept client `web` got neither.\n",
+                    "value": {
+                      "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                      "revision_id": "apprev_01KWHF2XY6RN7F0N9WD3P2E4YM",
+                      "slug": "shop",
+                      "created_at": "2026-11-06T09:11:00Z",
+                      "updated_at": "2026-11-07T14:20:00Z",
+                      "definition": {
+                        "slug": "shop",
+                        "name": "Shop",
+                        "clients": [
+                          {
+                            "slug": "web",
+                            "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code",
+                              "refresh_token"
+                            ],
+                            "redirect_uris": [
+                              "https://shop.example.com/callback",
+                              "http://localhost:3000/callback"
+                            ]
+                          },
+                          {
+                            "slug": "jobs",
+                            "client_id": "client_01KWHF2XY6RN7F0N9WD3P2E4YQ",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code"
+                            ],
+                            "redirect_uris": [
+                              "https://jobs.shop.example.com/callback"
+                            ]
+                          }
+                        ]
+                      },
+                      "client_secrets": [
+                        {
+                          "client": "jobs",
+                          "client_id": "client_01KWHF2XY6RN7F0N9WD3P2E4YQ",
+                          "secret": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The created application.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create-application-response"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "A newly created application",
+                    "description": "The slug was new to the project, so `id` and `revision_id`\nwere both allocated and `updated_at` equals `created_at`.\nThe client's `client_id` was generated, and its secret is shown\nhere and never again.\n",
+                    "value": {
+                      "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                      "revision_id": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN",
+                      "slug": "shop",
+                      "created_at": "2026-11-06T09:11:00Z",
+                      "updated_at": "2026-11-06T09:11:00Z",
+                      "definition": {
+                        "slug": "shop",
+                        "name": "Shop",
+                        "clients": [
+                          {
+                            "slug": "web",
+                            "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code",
+                              "refresh_token"
+                            ],
+                            "redirect_uris": [
+                              "https://shop.example.com/callback",
+                              "http://localhost:3000/callback"
+                            ]
+                          }
+                        ]
+                      },
+                      "client_secrets": [
+                        {
+                          "client": "web",
+                          "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                          "secret": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The document failed schema validation, breaks a rule of the\nauthorization server, or revises an existing application and changes\na field that is fixed for its life. The details identify the setting.\nFix the document and send it again.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project. Pick another id, or leave it out so the\nserver generates one.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/createApplication-error-response"
+          }
+        }
+      }
+    },
+    "/applications/{id}": {
+      "get": {
+        "operationId": "getApplicationById",
+        "summary": "Get an application by ID",
+        "description": "Returns an application that authenticates its users via Zitadel, by ID\nat its newest revision, with each client's `client_id` in `definition`. It\nnever returns a client secret: `createApplication` (`POST /applications`)\nshows one once, when it creates the client.\n\nThe lookup is scoped to the project in `project_id`.\n",
+        "tags": [
+          "Applications"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "application.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/application-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The application.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/application-response"
+                },
+                "examples": {
+                  "application": {
+                    "summary": "An application with one client",
+                    "value": {
+                      "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                      "revision_id": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN",
+                      "slug": "shop",
+                      "created_at": "2026-11-06T09:11:00Z",
+                      "updated_at": "2026-11-06T09:11:00Z",
+                      "definition": {
+                        "slug": "shop",
+                        "name": "Shop",
+                        "clients": [
+                          {
+                            "slug": "web",
+                            "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code",
+                              "refresh_token"
+                            ],
+                            "redirect_uris": [
+                              "https://shop.example.com/callback",
+                              "http://localhost:3000/callback"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No application with this ID exists in the given project.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getApplicationById-error-response"
+          }
+        }
+      }
+    },
     "/policies": {
       "get": {
         "operationId": "listPolicies",
@@ -6711,7 +7093,7 @@
       "post": {
         "operationId": "publishPolicy",
         "summary": "Publish a policy",
-        "description": "Publishes the project's policy for an operation as a new immutable\nrevision, creating the policy on its first publish. The newest revision\napplies the next time the operation runs. Nothing already stored is\nre-evaluated, so a stricter password policy applies the next time a\npassword is set.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. The first publish records a `policy.created` event and every\nlater one a `policy.updated` event.\n\nThe request is typed by `operation`. An unknown operation or setting, or\na value of the wrong type or outside its bounds, answers `req.invalid`\nlike any malformed request.\n\nThe operation's template then checks the config again, together with the\nrules that relate settings to each other (a `min_length` above\n`max_length`), and answers `pol.invalid`. Its `details.details.violations`\nlists everything that failed, settings first, then rules.\n`{\"setting\": \"min_length\"}` names one setting. `{\"config_rule\":\n\"min_length_not_above_max_length\", \"settings\": [\"min_length\",\n\"max_length\"]}` names a rule across settings, with the settings it reads.\nFix what the violations list and publish again. To check a config without\npublishing it, call `evaluatePolicy` (`POST /policies/evaluate`).\n\nA setting left out is off, and `{}` switches every rule off; there are no\ndefaults.\n",
+        "description": "Publishes the project's policy for an operation as a new immutable\nrevision, creating the policy on its first publish. A revision applies\nonce a deployed release pins it. Nothing already stored is\nre-evaluated, so a stricter password policy applies the next time a\npassword is set.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. The first publish records a `policy.created` event and every\nlater one a `policy.updated` event.\n\nThe request is typed by `operation`. An unknown operation or setting, or\na value of the wrong type or outside its bounds, answers `req.invalid`\nlike any malformed request.\n\nThe operation's template then checks the config again, together with the\nrules that relate settings to each other (a `min_length` above\n`max_length`), and answers `pol.invalid`. Its `details.details.violations`\nlists everything that failed, settings first, then rules.\n`{\"setting\": \"min_length\"}` names one setting. `{\"config_rule\":\n\"min_length_not_above_max_length\", \"settings\": [\"min_length\",\n\"max_length\"]}` names a rule across settings, with the settings it reads.\nFix what the violations list and publish again. To check a config without\npublishing it, call `evaluatePolicy` (`POST /policies/evaluate`).\n\nA setting left out is off, and `{}` switches every rule off; there are no\ndefaults.\n",
         "tags": [
           "Policies"
         ],
@@ -6897,7 +7279,7 @@
         "operationId": "getPolicy",
         "x-zitadel-cli": "policies get",
         "summary": "Get a policy by ID",
-        "description": "Returns a policy as its newest revision, the one that applies the next\ntime its operation runs.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.\n\nThe lookup is scoped to the project in `project_id`: a policy of another\nproject answers not found exactly as an unknown ID does.\n",
+        "description": "Returns a policy as its newest revision. A revision applies once a deployed\nrelease pins it.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.\n\nThe lookup is scoped to the project in `project_id`: a policy of another\nproject answers not found exactly as an unknown ID does.\n",
         "tags": [
           "Policies"
         ],
@@ -7347,7 +7729,7 @@
         "operationId": "buildRelease",
         "x-zitadel-cli": "deploy",
         "summary": "Build a release from files",
-        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too. A request that resolves no release reads the newest\nrevision, so it applies that policy as well.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
+        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
         "tags": [
           "Releases"
         ],
@@ -8716,7 +9098,7 @@
         "operationId": "createDeployment",
         "x-zitadel-cli": "deployment create",
         "summary": "Create a deployment",
-        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or preview URLs.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin exactly, mixes `primary` with\n  preview URLs, sends `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
+        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or a list of\npreview URLs. `[\"primary\"]`, which clients released before this shape\nsend, still deploys to every primary origin until 1.0.0; its answer\ncarries a `Deprecation` header (RFC 9745) and a `Link` to these docs.\n\nThe project's newest primary deployment also serves every request with no\n`Origin`, such as a backend, a native app or the CLI, and the console's\nlogin preview of a project that does not list the console's origin. A\npreview URL serves only itself.\n\n`primary` records the project's current primary origins. One added later\nserves nothing until the next deployment to `primary`; one removed stops\nbeing served at once.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin among the preview URLs, sends\n  `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
         "tags": [
           "Deployments"
         ],
@@ -8748,9 +9130,7 @@
                   "description": "The guard names the deployment the caller inspected before\ndeploying.\n",
                   "value": {
                     "release_id": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
-                    "targets": [
-                      "primary"
-                    ],
+                    "targets": "primary",
                     "message": "add phone_number to human-user",
                     "expected_deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
                   }
@@ -8890,7 +9270,7 @@
                     "description": "Primary origins are deployed as a whole: send `primary`.\n",
                     "value": {
                       "code": "dep.invalid",
-                      "message": "deploy primary origins with the primary keyword"
+                      "message": "deploy to primary origins with the primary target"
                     }
                   },
                   "variablesMissing": {
@@ -9028,7 +9408,7 @@
         "operationId": "listDeployments",
         "x-zitadel-cli": "deployment list",
         "summary": "List deployments",
-        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment, narrowed to origins that are\nstill primary, and the newest deployment to each live preview URL,\nnarrowed to the URLs it still serves. Combined with `origin`, it is the\none deployment that origin serves, or empty.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
+        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment with every origin it names, an\norigin the project no longer lists included: that deployment also serves\nrequests with no `Origin`, so it stays live. It also holds the newest\ndeployment to each live preview URL, narrowed to the URLs it still\nserves. Combined with `origin`, it is the one deployment that origin\nserves, or empty, as it is for an origin the project no longer lists.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
         "tags": [
           "Deployments"
         ],
@@ -9387,7 +9767,7 @@
         "x-zitadel-cli": "deployment rollback",
         "x-zitadel-destructive": true,
         "summary": "Roll back to a deployment",
-        "description": "Rolls back to an earlier deployment by deploying its release again to\nevery current primary origin, with the variable values that deployment\nfroze.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values with\nit.\n\nThe deployment ID in the path is the deployment to return to, not the one\nto undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists\nthe newest deployment first.\n\nA rollback is a new deployment, not an undo. It has `reason: rollback`,\nand its `rollback_to` names the deployment you returned to. It uses the\nvariable values that deployment froze, not the project's current ones, and\ncreates no release.\n\nTo guard against a deployment that landed since you looked, set\n`expected_deployment_id` in the request body to the newest primary\ndeployment, the one live now. The call then fails with `409 dep.conflict`\nif another deployment has replaced it.\n\nA rollback is idempotent like a deployment to `primary`. When nothing\nwould change, it answers `200` with the newest primary deployment.\n\nIf the request is refused:\n- `400 dep.invalid`: the deployment went to preview URLs, which cannot be\n  rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The\n  error also appears when the project has no primary origin. Add one with\n  `zitadel origin add`.\n- `404 dep.not_found`: no deployment of the project has that ID, or that\n  deployment recorded no variables to restore, so it cannot be a rollback\n  target. List them with `listDeployments` and pick another.\n- `409 dep.conflict`: `expected_deployment_id` is not the project's\n  newest primary deployment, and `details.deployment` is that deployment.\n  Inspect it, then retry with its ID, or stop.\n- `409 rel.revoked`: the release of that deployment is revoked and cannot\n  be deployed. Roll back to a deployment of a release that is not revoked.\n",
+        "description": "Rolls back to an earlier deployment by deploying its release again to the\nsame origins, with the same variable values. A listed primary origin that\ndeployment left out serves nothing until the next deployment to `primary`,\nand one it named serves its release again, even when the live deployment\nleft it out.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values with\nit.\n\nThe deployment ID in the path is the deployment to return to, not the one\nto undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists\nthe newest deployment first.\n\nA rollback is a new deployment, not an undo. It has `reason: rollback`,\nand its `rollback_to` names the deployment you returned to. It uses the\nvariable values that deployment froze, not the project's current ones, and\ncreates no release.\n\nTo guard against a deployment that landed since you looked, set\n`expected_deployment_id` in the request body to the newest primary\ndeployment, the one live now. The call then fails with `409 dep.conflict`\nif another deployment has replaced it.\n\nA rollback is idempotent like a deployment to `primary`. When nothing\nwould change, it answers `200` with the newest primary deployment.\n\nIf the request is refused:\n- `400 dep.invalid`: the deployment went to preview URLs, which cannot be\n  rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).\n- `404 dep.not_found`: no deployment of the project has that ID, or that\n  deployment recorded no variables to restore, so it cannot be a rollback\n  target. List them with `listDeployments` and pick another.\n- `409 dep.conflict`: `expected_deployment_id` is not the project's\n  newest primary deployment, and `details.deployment` is that deployment.\n  Inspect it, then retry with its ID, or stop.\n- `409 rel.revoked`: the release of that deployment is revoked and cannot\n  be deployed. Roll back to a deployment of a release that is not revoked.\n",
         "tags": [
           "Deployments"
         ],
@@ -9439,7 +9819,7 @@
             }
           },
           "201": {
-            "description": "The created rollback deployment. Every primary origin serves the\nrelease again.\n",
+            "description": "The new deployment. Its origins that the project still lists serve\nthe release again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -10907,6 +11287,8 @@
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
               "idp.write": "Permission to create and revise identity provider connections",
+              "application.read": "Permission to read applications",
+              "application.write": "Permission to create and revise registered applications",
               "release.read": "Permission to read project configuration releases",
               "release.write": "Permission to create and revoke project configuration releases",
               "deployment.read": "Permission to read deployments",
@@ -10959,6 +11341,8 @@
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
               "idp.write": "Permission to create and revise identity provider connections",
+              "application.read": "Permission to read applications",
+              "application.write": "Permission to create and revise registered applications",
               "release.read": "Permission to read project configuration releases",
               "release.write": "Permission to create and revoke project configuration releases",
               "deployment.read": "Permission to read deployments",
@@ -11066,11 +11450,13 @@
       "project-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
       "team-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
       "create-user-request": {
@@ -11278,6 +11664,7 @@
       "user-id": {
         "type": "string",
         "pattern": "^user_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a user ID: user_ followed by letters, digits, _ or -",
         "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
       },
       "user-attributes": {
@@ -11688,6 +12075,10 @@
             "type": "string",
             "minLength": 1,
             "description": "The ID of the schema the user follows after this patch: the `id` that\n`createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the\ncurrent schema. The schema must already be registered and be a revision\nof the user's current schema.\n"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Set to `true` to check the patch without applying it. The response is\nwhat the real request would answer now; a `200` holds the user as the\npatch would leave them, with `metadata.updated_at` unchanged. Leave it\nout to apply the patch. A server from before this field refuses the\nrequest with `400` and changes nothing.\n"
           },
           "attributes": {
             "type": "object",
@@ -12142,6 +12533,146 @@
           }
         }
       },
+      "proj-not_found": {
+        "description": "Project not found\n\nError code: proj.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "proj.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "proj-origin_not_allowed": {
+        "description": "The request origin is not an origin of this project\n\nError code: proj.origin_not_allowed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "proj.origin_not_allowed"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "proj-preview_not_live": {
+        "description": "No live preview for this origin; run zitadel preview on this branch\n\nError code: proj.preview_not_live\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "proj.preview_not_live"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-no_default": {
+        "description": "The project has no primary deployment\n\nError code: rel.no_default\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.no_default"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-not_deployed": {
+        "description": "Nothing is deployed to this origin\n\nError code: rel.not_deployed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.not_deployed"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-not_found": {
+        "description": "Release: not found\n\nError code: rel.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-revoked": {
+        "description": "The release this attempt runs on was revoked\n\nError code: rel.revoked\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.revoked"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "list-user-teams-response": {
         "type": "object",
         "description": "Paginated list of the teams a user belongs to.",
@@ -12208,7 +12739,7 @@
       "project-origin": {
         "title": "ProjectOrigin",
         "type": "object",
-        "description": "One of a project's origins: a pattern and what it is for. A `primary`\npattern is an exact origin (scheme and host, no `*`) that admits requests\nfrom the URLs it matches. A `preview` pattern only bounds which URLs a\npreview deploy may register. It may include at most one `*` inside a single\nhost label; `*` matches one or more characters, none of them a dot. A\nliteral beats a wildcard. Unknown hosts are accepted as written.\nAn empty list admits every origin until the first pattern is added.\nLoopback origins are admitted without a pattern.\n",
+        "description": "One of a project's origins: a pattern and what it is for. A `primary`\npattern is an exact origin (scheme and host, no `*`) that admits requests\nfrom the URLs it matches. A `preview` pattern only bounds which URLs a\npreview deploy may register. It may include at most one `*` inside a single\nhost label; `*` matches one or more characters, none of them a dot. A\nliteral beats a wildcard. Unknown hosts are accepted as written.\nAn empty list admits no origin except a loopback origin, which is admitted\nwithout a pattern.\n\nA loopback origin is on the local machine: `localhost`, a name under\n`.localhost`, or a loopback IP such as `127.0.0.1` or `[::1]`, on any port\nand over `http` or `https`. It is never a preview URL.\n",
         "required": [
           "pattern",
           "kind"
@@ -12322,7 +12853,7 @@
             "items": {
               "$ref": "#/components/schemas/project-origin"
             },
-            "description": "The project's origins. An empty list admits every origin until the\nfirst pattern is added. Loopback origins are admitted without a pattern.\n"
+            "description": "The project's origins. An empty list admits no origin except a loopback\norigin, which is admitted without a pattern.\n"
           },
           "created_at": {
             "type": "string",
@@ -12407,6 +12938,7 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
               "maxLength": 64,
               "examples": [
                 "google",
@@ -12467,6 +12999,7 @@
         "x-meta-schema": true,
         "type": "string",
         "pattern": "^[^.]+$",
+        "x-zitadel-pattern-message": "must not be empty or contain a .",
         "description": "The name of a single user attribute."
       },
       "user-property": {
@@ -12474,7 +13007,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "UserProperty",
         "type": "object",
-        "description": "The meta-schema that one property of a user schema is validated against.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API; nothing\nenforces it today, so responses still include write-only properties.\n",
+        "description": "The meta-schema that one property of a user schema is validated against.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. Any other key is refused, unless it\nis one of the annotations listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API; nothing\nenforces it today, so responses still include write-only properties.\n\n`format` is enforced on user writes for the standard JSON Schema names, such\nas `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as\n`phone`, is only an annotation; use `pattern` to enforce one.\n",
         "additionalProperties": true,
         "properties": {
           "x-unique": {
@@ -12704,6 +13237,7 @@
           "flow_definition_name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
             "description": "Name of a specific flow definition to use.\nWhen omitted, the server selects the best-matching definition\nbased on purpose + audience context.\n",
             "example": "custom-login"
           },
@@ -12717,6 +13251,7 @@
             "type": "string",
             "description": "Semver version of the flow definition JSON Schema to use.\nWhen omitted, the latest version is used.\n",
             "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "x-zitadel-pattern-message": "must be a version such as 1.2.3",
             "example": "1.0.0"
           },
           "challenge_nonce": {
@@ -12922,126 +13457,6 @@
           }
         ]
       },
-      "proj-not_found": {
-        "description": "Project not found\n\nError code: proj.not_found\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "proj.not_found"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "proj-origin_not_allowed": {
-        "description": "The request origin is not an origin of this project\n\nError code: proj.origin_not_allowed\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "proj.origin_not_allowed"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "proj-preview_not_live": {
-        "description": "No live preview for this origin; run zitadel preview on this branch\n\nError code: proj.preview_not_live\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "proj.preview_not_live"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-not_deployed": {
-        "description": "Nothing is deployed to this origin\n\nError code: rel.not_deployed\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.not_deployed"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-not_found": {
-        "description": "Release: not found\n\nError code: rel.not_found\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.not_found"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-revoked": {
-        "description": "The release this attempt runs on was revoked\n\nError code: rel.revoked\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.revoked"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
       "enc_key-unknown_alg": {
         "description": "Unsupported encryption algorithm\n\nError code: enc_key.unknown_alg\n",
         "allOf": [
@@ -13109,11 +13524,12 @@
               "number",
               "url",
               "date",
+              "date_time",
               "hidden",
               "checkbox",
               "select"
             ],
-            "description": "The input kind the client should render. Encodes the formats and\nJSON types that map to a familiar HTML input: `email`, `url`,\n`date` come from `format`; `checkbox` from JSON `type: boolean`;\n`select` from a closed `enum`. For other formats (for example uuid) the\ntype is `text` and `validation.format` carries the rule.\n"
+            "description": "The input kind the client should render. Encodes the formats and\nJSON types that map to a familiar HTML input: `email`, `url`,\n`date`, `date_time` come from `format`; `checkbox` from JSON\n`type: boolean`; `select` from a closed `enum`. For other formats (for\nexample uuid) the type is `text` and `validation.format` carries the\nrule. A `date_time` value is an RFC 3339 timestamp, both prefilled and\nsubmitted, which a `datetime-local` input neither shows nor produces on\nits own.\n"
           },
           "text_key": {
             "type": "string",
@@ -13484,6 +13900,7 @@
         "maxLength": 128,
         "description": "A color on a theme side: hex (`#4F46E5`), a CSS color name, or a color\nfunction: `rgb()`, `rgba()`, `hsl()`, `hsla()`, `hwb()`, `lab()`, `lch()`,\n`oklab()`, `oklch()`, `color()` or `color-mix()`. `url()` and `var()` are\nrejected: the value is written into a stylesheet, so only forms that resolve\nto a color are stored.\n\nThe pattern pins the shape: no semicolons, braces, comment markers or\nbackslashes, so a value cannot leave its declaration whatever it spells.\nWhich names CSS actually knows is the browser's business: an unrecognized\none is stored and paints nothing, rather than being refused here.\n",
         "pattern": "^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]{3,24}|[a-zA-Z][a-zA-Z-]{2,12}\\((?:[0-9a-zA-Z%.,+/# -]|[a-zA-Z][a-zA-Z-]{2,12}\\([0-9a-zA-Z%.,+/# -]*\\))*\\))$",
+        "x-zitadel-pattern-message": "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch()",
         "examples": [
           "#4F46E5",
           "#fff",
@@ -13563,7 +13980,8 @@
             "maxLength": 2048,
             "description": "The logo for this surface. A logo is never recolored, so each side\ncarries its own file. Absent means no logo on this side, unless the\ntop-level `logo_url` is the only one set.\n",
             "example": "https://cdn.example.com/logo-on-light.svg",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "palette": {
             "$ref": "#/components/schemas/branding-palette"
@@ -13608,6 +14026,7 @@
             "minLength": 1,
             "maxLength": 256,
             "pattern": "^ *(?:\"[^\"\\\\;{}]*\"|'[^'\\\\;{}]*'|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*)(?: *, *(?:\"[^\"\\\\;{}]*\"|'[^'\\\\;{}]*'|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*))* *$",
+            "x-zitadel-pattern-message": "must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name (\"APK Futural\")",
             "description": "CSS font stack for body and heading text. Include a generic family so\nthe surface still renders when the named face is unavailable.\n\nComma-separated family names, each either an identifier (`Inter`,\n`ui-sans-serif`, `Helvetica Neue`) or a quoted name (`\"APK Futural\"`).\nAnything else is rejected. The stack is written into a stylesheet, so\nonly names are stored, and a quoted name must close the quote it opened.\n",
             "example": "Inter, ui-sans-serif, sans-serif"
           },
@@ -13617,7 +14036,8 @@
             "maxLength": 2048,
             "description": "Stylesheet that loads `font_family`, for example a Google Fonts CSS URL.\nMust be https; unlike the logo and hero assets there is no\nloopback carve-out. Rejected without `font_family`, which would name\nnothing to paint with.\n\nLoaded only when the login component runs as `variant=\"page\"`, the\nfull-page login. In the default `variant=\"widget\"` it is stored but not\nloaded: the component injects no stylesheet, and the embedding page\nloads the face.\n",
             "example": "https://fonts.googleapis.com/css2?family=Inter&display=swap",
-            "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)"
+            "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials"
           },
           "scale": {
             "type": "number",
@@ -13681,7 +14101,7 @@
       "branding": {
         "x-meta-schema": true,
         "type": "object",
-        "description": "The branding of the login: logo, theme colors, typography, shape and\ntemplate. It has one shape in two places: the request body of\n`createBranding` (`POST /branding`), which publishes it as a new immutable\nrevision, and a read-only copy on flow responses, which carries the\nproject's latest revision. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's default, so a\nrevision carrying one color is as valid as one carrying the whole object.\n",
+        "description": "The branding of the login: logo, theme colors, typography, shape and\ntemplate. It has one shape in two places: the request body of\n`createBranding` (`POST /branding`), which publishes it as a new immutable\nrevision, and a read-only copy on flow responses, which carries the\nrevision the request's release pins. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's default, so a\nrevision carrying one color is as valid as one carrying the whole object.\n",
         "additionalProperties": false,
         "properties": {
           "$schema": {
@@ -13708,14 +14128,16 @@
             "format": "uri",
             "maxLength": 2048,
             "description": "Fallback logo, used only when neither `theme.light.logo_url` nor\n`theme.dark.logo_url` is set. Prefer the per-side logos, because one\nfile cannot serve both surfaces.\n",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "hero_url": {
             "type": "string",
             "format": "uri",
             "maxLength": 2048,
             "description": "Hero image URL, for templates that reference `branding.hero_url`. The\nbundled default template does not use it.\n",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "theme": {
             "$ref": "#/components/schemas/branding-theme"
@@ -14119,6 +14541,7 @@
       "session-id": {
         "type": "string",
         "pattern": "^sess_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a session ID: sess_ followed by letters, digits, _ or -",
         "example": "sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this session, an opaque string with a `sess_` prefix."
       },
@@ -14174,6 +14597,7 @@
       "attempt-id": {
         "type": "string",
         "pattern": "^att_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be an attempt ID: att_ followed by letters, digits, _ or -",
         "example": "att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this authentication attempt, an opaque string with an `att_` prefix."
       },
@@ -14317,6 +14741,7 @@
       "challenge-id": {
         "type": "string",
         "pattern": "^ch_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a challenge ID: ch_ followed by letters, digits, _ or -",
         "example": "ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this challenge, an opaque string with a `ch_` prefix."
       },
@@ -14721,7 +15146,7 @@
             "items": {
               "$ref": "#/components/schemas/project-origin"
             },
-            "description": "The origins the project starts with. An omitted or empty list admits\nevery origin until the first pattern is added. Loopback origins are\nadmitted without a pattern.\n"
+            "description": "The origins the project starts with. An omitted or empty list admits no\norigin except a loopback origin, which is admitted without a pattern.\n"
           },
           "seed_defaults": {
             "type": "boolean",
@@ -14862,7 +15287,7 @@
             "items": {
               "$ref": "#/components/schemas/project-origin"
             },
-            "description": "The project's origins. An empty list admits every origin until the\nfirst pattern is added. Loopback origins are admitted without a pattern.\n"
+            "description": "The project's origins. An empty list admits no origin except a loopback\norigin, which is admitted without a pattern.\n"
           },
           "created_at": {
             "type": "string",
@@ -15685,6 +16110,7 @@
         "type": "string",
         "description": "A web origin: `http` or `https`, a lowercase host (a DNS name or a\nbracketed IPv6 address) and, when it is not the scheme's default, a port\nfrom 1 to 65535. No user info, path, query or fragment, and no trailing\nslash. Compared exactly, so `https://app.acme.com` and\n`https://app.acme.com:443` are different strings.\n",
         "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
+        "x-zitadel-pattern-message": "must be an origin: http or https, a lowercase host and an optional port, with no path",
         "maxLength": 2048,
         "example": "https://app.acme.com"
       },
@@ -16770,6 +17196,7 @@
             "type": "string",
             "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
             "pattern": "^[a-z][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits, _ and -",
             "example": "login"
           },
           "fields": {
@@ -16826,6 +17253,7 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
               "maxLength": 64
             },
             "default": [],
@@ -16965,6 +17393,7 @@
           "name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
             "examples": [
               "standard-login",
               "combined-auth"
@@ -16976,7 +17405,7 @@
           },
           "user_schema": {
             "type": "string",
-            "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the project's newest revision of that schema, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
+            "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
             "example": "human-user"
           },
           "purposes": {
@@ -17612,6 +18041,7 @@
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
             "maxLength": 64,
             "description": "Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers`) reference it. Unique within the project.",
             "examples": [
@@ -17645,7 +18075,8 @@
             "type": "object",
             "additionalProperties": {
               "type": "string",
-              "pattern": "^[^$]"
+              "pattern": "^[^$]",
+              "x-zitadel-pattern-message": "must not be empty or start with $"
             },
             "description": "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
           },
@@ -17700,11 +18131,13 @@
               "issuer": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
               },
               "jwks_uri": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "id_token_mapping": {
@@ -17715,16 +18148,19 @@
               "authorization_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "token_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "userinfo_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set."
               },
               "client_id": {
@@ -17736,6 +18172,7 @@
               "client_secret": {
                 "type": "string",
                 "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
+                "x-zitadel-pattern-message": "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself",
                 "description": "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The server resolves it against the environment serving the request."
               },
               "token_endpoint_auth_method": {
@@ -18040,6 +18477,236 @@
           }
         }
       },
+      "application-client": {
+        "title": "ApplicationClient",
+        "description": "One OAuth client of the application: one way it talks to Zitadel, such as\nits web backend. Its `redirect_uris` and `grant_types` are its OAuth\nsettings. OpenID Connect is OAuth plus the `openid` scope, so one shape\nserves both.\n",
+        "type": "object",
+        "required": [
+          "slug",
+          "type",
+          "grant_types"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "maxLength": 64,
+            "description": "Stable identifier of the client, unique among the application's clients\nand fixed for the client's life. A revision matches each client to the\nstored one by its slug, which is how a client keeps its `client_id`.\nOther documents refer to it as `<application>/<client>`.\n",
+            "examples": [
+              "web"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Shown to the user in place of the application's name. Optional."
+          },
+          "client_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.~@-]+$",
+            "x-zitadel-pattern-message": "must be letters, digits, or _ . ~ @ -",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The `client_id` the client presents. Leave it out and the server\ngenerates one the first time the client is written and fills it into\nthe stored document. Set it to keep an id the client already has: one\na Zitadel v4 issued (`<id>@<project>`), or one the CLI generated before\nany deploy. Once set, the id never changes: a later revision may leave it\nout, but may not provide a different one. No two clients in the project\nshare an id, and an id is never reused once a client has held it. A\nnew client may not supply an id that starts with `client_` or `dcr_`:\nthose prefixes mark ids the server generates. A server-generated id\nsent back unchanged in a revision is accepted.\n",
+            "examples": [
+              "289374592837459283@shop"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "confidential"
+            ],
+            "description": "A `confidential` client runs where a secret can be kept, such as a web\napp's backend, and authenticates with one at the token endpoint. Public\nclients, which hold no secret, are not available yet.\n"
+          },
+          "grant_types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "refresh_token"
+              ]
+            },
+            "description": "The grant types the client may use, named as in RFC 7591.\n`authorization_code` signs a user in and needs `redirect_uris`.\n`refresh_token` lets the client renew its access tokens without a new\nsign-in; a refresh token is issued on sign-in, so it is only valid\ntogether with `authorization_code`.\n"
+          },
+          "redirect_uris": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "description": "Where the authorization endpoint may send the user back. Required with\n`authorization_code`; omit it otherwise, an empty list is refused. Each\nis an `https` URL, or an `http` URL on a loopback host for local\ndevelopment: `localhost`, a name under `.localhost`, or a loopback IP\nsuch as `127.0.0.1` or `[::1]`. A URI is written as the client will\nsend it, with a lowercase host and no fragment, since it is matched\nexactly; a loopback URI matches on any port (RFC 8252 §7.3).\n",
+            "examples": [
+              [
+                "https://shop.example.com/callback"
+              ]
+            ]
+          },
+          "first_party": {
+            "type": "boolean",
+            "description": "A first-party client belongs to the project's own product and skips\nconsent unless the request asks for it. An application registered\nthrough the API is third-party unless this says otherwise.\n"
+          }
+        }
+      },
+      "application": {
+        "x-meta-schema": true,
+        "title": "Application",
+        "description": "An application that authenticates its users via Zitadel, with its OAuth\nclients. The document is the `application` field of the `createApplication`\n(`POST /applications`) body.\n",
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "clients"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file. Ignored by the platform."
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "maxLength": 64,
+            "description": "Stable identifier of the application, unique within the project and\nfixed for its life. Flows and other documents reference it.\n",
+            "examples": [
+              "shop"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "The application's name, shown to the user when consent is asked.",
+            "examples": [
+              "Shop"
+            ]
+          },
+          "clients": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/application-client"
+            },
+            "description": "The application's OAuth clients. Each slug is unique within the application."
+          }
+        }
+      },
+      "create-application-request": {
+        "type": "object",
+        "description": "The request body for creating or revising a registered application.",
+        "required": [
+          "application"
+        ],
+        "properties": {
+          "application": {
+            "$ref": "#/components/schemas/application",
+            "description": "The application document. If its slug does not already exist in the\nproject, a new application is created. If one with that\nslug already exists, this becomes a new revision of it. The document is\nvalidated against the `application.json` schema, and returned as the\n`definition` in the response with each client's `client_id` filled in.\n"
+          }
+        }
+      },
+      "application-response": {
+        "type": "object",
+        "description": "An application at its newest revision, with its document as `definition`.\nIt never carries a client secret.\n",
+        "required": [
+          "id",
+          "revision_id",
+          "slug",
+          "definition",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique ID, generated when the application is created and shared by\nevery revision.\n",
+            "example": "app_01KWH3B72K7M7F0N9WD3P2E4YM"
+          },
+          "revision_id": {
+            "type": "string",
+            "description": "The ID of the revision this entry holds. `getApplicationById`\n(`GET /applications/{id}`) returns the newest one.\n",
+            "example": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN"
+          },
+          "slug": {
+            "type": "string",
+            "description": "The identifier by which other documents reference the application.\nFixed for the life of the application.\n",
+            "example": "shop"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the application was created.",
+            "example": "2026-11-06T09:11:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was created. On the newest revision, that is when\nthe application was last revised.\n",
+            "example": "2026-11-06T09:11:00Z"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/application",
+            "description": "The stored application document, with each client's `client_id`."
+          }
+        }
+      },
+      "application-client-secret": {
+        "type": "object",
+        "description": "A client secret the server generated, returned once.",
+        "required": [
+          "client",
+          "client_id",
+          "secret"
+        ],
+        "properties": {
+          "client": {
+            "type": "string",
+            "description": "The slug of the client the secret belongs to.",
+            "example": "web"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The `client_id` the client presents together with the secret.",
+            "example": "client_01KWH3B72K7M7F0N9WD3P2E4YP"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The secret, shown only in this response. Save it securely: the server cannot return it again.\n",
+            "example": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+          }
+        }
+      },
+      "create-application-response": {
+        "description": "An application as `createApplication` (`POST /applications`) wrote it, with\nits document as `definition` and the secrets of the clients it created.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/application-response"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "client_secrets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/application-client-secret"
+                },
+                "description": "The secrets this write generated, one for each client it created,\neach with the client's `client_id`. Absent when the write created\nno client. Each secret is shown only once.\n"
+              }
+            }
+          }
+        ]
+      },
       "policy-operation": {
         "title": "PolicyOperation",
         "type": "string",
@@ -18092,12 +18759,14 @@
         "type": "string",
         "description": "The identifier of a policy, shared by all of its revisions.",
         "pattern": "^pol_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a policy ID: pol_ followed by letters, digits, _ or -",
         "example": "pol_01KXA4F3Q8R7F0N9WD3P2E4YM5"
       },
       "policy-revision-id": {
         "type": "string",
         "description": "The identifier of one immutable revision of a policy.",
         "pattern": "^polrev_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a policy revision ID: polrev_ followed by letters, digits, _ or -",
         "example": "polrev_01KXA4F3Q8R7F0N9WD3P2E4YM6"
       },
       "password-set-config": {
@@ -18433,6 +19102,7 @@
         "type": "string",
         "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding` or `idp`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
         "pattern": "^sha256:[0-9a-f]{64}$",
+        "x-zitadel-pattern-message": "must be sha256: followed by 64 lowercase hex digits",
         "minLength": 71,
         "maxLength": 71,
         "example": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f"
@@ -18461,6 +19131,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a release.",
         "pattern": "^rel_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a release ID: rel_ followed by letters, digits, _ or -",
         "example": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
       },
       "release-metadata": {
@@ -19037,6 +19708,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a deployment.",
         "pattern": "^dep_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
       "revoke-release-conflict": {
@@ -21622,6 +22294,7 @@
         "minLength": 1,
         "maxLength": 255,
         "pattern": "^\\w+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits or _",
         "example": "GITHUB_CLIENT_ID",
         "description": "A variable's name, unique per project and kind.\n\nWord characters only, which is exactly what the `${{ NAME }}` reference\nsyntax can address: a name outside that grammar could be stored\nbut never referenced from a configuration document.\n"
       },
@@ -21884,7 +22557,7 @@
       "deployment-status": {
         "title": "DeploymentStatus",
         "type": "string",
-        "description": "Whether the deployment serves its release now.\n\n- `live`: at least one of its targets serves it now.\n- `inactive`: none does, because a later deployment replaced it or its\n  previews expired or were removed.\n",
+        "description": "Whether the deployment serves its release now.\n\n- `live`: the project's newest primary deployment, or a preview deployment\n  that one of its preview URLs still serves.\n- `inactive`: a later deployment replaced it, or its previews expired or\n  were removed.\n",
         "enum": [
           "live",
           "inactive"
@@ -21970,7 +22643,7 @@
       },
       "deployment": {
         "title": "Deployment",
-        "description": "An immutable record of a release made live on a set of origins. A release\nis a snapshot of the project's configuration, and a deployment freezes the\nproject's variable values with it. Deploying and rolling back each append\none, so the history is the audit trail.\n\nAll primary origins serve the project's newest primary deployment. An origin\nadded after it serves nothing until the next deployment to `primary`. A\npreview URL serves the newest deployment to it while its preview is live.\n\nEvery field is fixed at creation except `status`, which is read as of now.\n",
+        "description": "An immutable record of a release made live on a set of origins. A release\nis a snapshot of the project's configuration, and a deployment freezes the\nproject's variable values with it. Deploying and rolling back each append\none, so the history is the audit trail.\n\nA primary origin serves the project's newest primary deployment if that\ndeployment names it, so one added later serves nothing until the next\ndeployment to `primary`. Requests with no origin get the same deployment. A\npreview URL serves the newest deployment to it while its preview is live.\n\nEvery field is fixed at creation except `status`, which is read as of now.\n",
         "type": "object",
         "required": [
           "id",
@@ -22059,21 +22732,43 @@
           }
         }
       },
-      "deployment-targets-request": {
-        "title": "DeploymentTargetsRequest",
+      "deployment-primary-target": {
+        "title": "DeploymentPrimaryTarget",
+        "type": "string",
+        "enum": [
+          "primary"
+        ],
+        "description": "Every primary origin of the project, and every request with no `Origin`."
+      },
+      "deployment-preview-urls": {
+        "title": "DeploymentPreviewUrls",
         "type": "array",
         "minItems": 1,
         "maxItems": 50,
         "uniqueItems": true,
-        "description": "Where the release goes live: either `primary`, which resolves to every\ncurrent primary origin, or preview URLs in `Origin` form, each matching one\nof the project's preview patterns. Primary origins cannot be named one by\none, and the two forms cannot be mixed.\n",
+        "description": "Preview URLs in `Origin` form, each matching one of the project's preview\npatterns.\n",
         "items": {
           "type": "string",
-          "pattern": "^(primary|https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$",
+          "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
+          "x-zitadel-pattern-message": "must be an origin: http or https, a lowercase host and an optional port, with no path",
           "maxLength": 2048
         },
         "example": [
-          "primary"
+          "https://acme-k3x9v2-acmeinc.vercel.app"
         ]
+      },
+      "deployment-targets-request": {
+        "title": "DeploymentTargetsRequest",
+        "description": "Where the release goes live: `primary`, every primary origin of the project,\nor a list of preview URLs.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/deployment-primary-target"
+          },
+          {
+            "$ref": "#/components/schemas/deployment-preview-urls"
+          }
+        ],
+        "example": "primary"
       },
       "preview-ttl": {
         "title": "PreviewTTL",
@@ -22543,6 +23238,55 @@
           "message": "The password is too long for the project's password hashing method."
         }
       },
+      "proj-not_found": {
+        "summary": "proj.not_found",
+        "value": {
+          "code": "proj.not_found",
+          "message": "project not found"
+        }
+      },
+      "proj-origin_not_allowed": {
+        "summary": "proj.origin_not_allowed",
+        "value": {
+          "code": "proj.origin_not_allowed",
+          "message": "the request origin is not an origin of this project"
+        }
+      },
+      "proj-preview_not_live": {
+        "summary": "proj.preview_not_live",
+        "value": {
+          "code": "proj.preview_not_live",
+          "message": "no live preview for this origin; run zitadel preview on this branch"
+        }
+      },
+      "rel-no_default": {
+        "summary": "rel.no_default",
+        "value": {
+          "code": "rel.no_default",
+          "message": "the project has no primary deployment"
+        }
+      },
+      "rel-not_deployed": {
+        "summary": "rel.not_deployed",
+        "value": {
+          "code": "rel.not_deployed",
+          "message": "nothing is deployed to this origin"
+        }
+      },
+      "rel-not_found": {
+        "summary": "rel.not_found",
+        "value": {
+          "code": "rel.not_found",
+          "message": "release: not found"
+        }
+      },
+      "rel-revoked": {
+        "summary": "rel.revoked",
+        "value": {
+          "code": "rel.revoked",
+          "message": "the release this attempt runs on was revoked"
+        }
+      },
       "sess-project_mismatch": {
         "summary": "sess.project_mismatch",
         "value": {
@@ -22611,48 +23355,6 @@
         "value": {
           "code": "tkn.invalid_tknid",
           "message": "token identifiers do not match token type"
-        }
-      },
-      "proj-not_found": {
-        "summary": "proj.not_found",
-        "value": {
-          "code": "proj.not_found",
-          "message": "project not found"
-        }
-      },
-      "proj-origin_not_allowed": {
-        "summary": "proj.origin_not_allowed",
-        "value": {
-          "code": "proj.origin_not_allowed",
-          "message": "the request origin is not an origin of this project"
-        }
-      },
-      "proj-preview_not_live": {
-        "summary": "proj.preview_not_live",
-        "value": {
-          "code": "proj.preview_not_live",
-          "message": "no live preview for this origin; run zitadel preview on this branch"
-        }
-      },
-      "rel-not_deployed": {
-        "summary": "rel.not_deployed",
-        "value": {
-          "code": "rel.not_deployed",
-          "message": "nothing is deployed to this origin"
-        }
-      },
-      "rel-not_found": {
-        "summary": "rel.not_found",
-        "value": {
-          "code": "rel.not_found",
-          "message": "release: not found"
-        }
-      },
-      "rel-revoked": {
-        "summary": "rel.revoked",
-        "value": {
-          "code": "rel.revoked",
-          "message": "the release this attempt runs on was revoked"
         }
       },
       "enc_key-unknown_alg": {
@@ -24320,6 +25022,27 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-origin_not_allowed"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-preview_not_live"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-no_default"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-revoked"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -24354,6 +25077,13 @@
                   "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
+                  "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.no_default": "#/components/schemas/rel-no_default",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
+                  "rel.not_found": "#/components/schemas/rel-not_found",
+                  "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable",
                   "user.conflict": "#/components/schemas/user-conflict",
@@ -24378,6 +25108,27 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.origin_not_allowed": {
+                "$ref": "#/components/examples/proj-origin_not_allowed"
+              },
+              "proj.preview_not_live": {
+                "$ref": "#/components/examples/proj-preview_not_live"
+              },
+              "rel.no_default": {
+                "$ref": "#/components/examples/rel-no_default"
+              },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
+              },
+              "rel.not_found": {
+                "$ref": "#/components/examples/rel-not_found"
+              },
+              "rel.revoked": {
+                "$ref": "#/components/examples/rel-revoked"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
@@ -25096,6 +25847,9 @@
                   "$ref": "#/components/schemas/proj-preview_not_live"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-no_default"
+                },
+                {
                   "$ref": "#/components/schemas/rel-not_deployed"
                 },
                 {
@@ -25133,6 +25887,7 @@
                   "proj.not_found": "#/components/schemas/proj-not_found",
                   "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
                   "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.no_default": "#/components/schemas/rel-no_default",
                   "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
@@ -25190,6 +25945,9 @@
               },
               "proj.preview_not_live": {
                 "$ref": "#/components/examples/proj-preview_not_live"
+              },
+              "rel.no_default": {
+                "$ref": "#/components/examples/rel-no_default"
               },
               "rel.not_deployed": {
                 "$ref": "#/components/examples/rel-not_deployed"
@@ -25301,6 +26059,9 @@
                   "$ref": "#/components/schemas/proj-last_owner"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
@@ -25367,6 +26128,7 @@
                   "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.last_owner": "#/components/schemas/proj-last_owner",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -25463,6 +26225,9 @@
               },
               "proj.last_owner": {
                 "$ref": "#/components/examples/proj-last_owner"
+              },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
               },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
@@ -25598,6 +26363,9 @@
                   "$ref": "#/components/schemas/proj-preview_not_live"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
@@ -25666,6 +26434,7 @@
                   "proj.last_owner": "#/components/schemas/proj-last_owner",
                   "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
                   "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -25769,6 +26538,9 @@
               "proj.preview_not_live": {
                 "$ref": "#/components/examples/proj-preview_not_live"
               },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
+              },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
               },
@@ -25837,6 +26609,27 @@
                   "$ref": "#/components/schemas/proj-mismatch"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-origin_not_allowed"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-preview_not_live"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-no_default"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-revoked"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -25856,6 +26649,13 @@
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.mismatch": "#/components/schemas/proj-mismatch",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
+                  "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.no_default": "#/components/schemas/rel-no_default",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
+                  "rel.not_found": "#/components/schemas/rel-not_found",
+                  "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable"
@@ -25883,6 +26683,27 @@
               },
               "proj.mismatch": {
                 "$ref": "#/components/examples/proj-mismatch"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.origin_not_allowed": {
+                "$ref": "#/components/examples/proj-origin_not_allowed"
+              },
+              "proj.preview_not_live": {
+                "$ref": "#/components/examples/proj-preview_not_live"
+              },
+              "rel.no_default": {
+                "$ref": "#/components/examples/rel-no_default"
+              },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
+              },
+              "rel.not_found": {
+                "$ref": "#/components/examples/rel-not_found"
+              },
+              "rel.revoked": {
+                "$ref": "#/components/examples/rel-revoked"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
@@ -29664,6 +30485,112 @@
           }
         }
       },
+      "createApplication-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getApplicationById-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
       "listPolicies-error-response": {
         "description": "Error response",
         "content": {
@@ -31791,9 +32718,6 @@
                   "$ref": "#/components/schemas/proj-not_found"
                 },
                 {
-                  "$ref": "#/components/schemas/proj-origin_not_allowed"
-                },
-                {
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
@@ -31824,7 +32748,6 @@
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.not_found": "#/components/schemas/proj-not_found",
-                  "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -31869,9 +32792,6 @@
               },
               "proj.not_found": {
                 "$ref": "#/components/examples/proj-not_found"
-              },
-              "proj.origin_not_allowed": {
-                "$ref": "#/components/examples/proj-origin_not_allowed"
               },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
@@ -32196,6 +33116,16 @@
           "type": "string"
         },
         "example": "idprev_01KWH3B72K7M7F0N9WD3P2E4YN"
+      },
+      "application-id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The application ID: the `id` that `createApplication` (`POST /applications`) returns.\n",
+        "schema": {
+          "type": "string"
+        },
+        "example": "app_01KWH3B72K7M7F0N9WD3P2E4YM"
       },
       "policy-id": {
         "name": "policy_id",

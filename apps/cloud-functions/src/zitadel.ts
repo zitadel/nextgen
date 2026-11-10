@@ -94,7 +94,12 @@ export function liveDirectory(server: string): Directory {
       );
       return memberships
         .filter((membership) => membership.membership_status === "active")
-        .map(({ id, name }) => ({ id, name, personal: id === earliest?.id }));
+        .map(({ id, name, created_at }) => ({
+          id,
+          name,
+          personal: id === earliest?.id,
+          joined_at: created_at,
+        }));
     },
 
     async usage() {

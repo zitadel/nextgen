@@ -1,0 +1,61 @@
+# Start from an app that already works: a small Next.js todo app (App Router,
+# server actions, an in-memory store, no auth) kept under `fixtures/todo-app`.
+# It is committed and installed before the journey starts, so it looks like an
+# app a team already runs. The developer asks for sign-up and sign-in, with every
+# page but the home page protected, and the app must keep working. The agent has
+# to fit auth into code it did not write, rather than scaffold its own.
+cliSpec: "@zitadel/cli@latest"
+
+start:
+  fixture: todo-app
+  install: npm ci
+
+stages:
+  - id: 1
+    title: Add sign-up, sign-in and sign-out to an existing app, keeping it working
+    grade: setup
+    prompt: >-
+      This is my existing Next.js app in this directory. Add sign-up, sign-in
+      and sign-out to it using Zitadel, and make sure the rest of the app keeps
+      working. Set up a new Zitadel project and deploy it to a running local
+      server. This is my app, so ask me whatever you need to decide how sign-up,
+      sign-in and sign-out should work rather than guessing.
+    user: >-
+      You are the developer who owns this todo app. Every page except the home
+      page should need a signed-in user, the home page should have a way to sign
+      in, and signed-in people should see a sign-out button in the app. People
+      sign up with their first name and last name, and sign in
+      with a password. You do NOT want passkeys or single sign-on yet, and you do
+      not want the todo pages or their behaviour changed beyond what auth needs.
+      Answer the agent's questions briefly and concretely from these preferences,
+      and don't volunteer requirements it didn't ask about.
+    app:
+      check: protected-pages
+      public: /
+      protected: /todos
+      marker: Your todos
+      also: /about,/todos/1
+    assert:
+      - name: a project exists on the instance
+        get: projects list
+        path: items
+        op: count-gte
+        value: 1
+      - name: deployed schema collects a first name
+        get: schemas get human-user
+        path: [schema.properties.givenName, schema.properties.firstName]
+        op: exists
+      - name: deployed schema collects a last name
+        get: schemas get human-user
+        path: [schema.properties.familyName, schema.properties.lastName]
+        op: exists
+      - name: password sign-in is enabled
+        get: schemas get human-user
+        path: schema.x-auth-methods.password.enabled
+        op: eq
+        value: true
+      - name: passkeys are NOT enabled (the developer said no)
+        get: schemas get human-user
+        path: schema.x-auth-methods.passkey.enabled
+        op: neq
+        value: true

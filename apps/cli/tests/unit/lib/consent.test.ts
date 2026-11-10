@@ -76,7 +76,7 @@ describe("Consent", () => {
 
     it("refuses without --force when nobody can be asked", async () => {
       expect(await refusalOf(scripted)).toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot remove API_URL from the project without --force in non-interactive mode",
         nextCommands: ["zitadel variable rm API_URL --force"],
       });
@@ -84,7 +84,7 @@ describe("Consent", () => {
 
     it("refuses with the gate's own refusal when it has one", async () => {
       const refuse = (): never => {
-        throw new ZitadelError("E_VALIDATION", "Enable another method first");
+        throw new ZitadelError("E_CONFIRMATION_REQUIRED", "Enable another method first");
       };
 
       expect(await refusalOf(scripted, { ...GATE, refuse })).toMatchObject({
@@ -113,7 +113,7 @@ describe("Consent", () => {
 
     it("knows a gate's own refusal", async () => {
       const refuse = (): never => {
-        throw new ZitadelError("E_VALIDATION", "Enable another method first");
+        throw new ZitadelError("E_CONFIRMATION_REQUIRED", "Enable another method first");
       };
 
       expect(isRefusal(await refusalOf(scripted, { ...GATE, refuse }))).toBe(true);

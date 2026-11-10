@@ -159,7 +159,7 @@ describe("Destructive", () => {
 
     it("refuses without --force when nobody can be asked", async () => {
       await expect(new Removing({}).remove()).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot remove API_URL from the project without --force in non-interactive mode",
       });
     });

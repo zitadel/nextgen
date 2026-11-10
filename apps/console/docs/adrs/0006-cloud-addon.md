@@ -49,7 +49,7 @@ the builds that leave it empty nothing:
 - `Root`, rendered once beside the routes on every page and told the page
   (`AddonPage`: the path and the matched route, deployment prefix included,
   and whether the signed-in layout's guard let it through);
-- `track`, which receives each custom event `src/lib/analytics.ts` reports;
+- `track`, which receives each custom event `src/addon/analytics.ts` reports;
 - `screens`, each mounted as a route beneath the signed-in layout
   (`src/addon/screens.tsx`). A screen's sidebar entry is its route's
   `staticData.nav`, as every screen's is (ADR 0001), so a build without the
