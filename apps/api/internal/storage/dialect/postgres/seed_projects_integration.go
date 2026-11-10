@@ -68,8 +68,8 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 		return fmt.Errorf("postgres.InsertFlowDefinitionAt: expected *Pool, got %T", pool)
 	}
 	_, err := p.pool.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) `+
-			`VALUES ($1, $2, $3, '1.0.0', 'draft'`+statusCast+`, '{}'`+purposeArrCast+`, '{}', $4, $4)`,
+		`INSERT INTO zitadel_nextgen.flow_definitions (project_id, id, name, schema_version, purposes, definition, created_at, updated_at) `+
+			`VALUES ($1, $2, $3, '1.0.0', '{}'`+purposeArrCast+`, '{}', $4, $4)`,
 		projectID, id, name, createdAt,
 	)
 	return wrapError(err)

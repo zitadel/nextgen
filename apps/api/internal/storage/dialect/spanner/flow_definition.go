@@ -17,12 +17,12 @@ const (
 	flowDefinitionsTable = "flow_definitions"
 
 	createFlowDefinitionStmt = `INSERT INTO flow_definitions ` +
-		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
-		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at`
+		`(project_id, id, name, schema_version, purposes, definition, created_at, updated_at) ` +
+		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = @p1 AND id = @p2`
 
-	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
+	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, definition, created_at, updated_at ` +
 		`FROM flow_definitions`
 
 	// latestRevisionPerName keeps only the newest revision of each flow name.
@@ -42,7 +42,7 @@ const (
 )
 
 var flowDefinitionColumns = []string{
-	"project_id", "id", "name", "schema_version", "status", "definition", "created_at", "updated_at",
+	"project_id", "id", "name", "schema_version", "definition", "created_at", "updated_at",
 }
 
 type flowDefinitionStatements struct{ statement }
@@ -74,7 +74,6 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			entity.ID,
 			entity.Name,
 			entity.SchemaVersion,
-			entity.Status.String(),
 			purposes,
 			definition,
 		).statement()
@@ -158,22 +157,17 @@ func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, 
 func (f flowDefinitionStatements) scanFlowDefinition(row *spanner.Row) (*domain.FlowDefinition, error) {
 	var (
 		projectID, id, name, schemaVersion string
-		statusStr                          string
 		definitionJSON                     spanner.NullJSON
 		createdAt, updatedAt               time.Time
 	)
-	if err := row.Columns(&projectID, &id, &name, &schemaVersion, &statusStr, &definitionJSON, &createdAt, &updatedAt); err != nil {
+	if err := row.Columns(&projectID, &id, &name, &schemaVersion, &definitionJSON, &createdAt, &updatedAt); err != nil {
 		return nil, err
-	}
-	status, err := domain.FlowDefinitionStatusString(statusStr)
-	if err != nil {
-		return nil, wrapError(err)
 	}
 	raw, err := decodeNullJSON(definitionJSON)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, raw)
+	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, createdAt, updatedAt, raw)
 }
 
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)

@@ -4394,7 +4394,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "default-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -4532,7 +4531,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "password-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier"
@@ -4589,7 +4587,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "password-register",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "register": "signup"
@@ -4630,7 +4627,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "passkey-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "signin"
@@ -4669,7 +4665,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "passkey-register",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "register": "signup"
@@ -4708,7 +4703,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "combined-password",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -4825,7 +4819,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "combined-password-passkey",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -7789,7 +7782,6 @@
                       "flow_definitions": [
                         {
                           "name": "default-login",
-                          "status": "active",
                           "user_schema": "human-user",
                           "purposes": {
                             "login": "identify"
@@ -17580,14 +17572,6 @@
           }
         ]
       },
-      "flow-definition-status": {
-        "type": "string",
-        "enum": [
-          "active",
-          "draft"
-        ],
-        "description": "The lifecycle state of this flow definition.\n\nactive: The flow definition is ready to be used. The server can select it for new flows.\ndraft: The server will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.\n\nA revision's status is fixed at creation. Publish a new revision to change it.\n"
-      },
       "flow-audience": {
         "type": "object",
         "additionalProperties": false,
@@ -18042,7 +18026,6 @@
         "type": "object",
         "required": [
           "name",
-          "status",
           "user_schema",
           "purposes",
           "steps"
@@ -18063,9 +18046,6 @@
               "combined-auth"
             ],
             "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the server runs them. Every\nrevision of a flow shares its `name`; publishing a definition under an\nexisting `name` adds a revision to that flow. Renaming is not\nsupported: the `name` is part of the public contract another\ndefinition may reference. It acts as the human display label as well;\nthere is no separate slug.\n"
-          },
-          "status": {
-            "$ref": "#/components/schemas/flow-definition-status"
           },
           "user_schema": {
             "type": "string",
@@ -18237,7 +18217,7 @@
       },
       "create-flow-definition-request": {
         "type": "object",
-        "description": "The request body for creating a flow definition.\nThe flow definition is created in an `active` state by default.\nThe status can also be set with the `status` attribute in the flow definition payload.\n",
+        "description": "The request body for creating a flow definition.\n",
         "required": [
           "project_id",
           "flow_definition"
@@ -22316,9 +22296,6 @@
         "description": "Payload for `flowdef.created`: the fields of the created flow definition\nrevision, without its steps. The retired `flowdef.updated` event carries the\nchanged fields in the same shape.\n",
         "properties": {
           "name": {
-            "type": "string"
-          },
-          "status": {
             "type": "string"
           },
           "user_schema": {

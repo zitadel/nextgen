@@ -69,7 +69,7 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 		return fmt.Errorf("sqlite.InsertFlowDefinitionAt: expected *Pool, got %T", pool)
 	}
 	_, err := p.sqlDB.ExecContext(ctx,
-		`INSERT INTO flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (?, ?, ?, '1.0.0', 'draft', '[]', '{}', ?, ?)`,
+		`INSERT INTO flow_definitions (project_id, id, name, schema_version, purposes, definition, created_at, updated_at) VALUES (?, ?, ?, '1.0.0', '[]', '{}', ?, ?)`,
 		projectID, id, name, createdAt.UnixNano(), createdAt.UnixNano(),
 	)
 	return wrapError(err)

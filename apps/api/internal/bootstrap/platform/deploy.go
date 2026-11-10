@@ -179,7 +179,6 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 			Index: i,
 			Request: service.FlowDefinitionRequest{
 				Name:          flow.Name,
-				Status:        flow.Status.String(),
 				SchemaVersion: "1.0.0",
 				UserSchema:    flow.UserSchema,
 				Purposes:      purposes,

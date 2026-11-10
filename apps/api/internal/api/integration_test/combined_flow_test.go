@@ -125,7 +125,6 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "combined-password",
-		Status:     "active",
 		UserSchema: userSchema,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",
@@ -433,7 +432,6 @@ func purposeNavFlowDefinition(userSchema string) api.FlowDefinition {
 	loginPurpose := api.NewOptNilFlowDefinitionStepTransitionsItemPurpose(api.FlowDefinitionStepTransitionsItemPurposeLogin)
 	return api.FlowDefinition{
 		Name:       "purpose-nav-password",
-		Status:     "active",
 		UserSchema: userSchema,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",

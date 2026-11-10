@@ -205,7 +205,7 @@ team match). `<zitadel-login>` sends no hint, so for the widget an
 project default. A scoped flow definition is still served when no
 unscoped one serves the purpose.
 
-The flip side: a **new active flow definition without an `audience`, or a
+The flip side: a **new flow definition without an `audience`, or a
 new revision of one, becomes the newest unscoped definition, i.e. the
 project default for the purposes it serves**, the moment it deploys.
 So an experiment can't silently take over `/login`, give the flow

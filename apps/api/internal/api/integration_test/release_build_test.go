@@ -96,7 +96,6 @@ func TestBuildRelease(t *testing.T) {
 		// Wire-valid; entry step for login is missing.
 		badFlow := api.FlowDefinition{
 			Name:       "build-bad-flow",
-			Status:     "active",
 			UserSchema: "human-user",
 			Purposes:   map[string]string{"login": "missing-step"},
 			Steps: []api.FlowDefinitionStep{{
@@ -144,6 +143,35 @@ func TestBuildRelease(t *testing.T) {
 		require.NotEmpty(t, body.Details.Value.Resources)
 		assert.Equal(t, api.ReleasePointerKindFlowDefinition, body.Details.Value.Resources[0].Kind)
 		assert.Equal(t, api.ErrorCode(domain.ErrReleaseUnresolvedReference().Code), body.Details.Value.Resources[0].Code)
+	})
+
+	t.Run("a switch targets only a flow the release includes", func(t *testing.T) {
+		target := newFlowDefinitionFixture("build-switch-target", "human-user")
+		source := newFlowDefinitionFixture("build-switch-source", "human-user")
+		source.Steps[0].Actions = append(source.Steps[0].Actions, api.StepAction{Name: "other", Kind: api.StepActionKindSubmit})
+		source.Steps[0].Transitions.Value["other"] = api.FlowDefinitionStepTransitionsItem{
+			Target: api.NewOptString(target.Name),
+			Action: api.NewOptNilFlowDefinitionStepTransitionsItemAction(api.FlowDefinitionStepTransitionsItemActionSwitch),
+		}
+
+		resp, err := client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{FlowDefinitions: []api.FlowDefinition{target, source}},
+		}, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
+
+		// The target now has a revision in the project, but a release
+		// without it would pin nothing to switch to.
+		resp, err = client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{FlowDefinitions: []api.FlowDefinition{source}},
+		}, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		body := resp.(*api.BuildReleaseBadRequest)
+		require.True(t, body.Details.Set)
+		require.Len(t, body.Details.Value.Resources, 1)
+		assert.Equal(t, "build-switch-source", body.Details.Value.Resources[0].Handle.Value)
+		assert.Equal(t, api.ErrorCode(domain.ErrFlowDefinitionInvalid("", nil).Code), body.Details.Value.Resources[0].Code)
 	})
 
 	t.Run("allocates a new branding revision only when content changes", func(t *testing.T) {

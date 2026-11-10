@@ -99,8 +99,8 @@ export class Schemas extends PinnedCollection<UserSchema> {
   }
 
   /**
-   * List the methods a schema enables that some active login flow lets an
-   * existing user sign in with.
+   * List the methods a schema enables that some login flow lets an existing
+   * user sign in with.
    *
    * @remarks
    * Only steps reached from `purposes.login` count: a passkey a register step
@@ -231,7 +231,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    *
    * @remarks
    * A method enabled that no flow offers is said with where and how to offer
-   * it, naming the active login flows it could go in, since flows are not
+   * it, naming the login flows it could go in, since flows are not
    * edited for the developer (ADR 070 §2). Enabling first and editing the flow
    * second is a normal order of work, so it warns and does not refuse.
    *
@@ -263,7 +263,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
     if (schema.usableMethods.length > 0 && reachable.length === 0) {
       const noFlow: Notice = {
         severity: "warning",
-        message: `No active login flow for ${schema.name} offers a method it enables, so nobody can sign in until one does.`,
+        message: `No login flow for ${schema.name} offers a method it enables, so nobody can sign in until one does.`,
       };
       return [...unoffered, noFlow];
     }
@@ -288,9 +288,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
         return flow.path;
       });
     const where =
-      paths.length > 0
-        ? paths.join(" or ")
-        : `an active login flow for ${schema.name} in .zitadel/flows/`;
+      paths.length > 0 ? paths.join(" or ") : `a login flow for ${schema.name} in .zitadel/flows/`;
     const how = HOW_TO_OFFER[enabled];
     return {
       severity: "warning",

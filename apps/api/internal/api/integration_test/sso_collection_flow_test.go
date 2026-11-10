@@ -59,7 +59,6 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		ProjectID: f.projectID(),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "sso-collection",
-			Status:     "active",
 			UserSchema: schemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
 			Steps: []api.FlowDefinitionStep{

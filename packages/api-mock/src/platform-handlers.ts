@@ -281,7 +281,6 @@ type ProjectRecord = {
 type FlowDefinitionRecord = {
   id: string;
   projectId: string;
-  status: string;
   createdAt: string;
   updatedAt: string;
   seq: number;
@@ -512,9 +511,6 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     flow_definition: {
       audience: {},
       ...serverCanonicalFlow(r.body as Record<string, unknown>),
-      // After the spread: an update that omits `status` keeps the stored one,
-      // which is what the endpoint documents.
-      status: r.status,
     } as unknown as GetFlowDefinition200["flow_definition"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
@@ -540,7 +536,6 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   store.flowDefinitions.set(id, {
     id,
     projectId: projectID,
-    status: "active",
     createdAt,
     updatedAt: createdAt,
     seq: ++store.lastSeq,
@@ -1197,7 +1192,6 @@ function materializeBundle(
       store.flowDefinitions.set(id, {
         id,
         projectId,
-        status: typeof resource.status === "string" ? resource.status : "active",
         createdAt,
         updatedAt: createdAt,
         seq: ++store.lastSeq,
@@ -2835,7 +2829,6 @@ export function setupPlatformHandlers() {
       const record: FlowDefinitionRecord = {
         id,
         projectId: body.data.project_id,
-        status: "active",
         createdAt: now,
         updatedAt: now,
         seq: ++store.lastSeq,

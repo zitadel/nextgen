@@ -138,7 +138,6 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-login",
-			Status:     "active",
 			UserSchema: userSchemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "passkey-step"},
 			Steps: []api.FlowDefinitionStep{

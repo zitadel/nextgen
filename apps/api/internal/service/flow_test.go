@@ -173,7 +173,6 @@ func newDef(name, version string, audience domain.FlowDefinitionAudience, purpos
 		ID:            name + "-" + version,
 		Name:          name,
 		SchemaVersion: version,
-		Status:        domain.FlowDefinitionStatusActive,
 		UserSchema:    *testUserSchema.ObjectType,
 		Purposes:      entries,
 		Audience:      audience,
@@ -323,34 +322,6 @@ func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Same(t, first, got, "want first definition")
-}
-
-// A release can pin a draft, and only an active revision is served.
-func TestResolve_DraftIsNotServed(t *testing.T) {
-	draft := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	draft.Status = domain.FlowDefinitionStatusDraft
-	draft.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	active := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	active.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	t.Run("by name", func(t *testing.T) {
-		_, err := service.NewFlowService(stubGetFlowDefinition(t, draft), nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, draft), service.ResolveFlowRequest{
-			ProjectID: "proj",
-			Purpose:   domain.FlowDefinitionPurposeLogin,
-			Name:      new("login"),
-		})
-		assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
-	})
-
-	t.Run("by audience, even when it is newer", func(t *testing.T) {
-		repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{draft, active})
-		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, draft, active), service.ResolveFlowRequest{
-			ProjectID: "proj",
-			Purpose:   domain.FlowDefinitionPurposeLogin,
-		})
-		require.NoError(t, err)
-		assert.Same(t, active, got)
-	})
 }
 
 func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {

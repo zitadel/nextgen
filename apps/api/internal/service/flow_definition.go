@@ -27,7 +27,6 @@ type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinit
 type FlowDefinitionRequest struct {
 	ProjectID     string
 	Name          string
-	Status        string
 	SchemaVersion string // todo (grvijayan): currently empty as the request does not contain schema version
 	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
 	UserSchema    string
@@ -96,8 +95,8 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 
 // prepareFlowDefinition validates and builds a flow definition without writing.
 // userSchema is the schema the flow operates on — callers resolve the handle.
-// bundleFlows names other flows in the same Build bundle (active ones only)
-// so pivoting can target a sibling that is not yet persisted.
+// bundleFlows names the flows of a Build bundle, the only flows its release
+// pins; nil outside a Build.
 func (fd *flowDefinitionService) prepareFlowDefinition(
 	ctx context.Context,
 	stmts AllStatements,
@@ -108,10 +107,6 @@ func (fd *flowDefinitionService) prepareFlowDefinition(
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
-	}
-	status, err := domain.FlowDefinitionStatusString(req.Status)
-	if err != nil {
-		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
 	}
 	if userSchema.ObjectType == nil || *userSchema.ObjectType == "" {
 		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q declares no objectType", req.UserSchema), nil)
@@ -125,7 +120,6 @@ func (fd *flowDefinitionService) prepareFlowDefinition(
 		purposes,
 		req.Audience,
 		req.Steps,
-		status,
 	)
 	if err != nil {
 		return nil, err
@@ -234,14 +228,18 @@ func (fd *flowDefinitionService) validatePivotingTargets(
 		return nil
 	}
 	for _, target := range pivotingTargets {
-		if bundleFlows[target.Name] {
+		if bundleFlows != nil {
+			if !bundleFlows[target.Name] {
+				return domain.ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: transition %q targets flow %q, which the release does not include",
+					target.Step, target.Transition, target.Name), nil)
+			}
 			continue
 		}
 		defs, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 				database.Equal(database.Col(domain.FlowDefinitionFieldName), target.Name),
-				database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 			),
 		}, FlowDefinitionQueryOptions{})
 		if err != nil {
@@ -249,7 +247,7 @@ func (fd *flowDefinitionService) validatePivotingTargets(
 		}
 		if len(defs.Items) == 0 {
 			return domain.ErrFlowDefinitionInvalid(fmt.Sprintf(
-				"step %q: transition %q targets unknown or inactive flow %q", target.Step, target.Transition, target.Name), nil)
+				"step %q: transition %q targets unknown flow %q", target.Step, target.Transition, target.Name), nil)
 		}
 	}
 	return nil

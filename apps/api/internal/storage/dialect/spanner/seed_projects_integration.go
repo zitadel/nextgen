@@ -72,7 +72,7 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 	}
 	db := newClientDB(c.client)
 	_, err := db.Update(ctx, buildStatement(
-		`INSERT INTO flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (@p1, @p2, @p3, '1.0.0', 'draft', ARRAY<STRING>[], JSON '{}', @p4, @p4)`,
+		`INSERT INTO flow_definitions (project_id, id, name, schema_version, purposes, definition, created_at, updated_at) VALUES (@p1, @p2, @p3, '1.0.0', ARRAY<STRING>[], JSON '{}', @p4, @p4)`,
 		projectID, id, name, createdAt,
 	).statement())
 	return wrapError(err)

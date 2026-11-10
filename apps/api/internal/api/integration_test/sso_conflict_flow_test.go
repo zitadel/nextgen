@@ -27,7 +27,6 @@ import (
 // sso_user_not_found routes, which a bound attempt never reaches.
 const ssoConflictFlowDefinition = `{
 	"name": "sso-conflict-login",
-	"status": "active",
 	"user_schema": %q,
 	"purposes": {"login": "identifier", "register": "register"},
 	"steps": [

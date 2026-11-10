@@ -47,7 +47,7 @@ function summary(id: string, overrides: Record<string, unknown> = {}) {
 }
 
 const SCHEMA = { title: "Customer", objectType: "human-user", type: "object" };
-const FLOW = { name: "default-login", status: "active", user_schema: "human-user", steps: [] };
+const FLOW = { name: "default-login", user_schema: "human-user", steps: [] };
 const BRANDING = { theme: { primary: "#ff0000" } };
 
 /** `GET /releases/{id}`: the summary plus the pinned set. */
