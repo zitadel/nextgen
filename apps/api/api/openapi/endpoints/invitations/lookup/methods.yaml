@@ -1,0 +1,57 @@
+post:
+  operationId: lookupInvitation
+  summary: Look up an invitation by token
+  description: |
+    Returns a lean view of the invitation for the signed-in accept page:
+    project, role, inviter and expiry.
+
+    Send the plaintext token from the invitation link fragment. Every unknown
+    or finished token answers the same opaque `404`. Authenticate with a
+    platform-project user session cookie (`sessionCookie`). Lookup is a read:
+    same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
+    reject still do). The call is rate-limited.
+  tags:
+    - Invitations
+  security:
+    - sessionCookie: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../invitation-token-request.yaml
+  responses:
+    '200':
+      description: The invitation details for the accept page.
+      content:
+        application/json:
+          schema:
+            $ref: invitation-lookup-response.yaml
+    '400':
+      description: The request body was not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Unknown or finished invitation token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '429':
+      description: |
+        Too many requests. Lookup is rate-limited so a guessed token cannot be
+        brute-forced. Wait and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: lookupInvitation-error-response.yaml

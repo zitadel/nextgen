@@ -28,6 +28,21 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// AcceptInvitation invokes acceptInvitation operation.
+	//
+	// Accepts a pending invitation for the signed-in user and returns the updated
+	// invitation.
+	// Send the plaintext token from the invitation link fragment. Acceptance
+	// grants the invitation's role (a project grant for `project_member`) when
+	// the invitation is pending and unexpired, the project is active and claimed,
+	// and the creator still holds `admin` unless `created_by` is null. The
+	// inviter cannot accept their own invitation. Every unknown or finished token
+	// answers the same opaque `404`.
+	// Authenticate with a platform-project user session cookie (`sessionCookie`).
+	// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+	//
+	// POST /invitations/accept
+	AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error)
 	// AddOrigin invokes addOrigin operation.
 	//
 	// Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
@@ -97,6 +112,19 @@ type Invoker interface {
 	//
 	// POST /releases/build
 	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
+	// CancelInvitation invokes cancelInvitation operation.
+	//
+	// Deletes a pending invitation. Its link can no longer be redeemed. Only a
+	// `pending` invitation can be cancelled; a finished invitation answers the
+	// same opaque `404` as a miss. Expired invitations keep their row until a
+	// later cleanup job removes them.
+	// Authenticate with a project secret (`oauth2`) or a console session cookie
+	// (`sessionCookie`). Cancelling needs the same project `admin` check as
+	// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+	// rules.
+	//
+	// DELETE /invitations/{id}
+	CancelInvitation(ctx context.Context, params CancelInvitationParams) (CancelInvitationRes, error)
 	// CompleteClaim invokes completeClaim operation.
 	//
 	// Completes a claim by attaching the project to the signed-in developer's
@@ -391,6 +419,28 @@ type Invoker interface {
 	//
 	// POST /idps
 	CreateIdp(ctx context.Context, request *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
+	// CreateInvitation invokes createInvitation operation.
+	//
+	// Creates an invitation for a project, or replaces an existing one, and
+	// returns the invitation and its one-shot link.
+	// Send `type` and the object named after it. `project_member` takes
+	// `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
+	// and `role`, and answers `501` `not_implemented` until team invitations
+	// ship. Optional `metadata.name` labels who the link is for. Optional
+	// `replaces_invitation_id` replaces that invitation: the new row keeps the
+	// original's `journey_id`, and a pending original is deleted in the same
+	// transaction.
+	// The `link` appears only in this response. Share it out of band; whoever
+	// opens it and is signed in can redeem the role. It expires in 72 hours.
+	// Refused for an unclaimed project, on a server without a platform project,
+	// and when the project's pending-invitation cap is reached.
+	// Authenticate with a project secret (`oauth2`) or a console session cookie
+	// (`sessionCookie`). Creation needs the same project `admin` check as
+	// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+	// rules.
+	//
+	// POST /invitations
+	CreateInvitation(ctx context.Context, request CreateInvitationRequest, params CreateInvitationParams) (CreateInvitationRes, error)
 	// CreateProject invokes createProject operation.
 	//
 	// Creates a project and returns its project secret and preview secret, which no
@@ -772,6 +822,16 @@ type Invoker interface {
 	//
 	// GET /idps/revisions/{revision_id}
 	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
+	// GetInvitation invokes getInvitation operation.
+	//
+	// Returns one invitation by ID for the project named by `project_id`.
+	// The response never includes the redeem token or the create-time `link`.
+	// Authenticate with a project secret (`oauth2`) or a console session cookie
+	// (`sessionCookie`). Reading needs the same project `admin` check as
+	// `createGrant` (`POST /grants`).
+	//
+	// GET /invitations/{id}
+	GetInvitation(ctx context.Context, params GetInvitationParams) (GetInvitationRes, error)
 	// GetLive invokes getLive operation.
 	//
 	// Answers `ok` while the server process serves HTTP, and checks nothing
@@ -1047,6 +1107,13 @@ type Invoker interface {
 	// credential's team. Team-scoped credentials are not issued today.
 	// Each item carries an `event_type` that says which type of event it is, and
 	// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+	// Filters combine. These are answered from an index and fill their pages: no
+	// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
+	// `entity_id` or `actor_id` with or without `category`, each with or without
+	// the time bounds. Any other filter or combination is matched event by
+	// event, over at most a few thousand events per request. Such a page can
+	// hold fewer events than `limit`, or none, and still carry
+	// `next_page_token`: keep passing the token until a response has none.
 	//
 	// GET /events
 	ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error)
@@ -1070,6 +1137,17 @@ type Invoker interface {
 	//
 	// GET /idps/{id}/revisions
 	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
+	// ListInvitations invokes listInvitations operation.
+	//
+	// Lists a project's invitations, newest first, in any status, paginated with
+	// `limit` and `page_token`.
+	// Optional `status` and `type` filters narrow the page. `expired` is derived
+	// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+	// a console session cookie (`sessionCookie`). Listing needs the same project
+	// `admin` check as `createGrant` (`POST /grants`).
+	//
+	// GET /invitations
+	ListInvitations(ctx context.Context, params ListInvitationsParams) (ListInvitationsRes, error)
 	// ListMyIdentityLinks invokes listMyIdentityLinks operation.
 	//
 	// Lists the identity provider accounts a sign-in linked to the signed-in user,
@@ -1236,6 +1314,18 @@ type Invoker interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
+	// LookupInvitation invokes lookupInvitation operation.
+	//
+	// Returns a lean view of the invitation for the signed-in accept page:
+	// project, role, inviter and expiry.
+	// Send the plaintext token from the invitation link fragment. Every unknown
+	// or finished token answers the same opaque `404`. Authenticate with a
+	// platform-project user session cookie (`sessionCookie`). Lookup is a read:
+	// same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
+	// reject still do). The call is rate-limited.
+	//
+	// POST /invitations/lookup
+	LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error)
 	// PatchMyUser invokes patchMyUser operation.
 	//
 	// Partially updates the caller's own schema-defined attributes. The merged
@@ -1371,6 +1461,17 @@ type Invoker interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RejectInvitation invokes rejectInvitation operation.
+	//
+	// Declines a pending invitation for the signed-in user and returns the
+	// updated invitation with status `rejected`.
+	// Send the plaintext token from the invitation link fragment. Metadata is
+	// cleared. Every unknown or finished token answers the same opaque `404`.
+	// Authenticate with a platform-project user session cookie (`sessionCookie`).
+	// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+	//
+	// POST /invitations/reject
+	RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error)
 	// RemoveOrigin invokes removeOrigin operation.
 	//
 	// Removes one origin pattern from the project's origins.
@@ -1648,6 +1749,134 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// AcceptInvitation invokes acceptInvitation operation.
+//
+// Accepts a pending invitation for the signed-in user and returns the updated
+// invitation.
+// Send the plaintext token from the invitation link fragment. Acceptance
+// grants the invitation's role (a project grant for `project_member`) when
+// the invitation is pending and unexpired, the project is active and claimed,
+// and the creator still holds `admin` unless `created_by` is null. The
+// inviter cannot accept their own invitation. Every unknown or finished token
+// answers the same opaque `404`.
+// Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+//
+// POST /invitations/accept
+func (c *Client) AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error) {
+	res, err := c.sendAcceptInvitation(ctx, request)
+	return res, err
+}
+
+func (c *Client) sendAcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (res AcceptInvitationRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("acceptInvitation"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/invitations/accept"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, AcceptInvitationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/invitations/accept"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeAcceptInvitationRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, AcceptInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeAcceptInvitationResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // AddOrigin invokes addOrigin operation.
@@ -2128,6 +2357,174 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 
 	stage = "DecodeResponse"
 	result, err := decodeBuildReleaseResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// CancelInvitation invokes cancelInvitation operation.
+//
+// Deletes a pending invitation. Its link can no longer be redeemed. Only a
+// `pending` invitation can be cancelled; a finished invitation answers the
+// same opaque `404` as a miss. Expired invitations keep their row until a
+// later cleanup job removes them.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Cancelling needs the same project `admin` check as
+// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+// rules.
+//
+// DELETE /invitations/{id}
+func (c *Client) CancelInvitation(ctx context.Context, params CancelInvitationParams) (CancelInvitationRes, error) {
+	res, err := c.sendCancelInvitation(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendCancelInvitation(ctx context.Context, params CancelInvitationParams) (res CancelInvitationRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("cancelInvitation"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/invitations/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CancelInvitationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/invitations/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CancelInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CancelInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCancelInvitationResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -3731,6 +4128,174 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateIdpResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// CreateInvitation invokes createInvitation operation.
+//
+// Creates an invitation for a project, or replaces an existing one, and
+// returns the invitation and its one-shot link.
+// Send `type` and the object named after it. `project_member` takes
+// `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
+// and `role`, and answers `501` `not_implemented` until team invitations
+// ship. Optional `metadata.name` labels who the link is for. Optional
+// `replaces_invitation_id` replaces that invitation: the new row keeps the
+// original's `journey_id`, and a pending original is deleted in the same
+// transaction.
+// The `link` appears only in this response. Share it out of band; whoever
+// opens it and is signed in can redeem the role. It expires in 72 hours.
+// Refused for an unclaimed project, on a server without a platform project,
+// and when the project's pending-invitation cap is reached.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Creation needs the same project `admin` check as
+// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
+// rules.
+//
+// POST /invitations
+func (c *Client) CreateInvitation(ctx context.Context, request CreateInvitationRequest, params CreateInvitationParams) (CreateInvitationRes, error) {
+	res, err := c.sendCreateInvitation(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendCreateInvitation(ctx context.Context, request CreateInvitationRequest, params CreateInvitationParams) (res CreateInvitationRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createInvitation"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/invitations"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateInvitationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/invitations"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateInvitationRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CreateInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateInvitationResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -6906,11 +7471,23 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetEventOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -7707,6 +8284,171 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 
 	stage = "DecodeResponse"
 	result, err := decodeGetIdpRevisionByIdResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetInvitation invokes getInvitation operation.
+//
+// Returns one invitation by ID for the project named by `project_id`.
+// The response never includes the redeem token or the create-time `link`.
+// Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Reading needs the same project `admin` check as
+// `createGrant` (`POST /grants`).
+//
+// GET /invitations/{id}
+func (c *Client) GetInvitation(ctx context.Context, params GetInvitationParams) (GetInvitationRes, error) {
+	res, err := c.sendGetInvitation(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetInvitation(ctx context.Context, params GetInvitationParams) (res GetInvitationRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getInvitation"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/invitations/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetInvitationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/invitations/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetInvitationResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -11025,6 +11767,13 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and
 // the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+// Filters combine. These are answered from an index and fill their pages: no
+// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
+// `entity_id` or `actor_id` with or without `category`, each with or without
+// the time bounds. Any other filter or combination is matched event by
+// event, over at most a few thousand events per request. Such a page can
+// hold fewer events than `limit`, or none, and still carry
+// `next_page_token`: keep passing the token until a response has none.
 //
 // GET /events
 func (c *Client) ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error) {
@@ -11410,11 +12159,23 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListEventsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11891,6 +12652,225 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 
 	stage = "DecodeResponse"
 	result, err := decodeListIdpRevisionsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListInvitations invokes listInvitations operation.
+//
+// Lists a project's invitations, newest first, in any status, paginated with
+// `limit` and `page_token`.
+// Optional `status` and `type` filters narrow the page. `expired` is derived
+// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+// a console session cookie (`sessionCookie`). Listing needs the same project
+// `admin` check as `createGrant` (`POST /grants`).
+//
+// GET /invitations
+func (c *Client) ListInvitations(ctx context.Context, params ListInvitationsParams) (ListInvitationsRes, error) {
+	res, err := c.sendListInvitations(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListInvitations(ctx context.Context, params ListInvitationsParams) (res ListInvitationsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listInvitations"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/invitations"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListInvitationsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/invitations"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "status" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "status",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Status.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "type" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "type",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Type.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListInvitationsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListInvitationsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListInvitationsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -14473,6 +15453,131 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 	return result, nil
 }
 
+// LookupInvitation invokes lookupInvitation operation.
+//
+// Returns a lean view of the invitation for the signed-in accept page:
+// project, role, inviter and expiry.
+// Send the plaintext token from the invitation link fragment. Every unknown
+// or finished token answers the same opaque `404`. Authenticate with a
+// platform-project user session cookie (`sessionCookie`). Lookup is a read:
+// same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
+// reject still do). The call is rate-limited.
+//
+// POST /invitations/lookup
+func (c *Client) LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error) {
+	res, err := c.sendLookupInvitation(ctx, request)
+	return res, err
+}
+
+func (c *Client) sendLookupInvitation(ctx context.Context, request *InvitationTokenRequest) (res LookupInvitationRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("lookupInvitation"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/invitations/lookup"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, LookupInvitationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/invitations/lookup"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeLookupInvitationRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, LookupInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeLookupInvitationResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // PatchMyUser invokes patchMyUser operation.
 //
 // Partially updates the caller's own schema-defined attributes. The merged
@@ -16001,6 +17106,130 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryUsersResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RejectInvitation invokes rejectInvitation operation.
+//
+// Declines a pending invitation for the signed-in user and returns the
+// updated invitation with status `rejected`.
+// Send the plaintext token from the invitation link fragment. Metadata is
+// cleared. Every unknown or finished token answers the same opaque `404`.
+// Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+//
+// POST /invitations/reject
+func (c *Client) RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error) {
+	res, err := c.sendRejectInvitation(ctx, request)
+	return res, err
+}
+
+func (c *Client) sendRejectInvitation(ctx context.Context, request *InvitationTokenRequest) (res RejectInvitationRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("rejectInvitation"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/invitations/reject"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RejectInvitationOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/invitations/reject"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeRejectInvitationRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RejectInvitationOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRejectInvitationResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

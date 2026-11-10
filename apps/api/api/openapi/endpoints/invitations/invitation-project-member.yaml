@@ -1,0 +1,17 @@
+title: ProjectMemberInvitation
+description: |
+  An invitation that grants a project role (`viewer`, `editor` or `admin`) to
+  whoever redeems its link.
+allOf:
+  - $ref: invitation-common.yaml
+  - type: object
+    required:
+      - type
+      - project_member
+    properties:
+      type:
+        type: string
+        enum:
+          - project_member
+      project_member:
+        $ref: invitation-project-member-payload.yaml
