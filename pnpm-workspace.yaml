@@ -260,6 +260,7 @@ verifyDepsBeforeRun: false
 # apostrophes in the event docs makes it cut members apart and drop repeated
 # pieces, so `@zitadel/api` loses fields. The patch skips comments in that scan;
 # packages/api/scripts/orval-union.spec.ts holds it. An orval bump fails the
-# install until the patch is moved to the new version or dropped.
+# install until the patch is moved to the new version, or dropped once orval's
+# own dedupeUnionType skips comments.
 patchedDependencies:
   '@orval/core@8.42.0': patches/@orval__core@8.42.0.patch

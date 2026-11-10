@@ -1,23 +1,19 @@
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 97872aac8cd928f6fd87c7a603341b12f6dfa976..1159c12a4250cc6980391cbae583ac90fc3f9ead 100644
+index 97872aac8cd928f6fd87c7a603341b12f6dfa976..cb0fe995498ca78d9de97b3e54b07250f4e2c6e6 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -1560,7 +1560,19 @@ function dedupeUnionType(unionType) {
+@@ -1560,7 +1560,15 @@ function dedupeUnionType(unionType) {
  	let depth = 0;
  	let quote = "";
  	let escaped = false;
 -	for (const c of unionType) {
-+	let commentStart = -1;
 +	for (let i = 0; i < unionType.length; i++) {
 +		const c = unionType[i];
-+		if (commentStart >= 0) {
-+			current += c;
-+			if (c === "/" && unionType[i - 1] === "*" && i - 1 > commentStart + 1) commentStart = -1;
-+			continue;
-+		}
 +		if (!quote && c === "/" && unionType[i + 1] === "*") {
-+			commentStart = i;
-+			current += c;
++			const end = unionType.indexOf("*/", i + 2);
++			const stop = end < 0 ? unionType.length : end + 2;
++			current += unionType.slice(i, stop);
++			i = stop - 1;
 +			continue;
 +		}
  		if (!escaped && (c === "'" || c === "\"")) {

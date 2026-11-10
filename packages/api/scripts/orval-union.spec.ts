@@ -30,6 +30,12 @@ describe("dedupeUnionType", () => {
     );
   });
 
+  it("ignores a bracket or a double quote inside a comment", () => {
+    const member = '{ /** a < b, "1) first */ x: string | null }';
+
+    expect(dedupeUnionType(`${member} | ${member}`)).toBe(member);
+  });
+
   it("still dedupes string literal members", () => {
     expect(dedupeUnionType("'a' | 'b' | 'a'")).toBe("'a' | 'b'");
   });
