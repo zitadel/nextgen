@@ -239,13 +239,10 @@ type PatchUser struct {
 	ExpectedUpdatedAt time.Time
 	// Attributes is the complete desired attribute set after the merge.
 	Attributes CreateAttributes
-	// AttributeTeamScope is the team_id recorded on rewritten attribute rows,
-	// and the scope fallback RegistryTeamScopes was computed with.
-	AttributeTeamScope string
 	// RegistryTeamScopes is the resolved team scope of each registry row,
 	// index-aligned with Attributes: existing claims keep their stored scope,
-	// new team-unique claims fall back to AttributeTeamScope (see
-	// [CreateAttributes.RegistryTeamScopes]). Resolved here once so the
+	// new team-unique claims fall back to the lifecycle owner team, else ""
+	// (see [CreateAttributes.RegistryTeamScopes]). Resolved here once so the
 	// dialects stay pure writers.
 	RegistryTeamScopes []string
 }
@@ -308,7 +305,6 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 		SchemaURL:          params.SchemaURL,
 		ExpectedUpdatedAt:  params.Current.Metadata.UpdatedAt,
 		Attributes:         patchAttrs,
-		AttributeTeamScope: teamScope,
 		RegistryTeamScopes: patchAttrs.RegistryTeamScopes(params.StoredRegistryScopes, teamScope),
 	}, nil
 }

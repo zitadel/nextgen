@@ -485,7 +485,6 @@ func patchStateOf(t *testing.T, stmts service.AllStatements, user *domain.User, 
 		SchemaURL:          user.SchemaURL,
 		ExpectedUpdatedAt:  user.Metadata.UpdatedAt,
 		Attributes:         attrs,
-		AttributeTeamScope: teamScope,
 		RegistryTeamScopes: domain.CreateAttributes(attrs).RegistryTeamScopes(stored, teamScope),
 	}
 }

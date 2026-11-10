@@ -372,28 +372,47 @@ func TestNewPatchUser(t *testing.T) {
 		assert.Equal(t, "https://example.test/schema-v2.json", got.SchemaURL)
 	})
 
-	t.Run("team scope follows the lifecycle owner", func(t *testing.T) {
+	t.Run("new team-unique claim follows the lifecycle owner", func(t *testing.T) {
+		const teamUniqueSchema = `{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type": "object",
+			"properties": {
+				"email": {"type": "string", "format": "email", "x-unique": "project"},
+				"givenName": {"type": "string"},
+				"nickname": {"type": "string", "x-unique": "team"}
+			}
+		}`
+		nicknameScope := func(t *testing.T, got *domain.PatchUser) string {
+			t.Helper()
+			for i, a := range got.Attributes {
+				if a.Key == "nickname" {
+					return got.RegistryTeamScopes[i]
+				}
+			}
+			t.Fatal("nickname missing from the patch")
+			return ""
+		}
+
 		current := patchTestCurrentUser()
 		current.LifecycleOwnerTeamID = new("team_1")
-
 		got, err := domain.NewPatchUser(domain.PatchUserParams{
 			Current:         current,
 			SchemaURL:       current.SchemaURL,
-			Schema:          []byte(minimalUserSchema),
-			AttributesPatch: map[string]any{"givenName": "Alicia"},
+			Schema:          []byte(teamUniqueSchema),
+			AttributesPatch: map[string]any{"nickname": "ali"},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "team_1", got.AttributeTeamScope)
+		assert.Equal(t, "team_1", nicknameScope(t, got))
 
 		selfOwned := patchTestCurrentUser()
 		got, err = domain.NewPatchUser(domain.PatchUserParams{
 			Current:         selfOwned,
 			SchemaURL:       selfOwned.SchemaURL,
-			Schema:          []byte(minimalUserSchema),
-			AttributesPatch: map[string]any{"givenName": "Alicia"},
+			Schema:          []byte(teamUniqueSchema),
+			AttributesPatch: map[string]any{"nickname": "ali"},
 		})
 		require.NoError(t, err)
-		assert.Empty(t, got.AttributeTeamScope)
+		assert.Empty(t, nicknameScope(t, got))
 	})
 }
 
