@@ -354,6 +354,9 @@ Each invocation prints one JSON object:
   blank `-m` is refused. A release keeps the message of
   the run that first built its content, usually the pull request's `preview`.
   `deployment rollback -m` records why on the rollback.
+- `deployment get`, `deployment rollback` and `release revoke` refuse a value
+  that is not a deployment or release id before they ask or call the server,
+  saying what one looks like and suggesting the list command.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.

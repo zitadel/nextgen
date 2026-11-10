@@ -68,6 +68,19 @@ describe("deployment get", () => {
         expect(app.envelopeOf(result).data).toCarryTheDeploymentRecord();
       });
 
+      it("refuses a release id, which is not a deployment id", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "deployment",
+          "get",
+          "rel_01M6KPFXAE68N6G2X1HN5XD29R",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("reports an unknown deployment as not found", async () => {
         const app = await aSetUpApp();
 
