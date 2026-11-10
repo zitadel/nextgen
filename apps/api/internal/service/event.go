@@ -140,9 +140,11 @@ func (s *EventService) projectEventsVisible(ctx context.Context, projectID strin
 // (events.ListEach), so that each read is a range of one index, in order, and
 // stops at the page. It returns no values for a list that one read serves.
 //
-//   - A request, a session, a login flow and a resource each hold few events.
-//     Their index finds those, and whatever else is asked filters them: one
-//     read.
+//   - A request, a session, a login flow and a resource each have an index
+//     by time: one read. With nothing else asked it is that range and stops
+//     at the page. Whatever else is asked is matched row by row over it, so
+//     the read is as long as the events the id holds, and a session or a
+//     resource can hold as many as the project. Logs sends each on its own.
 //   - One actor's events are indexed by category, then time. An actor's
 //     events are mostly its API requests, so a read across categories, named
 //     or not, reads each category on its own.

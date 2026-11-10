@@ -169,23 +169,55 @@ export type LogsSearch = { view: LogView; category?: AuditCategory; since?: Time
 >;
 
 /**
- * Filters brought to a combination an index serves on the server, in order
- * and a page at a time. Every way into a list goes through here (the URL, a
- * click, the request itself), so no combination that would read every event
- * of the project can be asked for:
+ * The value filters that read on their own: each has an index that holds its
+ * value and then the time, and nothing else. In the order a URL that carries
+ * several is settled, the one that holds the fewest events first.
+ */
+const ALONE = [
+  "request",
+  "flow",
+  "session",
+  "resource",
+  "type",
+] as const satisfies readonly ValueFilterKey[];
+
+/** No value filter that reads on its own, to lay over a search before setting one. */
+const NONE_ALONE: Pick<LogsSearch, (typeof ALONE)[number]> = {
+  request: undefined,
+  flow: undefined,
+  session: undefined,
+  resource: undefined,
+  type: undefined,
+};
+
+/**
+ * Filters brought to a combination that is one range of one index on the
+ * server, read in order and no further than the page. Every way into a list
+ * goes through here (the URL, a click, the request itself), so nothing can be
+ * asked for that reads more than it shows:
  *
- * - A type is a category of its own and has its own index, which holds no
- *   category and no actor. So a type reads the All view, and takes neither a
- *   category nor an actor beside it.
+ * - A request, a login flow, a session, a resource and a type each read on
+ *   their own: the All view, with no category, no actor and none of the
+ *   others beside it. Anything beside one would be matched row by row over
+ *   that one's events, and a session or a resource can hold as many as the
+ *   project.
+ * - An actor's index holds the category too, so an actor combines with a view
+ *   and a category.
  * - The requests are one category themselves, so they take no other.
  *
- * Everything else combines: an actor with any view and category, and a
- * request, session, login flow or resource with anything, since each of those
- * holds few events. The time range bounds every one of them.
+ * The time range is part of every index, so it narrows all of them.
  */
 export function servedSearch(search: LogsSearch): LogsSearch {
-  if (search.type) {
-    return { ...search, view: "all", category: undefined, actor: undefined };
+  const alone = ALONE.find((key) => search[key]);
+  if (alone) {
+    return {
+      ...search,
+      ...NONE_ALONE,
+      view: "all",
+      category: undefined,
+      actor: undefined,
+      [alone]: search[alone],
+    };
   }
   if (search.view === "requests") return { ...search, category: undefined };
   return search;
@@ -265,14 +297,17 @@ export function eventsQuery(
   };
 }
 
-/** The list in another view. Only the All view holds a type. */
+/** The list in another view. Only the All view holds a filter that reads on its own. */
 export function withView(current: LogsSearch, view: LogView): LogsSearch {
-  return servedSearch({ ...current, view, type: view === "all" ? current.type : undefined });
+  return servedSearch({ ...current, ...(view === "all" ? {} : NONE_ALONE), view });
 }
 
-/** The list narrowed to one category, or to none. A category takes no type beside it. */
+/**
+ * The list narrowed to one category, or to none. A category takes no filter
+ * that reads on its own beside it.
+ */
 export function withCategory(current: LogsSearch, category: AuditCategory | undefined): LogsSearch {
-  return servedSearch({ ...current, category, type: category ? undefined : current.type });
+  return servedSearch({ ...current, ...(category ? NONE_ALONE : {}), category });
 }
 
 /** The list over another time range, or over everything retained. */
@@ -281,18 +316,17 @@ export function withTimeRange(current: LogsSearch, since: TimeRange | undefined)
 }
 
 /**
- * The list with one value filter set, on top of what already narrows it, or
- * cleared when `value` is empty.
+ * The list with one value filter set, or cleared when `value` is empty. The
+ * one set last is the one kept ({@link servedSearch}):
  *
- * - An actor and a resource keep the view and the category: "what did this
- *   person change" is the audit view by one actor, "what happened to this
- *   user" the audit view by one resource. An actor replaces a type, which it
- *   does not combine with.
- * - A request, a session and a login flow read every view: they tie audit
- *   events to the API requests behind them, and a request's own event is not
- *   an audit event.
- * - A type reads every view too, with no category and no actor beside it
- *   ({@link servedSearch}).
+ * - An actor keeps the view and the category: "what did this person change"
+ *   is the audit view by one actor. It replaces any filter that reads on its
+ *   own.
+ * - A request, a login flow, a session, a resource and a type each replace
+ *   every other value filter, the category and the view: they read the All
+ *   view, which ties audit events to the API requests behind them.
+ *
+ * The time range stays in both.
  */
 export function narrowedBy(
   current: LogsSearch,
@@ -300,9 +334,7 @@ export function narrowedBy(
   value: string | undefined,
 ): LogsSearch {
   if (!value) return { ...current, [key]: undefined };
-  if (key === "actor") return servedSearch({ ...current, type: undefined, actor: value });
-  if (key === "resource") return servedSearch({ ...current, resource: value });
-  return servedSearch({ ...current, view: "all", [key]: value });
+  return servedSearch({ ...current, ...NONE_ALONE, [key]: value });
 }
 
 /**

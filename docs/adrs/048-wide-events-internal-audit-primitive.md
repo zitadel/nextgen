@@ -677,8 +677,9 @@ audit events), a page of 25, warm:
 **How a list is read.** `EventService.List` plans each list onto the index
 that serves it in order (`readEach`):
 
-- A request, a session, a login flow and a resource each hold few events.
-  Their index finds those, and whatever else is asked filters them: one read.
+- A request, a session, a login flow and a resource are one read each, of
+  their own index. With nothing else asked, that is the range and it stops at
+  the page. Whatever else is asked is matched row by row over it.
 - Several categories, or several types, are read one value at a time and
   merged in the page's order (`events.ListEach`). With the category index in
   place, one statement over five categories still walked the `created_at`
@@ -695,9 +696,39 @@ since few rows carry either). A bulk insert of 200,000 request rows took 1.3
 to 1.8 s with the one index, 2.2 to 2.6 s with the first four and 3.7 to
 6.5 s with all seven.
 
+**One range, read no further than the page.** An index for each filter is
+not enough: a filter beside an indexed id is matched row by row over that
+id's events, and a session or a resource can hold as many as the project. So
+the console sends only what is one range of one index: a request, a login
+flow, a session, a resource or a type on its own, an actor with or without
+categories, categories alone, or nothing, each with or without the time
+bounds (`servedSearch` in the console's events model).
+
+Measured through the API on Postgres 18 with 2,700,000 events, where one
+session, one resource and one actor hold 300,000 events each and the few
+events a narrower filter asks for are older than all of them. Every request
+the Logs screen can build was sent, first page and next, and Postgres logged
+each statement's plan:
+
+| | Requests | Most rows one statement read | Slowest statement |
+| --- | --- | --- | --- |
+| Before, any filters together | 960 | 300,012, to return 12 | 82 ms |
+| Now, one range each | 76 | 34, to return 26 | 0.28 ms |
+
+Before, 116 of 1,015 calls read past their page: a session or a resource
+beside a category, an actor or one another. Now a request is at most six
+statements (one actor over every category), each reading its page and at
+most 31 buffers. The 34 is the requests' view, where Postgres chose the
+time index and skipped the few audit events between; on a project whose
+newest 300,000 events are all audit events it chose the category index. That
+choice is the planner's, from table-wide statistics, and is the one read
+here that is not a pure range by construction.
+
 **What is still unindexed.** `GET /events` also filters by `client_id`,
 `fingerprint`, `entity_type` and `team_id`, and each of those, without one of
 the filters above beside it, still reads the project's retained events. So do
-two combinations: a type beside a category, and a type beside an actor. The
-console sends none of them: a filter joins Logs with its index. Whether the
-API keeps them, indexes them or drops them is open.
+the combinations no single index holds: a type beside a category or an actor,
+and a request, a session, a login flow or a resource beside a category, an
+actor, a type or one another. The console sends none of them: a filter joins
+Logs with its index. Whether the API keeps them, indexes them or refuses them
+is open.
