@@ -24,6 +24,8 @@ const (
 	grantTypeRefreshToken      = "refresh_token"
 )
 
+type ApplicationField uint8
+
 const (
 	ApplicationFieldUnspecified ApplicationField = iota
 	ApplicationFieldProjectID
@@ -44,8 +46,6 @@ var refreshTokenIssuingGrants = []string{grantTypeAuthorizationCode}
 // take one, so a generated id never collides with a supplied one.
 var reservedClientIDPrefixes = []string{PrefixApplicationClient.IDPrefix(""), "dcr_"}
 
-type ApplicationField uint8
-
 // ApplicationDocument holds the document fields the server reads. The
 // stored document stays the raw JSON the contract defines.
 type ApplicationDocument struct {
@@ -62,8 +62,9 @@ type ApplicationClientDocument struct {
 }
 
 // Application is one application at one revision. The application row holds
-// identity, and every write appends a revision holding the document (ADR 063).
-// RevisionID and Document are the newest revision's.
+// what is fixed for its life: the id, the slug and the creation time. Every
+// write appends a revision holding the document (ADR 063). RevisionID,
+// Document and UpdatedAt come from the newest revision.
 type Application struct {
 	ProjectID  string
 	ID         string
