@@ -210,6 +210,25 @@ describe("release revoke", () => {
         });
       });
 
+      it("names the first few serving origins and counts the rest", async () => {
+        const app = await aSetUpApp();
+        for (const host of ["a", "b", "c", "d"]) {
+          await app.addPrimaryOrigin(`https://${host}.example.com`);
+        }
+        const served = await app.deployData();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ message: string }>(result).message).toMatch(/, \d+ more\.$/);
+      });
+
       it("suggests rolling back or deploying another release before revoking again", async () => {
         const { app, result } = await aRefusedRevoke();
 

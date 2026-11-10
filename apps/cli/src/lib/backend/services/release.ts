@@ -124,23 +124,28 @@ export class ReleaseService extends ApiService {
     } catch (error) {
       if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
         // The body is parsed rather than trusted: one that does not hold the
-        // origins the contract promises is rethrown as the conflict it is.
+        // origins the contract promises is rethrown as the conflict it is. The
+        // origins are read at both depths, as the error mapper reads them: the
+        // typed answer carries them in `details`, the generic one a level down.
+        const origins = z
+          .array(
+            z.object({
+              origin: z.string(),
+              deployment_id: z.string(),
+            }),
+          )
+          .min(1);
         const refusal = z
           .object({
-            details: z.object({
-              origins: z
-                .array(
-                  z.object({
-                    origin: z.string(),
-                    deployment_id: z.string(),
-                  }),
-                )
-                .min(1),
-            }),
+            details: z.union([z.object({ origins }), z.object({ details: z.object({ origins }) })]),
           })
           .safeParse(error.body);
         if (refusal.success) {
-          return { outcome: "in-use", origins: refusal.data.details.origins };
+          const { details } = refusal.data;
+          return {
+            outcome: "in-use",
+            origins: "origins" in details ? details.origins : details.details.origins,
+          };
         }
       }
       throw error;

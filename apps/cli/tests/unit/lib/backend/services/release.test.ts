@@ -124,6 +124,30 @@ describe("ReleaseService.revoke", () => {
     });
   });
 
+  it("answers in-use when the origins arrive one level down, as the generic error nests them", async ({
+    server,
+  }) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/releases/rel_1/revoke`, () => {
+        return HttpResponse.json(
+          {
+            code: "rel.in_use",
+            message: "release: still served by an origin",
+            details: {
+              details: { origins: [{ origin: "https://app.example.com", deployment_id: "dep_1" }] },
+            },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+
+    await expect(revoking("rel_1")).resolves.toEqual({
+      outcome: "in-use",
+      origins: [{ origin: "https://app.example.com", deployment_id: "dep_1" }],
+    });
+  });
+
   it("rethrows a rel.in_use refusal that names no origins", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/releases/rel_1/revoke`, () => {

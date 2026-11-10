@@ -26,6 +26,9 @@ const RELEASE_ID: Refused<string> = {
   },
 };
 
+/** How many serving origins the refusal names; `--json` lists them all. */
+const SERVED_NAMED = 3;
+
 /**
  * A release an origin still serves. The server names each origin and the
  * deployment that pins the release there; `{served}` lists them, so the person
@@ -90,11 +93,11 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
           const outcome = await releaseService.revoke(args.releaseId);
           if (outcome.outcome === "in-use") {
-            const served = outcome.origins
-              .map((one) => {
-                return `${one.origin} (deployment ${one.deployment_id})`;
-              })
-              .join(", ");
+            const named = outcome.origins.slice(0, SERVED_NAMED).map((one) => {
+              return `${one.origin} (deployment ${one.deployment_id})`;
+            });
+            const rest = outcome.origins.length - named.length;
+            const served = (rest > 0 ? [...named, `${rest} more`] : named).join(", ");
             throw refusalError(
               RELEASE_IN_USE_REFUSAL,
               {
