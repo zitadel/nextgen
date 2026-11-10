@@ -172,46 +172,58 @@ describe("projects screen", () => {
     expect(table.queryByText("Current")).not.toBeInTheDocument();
   });
 
-  it("lists the projects by name while they fit on one page", async () => {
-    // By id, the server's order, `proj_platform` sorts after every generated id.
+  it("asks the server for the newest project first and keeps its order", async () => {
+    // One page, and by name it would read alpha, zeta: the screen sorts
+    // nothing itself, whatever the list's length (D28).
+    const orders: (string | null)[] = [];
     server.use(
-      http.get(PROJECTS_URL, () =>
-        HttpResponse.json({
-          projects: [
-            listed("proj_1", "zeta"),
-            listed("proj_2", "app-10"),
-            listed("proj_3", "app-2"),
-            listed("proj_platform", "Platform"),
-          ],
-        }),
-      ),
-    );
-    await renderProjects();
-
-    const table = within(await screen.findByRole("table"));
-    expect(table.getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "app-2",
-      "app-10",
-      "Platform",
-      "zeta",
-    ]);
-  });
-
-  it("keeps the server's order past one page", async () => {
-    // A page sorted among itself would put rows Load more appends out of place.
-    server.use(
-      http.get(PROJECTS_URL, () =>
-        HttpResponse.json({
-          projects: [listed("proj_1", "zeta"), listed("proj_2", "alpha")],
-          next_page_token: "page-2",
-        }),
-      ),
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        // The guard's and the switcher's shared read sends no limit, and no order.
+        if (params.has("limit")) orders.push(params.get("order"));
+        return HttpResponse.json({
+          projects: [listed("proj_2", "zeta"), listed("proj_1", "alpha")],
+        });
+      }),
     );
     await renderProjects();
 
     const table = within(await screen.findByRole("table"));
     await table.findByRole("link", { name: "zeta" });
     expect(table.getAllByRole("link").map((link) => link.textContent)).toEqual(["zeta", "alpha"]);
+    expect(orders).toEqual(["desc"]);
+  });
+
+  it("loads more in the order the list began in", async () => {
+    // A page token continues the order it was issued under; the server
+    // refuses it under another.
+    const reads: URLSearchParams[] = [];
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        if (params.has("limit")) reads.push(params);
+        return params.get("page_token") === null
+          ? HttpResponse.json({
+              projects: [listed("proj_3", "newest"), listed("proj_2", "newer")],
+              next_page_token: "page-2",
+            })
+          : HttpResponse.json({ projects: [listed("proj_1", "oldest")] });
+      }),
+    );
+    await renderProjects();
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+
+    const table = within(screen.getByRole("table"));
+    await table.findByRole("link", { name: "oldest" });
+    expect(table.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "newest",
+      "newer",
+      "oldest",
+    ]);
+    expect(reads.map((params) => [params.get("page_token"), params.get("order")])).toEqual([
+      [null, "desc"],
+      ["page-2", "desc"],
+    ]);
   });
 
   it("lists a project somebody else granted access to", async () => {

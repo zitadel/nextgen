@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D28 · The Projects list reads newest first — 2026-11-09 · [standing]
+Amends D21, which read a one-page list by name and a longer one in the server's order, by id. An id says nothing about when a project was made, so past one page a platform operator's newest project sat behind `Load more`, and the order changed the day a list outgrew its page. The list is now newest first at every length, sorted on the server by creation time, which the Created column shows; `Load more` appends older projects. By name stays the project switcher's order, where a short list is scanned for a known name, and search finds a project by name here.
+
 ### D27 · One frame for every screen; Projects heads the account sidebar — 2026-11-09 · [standing]
 Supersedes D24's home without a sidebar, which made Projects a second shell and Settings a third. Every screen is drawn in one frame: the sidebar, with search at its top and the account menu in its footer, and the top bar with the project pill. Search leaves the top bar, as in Vercel, because there it sat a row above a list's own search. Above every project (Projects and Settings) the sidebar lists the account's screens instead of a project's: Projects first, then what the hosted cloud adds (Billing, Support, Email), then Settings, the person's profile. The pill reads "All projects" there and its list is the way back into a project, so Settings has no "Back to dashboard" row (D13) and Projects marks no row "Current" (D21).
 Projects is a list like every other: its search beside the title (D25), and beside that a New project button (D19) opening a drawer (D15) with the CLI's `setup` command and how a project lives, which no longer sits under a list that can run to pages. With no project yet there is nothing to list, so the page is that command and that guide. The logo and the switcher's "All projects" still open Projects, and it is still where the console lands with several projects and none selected.
