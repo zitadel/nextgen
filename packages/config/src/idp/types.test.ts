@@ -73,8 +73,13 @@ describe("slugFromDisplayName", () => {
     expect(slugFromDisplayName(name, RESERVED_SLUGS)).toBe("");
   });
 
-  it("drops accents rather than turning the letters into dashes", () => {
-    expect(slugFromDisplayName("Ünïcode Login")).toBe("unicode-login");
+  it("transliterates accented and non-Latin letters rather than dropping them", () => {
+    expect(slugFromDisplayName("Ünïcode Login")).toBe("uenicode-login");
+    expect(slugFromDisplayName("Вход Acme")).toBe("vkhod-acme");
+  });
+
+  it("keeps a camel-case name as one word", () => {
+    expect(slugFromDisplayName("GitHub Enterprise")).toBe("github-enterprise");
   });
 
   it("suggests nothing when the name has no letter or digit", () => {
