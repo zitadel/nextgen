@@ -277,6 +277,16 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find a user by their identifier, the value a user carries as `identifier`:
+`users list --filter identifier=starts_with:<start> --json` matches its start,
+ignoring case. Name the operation: `starts_with` is the only one, so a part from
+the middle of an identifier (the domain of an email) finds nothing. The users
+come back ordered by identifier, and `--sort` cannot be combined with the
+filter. The property comes from the revision the user is on, so a user who signs
+in through a flow on a newer revision that designates another property does not
+match on that property. Only string identifiers match, not a number or a
+boolean. Other attributes are not filterable.
+
 To find the users still on an older revision of a schema, filter on the
 schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
@@ -302,14 +312,20 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
+- A filtered `events list` page can hold fewer items than `--limit`, or none,
+  and still carry `next_page_token`: the server matches some filters over a
+  bounded number of events per request. Follow the token, or pass `--all`,
+  before you report that nothing matched.
 - `deploy` emits `data.content_hash` (the release digest), `data.origins`
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
 - When the server refuses a release, `deploy` fails with `E_VALIDATION` and
   the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
-  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
-  only `message` (`release: invalid`); the same entries are in
+  as `schema human-user: …` or `flow default-login: …`. A connection's line
+  ends with the fields it may not change or the endpoints it left out, as in
+  `idp acme-sso: …: oidc.issuer`. Read the hint, not only `message`
+  (`release: invalid`); the same entries are in
   `details.body.details.resources`.
 - `deploy`, `deploy --dry-run` and `doctor` check each user schema against
   the meta-schema the server uses. On the schema's root or a property, a key
@@ -363,6 +379,17 @@ Each invocation prints one JSON object:
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
+- `variable set` stores the value on the project, but a sign-in keeps using the
+  variables the last `deploy` froze, so the change applies after the next
+  `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
+  holds `deploy -m '<what changed>'`. With `--preview` it points to
+  `preview --origin '<preview-url>' -m '<what changed>'` instead, since a primary
+  `deploy` leaves the preview value unapplied; a pull-request build that sets its
+  own preview URL can drop `--origin`. In an environment other than
+  `preview` or `development`, where `preview` skips, no command is suggested; nor in a
+  CI build that names no environment, where it says to pass `--env preview`.
+  A secret written without `--preview` clears the name's preview value; set it again
+  with `variable set <name> --secret --preview`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` (the origins that deployment froze) and `data.pointers`, the
   `{kind, handle, revision_id}` revisions that release pins; the `schema` one

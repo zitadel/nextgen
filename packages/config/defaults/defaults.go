@@ -49,7 +49,7 @@ func DefaultPasswordPolicy() []byte {
 
 // DefaultUserCreatePolicy returns a copy of the free sign-up protection every
 // project starts with: the guard's own built-in challenge, written down as a
-// policy (ADR 087 §5). `setup` writes it and the platform project deploys
+// policy (ADR 088 §5). `setup` writes it and the platform project deploys
 // it; a server test keeps it equal to the guard, so deleting it loosens
 // nothing.
 func DefaultUserCreatePolicy() []byte {

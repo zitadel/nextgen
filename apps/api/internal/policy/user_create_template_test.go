@@ -25,7 +25,7 @@ func TestUserCreateTemplate_OffersTheGuardsChallenge(t *testing.T) {
 	assert.Contains(t, tpl.Config["challenge"].Enum, domain.SignupGateProvider)
 }
 
-// The default policy writes down the guards and nothing else (ADR 087 §5):
+// The default policy writes down the guards and nothing else (ADR 088 §5):
 // deploying it changes nothing, and deleting it loosens nothing, because the
 // guard applies without it. A setting only the default held would be lost
 // with the file, so a stronger free baseline is a stronger guard, not a

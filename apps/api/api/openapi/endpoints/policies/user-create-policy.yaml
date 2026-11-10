@@ -1,6 +1,6 @@
 title: UserCreatePolicy
 type: object
-# Policies are specified in ADR 066, sign-up protection in ADR 087.
+# Policies are specified in ADR 066, sign-up protection in ADR 088.
 description: |
   One revision of a project's `user.create` policy. `id` is shared by every
   revision of the operation's policy; `revision_id` names this revision.

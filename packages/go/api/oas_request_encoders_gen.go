@@ -10,6 +10,20 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
+func encodeAcceptInvitationRequest(
+	req *InvitationTokenRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeAddOriginRequest(
 	req *ProjectOrigin,
 	r *http.Request,
@@ -178,6 +192,20 @@ func encodeCreateIdpRequest(
 	return nil
 }
 
+func encodeCreateInvitationRequest(
+	req CreateInvitationRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateProjectRequest(
 	req *CreateProjectRequest,
 	r *http.Request,
@@ -306,6 +334,20 @@ func encodeFinishUserPasskeyRegistrationRequest(
 
 func encodeIssueChallengeRequest(
 	req *IssueChallengeRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeLookupInvitationRequest(
+	req *InvitationTokenRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -458,6 +500,20 @@ func encodeQueryUsersRequest(
 	return nil
 }
 
+func encodeRejectInvitationRequest(
+	req *InvitationTokenRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeRemoveOriginRequest(
 	req *RemoveOriginReq,
 	r *http.Request,
@@ -500,6 +556,20 @@ func encodeRollbackDeploymentRequest(
 		if req.Set {
 			req.Encode(e)
 		}
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeSearchRequest(
+	req *SearchRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
 	}
 	encoded := e.Bytes()
 	ht.SetBody(r, bytes.NewReader(encoded), contentType)

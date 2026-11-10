@@ -9,15 +9,15 @@ import (
 )
 
 // OperationUserCreate is the policy operation a sign-up is evaluated against
-// (ADR 087). It is named after `user.created`, the event it precedes.
+// (ADR 088). It is named after `user.created`, the event it precedes.
 const OperationUserCreate = "user.create"
 
 // UserCreatePolicy is the gate for [OperationUserCreate] on the public plane:
 // which challenge a sign-up must solve, and whether the one it solved is that
 // challenge. The guard, the signup proof of work and its per-flow limits,
 // applies with or without a policy: a policy chooses among challenges and
-// never switches the guard off (ADR 078 §4, ADR 087 §5). Credentialed callers
-// are never challenged (ADR 087 §3), so creating a user through the API does
+// never switches the guard off (ADR 078 §4, ADR 088 §5). Credentialed callers
+// are never challenged (ADR 088 §3), so creating a user through the API does
 // not call it.
 type UserCreatePolicy struct {
 	engine   *policy.Engine

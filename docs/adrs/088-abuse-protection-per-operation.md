@@ -1,4 +1,4 @@
-# ADR 087: Abuse Protection per Operation
+# ADR 088: Abuse Protection per Operation
 
 > **Status:** Draft
 > **Date:** 2026-11-05

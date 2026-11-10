@@ -12,7 +12,7 @@ import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 
 /**
  * The sign-up policy under `.zitadel/policies/`: the policy of the operation
- * that creates a user, which `setup` writes and keeps (ADR 087 §5).
+ * that creates a user, which `setup` writes and keeps (ADR 088 §5).
  */
 export class SignupPolicy extends Policy {
   /**

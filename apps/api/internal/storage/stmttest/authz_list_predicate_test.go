@@ -146,6 +146,58 @@ func TestAuthzListPredicate_Users(t *testing.T) {
 	})
 }
 
+// A search narrows a list; it must not reach around the caller's grants, or
+// stand in for the filter a management list has to carry.
+func TestAuthzListPredicate_UsersBySearch(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		granted := "usr-granted-" + suffix
+		other := "usr-other-" + suffix
+		principal := "usr-principal-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newSearchableTestUser(t, projectID, schemaURL, granted, "search-"+granted+"@example.com", "Granted")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newSearchableTestUser(t, projectID, schemaURL, other, "search-"+other+"@example.com", "Other")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newSearchableTestUser(t, projectID, schemaURL, principal, principal+"@example.com", "Principal")))
+
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+				ObjectType: "project", Relation: "viewer",
+			},
+			ResourceKind: domain.ResourceKindUser,
+		})
+		search := func(ctx context.Context) (*database.ListResult[*domain.User], error) {
+			return d.stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
+				Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			}, service.UserQueryOptions{Search: &service.UserSearch{
+				ProjectID: projectID,
+				Prefix:    "search-",
+				Arms:      []service.UserSearchArm{{Key: "email"}},
+			}})
+		}
+		list := func(t *testing.T, ctx context.Context) []string {
+			t.Helper()
+			res, err := search(ctx)
+			require.NoError(t, err)
+			return userIDs(res.Items)
+		}
+
+		// Both users match the search, and with no grant neither may be seen.
+		assert.ElementsMatch(t, []string{granted, other}, list(t, service.WithAuthzListUnrestricted(t.Context())))
+		assert.Empty(t, list(t, ctx))
+
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+			newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, principal, "project", "viewer", domain.NewResourceAssignmentScope(granted))))
+		assert.Equal(t, []string{granted}, list(t, ctx))
+
+		_, err = search(t.Context())
+		require.ErrorIs(t, err, service.ErrListFilterRequired)
+	})
+}
+
 func TestAuthzListUsers_RequiresFilter(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := ensureUserTestProject(t, d.stmts)
