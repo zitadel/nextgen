@@ -1,7 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- Lets a user be found by the start of their identifier or display name from
--- an index. See the postgres peer (000040_user_attributes_search_text.sql) for
+-- an index. See the postgres peer (000042_user_attributes_search_text.sql) for
 -- the column and the index. Spanner orders STRING by code point, which is the
 -- order the search ranges rely on.
 

@@ -38,12 +38,15 @@ const NAV_ORDER = [
   "Branding",
   "Deployments",
   "Authentication",
+  "Logs",
   "Settings",
 ];
 // What sits above every project: the home, then Settings, a list of its own.
 const ACCOUNT_ORDER = ["Projects", "Settings"];
 // Settings' list: the heading that leads back, then the person's profile.
 const SETTINGS_ORDER = ["Settings", "Profile"];
+// Logs' list: the heading that leads back, then the list's views.
+const LOGS_ORDER = ["Logs", "Audit events", "API requests", "All"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -60,6 +63,8 @@ const USERS_QUERY = "*/api/v1/users/query";
 const TEAMS_QUERY = "*/api/v1/teams/query";
 // `/settings` lands on the profile, which reads the signed-in person's own record.
 const MY_USER = "*/api/v1/users/me";
+// Logs reads the project's events.
+const EVENTS = "*/api/v1/events";
 beforeEach(() => {
   // The switcher's recent projects live in localStorage: none carry over.
   localStorage.clear();
@@ -289,6 +294,100 @@ describe("settings view", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
     await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+  });
+});
+
+/**
+ * Logs swaps the project's list for its own, as Settings does: the views and
+ * the filters of that one screen, under a heading that leads back to the
+ * project's screens (D30). Logs is inside a project, so the pill still names
+ * it.
+ */
+describe("logs view", () => {
+  beforeEach(() => {
+    server.use(
+      http.get(EVENTS, () => HttpResponse.json({ data: [] })),
+      http.get(`${EVENTS}/evt_1`, () =>
+        HttpResponse.json({
+          id: "evt_1",
+          project_id: "proj_1",
+          event_type: "user.deleted",
+          category: "entity",
+          occurred_at: "2026-11-10T08:15:43Z",
+          created_at: "2026-11-10T08:15:43Z",
+          client_id: "",
+          payload: {},
+        }),
+      ),
+    );
+  });
+
+  it("opens Logs' list from the project's Logs row", async () => {
+    const router = renderShell();
+    const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
+
+    await userEvent.click(primary.getByRole("link", { name: "Logs" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events"));
+    expect(await screen.findByRole("navigation", { name: "Logs" })).toBeInTheDocument();
+  });
+
+  it("swaps the project's list for Logs' on a logs URL", async () => {
+    renderShell("/events");
+    const nav = within(await screen.findByRole("navigation", { name: "Logs" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
+    expect(nav.getByRole("link", { name: "Audit events" })).toHaveAttribute("data-active", "true");
+    // The list's filters follow its views, in a group of their own.
+    expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
+    // The project's list is gone rather than sitting underneath it.
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps Logs' list on an event's page", async () => {
+    renderShell("/events/evt_1");
+    expect(await screen.findByRole("heading", { name: "user.deleted" })).toBeInTheDocument();
+    const nav = within(screen.getByRole("navigation", { name: "Logs" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+  });
+
+  it("goes back up to the project's list from the Logs heading", async () => {
+    const router = renderShell("/events");
+    const nav = within(await screen.findByRole("navigation", { name: "Logs" }));
+    // A row of the left nav (D13), named for where it leads: the project's
+    // landing screen, whichever that is.
+    const heading = nav.getByRole("link", { name: "Logs: back to the project" });
+    expect(heading).toHaveAttribute("href", scopedPath("/", "proj_1"));
+
+    await userEvent.click(heading);
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
+    expect(
+      primary.getAllByRole("listitem").map((li) => within(li).getAllByRole("link")[0]?.textContent),
+    ).toEqual(NAV_ORDER);
+    // Logs' filters leave with its list.
+    expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the pill on the project, which Logs is inside", async () => {
+    renderShell("/events");
+    await screen.findByRole("navigation", { name: "Logs" });
+
+    const pill = screen.getByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    expect(pill).not.toHaveTextContent("All projects");
+  });
+
+  it("finds Logs among the project's pages in search, from its own list too", async () => {
+    renderShell("/events");
+    await screen.findByRole("navigation", { name: "Logs" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    // The way to any other screen without going back up first.
+    expect(await dialog.findByRole("option", { name: "Teams" })).toBeInTheDocument();
+    expect(dialog.getByRole("option", { name: "Logs" })).toBeInTheDocument();
   });
 });
 
