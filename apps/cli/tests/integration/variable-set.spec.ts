@@ -220,7 +220,7 @@ describe("variable set", () => {
         });
 
         const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
-        expect(data.next_actions.join("\n")).toContain("Name the environment with `--env preview`");
+        expect(data.next_actions.join("\n")).toContain("Name the environment with --env preview");
         expect(result).not.toSuggest("preview");
       });
 
