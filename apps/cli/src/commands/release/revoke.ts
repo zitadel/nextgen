@@ -34,7 +34,7 @@ const SERVED_NAMED = 3;
  * deployment that pins the release there; `{served}` lists them, so the person
  * sees what to move off before the next step.
  */
-const RELEASE_IN_USE_REFUSAL: Refusal = {
+export const RELEASE_IN_USE_REFUSAL: Refusal = {
   code: "E_CONFLICT",
   message: "Release {release_id} is still served by {served}.",
   hint: "Deploy another release with `zitadel deploy`, or roll back with `zitadel deployment rollback`, then revoke this release again.",

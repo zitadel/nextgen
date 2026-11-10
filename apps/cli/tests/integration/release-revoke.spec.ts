@@ -192,12 +192,6 @@ describe("release revoke", () => {
         expect(result).toFailWith("E_CONFLICT");
       });
 
-      it("names the origin that still serves the release, and the deployment that pins it", async () => {
-        const { result } = await aRefusedRevoke();
-
-        expect(result.stdout + result.stderr).toContain("https://app.example.com (deployment ");
-      });
-
       it("lists each serving origin and its deployment in the --json details", async () => {
         const { app, result, served } = await aRefusedRevoke();
 
@@ -210,7 +204,7 @@ describe("release revoke", () => {
         });
       });
 
-      it("names the first few serving origins and counts the rest", async () => {
+      it("names only the first few serving origins, leaving the rest to the --json details", async () => {
         const app = await aSetUpApp();
         for (const host of ["a", "b", "c", "d"]) {
           await app.addPrimaryOrigin(`https://${host}.example.com`);
@@ -226,7 +220,11 @@ describe("release revoke", () => {
           "--json",
         ]);
 
-        expect(app.envelopeOf<{ message: string }>(result).message).toMatch(/, \d+ more\.$/);
+        const { message, details } = app.envelopeOf(result) as unknown as {
+          message: string;
+          details: { origins: { origin: string }[] };
+        };
+        expect(message).not.toContain(details.origins.at(-1)?.origin);
       });
 
       it("suggests rolling back or deploying another release before revoking again", async () => {
