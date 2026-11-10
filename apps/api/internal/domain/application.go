@@ -193,7 +193,7 @@ func ApplicationRevisionNewClients(stored, next ApplicationDocument) ([]string, 
 		if client.ClientID != nil && slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
 			return strings.HasPrefix(*client.ClientID, prefix)
 		}) {
-			failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with client_ or dcr_"
+			failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with " + strings.Join(reservedClientIDPrefixes, " or ")
 		}
 		added = append(added, client.Slug)
 	}
