@@ -19,6 +19,7 @@ get:
   security:
     - oauth2:
         - events.read
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/event-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
