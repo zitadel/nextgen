@@ -15,12 +15,13 @@ export type NavIcon = ComponentType<{
 }>;
 
 /**
- * Which sidebar an entry belongs to. The shell renders one of two navs from the
- * same route tree, so an entry has to say which: `portal` is the selected
- * project's screens, `account` the ones above every project (Projects, the
- * person's settings, what an add-on adds beside them).
+ * Which sidebar list an entry belongs to. The shell renders one of three from
+ * the same route tree, so an entry has to say which: `portal` is the selected
+ * project's screens, `account` what sits above every project (Projects, and
+ * Settings), `settings` the pages Settings opens (the person's profile, what
+ * an add-on adds beside it).
  */
-export type NavView = "portal" | "account";
+export type NavView = "portal" | "account" | "settings";
 
 export interface NavMeta {
   /** Sidebar label. */

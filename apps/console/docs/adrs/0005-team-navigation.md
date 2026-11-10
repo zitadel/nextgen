@@ -79,8 +79,9 @@ The tabs from §1 become the team nav's first entries, so nothing built under
 > [ADR 084](../../../../docs/adrs/084-hosted-cloud-business-systems.md) §3,
 > §6), so accounts matter, and §4 is due.
 
-Beside Projects, the account sidebar holds one screen of the console's own,
-with no section headings: **Settings**, the person's profile. The cloud does not use
+Beside Projects, the account sidebar holds one row of the console's own,
+**Settings**, and its list one page of the console's own: **Profile**, the
+person's profile (D29). The cloud does not use
 accounts (teams in the platform project) for anything a person acts on, so
 the console shows none: no account under the person's name, no list of
 their teams, no account rename, and no account in search.
