@@ -90335,7 +90335,8 @@ func (s *SearchResult) SetSubtitle(val OptString) {
 }
 
 // A type of result `search` (`POST /search`) finds:
-// - `user`: a user, matched on the value they carry as `identifier`
+// - `user`: a user, matched on the start of the value they carry as
+// `identifier` or of a part of their `display` name
 // - `team`: a team, matched on its name.
 // Ref: #
 type SearchResultType string

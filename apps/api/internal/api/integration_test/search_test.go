@@ -98,7 +98,8 @@ func TestSearch(t *testing.T) {
 		"email": "ann@search.example.com", "givenName": "Ann", "familyName": "Lee",
 	})
 	joann := seedSearchUser(t, project.ID, "", map[string]any{"email": "joann@search.example.com"})
-	seedSearchUser(t, project.ID, "", map[string]any{"email": "bob@search.example.com"})
+	bob := seedSearchUser(t, project.ID, "", map[string]any{"email": "bob@search.example.com"})
+	seedSearchUser(t, project.ID, "", map[string]any{"email": "bobby@search.example.com"})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -114,8 +115,9 @@ func TestSearch(t *testing.T) {
 		t.Parallel()
 		got := search(t, &api.SearchRequest{Query: "ann", Types: both})
 
-		// Two prefixes in the order of the types, then the substring.
-		require.Equal(t, []string{ann, annex, joann}, searchResultIDs(got.Results))
+		// The user whose given name is the text, then the team it starts.
+		// joann@… only contains it: users match from the start of a value.
+		require.Equal(t, []string{ann, annex}, searchResultIDs(got.Results))
 		assert.Empty(t, got.IncompleteTypes)
 
 		assert.Equal(t, api.SearchResult{
@@ -131,13 +133,23 @@ func TestSearch(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 			Title:     "Annex",
 		}, got.Results[1])
-		// A user without a display is titled by their identifier alone.
-		assert.Equal(t, api.SearchResult{
+	})
+
+	t.Run("a user without a display is titled by their identifier alone", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "joa", Types: both})
+		assert.Equal(t, []api.SearchResult{{
 			Type:      api.SearchResultTypeUser,
 			ID:        joann,
 			ProjectID: api.ProjectID(project.ID),
 			Title:     "joann@search.example.com",
-		}, got.Results[2])
+		}}, got.Results)
+	})
+
+	t.Run("a part of the display name finds its user", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "LEE", Types: both})
+		assert.Equal(t, []string{ann}, searchResultIDs(got.Results))
 	})
 
 	t.Run("searches only the requested types", func(t *testing.T) {
@@ -146,10 +158,10 @@ func TestSearch(t *testing.T) {
 		assert.Equal(t, []string{annex}, searchResultIDs(got.Results))
 	})
 
-	t.Run("a whole identifier comes before the ones that contain it", func(t *testing.T) {
+	t.Run("a whole identifier finds its user alone, whatever its case", func(t *testing.T) {
 		t.Parallel()
 		got := search(t, &api.SearchRequest{Query: "ANN@search.example.com", Types: both})
-		assert.Equal(t, []string{ann, joann}, searchResultIDs(got.Results))
+		assert.Equal(t, []string{ann}, searchResultIDs(got.Results))
 	})
 
 	t.Run("an id finds its resource", func(t *testing.T) {
@@ -177,6 +189,15 @@ func TestSearch(t *testing.T) {
 		})
 		assert.Equal(t, []string{paymentsAlpha}, searchResultIDs(got.Results))
 		assert.Equal(t, []api.SearchResultType{api.SearchResultTypeTeam}, got.IncompleteTypes)
+
+		// Users come from the search index best match first: bob@… before bobby@….
+		got = search(t, &api.SearchRequest{
+			Query:        "bob",
+			Types:        both,
+			LimitPerType: api.NewOptInt(1),
+		})
+		assert.Equal(t, []string{bob}, searchResultIDs(got.Results))
+		assert.Equal(t, []api.SearchResultType{api.SearchResultTypeUser}, got.IncompleteTypes)
 	})
 
 	t.Run("a wildcard character is text", func(t *testing.T) {
@@ -223,7 +244,7 @@ func TestSearchSessionCaller(t *testing.T) {
 	})
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "Session Search"})
 	require.NoError(t, err)
-	subject := seedSearchUser(t, project.ID, "", map[string]any{"email": "subject@search.example.com"})
+	subject := seedSearchUser(t, project.ID, "", map[string]any{"email": "search-subject@session.example.com"})
 
 	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)

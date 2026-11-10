@@ -16,8 +16,9 @@ const (
 )
 
 const (
-	// SearchUserMinLength is the shortest text users are searched for: their
-	// match scans every identifier of the project.
+	// SearchUserMinLength is the shortest text users are searched for. The
+	// search index answers any length at the same cost; a shorter text just
+	// starts too many identifiers and names to tell users apart.
 	SearchUserMinLength = 3
 	// SearchReadLimit is how many rows one type's read returns to rank from.
 	SearchReadLimit = 100

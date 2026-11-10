@@ -137,6 +137,24 @@ type ListUsersOutput struct {
 	NextPageToken string
 }
 
+// SearchUsersInput asks for the users of a project a text finds.
+type SearchUsersInput struct {
+	ProjectID string
+	// Query is matched, ignoring case, against the start of each user's
+	// identifier and of each part of their display name.
+	Query string
+	// Limit is the most users returned.
+	Limit int
+}
+
+// SearchUsersOutput holds the users found, the best match first: a user whose
+// value is the whole query comes before the users it only starts.
+type SearchUsersOutput struct {
+	Items []*domain.User
+	// More reports that further users match.
+	More bool
+}
+
 type ListUserTeamsOutput struct {
 	Items         []*domain.UserTeam
 	NextPageToken string
@@ -149,6 +167,10 @@ type UserService interface {
 	CreateUser(ctx context.Context, input CreateUserInput) (*domain.User, error)
 	DeleteUser(ctx context.Context, input DeleteUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
+	// SearchUsers finds users by the start of their identifier or of a part of
+	// their display name, from the search index (ADR 058). Like ListUsers it
+	// is a management list: the caller's list filter narrows it.
+	SearchUsers(ctx context.Context, input SearchUsersInput) (*SearchUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
 	ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
@@ -375,6 +397,62 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 		Items:         result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+func (s *userService) SearchUsers(ctx context.Context, input SearchUsersInput) (_ *SearchUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.SearchUsers")
+	defer end(&err)
+
+	term, ok := domain.SearchText(input.Query)
+	if !ok {
+		return &SearchUsersOutput{}, nil
+	}
+	limit := normalizeLimit(input.Limit)
+	keys, perUser, err := designatedSearchKeys(ctx, s.v2Pool.Statements(), input.ProjectID)
+	if err != nil {
+		return nil, mapListError(err, "failed to list schemas from database")
+	}
+	search := &UserSearch{ProjectID: input.ProjectID, Prefix: term, Arms: make([]UserSearchArm, 0, len(keys))}
+	for _, key := range keys {
+		// No schema narrows an arm: an attribute carries search text only
+		// when the user's own schema designates it.
+		search.Arms = append(search.Arms, UserSearchArm{Key: key})
+	}
+
+	// A user is returned once per property they match on, at most perUser
+	// times, so this many rows hold limit+1 different users whenever that
+	// many match: enough to fill the answer and to know whether more follow.
+	rows := (limit + 1) * max(perUser, 1)
+	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter:     database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Pagination: database.Page[domain.UserField]{Limit: uint32(rows), OrderBy: v2user.SearchOrder()},
+	}, UserQueryOptions{Search: search})
+	if err != nil {
+		return nil, mapListError(err, "failed to search users in database")
+	}
+
+	// The rows come best match first, so the first row of a user is their
+	// best match.
+	found := make([]*domain.User, 0, limit+1)
+	seen := make(map[string]struct{}, limit+1)
+	for _, user := range result.Items {
+		if _, dup := seen[user.ID]; dup {
+			continue
+		}
+		seen[user.ID] = struct{}{}
+		found = append(found, user)
+		if len(found) > limit {
+			break
+		}
+	}
+	out := &SearchUsersOutput{Items: found}
+	if len(found) > limit {
+		out.Items, out.More = found[:limit], true
+	}
+	if err := s.attachUserRefs(ctx, input.ProjectID, out.Items...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // splitUserFilters separates the predicates that compile to a filter on the

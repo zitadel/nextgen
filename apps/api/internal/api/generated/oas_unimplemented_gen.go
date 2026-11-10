@@ -1870,12 +1870,13 @@ func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollb
 // its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
 // with the type's own operation, `GetUserByID` (`GET /users/{user_id}`) or
 // `getTeam` (`GET /teams/{team_id}`).
-// A user matches when the value they carry as `identifier` contains the text,
-// from three characters on. A team matches when its name contains it.
-// Matching ignores case. A `query` that is the `id` of a user or a team finds
-// that one. `project_id` names the project to search; without it, the
-// credential's own project is searched. A caller with access to part of the
-// project finds only what that access covers.
+// A user matches when the value they carry as `identifier`, or a part of
+// their `display` name, starts with the text, from three characters on. A
+// team matches when its name contains it. Matching ignores case. A `query`
+// that is the `id` of a user or a team finds that one. `project_id` names the
+// project to search; without it, the credential's own project is searched. A
+// caller with access to part of the project finds only what that access
+// covers.
 // A token needs `project.read` and, for each type it asks for, the scope that
 // type's own list needs: `user.read` for `user` and `team.read` for `team`.
 // Results come best match first, at most `limit_per_type` of each type, and

@@ -52,7 +52,7 @@ func (h *Handler) Search(ctx context.Context, req *api.SearchRequest, params api
 		)
 		switch resultType {
 		case domain.SearchResultTypeUser:
-			candidates, incomplete, err = h.searchUsers(ctx, projectID, query)
+			candidates, incomplete, err = h.searchUsers(ctx, projectID, query, limit)
 		case domain.SearchResultTypeTeam:
 			candidates, incomplete, err = h.searchTeams(ctx, projectID, query)
 		}
@@ -79,13 +79,14 @@ func (h *Handler) Search(ctx context.Context, req *api.SearchRequest, params api
 const searchDefaultLimitPerType = 5
 
 // searchUsers finds the user whose id the text is, else the users whose
-// identifier contains it. Text too short to match users by is reported as an
-// incomplete read rather than scanned for.
-func (h *Handler) searchUsers(ctx context.Context, projectID, query string) (_ []domain.SearchResult, incomplete bool, _ error) {
+// identifier or display name it starts: the best limit of them, read from the
+// search index. Text too short to tell users apart is reported as an
+// incomplete read rather than answered with the first users in the alphabet.
+func (h *Handler) searchUsers(ctx context.Context, projectID, query string, limit int) (_ []domain.SearchResult, incomplete bool, _ error) {
 	if domain.IsSearchID(domain.PrefixUser, query) {
 		// Text shaped like an id can still be an identifier ("user_ann"), so a
 		// miss falls through to the text match.
-		found, _, err := h.listUsersForSearch(ctx, projectID, query, service.Filter{Field: "id", Operation: "equals", Value: query})
+		found, err := h.findUserForSearch(ctx, projectID, query)
 		if err != nil || len(found) > 0 {
 			return found, false, err
 		}
@@ -93,32 +94,53 @@ func (h *Handler) searchUsers(ctx context.Context, projectID, query string) (_ [
 	if !domain.SearchQueryLongEnoughForUsers(query) {
 		return nil, true, nil
 	}
-	return h.listUsersForSearch(ctx, projectID, query, service.Filter{Field: "identifier", Operation: "contains", Value: query})
-}
-
-func (h *Handler) listUsersForSearch(ctx context.Context, projectID, query string, filter service.Filter) (_ []domain.SearchResult, incomplete bool, _ error) {
 	ctx, _, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, false, err
 	}
-	listed, err := h.userService.ListUsers(ctx, service.ListUsersInput{
-		ProjectID: projectID,
-		Limit:     domain.SearchReadLimit,
-		Filters:   []service.Filter{filter},
-	})
+	found, err := h.userService.SearchUsers(ctx, service.SearchUsersInput{ProjectID: projectID, Query: query, Limit: limit})
 	if err != nil {
 		return nil, false, err
 	}
-	candidates := make([]domain.SearchResult, 0, len(listed.Items))
-	for _, user := range listed.Items {
-		candidates = append(candidates, userSearchResult(user, query))
+	term, _ := domain.SearchText(query)
+	candidates := make([]domain.SearchResult, 0, len(found.Items))
+	for _, user := range found.Items {
+		result := userSearchResult(user)
+		result.Rank = domain.SearchRankPrefix
+		if user.MatchedText == term {
+			result.Rank = domain.SearchRankWhole
+		}
+		candidates = append(candidates, result)
 	}
-	return candidates, listed.NextPageToken != "", nil
+	return candidates, found.More, nil
+}
+
+// findUserForSearch reads the user with the id, through the users list and
+// its gate, so it finds only a user the list would show the caller.
+func (h *Handler) findUserForSearch(ctx context.Context, projectID, id string) ([]domain.SearchResult, error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
+	if err != nil {
+		return nil, err
+	}
+	listed, err := h.userService.ListUsers(ctx, service.ListUsersInput{
+		ProjectID: projectID,
+		Limit:     1,
+		Filters:   []service.Filter{{Field: "id", Operation: "equals", Value: id}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	found := make([]domain.SearchResult, 0, len(listed.Items))
+	for _, user := range listed.Items {
+		found = append(found, userSearchResult(user))
+	}
+	return found, nil
 }
 
 // userSearchResult names a user as every surface does (ADR 058): by their
-// display, else their identifier, else their id.
-func userSearchResult(user *domain.User, query string) domain.SearchResult {
+// display, else their identifier, else their id. It ranks as an id match; a
+// text match sets its own rank.
+func userSearchResult(user *domain.User) domain.SearchResult {
 	result := domain.SearchResult{
 		Type:      domain.SearchResultTypeUser,
 		ID:        user.ID,
@@ -126,21 +148,14 @@ func userSearchResult(user *domain.User, query string) domain.SearchResult {
 		Title:     user.ID,
 		Rank:      domain.SearchRankID,
 	}
-	var identifier string
 	if user.Ref != nil {
-		identifier = user.Ref.Identifier
-		switch {
+		switch identifier := user.Ref.Identifier; {
 		case user.Ref.Display != "":
 			result.Title = user.Ref.Display
 			result.Subtitle = identifier
 		case identifier != "":
 			result.Title = identifier
 		}
-	}
-	if user.ID != query {
-		// The list matched the user, so they rank as a match even where the
-		// database folds case differently than RankSearchText does.
-		result.Rank = min(domain.RankSearchText(query, identifier), domain.SearchRankContains)
 	}
 	return result
 }
