@@ -25,11 +25,11 @@
           "headers": [
             {
               "key": "Content-Security-Policy",
-              "value": "script-src 'self' 'sha256-O+s6aqJ2uLXTyNZuD6aYTuuuGWE894WpAzDIYTy4PBY=' https://vercel.live; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; report-uri /csp-report"
+              "value": "script-src 'self' 'sha256-8uazrJgLK9xksqbl8B40+OlfBNJOCmls8ZpXp3Pr0xk=' https://vercel.live; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; report-uri /csp-report"
             },
             {
               "key": "Content-Security-Policy-Report-Only",
-              "value": "default-src 'self'; script-src 'self' 'sha256-O+s6aqJ2uLXTyNZuD6aYTuuuGWE894WpAzDIYTy4PBY=' https://vercel.live; style-src 'self' 'unsafe-inline' https://vercel.live; img-src 'self' data: https: blob:; font-src 'self' https://vercel.live https://assets.vercel.com; connect-src 'self' https://vercel.live wss://ws-us3.pusher.com; frame-src https://vercel.live; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri /csp-report"
+              "value": "default-src 'self'; script-src 'self' 'sha256-8uazrJgLK9xksqbl8B40+OlfBNJOCmls8ZpXp3Pr0xk=' https://vercel.live; style-src 'self' 'unsafe-inline' https://vercel.live; img-src 'self' data: https: blob:; font-src 'self' https://vercel.live https://assets.vercel.com; connect-src 'self' https://vercel.live wss://ws-us3.pusher.com; frame-src https://vercel.live; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri /csp-report"
             }
           ]
         }

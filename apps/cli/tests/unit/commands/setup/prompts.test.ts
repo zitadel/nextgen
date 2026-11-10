@@ -85,7 +85,7 @@ const ACME_ISSUER = "https://sso.acme.example";
 /**
  * The order the custom connection's questions are asked in.
  */
-const QUESTION = { slug: 0, displayName: 1, issuer: 2, scopes: 3 } as const;
+const QUESTION = { displayName: 0, slug: 1, issuer: 2, scopes: 3 } as const;
 
 /**
  * A custom connection's settings, every one of them given.
@@ -160,8 +160,8 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
  */
 function describesAcme(overrides: { issuer?: string; clientId?: string } = {}): void {
   vi.mocked(text)
-    .mockResolvedValueOnce(" acme-sso ")
     .mockResolvedValueOnce(" Acme SSO ")
+    .mockResolvedValueOnce(" acme-sso ")
     .mockResolvedValueOnce(overrides.issuer ?? ` ${ACME_ISSUER} `)
     .mockResolvedValueOnce("openid profile email groups")
     .mockResolvedValueOnce(overrides.clientId ?? "acme-client-id");
@@ -784,10 +784,32 @@ describe("SocialSignInPrompt", () => {
   describe("when no provider is wanted", () => {
     it("leaves the answers alone", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(answers.sso).toEqual([]);
+    });
+
+    it("asks before going on without SSO, where No goes back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+        message: "Would you like to continue without setting up SSO?",
+        initialValue: false,
+      });
+    });
+
+    it("asks for the providers again when Go back is chosen", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(multiselect)).toHaveBeenCalledTimes(2);
     });
 
     it.each([
@@ -795,6 +817,7 @@ describe("SocialSignInPrompt", () => {
       ["password", password],
     ])("asks no %s question", async (_kind, prompt) => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -804,6 +827,7 @@ describe("SocialSignInPrompt", () => {
 
   it("offers every catalog provider and a custom one, with no option meaning none", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -814,18 +838,20 @@ describe("SocialSignInPrompt", () => {
     ).toEqual([...IDP_PROVIDERS, "custom"]);
   });
 
-  it("says the providers are optional and that Enter skips them", async () => {
+  it("says that Space selects a provider and Enter continues", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
     expect(vi.mocked(multiselect).mock.calls[0]?.[0].message).toBe(
-      "Which external sign-in providers would you like to add? Press Enter to skip.",
+      "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
     );
   });
 
   it("says what each provider requires", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -844,6 +870,23 @@ describe("SocialSignInPrompt", () => {
       vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
       vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  ");
       vi.mocked(password).mockResolvedValueOnce("  s3cret  ");
+
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.sso).toEqual([
+        {
+          selection: googleSelection,
+          credentials: { clientId: "1234-abc.apps.googleusercontent.com", secret: "s3cret" },
+          endpoints: undefined,
+        },
+      ]);
+    });
+
+    it("keeps a provider ticked after Go back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce(["google"]);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
+      vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
+      vi.mocked(password).mockResolvedValueOnce("s3cret");
 
       const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -986,6 +1029,7 @@ describe("SocialSignInPrompt", () => {
   describe("with a custom provider", () => {
     it("is offered beside the catalog, saying what it will ask for", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -1402,7 +1446,7 @@ describe("askCustomSettings", () => {
       ["slug", "issuer"],
     ],
     [["slug", "displayName", "issuer"], ["scopes"]],
-    [[], ["slug", "displayName", "issuer", "scopes"]],
+    [[], ["displayName", "slug", "issuer", "scopes"]],
   ] as const)("given %j asks only for %j, in that order", async (givenKeys, askedKeys) => {
     const given = Object.fromEntries(
       givenKeys.map((key) => {
@@ -1447,6 +1491,36 @@ describe("askCustomSettings", () => {
 
       expect(text).not.toHaveBeenCalled();
     });
+  });
+
+  it("suggests the slug from the display name it was asked first", async () => {
+    vi.mocked(text).mockResolvedValueOnce("Zitadel Cloud").mockResolvedValueOnce("zitadel-cloud");
+
+    await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+    expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({
+      message: expect.stringContaining("What would you like to call this connection?"),
+      initialValue: "zitadel-cloud",
+    });
+  });
+
+  it.each(["Google", "Custom"])(
+    "suggests no slug for the built-in provider name %j",
+    async (displayName) => {
+      vi.mocked(text).mockResolvedValueOnce(displayName).mockResolvedValueOnce("acme-sso");
+
+      await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+      expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({ initialValue: "" });
+    },
+  );
+
+  it("suggests no slug when the display name has nothing a slug can keep", async () => {
+    vi.mocked(text).mockResolvedValueOnce("!!!").mockResolvedValueOnce("slug");
+
+    await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+    expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({ initialValue: "" });
   });
 
   it("returns the scopes that were given as one string", async () => {

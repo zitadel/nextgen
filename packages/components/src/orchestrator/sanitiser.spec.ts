@@ -14,6 +14,14 @@ describe("DOMPurify sanitiser", () => {
     expect(out).toContain("required");
   });
 
+  it.each(["name", "title", "id", "action", "method", "length", "location", "body", "domain"])(
+    'keeps a field named "%s" that collides with a DOM property (#2532)',
+    (value) => {
+      const out = sanitise(`<zl-field name="${value}" label="x"></zl-field>`);
+      expect(out).toContain(`name="${value}"`);
+    },
+  );
+
   it("preserves <zl-button> with hierarchy, action, and label", () => {
     const out = sanitise(
       `<zl-button hierarchy="primary" size="medium" type="submit" action="submit" label="Continue"></zl-button>`,

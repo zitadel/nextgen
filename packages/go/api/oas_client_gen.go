@@ -1096,7 +1096,8 @@ type Invoker interface {
 	// Lists the projects the signed-in user can act on: those they hold an active
 	// grant on, either directly or through a team they are a member of. For a
 	// platform operator, someone who runs the deployment, that is every project of
-	// the deployment. Ordered by project ID and paged with an opaque cursor.
+	// the deployment. Ordered by project ID unless `order` asks for creation
+	// time, and paged with an opaque cursor.
 	// This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
 	// one
 	// project the calling credential is bound to. Here the session is the caller
@@ -12253,7 +12254,8 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 // Lists the projects the signed-in user can act on: those they hold an active
 // grant on, either directly or through a team they are a member of. For a
 // platform operator, someone who runs the deployment, that is every project of
-// the deployment. Ordered by project ID and paged with an opaque cursor.
+// the deployment. Ordered by project ID unless `order` asks for creation
+// time, and paged with an opaque cursor.
 // This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
 // one
 // project the calling credential is bound to. Here the session is the caller
@@ -12366,6 +12368,23 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.NameContains.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "order" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "order",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Order.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
