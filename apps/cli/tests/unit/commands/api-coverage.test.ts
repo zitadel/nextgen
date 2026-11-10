@@ -63,7 +63,8 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // OAuth settings are written only through a release, so there is nothing to
   // create or update here; reading them is `zitadel oauth`'s, which comes with
   // the authorization server (#2793).
-  oauth_settings: "written only through a release; the CLI command comes with `zitadel oauth` (#2793)",
+  oauth_settings:
+    "written only through a release; the CLI command comes with `zitadel oauth` (#2793)",
 };
 
 /**
