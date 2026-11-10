@@ -192,29 +192,45 @@ export class SocialSignInPrompt implements SetupPrompt {
    *
    * A multi-select rather than one choice: a project may offer several at
    * once, and the schema and flow already carry `sso_providers` as a list.
-   * `required: false` is what makes "none" an answer -- an explicit "not now"
-   * option cannot coexist with ticking a provider beside it.
+   * Space ticks a provider and Enter continues, so Enter on an empty list is
+   * not a silent skip: it asks whether to go on without SSO, where No goes back
+   * to the list, and only a Yes returns none.
    */
   private async chooseProviders(ask: Asker): Promise<readonly ProviderName[]> {
-    return ask({
-      kind: "multiselect",
-      name: "external sign-in providers",
-      message: "Which external sign-in providers would you like to add? Press Enter to skip.",
+    for (;;) {
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
-      required: false,
-      options: [
-        ...IDP_PROVIDERS.map((provider) => ({
-          value: provider as ProviderName,
-          label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
-        })),
-        {
-          value: CUSTOM_PROVIDER as ProviderName,
-          label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
-        },
-      ],
-    });
+      const chosen: readonly ProviderName[] = await ask({
+        kind: "multiselect",
+        name: "external sign-in providers",
+        message:
+          "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
+        required: false,
+        options: [
+          ...IDP_PROVIDERS.map((provider) => ({
+            value: provider as ProviderName,
+            label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
+          })),
+          {
+            value: CUSTOM_PROVIDER as ProviderName,
+            label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
+          },
+        ],
+      });
+      if (chosen.length > 0) {
+        return chosen;
+      }
+      const continueWithout = await ask({
+        kind: "yes-no",
+        name: "continue without SSO",
+        message: "Would you like to continue without setting up SSO?",
+        initialValue: false,
+      });
+      if (continueWithout) {
+        return [];
+      }
+    }
   }
 
   /**

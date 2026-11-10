@@ -784,10 +784,32 @@ describe("SocialSignInPrompt", () => {
   describe("when no provider is wanted", () => {
     it("leaves the answers alone", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(answers.sso).toEqual([]);
+    });
+
+    it("asks before going on without SSO, where No goes back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+        message: "Would you like to continue without setting up SSO?",
+        initialValue: false,
+      });
+    });
+
+    it("asks for the providers again when Go back is chosen", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(multiselect)).toHaveBeenCalledTimes(2);
     });
 
     it.each([
@@ -795,6 +817,7 @@ describe("SocialSignInPrompt", () => {
       ["password", password],
     ])("asks no %s question", async (_kind, prompt) => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -804,6 +827,7 @@ describe("SocialSignInPrompt", () => {
 
   it("offers every catalog provider and a custom one, with no option meaning none", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -814,18 +838,20 @@ describe("SocialSignInPrompt", () => {
     ).toEqual([...IDP_PROVIDERS, "custom"]);
   });
 
-  it("says the providers are optional and that Enter skips them", async () => {
+  it("says that Space selects a provider and Enter continues", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
     expect(vi.mocked(multiselect).mock.calls[0]?.[0].message).toBe(
-      "Which external sign-in providers would you like to add? Press Enter to skip.",
+      "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
     );
   });
 
   it("says what each provider requires", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -844,6 +870,23 @@ describe("SocialSignInPrompt", () => {
       vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
       vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  ");
       vi.mocked(password).mockResolvedValueOnce("  s3cret  ");
+
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.sso).toEqual([
+        {
+          selection: googleSelection,
+          credentials: { clientId: "1234-abc.apps.googleusercontent.com", secret: "s3cret" },
+          endpoints: undefined,
+        },
+      ]);
+    });
+
+    it("keeps a provider ticked after Go back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce(["google"]);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
+      vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
+      vi.mocked(password).mockResolvedValueOnce("s3cret");
 
       const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
@@ -986,6 +1029,7 @@ describe("SocialSignInPrompt", () => {
   describe("with a custom provider", () => {
     it("is offered beside the catalog, saying what it will ask for", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
