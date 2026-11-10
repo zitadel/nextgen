@@ -5600,18 +5600,14 @@
       "post": {
         "operationId": "search",
         "summary": "Search a project",
-        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the value they carry as `identifier`, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA match is the text anywhere in that value, ignoring case. A `query` that\nis the `id` of a resource of a requested type finds that one. A schema and\na flow definition are found at their newest revision. `project_id` names\nthe project to search; without it, the credential's own project is\nsearched. A caller with access to part of the project finds only what that\naccess covers.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
+        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the value they carry as `identifier`, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA match is the text anywhere in that value, ignoring case. A `query` that\nis the `id` of a resource of a requested type finds that one. A schema and\na flow definition are found at their newest revision. `project_id` names\nthe project to search; without it, the credential's own project is\nsearched. A caller with access to part of the project finds only what that\naccess covers.\n\nA token needs `project.read` and, for each type it asks for, the scope that\ntype's own list needs: `user.read`, `team.read`, `schema.read`,\n`flow_definition.read` or `idp.read`.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
         "tags": [
           "Search"
         ],
         "security": [
           {
             "oauth2": [
-              "user.read",
-              "team.read",
-              "schema.read",
-              "flow_definition.read",
-              "idp.read"
+              "project.read"
             ]
           },
           {
