@@ -133,6 +133,7 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 		HomeProjectID: self.ProjectID(),
 		UserID:        self.UserID(),
 		NameContains:  params.NameContains.Value,
+		Order:         string(params.Order.Value),
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
 	}

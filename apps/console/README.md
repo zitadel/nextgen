@@ -45,8 +45,8 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Branding** (`/branding`).
 - **Authentication** (`/authentication`).
 - **Project settings** (`/project`).
-- **Settings** (`/settings/profile`), your profile, in the Settings view the
-  account menu opens.
+- **Profile** (`/settings/profile`), your profile, under Settings in the
+  account sidebar.
 
 The sidebar is one level, in the order and with the icons of the design's
 "01 / Nav Level 1".

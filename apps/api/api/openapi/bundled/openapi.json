@@ -62,6 +62,10 @@
       "description": "Identity providers are the external login providers a project offers.\nEach is published as a revisioned connection document and referenced by\nits slug from user schemas and flow definitions. These operations create\nor revise a connection, query connections, read one by ID, and read its\nrevisions. A slug resolves through the query.\n"
     },
     {
+      "name": "Applications",
+      "description": "Applications authenticate their users via Zitadel, each through its\nOAuth clients. A registered application is written through the API as\none revisioned document. These operations create or revise a registered\napplication and read one by ID.\n"
+    },
+    {
       "name": "Policies",
       "description": "A policy holds the settings an operation is checked against, such as a\npassword policy's minimum length. A project publishes them per guarded\noperation, and every publish is an immutable revision.\n"
     },
@@ -80,6 +84,10 @@
     {
       "name": "Grants",
       "description": "Grants give a user or a team the project.viewer, project.editor or\nproject.admin role on a project. These operations create, get, query and\nrevoke grants. There is no operation to change a grant's role yet.\n"
+    },
+    {
+      "name": "Invitations",
+      "description": "Invitations are 72-hour links that grant a project role (or, later, a team\nrole) to whoever redeems them. These operations create, list, read and\ncancel invitations, and look up, accept or decline one by its token.\n"
     },
     {
       "name": "Events",
@@ -1633,7 +1641,7 @@
       "get": {
         "operationId": "listMyProjects",
         "summary": "List the projects I can act on",
-        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
+        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
         "tags": [
           "Projects"
         ],
@@ -1660,6 +1668,16 @@
             "example": "acme"
           },
           {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sorts the list by `created_at` and then `id`: `desc` lists the newest\nproject first, `asc` the oldest first. Leave it out to list by\nproject ID, which says nothing about when a project was created. Send\nthe same value with every `page_token` the list returns: a token\ncontinues the list it came from, and under another order it is\nrefused with `400`.\n",
+            "schema": {
+              "$ref": "#/components/schemas/sort-direction"
+            },
+            "example": "desc"
+          },
+          {
             "$ref": "#/components/parameters/session-project-id"
           }
         ],
@@ -1680,7 +1698,7 @@
             }
           },
           "400": {
-            "description": "The page token or limit was not valid.",
+            "description": "The page token or limit was not valid, or the token was issued under another `order`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5042,7 +5060,8 @@
             "description": "The flow name to filter by. Every revision of a flow shares its\n`name`, so the result is that flow's revisions, newest by creation\ntime first.\n",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z][a-z0-9-]*$"
+              "pattern": "^[a-z][a-z0-9-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -"
             }
           },
           {
@@ -6647,6 +6666,355 @@
           },
           "default": {
             "$ref": "#/components/responses/getIdpRevisionById-error-response"
+          }
+        }
+      }
+    },
+    "/applications": {
+      "post": {
+        "operationId": "createApplication",
+        "summary": "Create or revise a registered application",
+        "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`application.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`application.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `application.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `application.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
+        "tags": [
+          "Applications"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "application.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency-key",
+            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `client_secrets` included,\ninstead of creating another revision. Without it, a retry after a\nlost response finds the clients already stored and returns no\nsecret.\n"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create-application-request"
+              },
+              "examples": {
+                "shop": {
+                  "summary": "A web application with one confidential client",
+                  "description": "The client leaves `client_id` out, so the server generates one.\n",
+                  "value": {
+                    "application": {
+                      "slug": "shop",
+                      "name": "Shop",
+                      "clients": [
+                        {
+                          "slug": "web",
+                          "type": "confidential",
+                          "grant_types": [
+                            "authorization_code",
+                            "refresh_token"
+                          ],
+                          "redirect_uris": [
+                            "https://shop.example.com/callback",
+                            "http://localhost:3000/callback"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "imported": {
+                  "summary": "A client that keeps the id a Zitadel v4 issued",
+                  "value": {
+                    "application": {
+                      "slug": "shop",
+                      "name": "Shop",
+                      "clients": [
+                        {
+                          "slug": "web",
+                          "client_id": "289374592837459283@shop",
+                          "type": "confidential",
+                          "grant_types": [
+                            "authorization_code"
+                          ],
+                          "redirect_uris": [
+                            "https://shop.example.com/callback"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The revised application.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create-application-response"
+                },
+                "examples": {
+                  "revised": {
+                    "summary": "The application after a revision that added a client",
+                    "description": "`id` is the one allocated when the application was created,\n`revision_id` is new, and `updated_at` has moved past\n`created_at`. The new client `jobs` got a generated `client_id`\nand a secret; the kept client `web` got neither.\n",
+                    "value": {
+                      "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                      "revision_id": "apprev_01KWHF2XY6RN7F0N9WD3P2E4YM",
+                      "slug": "shop",
+                      "created_at": "2026-11-06T09:11:00Z",
+                      "updated_at": "2026-11-07T14:20:00Z",
+                      "definition": {
+                        "slug": "shop",
+                        "name": "Shop",
+                        "clients": [
+                          {
+                            "slug": "web",
+                            "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code",
+                              "refresh_token"
+                            ],
+                            "redirect_uris": [
+                              "https://shop.example.com/callback",
+                              "http://localhost:3000/callback"
+                            ]
+                          },
+                          {
+                            "slug": "jobs",
+                            "client_id": "client_01KWHF2XY6RN7F0N9WD3P2E4YQ",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code"
+                            ],
+                            "redirect_uris": [
+                              "https://jobs.shop.example.com/callback"
+                            ]
+                          }
+                        ]
+                      },
+                      "client_secrets": [
+                        {
+                          "client": "jobs",
+                          "client_id": "client_01KWHF2XY6RN7F0N9WD3P2E4YQ",
+                          "secret": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The created application.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create-application-response"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "A newly created application",
+                    "description": "The slug was new to the project, so `id` and `revision_id`\nwere both allocated and `updated_at` equals `created_at`.\nThe client's `client_id` was generated, and its secret is shown\nhere and never again.\n",
+                    "value": {
+                      "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                      "revision_id": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN",
+                      "slug": "shop",
+                      "created_at": "2026-11-06T09:11:00Z",
+                      "updated_at": "2026-11-06T09:11:00Z",
+                      "definition": {
+                        "slug": "shop",
+                        "name": "Shop",
+                        "clients": [
+                          {
+                            "slug": "web",
+                            "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code",
+                              "refresh_token"
+                            ],
+                            "redirect_uris": [
+                              "https://shop.example.com/callback",
+                              "http://localhost:3000/callback"
+                            ]
+                          }
+                        ]
+                      },
+                      "client_secrets": [
+                        {
+                          "client": "web",
+                          "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                          "secret": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The document failed schema validation, breaks a rule of the\nauthorization server, or revises an existing application and changes\na field that is fixed for its life. The details identify the setting.\nFix the document and send it again.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project. Pick another id, or leave it out so the\nserver generates one.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/createApplication-error-response"
+          }
+        }
+      }
+    },
+    "/applications/{id}": {
+      "get": {
+        "operationId": "getApplicationById",
+        "summary": "Get an application by ID",
+        "description": "Returns an application that authenticates its users via Zitadel, by ID\nat its newest revision, with each client's `client_id` in `definition`. It\nnever returns a client secret: `createApplication` (`POST /applications`)\nshows one once, when it creates the client.\n\nThe lookup is scoped to the project in `project_id`.\n",
+        "tags": [
+          "Applications"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "application.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/application-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The application.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/application-response"
+                },
+                "examples": {
+                  "application": {
+                    "summary": "An application with one client",
+                    "value": {
+                      "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                      "revision_id": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN",
+                      "slug": "shop",
+                      "created_at": "2026-11-06T09:11:00Z",
+                      "updated_at": "2026-11-06T09:11:00Z",
+                      "definition": {
+                        "slug": "shop",
+                        "name": "Shop",
+                        "clients": [
+                          {
+                            "slug": "web",
+                            "client_id": "client_01KWH3B72K7M7F0N9WD3P2E4YP",
+                            "type": "confidential",
+                            "grant_types": [
+                              "authorization_code",
+                              "refresh_token"
+                            ],
+                            "redirect_uris": [
+                              "https://shop.example.com/callback",
+                              "http://localhost:3000/callback"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No application with this ID exists in the given project.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getApplicationById-error-response"
           }
         }
       }
@@ -8258,6 +8626,666 @@
         }
       }
     },
+    "/invitations": {
+      "post": {
+        "operationId": "createInvitation",
+        "summary": "Create an invitation",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original is deleted in the same\ntransaction.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create-invitation-request"
+              },
+              "examples": {
+                "project_member": {
+                  "summary": "Invite a project viewer",
+                  "value": {
+                    "type": "project_member",
+                    "project_member": {
+                      "relation": "viewer"
+                    },
+                    "metadata": {
+                      "name": "John Doe"
+                    }
+                  }
+                },
+                "replace_project_member": {
+                  "summary": "Replace a pending invitation and keep its journey",
+                  "value": {
+                    "type": "project_member",
+                    "project_member": {
+                      "relation": "editor"
+                    },
+                    "metadata": {
+                      "name": "John Doe"
+                    },
+                    "replaces_invitation_id": "inv_01JCQK5R7T9V1X3Z5B7D9F1H3J"
+                  }
+                },
+                "team_member": {
+                  "summary": "Invite a team member (answers 501 until implemented)",
+                  "value": {
+                    "type": "team_member",
+                    "team_member": {
+                      "team_id": "team_01JCQK5R7T9V1X3Z5B7D9F1H3J",
+                      "role": "member"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invitation was created, with its one-shot link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create-invitation-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body or parameters were not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found, or the invitation to replace was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project cannot accept invitations yet (unclaimed), the pending\ninvitation cap was reached, or the server has no platform project.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "`type` is `team_member`, which is declared but not implemented yet.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_implemented"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/createInvitation-error-response"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listInvitations",
+        "summary": "List invitations",
+        "description": "Lists a project's invitations, newest first, in any status, paginated with\n`limit` and `page_token`.\n\nOptional `status` and `type` filters narrow the page. `expired` is derived\non read from `expires_at`. Authenticate with a project secret (`oauth2`) or\na console session cookie (`sessionCookie`). Listing needs the same project\n`admin` check as `createGrant` (`POST /grants`).\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page-token"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Only invitations with this status.",
+            "schema": {
+              "$ref": "#/components/schemas/invitation-status"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Only invitations of this type.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "project_member",
+                "team_member"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the project's invitations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/list-invitations-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The page token is not valid. Send the `next_page_token` from the previous response unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/listInvitations-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/lookup": {
+      "post": {
+        "operationId": "lookupInvitation",
+        "summary": "Look up an invitation by token",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do). The call is rate-limited.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-token-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation details for the accept page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation-lookup-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body was not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Lookup is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/lookupInvitation-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/accept": {
+      "post": {
+        "operationId": "acceptInvitation",
+        "summary": "Accept an invitation",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-token-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation was accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body was not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The inviter cannot accept their own invitation, the creator no longer\nholds admin, or CSRF failed (`auth.csrf_invalid`).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is unclaimed or inactive, so acceptance cannot complete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Accept is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/acceptInvitation-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/reject": {
+      "post": {
+        "operationId": "rejectInvitation",
+        "summary": "Decline an invitation",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. Every unknown or finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-token-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation was declined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body was not acceptable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF failed (`auth.csrf_invalid`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Decline is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/rejectInvitation-error-response"
+          }
+        }
+      }
+    },
+    "/invitations/{id}": {
+      "get": {
+        "operationId": "getInvitation",
+        "summary": "Get an invitation",
+        "description": "Returns one invitation by ID for the project named by `project_id`.\n\nThe response never includes the redeem token or the create-time `link`.\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Reading needs the same project `admin` check as\n`createGrant` (`POST /grants`).\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invitation-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invitation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invitation or project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getInvitation-error-response"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelInvitation",
+        "summary": "Cancel an invitation",
+        "description": "Deletes a pending invitation. Its link can no longer be redeemed. Only a\n`pending` invitation can be cancelled; a finished invitation answers the\nsame opaque `404` as a miss. Expired invitations keep their row until a\nlater cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "tags": [
+          "Invitations"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invitation-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The invitation was deleted."
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a project administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invitation or project not found, or the invitation is no longer\npending.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/cancelInvitation-error-response"
+          }
+        }
+      }
+    },
     "/events": {
       "get": {
         "operationId": "listEvents",
@@ -8734,7 +9762,7 @@
         "operationId": "createDeployment",
         "x-zitadel-cli": "deployment create",
         "summary": "Create a deployment",
-        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or a list of\npreview URLs. `[\"primary\"]`, which clients released before this shape\nsend, still deploys to every primary origin until 1.0.0; its answer\ncarries a `Deprecation` header (RFC 9745) and a `Link` to these docs.\n\nThe project's newest primary deployment also serves every request with no\n`Origin`, such as a backend, a native app or the CLI, and the console's\nlogin preview of a project that does not list the console's origin. A\npreview URL serves only itself.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin among the preview URLs, sends\n  `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
+        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or a list of\npreview URLs. `[\"primary\"]`, which clients released before this shape\nsend, still deploys to every primary origin until 1.0.0; its answer\ncarries a `Deprecation` header (RFC 9745) and a `Link` to these docs.\n\nThe project's newest primary deployment also serves every request with no\n`Origin`, such as a backend, a native app or the CLI, and the console's\nlogin preview of a project that does not list the console's origin. A\npreview URL serves only itself.\n\n`primary` records the project's current primary origins. One added later\nserves nothing until the next deployment to `primary`; one removed stops\nbeing served at once.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin among the preview URLs, sends\n  `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
         "tags": [
           "Deployments"
         ],
@@ -9403,7 +10431,7 @@
         "x-zitadel-cli": "deployment rollback",
         "x-zitadel-destructive": true,
         "summary": "Roll back to a deployment",
-        "description": "Rolls back to an earlier deployment by deploying its release again to\nevery current primary origin, with the variable values that deployment\nfroze.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values with\nit.\n\nThe deployment ID in the path is the deployment to return to, not the one\nto undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists\nthe newest deployment first.\n\nA rollback is a new deployment, not an undo. It has `reason: rollback`,\nand its `rollback_to` names the deployment you returned to. It uses the\nvariable values that deployment froze, not the project's current ones, and\ncreates no release.\n\nTo guard against a deployment that landed since you looked, set\n`expected_deployment_id` in the request body to the newest primary\ndeployment, the one live now. The call then fails with `409 dep.conflict`\nif another deployment has replaced it.\n\nA rollback is idempotent like a deployment to `primary`. When nothing\nwould change, it answers `200` with the newest primary deployment.\n\nIf the request is refused:\n- `400 dep.invalid`: the deployment went to preview URLs, which cannot be\n  rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The\n  error also appears when the project has no primary origin. Add one with\n  `zitadel origin add`.\n- `404 dep.not_found`: no deployment of the project has that ID, or that\n  deployment recorded no variables to restore, so it cannot be a rollback\n  target. List them with `listDeployments` and pick another.\n- `409 dep.conflict`: `expected_deployment_id` is not the project's\n  newest primary deployment, and `details.deployment` is that deployment.\n  Inspect it, then retry with its ID, or stop.\n- `409 rel.revoked`: the release of that deployment is revoked and cannot\n  be deployed. Roll back to a deployment of a release that is not revoked.\n",
+        "description": "Rolls back to an earlier deployment by deploying its release again to the\nsame origins, with the same variable values. A listed primary origin that\ndeployment left out serves nothing until the next deployment to `primary`,\nand one it named serves its release again, even when the live deployment\nleft it out.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values with\nit.\n\nThe deployment ID in the path is the deployment to return to, not the one\nto undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists\nthe newest deployment first.\n\nA rollback is a new deployment, not an undo. It has `reason: rollback`,\nand its `rollback_to` names the deployment you returned to. It uses the\nvariable values that deployment froze, not the project's current ones, and\ncreates no release.\n\nTo guard against a deployment that landed since you looked, set\n`expected_deployment_id` in the request body to the newest primary\ndeployment, the one live now. The call then fails with `409 dep.conflict`\nif another deployment has replaced it.\n\nA rollback is idempotent like a deployment to `primary`. When nothing\nwould change, it answers `200` with the newest primary deployment.\n\nIf the request is refused:\n- `400 dep.invalid`: the deployment went to preview URLs, which cannot be\n  rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).\n- `404 dep.not_found`: no deployment of the project has that ID, or that\n  deployment recorded no variables to restore, so it cannot be a rollback\n  target. List them with `listDeployments` and pick another.\n- `409 dep.conflict`: `expected_deployment_id` is not the project's\n  newest primary deployment, and `details.deployment` is that deployment.\n  Inspect it, then retry with its ID, or stop.\n- `409 rel.revoked`: the release of that deployment is revoked and cannot\n  be deployed. Roll back to a deployment of a release that is not revoked.\n",
         "tags": [
           "Deployments"
         ],
@@ -9455,7 +10483,7 @@
             }
           },
           "201": {
-            "description": "The created rollback deployment. Every primary origin serves the\nrelease again.\n",
+            "description": "The new deployment. Its origins that the project still lists serve\nthe release again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -10923,6 +11951,8 @@
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
               "idp.write": "Permission to create and revise identity provider connections",
+              "application.read": "Permission to read applications",
+              "application.write": "Permission to create and revise registered applications",
               "release.read": "Permission to read project configuration releases",
               "release.write": "Permission to create and revoke project configuration releases",
               "deployment.read": "Permission to read deployments",
@@ -10975,6 +12005,8 @@
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
               "idp.write": "Permission to create and revise identity provider connections",
+              "application.read": "Permission to read applications",
+              "application.write": "Permission to create and revise registered applications",
               "release.read": "Permission to read project configuration releases",
               "release.write": "Permission to create and revoke project configuration releases",
               "deployment.read": "Permission to read deployments",
@@ -11009,7 +12041,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "__Host-zitadel_session",
-        "description": "The session cookie issued at session creation or superseding handoff exchange.\n\nA browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain\nhttp to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it\nas `zitadel_session` instead, without `Secure` or the prefix, so that Safari\nkeeps it, and accepts that name there too; `__Host-zitadel_session` takes\nprecedence. A program sends `__Host-zitadel_session` over any transport.\n\nA missing or invalid cookie yields `401` with code `auth.unauthorized` and the message\n`Missing or invalid session token.`\n\nCross-site request forgery (CSRF) protection: a state-changing request that\nthis cookie authenticates must come from the same origin. A cross-site\nbrowser request is refused with `403` and code `auth.csrf_invalid`. Every\nsuch request must also send the session's token from `GET /sessions/me/csrf`\nin the `X-Zitadel-CSRF` header, or it answers the same `403`. The only\nexceptions are the `POST …/query` reads, which need no token. Safe methods\n(`GET`) are not checked. A request a project secret authenticates is not\naffected.\n"
+        "description": "The session cookie issued at session creation or superseding handoff exchange.\n\nA browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain\nhttp to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it\nas `zitadel_session` instead, without `Secure` or the prefix, so that Safari\nkeeps it, and accepts that name there too; `__Host-zitadel_session` takes\nprecedence. A program sends `__Host-zitadel_session` over any transport.\n\nA missing or invalid cookie yields `401` with code `auth.unauthorized` and the message\n`Missing or invalid session token.`\n\nCross-site request forgery (CSRF) protection: a state-changing request that\nthis cookie authenticates must come from the same origin. A cross-site\nbrowser request is refused with `403` and code `auth.csrf_invalid`. Every\nsuch request must also send the session's token from `GET /sessions/me/csrf`\nin the `X-Zitadel-CSRF` header, or it answers the same `403`. The only\nexceptions are the `POST …/query` reads and `POST /invitations/lookup`,\nwhich need no token. Safe methods (`GET`) are not checked. A request a\nproject secret authenticates is not affected.\n"
       }
     },
     "schemas": {
@@ -11082,11 +12114,13 @@
       "project-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
       "team-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
       "create-user-request": {
@@ -11294,6 +12328,7 @@
       "user-id": {
         "type": "string",
         "pattern": "^user_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a user ID: user_ followed by letters, digits, _ or -",
         "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
       },
       "user-attributes": {
@@ -12567,6 +13602,7 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
               "maxLength": 64,
               "examples": [
                 "google",
@@ -12627,6 +13663,7 @@
         "x-meta-schema": true,
         "type": "string",
         "pattern": "^[^.]+$",
+        "x-zitadel-pattern-message": "must not be empty or contain a .",
         "description": "The name of a single user attribute."
       },
       "user-property": {
@@ -12634,7 +13671,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "UserProperty",
         "type": "object",
-        "description": "The meta-schema that one property of a user schema is validated against.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API; nothing\nenforces it today, so responses still include write-only properties.\n",
+        "description": "The meta-schema that one property of a user schema is validated against.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. Any other key is refused, unless it\nis one of the annotations listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API; nothing\nenforces it today, so responses still include write-only properties.\n\n`format` is enforced on user writes for the standard JSON Schema names, such\nas `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as\n`phone`, is only an annotation; use `pattern` to enforce one.\n",
         "additionalProperties": true,
         "properties": {
           "x-unique": {
@@ -12864,6 +13901,7 @@
           "flow_definition_name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
             "description": "Name of a specific flow definition to use.\nWhen omitted, the server selects the best-matching definition\nbased on purpose + audience context.\n",
             "example": "custom-login"
           },
@@ -12877,6 +13915,7 @@
             "type": "string",
             "description": "Semver version of the flow definition JSON Schema to use.\nWhen omitted, the latest version is used.\n",
             "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "x-zitadel-pattern-message": "must be a version such as 1.2.3",
             "example": "1.0.0"
           },
           "challenge_nonce": {
@@ -13149,11 +14188,12 @@
               "number",
               "url",
               "date",
+              "date_time",
               "hidden",
               "checkbox",
               "select"
             ],
-            "description": "The input kind the client should render. Encodes the formats and\nJSON types that map to a familiar HTML input: `email`, `url`,\n`date` come from `format`; `checkbox` from JSON `type: boolean`;\n`select` from a closed `enum`. For other formats (for example uuid) the\ntype is `text` and `validation.format` carries the rule.\n"
+            "description": "The input kind the client should render. Encodes the formats and\nJSON types that map to a familiar HTML input: `email`, `url`,\n`date`, `date_time` come from `format`; `checkbox` from JSON\n`type: boolean`; `select` from a closed `enum`. For other formats (for\nexample uuid) the type is `text` and `validation.format` carries the\nrule. A `date_time` value is an RFC 3339 timestamp, both prefilled and\nsubmitted, which a `datetime-local` input neither shows nor produces on\nits own.\n"
           },
           "text_key": {
             "type": "string",
@@ -13524,6 +14564,7 @@
         "maxLength": 128,
         "description": "A color on a theme side: hex (`#4F46E5`), a CSS color name, or a color\nfunction: `rgb()`, `rgba()`, `hsl()`, `hsla()`, `hwb()`, `lab()`, `lch()`,\n`oklab()`, `oklch()`, `color()` or `color-mix()`. `url()` and `var()` are\nrejected: the value is written into a stylesheet, so only forms that resolve\nto a color are stored.\n\nThe pattern pins the shape: no semicolons, braces, comment markers or\nbackslashes, so a value cannot leave its declaration whatever it spells.\nWhich names CSS actually knows is the browser's business: an unrecognized\none is stored and paints nothing, rather than being refused here.\n",
         "pattern": "^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]{3,24}|[a-zA-Z][a-zA-Z-]{2,12}\\((?:[0-9a-zA-Z%.,+/# -]|[a-zA-Z][a-zA-Z-]{2,12}\\([0-9a-zA-Z%.,+/# -]*\\))*\\))$",
+        "x-zitadel-pattern-message": "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch()",
         "examples": [
           "#4F46E5",
           "#fff",
@@ -13603,7 +14644,8 @@
             "maxLength": 2048,
             "description": "The logo for this surface. A logo is never recolored, so each side\ncarries its own file. Absent means no logo on this side, unless the\ntop-level `logo_url` is the only one set.\n",
             "example": "https://cdn.example.com/logo-on-light.svg",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "palette": {
             "$ref": "#/components/schemas/branding-palette"
@@ -13648,6 +14690,7 @@
             "minLength": 1,
             "maxLength": 256,
             "pattern": "^ *(?:\"[^\"\\\\;{}]*\"|'[^'\\\\;{}]*'|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*)(?: *, *(?:\"[^\"\\\\;{}]*\"|'[^'\\\\;{}]*'|[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*))* *$",
+            "x-zitadel-pattern-message": "must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name (\"APK Futural\")",
             "description": "CSS font stack for body and heading text. Include a generic family so\nthe surface still renders when the named face is unavailable.\n\nComma-separated family names, each either an identifier (`Inter`,\n`ui-sans-serif`, `Helvetica Neue`) or a quoted name (`\"APK Futural\"`).\nAnything else is rejected. The stack is written into a stylesheet, so\nonly names are stored, and a quoted name must close the quote it opened.\n",
             "example": "Inter, ui-sans-serif, sans-serif"
           },
@@ -13657,7 +14700,8 @@
             "maxLength": 2048,
             "description": "Stylesheet that loads `font_family`, for example a Google Fonts CSS URL.\nMust be https; unlike the logo and hero assets there is no\nloopback carve-out. Rejected without `font_family`, which would name\nnothing to paint with.\n\nLoaded only when the login component runs as `variant=\"page\"`, the\nfull-page login. In the default `variant=\"widget\"` it is stored but not\nloaded: the component injects no stylesheet, and the embedding page\nloads the face.\n",
             "example": "https://fonts.googleapis.com/css2?family=Inter&display=swap",
-            "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)"
+            "pattern": "^[hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials"
           },
           "scale": {
             "type": "number",
@@ -13748,14 +14792,16 @@
             "format": "uri",
             "maxLength": 2048,
             "description": "Fallback logo, used only when neither `theme.light.logo_url` nor\n`theme.dark.logo_url` is set. Prefer the per-side logos, because one\nfile cannot serve both surfaces.\n",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "hero_url": {
             "type": "string",
             "format": "uri",
             "maxLength": 2048,
             "description": "Hero image URL, for templates that reference `branding.hero_url`. The\nbundled default template does not use it.\n",
-            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[[0-9A-Fa-f:.]+\\]|[^/:?#@]+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#]|$)|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?([/?#]|$))"
+            "pattern": "^([hH][tT][tT][pP][sS]://(?:\\[(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){6}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}::(?:[0-9A-Fa-f]{1,4}:){0,4}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})::(?:[0-9A-Fa-f]{1,4}:){0,3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){2}::(?:[0-9A-Fa-f]{1,4}:){0,2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){3}::(?:[0-9A-Fa-f]{1,4}:){0,1}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){4}::(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3})\\]|(?:[^\\s\\\\/:?#@%\\[\\]{}|^`\\x00-\\x1f\\x7f]|%[89A-Fa-f][0-9A-Fa-f])+)(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$|[hH][tT][tT][pP]://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){2}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|\\[::1\\])(?::0*(?:[0-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:/(?:[^%?\\x00-\\x1f\\x7f]|%[0-9A-Fa-f]{2})*)?(?:\\?[^\\x00-\\x1f\\x7f]*)?$)",
+            "x-zitadel-pattern-message": "must be a valid absolute https URL without credentials (http is allowed for canonical loopback development hosts only)"
           },
           "theme": {
             "$ref": "#/components/schemas/branding-theme"
@@ -14159,6 +15205,7 @@
       "session-id": {
         "type": "string",
         "pattern": "^sess_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a session ID: sess_ followed by letters, digits, _ or -",
         "example": "sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this session, an opaque string with a `sess_` prefix."
       },
@@ -14214,6 +15261,7 @@
       "attempt-id": {
         "type": "string",
         "pattern": "^att_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be an attempt ID: att_ followed by letters, digits, _ or -",
         "example": "att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this authentication attempt, an opaque string with an `att_` prefix."
       },
@@ -14357,6 +15405,7 @@
       "challenge-id": {
         "type": "string",
         "pattern": "^ch_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a challenge ID: ch_ followed by letters, digits, _ or -",
         "example": "ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this challenge, an opaque string with a `ch_` prefix."
       },
@@ -15725,6 +16774,7 @@
         "type": "string",
         "description": "A web origin: `http` or `https`, a lowercase host (a DNS name or a\nbracketed IPv6 address) and, when it is not the scheme's default, a port\nfrom 1 to 65535. No user info, path, query or fragment, and no trailing\nslash. Compared exactly, so `https://app.acme.com` and\n`https://app.acme.com:443` are different strings.\n",
         "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
+        "x-zitadel-pattern-message": "must be an origin: http or https, a lowercase host and an optional port, with no path",
         "maxLength": 2048,
         "example": "https://app.acme.com"
       },
@@ -16810,6 +17860,7 @@
             "type": "string",
             "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
             "pattern": "^[a-z][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits, _ and -",
             "example": "login"
           },
           "fields": {
@@ -16866,6 +17917,7 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
               "maxLength": 64
             },
             "default": [],
@@ -17005,6 +18057,7 @@
           "name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
             "examples": [
               "standard-login",
               "combined-auth"
@@ -17652,6 +18705,7 @@
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
             "maxLength": 64,
             "description": "Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers`) reference it. Unique within the project.",
             "examples": [
@@ -17685,7 +18739,8 @@
             "type": "object",
             "additionalProperties": {
               "type": "string",
-              "pattern": "^[^$]"
+              "pattern": "^[^$]",
+              "x-zitadel-pattern-message": "must not be empty or start with $"
             },
             "description": "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
           },
@@ -17740,11 +18795,13 @@
               "issuer": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
               },
               "jwks_uri": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "id_token_mapping": {
@@ -17755,16 +18812,19 @@
               "authorization_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "token_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints."
               },
               "userinfo_endpoint": {
                 "type": "string",
                 "pattern": "^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$",
+                "x-zitadel-pattern-message": "must be an https URL (http is allowed for localhost only)",
                 "description": "For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set."
               },
               "client_id": {
@@ -17776,6 +18836,7 @@
               "client_secret": {
                 "type": "string",
                 "pattern": "^\\$\\{\\{ *[A-Za-z0-9_]+ *\\}\\}$",
+                "x-zitadel-pattern-message": "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself",
                 "description": "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The server resolves it against the environment serving the request."
               },
               "token_endpoint_auth_method": {
@@ -18080,6 +19141,236 @@
           }
         }
       },
+      "application-client": {
+        "title": "ApplicationClient",
+        "description": "One OAuth client of the application: one way it talks to Zitadel, such as\nits web backend. Its `redirect_uris` and `grant_types` are its OAuth\nsettings. OpenID Connect is OAuth plus the `openid` scope, so one shape\nserves both.\n",
+        "type": "object",
+        "required": [
+          "slug",
+          "type",
+          "grant_types"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "maxLength": 64,
+            "description": "Stable identifier of the client, unique among the application's clients\nand fixed for the client's life. A revision matches each client to the\nstored one by its slug, which is how a client keeps its `client_id`.\nOther documents refer to it as `<application>/<client>`.\n",
+            "examples": [
+              "web"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Shown to the user in place of the application's name. Optional."
+          },
+          "client_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.~@-]+$",
+            "x-zitadel-pattern-message": "must be letters, digits, or _ . ~ @ -",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The `client_id` the client presents. Leave it out and the server\ngenerates one the first time the client is written and fills it into\nthe stored document. Set it to keep an id the client already has: one\na Zitadel v4 issued (`<id>@<project>`), or one the CLI generated before\nany deploy. Once set, the id never changes: a later revision may leave it\nout, but may not provide a different one. No two clients in the project\nshare an id, and an id is never reused once a client has held it. A\nnew client may not supply an id that starts with `client_` or `dcr_`:\nthose prefixes mark ids the server generates. A server-generated id\nsent back unchanged in a revision is accepted.\n",
+            "examples": [
+              "289374592837459283@shop"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "confidential"
+            ],
+            "description": "A `confidential` client runs where a secret can be kept, such as a web\napp's backend, and authenticates with one at the token endpoint. Public\nclients, which hold no secret, are not available yet.\n"
+          },
+          "grant_types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "refresh_token"
+              ]
+            },
+            "description": "The grant types the client may use, named as in RFC 7591.\n`authorization_code` signs a user in and needs `redirect_uris`.\n`refresh_token` lets the client renew its access tokens without a new\nsign-in; a refresh token is issued on sign-in, so it is only valid\ntogether with `authorization_code`.\n"
+          },
+          "redirect_uris": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "description": "Where the authorization endpoint may send the user back. Required with\n`authorization_code`; omit it otherwise, an empty list is refused. Each\nis an `https` URL, or an `http` URL on a loopback host for local\ndevelopment: `localhost`, a name under `.localhost`, or a loopback IP\nsuch as `127.0.0.1` or `[::1]`. A URI is written as the client will\nsend it, with a lowercase host and no fragment, since it is matched\nexactly; a loopback URI matches on any port (RFC 8252 §7.3).\n",
+            "examples": [
+              [
+                "https://shop.example.com/callback"
+              ]
+            ]
+          },
+          "first_party": {
+            "type": "boolean",
+            "description": "A first-party client belongs to the project's own product and skips\nconsent unless the request asks for it. An application registered\nthrough the API is third-party unless this says otherwise.\n"
+          }
+        }
+      },
+      "application": {
+        "x-meta-schema": true,
+        "title": "Application",
+        "description": "An application that authenticates its users via Zitadel, with its OAuth\nclients. The document is the `application` field of the `createApplication`\n(`POST /applications`) body.\n",
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "clients"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Editor affordance: path or URL of this schema so editors validate and autocomplete the file. Ignored by the platform."
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "maxLength": 64,
+            "description": "Stable identifier of the application, unique within the project and\nfixed for its life. Flows and other documents reference it.\n",
+            "examples": [
+              "shop"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "The application's name, shown to the user when consent is asked.",
+            "examples": [
+              "Shop"
+            ]
+          },
+          "clients": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/application-client"
+            },
+            "description": "The application's OAuth clients. Each slug is unique within the application."
+          }
+        }
+      },
+      "create-application-request": {
+        "type": "object",
+        "description": "The request body for creating or revising a registered application.",
+        "required": [
+          "application"
+        ],
+        "properties": {
+          "application": {
+            "$ref": "#/components/schemas/application",
+            "description": "The application document. If its slug does not already exist in the\nproject, a new application is created. If one with that\nslug already exists, this becomes a new revision of it. The document is\nvalidated against the `application.json` schema, and returned as the\n`definition` in the response with each client's `client_id` filled in.\n"
+          }
+        }
+      },
+      "application-response": {
+        "type": "object",
+        "description": "An application at its newest revision, with its document as `definition`.\nIt never carries a client secret.\n",
+        "required": [
+          "id",
+          "revision_id",
+          "slug",
+          "definition",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique ID, generated when the application is created and shared by\nevery revision.\n",
+            "example": "app_01KWH3B72K7M7F0N9WD3P2E4YM"
+          },
+          "revision_id": {
+            "type": "string",
+            "description": "The ID of the revision this entry holds. `getApplicationById`\n(`GET /applications/{id}`) returns the newest one.\n",
+            "example": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN"
+          },
+          "slug": {
+            "type": "string",
+            "description": "The identifier by which other documents reference the application.\nFixed for the life of the application.\n",
+            "example": "shop"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the application was created.",
+            "example": "2026-11-06T09:11:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was created. On the newest revision, that is when\nthe application was last revised.\n",
+            "example": "2026-11-06T09:11:00Z"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/application",
+            "description": "The stored application document, with each client's `client_id`."
+          }
+        }
+      },
+      "application-client-secret": {
+        "type": "object",
+        "description": "A client secret the server generated, returned once.",
+        "required": [
+          "client",
+          "client_id",
+          "secret"
+        ],
+        "properties": {
+          "client": {
+            "type": "string",
+            "description": "The slug of the client the secret belongs to.",
+            "example": "web"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The `client_id` the client presents together with the secret.",
+            "example": "client_01KWH3B72K7M7F0N9WD3P2E4YP"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The secret, shown only in this response. Save it securely: the server cannot return it again.\n",
+            "example": "sk_client_7Kp2mQx9vR4tL8nB3wZ5yH6jF1dS0aE2"
+          }
+        }
+      },
+      "create-application-response": {
+        "description": "An application as `createApplication` (`POST /applications`) wrote it, with\nits document as `definition` and the secrets of the clients it created.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/application-response"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "client_secrets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/application-client-secret"
+                },
+                "description": "The secrets this write generated, one for each client it created,\neach with the client's `client_id`. Absent when the write created\nno client. Each secret is shown only once.\n"
+              }
+            }
+          }
+        ]
+      },
       "policy-operation": {
         "title": "PolicyOperation",
         "type": "string",
@@ -18132,12 +19423,14 @@
         "type": "string",
         "description": "The identifier of a policy, shared by all of its revisions.",
         "pattern": "^pol_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a policy ID: pol_ followed by letters, digits, _ or -",
         "example": "pol_01KXA4F3Q8R7F0N9WD3P2E4YM5"
       },
       "policy-revision-id": {
         "type": "string",
         "description": "The identifier of one immutable revision of a policy.",
         "pattern": "^polrev_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a policy revision ID: polrev_ followed by letters, digits, _ or -",
         "example": "polrev_01KXA4F3Q8R7F0N9WD3P2E4YM6"
       },
       "password-set-config": {
@@ -18473,6 +19766,7 @@
         "type": "string",
         "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding` or `idp`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
         "pattern": "^sha256:[0-9a-f]{64}$",
+        "x-zitadel-pattern-message": "must be sha256: followed by 64 lowercase hex digits",
         "minLength": 71,
         "maxLength": 71,
         "example": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f"
@@ -18501,6 +19795,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a release.",
         "pattern": "^rel_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a release ID: rel_ followed by letters, digits, _ or -",
         "example": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
       },
       "release-metadata": {
@@ -19077,6 +20372,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a deployment.",
         "pattern": "^dep_[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
       "revoke-release-conflict": {
@@ -19552,6 +20848,715 @@
             ]
           }
         }
+      },
+      "invitation-status": {
+        "title": "InvitationStatus",
+        "type": "string",
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected",
+          "expired"
+        ],
+        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace of a\npending invitation delete the row rather than leaving a cancelled status.\n"
+      },
+      "inv-not_found": {
+        "description": "Invitation not found\n\nError code: inv.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-permission_denied": {
+        "description": "Insufficient permissions to manage invitations\n\nError code: inv.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "invitation-id": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
+        "description": "The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`\n(`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.\n",
+        "example": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E"
+      },
+      "invitation-metadata": {
+        "title": "InvitationMetadata",
+        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel and replace of a pending\ninvitation delete the row, so the metadata goes with it.\n",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "A display name for who the invitation is intended for.",
+            "example": "John Doe"
+          }
+        }
+      },
+      "invitation-created-by-type": {
+        "title": "InvitationCreatedByType",
+        "description": "What kind of principal `created_by` names.",
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "human",
+              "service",
+              "system",
+              "agent"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "example": "human"
+      },
+      "invitation-common": {
+        "title": "InvitationCommon",
+        "description": "Fields every invitation carries. Each type adds its own `type` const and the\nnested object named after that type.\n",
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "status",
+          "created_at",
+          "expires_at",
+          "journey_id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/invitation-id"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id"
+          },
+          "metadata": {
+            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace of a pending invitation delete the row.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/invitation-metadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/invitation-status"
+          },
+          "created_by": {
+            "description": "The user who created the invitation. Null when a project secret created\nit (`created_by_type` is then `service`).\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by_type": {
+            "$ref": "#/components/schemas/invitation-created-by-type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation was created.",
+            "example": "2026-11-04T10:00:00Z"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation expires (72 hours after create).",
+            "example": "2026-11-07T10:00:00Z"
+          },
+          "journey_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Correlates this invitation with its replacements. A replacement keeps the\noriginal's `journey_id`. It is a random correlation id, not a resource id.\n",
+            "example": "q7Z0bX2rT1aM4cV8nL5wYg"
+          },
+          "accepted_by": {
+            "description": "The user who redeemed the link. Null until accepted.",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted_at": {
+            "description": "When the invitation was accepted. Null until accepted.",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "invitation-project-member-payload": {
+        "title": "ProjectMemberInvitationPayload",
+        "description": "Type-specific input for a `project_member` invitation.",
+        "type": "object",
+        "required": [
+          "relation"
+        ],
+        "properties": {
+          "relation": {
+            "type": "string",
+            "enum": [
+              "viewer",
+              "editor",
+              "admin"
+            ],
+            "description": "The project role the accepter receives, as in `POST /grants`."
+          }
+        }
+      },
+      "invitation-project-member": {
+        "title": "ProjectMemberInvitation",
+        "description": "An invitation that grants a project role (`viewer`, `editor` or `admin`) to\nwhoever redeems its link.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-team-member-payload": {
+        "title": "TeamMemberInvitationPayload",
+        "description": "Type-specific input for a `team_member` invitation.",
+        "type": "object",
+        "required": [
+          "team_id",
+          "role"
+        ],
+        "properties": {
+          "team_id": {
+            "$ref": "#/components/schemas/team-id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member"
+            ],
+            "description": "The team role the accepter receives."
+          }
+        }
+      },
+      "invitation-team-member": {
+        "title": "TeamMemberInvitation",
+        "description": "An invitation that adds the accepter to a team. Declared now so the contract\ndoes not change when team invitations ship; creating one answers `501`\n`not_implemented` until then.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation": {
+        "title": "Invitation",
+        "description": "An invitation is a link, valid for 72 hours, that grants a role to whoever\nredeems it. Discriminate on `type`; the object named after the type holds\neverything specific to that type.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-project-member"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-team-member"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-project-member",
+            "team_member": "#/components/schemas/invitation-team-member"
+          }
+        }
+      },
+      "list-invitations-response": {
+        "title": "ListInvitationsResponse",
+        "description": "A page of a project's invitations, newest first.",
+        "type": "object",
+        "required": [
+          "invitations"
+        ],
+        "properties": {
+          "invitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/invitation"
+            }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "create-invitation-common": {
+        "title": "CreateInvitationCommon",
+        "description": "Shared optional fields on every create-invitation request.",
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "description": "Optional label for who the link is for. Displayed only; never matched.",
+            "$ref": "#/components/schemas/invitation-metadata"
+          },
+          "replaces_invitation_id": {
+            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id`, and a pending original is deleted in the\nsame transaction. Use the `id` that `createInvitation`\n(`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.\n",
+            "$ref": "#/components/schemas/invitation-id"
+          }
+        }
+      },
+      "create-invitation-project-member-request": {
+        "title": "CreateProjectMemberInvitationRequest",
+        "description": "Creates a project-member invitation, or replaces an existing one.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-team-member-request": {
+        "title": "CreateTeamMemberInvitationRequest",
+        "description": "Creates a team-member invitation. Declared now; creating one answers `501`\n`not_implemented` until team invitations ship.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-request": {
+        "title": "CreateInvitationRequest",
+        "description": "Creates an invitation. Discriminate on `type`. Optional `metadata` labels who\nthe link is for. Optional `replaces_invitation_id` replaces an existing\ninvitation in the same create.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-project-member-request"
+          },
+          {
+            "$ref": "#/components/schemas/create-invitation-team-member-request"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/create-invitation-project-member-request",
+            "team_member": "#/components/schemas/create-invitation-team-member-request"
+          }
+        }
+      },
+      "inv-invalid": {
+        "description": "The invitation request is invalid\n\nError code: inv.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-pending_limit": {
+        "description": "The project has reached its pending invitation limit\n\nError code: inv.pending_limit\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.pending_limit"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-platform_required": {
+        "description": "Invitations require a platform project\n\nError code: inv.platform_required\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.platform_required"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-project_unclaimed": {
+        "description": "Claim the project before inviting into it\n\nError code: inv.project_unclaimed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.project_unclaimed"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "create-invitation-project-member-response": {
+        "title": "CreateProjectMemberInvitationResponse",
+        "description": "The created project-member invitation and its one-shot link. Only this\nresponse returns the link; later reads never include it.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-project-member"
+          },
+          {
+            "type": "object",
+            "required": [
+              "link"
+            ],
+            "properties": {
+              "link": {
+                "type": "string",
+                "format": "uri",
+                "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n",
+                "example": "https://console.example.com/invitations/accept#token=dGhpc2lzYXRva2Vu"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-team-member-response": {
+        "title": "CreateTeamMemberInvitationResponse",
+        "description": "The created team-member invitation and its one-shot link. Creating a\nteam-member invitation answers `501` until team invitations ship.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-team-member"
+          },
+          {
+            "type": "object",
+            "required": [
+              "link"
+            ],
+            "properties": {
+              "link": {
+                "type": "string",
+                "format": "uri",
+                "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n"
+              }
+            }
+          }
+        ]
+      },
+      "create-invitation-response": {
+        "title": "CreateInvitationResponse",
+        "description": "The created invitation and its one-shot `link`. Discriminate on `type`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/create-invitation-project-member-response"
+          },
+          {
+            "$ref": "#/components/schemas/create-invitation-team-member-response"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/create-invitation-project-member-response",
+            "team_member": "#/components/schemas/create-invitation-team-member-response"
+          }
+        }
+      },
+      "invitation-token-request": {
+        "title": "InvitationTokenRequest",
+        "description": "The redeem token from an invitation link's fragment.",
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The plaintext token from the invitation link fragment. It never appears in\na URL query. Every unknown or finished token gets the same `404`.\n"
+          }
+        }
+      },
+      "invitation-lookup-common": {
+        "title": "LookupInvitationCommon",
+        "description": "Shared fields of the lean invitation view for the accept page.\n",
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "status",
+          "expires_at"
+        ],
+        "properties": {
+          "project_id": {
+            "$ref": "#/components/schemas/project-id"
+          },
+          "project_name": {
+            "type": "string",
+            "description": "The project's display name."
+          },
+          "created_by": {
+            "description": "The user who created the invitation. Null when a project secret created it.\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by_type": {
+            "$ref": "#/components/schemas/invitation-created-by-type"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation expires."
+          },
+          "status": {
+            "$ref": "#/components/schemas/invitation-status"
+          }
+        }
+      },
+      "invitation-lookup-project-member-response": {
+        "title": "LookupProjectMemberInvitationResponse",
+        "description": "Lean view of a project-member invitation for the accept page: project, role,\ninviter and expiry.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-lookup-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-lookup-team-member-response": {
+        "title": "LookupTeamMemberInvitationResponse",
+        "description": "Lean view of a team-member invitation for the accept page: project, team role,\ninviter and expiry.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-lookup-common"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-lookup-response": {
+        "title": "LookupInvitationResponse",
+        "description": "Lean invitation view for the signed-in accept page. Discriminate on `type`.\nUnknown and finished tokens answer the same opaque `404`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-lookup-project-member-response"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-lookup-team-member-response"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-lookup-project-member-response",
+            "team_member": "#/components/schemas/invitation-lookup-team-member-response"
+          }
+        }
+      },
+      "inv-self_accept": {
+        "description": "The inviter cannot accept their own invitation\n\nError code: inv.self_accept\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.self_accept"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
       },
       "evt-not_found": {
         "description": "Event: not found\n\nError code: evt.not_found\n",
@@ -21662,6 +23667,7 @@
         "minLength": 1,
         "maxLength": 255,
         "pattern": "^\\w+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits or _",
         "example": "GITHUB_CLIENT_ID",
         "description": "A variable's name, unique per project and kind.\n\nWord characters only, which is exactly what the `${{ NAME }}` reference\nsyntax can address: a name outside that grammar could be stored\nbut never referenced from a configuration document.\n"
       },
@@ -21924,7 +23930,7 @@
       "deployment-status": {
         "title": "DeploymentStatus",
         "type": "string",
-        "description": "Whether the deployment serves its release now.\n\n- `live`: at least one of its targets serves it now.\n- `inactive`: none does, because a later deployment replaced it or its\n  previews expired or were removed.\n",
+        "description": "Whether the deployment serves its release now.\n\n- `live`: the project's newest primary deployment, or a preview deployment\n  that one of its preview URLs still serves.\n- `inactive`: a later deployment replaced it, or its previews expired or\n  were removed.\n",
         "enum": [
           "live",
           "inactive"
@@ -22010,7 +24016,7 @@
       },
       "deployment": {
         "title": "Deployment",
-        "description": "An immutable record of a release made live on a set of origins. A release\nis a snapshot of the project's configuration, and a deployment freezes the\nproject's variable values with it. Deploying and rolling back each append\none, so the history is the audit trail.\n\nAll primary origins serve the project's newest primary deployment. An origin\nadded after it serves nothing until the next deployment to `primary`. A\npreview URL serves the newest deployment to it while its preview is live.\n\nEvery field is fixed at creation except `status`, which is read as of now.\n",
+        "description": "An immutable record of a release made live on a set of origins. A release\nis a snapshot of the project's configuration, and a deployment freezes the\nproject's variable values with it. Deploying and rolling back each append\none, so the history is the audit trail.\n\nA primary origin serves the project's newest primary deployment if that\ndeployment names it, so one added later serves nothing until the next\ndeployment to `primary`. Requests with no origin get the same deployment. A\npreview URL serves the newest deployment to it while its preview is live.\n\nEvery field is fixed at creation except `status`, which is read as of now.\n",
         "type": "object",
         "required": [
           "id",
@@ -22117,6 +24123,7 @@
         "items": {
           "type": "string",
           "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
+          "x-zitadel-pattern-message": "must be an origin: http or https, a lowercase host and an optional port, with no path",
           "maxLength": 2048
         },
         "example": [
@@ -23330,6 +25337,55 @@
         "value": {
           "code": "grant.project_unclaimed",
           "message": "claim the project before granting access to it"
+        }
+      },
+      "inv-not_found": {
+        "summary": "inv.not_found",
+        "value": {
+          "code": "inv.not_found",
+          "message": "invitation not found"
+        }
+      },
+      "inv-permission_denied": {
+        "summary": "inv.permission_denied",
+        "value": {
+          "code": "inv.permission_denied",
+          "message": "insufficient permissions to manage invitations"
+        }
+      },
+      "inv-invalid": {
+        "summary": "inv.invalid",
+        "value": {
+          "code": "inv.invalid",
+          "message": "the invitation request is invalid"
+        }
+      },
+      "inv-pending_limit": {
+        "summary": "inv.pending_limit",
+        "value": {
+          "code": "inv.pending_limit",
+          "message": "the project has reached its pending invitation limit"
+        }
+      },
+      "inv-platform_required": {
+        "summary": "inv.platform_required",
+        "value": {
+          "code": "inv.platform_required",
+          "message": "invitations require a platform project"
+        }
+      },
+      "inv-project_unclaimed": {
+        "summary": "inv.project_unclaimed",
+        "value": {
+          "code": "inv.project_unclaimed",
+          "message": "claim the project before inviting into it"
+        }
+      },
+      "inv-self_accept": {
+        "summary": "inv.self_accept",
+        "value": {
+          "code": "inv.self_accept",
+          "message": "the inviter cannot accept their own invitation"
         }
       },
       "evt-not_found": {
@@ -29851,6 +31907,112 @@
           }
         }
       },
+      "createApplication-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getApplicationById-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
       "listPolicies-error-response": {
         "description": "Error response",
         "content": {
@@ -31164,6 +33326,538 @@
           }
         }
       },
+      "listInvitations-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "createInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-pending_limit"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-platform_required"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-project_unclaimed"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.invalid": "#/components/schemas/inv-invalid",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.pending_limit": "#/components/schemas/inv-pending_limit",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "inv.platform_required": "#/components/schemas/inv-platform_required",
+                  "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.invalid": {
+                "$ref": "#/components/examples/inv-invalid"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.pending_limit": {
+                "$ref": "#/components/examples/inv-pending_limit"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "inv.platform_required": {
+                "$ref": "#/components/examples/inv-platform_required"
+              },
+              "inv.project_unclaimed": {
+                "$ref": "#/components/examples/inv-project_unclaimed"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "lookupInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "acceptInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-platform_required"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-project_unclaimed"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-self_accept"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.platform_required": "#/components/schemas/inv-platform_required",
+                  "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
+                  "inv.self_accept": "#/components/schemas/inv-self_accept",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.platform_required": {
+                "$ref": "#/components/examples/inv-platform_required"
+              },
+              "inv.project_unclaimed": {
+                "$ref": "#/components/examples/inv-project_unclaimed"
+              },
+              "inv.self_accept": {
+                "$ref": "#/components/examples/inv-self_accept"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "rejectInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "cancelInvitation-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.permission_denied": "#/components/schemas/inv-permission_denied",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "inv.not_found": {
+                "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.permission_denied": {
+                "$ref": "#/components/examples/inv-permission_denied"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
       "listEvents-error-response": {
         "description": "Error response",
         "content": {
@@ -31978,9 +34672,6 @@
                   "$ref": "#/components/schemas/proj-not_found"
                 },
                 {
-                  "$ref": "#/components/schemas/proj-origin_not_allowed"
-                },
-                {
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
@@ -32011,7 +34702,6 @@
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.not_found": "#/components/schemas/proj-not_found",
-                  "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -32056,9 +34746,6 @@
               },
               "proj.not_found": {
                 "$ref": "#/components/examples/proj-not_found"
-              },
-              "proj.origin_not_allowed": {
-                "$ref": "#/components/examples/proj-origin_not_allowed"
               },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
@@ -32384,6 +35071,16 @@
         },
         "example": "idprev_01KWH3B72K7M7F0N9WD3P2E4YN"
       },
+      "application-id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The application ID: the `id` that `createApplication` (`POST /applications`) returns.\n",
+        "schema": {
+          "type": "string"
+        },
+        "example": "app_01KWH3B72K7M7F0N9WD3P2E4YM"
+      },
       "policy-id": {
         "name": "policy_id",
         "in": "path",
@@ -32430,6 +35127,16 @@
           "type": "string"
         },
         "example": "asgn_01KWH9D4R2V7F0N9WD3P2E4YM8"
+      },
+      "invitation-id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`\n(`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.\n",
+        "schema": {
+          "$ref": "#/components/schemas/invitation-id"
+        },
+        "example": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E"
       },
       "event-id": {
         "name": "id",

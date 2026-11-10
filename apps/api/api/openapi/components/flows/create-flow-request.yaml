@@ -11,6 +11,7 @@ properties:
   flow_definition_name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
+    x-zitadel-pattern-message: "must start with a lowercase letter and use only lowercase letters, digits and -"
     description: |
       Name of a specific flow definition to use.
       When omitted, the server selects the best-matching definition
@@ -30,6 +31,7 @@ properties:
       Semver version of the flow definition JSON Schema to use.
       When omitted, the latest version is used.
     pattern: '^\d+\.\d+\.\d+$'
+    x-zitadel-pattern-message: "must be a version such as 1.2.3"
     example: "1.0.0"
   challenge_nonce:
     $ref: ../schemas/challenge-nonce.yaml
