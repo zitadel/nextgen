@@ -97,21 +97,24 @@ export function parseConnectionSlug(
  * The slug a display name suggests: accents dropped, lowercase, every run of
  * other characters a dash, and the dashes at the ends dropped, so `Zitadel
  * Cloud` is `zitadel-cloud`. It is cut to the slug's length, and is empty when
- * the name has no letter or digit, which `parseConnectionSlug` then refuses.
+ * the name has no letter or digit, or when the result is one of `reserved`,
+ * which `parseConnectionSlug` would refuse.
  *
  * @param displayName - The name shown on the sign-in button.
+ * @param reserved - The slugs that cannot be used, as `parseConnectionSlug`
+ *   takes them.
  * @returns The suggested slug, which the developer may still change.
  */
-export function slugFromDisplayName(displayName: string): string {
-  return displayName
+export function slugFromDisplayName(displayName: string, reserved: readonly string[] = []): string {
+  const slug = displayName
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .trim()
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+/, "")
     .slice(0, SLUG_MAX)
     .replace(/-+$/, "");
+  return reserved.includes(slug) ? "" : slug;
 }
 
 /** The text on the sign-in button, or why there is none. */

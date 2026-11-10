@@ -62,8 +62,15 @@ describe("slugFromDisplayName", () => {
 
   it("suggests only a slug the parser accepts", () => {
     for (const name of ["Zitadel Cloud", "Acme SSO", "1Password", "a".repeat(200)]) {
-      expect(parseConnectionSlug(slugFromDisplayName(name), RESERVED_SLUGS).ok, name).toBe(true);
+      expect(
+        parseConnectionSlug(slugFromDisplayName(name, RESERVED_SLUGS), RESERVED_SLUGS).ok,
+        name,
+      ).toBe(true);
     }
+  });
+
+  it.each(["Google", "Custom"])("suggests nothing for the reserved name %j", (name) => {
+    expect(slugFromDisplayName(name, RESERVED_SLUGS)).toBe("");
   });
 
   it("drops accents rather than turning the letters into dashes", () => {
