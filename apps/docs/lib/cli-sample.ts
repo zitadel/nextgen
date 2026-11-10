@@ -60,7 +60,7 @@ export function cliSample(
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
   if (topic === "variable") {
-    return variables(verb, positionals, request) ?? apiSample(operation, path, request);
+    return variables(verb, positionals, request) ?? apiSample(operation, path, request, true);
   }
 
   const flags: string[] = [];
@@ -75,8 +75,16 @@ export function cliSample(
 // `zitadel api <operationId>`: the path parameters are its arguments, but a
 // trailing `project_id`, which the CLI fills in itself; each query parameter
 // and top-level body field is a `--field`, typed by the operation's schema, and
-// an object, a list or `null` is JSON after `:=`.
-function apiSample(operation: OperationObject, path: string, request: RequestData): string {
+// an object, a list or `null` is JSON after `:=`. A body whose keys are the
+// caller's own, such as a variables map, is piped in as JSON instead
+// (`--input -`): a key named `kind` or `project_id` as a `--field` is a query
+// parameter, and a bare number or boolean would reach the API as a string.
+function apiSample(
+  operation: OperationObject,
+  path: string,
+  request: RequestData,
+  bodyAsInput = false,
+): string {
   const names = pathParameterNames(path);
   const positionals = names
     .filter((name, index) => name !== "project_id" || index < names.length - 1)
@@ -85,15 +93,22 @@ function apiSample(operation: OperationObject, path: string, request: RequestDat
     ...Object.entries(request.query)
       .filter(([name]) => name !== "project_id")
       .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
-    ...Object.entries(record(request.body)).map(([name, value]) => field(name, value)),
+    ...(bodyAsInput
+      ? []
+      : Object.entries(record(request.body)).map(([name, value]) => field(name, value))),
   ];
+  const piped = bodyAsInput && Object.keys(record(request.body)).length > 0;
+  if (piped) {
+    fields.unshift("--input -");
+  }
   // An operation that needs no credential runs anywhere, unless the CLI is
   // to fill in its project.
   const project =
     authentication(operation) === "secret" ||
     names.includes("project_id") ||
     "project_id" in request.query;
-  const call = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
+  const run = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
+  const call = piped ? `echo ${quote(JSON.stringify(request.body))} | ${run}` : run;
   return project ? `${context}\n${call}` : call;
 }
 
@@ -126,29 +141,38 @@ function listFlags(request: RequestData): string[] {
 
 // The variable commands act on the project the directory was set up for.
 // `set` takes no value on the command line here: it prompts for it, or reads
-// it from stdin, so a credential stays out of the shell's history. A body sets
-// many variables at once, so it is a command for each, and the `null` that
-// removes one is a `variable rm`.
+// it from stdin, so a credential stays out of the shell's history. A command
+// stands for a request only when it does exactly what the request does, and
+// where none does, the `zitadel api` call stands in (`undefined` here):
+// - `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` take.
+// - `get` always reads one kind, so a request that names none, which returns
+//   both, has no command; `list` without `--preview` is every name, so a
+//   primary-only list has none either.
+// - A write or a removal without `--preview` also changes the preview value
+//   (a secret write clears it), so `kind=primary` has none for those.
+// - A body that sets several variables is one atomic request, and a `null`
+//   removes a name that may not exist, which `variable rm` refuses, so only a
+//   body that sets one variable is a command.
+// - `variable set` refuses `--secret --as number` and `--as boolean`.
+// - `resolve` takes the origin, not the deployment id the path names.
 function variables(
   verb: string | undefined,
   positionals: string[],
   request: RequestData,
 ): string | undefined {
-  // `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` all take.
-  // `kind=primary` is the command without one: `get` and `list` read the
-  // primary values then. The CLI has no primary-only flag, and a write or a
-  // removal without `--preview` also changes the preview value (a secret write
-  // clears it), so those have no CLI sample, and the API sample stands in.
   const kind = request.query.kind?.values[0];
   const preview = kind === "preview" ? ["--preview"] : [];
 
-  if (kind === "primary" && (verb === "set" || verb === "rm")) {
+  if (verb === "resolve") {
     return undefined;
   }
-
-  // `resolve` takes the origin, not the deployment id the operation's path
-  // names, so a CLI sample would drop the id the request carries.
-  if (verb === "resolve") {
+  if (verb === "get" && kind === undefined) {
+    return undefined;
+  }
+  if (verb === "list" && kind === "primary") {
+    return undefined;
+  }
+  if (kind === "primary" && (verb === "set" || verb === "rm")) {
     return undefined;
   }
 
@@ -157,34 +181,24 @@ function variables(
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
-  // `variable set` refuses `--secret --as number` and `--as boolean`, so a secret
-  // that is not a string has no CLI sample either.
-  if (
-    entries.some(
-      ([, value]) => record(value).secret === true && typeof record(value).value !== "string",
-    )
-  ) {
+  if (entries.length > 1 || entries.some(([, value]) => value === null)) {
     return undefined;
   }
-  const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
-    if (value === null) return line([`${cli} variable rm`, word(name)], preview);
-    const { secret, value: scalar } = record(value);
-    const type = typeof (scalar ?? value);
-    return line(
-      [`${cli} variable set`, word(name)],
-      [
-        ...(secret === true ? ["--secret"] : []),
-        ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
-        ...preview,
-      ],
-    );
-  });
-  const prompts = entries.length === 0 || entries.some(([, value]) => value !== null);
-  return [
-    context,
-    ...(prompts ? ["# Each set prompts for the value, or reads it from stdin."] : []),
-    ...commands,
-  ].join("\n");
+  const [name, value] = entries[0] ?? ["NAME", ""];
+  const { secret, value: scalar } = record(value);
+  if (secret === true && typeof scalar !== "string") {
+    return undefined;
+  }
+  const type = typeof (scalar ?? value);
+  const command = line(
+    [`${cli} variable set`, word(name)],
+    [
+      ...(secret === true ? ["--secret"] : []),
+      ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
+      ...preview,
+    ],
+  );
+  return [context, "# The set prompts for the value, or reads it from stdin.", command].join("\n");
 }
 
 /** One command: on a line while it fits the repo's 100 columns, else a flag a line, as cURL is. */
