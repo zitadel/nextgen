@@ -30,7 +30,7 @@ const (
 
 	// Binds the stamp of the revision that adds the client.
 	createApplicationClientStmt = `INSERT INTO application_clients ` +
-		`(project_id, id, application_id, slug, client_id, secret_hash, created_at) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)`
+		`(project_id, id, application_id, slug, client_id, created_at) VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`
 
 	lockApplicationStmt = `SELECT id FROM applications WHERE project_id = @p1 AND id = @p2 FOR UPDATE`
 
@@ -45,7 +45,7 @@ JOIN application_revisions r
 		` AND newer.application_id = r.application_id` +
 		` AND newer.created_at > r.created_at)`
 
-	applicationClientColumns = `SELECT project_id, application_id, id, slug, client_id, secret_hash, created_at` +
+	applicationClientColumns = `SELECT project_id, application_id, id, slug, client_id, created_at` +
 		` FROM application_clients`
 
 	listApplicationClientsStmt = applicationClientColumns +
@@ -53,6 +53,13 @@ JOIN application_revisions r
 
 	getApplicationClientByClientIDStmt = applicationClientColumns +
 		` WHERE project_id = @p1 AND client_id = @p2`
+
+	createApplicationClientSecretStmt = `INSERT INTO application_client_secrets ` +
+		`(project_id, id, application_client_id, secret_hash) VALUES (@p1, @p2, @p3, @p4) THEN RETURN created_at`
+
+	listApplicationClientSecretsStmt = `SELECT project_id, id, application_client_id, secret_hash, created_at` +
+		` FROM application_client_secrets` +
+		` WHERE project_id = @p1 AND application_client_id = @p2 ORDER BY created_at, id`
 )
 
 var _ service.ApplicationStatements = (*applicationStatements)(nil)
@@ -209,6 +216,44 @@ func (s applicationStatements) GetApplicationClientByClientID(ctx context.Contex
 	return client, nil
 }
 
+// CreateApplicationClientSecret implements [service.ApplicationStatements].
+func (s applicationStatements) CreateApplicationClientSecret(ctx context.Context, secret *domain.ApplicationClientSecret) error {
+	if err := ensureManagedID(&secret.ID, domain.PrefixApplicationClientSecret); err != nil {
+		return err
+	}
+	stmt := buildStatement(createApplicationClientSecretStmt,
+		secret.ProjectID,
+		secret.ID,
+		secret.ApplicationClientID,
+		secret.SecretHash,
+	).statement()
+	if err := s.db.Write(ctx, stmt, scanReturnedTimestamp(&secret.CreatedAt)); err != nil {
+		return err
+	}
+	secret.CreatedAt = secret.CreatedAt.UTC()
+	return nil
+}
+
+// ListApplicationClientSecrets implements [service.ApplicationStatements].
+func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) ([]*domain.ApplicationClientSecret, error) {
+	var secrets []*domain.ApplicationClientSecret
+	if err := s.db.Query(ctx, buildStatement(listApplicationClientSecretsStmt, projectID, applicationClientID).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		secrets, err = collectRows(iter, func(row *spanner.Row) (*domain.ApplicationClientSecret, error) {
+			var secret domain.ApplicationClientSecret
+			if err := row.Columns(&secret.ProjectID, &secret.ID, &secret.ApplicationClientID, &secret.SecretHash, &secret.CreatedAt); err != nil {
+				return nil, err
+			}
+			secret.CreatedAt = secret.CreatedAt.UTC()
+			return &secret, nil
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return secrets, nil
+}
+
 func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient, createdAt time.Time) error {
 	for _, client := range clients {
 		stmt := buildStatement(createApplicationClientStmt,
@@ -217,7 +262,6 @@ func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*
 			client.ApplicationID,
 			client.Slug,
 			client.ClientID,
-			client.SecretHash,
 			createdAt,
 		).statement()
 		if _, err := tx.Update(ctx, stmt); err != nil {
@@ -248,7 +292,7 @@ func scanApplication(row *spanner.Row) (*domain.Application, error) {
 
 func scanApplicationClient(row *spanner.Row) (*domain.ApplicationClient, error) {
 	var client domain.ApplicationClient
-	if err := row.Columns(&client.ProjectID, &client.ApplicationID, &client.ID, &client.Slug, &client.ClientID, &client.SecretHash, &client.CreatedAt); err != nil {
+	if err := row.Columns(&client.ProjectID, &client.ApplicationID, &client.ID, &client.Slug, &client.ClientID, &client.CreatedAt); err != nil {
 		return nil, err
 	}
 	client.CreatedAt = client.CreatedAt.UTC()

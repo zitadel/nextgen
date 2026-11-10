@@ -17,6 +17,8 @@ const (
 	// PrefixApplicationClient prefixes a client row's primary key. The row's
 	// client_id copies it when the document supplied none (ADR 047 §5).
 	PrefixApplicationClient ResourcePrefix = "client"
+	// PrefixApplicationClientSecret prefixes a client secret row's primary key.
+	PrefixApplicationClientSecret ResourcePrefix = "csec"
 )
 
 const (
@@ -75,19 +77,28 @@ type Application struct {
 	UpdatedAt  time.Time
 }
 
-// ApplicationClient is the stored credential of one client, matched to the
-// document's client by Slug. ID is the row's primary key and stays inside
-// storage; the API and the OAuth endpoints identify a client by ClientID.
-// SecretHash is [HashSecret] of the secret, which the server returns once,
-// when it creates the client.
+// ApplicationClient is one stored client, matched to the document's client by
+// Slug. ID is the row's primary key and stays inside storage; the API and the
+// OAuth endpoints identify a client by ClientID.
 type ApplicationClient struct {
 	ProjectID     string
 	ApplicationID string
 	ID            string
 	Slug          string
 	ClientID      string
-	SecretHash    string
 	CreatedAt     time.Time
+}
+
+// ApplicationClientSecret is one secret of one client. ApplicationClientID is
+// the client's [ApplicationClient.ID], not its ClientID. SecretHash is
+// [HashSecret] of the secret, which the server returns once, when it creates
+// the secret.
+type ApplicationClientSecret struct {
+	ProjectID           string
+	ID                  string
+	ApplicationClientID string
+	SecretHash          string
+	CreatedAt           time.Time
 }
 
 // The codes are literal: the ID prefix is "app", the error resource is

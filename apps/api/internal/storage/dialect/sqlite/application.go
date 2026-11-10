@@ -19,7 +19,7 @@ const (
 		`(project_id, id, application_id, document, created_at) VALUES (?, ?, ?, ?, ?)`
 
 	createApplicationClientStmt = `INSERT INTO application_clients ` +
-		`(project_id, id, application_id, slug, client_id, secret_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+		`(project_id, id, application_id, slug, client_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`
 
 	// No FOR UPDATE; see lockIDPConnectionStmt.
 	lockApplicationStmt = `SELECT id FROM applications WHERE project_id = ? AND id = ?`
@@ -35,7 +35,7 @@ JOIN application_revisions r
 		` AND newer.application_id = r.application_id` +
 		` AND newer.created_at > r.created_at)`
 
-	applicationClientColumns = `SELECT project_id, application_id, id, slug, client_id, secret_hash, created_at` +
+	applicationClientColumns = `SELECT project_id, application_id, id, slug, client_id, created_at` +
 		` FROM application_clients`
 
 	listApplicationClientsStmt = applicationClientColumns +
@@ -43,6 +43,13 @@ JOIN application_revisions r
 
 	getApplicationClientByClientIDStmt = applicationClientColumns +
 		` WHERE project_id = ? AND client_id = ?`
+
+	createApplicationClientSecretStmt = `INSERT INTO application_client_secrets ` +
+		`(project_id, id, application_client_id, secret_hash, created_at) VALUES (?, ?, ?, ?, ?)`
+
+	listApplicationClientSecretsStmt = `SELECT project_id, id, application_client_id, secret_hash, created_at` +
+		` FROM application_client_secrets` +
+		` WHERE project_id = ? AND application_client_id = ? ORDER BY created_at, id`
 )
 
 var _ service.ApplicationStatements = (*applicationStatements)(nil)
@@ -194,6 +201,49 @@ func (s applicationStatements) GetApplicationClientByClientID(ctx context.Contex
 	return client, nil
 }
 
+// CreateApplicationClientSecret implements [service.ApplicationStatements].
+func (s applicationStatements) CreateApplicationClientSecret(ctx context.Context, secret *domain.ApplicationClientSecret) error {
+	if err := ensureManagedID(&secret.ID, domain.PrefixApplicationClientSecret); err != nil {
+		return err
+	}
+	now := nowUnixNano()
+	if _, err := s.client.Exec(ctx, createApplicationClientSecretStmt,
+		secret.ProjectID,
+		secret.ID,
+		secret.ApplicationClientID,
+		secret.SecretHash,
+		now,
+	); err != nil {
+		return wrapError(err)
+	}
+	secret.CreatedAt = timeFromUnixNano(now)
+	return nil
+}
+
+// ListApplicationClientSecrets implements [service.ApplicationStatements].
+func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) ([]*domain.ApplicationClientSecret, error) {
+	rows, err := s.client.Query(ctx, listApplicationClientSecretsStmt, projectID, applicationClientID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	secrets, err := collectRows(rows, func(rows *sql.Rows) (*domain.ApplicationClientSecret, error) {
+		var (
+			secret      domain.ApplicationClientSecret
+			createdNano int64
+		)
+		if err := rows.Scan(&secret.ProjectID, &secret.ID, &secret.ApplicationClientID, &secret.SecretHash, &createdNano); err != nil {
+			return nil, err
+		}
+		secret.CreatedAt = timeFromUnixNano(createdNano)
+		return &secret, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return secrets, nil
+}
+
 func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient, now int64) error {
 	for _, client := range clients {
 		if _, err := tx.Exec(ctx, createApplicationClientStmt,
@@ -202,7 +252,6 @@ func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*
 			client.ApplicationID,
 			client.Slug,
 			client.ClientID,
-			client.SecretHash,
 			now,
 		); err != nil {
 			return wrapError(err)
@@ -231,7 +280,7 @@ func scanApplicationClient(rows *sql.Rows) (*domain.ApplicationClient, error) {
 		client      domain.ApplicationClient
 		createdNano int64
 	)
-	if err := rows.Scan(&client.ProjectID, &client.ApplicationID, &client.ID, &client.Slug, &client.ClientID, &client.SecretHash, &createdNano); err != nil {
+	if err := rows.Scan(&client.ProjectID, &client.ApplicationID, &client.ID, &client.Slug, &client.ClientID, &createdNano); err != nil {
 		return nil, err
 	}
 	client.CreatedAt = timeFromUnixNano(createdNano)

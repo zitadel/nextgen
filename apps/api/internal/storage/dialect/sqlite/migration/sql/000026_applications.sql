@@ -49,7 +49,6 @@ CREATE TABLE application_clients (
     application_id  TEXT    NOT NULL,
     slug            TEXT    NOT NULL,
     client_id       TEXT    NOT NULL,
-    secret_hash     TEXT    NOT NULL,
     created_at      INTEGER NOT NULL,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_application_clients_id CHECK (id <> ''),
@@ -73,7 +72,34 @@ CREATE UNIQUE INDEX uq_application_clients_application_slug
     ON application_clients (project_id, application_id, slug);
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+-- See the postgres migration for why secrets have their own table.
+CREATE TABLE application_client_secrets (
+    project_id             TEXT    NOT NULL,
+    id                     TEXT    NOT NULL,
+    application_client_id  TEXT    NOT NULL,
+    secret_hash            TEXT    NOT NULL,
+    created_at             INTEGER NOT NULL,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_application_client_secrets_id CHECK (id <> ''),
+    CONSTRAINT fk_application_client_secrets_client
+        FOREIGN KEY (project_id, application_client_id)
+        REFERENCES application_clients (project_id, id) ON DELETE CASCADE
+);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_application_client_secrets_client
+    ON application_client_secrets (project_id, application_client_id, created_at);
+-- +goose StatementEnd
+
 -- +goose Down
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_application_client_secrets_client;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP TABLE IF EXISTS application_client_secrets;
+-- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS uq_application_clients_application_slug;
 -- +goose StatementEnd

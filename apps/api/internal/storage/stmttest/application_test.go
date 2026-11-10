@@ -20,8 +20,8 @@ func TestApplicationStatements_CreateAndGet(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		slug := "shop-" + uniqueSuffix(t)
-		generated := &domain.ApplicationClient{Slug: "web", SecretHash: domain.HashSecret("one")}
-		supplied := &domain.ApplicationClient{Slug: "api", ClientID: "shop-api-" + uniqueSuffix(t), SecretHash: domain.HashSecret("two")}
+		generated := &domain.ApplicationClient{Slug: "web"}
+		supplied := &domain.ApplicationClient{Slug: "api", ClientID: "shop-api-" + uniqueSuffix(t)}
 
 		application := createApplication(t, d.stmts, projectID, slug, generated, supplied)
 
@@ -55,6 +55,20 @@ func TestApplicationStatements_CreateAndGet(t *testing.T) {
 		clients, err := d.stmts.ListApplicationClients(t.Context(), projectID, application.ID)
 		require.NoError(t, err)
 		assert.Equal(t, []*domain.ApplicationClient{supplied, generated}, clients, "ordered by slug")
+
+		first := &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: generated.ID, SecretHash: domain.HashSecret("one")}
+		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), first))
+		assert.True(t, domain.PrefixApplicationClientSecret.Matches(first.ID), "id %q is not csec_-prefixed", first.ID)
+		assert.WithinDuration(t, time.Now(), first.CreatedAt, 5*time.Second)
+		second := &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: generated.ID, SecretHash: domain.HashSecret("two")}
+		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), second))
+
+		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, generated.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []*domain.ApplicationClientSecret{first, second}, secrets, "a client can hold more than one secret, oldest first")
+		secrets, err = d.stmts.ListApplicationClientSecrets(t.Context(), projectID, supplied.ID)
+		require.NoError(t, err)
+		assert.Empty(t, secrets)
 	})
 }
 
@@ -75,12 +89,12 @@ func TestApplicationStatements_ClientIDUniquePerProject(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		clientID := "shared-" + uniqueSuffix(t)
-		holder := &domain.ApplicationClient{Slug: "web", ClientID: clientID, SecretHash: domain.HashSecret("one")}
+		holder := &domain.ApplicationClient{Slug: "web", ClientID: clientID}
 		owner := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), holder)
 
 		second := &domain.Application{ProjectID: projectID, Slug: "blog-" + uniqueSuffix(t), Document: applicationDocument("blog")}
 		err := d.stmts.CreateApplication(t.Context(), second, []*domain.ApplicationClient{
-			{Slug: "web", ClientID: clientID, SecretHash: domain.HashSecret("two")},
+			{Slug: "web", ClientID: clientID},
 		})
 		require.ErrorIs(t, err, new(database.UniqueError))
 
@@ -102,12 +116,12 @@ func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		slug := "shop-" + uniqueSuffix(t)
-		web := &domain.ApplicationClient{Slug: "web", SecretHash: domain.HashSecret("one")}
+		web := &domain.ApplicationClient{Slug: "web"}
 		application := createApplication(t, d.stmts, projectID, slug, web)
 		firstRevisionID := application.RevisionID
 
 		// The revision leaves web's client_id out, which the contract allows.
-		api := &domain.ApplicationClient{Slug: "api", SecretHash: domain.HashSecret("two")}
+		api := &domain.ApplicationClient{Slug: "api"}
 		application.Document = applicationDocument(slug, &domain.ApplicationClient{Slug: "web"}, api)
 		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{api}))
 		assert.NotEqual(t, firstRevisionID, application.RevisionID)
@@ -127,11 +141,11 @@ func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
 
 		// A revise that trips the client_id index rolls back whole: the
 		// revision insert before it does not survive.
-		holder := &domain.ApplicationClient{Slug: "web", ClientID: "held-" + uniqueSuffix(t), SecretHash: domain.HashSecret("three")}
+		holder := &domain.ApplicationClient{Slug: "web", ClientID: "held-" + uniqueSuffix(t)}
 		createApplication(t, d.stmts, projectID, "blog-"+uniqueSuffix(t), holder)
 		revised := application.RevisionID
 		err = d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{
-			{Slug: "worker", ClientID: holder.ClientID, SecretHash: domain.HashSecret("four")},
+			{Slug: "worker", ClientID: holder.ClientID},
 		})
 		require.ErrorIs(t, err, new(database.UniqueError))
 		assert.Equal(t, revised, application.RevisionID, "a failed revise must not move the entity to a rolled-back revision")
@@ -157,14 +171,21 @@ func TestApplicationStatements_UnknownApplication(t *testing.T) {
 		clients, err := d.stmts.ListApplicationClients(t.Context(), projectID, unknown.ID)
 		require.NoError(t, err)
 		assert.Empty(t, clients)
+
+		err = d.stmts.CreateApplicationClientSecret(t.Context(), &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: "client_unknown", SecretHash: domain.HashSecret("one")})
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
+		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, "client_unknown")
+		require.NoError(t, err)
+		assert.Empty(t, secrets)
 	})
 }
 
 func TestApplicationStatements_ProjectDeleteCascades(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
-		client := &domain.ApplicationClient{Slug: "web", SecretHash: domain.HashSecret("one")}
+		client := &domain.ApplicationClient{Slug: "web"}
 		application := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), client)
+		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: client.ID, SecretHash: domain.HashSecret("one")}))
 
 		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
 		require.NoError(t, err)
@@ -173,6 +194,9 @@ func TestApplicationStatements_ProjectDeleteCascades(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		_, err = d.stmts.GetApplicationClientByClientID(t.Context(), projectID, client.ClientID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, client.ID)
+		require.NoError(t, err)
+		assert.Empty(t, secrets)
 	})
 }
 

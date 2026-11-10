@@ -37,7 +37,7 @@ CREATE TABLE zitadel_nextgen.application_revisions (
 CREATE UNIQUE INDEX uq_application_revisions_application_created_at
     ON zitadel_nextgen.application_revisions (project_id, application_id, created_at);
 
--- The credential of one client. A revision cannot remove a client, so no row
+-- One client of an application. A revision cannot remove a client, so no row
 -- is deleted, and a client_id stays taken once held (ADR 047 section 5). The
 -- cascade frees a client_id when its application is deleted; the PR that adds
 -- deletion owns the contract's promise that an id once held is never reused.
@@ -47,8 +47,6 @@ CREATE TABLE zitadel_nextgen.application_clients (
     , application_id TEXT COLLATE "C" NOT NULL
     , slug TEXT COLLATE "C" NOT NULL CHECK (slug <> '')
     , client_id TEXT COLLATE "C" NOT NULL CHECK (client_id <> '')
-    -- Hex SHA-256 from domain.HashSecret.
-    , secret_hash TEXT COLLATE "C" NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
     , PRIMARY KEY (project_id, id)
@@ -66,14 +64,38 @@ CREATE TABLE zitadel_nextgen.application_clients (
 CREATE UNIQUE INDEX uq_application_clients_project_client_id
     ON zitadel_nextgen.application_clients (project_id, client_id);
 
--- Catches a bug that inserts the same slug twice and leaves a hidden
--- credential; it surfaces as one of the two errors above, which is acceptable
--- because the domain rejects duplicate slugs before any write. Also serves the
--- by-application list a revision needs.
+-- Catches a bug that inserts the same slug twice and leaves a client no
+-- document can reach; it surfaces as one of the two errors above, which is
+-- acceptable because the domain rejects duplicate slugs before any write. Also
+-- serves the by-application list a revision needs.
 CREATE UNIQUE INDEX uq_application_clients_application_slug
     ON zitadel_nextgen.application_clients (project_id, application_id, slug);
 
+-- One secret of one client. Secrets have their own table, like user
+-- passwords and passkeys, so a client can hold more than one and other
+-- authentication methods can follow.
+CREATE TABLE zitadel_nextgen.application_client_secrets (
+    project_id TEXT COLLATE "C" NOT NULL
+    , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
+    , application_client_id TEXT COLLATE "C" NOT NULL
+    -- Hex SHA-256 from domain.HashSecret.
+    , secret_hash TEXT COLLATE "C" NOT NULL
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (project_id, id)
+    , CONSTRAINT fk_application_client_secrets_client
+        FOREIGN KEY (project_id, application_client_id)
+        REFERENCES zitadel_nextgen.application_clients (project_id, id)
+        ON DELETE CASCADE
+);
+
+-- Serves the by-client list.
+CREATE INDEX idx_application_client_secrets_client
+    ON zitadel_nextgen.application_client_secrets (project_id, application_client_id, created_at);
+
 -- +goose Down
+DROP INDEX IF EXISTS zitadel_nextgen.idx_application_client_secrets_client;
+DROP TABLE IF EXISTS zitadel_nextgen.application_client_secrets;
 DROP INDEX IF EXISTS zitadel_nextgen.uq_application_clients_application_slug;
 DROP INDEX IF EXISTS zitadel_nextgen.uq_application_clients_project_client_id;
 DROP TABLE IF EXISTS zitadel_nextgen.application_clients;

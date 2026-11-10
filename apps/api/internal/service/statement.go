@@ -295,9 +295,9 @@ type IDPConnectionStatements interface {
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 
-// ApplicationStatements persists registered applications, their revisions and
-// the credentials of their clients. Like an IdP connection, the newest revision
-// is the one with the greatest created_at (ADR 063 §7).
+// ApplicationStatements persists registered applications, their revisions,
+// their clients and the clients' secrets. Like an IdP connection, the newest
+// revision is the one with the greatest created_at (ADR 063 §7).
 //
 // Clients are rows of their own, never removed by a revision. Each gets a
 // minted client_* id; an empty ClientID takes a copy of it (ADR 047 §5).
@@ -332,6 +332,15 @@ type ApplicationStatements interface {
 	// GetApplicationClientByClientID returns the client holding clientID in
 	// the project. No match returns *database.NoRowFoundError.
 	GetApplicationClientByClientID(ctx context.Context, projectID, clientID string) (*domain.ApplicationClient, error)
+	// CreateApplicationClientSecret stores secret for a stored client and sets
+	// its id, when empty, and CreatedAt. Call it in the transaction that
+	// creates the client, so a client is never stored without its secret. An
+	// unknown client returns *database.ForeignKeyError.
+	CreateApplicationClientSecret(ctx context.Context, secret *domain.ApplicationClientSecret) error
+	// ListApplicationClientSecrets returns the client's secrets, oldest first.
+	// applicationClientID is the client's row id. An unknown client returns
+	// none.
+	ListApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) ([]*domain.ApplicationClientSecret, error)
 }
 
 // IDPIdentityLinkStatements stores which user a provider subject resolves to.
