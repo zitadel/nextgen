@@ -257,11 +257,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"deployment.write",
 	},
 	SearchOperation: []string{
-		"user.read",
-		"team.read",
-		"schema.read",
-		"flow_definition.read",
-		"idp.read",
+		"project.read",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
