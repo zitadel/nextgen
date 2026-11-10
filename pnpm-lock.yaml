@@ -611,6 +611,9 @@ overrides:
   vite@>=8.3.0 <8.3.3: ^8.3.3
   zod@>=4.0.0 <4.6.6: ^4.6.6
 
+patchedDependencies:
+  '@orval/core@8.42.0': 3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183
+
 importers:
 
   .:
@@ -21096,19 +21099,19 @@ snapshots:
 
   '@orval/angular@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
 
   '@orval/axios@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
 
-  '@orval/core@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
+  '@orval/core@8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
       '@scalar/openapi-types': 0.9.7
       acorn: 8.18.0
@@ -21124,21 +21127,21 @@ snapshots:
 
   '@orval/effect@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
 
   '@orval/fetch@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
 
   '@orval/hono@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(typescript@6.0.3)(zod@4.6.7)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/zod': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(zod@4.6.7)
     optionalDependencies:
       typescript: 6.0.3
@@ -21149,7 +21152,7 @@ snapshots:
 
   '@orval/mcp@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(zod@4.6.7)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/fetch': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/zod': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(zod@4.6.7)
     optionalDependencies:
@@ -21160,7 +21163,7 @@ snapshots:
 
   '@orval/mock@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     optionalDependencies:
       '@faker-js/faker': 10.6.0
       msw: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
@@ -21170,7 +21173,7 @@ snapshots:
   '@orval/pinia-colada@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
       '@orval/axios': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/fetch': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     transitivePeerDependencies:
       - '@faker-js/faker'
@@ -21178,7 +21181,7 @@ snapshots:
 
   '@orval/query@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.2.8))':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/fetch': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     optionalDependencies:
       '@tanstack/react-query': 5.100.6(react@19.2.8)
@@ -21188,14 +21191,14 @@ snapshots:
 
   '@orval/solid-start@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
 
   '@orval/swr@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(swr@2.4.1(react@19.2.8))':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/fetch': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
     optionalDependencies:
       swr: 2.4.1(react@19.2.8)
@@ -21205,7 +21208,7 @@ snapshots:
 
   '@orval/zod@8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(zod@4.6.7)':
     dependencies:
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       jsesc: 3.1.0
     optionalDependencies:
       zod: 4.6.7
@@ -31738,7 +31741,7 @@ snapshots:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
       '@orval/angular': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/axios': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
-      '@orval/core': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
+      '@orval/core': 8.42.0(patch_hash=3a05adbde5d3e1e0be4999438ce05c917f4941de7bf347fddd6c0be08f75b183)(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/effect': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/fetch': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
       '@orval/hono': 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(typescript@6.0.3)(zod@4.6.7)
