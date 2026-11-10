@@ -2604,33 +2604,51 @@ describe("the paged resources' lists", () => {
 
 describe("the id of a resource whose id has a format", () => {
   const IDS = {
-    users: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "user", "a user"],
-    sessions: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "session", "a session"],
-    release: ["rel_01M6KPFXAE68N6G2X1HN5XD29R", "release", "a release"],
+    users: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a user"],
+    sessions: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a session"],
+    release: ["rel_01M6KPFXAE68N6G2X1HN5XD29R", "a release"],
   } as const;
   const TOPICS = Object.keys(IDS) as Array<keyof typeof IDS>;
+
+  /**
+   * The positional a resource's verbs take for its id.
+   *
+   * @param topic - The resource the positional belongs to.
+   * @returns The positional as the resource declares it.
+   */
+  function positional(topic: keyof typeof IDS) {
+    const arg = idArg(RESOURCES[topic]).id;
+    if (arg === undefined) {
+      throw new Error(`${topic} declares no id positional`);
+    }
+    return arg;
+  }
 
   it.each(TOPICS)("takes a %s id, trimmed", async (topic) => {
     const [id] = IDS[topic];
 
-    await expect(parseArg(idArg(RESOURCES[topic]).id!, ` ${id}\n`, "id")).resolves.toBe(id);
+    await expect(parseArg(positional(topic), ` ${id}\n`, "id")).resolves.toBe(id);
   });
 
   it.each(
     TOPICS.flatMap((topic) => {
-      const other = TOPICS.find((candidate) => candidate !== topic) as keyof typeof IDS;
       const prefix = IDS[topic][0].split("_")[0];
+      const others = TOPICS.filter((other) => {
+        return other !== topic;
+      }).map((other) => {
+        return [topic, `a ${other} id`, IDS[other][0]] as const;
+      });
       return [
-        [topic, "another resource's id", IDS[other][0]],
-        [topic, "a blank", "   "],
-        [topic, "a prefix alone", `${prefix}_`],
-        [topic, "a space inside", `${prefix}_has space`],
-      ] as const;
+        ...others,
+        [topic, "a blank", "   "] as const,
+        [topic, "a prefix alone", `${prefix}_`] as const,
+        [topic, "a space inside", `${prefix}_has space`] as const,
+      ];
     }),
   )("%s refuses %s, saying what its id is", async (topic, _, value) => {
-    await expect(parseArg(idArg(RESOURCES[topic]).id!, value, "id")).rejects.toMatchObject({
+    await expect(parseArg(positional(topic), value, "id")).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining(`must be ${IDS[topic][2]} ID`),
+      message: expect.stringContaining(`must be ${IDS[topic][1]} ID`),
     });
   });
 });
