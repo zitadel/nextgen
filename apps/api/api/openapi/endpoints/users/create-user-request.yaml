@@ -30,7 +30,8 @@ properties:
     propertyNames:
       # No "." and at least one character.
       pattern: '^[^.]+$'
-    # Said once more for the objects nested in the values, at every depth. It sits
+    # Said once more for the objects nested in the values, down to five levels (a schema that refers to itself loops the
+    # test tool and the docs sampler; the server applies the rule at every depth). It sits
     # in an always-true `if` because a `$ref` here would turn the generated
     # clients' attribute map into a named type; the generator ignores `if`.
     if:

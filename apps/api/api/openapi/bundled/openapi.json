@@ -11177,9 +11177,21 @@
         "pattern": "^[a-zA-Z0-9_-]+$",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
-      "attribute-value": {
+      "attribute-value-depth-5": {
         "title": "AttributeValue",
-        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself, at every depth: its\nproperty names are not empty and hold no `.`, because the server stores an\nattribute under its dot-joined path and `{\"a.b\": 1}` would be the same\nattribute as `{\"a\": {\"b\": 1}}`.\n",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          }
+        }
+      },
+      "attribute-value-depth-4": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
         "if": {
           "type": "object"
         },
@@ -11188,7 +11200,52 @@
             "pattern": "^[^.]+$"
           },
           "additionalProperties": {
-            "$ref": "#/components/schemas/attribute-value"
+            "$ref": "#/components/schemas/attribute-value-depth-5"
+          }
+        }
+      },
+      "attribute-value-depth-3": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-4"
+          }
+        }
+      },
+      "attribute-value-depth-2": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-3"
+          }
+        }
+      },
+      "attribute-value": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-2"
           }
         }
       },
