@@ -2,7 +2,7 @@ module github.com/zitadel/nextgen/tools/oidc-mock
 
 go 1.26.0
 
-require github.com/zitadel/oidc/v3 v3.51.18-0.20261109065440-6da543097051
+require github.com/zitadel/oidc/v3 v3.51.18-0.20261110040704-a1cb9f34c7b9
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.4 // indirect

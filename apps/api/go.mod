@@ -34,7 +34,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.43.0
 	github.com/veqryn/slog-context v0.9.0
 	github.com/veqryn/slog-context/otel v0.9.0
-	github.com/zitadel/oidc/v3 v3.51.18-0.20261109065440-6da543097051
+	github.com/zitadel/oidc/v3 v3.51.18-0.20261110040704-a1cb9f34c7b9
 	github.com/zitadel/passwap v0.12.1
 	github.com/zitadel/sloggcp v0.6.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.0
