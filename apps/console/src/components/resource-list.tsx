@@ -309,20 +309,34 @@ export function RowMenu({
  * `Load more` under a cursor-paginated list (decisions log D5: a button, not
  * pagination controls). Its presence means there is more; its absence means the
  * list is complete.
+ *
+ * A list whose server may stop reading before a page is full names the button
+ * for that (`label`) and says so in a line above it (`note`).
  */
-export function LoadMore({ paging }: { paging: LoadMoreState }) {
+export function LoadMore({
+  paging,
+  label = "Load more",
+  note,
+}: {
+  paging: LoadMoreState;
+  label?: string;
+  note?: ReactNode;
+}) {
   return (
     <>
       <FormError message={paging.error} className="mt-3" />
       {paging.hasMore && (
-        <Button
-          variant="secondary"
-          className="mt-6 h-9 w-full gap-1.5 px-2.5"
-          onClick={() => void paging.loadMore()}
-          loading={paging.loading}
-        >
-          Load more
-        </Button>
+        <>
+          {note && <p className="text-muted-foreground mt-6 text-center text-sm">{note}</p>}
+          <Button
+            variant="secondary"
+            className={cn("h-9 w-full gap-1.5 px-2.5", note ? "mt-3" : "mt-6")}
+            onClick={() => void paging.loadMore()}
+            loading={paging.loading}
+          >
+            {label}
+          </Button>
+        </>
       )}
     </>
   );
