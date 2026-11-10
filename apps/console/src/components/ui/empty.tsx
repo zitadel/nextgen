@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils";
  * Ours differs from the registry's in three places: corners are `rounded-md`
  * (D18), the title is the display face, and `EmptyTitle` takes `asChild` so a
  * screen whose only heading it is can make it the `h1`.
+ *
+ * It draws no outline, as in the registry: `border-dashed` only sets the style
+ * for a caller that adds `border`.
  */
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
   return (
