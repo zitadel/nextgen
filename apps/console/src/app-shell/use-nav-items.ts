@@ -14,7 +14,7 @@ export interface NavItem {
  * Builds one sidebar's list from `staticData.nav` on the route tree (Console
  * ADR 0001).
  *
- * `view` selects which sidebar. The shell renders two from one route tree, so
+ * `view` selects which list. The shell renders three from one route tree, so
  * an entry belongs to exactly one of them. The list is one level, sorted by
  * `nav.order` so the sidebar matches the design regardless of route
  * registration order.

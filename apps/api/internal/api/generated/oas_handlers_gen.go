@@ -13332,7 +13332,8 @@ func (s *Server) handleListMyPasskeysRequest(args [0]string, argsEscaped bool, w
 // Lists the projects the signed-in user can act on: those they hold an active
 // grant on, either directly or through a team they are a member of. For a
 // platform operator, someone who runs the deployment, that is every project of
-// the deployment. Ordered by project ID and paged with an opaque cursor.
+// the deployment. Ordered by project ID unless `order` asks for creation
+// time, and paged with an opaque cursor.
 // This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
 // one
 // project the calling credential is bound to. Here the session is the caller
@@ -13496,6 +13497,10 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 					Name: "name_contains",
 					In:   "query",
 				}: params.NameContains,
+				{
+					Name: "order",
+					In:   "query",
+				}: params.Order,
 				{
 					Name: "project_id",
 					In:   "query",

@@ -20,6 +20,9 @@ import {
   POLICY_TEST_SUFFIX,
 } from "@/lib/zitadel/resources/policies/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
+
+export type { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
 
 /**
  * A JSON value, read-only all the way down: what a configuration file parses
@@ -105,26 +108,6 @@ export type ConfigFile = {
    * The file's parsed body.
    */
   readonly body: JsonObject;
-};
-
-/**
- * A configuration file a store found but could not take as a JSON object.
- *
- * @remarks
- * It has no body, so nothing can mistake it for an empty one. A store hands it
- * on instead of refusing the read, so the one file is reported as a broken
- * file and the rest of the configuration still loads.
- */
-export type UnparsedFile = {
-  /**
-   * The file's project-relative path.
-   */
-  readonly path: string;
-  /**
-   * Why the file could not be taken as a JSON object, such as
-   * `invalid JSON at position 3` or `not a JSON object`.
-   */
-  readonly unparsed: string;
 };
 
 /**

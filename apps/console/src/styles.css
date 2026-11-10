@@ -69,6 +69,12 @@ html[data-theme="light"] {
   color-scheme: light;
 }
 
+/* The root as well as <body>: a browser that colours what it draws around the
+   page from the root element finds the theme's background there. */
+html {
+  background: var(--zl-background);
+}
+
 body {
   margin: 0;
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
