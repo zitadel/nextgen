@@ -1,4 +1,4 @@
 /**
- * Where the configuration is kept: a project's files, or whatever a test gives a {@link Store}.
+ * Where the configuration is kept: a project's files.
  */
-export { DiskStore, Store } from "@/lib/zitadel/storage/backend";
+export { DiskStore } from "@/lib/zitadel/storage/backend";

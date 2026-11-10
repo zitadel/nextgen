@@ -1,12 +1,7 @@
 import { describe, expect } from "vitest";
 
-import {
-  CONFIG_DIRECTORIES,
-  ConfigError,
-  FileExistsError,
-  type JsonObject,
-  type Store,
-} from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, ConfigError, FileExistsError, type JsonObject } from "@/lib/zitadel";
+import type { Store } from "@/lib/zitadel/storage/backend/store";
 import { BACKENDS } from "@tests/helpers/storage/backend/backends";
 import { it } from "@tests/helpers/fixtures";
 import { aBrandingReferencing } from "@tests/helpers/stores";
@@ -384,6 +379,18 @@ describe("Store.remove", () => {
       });
 
       expect(error).toBeUndefined();
+    });
+
+    it("refuses a directory where the file should be", async ({ dir, other }) => {
+      const { store, project } = open(dir, other);
+      await project.directory(IDP_A);
+
+      const error = await rejectionOf(() => {
+        return store.remove(IDP_A);
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({ details: { file: IDP_A, code: "EISDIR" } });
     });
 
     it("refuses a path outside .zitadel/", async ({ dir, other }) => {

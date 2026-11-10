@@ -190,16 +190,27 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   *   a directory.
    */
   async remove(path: string): Promise<void> {
     await this.fs.promises
       .rm(this.place(path).toString(), { force: true })
       .catch((error: unknown) => {
+        const code = Store.errnoOf(error);
         // A directory on the way is a file, so there is nothing to remove.
-        if (Store.errnoOf(error) !== "ENOTDIR") {
-          throw error;
+        if (code === "ENOTDIR") {
+          return;
         }
+        // A directory where the file should be is not a file to delete, and
+        // `rm` without `recursive` will not take it.
+        if (code === "EISDIR" || code === "ERR_FS_EISDIR") {
+          throw new ConfigError(`${path} cannot be removed (EISDIR)`, {
+            hint: `Remove ${path}, which is a directory where a file is expected, then run the command again.`,
+            details: { file: path, code: "EISDIR" },
+          });
+        }
+        throw error;
       });
   }
 
