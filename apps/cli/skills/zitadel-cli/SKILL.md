@@ -712,6 +712,14 @@ them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 `auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
 provider or an older CLI version does not work.
 
+In a terminal, `setup --sso custom` asks for the name the sign-in button shows
+first, then offers a connection name made from it (`Zitadel Cloud` offers
+`zitadel-cloud`) for the user to accept or edit; a name that would be a built-in
+provider's (`google`, `custom`) is offered empty. A scripted, `--json` or
+`--non-interactive` run asks nothing and still needs `--sso-slug`,
+`--sso-display-name` and `--sso-issuer`. `auth-method sso enable` keeps asking for
+the connection name first.
+
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user at `/register`,
 logging out, logging back in at `/login` with the same email/password, and ending

@@ -22,6 +22,7 @@ import {
   type ProviderSelection,
   providerOf,
   selectionName,
+  slugFromDisplayName,
   validated,
 } from "@zitadel/config/idp";
 
@@ -51,6 +52,15 @@ export async function askCustomSettings(
   given: CustomFlagValues,
   ask: Asker,
 ): Promise<Required<CustomFlagValues>> {
+  // The display name comes first so the slug can be suggested from it: "Acme
+  // SSO" offers "acme-sso", which the developer accepts or edits.
+  const displayName = await ask({
+    kind: "text",
+    name: "display name",
+    message: "What name should the sign-in button show? For example Acme SSO.",
+    parse: parseDisplayName,
+    given: given.displayName,
+  });
   const slug = await ask({
     kind: "text",
     name: "connection name",
@@ -58,13 +68,7 @@ export async function askCustomSettings(
       "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
     parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
     given: given.slug,
-  });
-  const displayName = await ask({
-    kind: "text",
-    name: "display name",
-    message: "What name should the sign-in button show? For example Acme SSO.",
-    parse: parseDisplayName,
-    given: given.displayName,
+    initialValue: slugFromDisplayName(displayName, RESERVED_SLUGS),
   });
   const issuer = await ask({
     kind: "text",
