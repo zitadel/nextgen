@@ -1118,6 +1118,37 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
+	// ListProjectMembers implements listProjectMembers operation.
+	//
+	// Lists the people who have a role on a project, with each person's strongest
+	// role and how they hold it.
+	// A person appears once, with their strongest `relation` (`viewer`, `editor`
+	// or `admin`; a stronger role includes the weaker ones) and one entry in
+	// `sources` per way they hold that role:
+	// - `owning_team`: an active member of the team that owns the project, the
+	// team a claim attaches the project to. It holds `admin`. Removing a grant
+	// does not remove this access. It ends only when the person leaves the
+	// team or the project changes owner.
+	// - `grant`: an unexpired grant on the project, which is a role given to the
+	// person (`grant_id` only) or to a team they are an active member of
+	// (`grant_id` and `team`). Revoking that grant removes this source.
+	// Grants of a weaker role than the person's strongest are not in `sources`;
+	// they still show in the project's grants (`queryGrants`,
+	// `POST /grants/query`).
+	// Pass `relation` to list only the people whose strongest role is at least
+	// that strong: `relation=admin` lists the people who can administer the
+	// project.
+	// The list follows the authorization check. A person who left a team, or
+	// whose team or user was deactivated, is not listed through it. Expired
+	// grants are left out. Like the check, the list does not look at a person's
+	// user status beyond that, so a direct grant to a suspended person is
+	// listed.
+	// The list is ordered by `user_id` and paginated with `page_token`.
+	// Authenticate with a project secret (`oauth2`), or with the session cookie
+	// (`sessionCookie`) of a signed-in person who can read the project.
+	//
+	// GET /projects/{project_id}/members
+	ListProjectMembers(ctx context.Context, params ListProjectMembersParams) (ListProjectMembersRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first. A release is a snapshot of the

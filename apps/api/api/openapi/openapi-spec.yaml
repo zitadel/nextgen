@@ -205,6 +205,8 @@ paths:
     $ref: endpoints/projects/by_id/methods.yaml
   /projects/{project_id}/admins:
     $ref: endpoints/projects/by_id/admins/methods.yaml
+  /projects/{project_id}/members:
+    $ref: endpoints/projects/by_id/members/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
