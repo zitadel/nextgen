@@ -62,9 +62,8 @@ export function cliSample(
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
   if (topic === "variable") {
-    return (
-      variableCommand(verb, positionals, request) ?? apiSample(operation, path, request, "input")
-    );
+    const exact = variableCommand(verb, positionals, request);
+    return exact ?? apiSample(operation, path, request, "input");
   }
 
   const flags: string[] = [];
