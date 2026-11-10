@@ -654,8 +654,10 @@ first iteration. Schema claims wait as well (#2803).
     ask for `prompt=login` (D5). #1425 still asks for sign-out.
 15. **Audit, limits and keys.** #1283 asks for attributable token-issuance
     and authorization events; #2451 reuses `auth.token.issued` and
-    `auth.token.revoked`, and consent, denial and replay have no event of
-    their own. Nothing limits guessing a client secret at the token endpoint
+    `auth.token.revoked`, and emits `consent.given` and `consent.revoked`
+    from its consent service, but a denial, a replayed code or refresh
+    token, and a refused authorization request have no event of their own.
+    Nothing limits guessing a client secret at the token endpoint
     or flooding authorize (ADR 078). Signing keys are minted when first
     needed, with no rotation that publishes the next key before it signs
     (ADR 039), while both the server and the SDK cache a JWKS for five
@@ -674,7 +676,8 @@ version bump and never a re-scaffold.
 | `@zitadel/components` | MIT | The authorization request's handle in `<zitadel-login>`; later, consent (with fields if open question 12 says so), account choice and a connected-apps element |
 | `@zitadel/config` | MIT | Schemas and presets for applications, with their `apis` entries (ADR 082 §5: no files or commands of their own), and the OAuth settings |
 | `@zitadel/cli` | MIT | The commands that write those files, `doctor` checks, and the skill an agent reads |
-| `@zitadel/testing`, the API mock | MIT | An authorization server to test against without a running Zitadel |
+| `@zitadel/testing` | MIT | The published test kit; an authorization server to test against without a running Zitadel would be added here |
+| `packages/api-mock` | AGPL, private | The mock the demos and e2e lanes run on; it would learn the authorization server for them. It is not published, and shipping it to customers would be a proposal of its own ([LICENSING.md](../../../LICENSING.md)) |
 
 The names below are the epic's where it has one, and ADR 082 §12's working
 names otherwise.
@@ -693,8 +696,10 @@ OpenID Connect comes later. This is the epic's first scope:
    `zitadel variable set <NAME> --secret`, puts the same value in the
    backend, and runs `zitadel deploy`. The CLI neither generates nor prints
    a secret for a declared application.
-4. The login app answers the request. Which login ships first is open
-   ([#2784](https://github.com/zitadel/nextgen/issues/2784)).
+4. The login app answers the request: the generated login app, with the
+   starter app serving as the login at first, as agreed on
+   [#2784](https://github.com/zitadel/nextgen/issues/2784). A login-only
+   mode waits for open registration (ADR 082 §9).
 5. The backend takes the issuer, the client id and the secret into an
    OAuth library, verifies the access token against the JWKS, checks `aud`
    against its own client id, and reads the user from `sub`. Its sign-out
@@ -772,8 +777,11 @@ to 7 are this note's proposal for what follows.
    issuer derived under D1's guards, authorize with `prompt=login`, the
    token endpoint with client authentication, and the JWKS (#2793, #2794,
    #2796, #2797), with the customer-hosted login (#2795) and the cloud's
-   routing rules. Each issue's acceptance criteria name its audit event and
-   its limits. The SDK's reservation release inside #2795 depends on
+   routing rules. Part of this step is adding to each issue's acceptance
+   criteria the audit event and the limits it needs, which none of them
+   names today: #2796 has no event and no limit on secret guessing, and
+   #2794 none on flooding authorize (challenge 15). The SDK's reservation
+   release inside #2795 depends on
    nothing else and has the longest lead time, so it can ship ahead. It
    covers the server frameworks; SPAs stay embedded logins
    ([Scope](#scope-which-apps-become-the-issuer)).
