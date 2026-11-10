@@ -178,8 +178,33 @@ describe("NextPatcher.plan", () => {
       const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
       const profile = writeContents(plan, "app/profile/page.tsx");
       expect(profile).toContain("if (!response.ok)");
-      expect(profile).toContain(".catch(() => setFailed(true))");
+      expect(profile).toContain("setFailed(true)");
       expect(profile).toContain("Could not load your details.");
+    }
+  });
+
+  it("shows no error on the profile page to a visitor who is not signed in", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("if (response.status === 401)");
+    }
+  });
+
+  it("stops the attributes request when the profile page unmounts", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("return () => controller.abort();");
+      expect(profile).toContain('error.name !== "AbortError"');
+    }
+  });
+
+  it("leaves attributes without a value off the profile page", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("value !== null && value !== undefined");
     }
   });
 

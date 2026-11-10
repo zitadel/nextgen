@@ -38,6 +38,9 @@ import type { RendererSpec } from "@/lib/orca/patchers/rule/next/renderers/types
  */
 export const PAGE_SURFACE_BACKGROUND = "#050505";
 
+/** The text colour that reads on {@link PAGE_SURFACE_BACKGROUND}. */
+const PAGE_FOREGROUND = "#fafafa";
+
 const PAGE_WRAPPER_OPEN = `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark" }}>`;
 
 const PAGE_WRAPPER_COMMENT = `  // The wrapper paints the widget's dark page surface before the client-only
@@ -166,7 +169,7 @@ ${PAGE_WRAPPER_COMMENT}`;
       const wrapperClose = widget ? `</div>` : `</main>`;
       // The page posture paints its own dark surface, so its list needs a light
       // foreground; the widget posture inherits the host app's styling.
-      const listStyle = widget ? "" : ` style={{ color: "#fafafa" }}`;
+      const listStyle = widget ? "" : ` style={{ color: "${PAGE_FOREGROUND}" }}`;
       return {
         contents: `${MANAGED_MARKER}
 "use client";
@@ -176,34 +179,49 @@ import { useEffect, useState } from "react";
 
 // Lists the attributes captured at sign-in (email, name and any other field
 // of your user schema) from "/__nextgen/api/v1/users/me", which the session
-// cookie authenticates. A request that fails shows an error, so it is not read
-// as a user with no attributes.
+// cookie authenticates. A visitor who is not signed in gets a 401 and sees no
+// list; any other failed request shows an error, so it is not read as a user
+// with no attributes.
 function Attributes() {
   const [attributes, setAttributes] = useState<Record<string, unknown>>({});
   const [failed, setFailed] = useState(false);
   useEffect(() => {
+    const controller = new AbortController();
     const projectId = encodeURIComponent(process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "");
-    fetch(\`/__nextgen/api/v1/users/me?project_id=\${projectId}\`, { credentials: "include" })
+    fetch(\`/__nextgen/api/v1/users/me?project_id=\${projectId}\`, {
+      credentials: "include",
+      signal: controller.signal,
+    })
       .then((response) => {
+        if (response.status === 401) {
+          return null;
+        }
         if (!response.ok) {
           throw new Error(\`HTTP \${response.status}\`);
         }
         return response.json();
       })
       .then((user) => setAttributes(user?.attributes ?? {}))
-      .catch(() => setFailed(true));
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setFailed(true);
+        }
+      });
+    return () => controller.abort();
   }, []);
   if (failed) {
     return <p role="alert"${listStyle}>Could not load your details. Try signing in again.</p>;
   }
   return (
     <dl${listStyle}>
-      {Object.entries(attributes).map(([name, value]) => (
-        <div key={name}>
-          <dt>{name}</dt>
-          <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
-        </div>
-      ))}
+      {Object.entries(attributes)
+        .filter(([, value]) => value !== null && value !== undefined)
+        .map(([name, value]) => (
+          <div key={name}>
+            <dt>{name}</dt>
+            <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
+          </div>
+        ))}
     </dl>
   );
 }
