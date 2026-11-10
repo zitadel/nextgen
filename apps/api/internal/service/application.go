@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 
@@ -73,20 +72,8 @@ func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *
 // validate checks document against the application.json schema, then against
 // the rules of the authorization server the schema cannot express.
 func (s *applicationService) validate(document []byte) (domain.ApplicationDocument, error) {
-	uri, err := s.schemas.LatestSchemaURI(domain.SchemaKindApplication)
-	if err != nil {
-		return domain.ApplicationDocument{}, domain.ErrInternal(err).WithMessage("application schema not registered")
-	}
-	schema, err := s.schemas.GetBuiltinSchema(uri)
-	if err != nil {
-		return domain.ApplicationDocument{}, domain.ErrInternal(err).WithMessage("application schema not compiled")
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(document, &raw); err != nil {
-		return domain.ApplicationDocument{}, domain.ErrRequestInvalid().WithParent(err)
-	}
-	if err := schema.Validate(raw); err != nil {
-		return domain.ApplicationDocument{}, domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(domain.SchemaValidationCause(err))
+	if _, err := validateBuiltinSchema(s.schemas, domain.SchemaKindApplication, document); err != nil {
+		return domain.ApplicationDocument{}, err
 	}
 	doc, err := domain.ParseApplicationDocument(document)
 	if err != nil {
