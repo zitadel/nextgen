@@ -40,8 +40,10 @@ const NAV_ORDER = [
   "Authentication",
   "Settings",
 ];
-// What sits above every project: the home, then the person's own settings.
+// What sits above every project: the home, then Settings, a list of its own.
 const ACCOUNT_ORDER = ["Projects", "Settings"];
+// Settings' list: the heading that leads back, then the person's profile.
+const SETTINGS_ORDER = ["Settings", "Profile"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -121,6 +123,8 @@ describe("app shell navigation", () => {
     const nav = within(screen.getByRole("navigation", { name: "Account" }));
     expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(ACCOUNT_ORDER);
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
+    // One row for Settings: its pages are its own list's, not repeated here.
+    expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
       "All projects",
@@ -212,12 +216,13 @@ describe("app shell navigation", () => {
 });
 
 /**
- * The sidebar has two lists and the route picks between them, so a settings URL
- * restores the account's list rather than dropping the operator back into the
- * project's. The account dropdown is the way in; the project pill is the way
- * back into a project.
+ * The sidebar has three lists and the route picks between them, so a settings
+ * URL restores Settings' list rather than dropping the operator back into the
+ * project's. The account list's Settings row and the account dropdown are the
+ * ways in; the list's heading leads back up, and the project pill back into a
+ * project (D29).
  */
-describe("account view", () => {
+describe("settings view", () => {
   it("shows the project's list and the account dropdown's entry point by default", async () => {
     renderShell();
     await screen.findByRole("link", { name: /^Users/ });
@@ -236,29 +241,44 @@ describe("account view", () => {
     expect(screen.queryByRole("menuitem", { name: "Test account" })).not.toBeInTheDocument();
   });
 
-  it("swaps the project's list for the account's on a settings URL", async () => {
+  it("swaps the project's list for Settings' on a settings URL", async () => {
     renderShell("/settings");
-    const nav = within(await screen.findByRole("navigation", { name: "Account" }));
-    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(ACCOUNT_ORDER);
-    // One project, so it is selected here too, and Projects keeps it.
-    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute(
-      "href",
-      scopedPath("/projects", "proj_1"),
+    const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(
+      SETTINGS_ORDER,
     );
-    // The project's list is gone rather than sitting underneath it.
+    expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("data-active", "true");
+    // The project's list and the account's are gone rather than sitting
+    // underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Account" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
+  });
+
+  it("goes back up to the account's list from the Settings heading", async () => {
+    const router = renderShell("/settings");
+    const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
+    // A row of the left nav (D13), named for where it leads. One project, so
+    // it is selected here too, and Projects keeps it.
+    const heading = nav.getByRole("link", { name: "Settings: back to Projects" });
+    expect(heading).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
+
+    await userEvent.click(heading);
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    const account = within(await screen.findByRole("navigation", { name: "Account" }));
+    expect(account.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(
+      ACCOUNT_ORDER,
+    );
   });
 
   it("keeps the bar in Settings, its pill the way back into a project", async () => {
     const router = renderShell("/settings");
-    await screen.findByRole("navigation", { name: "Account" });
+    await screen.findByRole("navigation", { name: "Settings" });
 
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
     expect(document.querySelector('[data-sidebar="trigger"]')).toBeInTheDocument();
-    // No back row (D13): the pill names no project up here, and its list
-    // opens on the one that was selected.
-    expect(screen.queryByRole("link", { name: "Back to dashboard" })).not.toBeInTheDocument();
+    // The pill names no project up here, and its list opens on the one that
+    // was selected.
     const pill = screen.getByRole("button", { name: "Switch project" });
     expect(pill).toHaveTextContent("All projects");
 
@@ -872,7 +892,7 @@ describe("search", () => {
 
   it("toggles with the keyboard shortcut, in Settings too", async () => {
     renderShell("/settings/profile");
-    await screen.findByRole("navigation", { name: "Account" });
+    await screen.findByRole("navigation", { name: "Settings" });
     await userEvent.keyboard("{Control>}k{/Control}");
     expect(await screen.findByRole("dialog", { name: "Go to" })).toBeInTheDocument();
     await userEvent.keyboard("{Control>}k{/Control}");
@@ -938,16 +958,25 @@ describe("search", () => {
     );
   });
 
-  it("finds your settings by the account sidebar's name for them", async () => {
+  it("finds Settings' pages by their own name and by the list's", async () => {
     const router = renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const field = dialog.getByPlaceholderText("Go to a page, project or team");
+
+    // The Settings row is a list, not a page, so its pages stand in for it,
+    // each marked with the list's name.
+    await userEvent.type(field, "prof");
+    const byName = within(await dialog.findByRole("group", { name: "Account" }));
+    expect(byName.getByRole("option", { name: /^Profile/ })).toHaveTextContent("Settings");
 
     // The project's own page is called Settings too, under the project's
     // pages; the group heading is what tells them apart.
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "sett");
+    await userEvent.clear(field);
+    await userEvent.type(field, "sett");
     const account = within(await dialog.findByRole("group", { name: "Account" }));
-    await userEvent.click(account.getByRole("option", { name: "Settings" }));
+    expect(account.getAllByRole("option")).toHaveLength(1);
+    await userEvent.click(account.getByRole("option", { name: /^Profile/ }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
   });
