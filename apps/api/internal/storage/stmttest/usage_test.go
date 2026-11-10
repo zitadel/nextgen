@@ -279,11 +279,3 @@ func TestUsageStatements_DeleteCountedEventsOlderThan(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a project with no cursor purges by age")
 	})
 }
-
-func eventIDs(events []*domain.Event) []string {
-	ids := make([]string, 0, len(events))
-	for _, ev := range events {
-		ids = append(ids, ev.ID)
-	}
-	return ids
-}
