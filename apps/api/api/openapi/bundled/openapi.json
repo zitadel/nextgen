@@ -11083,13 +11083,13 @@
       "project-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "may only contain letters, digits, _ and -",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
       "team-id": {
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "may only contain letters, digits, _ and -",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
       "create-user-request": {
@@ -11297,7 +11297,7 @@
       "user-id": {
         "type": "string",
         "pattern": "^user_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a user ID, which starts with user_",
+        "x-zitadel-pattern-message": "must be a user ID: user_ followed by letters, digits, _ or -",
         "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
       },
       "user-attributes": {
@@ -12632,7 +12632,7 @@
         "x-meta-schema": true,
         "type": "string",
         "pattern": "^[^.]+$",
-        "x-zitadel-pattern-message": "must not contain a .",
+        "x-zitadel-pattern-message": "must not be empty or contain a .",
         "description": "The name of a single user attribute."
       },
       "user-property": {
@@ -14174,7 +14174,7 @@
       "session-id": {
         "type": "string",
         "pattern": "^sess_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a session ID, which starts with sess_",
+        "x-zitadel-pattern-message": "must be a session ID: sess_ followed by letters, digits, _ or -",
         "example": "sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this session, an opaque string with a `sess_` prefix."
       },
@@ -14230,7 +14230,7 @@
       "attempt-id": {
         "type": "string",
         "pattern": "^att_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be an attempt ID, which starts with att_",
+        "x-zitadel-pattern-message": "must be an attempt ID: att_ followed by letters, digits, _ or -",
         "example": "att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this authentication attempt, an opaque string with an `att_` prefix."
       },
@@ -14374,7 +14374,7 @@
       "challenge-id": {
         "type": "string",
         "pattern": "^ch_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a challenge ID, which starts with ch_",
+        "x-zitadel-pattern-message": "must be a challenge ID: ch_ followed by letters, digits, _ or -",
         "example": "ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
         "description": "The unique identifier of this challenge, an opaque string with a `ch_` prefix."
       },
@@ -17709,7 +17709,7 @@
             "additionalProperties": {
               "type": "string",
               "pattern": "^[^$]",
-              "x-zitadel-pattern-message": "must not start with $"
+              "x-zitadel-pattern-message": "must not be empty or start with $"
             },
             "description": "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
           },
@@ -18162,14 +18162,14 @@
         "type": "string",
         "description": "The identifier of a policy, shared by all of its revisions.",
         "pattern": "^pol_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a policy ID, which starts with pol_",
+        "x-zitadel-pattern-message": "must be a policy ID: pol_ followed by letters, digits, _ or -",
         "example": "pol_01KXA4F3Q8R7F0N9WD3P2E4YM5"
       },
       "policy-revision-id": {
         "type": "string",
         "description": "The identifier of one immutable revision of a policy.",
         "pattern": "^polrev_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a policy revision ID, which starts with polrev_",
+        "x-zitadel-pattern-message": "must be a policy revision ID: polrev_ followed by letters, digits, _ or -",
         "example": "polrev_01KXA4F3Q8R7F0N9WD3P2E4YM6"
       },
       "password-set-config": {
@@ -18534,7 +18534,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a release.",
         "pattern": "^rel_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a release ID, which starts with rel_",
+        "x-zitadel-pattern-message": "must be a release ID: rel_ followed by letters, digits, _ or -",
         "example": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
       },
       "release-metadata": {
@@ -19111,7 +19111,7 @@
         "type": "string",
         "description": "The opaque, immutable identifier of a deployment.",
         "pattern": "^dep_[a-zA-Z0-9_-]+$",
-        "x-zitadel-pattern-message": "must be a deployment ID, which starts with dep_",
+        "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
       "revoke-release-conflict": {
@@ -21697,7 +21697,7 @@
         "minLength": 1,
         "maxLength": 255,
         "pattern": "^\\w+$",
-        "x-zitadel-pattern-message": "may only contain letters, digits and _",
+        "x-zitadel-pattern-message": "must be one or more letters, digits or _",
         "example": "GITHUB_CLIENT_ID",
         "description": "A variable's name, unique per project and kind.\n\nWord characters only, which is exactly what the `${{ NAME }}` reference\nsyntax can address: a name outside that grammar could be stored\nbut never referenced from a configuration document.\n"
       },

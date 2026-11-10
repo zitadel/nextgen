@@ -115,7 +115,12 @@ describe("brandingConfigSchema", () => {
       "must be an absolute https URL with no credentials (http is allowed for canonical loopback development hosts only)";
     const STYLESHEET_URL = "must be an absolute https URL with no credentials";
     const NEEDS_FAMILY =
-      "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.";
+      "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in";
+    const CONTROL = "must not contain a control character, such as a tab or a newline";
+    const PERCENT = "must not contain a % that is not followed by two hexadecimal digits";
+    const PERCENT_HOST = "must not contain a percent-escape in its host";
+    const FONT_STACK_NO_COMMA =
+      'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural") with no comma inside the quotes';
     const INTER = "Inter";
 
     it.each([
@@ -210,9 +215,89 @@ describe("brandingConfigSchema", () => {
         ["typography.font_url Too big: expected string to have <=2048 characters"],
       ],
       [
+        "a logo with a tab in its path, which the server's URL parser refuses",
+        { logo_url: "https://cdn.example.com/a\tb.png" },
+        [`logo_url ${CONTROL}`],
+      ],
+      [
+        "a hero with a newline in its path",
+        { hero_url: "https://cdn.example.com/a\nb.png" },
+        [`hero_url ${CONTROL}`],
+      ],
+      [
+        "a theme logo with a control character in its query",
+        { theme: { dark: { logo_url: "https://cdn.example.com/a?x=\u0001" } } },
+        [`theme.dark.logo_url ${CONTROL}`],
+      ],
+      [
+        "a font_url with a control character in its path",
+        { typography: { font_family: INTER, font_url: "https://f.example/a\tb.css" } },
+        [`typography.font_url ${CONTROL}`],
+      ],
+      [
+        "a logo with a malformed escape in its host, which the server's URL parser refuses",
+        { logo_url: "https://%zz/logo.svg" },
+        [`logo_url ${PERCENT}`],
+      ],
+      [
+        "a logo with a malformed escape in its path",
+        { logo_url: "https://cdn.example.com/%zz" },
+        [`logo_url ${PERCENT}`],
+      ],
+      [
+        "a theme logo with a well-formed escape that spells a letter in its host",
+        { theme: { light: { logo_url: "https://%41.example.com/logo.svg" } } },
+        [`theme.light.logo_url ${PERCENT_HOST}`],
+      ],
+      [
+        "a font_url with a malformed escape in its host",
+        { typography: { font_family: INTER, font_url: "https://%zz/c.css" } },
+        [`typography.font_url ${PERCENT}`],
+      ],
+      [
+        "a logo with a well-formed escape in its path",
+        { logo_url: "https://cdn.example.com/a%20b.png" },
+        [],
+      ],
+      [
+        "a font stack with a comma inside a quoted name, which the server splits on",
+        { typography: { font_family: '"Acme, Inc", sans-serif' } },
+        [`typography.font_family ${FONT_STACK_NO_COMMA}`],
+      ],
+      [
+        "a font stack with a quoted name and no comma inside it",
+        { typography: { font_family: '"Acme Inc", sans-serif' } },
+        [],
+      ],
+      [
+        "a logo with a space in its host",
+        { logo_url: "https://cdn example.com/logo.png" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a logo with a backslash in its host",
+        { logo_url: "https://cdn\\example.com/logo.png" },
+        [`logo_url ${IMAGE_URL}`],
+      ],
+      [
+        "a font_url with a space in its host",
+        { typography: { font_family: INTER, font_url: "https://f example.com/c.css" } },
+        [`typography.font_url ${STYLESHEET_URL}`],
+      ],
+      [
+        "a colour function that is long as well as not allowed, said once",
+        { theme: { light: { palette: { primary: `var(${"a".repeat(130)})` } } } },
+        ["theme.light.palette.primary Too big: expected string to have <=128 characters"],
+      ],
+      [
         "a font_url without a font family",
         { typography: { font_url: "https://fonts.example.com/css2" } },
         [NEEDS_FAMILY],
+      ],
+      [
+        "a font_url without a font family beside a mistake of type in another typography field",
+        { typography: { scale: "big", font_url: "https://fonts.example.com/css2" } },
+        ["typography.scale Invalid input: expected number, received string", NEEDS_FAMILY],
       ],
       [
         "a font_url that is refused and has no font family",

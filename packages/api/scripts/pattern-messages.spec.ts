@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { collectPatternMessages, withPatternMessages } from "./pattern-messages";
+import {
+  assertEveryPatternHasOneMessage,
+  collectPatternMessages,
+  withPatternMessages,
+} from "./pattern-messages";
+import { loadSpec } from "./spec";
 
 const KEY = "x-zitadel-pattern-message";
 
@@ -124,9 +129,39 @@ describe("withPatternMessages", () => {
     expect(() => withPatternMessages(source, new Map())).toThrow(/\^user_\[a-z\]\+\$/);
   });
 
-  it("leaves a regex call it holds no constant for as it is", () => {
-    expect(withPatternMessages("zod.string().regex(elsewhere)", new Map())).toBe(
-      "zod.string().regex(elsewhere)",
+  it("refuses a regex call it holds no constant for, which would keep the raw message", () => {
+    expect(() => withPatternMessages("zod.string().regex(elsewhere)", new Map())).toThrow(
+      /\.regex\(elsewhere\)/,
     );
   });
+
+  it("refuses a constant written in a form it does not recognise", () => {
+    const written = ['export const aRegExp = new RegExp("^a$");', "zod.string().regex(aRegExp)"];
+
+    expect(() => withPatternMessages(written.join("\n"), new Map([["^a$", "must be a"]]))).toThrow(
+      /\.regex\(aRegExp\)/,
+    );
+  });
+});
+
+describe("assertEveryPatternHasOneMessage", () => {
+  it("passes a spec whose patterns each have one message", () => {
+    expect(() =>
+      assertEveryPatternHasOneMessage({ messages: new Map(), missing: [], conflicting: [] }),
+    ).not.toThrow();
+  });
+
+  it("names the patterns that have none or two", () => {
+    expect(() =>
+      assertEveryPatternHasOneMessage({
+        messages: new Map(),
+        missing: ["^none$"],
+        conflicting: ["^two$"],
+      }),
+    ).toThrow(/no x-zitadel-pattern-message: \^none\$[\s\S]*different[\s\S]*\^two\$/);
+  });
+
+  it("holds for the pattern of every field in the spec", async () => {
+    assertEveryPatternHasOneMessage(collectPatternMessages(await loadSpec()));
+  }, 60_000);
 });

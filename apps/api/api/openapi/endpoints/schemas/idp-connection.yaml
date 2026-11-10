@@ -47,7 +47,7 @@ properties:
     additionalProperties:
       type: string
       pattern: ^[^$]
-      x-zitadel-pattern-message: "must not start with $"
+      x-zitadel-pattern-message: "must not be empty or start with $"
     description: "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
   verified_claims:
     type: object
@@ -56,7 +56,6 @@ properties:
       - const: true
       - type: string
         pattern: ^[^$]
-        x-zitadel-pattern-message: "must not start with $"
     description: "Maps a verifiable user schema property to its verification source: a claim name (read the claim) or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved for future sources. Distinct from `claim_mapping`, which carries values, not verification state."
     examples:
     - email: email_verified

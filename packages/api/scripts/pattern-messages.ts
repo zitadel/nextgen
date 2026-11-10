@@ -2,11 +2,9 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { bundle, loadConfig } from "@redocly/openapi-core";
+import { loadSpec } from "./spec.ts";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = resolve(packageRoot, "../..");
-const input = resolve(repoRoot, "apps/api/api/openapi/openapi-spec.yaml");
 const endpointsDirectory = resolve(packageRoot, "src/generated/endpoints");
 
 /**
@@ -33,6 +31,12 @@ const REGEXP_CONSTANT = /export const (\w+) = new RegExp\('((?:[^'\\]|\\.)*)'\);
  * before the call, and the constant.
  */
 const REGEX_CHAIN = /(zod\.(?:url|string)\(\))((?:\.(?!regex\()\w+\([^()]*\))*)\.regex\((\w+)\)/g;
+
+/**
+ * A `.regex()` call given a pattern and nothing else, which fails with the
+ * pattern as its message.
+ */
+const BARE_REGEX_CALL = /\.regex\([^,()]*\)/g;
 
 /**
  * What {@link collectPatternMessages} found in a spec.
@@ -141,14 +145,48 @@ export function withPatternMessages(source: string, messages: ReadonlyMap<string
       `A generated pattern has no ${MESSAGE_KEY} in the spec:\n${[...unmessaged].join("\n")}`,
     );
   }
-  return source.replace(REGEX_CHAIN, (chain, _type: string, checks: string, name: string) => {
-    const found = byConstant.get(name);
-    if (found === undefined) {
-      return chain;
-    }
-    const kept = found.acceptsEmpty ? checks : checks.replace(".min(1)", "");
-    return `zod.string()${kept}.regex(${name}, ${JSON.stringify(found.message)})`;
-  });
+  const messaged = source.replace(
+    REGEX_CHAIN,
+    (chain, _type: string, checks: string, name: string) => {
+      const found = byConstant.get(name);
+      if (found === undefined) {
+        return chain;
+      }
+      const kept = found.acceptsEmpty ? checks : checks.replace(".min(1)", "");
+      return `zod.string()${kept}.regex(${name}, ${JSON.stringify(found.message)})`;
+    },
+  );
+  // A pattern written in a form this does not recognise would otherwise keep
+  // its raw message without a word, so every call must have come out with one.
+  const bare = messaged.match(BARE_REGEX_CALL);
+  if (bare !== null) {
+    throw new Error(
+      `A generated .regex() call was left without a message, which orval may now write differently:\n${[...new Set(bare)].join("\n")}`,
+    );
+  }
+  return messaged;
+}
+
+/**
+ * Refuse a spec whose patterns do not each have exactly one message.
+ *
+ * @remarks
+ * A pattern reads the same wherever it is used, so a message belongs to the
+ * pattern's text: two fields that share a regex share its wording, and the
+ * spec fails when they word it differently.
+ *
+ * @param found - What {@link collectPatternMessages} found in the spec.
+ * @throws {@link Error} Naming each pattern that has no message, or two different ones.
+ */
+export function assertEveryPatternHasOneMessage(found: PatternMessages): void {
+  if (found.missing.length === 0 && found.conflicting.length === 0) {
+    return;
+  }
+  const lines = [
+    ...found.missing.map((pattern) => `no ${MESSAGE_KEY}: ${pattern}`),
+    ...found.conflicting.map((pattern) => `different ${MESSAGE_KEY}s on one pattern: ${pattern}`),
+  ];
+  throw new Error(`Every pattern in the spec needs one message:\n${lines.join("\n")}`);
 }
 
 /**
@@ -164,20 +202,16 @@ export function withPatternMessages(source: string, messages: ReadonlyMap<string
  * @throws {@link Error} When a pattern in the spec has no message or two.
  */
 export async function writePatternMessages(): Promise<void> {
-  const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
-  const { bundle: result } = await bundle({ ref: input, config, dereference: true });
-  const { messages, missing, conflicting } = collectPatternMessages(result.parsed);
-  if (missing.length > 0 || conflicting.length > 0) {
-    const lines = [
-      ...missing.map((pattern) => `no ${MESSAGE_KEY}: ${pattern}`),
-      ...conflicting.map((pattern) => `two ${MESSAGE_KEY}s: ${pattern}`),
-    ];
-    throw new Error(`Every pattern in the spec needs one message:\n${lines.join("\n")}`);
-  }
+  const found = collectPatternMessages(await loadSpec());
+  assertEveryPatternHasOneMessage(found);
   for (const entry of await readdir(endpointsDirectory)) {
     if (entry.endsWith(".zod.ts")) {
       const file = resolve(endpointsDirectory, entry);
-      await writeFile(file, withPatternMessages(await readFile(file, "utf8"), messages));
+      const current = await readFile(file, "utf8");
+      const messaged = withPatternMessages(current, found.messages);
+      if (messaged !== current) {
+        await writeFile(file, messaged);
+      }
     }
   }
 }

@@ -2,7 +2,7 @@ type: string
 minLength: 1
 maxLength: 255
 pattern: '^\w+$'
-x-zitadel-pattern-message: "may only contain letters, digits and _"
+x-zitadel-pattern-message: "must be one or more letters, digits or _"
 example: GITHUB_CLIENT_ID
 description: |
   A variable's name, unique per project and kind.
