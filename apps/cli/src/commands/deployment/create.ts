@@ -1,18 +1,30 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
-import { DeploymentService } from "../../lib/backend";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { DeploymentService } from "@/lib/backend";
+import { GetReleaseByIdParams } from "@/lib/backend/schemas";
 
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
-import { prose } from "../../lib/oclif/rendering";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { prose } from "@/lib/oclif/rendering";
+
+/**
+ * The release `--release` deploys. The schema is the API spec's own, so a
+ * value that is not a release id is refused before anything is called, and
+ * says what one looks like.
+ */
+const RELEASE: Refused<string> = {
+  schema: z.string().trim().pipe(GetReleaseByIdParams.shape.release_id),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "Find one with `zitadel release list`.",
+    next: ["release list"],
+    details: {
+      argument: "{input}",
+    },
+  },
+};
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -44,7 +56,9 @@ export default class DeploymentCreate extends EnvironmentCommand {
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   ];
   static override flags = {
-    release: nonBlankString({ description: "The release id to deploy.", required: true }),
+    release: Flags.custom<string>({
+      parse: reads(RELEASE),
+    })({ description: "The release id to deploy.", required: true }),
     message: Flags.custom<string>({
       parse: reads(MESSAGE),
     })({
@@ -54,8 +68,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
-    const targets = ["primary"];
-
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
     // literal: deploying an existing release writes a deployment record, and a
@@ -63,10 +75,8 @@ export default class DeploymentCreate extends EnvironmentCommand {
     if (this.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets },
-        pretty: prose(
-          `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
-        ),
+        data: { dry_run: true, release_id: flags.release, targets: "primary" },
+        pretty: prose(`Would deploy ${flags.release} to primary. Nothing was deployed (dry run).`),
       });
     }
 
@@ -75,7 +85,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     const deploymentService = new DeploymentService(client, projectId);
     const deployment = await deploymentService.create({
       release_id: flags.release,
-      targets,
+      targets: "primary",
       message: flags.message,
     });
 

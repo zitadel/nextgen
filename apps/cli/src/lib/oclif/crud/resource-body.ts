@@ -1,5 +1,5 @@
-import { isObject } from "../../json";
-import { refusalError, type Refusal } from "../refusal";
+import { isObject } from "@/lib/json";
+import { refusalError, type Refusal } from "@/lib/oclif/refusal";
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
 import { mergeDocuments, setAt, valueAt } from "./document";

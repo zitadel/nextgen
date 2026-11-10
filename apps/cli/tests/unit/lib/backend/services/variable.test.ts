@@ -2,22 +2,18 @@ import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import {
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-} from "../../../../../src/lib/backend/errors";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/backend/errors";
 import {
   Variable,
   VariableRemoval,
   VariableService,
   VariableWrite,
-} from "../../../../../src/lib/backend/services/variable";
-import { createZitadelClient } from "../../../../../src/lib/backend";
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
+} from "@/lib/backend/services/variable";
+import { createZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
 /** A server a cancelled run is pointed at. */
 const CANCEL_SERVER = "http://localhost:8080";

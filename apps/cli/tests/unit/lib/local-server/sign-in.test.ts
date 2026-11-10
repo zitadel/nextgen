@@ -1,11 +1,11 @@
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
-import { EXIT_CODES, toZitadelError, type ZitadelError } from "../../../../src/lib/errors";
-import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
+import type { LocalAdmin } from "@/lib/local-server/admin-credential";
+import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
+import { adminSessionCookie, consoleSignInUrl } from "@/lib/local-server/sign-in";
 
 const signal = new AbortController().signal;
 

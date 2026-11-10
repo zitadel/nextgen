@@ -3,25 +3,20 @@ import { z } from "zod";
 import consola from "consola";
 import pRetry, { AbortError } from "p-retry";
 
-import { ClaimService } from "../../lib/backend";
-import { BOX_STYLE, wrapForBox } from "../../lib/box";
-import { openInBrowser } from "../../lib/browser";
-import { CLAIM_WINDOW_DAYS, isAttached } from "../../lib/claim-state";
-import { requireValue } from "../../lib/environment";
-import { ZitadelError } from "../../lib/errors";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../lib/project";
-import { getClaimStatusQueryChallengeIdRegExp } from "../../lib/backend/schemas";
+import { ClaimService } from "@/lib/backend";
+import { BOX_STYLE, wrapForBox } from "@/lib/box";
+import { openInBrowser } from "@/lib/browser";
+import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
+import { requireValue } from "@/lib/environment";
+import { ZitadelError } from "@/lib/errors";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
+import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { isLoopbackUrl } from "../../lib/server";
-import { reportWarning } from "../../lib/warnings";
-import type { SuggestedCommand } from "../../lib/suggestion";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { isLoopbackUrl } from "@/lib/server";
+import { reportWarning } from "@/lib/warnings";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -100,7 +95,7 @@ const TIMEOUT: Refused<number> = {
  * asked or sent.
  */
 const CHALLENGE_ID: Refused<string> = {
-  schema: z.string().regex(getClaimStatusQueryChallengeIdRegExp),
+  schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),
   refusal: {
     message:
       "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",

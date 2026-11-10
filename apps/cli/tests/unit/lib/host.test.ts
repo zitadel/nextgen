@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isLoopbackHost } from "../../../src/lib/host";
+import { isLoopbackHost } from "@/lib/host";
 
 describe("isLoopbackHost", () => {
   it.for(["localhost", "127.0.0.1", "127.1.2.3", "::1", "[::1]"])("accepts %s", (host) => {

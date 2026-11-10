@@ -1,4 +1,8 @@
-import { type Change, Operation, type Source } from "../operation";
+import {
+  type Change,
+  Operation,
+  type Source,
+} from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
  * Adds the entries `.gitignore` does not hold yet, at the end.

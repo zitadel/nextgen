@@ -1,22 +1,14 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  DEFAULT_LOCAL_SERVER_URL,
-  readNearestRuntimeMetadata,
-} from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
-import { startedServer } from "../local-server/started";
-import {
-  LOG_LEVELS,
-  type LogLine,
-  logText,
-  renderLogLine,
-} from "../../lib/local-server/server-log";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { type Refused, reads, whole } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { painted } from "../../lib/oclif/rendering";
+import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { startedServer } from "@/commands/local-server/started";
+import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-server/server-log";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { painted } from "@/lib/oclif/rendering";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;

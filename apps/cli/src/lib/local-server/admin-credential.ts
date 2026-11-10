@@ -6,10 +6,10 @@ import { join } from "node:path";
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import { ZitadelError, errorMessage } from "../errors";
-import { enforceMode } from "../fs-safe";
-import { ancestors } from "../paths";
-import { isObject } from "../json";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { enforceMode } from "@/lib/fs-safe";
+import { ancestors } from "@/lib/paths";
+import { isObject } from "@/lib/json";
 import {
   findUpward,
   LOCAL_RUNTIME_DIR,
@@ -17,7 +17,7 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
-import { shellCommand, unscopedCommand } from "../suggestion";
+import { shellCommand, unscopedCommand } from "@/lib/suggestion";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):

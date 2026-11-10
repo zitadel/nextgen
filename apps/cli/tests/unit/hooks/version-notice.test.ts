@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isVersionRun } from "../../../src/hooks/version-notice";
+import { isVersionRun } from "@/hooks/version-notice";
 
 describe("isVersionRun", () => {
   it.each([

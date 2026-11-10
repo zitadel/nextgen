@@ -5,16 +5,16 @@ import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { connectionOf, REQUEST_TIMEOUT_MS } from "../../../../src/lib/backend/client";
-import { CREDENTIALS } from "../../../../src/lib/oclif/credentials";
-import { EnvironmentCommand, PreviewCommand } from "../../../../src/lib/oclif/environment-command";
-import type { ConnectOptions } from "../../../../src/lib/oclif/types";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
-import { asTerminal } from "../../../helpers/terminal";
+import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
+import { CREDENTIALS } from "@/lib/oclif/credentials";
+import { EnvironmentCommand, PreviewCommand } from "@/lib/oclif/environment-command";
+import type { ConnectOptions } from "@/lib/oclif/types";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { asTerminal } from "@tests/helpers/terminal";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 /** Connects with the project secret, the default credential. */
 class ProjectProbe extends EnvironmentCommand {

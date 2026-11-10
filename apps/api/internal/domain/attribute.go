@@ -106,8 +106,10 @@ func (attrs Attributes) MarshalJSON() ([]byte, error) {
 // mutated. An object that merges down to no keys is kept as an empty map;
 // the EAV flattening then stores nothing for it, same as on create.
 func MergeAttributesPatch(current, patch map[string]any) map[string]any {
-	merged := make(map[string]any, len(current)+len(patch))
-	maps.Copy(merged, current)
+	merged := maps.Clone(current)
+	if merged == nil {
+		merged = make(map[string]any, len(patch))
+	}
 	for key, value := range patch {
 		switch typed := value.(type) {
 		case nil:
@@ -208,6 +210,15 @@ func (attrs CreateAttributes) Get(key AttributeKey) (value *CreateAttribute, ok 
 	}
 
 	return nil, false
+}
+
+// Attributes returns the attributes as a user read holds them.
+func (attrs CreateAttributes) Attributes() Attributes {
+	out := make(Attributes, 0, len(attrs))
+	for _, attr := range attrs {
+		out = append(out, Attribute{Key: attr.Key, Value: attr.Value})
+	}
+	return out
 }
 
 func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, keyPrefix AttributeKey) error {

@@ -1,4 +1,4 @@
-import { PreviewService } from "../../lib/backend";
+import { PreviewService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -8,9 +8,9 @@ import {
   type JsonEnvelope,
   nonBlankString,
   PreviewCommand,
-} from "../../lib/oclif";
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;

@@ -6,9 +6,9 @@ import type {
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../client";
-import { ApiService } from "../api-service";
-import { ConflictError } from "../errors";
+import type { ZitadelClient } from "@/lib/backend/client";
+import { ApiService } from "@/lib/backend/api-service";
+import { ConflictError } from "@/lib/backend/errors";
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;

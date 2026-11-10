@@ -1,6 +1,6 @@
-import type { Consent, Gate } from "../../../lib/consent";
-import { ZitadelError, type ZitadelErrorCode, errorMessage } from "../../../lib/errors";
-import type { Orca } from "../../../lib/orca";
+import type { Consent, Gate } from "@/lib/consent";
+import { ZitadelError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
+import type { Orca } from "@/lib/orca";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {

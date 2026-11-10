@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   dependencySpecProvablyBelow,
@@ -13,7 +13,7 @@ import {
   installedVersionBelow,
   readPackageJson,
   type PackageJson,
-} from "../../../../../src/lib/orca/detectors/package-json";
+} from "@/lib/orca/detectors/package-json";
 
 describe("readPackageJson", () => {
   it("reads and parses a valid package.json", async ({ dir }) => {

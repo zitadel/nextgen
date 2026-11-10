@@ -1,7 +1,7 @@
 import semver from "semver";
 
-import { readPackageJsonIfExists } from "../../../lib/npm";
-import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
+import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
+import { exactZitadelPins } from "@/lib/zitadel-pins";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
@@ -88,31 +88,4 @@ export class DependencyVersionCheck implements SanityCheck {
   async fix(_ctx: CheckContext): Promise<void> {
     return;
   }
-}
-
-/**
- * The `@zitadel/*` dependencies `package.json` pins to an exact version, as
- * `[name, version]`, or undefined without a `package.json`. A `package.json`
- * that is not valid JSON rejects. Ranges, dist-tags and `file:`/`workspace:`
- * specifiers are left out: they express a resolution choice, not a train.
- */
-export async function exactZitadelPins(cwd: string): Promise<Array<[string, string]> | undefined> {
-  return (await zitadelSpecs(cwd))?.filter(([, version]) => semver.valid(version) !== null);
-}
-
-/** The `@zitadel/*` dependencies {@link exactZitadelPins} leaves out, as `[name, specifier]`. */
-export async function floatingZitadelSpecs(
-  cwd: string,
-): Promise<Array<[string, string]> | undefined> {
-  return (await zitadelSpecs(cwd))?.filter(([, version]) => semver.valid(version) === null);
-}
-
-async function zitadelSpecs(cwd: string): Promise<Array<[string, string]> | undefined> {
-  const pkg = await readPackageJsonIfExists(cwd);
-  return (
-    pkg &&
-    Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
-      .filter(([name]) => name.startsWith("@zitadel/"))
-      .map(([name, version]): [string, string] => [name, (version ?? "").trim()])
-  );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PolicyService } from "../../../../../src/lib/backend/services/policy";
-import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
+import { PolicyService } from "@/lib/backend/services/policy";
+import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** The only operation the spec's policies guard. */
 const OPERATION = "auth.factor.password.set";

@@ -31,6 +31,7 @@ properties:
   name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
+    x-zitadel-pattern-message: "must start with a lowercase letter and use only lowercase letters, digits and -"
     examples: [ standard-login, combined-auth ]
     description: |
       Stable identifier for this flow, and the name a cross-flow `switch` or
@@ -48,7 +49,7 @@ properties:
     type: string
     description: |
       The user schema this flow operates on, named by its `objectType`. The
-      flow runs against the project's newest revision of that schema, so
+      flow runs against the revision of that schema its release pins, so
       publishing a schema revision needs no change to the flow. A schema ID
       as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
       schema's `objectType`; reading the definition back returns the

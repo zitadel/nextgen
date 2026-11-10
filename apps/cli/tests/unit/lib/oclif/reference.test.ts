@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS } from "../../../../src/index";
-import { EXIT_CODES } from "../../../../src/lib/errors";
-import { BaseCommand, FLAG_VARIABLES } from "../../../../src/lib/oclif/base";
-import { CommandGroups } from "../../../../src/lib/oclif/groups";
-import { cliReference } from "../../../../src/lib/oclif/reference";
+import { COMMANDS } from "@/index";
+import { EXIT_CODES } from "@/lib/errors";
+import { BaseCommand, FLAG_VARIABLES } from "@/lib/oclif/base";
+import { CommandGroups } from "@/lib/oclif/groups";
+import { cliReference } from "@/lib/oclif/reference";
 
 const packageRoot = join(import.meta.dirname, "../../../..");
 

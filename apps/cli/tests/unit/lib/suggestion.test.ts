@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
-import {
-  inShell,
-  projectCommand,
-  shellCommand,
-  unscopedCommand,
-} from "../../../src/lib/suggestion";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { inShell, projectCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
 
 const VERSION = "1.0.0-alpha.25";
 

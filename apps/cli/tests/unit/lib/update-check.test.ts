@@ -6,11 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  isNewerVersion,
-  latestCliVersion,
-  updateCheckDisabled,
-} from "../../../src/lib/update-check";
+import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "@/lib/update-check";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 

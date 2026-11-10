@@ -1,14 +1,9 @@
 import { Flags } from "@oclif/core";
 
-import { VariableService } from "../../lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import { inventoryCell, variableCell } from "../../lib/variables";
+import { VariableService } from "@/lib/backend";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { inventoryCell, variableCell } from "@/lib/variables";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;

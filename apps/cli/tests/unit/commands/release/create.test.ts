@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import ReleaseCreate from "../../../../src/commands/release/create";
-import { parseFlag } from "../../../helpers/inputs";
+import ReleaseCreate from "@/commands/release/create";
+import { parseFlag } from "@tests/helpers/inputs";
 
 describe("-m", () => {
   it("trims a message", async () => {

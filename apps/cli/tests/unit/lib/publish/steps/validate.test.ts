@@ -1,166 +1,383 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 
-import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
-import { describe, expect, vi } from "vitest";
-
-import { it } from "../../../../helpers/fixtures";
-
+import { SchemaService } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { validateStep } from "@/lib/publish/steps/validate";
 import {
-  DeploymentService,
-  VariableService,
-  SchemaService,
-  UserService,
-} from "../../../../../src/lib/backend";
-import { validateStep } from "../../../../../src/lib/publish/steps/validate";
-import type { StepContext } from "../../../../../src/lib/publish/pipeline";
-import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
-import { fakeClient, pagesOf } from "../../../../helpers/fake-client";
+  aBranding,
+  aConfig,
+  aLoginFlow,
+  anOidcConnection,
+  aPasswordPolicy,
+  aStore,
+  aUserSchema,
+  PASSWORD_POLICY,
+} from "@tests/helpers/config";
+import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
+import { holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
+import { aStepContext } from "@tests/helpers/step-context";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-/** A valid user-schema the server would accept, so schema parsing passes. */
-const validSchema = {
-  objectType: "human-user",
-  kind: "user-schema",
-  metaSchema: "https://example.com/meta/user-schema.json",
-  "x-auth-methods": { password: { enabled: true } },
-  "x-identifier": "email",
-  properties: { email: { "x-unique": "project" } },
-};
+/**
+ * What the step reports for a configuration it accepts.
+ */
+const ACCEPTED = { warnings: [] };
 
-/** A branding descriptor whose template lives inline, so it reads total. */
-const validBranding = {
-  layout: "centered",
-  liquid_template: "<zl-page-shell>{% mandatory_gates %}</zl-page-shell>",
-};
+/**
+ * A connection whose client secret is written out rather than referenced.
+ */
+const LITERAL_SECRET = anOidcConnection({ oidc: { client_secret: "a-literal-secret" } });
 
-function ctx(
-  bundle: Partial<StepContext["bundle"]>,
-  {
-    env = {},
-    brandingSources = [],
-    cwd = "/tmp",
-    idpFiles = [],
-    policyFiles = [],
-    schemas,
-  }: {
-    schemas?: StepContext["schemas"];
-    env?: StepContext["env"];
-    brandingSources?: StepContext["brandingSources"];
-    cwd?: string;
-    idpFiles?: StepContext["idpFiles"];
-    policyFiles?: StepContext["policyFiles"];
-  } = {},
-): StepContext {
-  return {
-    cwd,
-    deployments: new DeploymentService(fakeClient({}), "proj_1"),
-    variables: new VariableService(fakeClient({}), "proj_1"),
-    schemas: schemas ?? new SchemaService(fakeClient({}), "proj_1"),
-    users: new UserService(fakeClient({})),
-    env,
-    mode: "deploy",
-    dryRun: false,
-    json: true,
-    color: false,
-    bundle: { schemas: [], flow_definitions: [], idps: [], policies: [], ...bundle },
-    brandingSources,
-    idpFiles,
-    policyFiles,
-    suggest: (args) => args as SuggestedCommand,
-  };
+/**
+ * The project's variables, holding the secret the default connection names.
+ */
+const ACME_SECRET_HELD = holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE });
+
+/**
+ * The project's variables, holding none.
+ */
+const NOTHING_HELD = holdingVariables({});
+
+/**
+ * A configuration of the shipped user schema and a login flow whose identifier
+ * step collects `collects` for the schema `userSchema`.
+ *
+ * @param userSchema - What the flow names as its user schema.
+ * @param collects - The fields the identifier step collects.
+ * @returns The configuration.
+ */
+function aFlowNaming(userSchema: string, collects: readonly string[]) {
+  return aConfig({
+    schemas: { "human-user.json": aUserSchema() },
+    flows: { "default-login.json": aLoginFlow({ userSchema, collects }) },
+  });
 }
 
-describe("validate step", () => {
-  it("fails naming an environment variable a resource references but the env lacks", async () => {
-    const bundle = {
-      schemas: [{ objectType: "human-user", hint: "${MISSING_VAR}" }],
-      flow_definitions: [],
-    };
+/**
+ * A schema service over a project holding the latest revision of each of
+ * `objectTypes`, and the stub its listing goes through.
+ *
+ * @param objectTypes - The object types the project holds.
+ * @returns The service, and the listing to observe.
+ */
+function aProjectHolding(...objectTypes: string[]) {
+  const listSchemas = vi.fn(({ object_type }: { object_type?: string }) => {
+    return pagesOf({
+      schemas: objectTypes.includes(object_type ?? "") ? [{ id: "sch_1" }] : [],
+      next_page_token: null,
+    });
+  });
+  const schemas = new SchemaService(
+    fakeClient({ listSchemas: { pages: listSchemas } }),
+    PROJECT_ID,
+  );
+  return { schemas, listSchemas };
+}
 
-    await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+describe("validateStep", () => {
+  it("passes when every referenced variable resolves and every kind is valid", async () => {
+    const config = aConfig({
+      schemas: { "human-user.json": aUserSchema({ $comment: "${PRESENT_VAR}" }) },
+      branding: { "branding.json": aBranding() },
+    });
+
+    const result = await validateStep.run(aStepContext({ config, env: { PRESENT_VAR: "v1" } }));
+
+    expect(result).toEqual(ACCEPTED);
+  });
+
+  it("refuses a resource naming an environment variable the env lacks", async () => {
+    const config = aConfig({
+      schemas: { "human-user.json": aUserSchema({ $comment: "${MISSING_VAR}" }) },
+    });
+
+    const error = await rejectionOf(() => {
+      return validateStep.run(aStepContext({ config }));
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("MISSING_VAR"),
     });
   });
 
-  it("passes when every referenced variable resolves and every kind is valid", async () => {
-    // The `${PRESENT_VAR}` rides an editor-only key the schema parse strips but
-    // the env-ref scan still sees, so the schema stays valid.
-    const bundle = {
-      schemas: [{ ...validSchema, $comment: "${PRESENT_VAR}" }],
-      flow_definitions: [],
-      branding: validBranding,
-    };
-
-    await expect(
-      validateStep.run(
-        ctx(bundle, { env: { PRESENT_VAR: "v1" }, brandingSources: [validBranding] }),
-      ),
-    ).resolves.toEqual({ warnings: [] });
-  });
-
-  it("rejects a malformed schema before anything is written", async () => {
-    const bundle = {
-      // Missing kind/metaSchema/x-auth-methods: not a valid user schema.
-      schemas: [{ objectType: "human-user" }],
-      flow_definitions: [],
-    };
-
-    await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
-  });
-
-  it("refuses an x-auth-methods key that is no authentication method, naming the schema", async () => {
-    const schema = {
-      ...validSchema,
-      "x-auth-methods": { password: { enabled: true }, pasword: { enabled: true } },
-    };
-
-    await expect(validateStep.run(ctx({ schemas: [schema] }))).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      details: {
-        issues: [expect.stringMatching(/^human-user: x-auth-methods pasword is not/)],
-      },
+  it("names every refused file in one refusal", async () => {
+    const config = aConfig({
+      schemas: { "a.json": { objectType: "a" }, "b.json": { objectType: "b" } },
     });
-  });
 
-  it("keeps the fix a literal client_secret gets, rather than the release body's pattern", async () => {
-    const connection = {
-      slug: "acme",
-      protocol: "oidc",
-      display_name: "Acme",
-      oidc: {
-        issuer: "https://sso.acme.example",
-        client_id: "client",
-        client_secret: "a-literal-secret",
-        scopes: ["openid"],
-      },
-    };
-
-    await expect(
-      validateStep.run(ctx({ idps: [connection] }, { idpFiles: ["acme.json"] })),
-    ).rejects.toMatchObject({
-      message: "Connection file's client_secret must reference a variable, not hold a value",
-      hint: expect.stringContaining("variable set NAME --secret"),
+    const error = await rejectionOf(() => {
+      return validateStep.run(aStepContext({ config }));
     });
-  });
 
-  describe("a flow's user_schema", () => {
-    /** The default login flow, naming its schema `userSchema` and collecting `fields` first. */
-    const flowNaming = (userSchema: string, fields: string[]) => ({
-      ...defaultLogin,
-      user_schema: userSchema,
-      steps: defaultLogin.steps.map((step) =>
-        step.name === "identifier" ? { ...step, fields } : step,
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({
+      message: expect.stringMatching(
+        /\.zitadel\/schemas\/a\.json[\s\S]*\.zitadel\/schemas\/b\.json/,
       ),
     });
+  });
 
+  describe("with a schema file", () => {
+    it("refuses one that is not a user schema", async () => {
+      const config = aConfig({ schemas: { "human-user.json": { objectType: "human-user" } } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+    });
+
+    it("refuses an x-auth-methods key that is no authentication method, naming the file", async () => {
+      const schema = aUserSchema({
+        "x-auth-methods": { password: { enabled: true }, pasword: { enabled: true } },
+      });
+      const config = aConfig({ schemas: { "human-user.json": schema } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: ".zitadel/schemas/human-user.json",
+              message: expect.stringMatching(/x-auth-methods pasword is not/),
+            }),
+          ],
+        },
+      });
+    });
+  });
+
+  describe("with a schema holding a key its meta-schema refuses", () => {
+    const config = aConfig({
+      schemas: {
+        "human-user.json": aUserSchema({
+          properties: { firstName: { type: "string", minimumLength: 3 } },
+        }),
+      },
+    });
+
+    it("names the key and its path", async () => {
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: ".zitadel/schemas/human-user.json",
+              message:
+                "properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+            }),
+          ],
+        },
+      });
+    });
+
+    it("says a key a newer server added needs a CLI as new as the server", async () => {
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        hint: "Fix the files named above and re-run; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
+      });
+    });
+  });
+
+  describe("with a connection file", () => {
+    it("refuses a literal client_secret, naming the file", async () => {
+      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(
+          ".zitadel/idps/acme.json: client_secret must reference a variable, not hold a value",
+        ),
+      });
+    });
+
+    it("tells a literal client_secret how to publish it, in the deploy's environment", async () => {
+      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        hint: expect.stringContaining("variable set NAME --secret --env staging"),
+      });
+    });
+
+    it("words the hint of a refusal without claiming the server enforces every rule", async () => {
+      const config = aConfig({ flows: { "login.json": { name: "bad" } } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        hint: "Fix the files named above and re-run; no changes were made.",
+      });
+    });
+
+    it("leaves out the subject-claim advice when the connections could not be listed", async () => {
+      const config = aConfig({
+        connections: { "acme.json": anOidcConnection({ subject_claim: "email" }) },
+      });
+
+      const unlisted = await validateStep.run(
+        aStepContext({ config, client: ACME_SECRET_HELD, deployedUnknown: true }),
+      );
+      const listed = await validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+
+      expect(unlisted).toEqual(ACCEPTED);
+      expect(listed?.warnings).toContainEqual(expect.stringContaining("subject_claim is"));
+    });
+
+    it.each([
+      ["on a dry run", { dryRun: true }],
+      ["for a preview", { mode: "preview" }],
+    ] as const)("refuses a literal client_secret %s too", async (_run, overrides) => {
+      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, ...overrides }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+    });
+
+    it("refuses a literal client_secret in a later one after an earlier one passes", async () => {
+      const config = aConfig({
+        connections: { "a-acme.json": anOidcConnection(), "b-acme.json": LITERAL_SECRET },
+      });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/idps/b-acme.json: client_secret must reference"),
+      });
+    });
+
+    it("refuses a literal client_secret before the project's variables are read", async () => {
+      const getVariables = vi.fn(async () => {
+        return {};
+      });
+      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
+
+      await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, client: { getVariables } }));
+      });
+
+      expect(getVariables).not.toHaveBeenCalled();
+    });
+
+    it("never echoes a literal client_secret in the refusal", async () => {
+      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(JSON.stringify(error)).not.toContain("a-literal-secret");
+    });
+
+    it("refuses an oidc block naming some endpoints but not the rest", async () => {
+      const partial = anOidcConnection({
+        oidc: { authorization_endpoint: "https://sso.acme.example/auth" },
+      });
+      const config = aConfig({ connections: { "acme.json": partial } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        message: expect.stringContaining(
+          ".zitadel/idps/acme.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint",
+        ),
+      });
+    });
+
+    it("passes an oidc block naming every endpoint", async () => {
+      const complete = anOidcConnection({
+        oidc: {
+          authorization_endpoint: "https://sso.acme.example/auth",
+          jwks_uri: "https://sso.acme.example/jwks",
+          token_endpoint: "https://sso.acme.example/token",
+          userinfo_endpoint: "https://sso.acme.example/userinfo",
+        },
+      });
+      const config = aConfig({ connections: { "acme.json": complete } });
+
+      const result = await validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+
+      expect(result).toEqual(ACCEPTED);
+    });
+
+    it("refuses a later malformed one, naming that file", async () => {
+      const config = aConfig({
+        connections: {
+          "a-acme.json": anOidcConnection(),
+          "b-bad.json": { slug: "bad", protocol: "oidc" },
+        },
+      });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/idps/b-bad.json"),
+      });
+    });
+
+    it("refuses one naming a variable the project lacks", async () => {
+      const config = aConfig({ connections: { "acme.json": anOidcConnection() } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, client: NOTHING_HELD }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+    });
+  });
+
+  describe("with a flow naming its user_schema", () => {
     it("resolves the schema by its objectType, so a field the schema lacks is refused", async () => {
-      const bundle = {
-        schemas: [validSchema],
-        flow_definitions: [flowNaming("human-user", ["phone_number"])],
-      };
+      const config = aFlowNaming("human-user", ["phone_number"]);
 
-      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
         details: {
           issues: [
@@ -172,58 +389,80 @@ describe("validate step", () => {
       });
     });
 
-    it("accepts a field the named schema declares", async () => {
-      const bundle = {
-        schemas: [validSchema],
-        flow_definitions: [flowNaming("human-user", ["email"])],
-      };
+    it("lists the steps a refusal names under its issue", async () => {
+      const flow = aLoginFlow({ userSchema: "human-user" });
+      const config = aConfig({
+        schemas: { "human-user.json": aUserSchema() },
+        flows: {
+          "default-login.json": {
+            ...flow,
+            steps: [{ name: "identifier", sso_providers: ["google", "google"] }],
+          },
+        },
+      });
 
-      await expect(validateStep.run(ctx(bundle))).resolves.toEqual({ warnings: [] });
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        details: {
+          issues: expect.arrayContaining([
+            expect.objectContaining({
+              steps: ["identifier"],
+              path: ".zitadel/flows/default-login.json",
+            }),
+          ]),
+        },
+      });
     });
 
-    /** A project holding the latest revision of each of `objectTypes`. */
-    const projectHolding = (...objectTypes: string[]) => {
-      const listSchemas = vi.fn(({ object_type }: { object_type?: string }) =>
-        pagesOf({
-          schemas: objectTypes.includes(object_type ?? "") ? [{ id: "sch_1" }] : [],
-          next_page_token: null,
-        }),
-      );
-      return {
-        schemas: new SchemaService(fakeClient({ listSchemas: { pages: listSchemas } }), "proj_1"),
-        listSchemas,
-      };
-    };
+    it("accepts a field the named schema declares", async () => {
+      const config = aFlowNaming("human-user", ["email"]);
+
+      const result = await validateStep.run(aStepContext({ config }));
+
+      expect(result).toEqual(ACCEPTED);
+    });
 
     it("skips the schema-dependent rules for a schema only the project holds", async () => {
-      const { schemas, listSchemas } = projectHolding("server-schema");
-      const bundle = {
-        schemas: [validSchema],
-        flow_definitions: [flowNaming("server-schema", ["phone_number"])],
-      };
+      const { schemas } = aProjectHolding("server-schema");
+      const config = aFlowNaming("server-schema", ["phone_number"]);
 
-      await expect(validateStep.run(ctx(bundle, { schemas }))).resolves.toEqual({ warnings: [] });
+      const result = await validateStep.run(aStepContext({ config, schemas }));
+
+      expect(result).toEqual(ACCEPTED);
+    });
+
+    it("asks the project for the latest revision of a schema the configuration lacks", async () => {
+      const { schemas, listSchemas } = aProjectHolding("server-schema");
+      const config = aFlowNaming("server-schema", ["phone_number"]);
+
+      await validateStep.run(aStepContext({ config, schemas }));
+
       expect(listSchemas).toHaveBeenCalledWith({
-        project_id: "proj_1",
+        project_id: PROJECT_ID,
         object_type: "server-schema",
         revisions: "latest",
         limit: 1,
       });
     });
 
-    it("refuses a flow whose user_schema neither the bundle nor the project holds", async () => {
-      const { schemas } = projectHolding();
-      const bundle = {
-        schemas: [validSchema],
-        flow_definitions: [flowNaming("missing-schema", ["email"])],
-      };
+    it("refuses a user_schema neither the configuration nor the project holds", async () => {
+      const { schemas } = aProjectHolding();
+      const config = aFlowNaming("missing-schema", ["email"]);
 
-      await expect(validateStep.run(ctx(bundle, { schemas }))).rejects.toMatchObject({
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, schemas }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
         details: {
           issues: [
             {
-              handle: defaultLogin.name,
+              path: ".zitadel/flows/default-login.json",
               rule: "release/user-schema-resolves",
               message:
                 'user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
@@ -233,110 +472,158 @@ describe("validate step", () => {
       });
     });
 
+    it("refuses a file its contract refuses before it asks the project anything", async () => {
+      const listSchemas = vi.fn(() => {
+        throw new Error("the server is unreachable");
+      });
+      const schemas = new SchemaService(
+        fakeClient({ listSchemas: { pages: listSchemas } }),
+        PROJECT_ID,
+      );
+      const config = aConfig({
+        schemas: { "human-user.json": aUserSchema(), "a.json": { objectType: "a" } },
+        flows: { "default-login.json": aLoginFlow({ userSchema: "missing", collects: ["email"] }) },
+      });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, schemas }));
+      });
+
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/schemas/a.json"),
+      });
+    });
+
     it.each(["sch_01J000000000000000000000", "https://schemas.zitadel.com/human-user/v1"])(
       "leaves a user_schema that is a schema id (%s) to the server",
-      async (ref) => {
-        const { schemas, listSchemas } = projectHolding();
-        const bundle = { schemas: [validSchema], flow_definitions: [flowNaming(ref, ["email"])] };
+      async (reference) => {
+        const { schemas, listSchemas } = aProjectHolding();
+        const config = aFlowNaming(reference, ["email"]);
 
-        await expect(validateStep.run(ctx(bundle, { schemas }))).resolves.toEqual({ warnings: [] });
+        await validateStep.run(aStepContext({ config, schemas }));
+
         expect(listSchemas).not.toHaveBeenCalled();
       },
     );
 
-    it("leaves a user_schema to the server when the bundle holds a schema-url entry", async () => {
-      const { schemas, listSchemas } = projectHolding();
-      const bundle = {
-        schemas: [{ kind: "schema-url", url: "https://example.com/human.json" }],
-        flow_definitions: [flowNaming("fetched-schema", ["email"])],
-      };
+    it("leaves a user_schema to the server when the configuration holds a schema-url entry", async () => {
+      const { schemas, listSchemas } = aProjectHolding();
+      const config = aConfig({
+        schemas: { "human.json": { kind: "schema-url", url: "https://example.com/human.json" } },
+        flows: { "default-login.json": aLoginFlow({ userSchema: "fetched-schema" }) },
+      });
 
-      await expect(validateStep.run(ctx(bundle, { schemas }))).resolves.toEqual({ warnings: [] });
+      await validateStep.run(aStepContext({ config, schemas }));
+
       expect(listSchemas).not.toHaveBeenCalled();
     });
   });
 
-  describe("a policy file", () => {
-    const policy = { operation: "auth.factor.password.set", config: { min_length: 12 } };
+  describe("with a policy file", () => {
+    it("passes one that is valid and named after its operation", async () => {
+      const config = aConfig({ policies: { [`${PASSWORD_POLICY}.json`]: aPasswordPolicy() } });
 
-    it("passes when it is valid and named after its operation", async () => {
-      await expect(
-        validateStep.run(
-          ctx({ policies: [policy] }, { policyFiles: ["auth.factor.password.set.json"] }),
-        ),
-      ).resolves.toEqual({ warnings: [] });
+      const result = await validateStep.run(aStepContext({ config }));
+
+      expect(result).toEqual(ACCEPTED);
     });
 
-    it("is refused for an unknown setting or a value outside its bounds, naming the file", async () => {
-      const bad = { operation: "auth.factor.password.set", config: { min_length: 0, colour: 1 } };
-      await expect(
-        validateStep.run(
-          ctx({ policies: [bad] }, { policyFiles: ["auth.factor.password.set.json"] }),
-        ),
-      ).rejects.toMatchObject({
+    it("refuses an unknown setting or a value outside its bounds, naming the file", async () => {
+      const policy = aPasswordPolicy({ min_length: 0, colour: 1 });
+      const config = aConfig({ policies: { [`${PASSWORD_POLICY}.json`]: policy } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
-        message: expect.stringContaining(".zitadel/policies/auth.factor.password.set.json: config"),
+        message: expect.stringContaining(`.zitadel/policies/${PASSWORD_POLICY}.json: config`),
       });
     });
 
-    it("is refused when it is not named after its operation", async () => {
-      await expect(
-        validateStep.run(ctx({ policies: [policy] }, { policyFiles: ["password.json"] })),
-      ).rejects.toMatchObject({
+    it("refuses one not named after its operation", async () => {
+      const config = aConfig({ policies: { "password.json": aPasswordPolicy() } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(
-          ".zitadel/policies/password.json holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
+          `.zitadel/policies/password.json: holds the ${PASSWORD_POLICY} policy, so it must be named ${PASSWORD_POLICY}.json`,
         ),
       });
     });
   });
 
-  it("rejects a malformed branding descriptor", async () => {
-    const badBranding = { ...validBranding, logo_url: "not-a-url" };
-    const bundle = { schemas: [], flow_definitions: [], branding: badBranding };
+  describe("with a branding descriptor", () => {
+    it.each([
+      ["a malformed logo_url", aBranding({ logo_url: "not-a-url" }), "logo_url"],
+      [
+        "the retired liquid_template_file key",
+        { layout: "centered", liquid_template_file: "./login.liquid" },
+        '"liquid_template": { "$file": "./login.liquid" }',
+      ],
+      [
+        "a template that leaves out the mandatory gates",
+        aBranding({ liquid_template: "<zl-page-shell></zl-page-shell>" }),
+        "mandatory-gates",
+      ],
+      [
+        "a template carrying a script tag",
+        aBranding({ liquid_template: "<script>alert(1)</script>{% mandatory_gates %}" }),
+        "no-script-tag",
+      ],
+      [
+        "a $file reference that cannot be read",
+        aBranding({ liquid_template: { $file: "./missing.liquid" } }),
+        "missing.liquid",
+      ],
+    ])("refuses %s, saying why", async (_problem, branding, why) => {
+      const config = aConfig({ branding: { "branding.json": branding } });
 
-    await expect(
-      validateStep.run(ctx(bundle, { brandingSources: [badBranding] })),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
-  });
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
 
-  it("tells a descriptor with the retired liquid_template_file key how to migrate", async () => {
-    const descriptor = { layout: "centered", liquid_template_file: "./login.liquid" };
-    const bundle = { schemas: [], flow_definitions: [], branding: { layout: "centered" } };
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_VALIDATION", message: expect.stringContaining(why) });
+    });
 
-    await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
-      /"liquid_template": \{ "\$file": "\.\/login\.liquid" \}/,
-    );
-  });
+    it("passes with a template read through a $file reference", async () => {
+      const config = aConfig({
+        branding: { "branding.json": aBranding({ liquid_template: { $file: "./login.liquid" } }) },
+      });
+      const store = aStore({}, { ".zitadel/branding/login.liquid": "{% mandatory_gates %}" });
 
-  it("rejects a login template that leaves out the mandatory gates", async () => {
-    const descriptor = { layout: "centered", liquid_template: "<zl-page-shell></zl-page-shell>" };
-    const bundle = { schemas: [], flow_definitions: [], branding: descriptor };
+      const result = await validateStep.run(aStepContext({ config, store }));
 
-    await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
-      /mandatory-gates/,
-    );
-  });
+      expect(result).toEqual(ACCEPTED);
+    });
 
-  it("rejects a login template that carries a script tag", async () => {
-    const descriptor = {
-      layout: "centered",
-      liquid_template: "<script>alert(1)</script>{% mandatory_gates %}",
-    };
-    const bundle = { schemas: [], flow_definitions: [], branding: descriptor };
+    it("refuses a $file template referencing a variable the env lacks", async () => {
+      const config = aConfig({
+        branding: { "branding.json": aBranding({ liquid_template: { $file: "./login.liquid" } }) },
+      });
+      const store = aStore(
+        {},
+        { ".zitadel/branding/login.liquid": "<p>${BRAND_NAME}</p>{% mandatory_gates %}" },
+      );
 
-    await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
-      /no-script-tag/,
-    );
-  });
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config, store }));
+      });
 
-  it("rejects a branding $file reference that cannot be read", async ({ dir }) => {
-    await mkdir(join(dir, ".zitadel", "branding"), { recursive: true });
-    const descriptor = { layout: "centered", liquid_template: { $file: "./missing.liquid" } };
-    const bundle = { schemas: [], flow_definitions: [], branding: { layout: "centered" } };
-
-    await expect(
-      validateStep.run(ctx(bundle, { cwd: dir, brandingSources: [descriptor] })),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining("BRAND_NAME"),
+      });
+    });
   });
 });

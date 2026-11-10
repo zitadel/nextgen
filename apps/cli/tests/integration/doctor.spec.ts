@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "../helpers/project";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -223,7 +223,7 @@ describe("doctor", () => {
 
           const result = await app.doctor(["--fix"]);
 
-          expect(result).toSay("Pass --force to replace the preview origin");
+          expect(result).toSay("Pass --force only once they agree");
         });
 
         it("suggests running it again with --force", async () => {

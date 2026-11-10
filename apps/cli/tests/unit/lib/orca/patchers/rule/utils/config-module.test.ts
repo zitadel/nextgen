@@ -1,7 +1,7 @@
 import { generateCode } from "magicast";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ConfigModule } from "../../../../../../../src/lib/orca/patchers/rule/utils/config-module";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 describe("ConfigModule.open", () => {
   it("parses valid source", () => {
@@ -188,9 +188,7 @@ describe("ConfigModule#render", () => {
           generateCode: () => ({ code: "(((" }),
         };
       });
-      const { ConfigModule: Mocked } = await import(
-        "../../../../../../../src/lib/orca/patchers/rule/utils/config-module"
-      );
+      const { ConfigModule: Mocked } = await import("@/lib/orca/patchers/rule/utils/config-module");
       const file = Mocked.open("export default {}", "x.ts");
 
       expect(() => file.render(true)).toThrowError(/Could not write/);

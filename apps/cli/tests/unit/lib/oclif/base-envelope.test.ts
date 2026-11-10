@@ -1,10 +1,10 @@
 import { Command, type Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { Deployment } from "../../../../src/lib/backend";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { painted, prose } from "../../../../src/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
+import { Deployment } from "@/lib/backend";
+import { BaseCommand } from "@/lib/oclif/base";
+import { painted, prose } from "@/lib/oclif/rendering";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 
 /**
  * A command that answers the envelope `emit` built, printing nothing. It runs

@@ -3,12 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { ZitadelError } from "../../../../../../../src/lib/errors";
-import { FileWriter } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
-import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { rejectionOf } from "../../../../../../helpers/thrown-value";
+import { ZitadelError } from "@/lib/errors";
+import { FileWriter } from "@/lib/orca/patchers/rule/file-writer/index";
+import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 function plan(...ops: ScaffoldPlan["ops"]): ScaffoldPlan {
   return { ops, summary: [] };

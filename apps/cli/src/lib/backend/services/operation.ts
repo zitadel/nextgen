@@ -3,10 +3,10 @@ import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { distance } from "fastest-levenshtein";
 
-import { ApiService } from "../api-service";
-import { connectionOf, responseFailure } from "../client";
-import { InvalidError } from "../errors";
-import { request as fetchWithPolicy } from "../transport";
+import { ApiService } from "@/lib/backend/api-service";
+import { connectionOf, responseFailure } from "@/lib/backend/client";
+import { InvalidError } from "@/lib/backend/errors";
+import { request as fetchWithPolicy } from "@/lib/backend/transport";
 
 export type { ApiOperation };
 

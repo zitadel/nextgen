@@ -10,7 +10,7 @@
  * process is spawned or how a port is probed, the tests that make it cheap to
  * change stop being able to cover it.
  */
-import { DEFAULT_LOCAL_SERVER_PORT } from "../runtime";
+import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/local-server/runtime";
 import { type Clock, realClock } from "./clock";
 
 /**

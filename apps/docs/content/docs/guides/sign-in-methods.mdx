@@ -159,6 +159,8 @@ npx @zitadel/cli@latest deploy --dry-run
 npx @zitadel/cli@latest deploy
 ```
 
+Users who signed up with only a passkey have nothing left to sign in with once passkeys are off. The dry run warns with how many there are; keep passkeys enabled until each has another way in.
+
 ## Enable password sign-in
 
 The default flow already offers a password. For a flow that does not, add a step whose `fields` list `x-auth-methods#password`, and point a transition at it, as the default flow's `identifier` step does with `"submit": { "target": "password" }`. A sign-up journey needs a step with `x-auth-methods#password` and `"on_success": "create_user"`, like `register-password`.
@@ -236,6 +238,8 @@ npx @zitadel/cli@latest auth-method password disable
 npx @zitadel/cli@latest deploy --dry-run
 npx @zitadel/cli@latest deploy
 ```
+
+Users who signed up with only a password have nothing left to sign in with once passwords are off. The dry run warns with how many there are; keep passwords enabled until each has another way in.
 
 ## Disable the last method
 

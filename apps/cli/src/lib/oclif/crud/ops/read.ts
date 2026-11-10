@@ -1,11 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { chosenColumns, readColumns } from "../columns";
-import { type FieldPaths, fieldPaths } from "../paths";
-import { idArg, idName, idValue } from "../shared";
-import type { GetSpec } from "../types";
-import type { CommandResult } from "../../types";
-import { json, painted } from "../../rendering";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
+import type { GetSpec } from "@/lib/oclif/crud/types";
+import type { CommandResult } from "@/lib/oclif/types";
+import { json, painted } from "@/lib/oclif/rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -55,7 +55,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
         }),
         ...options.flags,
       },
-      args: idArg(resource),
+      args: idArg(resource, topic),
     };
   }
 

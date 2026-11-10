@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Report } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/report";
+import { Report } from "@/lib/orca/patchers/rule/file-writer/report";
 
 describe("Report", () => {
   it("starts with nothing done", () => {

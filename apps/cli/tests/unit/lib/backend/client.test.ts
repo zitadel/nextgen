@@ -7,13 +7,9 @@ import {
   createZitadelClient,
   responseFailure,
   type ZitadelClient,
-} from "../../../../src/lib/backend";
-import {
-  connectionOf,
-  REQUEST_TIMEOUT_MS,
-  translateFailure,
-} from "../../../../src/lib/backend/client";
-import { InvalidError } from "../../../../src/lib/backend/errors";
+} from "@/lib/backend";
+import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
+import { InvalidError } from "@/lib/backend/errors";
 
 const signal = new AbortController().signal;
 
@@ -286,7 +282,7 @@ describe("connectionOf", () => {
         createZitadelClient: raw,
       };
     });
-    const built = await import("../../../../src/lib/backend/client");
+    const built = await import("@/lib/backend/client");
     const client = built.createZitadelClient({
       signal,
       baseUrl: "http://localhost:8080",

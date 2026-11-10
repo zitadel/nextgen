@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { readPackageJson, readPackageJsonIfExists } from "../../../src/lib/npm";
-import { it } from "../../helpers/fixtures";
+import { readPackageJson, readPackageJsonIfExists } from "@/lib/npm";
+import { it } from "@tests/helpers/fixtures";
 
 describe("readPackageJson", () => {
   it("returns the typed contents of package.json", async ({ dir }) => {

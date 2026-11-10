@@ -178,6 +178,26 @@ export class Git {
     return `:(literal)${path}`;
   }
 
+  /**
+   * `pattern` as a pathspec that matches what the glob does, with `*` stopping at a `/`.
+   *
+   * `glob` rather than a plain pathspec, whose `*` also matches `/`, so
+   * `dir/*.json` would take in `dir/nested/x.json` as well.
+   */
+  static glob(pattern: string): string {
+    return `:(glob)${pattern}`;
+  }
+
+  /** {@link glob}, leaving out what it matches. */
+  static excluded(pattern: string): string {
+    return `:(exclude,glob)${pattern}`;
+  }
+
+  /** {@link literal}, leaving out only `path` itself. */
+  static excludedLiteral(path: string): string {
+    return `:(exclude,literal)${path}`;
+  }
+
   /** Whether `path`, relative to the directory, names something that exists. */
   exists(path: string): boolean {
     return path !== "" && existsSync(resolve(this.dir, path));

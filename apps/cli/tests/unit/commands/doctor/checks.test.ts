@@ -1,19 +1,8 @@
-import {
-  chmod,
-  lstat,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  stat,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import {
   ClaimCheck,
@@ -26,176 +15,298 @@ import {
   ManagedFilesCheck,
   MetaSchemasCheck,
   ProjectMatchCheck,
-  SchemaCheck,
   SecretCheck,
   SecretPermissionsCheck,
-  type CheckContext,
-} from "../../../../src/commands/doctor/checks";
-import { exactZitadelPins } from "../../../../src/commands/doctor/checks/dependency-version";
-import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
-import { createOrca } from "../../../../src/lib/orca";
-import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
-import { bearerOnlyProxyConf, v1ProxyConf } from "../../../helpers/proxy-conf";
-import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
-import { MANAGED_MARKER } from "../../../../src/lib/paths";
-import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
-import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
+} from "@/commands/doctor/checks";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
+import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
+import { createOrca } from "@/lib/orca";
+import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { hashScaffoldFile } from "@/lib/scaffold-manifest";
+import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
+import { aUserSchema } from "@tests/helpers/config";
+import { it } from "@tests/helpers/fixtures";
+import { write } from "@tests/helpers/git-repo";
+import { readJson } from "@tests/helpers/local-project";
+import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const signal = new AbortController().signal;
+/**
+ * The project the config and the secret name.
+ */
+const PROJECT_ID = "proj-001";
 
-const tempDirs: string[] = [];
+/**
+ * The server the config names: the hosted cloud.
+ */
+const CLOUD = "https://api.zitadel.cloud";
 
-// Matches the generated `CreateSchemaBody` zod (the `user-schema` branch):
-// required keys are `kind`, `metaSchema`, `objectType`, `x-auth-methods`.
-const VALID_USER_SCHEMA = {
-  kind: "user-schema",
-  objectType: "human-user",
-  metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
-  "x-auth-methods": { passkey: { enabled: true } },
-  properties: { email: { type: "string" } },
+/**
+ * The issuer a Next project's `.env.local` names.
+ */
+const ISSUER = "http://localhost:3000";
+
+/**
+ * The project's credentials file.
+ */
+const SECRET_FILE = ".zitadel/secret";
+
+/**
+ * Where setup records what it scaffolded.
+ */
+const STATE_FILE = ".zitadel/state.json";
+
+/**
+ * The project's user schema.
+ */
+const SCHEMA_FILE = ".zitadel/schemas/user.json";
+
+/**
+ * Next's request boundary up to Next 15.
+ */
+const MIDDLEWARE = "middleware.ts";
+
+/**
+ * Next's request boundary from Next 16 on.
+ */
+const PROXY = "proxy.ts";
+
+/**
+ * The scaffolded sign-in page.
+ */
+const LOGIN_PAGE = "app/login/page.tsx";
+
+/**
+ * The scaffolded sign-up page.
+ */
+const REGISTER_PAGE = "app/register/page.tsx";
+
+/**
+ * The framework home page, scaffolded only into a fresh app.
+ */
+const HOME_PAGE = "app/page.tsx";
+
+/**
+ * The route layout a newer setup adds beside the sign-in page.
+ */
+const LOGIN_LAYOUT = "app/login/layout.tsx";
+
+/**
+ * An Angular project's managed dev proxy.
+ */
+const ANGULAR_PROXY = "proxy.conf.cjs";
+
+/**
+ * A recorded hash no file on disk has, so the file reads as edited.
+ */
+const EDITED_HASH = "0".repeat(64);
+
+/**
+ * The branding meta-schema's path.
+ */
+const META_BRANDING = ".zitadel/meta/branding.json";
+
+/**
+ * The flow-definition meta-schema's path.
+ */
+const META_FLOW = ".zitadel/meta/flow-definition.json";
+
+/**
+ * A CLI release the dependency-version check compares pins against.
+ */
+const RELEASE = "0.1.0-alpha.18";
+
+/**
+ * The release before {@link RELEASE}.
+ */
+const TRAILING = "0.1.0-alpha.17";
+
+/**
+ * A Next managed boundary file as setup wrote it.
+ */
+const MANAGED_MIDDLEWARE = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
+
+/**
+ * A Next managed boundary file the developer edited.
+ */
+const EDITED_MIDDLEWARE = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+
+/**
+ * A Next 16 app's `package.json`, which has the SDK.
+ */
+const NEXT_16_PACKAGE = {
+  name: "demo",
+  dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
 };
 
+/**
+ * The project's secret.
+ *
+ * @remarks
+ * Created a minute ago, so the claim window reads as open.
+ */
 const SECRET = {
-  project_id: "proj-001",
+  project_id: PROJECT_ID,
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
   primary_origins: [],
   preview_origins: [],
-  // Recent, so the claim window reads as open; the closed-window test writes
-  // its own stale timestamp.
   created_at: new Date(Date.now() - 60_000).toISOString(),
 };
 
-/** A fully healthy Next.js managed project: every check passes against it. */
-async function makeProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-"));
-  tempDirs.push(cwd);
-  await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await mkdir(join(cwd, "app/login"), { recursive: true });
-  await mkdir(join(cwd, "app/register"), { recursive: true });
-  await mkdir(join(cwd, "app/profile"), { recursive: true });
+/**
+ * The SDK packages a doctor names as missing for each framework, as the
+ * framework's own patcher adds them, the widget SDK included.
+ */
+const SDK_PACKAGES_BY_FRAMEWORK = [
+  ["next", { next: "^16" }, "@zitadel/sdk-next"],
+  ["nuxt", { nuxt: "^4" }, "@zitadel/sdk-nuxt"],
+  ["react", { react: "^19", vite: "^8" }, "@zitadel/sdk-react"],
+  ["vue", { vue: "^3.5", vite: "^8" }, "@zitadel/sdk-vue"],
+  ["solid", { "solid-js": "^1.9", vite: "^8" }, "@zitadel/sdk-solid"],
+  ["svelte", { svelte: "^5", vite: "^8" }, "@zitadel/sdk-svelte"],
+  ["qwik", { "@qwik.dev/core": "^2.0.0-beta.45", vite: "^8" }, "@zitadel/sdk-qwik"],
+  ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
+  [
+    "sveltekit",
+    { "@sveltejs/kit": "^3", svelte: "^5" },
+    "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
+  ],
+  [
+    "tanstack-start",
+    { react: "^19", "@tanstack/react-start": "^1.168.10" },
+    "@zitadel/sdk-tanstack-start",
+  ],
+  [
+    "solid-start",
+    { "solid-js": "^1.9", "@solidjs/start": "^2.0.0" },
+    "@zitadel/sdk-solid-start, @zitadel/sdk-solid",
+  ],
+  [
+    "qwik-router",
+    { "@qwik.dev/core": "^2.0.0-beta.45", "@qwik.dev/router": "^2.0.0-beta.45" },
+    "@zitadel/sdk-qwik-router, @zitadel/sdk-qwik",
+  ],
+] as const;
 
-  await writeFile(
-    join(cwd, "package.json"),
-    JSON.stringify({
-      name: "demo",
-      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
-    }),
-  );
-  await writeFile(
-    join(cwd, "zitadel.json"),
-    JSON.stringify({
-      project: "proj-001",
-      server: "https://api.zitadel.cloud",
-      framework: { id: "next" },
-    }),
-  );
-  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
-  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
-  await chmod(join(cwd, ".zitadel/secret"), 0o600);
-  await writeFile(
-    join(cwd, ".gitignore"),
-    [".zitadel/secret", ".env*", "!.env.example"].join("\n"),
-  );
-  await writeFile(
-    join(cwd, ".env.example"),
-    ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
-  );
-  await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
-  await writeFile(
-    join(cwd, "app/login/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function L() {}\n`,
-  );
-  await writeFile(
-    join(cwd, "app/register/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function R() {}\n`,
-  );
-  await writeFile(
-    join(cwd, "app/profile/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function P() {}\n`,
-  );
-  await writeFile(
-    join(cwd, "middleware.ts"),
-    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
-  );
-  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
-  return cwd;
-}
+/**
+ * The Nuxt plugins an older setup wrote and a newer one no longer does.
+ */
+const RETIRED_NUXT_PLUGINS = [
+  "app/plugins/auth.server.ts",
+  "app/plugins/zitadel-components.client.ts",
+] as const;
 
-/** Writes `.zitadel/state.json` carrying a scaffold manifest section. */
-async function writeScaffoldState(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
-  await writeFile(
-    join(cwd, ".zitadel/state.json"),
-    JSON.stringify({ framework: "next", resources: {}, scaffold }),
-  );
-}
-
-async function readScaffoldState(cwd: string): Promise<ScaffoldManifest> {
-  const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
-    scaffold: ScaffoldManifest;
-  };
-  return state.scaffold;
-}
-
-/** A context for checks whose repairs remove nothing, so none of them asks for consent. */
-function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return {
-    cwd,
-    orca: createOrca(),
-    cliVersion: "0.1.0-alpha.0",
-    dryRun,
-    signal,
-    consent: (gate) => Promise.reject(new Error(`unexpected request to ${gate.name}`)),
-  };
+/**
+ * Writes `body` as `.zitadel/secret`, at the 0600 mode doctor asserts.
+ *
+ * @param dir - The project directory.
+ * @param body - The secret's content.
+ */
+async function writeSecret(dir: string, body: object): Promise<void> {
+  await write(dir, { [SECRET_FILE]: JSON.stringify(body) });
+  await chmod(join(dir, SECRET_FILE), 0o600);
 }
 
 /**
- * A healthy Angular managed project with every config wiring applied:
- * `angular.json` carries the proxyConfig + port, the auth routes are in the
- * route table, and a `dev` script exists. The codex-review reproduction:
- * detaching only the angular.json wiring must fail doctor even though all
- * marked files are pristine.
+ * Writes `.zitadel/state.json` for a Next app, carrying `scaffold` as its
+ * scaffold manifest, or none when it is undefined.
+ *
+ * @param dir - The project directory.
+ * @param scaffold - The manifest as it is on disk, which may be malformed.
  */
-async function makeAngularProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-ng-"));
-  tempDirs.push(cwd);
-  await mkdir(join(cwd, ".zitadel"), { recursive: true });
-  await mkdir(join(cwd, "src/app"), { recursive: true });
+async function writeScaffold(dir: string, scaffold?: unknown): Promise<void> {
+  await write(dir, {
+    [STATE_FILE]: JSON.stringify({ framework: "next", resources: {}, scaffold }),
+  });
+}
 
-  await writeFile(
-    join(cwd, "package.json"),
-    JSON.stringify({
+/**
+ * Fills `dir` with a healthy Next.js managed project: every check passes against it.
+ *
+ * @param dir - The directory to fill.
+ */
+async function aNextProject(dir: string): Promise<void> {
+  await write(dir, {
+    "package.json": JSON.stringify({
+      name: "demo",
+      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
+    }),
+    "zitadel.json": JSON.stringify({
+      project: PROJECT_ID,
+      server: CLOUD,
+      framework: { id: "next" },
+    }),
+    ".env.local": `ZITADEL_ISSUER=${ISSUER}\n`,
+    ".gitignore": [SECRET_FILE, ".env*", "!.env.example"].join("\n"),
+    ".env.example": ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
+    [SCHEMA_FILE]: JSON.stringify(aUserSchema()),
+    [LOGIN_PAGE]: `${MANAGED_MARKER}\nexport default function L() {}\n`,
+    [REGISTER_PAGE]: `${MANAGED_MARKER}\nexport default function R() {}\n`,
+    "app/profile/page.tsx": `${MANAGED_MARKER}\nexport default function P() {}\n`,
+    [MIDDLEWARE]: MANAGED_MIDDLEWARE,
+    "custom-elements.d.ts": `${MANAGED_MARKER}\nexport {};\n`,
+  });
+  await writeSecret(dir, SECRET);
+}
+
+/**
+ * Fills `dir` with a healthy Next.js managed project whose dev script is
+ * `devScript` and whose registered issuer is on `issuerPort`.
+ *
+ * @remarks
+ * The dev script is verified against the port the project registered as its
+ * allowed origin, not the port the app starts on now: reading the live script
+ * would verify an edited script against itself, and a repair would write back
+ * the detected fallback instead of the port the server allows.
+ *
+ * @param dir - The directory to fill.
+ * @param devScript - The `dev` script.
+ * @param issuerPort - The port of the issuer `.env.local` names.
+ */
+async function aNextProjectWithDevScript(
+  dir: string,
+  devScript: string,
+  issuerPort: number,
+): Promise<void> {
+  await aNextProject(dir);
+  await write(dir, {
+    "package.json": JSON.stringify({
+      name: "demo",
+      scripts: { dev: devScript },
+      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
+    }),
+    ".env.local": `ZITADEL_ISSUER=http://localhost:${issuerPort}\n`,
+  });
+}
+
+/**
+ * Fills `dir` with a healthy Angular managed project with every config wiring
+ * applied: `angular.json` carries the proxy config and the port, the auth
+ * routes are in the route table, and a `dev` script exists.
+ *
+ * @param dir - The directory to fill.
+ */
+async function anAngularProject(dir: string): Promise<void> {
+  await write(dir, {
+    "package.json": JSON.stringify({
       name: "demo",
       scripts: { dev: "ng serve" },
       dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
     }),
-  );
-  await writeFile(
-    join(cwd, "zitadel.json"),
-    JSON.stringify({
-      project: "proj-001",
-      server: "https://api.zitadel.cloud",
+    "zitadel.json": JSON.stringify({
+      project: PROJECT_ID,
+      server: CLOUD,
       framework: { id: "angular" },
     }),
-  );
-  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:4200\n");
-  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
-  await chmod(join(cwd, ".zitadel/secret"), 0o600);
-  await writeFile(
-    join(cwd, "angular.json"),
-    JSON.stringify({
+    ".env.local": "ZITADEL_ISSUER=http://localhost:4200\n",
+    "angular.json": JSON.stringify({
       projects: {
-        demo: {
-          architect: {
-            serve: { options: { proxyConfig: "proxy.conf.cjs", port: 4200 } },
-          },
-        },
+        demo: { architect: { serve: { options: { proxyConfig: ANGULAR_PROXY, port: 4200 } } } },
       },
     }),
-  );
-  await writeFile(
-    join(cwd, "src/app/app.routes.ts"),
-    [
+    "src/app/app.routes.ts": [
       'import { Routes } from "@angular/router";',
       "",
       "export const routes: Routes = [",
@@ -205,1083 +316,124 @@ async function makeAngularProject(): Promise<string> {
       "];",
       "",
     ].join("\n"),
-  );
-  await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
-  await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
-  await writeFile(join(cwd, "proxy.conf.cjs"), proxyConfTemplate());
-  return cwd;
+    "src/app/app.ts": `${MANAGED_MARKER}\nexport class App {}\n`,
+    "src/app/app.html": `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`,
+    [ANGULAR_PROXY]: proxyConfTemplate(),
+  });
+  await writeSecret(dir, SECRET);
 }
 
 /**
- * A Nuxt 4 app as an older setup left it: every page and plugin it wrote is
- * on disk, and its manifest records both plugins as infrastructure.
+ * Fills `dir` with a Nuxt 4 app as an older setup left it: every page and
+ * plugin it wrote is on disk, and its manifest records both plugins as
+ * infrastructure.
+ *
+ * @param dir - The directory to fill.
  */
-async function makeOlderNuxtProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-nuxt-"));
-  tempDirs.push(cwd);
-  await mkdir(join(cwd, ".zitadel"), { recursive: true });
-  await mkdir(join(cwd, "app/pages"), { recursive: true });
-  await mkdir(join(cwd, "app/plugins"), { recursive: true });
-  await writeFile(
-    join(cwd, "package.json"),
-    JSON.stringify({
+async function anOlderNuxtProject(dir: string): Promise<void> {
+  const contents = `// ${MANAGED_MARKER}\n`;
+  const hash = hashScaffoldFile(contents);
+  const pages = ["app/pages/login.vue", "app/pages/register.vue", "app/pages/profile.vue"];
+  await write(dir, {
+    "package.json": JSON.stringify({
       name: "demo",
       dependencies: { nuxt: "^4.1.0", "@zitadel/sdk-nuxt": "latest" },
     }),
-  );
-  await writeFile(
-    join(cwd, "zitadel.json"),
-    JSON.stringify({
-      project: "proj-001",
-      server: "https://api.zitadel.cloud",
+    "zitadel.json": JSON.stringify({
+      project: PROJECT_ID,
+      server: CLOUD,
       framework: { id: "nuxt" },
-      environments: { development: { issuer: "http://localhost:3000" } },
+      environments: { development: { issuer: ISSUER } },
     }),
-  );
-  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
-  await chmod(join(cwd, ".zitadel/secret"), 0o600);
-  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
-  const files: ScaffoldManifest["files"] = {};
-  for (const [path, cls] of [
-    ["app/pages/login.vue", "presentation"],
-    ["app/pages/register.vue", "presentation"],
-    ["app/pages/profile.vue", "presentation"],
-    ["app/plugins/zitadel-components.client.ts", "infrastructure"],
-    ["app/plugins/auth.server.ts", "infrastructure"],
-  ] as const) {
-    const contents = `// ${MANAGED_MARKER}\n`;
-    await writeFile(join(cwd, path), contents);
-    files[path] = { hash: hashScaffoldFile(contents), class: cls };
-  }
-  await writeFile(
-    join(cwd, ".zitadel/state.json"),
-    JSON.stringify({ framework: "nuxt", resources: {}, scaffold: { files } }),
-  );
-  return cwd;
-}
-
-/** Rewrites angular.json with the serve proxyConfig wiring removed. */
-async function detachAngularProxy(cwd: string): Promise<void> {
-  await writeFile(
-    join(cwd, "angular.json"),
-    JSON.stringify({
-      projects: { demo: { architect: { serve: { options: { port: 4200 } } } } },
-    }),
-  );
-}
-
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
-describe("ConfigCheck", () => {
-  it("passes when zitadel.json parses", async () => {
-    const cwd = await makeProject();
-    expect((await new ConfigCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails when zitadel.json is missing", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, "zitadel.json"));
-    expect((await new ConfigCheck().run(ctxFor(cwd))).status).toBe("fail");
-  });
-
-  it("has a no-op fix (no override) that does not throw", async () => {
-    const cwd = await makeProject();
-    await expect(new ConfigCheck().fix(ctxFor(cwd))).resolves.toBeUndefined();
-  });
-});
-
-describe("SecretCheck", () => {
-  it("passes when .zitadel/secret parses", async () => {
-    const cwd = await makeProject();
-    expect((await new SecretCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails when .zitadel/secret is missing", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, ".zitadel/secret"));
-    expect((await new SecretCheck().run(ctxFor(cwd))).status).toBe("fail");
-  });
-});
-
-describe("SecretPermissionsCheck", () => {
-  it("passes at 0600 and fails at 0644", async () => {
-    const cwd = await makeProject();
-    expect((await new SecretPermissionsCheck().run(ctxFor(cwd))).status).toBe("pass");
-    await chmod(join(cwd, ".zitadel/secret"), 0o644);
-    expect((await new SecretPermissionsCheck().run(ctxFor(cwd))).status).toBe("fail");
-  });
-
-  it("fix re-locks the secret to 0600", async () => {
-    const cwd = await makeProject();
-    await chmod(join(cwd, ".zitadel/secret"), 0o644);
-    await new SecretPermissionsCheck().fix(ctxFor(cwd));
-    expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);
-  });
-
-  it("fix is a no-op under dryRun", async () => {
-    const cwd = await makeProject();
-    await chmod(join(cwd, ".zitadel/secret"), 0o644);
-    await new SecretPermissionsCheck().fix(ctxFor(cwd, true));
-    expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o644);
-  });
-});
-
-describe("GitignoreCheck", () => {
-  it("fails when an entry is missing, then fix appends it", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, ".gitignore"), ".zitadel/secret\n");
-    const check = new GitignoreCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-    const contents = await readFile(join(cwd, ".gitignore"), "utf8");
-    expect(contents).toContain(".env*");
-    expect(contents).toContain("!.env.example");
-  });
-
-  it("fix creates .gitignore when it is absent", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, ".gitignore"));
-    const check = new GitignoreCheck();
-    await check.fix(ctxFor(cwd));
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fix is a no-op under dryRun", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, ".gitignore"), ".zitadel/secret\n");
-    const check = new GitignoreCheck();
-    await check.fix(ctxFor(cwd, true));
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-  });
-});
-
-describe("MetaSchemasCheck", () => {
-  /** Writes every meta-schema as setup does for `cliVersion`. */
-  async function writeMetaSchemas(cwd: string, cliVersion = ctxFor(cwd).cliVersion): Promise<void> {
-    for (const file of projectMetaSchemas(cliVersion)) {
-      await mkdir(join(cwd, file.path, ".."), { recursive: true });
-      await writeFile(join(cwd, file.path), file.contents);
-    }
-  }
-
-  /** A meta-schema file the project holds, by name. */
-  const metaFile = (name: string) => `.zitadel/meta/${name}`;
-
-  it("passes when the project holds this CLI's schemas", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-
-    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("warns on a missing schema and names doctor --fix", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    await rm(join(cwd, metaFile("branding.json")));
-
-    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.details).toEqual({ missing: [metaFile("branding.json")], outdated: [] });
-    expect(outcome.message).toContain("doctor --fix writes this version's");
-  });
-
-  it("passes schemas another CLI version wrote when only the version differs", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd, "0.2.0");
-    const held = await readFile(join(cwd, metaFile("branding.json")), "utf8");
-    const current = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
-      (meta) => meta.path === metaFile("branding.json"),
-    );
-    expect(held).not.toBe(current?.contents);
-
-    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("reports a schema it cannot read, and fix leaves it alone", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    await rm(join(cwd, metaFile("branding.json")));
-    await mkdir(join(cwd, metaFile("branding.json")));
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd));
-    const outcome = await check.run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.details).toEqual({
-      missing: [],
-      outdated: [],
-      unreadable: [{ path: metaFile("branding.json"), reason: "EISDIR" }],
-    });
-    expect(outcome.message).not.toContain("doctor --fix");
-  });
-
-  it("reports a schema that is a symlink, and fix leaves its target alone", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
-    await rm(join(cwd, metaFile("branding.json")));
-    await symlink("../secret", join(cwd, metaFile("branding.json")));
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd));
-    const outcome = await check.run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.details).toEqual({
-      missing: [],
-      outdated: [],
-      linked: [metaFile("branding.json")],
-    });
-    expect(outcome.message).toContain(`${metaFile("branding.json")} is a symbolic link`);
-    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
-      '{"project_secret": "sk_proj_test"}\n',
-    );
-    expect((await lstat(join(cwd, metaFile("branding.json")))).isSymbolicLink()).toBe(true);
-  });
-
-  it("writes nothing through a symlinked .zitadel/meta/", async () => {
-    const cwd = await makeProject();
-    const elsewhere = await makeProject();
-    await mkdir(join(cwd, ".zitadel"), { recursive: true });
-    await symlink(elsewhere, join(cwd, ".zitadel/meta"));
-    const before = await readdir(elsewhere);
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd));
-    const outcome = await check.run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.details).toEqual({ missing: [], outdated: [], linked: [".zitadel/meta"] });
-    expect(await readdir(elsewhere)).toEqual(before);
-  });
-
-  it("passes a symlinked .zitadel/meta/ that holds this CLI's schemas", async () => {
-    const cwd = await makeProject();
-    const shared = await makeProject();
-    await writeMetaSchemas(shared);
-    await mkdir(join(cwd, ".zitadel"), { recursive: true });
-    await symlink(join(shared, ".zitadel/meta"), join(cwd, ".zitadel/meta"));
-
-    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("writes nothing when the project pins a newer @zitadel/* version", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "a newer dialect"}\n');
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ dependencies: { "@zitadel/sdk-next": "0.2.0" } }),
-    );
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd));
-    const outcome = await check.run(ctxFor(cwd));
-
-    expect(outcome.details).toMatchObject({
-      outdated: [metaFile("flow-definition.json")],
-      newer_pin: { name: "@zitadel/sdk-next", version: "0.2.0" },
-    });
-    expect(outcome.message).not.toContain("doctor --fix writes");
-    expect(await readFile(join(cwd, metaFile("flow-definition.json")), "utf8")).toBe(
-      '{"title": "a newer dialect"}\n',
-    );
-  });
-
-  it("warns on a schema that differs from this CLI's", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "an older dialect"}\n');
-
-    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.details).toMatchObject({ outdated: [metaFile("flow-definition.json")] });
-  });
-
-  it("passes a schema that only differs in key order or formatting", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    const file = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
-      (meta) => meta.path === metaFile("branding.json"),
-    );
-    const reordered = Object.fromEntries(Object.entries(file?.body ?? {}).reverse());
-    await writeFile(join(cwd, metaFile("branding.json")), JSON.stringify(reordered));
-
-    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fix writes the missing and outdated schemas and leaves other files alone", async () => {
-    const cwd = await makeProject();
-    await writeMetaSchemas(cwd);
-    await rm(join(cwd, metaFile("branding.json")));
-    await writeFile(join(cwd, metaFile("flow-definition.json")), "{}\n");
-    await writeFile(join(cwd, metaFile("mine.json")), '{"kept": true}\n');
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-    expect(await readFile(join(cwd, metaFile("mine.json")), "utf8")).toBe('{"kept": true}\n');
-  });
-
-  it("fix creates .zitadel/meta/ when the project has none", async () => {
-    const cwd = await makeProject();
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fix is a no-op under dryRun", async () => {
-    const cwd = await makeProject();
-    const check = new MetaSchemasCheck();
-
-    await check.fix(ctxFor(cwd, true));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
-  });
-});
-
-describe("EnvExampleCheck", () => {
-  it("fails when a key is missing, then fix appends it", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, ".env.example"), "ZITADEL_PROJECT_ID=\n");
-    const check = new EnvExampleCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-    const contents = await readFile(join(cwd, ".env.example"), "utf8");
-    expect(contents).toContain("ZITADEL_ISSUER=");
-  });
-
-  it("fix is a no-op under dryRun", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, ".env.example"), "ZITADEL_PROJECT_ID=\n");
-    const check = new EnvExampleCheck();
-    await check.fix(ctxFor(cwd, true));
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-  });
-});
-
-describe("FrameworkCheck", () => {
-  it("passes when detected framework matches the recorded one", async () => {
-    const cwd = await makeProject();
-    expect((await new FrameworkCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails when the recorded framework disagrees with detection", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({ project: "proj-001", server: "x", framework: { id: "vue" } }),
-    );
-    expect((await new FrameworkCheck().run(ctxFor(cwd))).status).toBe("fail");
-  });
-
-  it("fails with the version floor when the app dropped below Next 15", async () => {
-    // A scaffolded app later downgraded (or a pre-floor scaffold): doctor
-    // must say why the integration is unsupported, not crash or pass.
-    const cwd = await makeProject();
-    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
-      dependencies: Record<string, string>;
-    };
-    pkg.dependencies.next = "^14.2.0";
-    await writeFile(join(cwd, "package.json"), JSON.stringify(pkg));
-    const outcome = await new FrameworkCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("below the supported floor");
-    // The typed error's category and remedy travel through the outcome so
-    // the doctor envelope can surface them instead of generic --fix advice.
-    expect(outcome.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
-    expect(outcome.hint).toContain("Upgrade");
-  });
-});
-
-describe("SchemaCheck", () => {
-  it("passes for a valid JSON Schema", async () => {
-    const cwd = await makeProject();
-    expect((await new SchemaCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails for a malformed JSON Schema", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: 123 }));
-    expect((await new SchemaCheck().run(ctxFor(cwd))).status).toBe("fail");
-  });
-
-  it("fails when the kind discriminator is missing", async () => {
-    const cwd = await makeProject();
-    // Valid JSON Schema, but no `kind: "user-schema" | "schema-url"` —
-    // the platform would reject this at apply; doctor must catch it locally.
-    await writeFile(
-      join(cwd, ".zitadel/schemas/user.json"),
-      JSON.stringify({ type: "object", properties: { email: { type: "string" } } }),
-    );
-    const outcome = await new SchemaCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("fail");
-  });
-
-  it("fails on an x-auth-methods key that is no authentication method", async () => {
-    const cwd = await makeProject();
-    const file = join(cwd, ".zitadel/schemas/user.json");
-    const schema = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
-    schema["x-auth-methods"] = { pasword: { enabled: true } };
-    await writeFile(file, JSON.stringify(schema));
-    const outcome = await new SchemaCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("x-auth-methods pasword is not");
-  });
-});
-
-describe("DependencyCheck", () => {
-  it("passes when a @zitadel package is declared", async () => {
-    const cwd = await makeProject();
-    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails when no @zitadel package is present", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
-    );
-    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
-  });
-
-  // The check asks each framework's own patcher which SDK packages it adds, so one row
-  // per framework pins that the doctor names exactly those, the widget SDK included.
-  it.each([
-    ["next", { next: "^16" }, "@zitadel/sdk-next"],
-    ["nuxt", { nuxt: "^4" }, "@zitadel/sdk-nuxt"],
-    ["react", { react: "^19", vite: "^8" }, "@zitadel/sdk-react"],
-    ["vue", { vue: "^3.5", vite: "^8" }, "@zitadel/sdk-vue"],
-    ["solid", { "solid-js": "^1.9", vite: "^8" }, "@zitadel/sdk-solid"],
-    ["svelte", { svelte: "^5", vite: "^8" }, "@zitadel/sdk-svelte"],
-    ["qwik", { "@qwik.dev/core": "^2.0.0-beta.45", vite: "^8" }, "@zitadel/sdk-qwik"],
-    ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
-    [
-      "sveltekit",
-      { "@sveltejs/kit": "^3", svelte: "^5" },
-      "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
-    ],
-    [
-      "tanstack-start",
-      { react: "^19", "@tanstack/react-start": "^1.168.10" },
-      "@zitadel/sdk-tanstack-start",
-    ],
-    [
-      "solid-start",
-      { "solid-js": "^1.9", "@solidjs/start": "^2.0.0" },
-      "@zitadel/sdk-solid-start, @zitadel/sdk-solid",
-    ],
-    [
-      "qwik-router",
-      { "@qwik.dev/core": "^2.0.0-beta.45", "@qwik.dev/router": "^2.0.0-beta.45" },
-      "@zitadel/sdk-qwik-router, @zitadel/sdk-qwik",
-    ],
-  ])("requires the %s SDK package, not just the CLI", async (_framework, dependencies, missing) => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies,
-        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+    "nuxt.config.ts": "export default defineNuxtConfig({});\n",
+    ...Object.fromEntries(
+      [...pages, ...RETIRED_NUXT_PLUGINS].map((path) => {
+        return [path, contents];
       }),
-    );
-    const outcome = await new DependencyCheck().run(ctxFor(cwd));
-    expect(outcome).toMatchObject({
-      status: "fail",
-      message: `package.json does not declare ${missing}, which the app imports`,
-    });
-  });
-
-  it("fails when the only @zitadel package is not the SDK the app imports", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^15" },
-        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
-      }),
-    );
-    const outcome = await new DependencyCheck().run(ctxFor(cwd));
-    expect(outcome).toMatchObject({
-      status: "fail",
-      message: "package.json does not declare @zitadel/sdk-next, which the app imports",
-    });
-  });
-
-  it("fails a meta-framework app that lacks the widget SDK its pages import", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { "@sveltejs/kit": "^3", svelte: "^5", "@zitadel/sdk-sveltekit": "latest" },
-      }),
-    );
-    const outcome = await new DependencyCheck().run(ctxFor(cwd));
-    expect(outcome.message).toBe(
-      "package.json does not declare @zitadel/sdk-svelte, which the app imports",
-    );
-  });
-
-  it("passes a meta-framework app that declares both of its SDKs", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: {
-          "@sveltejs/kit": "^3",
-          svelte: "^5",
-          "@zitadel/sdk-sveltekit": "latest",
-          "@zitadel/sdk-svelte": "latest",
-        },
-      }),
-    );
-    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fix re-adds the SDK an app kept only the CLI in place of", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^15" },
-        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
-      }),
-    );
-    const check = new DependencyCheck();
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fix re-adds the SDK dependency via the patcher", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
-    );
-    const check = new DependencyCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fix does not create proxy.ts beside an edited middleware.ts when the SDK is missing", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^16" },
-        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
-      }),
-    );
-    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
-    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
-    await writeScaffoldState(cwd, {
-      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
-    });
-
-    await new DependencyCheck().fix(ctxFor(cwd));
-
-    expect(await readFile(join(cwd, "package.json"), "utf8")).toContain("@zitadel/sdk-next");
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
-    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-  });
-
-  it("fix reclaims proxy.ts for Next 16 projects", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
-    );
-    await rm(join(cwd, "middleware.ts"));
-
-    await new DependencyCheck().fix(ctxFor(cwd));
-
-    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).resolves.toContain(
-      "export function proxy(",
-    );
-    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-  });
-});
-
-describe("ManagedFilesCheck", () => {
-  type ManagedDetails = {
-    mode: "manifest" | "template";
-    files: Array<{ path: string; class: string; state: string }>;
-  };
-
-  it("passes for a healthy scaffold without a manifest (template mode)", async () => {
-    const cwd = await makeProject();
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("pass");
-    const details = outcome.details as ManagedDetails;
-    expect(details.mode).toBe("template");
-    // The framework home page is conditionally scaffolded (fresh apps only)
-    // and must not be demanded of a pre-existing app without a manifest.
-    expect(details.files.map((file) => file.path)).not.toContain("app/page.tsx");
-    expect(details.files).toHaveLength(5);
-  });
-
-  it("fails when an infrastructure file is missing", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, "middleware.ts"));
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("middleware.ts");
-  });
-
-  it("warns (not fails) when a presentation page is missing", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, "app/login/page.tsx"));
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("app/login/page.tsx");
-  });
-
-  it("passes for a user-adopted page (marker removed)", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Mine() {}\n");
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("pass");
-    const details = outcome.details as ManagedDetails;
-    expect(details.files.find((file) => file.path === "app/register/page.tsx")?.state).toBe(
-      "adopted",
-    );
-  });
-
-  it("warns instead of failing when nothing can be enumerated", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-bare-"));
-    tempDirs.push(cwd);
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("Could not enumerate");
-  });
-
-  it("template-mode fix restores a deleted boundary and leaves an edited page untouched", async () => {
-    const cwd = await makeProject();
-    const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "custom"; }\n`;
-    await writeFile(join(cwd, "app/login/page.tsx"), editedLogin);
-    await rm(join(cwd, "middleware.ts"));
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
-    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toBe(editedLogin);
-  });
-
-  it("trusts the manifest over current templates", async () => {
-    const cwd = await makeProject();
-    const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
-    await writeScaffoldState(cwd, {
-      files: { "middleware.ts": { hash: hashScaffoldFile(middleware), class: "infrastructure" } },
-    });
-    // Deleting a file the manifest never recorded must not matter.
-    await rm(join(cwd, "custom-elements.d.ts"));
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("pass");
-    const details = outcome.details as ManagedDetails;
-    expect(details.mode).toBe("manifest");
-    expect(details.files).toHaveLength(1);
-    expect(details.files[0]).toMatchObject({ path: "middleware.ts", state: "pristine" });
-  });
-
-  it("classifies edited files via the recorded hash", async () => {
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, {
-      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
-    });
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("pass");
-    const details = outcome.details as ManagedDetails;
-    expect(details.files[0]?.state).toBe("edited");
-  });
-
-  it("fails on missing manifest infrastructure; fix restores it and refreshes the hash", async () => {
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, {
-      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
-    });
-    await rm(join(cwd, "middleware.ts"));
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    await check.fix(ctxFor(cwd));
-
-    const outcome = await check.run(ctxFor(cwd));
-    expect(outcome.status).toBe("pass");
-    expect((outcome.details as ManagedDetails).files[0]?.state).toBe("pristine");
-    const restored = await readFile(join(cwd, "middleware.ts"), "utf8");
-    expect(restored).toContain(MANAGED_MARKER);
-    expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe(
-      hashScaffoldFile(restored),
-    );
-    // Without `scaffolded_framework` in the manifest, repair must not have
-    // invented a framework home page.
-    await expect(readFile(join(cwd, "app/page.tsx"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-  });
-
-  it("fix never touches edited or adopted files", async () => {
-    const cwd = await makeProject();
-    const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "edited"; }\n`;
-    const adoptedRegister = "export default function Own() {}\n";
-    await writeFile(join(cwd, "app/login/page.tsx"), editedLogin);
-    await writeFile(join(cwd, "app/register/page.tsx"), adoptedRegister);
-    await writeScaffoldState(cwd, {
-      files: {
-        "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" },
-        "app/login/page.tsx": { hash: "1".repeat(64), class: "presentation" },
-        "app/register/page.tsx": { hash: "2".repeat(64), class: "presentation" },
+    ),
+    [STATE_FILE]: JSON.stringify({
+      framework: "nuxt",
+      resources: {},
+      scaffold: {
+        files: Object.fromEntries([
+          ...pages.map((path) => {
+            return [path, { hash, class: "presentation" }];
+          }),
+          ...RETIRED_NUXT_PLUGINS.map((path) => {
+            return [path, { hash, class: "infrastructure" }];
+          }),
+        ]),
       },
-    });
-    await rm(join(cwd, "middleware.ts"));
-
-    await new ManagedFilesCheck().fix(ctxFor(cwd));
-
-    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toBe(editedLogin);
-    expect(await readFile(join(cwd, "app/register/page.tsx"), "utf8")).toBe(adoptedRegister);
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    }),
   });
+  await writeSecret(dir, SECRET);
+}
 
-  it("fix previews without writing under dryRun", async () => {
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, {
-      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
-    });
-    await rm(join(cwd, "middleware.ts"));
-
-    await new ManagedFilesCheck().fix(ctxFor(cwd, true));
-
-    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-    expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe("0".repeat(64));
-  });
-
-  it("fix never re-pins an already-declared SDK dependency version", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^15", "@zitadel/sdk-next": "user-pinned-0.0.1" },
+/**
+ * Writes every meta-schema as setup does for `cliVersion`.
+ *
+ * @param dir - The project directory.
+ * @param cliVersion - The CLI version whose schemas to write.
+ */
+async function writeTheMetaSchemas(dir: string, cliVersion = CHECK_CLI_VERSION): Promise<void> {
+  await write(
+    dir,
+    Object.fromEntries(
+      projectMetaSchemas(cliVersion).map((file) => {
+        return [file.path, file.contents];
       }),
-    );
-    await rm(join(cwd, "middleware.ts"));
+    ),
+  );
+}
 
-    await new ManagedFilesCheck().fix(ctxFor(cwd));
-
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
-    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
-      dependencies: Record<string, string>;
-    };
-    expect(pkg.dependencies["@zitadel/sdk-next"]).toBe("user-pinned-0.0.1");
+/**
+ * This CLI's meta-schema at `path`.
+ *
+ * @param path - The meta-schema's project-relative path.
+ * @returns The meta-schema.
+ * @throws When this CLI ships none there.
+ */
+function thisCliMetaSchema(path: string): ProjectMetaSchema {
+  const file = projectMetaSchemas(CHECK_CLI_VERSION).find((meta) => {
+    return meta.path === path;
   });
-
-  it("degrades to template mode when a manifest entry is malformed", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, ".zitadel/state.json"),
-      JSON.stringify({
-        framework: "next",
-        resources: {},
-        scaffold: { files: { "middleware.ts": null } },
-      }),
-    );
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("pass");
-    expect((outcome.details as ManagedDetails).mode).toBe("template");
-  });
-
-  it("template-mode fix materializes a manifest for pre-manifest apps", async () => {
-    const cwd = await makeProject();
-    // A pre-manifest app: state.json exists (sync resources) but has no
-    // scaffold section. One page was adopted by the user; the boundary is
-    // missing.
-    await writeFile(
-      join(cwd, ".zitadel/state.json"),
-      JSON.stringify({ framework: "next", resources: {} }),
-    );
-    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Own() {}\n");
-    await rm(join(cwd, "middleware.ts"));
-    const check = new ManagedFilesCheck();
-    expect(((await check.run(ctxFor(cwd))).details as ManagedDetails).mode).toBe("template");
-
-    await check.fix(ctxFor(cwd));
-
-    const scaffold = await readScaffoldState(cwd);
-    expect(scaffold.files["middleware.ts"]?.class).toBe("infrastructure");
-    expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
-    // Adopted and conditionally-scaffolded files stay out of the manifest.
-    expect(scaffold.files).not.toHaveProperty("app/register/page.tsx");
-    expect(scaffold.files).not.toHaveProperty("app/page.tsx");
-    const after = await check.run(ctxFor(cwd));
-    expect(after.status).toBe("pass");
-    expect((after.details as ManagedDetails).mode).toBe("manifest");
-  });
-
-  // The dev script has to be verified against the port the project
-  // *registered* as its allowed origin, not the port the app happens to start
-  // on now. Those agree at setup and diverge exactly when it matters: reading
-  // the live script would make any edited script verify against itself, and
-  // would make `--fix` write back the detected fallback instead of the port
-  // the server actually allows — leaving login broken while doctor says the
-  // wiring is applied.
-  async function makeNextProjectWithDevScript(devScript: string, issuerPort: number) {
-    const cwd = await makeProject();
-    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ ...pkg, scripts: { dev: devScript } }),
-    );
-    await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=http://localhost:${issuerPort}\n`);
-    return cwd;
+  if (file === undefined) {
+    throw new Error(`no meta-schema at ${path}`);
   }
+  return file;
+}
 
-  function devScriptOf(cwd: string): Promise<string> {
-    return readFile(join(cwd, "package.json"), "utf8").then(
-      (raw) => (JSON.parse(raw) as { scripts: { dev: string } }).scripts.dev,
+/**
+ * The managed Angular proxy as the v2 template wrote it, which attaches the
+ * project secret only to the exchange at the root.
+ *
+ * @returns The proxy's source.
+ * @throws When the current template no longer holds what the v2 one lacked.
+ */
+function aV2ProxyConf(): string {
+  const v2 = proxyConfTemplate()
+    .replace("/* zitadel:proxy:v3 */", "/* zitadel:proxy:v2 */")
+    .replace(
+      '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")',
+      'pathname === "/sessions/exchange"',
     );
+  if (v2 === proxyConfTemplate()) {
+    throw new Error("the template no longer differs from the v2 proxy");
   }
+  return v2;
+}
 
-  it("reports the dev script as applied only when it serves the registered port", async () => {
-    const cwd = await makeNextProjectWithDevScript("next dev --port 3456", 3456);
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("pass");
-  });
-
-  it("flags a dev script edited to a port the project does not allow", async () => {
-    // Detection would report 4000 and happily verify it against itself.
-    const cwd = await makeNextProjectWithDevScript("next dev --port 4000", 3456);
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("unapplied managed config edit(s): package.json");
-  });
-
-  it("--fix restores the registered port, not the detected fallback", async () => {
-    // No declaration at all: detection falls back to 3000, so a fix driven by
-    // the live script would write 3000 and keep login broken.
-    const cwd = await makeNextProjectWithDevScript("next dev", 3456);
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
-
-    await check.fix(ctxFor(cwd));
-
-    expect(await devScriptOf(cwd)).toBe("next dev --port 3456");
-    expect(await devScriptOf(cwd)).not.toContain("3000");
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails when a managed config wiring is detached, and --fix re-applies it", async () => {
-    const cwd = await makeAngularProject();
-    const check = new ManagedFilesCheck();
-    const healthy = await check.run(ctxFor(cwd));
-    expect(healthy.status).toBe("pass");
-    expect(healthy.message).toContain("wirings verified");
-
-    // The codex repro: only the angular.json proxy wiring is removed — every
-    // marked file stays pristine, yet auth requests are broken.
-    await detachAngularProxy(cwd);
-    const detached = await check.run(ctxFor(cwd));
-    expect(detached.status).toBe("fail");
-    expect(detached.message).toContain("detached managed config wiring: angular.json");
-
-    await check.fix(ctxFor(cwd));
-
-    const repaired = await check.run(ctxFor(cwd));
-    expect(repaired.status).toBe("pass");
-    const angularJson = JSON.parse(await readFile(join(cwd, "angular.json"), "utf8")) as {
-      projects: { demo: { architect: { serve: { options: Record<string, unknown> } } } };
-    };
-    expect(angularJson.projects.demo.architect.serve.options.proxyConfig).toBe("proxy.conf.cjs");
-  });
-
-  it("fails when a wiring's host config file is deleted outright", async () => {
-    const cwd = await makeAngularProject();
-    await rm(join(cwd, "angular.json"));
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("detached managed config wiring: angular.json");
-  });
-
-  it("warns unverifiable when a wiring's config was restructured beyond the transform", async () => {
-    const cwd = await makeAngularProject();
-    // Two projects, no defaultProject: the transform throws rather than
-    // guessing — the wiring state is unknown, which must surface, not vanish.
-    await writeFile(join(cwd, "angular.json"), JSON.stringify({ projects: { a: {}, b: {} } }));
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("unverifiable managed config wiring");
-    expect(outcome.message).toContain("angular.json");
-  });
-
-  // Sign-in works without the session-cookie hooks (ADR 073); without them the
-  // Console and the app share one session cookie on localhost.
-  it("warns while the managed proxy lacks the session-cookie hooks, and --fix adds them", async () => {
-    const cwd = await makeAngularProject();
-    const proxyPath = join(cwd, "proxy.conf.cjs");
-    await writeFile(proxyPath, bearerOnlyProxyConf());
-    const check = new ManagedFilesCheck();
-
-    const outcome = await check.run(ctxFor(cwd));
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain(
-      "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
-    );
-
-    await check.fix(ctxFor(cwd));
-
-    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  // The packages call /api/v1 (ADR 077), and a v2 proxy attaches the project
-  // secret only to the exchange at the root: sign-in fails.
-  it("fails while the managed proxy knows only the bare exchange, and --fix moves it to both paths", async () => {
-    const cwd = await makeAngularProject();
-    const proxyPath = join(cwd, "proxy.conf.cjs");
-    const v2 = proxyConfTemplate()
-      .replace("/* zitadel:proxy:v3 */", "/* zitadel:proxy:v2 */")
-      .replace(
-        '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")',
-        'pathname === "/sessions/exchange"',
-      );
-    expect(v2).not.toBe(proxyConfTemplate());
-    await writeFile(proxyPath, v2);
-    const check = new ManagedFilesCheck();
-
-    const outcome = await check.run(ctxFor(cwd));
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("detached managed config wiring: proxy.conf.cjs");
-
-    await check.fix(ctxFor(cwd));
-
-    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  // Hooks from before ADR 083 keep the session in cookies the server no longer
-  // reads: there is no interval in which they count as compatible.
-  it("fails on the session-cookie hooks from before ADR 083, and --fix replaces them", async () => {
-    const cwd = await makeAngularProject();
-    const proxyPath = join(cwd, "proxy.conf.cjs");
-    await writeFile(proxyPath, v1ProxyConf());
-    const check = new ManagedFilesCheck();
-
-    const outcome = await check.run(ctxFor(cwd));
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("outdated managed config wiring: proxy.conf.cjs");
-    expect(outcome.message).toContain("doctor --fix updates them");
-
-    await check.fix(ctxFor(cwd));
-
-    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("fails on hooks from before ADR 083 changed by hand, and leaves them to the developer", async () => {
-    const cwd = await makeAngularProject();
-    const proxyPath = join(cwd, "proxy.conf.cjs");
-    const changed = v1ProxyConf().replace(
-      "function renameSessionCookie(proxyRes) {",
-      'function renameSessionCookie(proxyRes) {\n  console.debug("cookies");',
-    );
-    await writeFile(proxyPath, changed);
-    const check = new ManagedFilesCheck();
-
-    const outcome = await check.run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("must be updated by hand");
-    await check.fix(ctxFor(cwd));
-    expect(await readFile(proxyPath, "utf8")).toBe(changed);
-  });
-
-  // The edit leaves a managed proxy it cannot recognize as it is, so that
-  // --fix does not fail; the doctor must not read that as applied.
-  it("warns that the session-cookie hooks need adding by hand to a managed proxy changed since", async () => {
-    const cwd = await makeAngularProject();
-    const proxyPath = join(cwd, "proxy.conf.cjs");
-    const reformatted = bearerOnlyProxyConf().replace(
-      'configure: (proxy) => proxy.on("proxyReq", setBearer),',
-      "configure: (proxy) => proxy.on('proxyReq', setBearer),",
-    );
-    await writeFile(proxyPath, reformatted);
-    const check = new ManagedFilesCheck();
-
-    const outcome = await check.run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("unverifiable managed config wiring");
-    expect(outcome.message).toContain("session-cookie hooks (ADR 073) must be added by hand");
-    await check.fix(ctxFor(cwd));
-    expect(await readFile(proxyPath, "utf8")).toBe(reformatted);
-  });
-
-  it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
-    const cwd = await makeAngularProject();
-    const proxyPath = join(cwd, "proxy.conf.cjs");
-    const managed = await readFile(proxyPath, "utf8");
-    const unsafe = managed.replace(
-      `/* zitadel:proxy:v3 */
+/**
+ * The managed Angular proxy rewritten so its bearer is set on every request,
+ * in a shape no template matches.
+ *
+ * @returns The proxy's source.
+ * @throws When the current template no longer holds the guarded bearer.
+ */
+function anUnguardedProxyConf(): string {
+  const managed = proxyConfTemplate();
+  const unsafe = managed.replace(
+    `/* zitadel:proxy:v3 */
 function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
@@ -1292,558 +444,2114 @@ function setBearer(proxyReq) {
     proxyReq.setHeader("authorization", bearer);
   }
 }`,
-      `function setBearer(proxyReq) {
+    `function setBearer(proxyReq) {
   proxyReq
     .setHeader("authorization", bearer);
 }`,
-    );
-    expect(unsafe).not.toBe(managed);
-    await writeFile(proxyPath, unsafe);
+  );
+  if (unsafe === managed) {
+    throw new Error("the template no longer holds the guarded bearer");
+  }
+  return unsafe;
+}
 
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+/**
+ * The managed proxy's session-cookie hooks from before ADR 083, changed by
+ * hand so no template matches them.
+ *
+ * @returns The proxy's source.
+ */
+function aHandChangedV1ProxyConf(): string {
+  return v1ProxyConf().replace(
+    "function renameSessionCookie(proxyRes) {",
+    'function renameSessionCookie(proxyRes) {\n  console.debug("cookies");',
+  );
+}
 
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("proxy.conf.cjs");
-    expect(outcome.message).toContain(
-      "may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange",
-    );
-  });
+/**
+ * The bearer-only managed proxy reformatted, so no template matches it and a
+ * repair cannot add the session-cookie hooks.
+ *
+ * @returns The proxy's source.
+ */
+function aReformattedBearerOnlyProxyConf(): string {
+  return bearerOnlyProxyConf().replace(
+    'configure: (proxy) => proxy.on("proxyReq", setBearer),',
+    "configure: (proxy) => proxy.on('proxyReq', setBearer),",
+  );
+}
 
-  it("migrates a pristine retired boundary: --fix removes middleware.ts and installs proxy.ts", async () => {
-    const cwd = await makeProject();
-    const middleware = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
-      }),
-    );
-    await writeScaffoldState(cwd, {
-      files: {
-        "middleware.ts": { hash: hashScaffoldFile(middleware), class: "infrastructure" },
-      },
-    });
-    const check = new ManagedFilesCheck();
-    const before = await check.run(ctxFor(cwd));
-    expect(before.status).toBe("warn");
-    expect(before.message).toContain("retired boundary middleware.ts left over");
+/**
+ * The text of a file in the project.
+ *
+ * @param dir - The project directory.
+ * @param path - The file's project-relative path.
+ * @returns Its content.
+ */
+function textOf(dir: string, path: string): Promise<string> {
+  return readFile(join(dir, path), "utf8");
+}
 
-    await check.fix(ctxFor(cwd));
+describe("ConfigCheck", () => {
+  it("passes when zitadel.json parses", async ({ dir }) => {
+    await aNextProject(dir);
 
-    // The pristine leftover is gone, the current boundary exists, and the
-    // manifest swapped over — Next 16 would reject the pair.
-    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-    expect(await readFile(join(cwd, "proxy.ts"), "utf8")).toContain(MANAGED_MARKER);
-    const scaffold = await readScaffoldState(cwd);
-    expect(scaffold.files).not.toHaveProperty("middleware.ts");
-    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("refuses to create proxy.ts beside an edited middleware.ts and reports the conflict", async () => {
-    const cwd = await makeProject();
-    // The user upgraded to Next 16 but kept an edited middleware.ts; an
-    // unrelated page is missing so --fix has repair work to do.
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
-      }),
-    );
-    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
-    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
-    await writeScaffoldState(cwd, {
-      files: {
-        "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" },
-        "app/login/page.tsx": { hash: "1".repeat(64), class: "presentation" },
-      },
-    });
-    await rm(join(cwd, "app/login/page.tsx"));
-    const check = new ManagedFilesCheck();
-    const before = await check.run(ctxFor(cwd));
-    expect(before.status).toBe("fail");
-    expect(before.message).toContain("conflicting request boundaries");
-    expect(before.message).toContain("middleware.ts");
-
-    await check.fix(ctxFor(cwd));
-
-    // The unrelated page is restored; the conflicting boundary pair is NOT
-    // created — Next throws when both exist — and the user file is untouched.
-    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
-    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-  });
-
-  it("ignores a user-owned proxy.ts on Next 15 (not a reserved convention there)", async () => {
-    const cwd = await makeProject();
-    // The fixture is Next ^15 (boundary: middleware.ts). A root proxy.ts is
-    // simply the user's file and must not trip the boundary-conflict logic.
-    await writeFile(join(cwd, "proxy.ts"), "export function proxy() { /* user-owned */ }\n");
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+    const outcome = await new ConfigCheck().run(aCheckContext(dir));
 
     expect(outcome.status).toBe("pass");
-    expect(outcome.message).not.toContain("conflicting");
   });
 
-  it("does not materialize a manifest while a boundary conflict is unresolved", async () => {
-    const cwd = await makeProject();
-    // Pre-manifest Next 15 app upgraded to 16 with an edited middleware.ts:
-    // --fix must not finalize a manifest that records no boundary at all.
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
-      }),
-    );
-    await writeFile(
-      join(cwd, "middleware.ts"),
-      `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`,
-    );
-    await writeFile(
-      join(cwd, ".zitadel/state.json"),
-      JSON.stringify({ framework: "next", resources: {} }),
-    );
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+  it("fails when zitadel.json is missing", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, "zitadel.json"));
 
-    await check.fix(ctxFor(cwd));
+    const outcome = await new ConfigCheck().run(aCheckContext(dir));
 
-    // No proxy.ts, no manifest: the app stays on the template fallback,
-    // which keeps demanding the boundary — deleting middleware.ts later
-    // still fails instead of passing against an empty manifest.
-    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
+    expect(outcome.status).toBe("fail");
+  });
+
+  describe("fix", () => {
+    it("does nothing, without throwing", async ({ dir }) => {
+      await aNextProject(dir);
+
+      const error = await rejectionOf(() => {
+        return new ConfigCheck().fix(aCheckContext(dir));
+      });
+
+      expect(error).toBeUndefined();
     });
-    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
-      scaffold?: unknown;
-    };
-    expect(state.scaffold).toBeUndefined();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    // The user resolves the conflict properly (migrates their edits): the
-    // next --fix materializes a manifest that records the boundary.
-    await rm(join(cwd, "middleware.ts"));
-    await writeFile(join(cwd, "proxy.ts"), `${MANAGED_MARKER}\nexport function proxy() {}\n`);
-    await check.fix(ctxFor(cwd));
-    const scaffold = await readScaffoldState(cwd);
-    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("stays on the template fallback when an infrastructure file was adopted", async () => {
-    const cwd = await makeProject();
-    // The user replaced the boundary with their own marker-less file; a
-    // materialized manifest could not track it, so none is written and the
-    // presence-enforcing fallback stays in charge.
-    await writeFile(join(cwd, "middleware.ts"), "export function middleware() {}\n");
-    await writeFile(
-      join(cwd, ".zitadel/state.json"),
-      JSON.stringify({ framework: "next", resources: {} }),
-    );
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-
-    await check.fix(ctxFor(cwd));
-
-    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
-      scaffold?: unknown;
-    };
-    expect(state.scaffold).toBeUndefined();
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-  });
-
-  it("warns (not fails) when only the convenience dev script is missing", async () => {
-    const cwd = await makeAngularProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
-      }),
-    );
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("unapplied managed config edit(s): package.json");
-  });
-
-  it("degrades to template mode when the manifest files record is an array", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, ".zitadel/state.json"),
-      JSON.stringify({ framework: "next", resources: {}, scaffold: { files: [] } }),
-    );
-
-    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
-
-    expect(outcome.status).toBe("pass");
-    expect((outcome.details as ManagedDetails).mode).toBe("template");
-    expect((outcome.details as ManagedDetails).files.length).toBeGreaterThan(0);
-  });
-
-  it("reconciles retired boundary paths across a Next 15 to 16 upgrade", async () => {
-    const cwd = await makeProject();
-    // The app was scaffolded on Next 15 (manifest demands middleware.ts),
-    // then upgraded to Next 16 — the current templates write proxy.ts.
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
-      }),
-    );
-    await writeScaffoldState(cwd, {
-      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
-    });
-    await rm(join(cwd, "middleware.ts"));
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
-
-    await check.fix(ctxFor(cwd));
-
-    // Repair restored the *current* boundary and the manifest converged on
-    // it: the retired middleware.ts entry is gone, so doctor passes instead
-    // of failing forever (setup skips initialized projects).
-    expect(await readFile(join(cwd, "proxy.ts"), "utf8")).toContain(MANAGED_MARKER);
-    const scaffold = await readScaffoldState(cwd);
-    expect(scaffold.files).not.toHaveProperty("middleware.ts");
-    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
-    const after = await check.run(ctxFor(cwd));
-    expect(after.status).toBe("pass");
-    expect((after.details as ManagedDetails).mode).toBe("manifest");
-  });
-
-  it("restores the framework home page when the manifest recorded a fresh scaffold", async () => {
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, {
-      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
-      scaffolded_framework: true,
-    });
-
-    const check = new ManagedFilesCheck();
-    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
-
-    await check.fix(ctxFor(cwd));
-
-    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
-    expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
-  });
-
-  it("records the route layouts a repair adds to a fresh scaffold from an older setup", async () => {
-    // An older setup wrote no route layouts, so its manifest has none.
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, {
-      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
-      scaffolded_framework: true,
-    });
-    const check = new ManagedFilesCheck();
-
-    await check.fix(ctxFor(cwd));
-
-    expect(await readFile(join(cwd, "app/login/layout.tsx"), "utf8")).toContain(MANAGED_MARKER);
-    expect((await readScaffoldState(cwd)).files).toHaveProperty("app/login/layout.tsx");
-    await rm(join(cwd, "app/login/layout.tsx"));
-    expect((await check.run(ctxFor(cwd))).message).toContain("app/login/layout.tsx");
   });
 });
 
-describe("ManagedFilesCheck on a Nuxt app from an older setup", () => {
-  it.each(["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"])(
-    "drops the retired %s record once the user deleted the file",
-    async (retired) => {
-      const cwd = await makeOlderNuxtProject();
-      await rm(join(cwd, retired));
-      const check = new ManagedFilesCheck();
-      expect((await check.run(ctxFor(cwd))).message).toContain(retired);
+describe("SecretCheck", () => {
+  it("passes when .zitadel/secret parses", async ({ dir }) => {
+    await aNextProject(dir);
 
-      await check.fix(ctxFor(cwd));
+    const outcome = await new SecretCheck().run(aCheckContext(dir));
 
-      expect((await readScaffoldState(cwd)).files).not.toHaveProperty(retired);
-      expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("fails when .zitadel/secret is missing", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+
+    const outcome = await new SecretCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
+  });
+});
+
+describe("SecretPermissionsCheck", () => {
+  it("passes at 0600", async ({ dir }) => {
+    await aNextProject(dir);
+
+    const outcome = await new SecretPermissionsCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("fails at 0644", async ({ dir }) => {
+    await aNextProject(dir);
+    await chmod(join(dir, SECRET_FILE), 0o644);
+
+    const outcome = await new SecretPermissionsCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
+  });
+
+  describe("fix", () => {
+    it("re-locks the secret to 0600", async ({ dir }) => {
+      await aNextProject(dir);
+      await chmod(join(dir, SECRET_FILE), 0o644);
+
+      await new SecretPermissionsCheck().fix(aCheckContext(dir));
+
+      expect((await stat(join(dir, SECRET_FILE))).mode & 0o777).toBe(0o600);
+    });
+
+    it("leaves the mode as it is on a dry run", async ({ dir }) => {
+      await aNextProject(dir);
+      await chmod(join(dir, SECRET_FILE), 0o644);
+
+      await new SecretPermissionsCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+      expect((await stat(join(dir, SECRET_FILE))).mode & 0o777).toBe(0o644);
+    });
+  });
+});
+
+describe("GitignoreCheck", () => {
+  it("fails when an entry is missing", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
+
+    const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
+  });
+
+  describe("fix", () => {
+    it("appends the missing entries", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
+
+      await new GitignoreCheck().fix(aCheckContext(dir));
+
+      expect((await textOf(dir, ".gitignore")).split("\n")).toEqual(
+        expect.arrayContaining([".env*", "!.env.example"]),
+      );
+    });
+
+    it("leaves the check passing", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
+
+      await new GitignoreCheck().fix(aCheckContext(dir));
+
+      expect((await new GitignoreCheck().run(aCheckContext(dir))).status).toBe("pass");
+    });
+
+    it("creates .gitignore when it is absent", async ({ dir }) => {
+      await aNextProject(dir);
+      await rm(join(dir, ".gitignore"));
+
+      await new GitignoreCheck().fix(aCheckContext(dir));
+
+      expect((await new GitignoreCheck().run(aCheckContext(dir))).status).toBe("pass");
+    });
+
+    it("writes nothing on a dry run", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
+
+      await new GitignoreCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+      expect((await new GitignoreCheck().run(aCheckContext(dir))).status).toBe("fail");
+    });
+  });
+});
+
+describe("MetaSchemasCheck", () => {
+  it("passes when the project holds this CLI's schemas", async ({ dir }) => {
+    await aNextProject(dir);
+    await writeTheMetaSchemas(dir);
+
+    const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("warns on a schema that differs from this CLI's", async ({ dir }) => {
+    await aNextProject(dir);
+    await writeTheMetaSchemas(dir);
+    await write(dir, { [META_FLOW]: '{"title": "an older dialect"}\n' });
+
+    const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "warn", details: { outdated: [META_FLOW] } });
+  });
+
+  it("passes a schema that only differs in key order or formatting", async ({ dir }) => {
+    await aNextProject(dir);
+    await writeTheMetaSchemas(dir);
+    const reordered = Object.fromEntries(
+      Object.entries(thisCliMetaSchema(META_BRANDING).body).reverse(),
+    );
+    await write(dir, { [META_BRANDING]: JSON.stringify(reordered) });
+
+    const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  describe("with a missing schema", () => {
+    it("warns, naming it", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome).toEqual(
+        expect.objectContaining({
+          status: "warn",
+          details: { missing: [META_BRANDING], outdated: [] },
+        }),
+      );
+    });
+
+    it("names doctor --fix in the warning", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.message).toContain("doctor --fix writes this version's");
+    });
+  });
+
+  describe("with schemas another CLI version wrote", () => {
+    it("holds files that differ from this CLI's", async ({ dir }) => {
+      await writeTheMetaSchemas(dir, "0.2.0");
+
+      const held = await textOf(dir, META_BRANDING);
+
+      expect(held).not.toBe(thisCliMetaSchema(META_BRANDING).contents);
+    });
+
+    it("passes them when only the version differs", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir, "0.2.0");
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+  });
+
+  describe("with a schema it cannot read", () => {
+    it("reports it as unreadable", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+      await mkdir(join(dir, META_BRANDING));
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome).toEqual(
+        expect.objectContaining({
+          status: "warn",
+          details: {
+            missing: [],
+            outdated: [],
+            unreadable: [{ path: META_BRANDING, reason: "EISDIR" }],
+          },
+        }),
+      );
+    });
+
+    it("does not offer doctor --fix for it", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+      await mkdir(join(dir, META_BRANDING));
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.message).not.toContain("doctor --fix");
+    });
+
+    it("still reports it after fix, which leaves it alone", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+      await mkdir(join(dir, META_BRANDING));
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect(await new MetaSchemasCheck().run(aCheckContext(dir))).toMatchObject({
+        details: { unreadable: [{ path: META_BRANDING, reason: "EISDIR" }] },
+      });
+    });
+  });
+
+  describe("with a schema that is a symlink", () => {
+    /**
+     * Fills `dir` with a project whose branding meta-schema is a symlink to
+     * its secret.
+     *
+     * @param dir - The directory to fill.
+     */
+    const aLinkedSchema = async (dir: string): Promise<void> => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+      await symlink("../secret", join(dir, META_BRANDING));
+    };
+
+    it("reports it as linked", async ({ dir }) => {
+      await aLinkedSchema(dir);
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome).toEqual(
+        expect.objectContaining({
+          status: "warn",
+          details: { missing: [], outdated: [], linked: [META_BRANDING] },
+        }),
+      );
+    });
+
+    it("says it is a symbolic link", async ({ dir }) => {
+      await aLinkedSchema(dir);
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.message).toContain(`${META_BRANDING} is a symbolic link`);
+    });
+
+    it("fix writes nothing through it", async ({ dir }) => {
+      await aLinkedSchema(dir);
+      const secret = await textOf(dir, SECRET_FILE);
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, SECRET_FILE)).toBe(secret);
+    });
+
+    it("fix leaves the symlink in place", async ({ dir }) => {
+      await aLinkedSchema(dir);
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect((await lstat(join(dir, META_BRANDING))).isSymbolicLink()).toBe(true);
+    });
+  });
+
+  describe("with .zitadel/meta/ a symlink", () => {
+    it("reports it as linked", async ({ dir, other }) => {
+      await aNextProject(dir);
+      await aNextProject(other);
+      await symlink(other, join(dir, ".zitadel/meta"));
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome).toEqual(
+        expect.objectContaining({
+          status: "warn",
+          details: { missing: [], outdated: [], linked: [".zitadel/meta"] },
+        }),
+      );
+    });
+
+    it("fix writes nothing through it", async ({ dir, other }) => {
+      await aNextProject(dir);
+      await aNextProject(other);
+      await symlink(other, join(dir, ".zitadel/meta"));
+      const before = await readdir(other);
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect(await readdir(other)).toEqual(before);
+    });
+
+    it("passes when its target holds this CLI's schemas", async ({ dir, other }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(other);
+      await symlink(join(other, ".zitadel/meta"), join(dir, ".zitadel/meta"));
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+  });
+
+  describe("when the project pins a newer @zitadel/* version", () => {
+    /**
+     * Fills `dir` with a project pinning `@zitadel/sdk-next` 0.2.0 whose
+     * flow-definition meta-schema is that version's.
+     *
+     * @param dir - The directory to fill.
+     */
+    const aNewerPin = async (dir: string): Promise<void> => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await write(dir, {
+        [META_FLOW]: '{"title": "a newer dialect"}\n',
+        "package.json": JSON.stringify({ dependencies: { "@zitadel/sdk-next": "0.2.0" } }),
+      });
+    };
+
+    it("reports the newer pin", async ({ dir }) => {
+      await aNewerPin(dir);
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.details).toMatchObject({
+        outdated: [META_FLOW],
+        newer_pin: { name: "@zitadel/sdk-next", version: "0.2.0" },
+      });
+    });
+
+    it("does not offer doctor --fix", async ({ dir }) => {
+      await aNewerPin(dir);
+
+      const outcome = await new MetaSchemasCheck().run(aCheckContext(dir));
+
+      expect(outcome.message).not.toContain("doctor --fix writes");
+    });
+
+    it("fix writes nothing", async ({ dir }) => {
+      await aNewerPin(dir);
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, META_FLOW)).toBe('{"title": "a newer dialect"}\n');
+    });
+  });
+
+  describe("fix", () => {
+    it("writes the missing and outdated schemas, leaving the check passing", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+      await write(dir, { [META_FLOW]: "{}\n" });
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect((await new MetaSchemasCheck().run(aCheckContext(dir))).status).toBe("pass");
+    });
+
+    it("leaves other files in .zitadel/meta/ alone", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeTheMetaSchemas(dir);
+      await rm(join(dir, META_BRANDING));
+      await write(dir, { ".zitadel/meta/mine.json": '{"kept": true}\n' });
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, ".zitadel/meta/mine.json")).toBe('{"kept": true}\n');
+    });
+
+    it("creates .zitadel/meta/ when the project has none", async ({ dir }) => {
+      await aNextProject(dir);
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir));
+
+      expect((await new MetaSchemasCheck().run(aCheckContext(dir))).status).toBe("pass");
+    });
+
+    it("writes nothing on a dry run", async ({ dir }) => {
+      await aNextProject(dir);
+
+      await new MetaSchemasCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+      expect((await new MetaSchemasCheck().run(aCheckContext(dir))).status).toBe("warn");
+    });
+  });
+});
+
+describe("EnvExampleCheck", () => {
+  it("fails when a key is missing", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, { ".env.example": "ZITADEL_PROJECT_ID=\n" });
+
+    const outcome = await new EnvExampleCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
+  });
+
+  describe("fix", () => {
+    it("appends the missing key", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".env.example": "ZITADEL_PROJECT_ID=\n" });
+
+      await new EnvExampleCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, ".env.example")).toContain("ZITADEL_ISSUER=");
+    });
+
+    it("leaves the check passing", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".env.example": "ZITADEL_PROJECT_ID=\n" });
+
+      await new EnvExampleCheck().fix(aCheckContext(dir));
+
+      expect((await new EnvExampleCheck().run(aCheckContext(dir))).status).toBe("pass");
+    });
+
+    it("writes nothing on a dry run", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".env.example": "ZITADEL_PROJECT_ID=\n" });
+
+      await new EnvExampleCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+      expect((await new EnvExampleCheck().run(aCheckContext(dir))).status).toBe("fail");
+    });
+  });
+});
+
+describe("FrameworkCheck", () => {
+  it("passes when the detected framework matches the recorded one", async ({ dir }) => {
+    await aNextProject(dir);
+
+    const outcome = await new FrameworkCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("fails when the recorded framework disagrees with detection", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "zitadel.json": JSON.stringify({
+        project: PROJECT_ID,
+        server: "x",
+        framework: { id: "vue" },
+      }),
+    });
+
+    const outcome = await new FrameworkCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
+  });
+
+  describe("with an app below Next 15", () => {
+    /**
+     * Fills `dir` with a scaffolded app later downgraded to Next 14.
+     *
+     * @param dir - The directory to fill.
+     */
+    const aDowngradedApp = async (dir: string): Promise<void> => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies: { next: "^14.2.0", "@zitadel/sdk-next": "latest" },
+        }),
+      });
+    };
+
+    it("fails, naming the version floor", async ({ dir }) => {
+      await aDowngradedApp(dir);
+
+      const outcome = await new FrameworkCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining("below the supported floor"),
+      });
+    });
+
+    it("carries the error's code and remedy for the doctor envelope", async ({ dir }) => {
+      await aDowngradedApp(dir);
+
+      const outcome = await new FrameworkCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        code: "E_UNSUPPORTED_PROJECT_SHAPE",
+        hint: expect.stringContaining("Upgrade"),
+      });
+    });
+  });
+});
+
+describe("DependencyCheck", () => {
+  it("passes when a @zitadel package is declared", async ({ dir }) => {
+    await aNextProject(dir);
+
+    const outcome = await new DependencyCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("fails when no @zitadel package is present", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    });
+
+    const outcome = await new DependencyCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
+  });
+
+  it.for(SDK_PACKAGES_BY_FRAMEWORK)(
+    "requires the %s SDK package, not just the CLI",
+    async ([, dependencies, missing], { dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies,
+          devDependencies: { "@zitadel/cli": CHECK_CLI_VERSION },
+        }),
+      });
+
+      const outcome = await new DependencyCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: `package.json does not declare ${missing}, which the app imports`,
+      });
     },
   );
 
-  it.each(["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"])(
-    "keeps the retired %s record while the file is on disk",
-    async (retired) => {
-      const cwd = await makeOlderNuxtProject();
-      await rm(join(cwd, "app/pages/login.vue"));
+  it("fails a meta-framework app that lacks the widget SDK its pages import", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "package.json": JSON.stringify({
+        name: "demo",
+        dependencies: { "@sveltejs/kit": "^3", svelte: "^5", "@zitadel/sdk-sveltekit": "latest" },
+      }),
+    });
 
-      await new ManagedFilesCheck().fix(ctxFor(cwd));
+    const outcome = await new DependencyCheck().run(aCheckContext(dir));
 
-      expect((await readScaffoldState(cwd)).files).toHaveProperty(retired);
-    },
-  );
+    expect(outcome.message).toBe(
+      "package.json does not declare @zitadel/sdk-svelte, which the app imports",
+    );
+  });
+
+  it("passes a meta-framework app that declares both of its SDKs", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "package.json": JSON.stringify({
+        name: "demo",
+        dependencies: {
+          "@sveltejs/kit": "^3",
+          svelte: "^5",
+          "@zitadel/sdk-sveltekit": "latest",
+          "@zitadel/sdk-svelte": "latest",
+        },
+      }),
+    });
+
+    const outcome = await new DependencyCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  describe("fix", () => {
+    it.for([
+      ["kept only the CLI in its place", { "@zitadel/cli": CHECK_CLI_VERSION }],
+      ["declares no @zitadel package", {}],
+    ] as const)(
+      "re-adds the SDK of an app that %s, leaving the check passing",
+      async ([, devDependencies], { dir }) => {
+        await aNextProject(dir);
+        await write(dir, {
+          "package.json": JSON.stringify({
+            name: "demo",
+            dependencies: { next: "^15" },
+            devDependencies,
+          }),
+        });
+
+        await new DependencyCheck().fix(aCheckContext(dir));
+
+        expect((await new DependencyCheck().run(aCheckContext(dir))).status).toBe("pass");
+      },
+    );
+
+    describe("with an edited middleware.ts on Next 16", () => {
+      /**
+       * Fills `dir` with a Next 16 app missing its SDK, whose middleware.ts
+       * the developer edited.
+       *
+       * @param dir - The directory to fill.
+       */
+      const anEditedBoundary = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await write(dir, {
+          "package.json": JSON.stringify({
+            name: "demo",
+            dependencies: { next: "^16" },
+            devDependencies: { "@zitadel/cli": CHECK_CLI_VERSION },
+          }),
+          [MIDDLEWARE]: EDITED_MIDDLEWARE,
+        });
+        await writeScaffold(dir, {
+          files: { [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" } },
+        });
+      };
+
+      it("adds the SDK", async ({ dir }) => {
+        await anEditedBoundary(dir);
+
+        await new DependencyCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, "package.json")).toContain("@zitadel/sdk-next");
+      });
+
+      it("leaves middleware.ts as it is", async ({ dir }) => {
+        await anEditedBoundary(dir);
+
+        await new DependencyCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, MIDDLEWARE)).toBe(EDITED_MIDDLEWARE);
+      });
+
+      it("does not create proxy.ts beside it", async ({ dir }) => {
+        await anEditedBoundary(dir);
+
+        await new DependencyCheck().fix(aCheckContext(dir));
+
+        expect(existsSync(join(dir, PROXY))).toBe(false);
+      });
+    });
+
+    describe("with a Next 16 app without a boundary", () => {
+      /**
+       * Fills `dir` with a Next 16 app missing its SDK and its boundary.
+       *
+       * @param dir - The directory to fill.
+       */
+      const aBareNext16App = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await write(dir, {
+          "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+        });
+        await rm(join(dir, MIDDLEWARE));
+      };
+
+      it("writes proxy.ts", async ({ dir }) => {
+        await aBareNext16App(dir);
+
+        await new DependencyCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, PROXY)).toContain("export function proxy(");
+      });
+
+      it("writes no middleware.ts", async ({ dir }) => {
+        await aBareNext16App(dir);
+
+        await new DependencyCheck().fix(aCheckContext(dir));
+
+        expect(existsSync(join(dir, MIDDLEWARE))).toBe(false);
+      });
+    });
+  });
+});
+
+describe("ManagedFilesCheck", () => {
+  describe("without a manifest", () => {
+    it("passes a healthy scaffold", async ({ dir }) => {
+      await aNextProject(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("checks the files the templates write", async ({ dir }) => {
+      await aNextProject(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.details).toMatchObject({ mode: "template" });
+    });
+
+    it("checks the five files a pre-existing app was given", async ({ dir }) => {
+      await aNextProject(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.details).toHaveProperty(["files", "length"], 5);
+    });
+
+    it("does not demand the framework home page, which only a fresh app is given", async ({
+      dir,
+    }) => {
+      await aNextProject(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.details).toMatchObject({
+        files: expect.not.arrayContaining([expect.objectContaining({ path: HOME_PAGE })]),
+      });
+    });
+
+    it("fails when an infrastructure file is missing", async ({ dir }) => {
+      await aNextProject(dir);
+      await rm(join(dir, MIDDLEWARE));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining(MIDDLEWARE),
+      });
+    });
+
+    it("warns, rather than failing, when a presentation page is missing", async ({ dir }) => {
+      await aNextProject(dir);
+      await rm(join(dir, LOGIN_PAGE));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(LOGIN_PAGE),
+      });
+    });
+
+    it("passes a page the user adopted by removing its marker", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { [REGISTER_PAGE]: "export default function Mine() {}\n" });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("classifies a page without the marker as adopted", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { [REGISTER_PAGE]: "export default function Mine() {}\n" });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.details).toMatchObject({
+        files: expect.arrayContaining([
+          expect.objectContaining({ path: REGISTER_PAGE, state: "adopted" }),
+        ]),
+      });
+    });
+
+    it("warns instead of failing when nothing can be enumerated", async ({ dir }) => {
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("Could not enumerate"),
+      });
+    });
+
+    it("passes a boundary the user adopted", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { [MIDDLEWARE]: "export function middleware() {}\n" });
+      await writeScaffold(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("ignores a user-owned proxy.ts on Next 15, where it is no reserved convention", async ({
+      dir,
+    }) => {
+      await aNextProject(dir);
+      await write(dir, { [PROXY]: "export function proxy() { /* user-owned */ }\n" });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        message: expect.not.stringContaining("conflicting"),
+      });
+    });
+  });
+
+  describe("with a malformed manifest", () => {
+    it.for([
+      ["an entry is malformed", { files: { [MIDDLEWARE]: null } }],
+      ["its files record is an array", { files: [] }],
+    ] as const)("degrades to template mode when %s", async ([, scaffold], { dir }) => {
+      await aNextProject(dir);
+      await writeScaffold(dir, scaffold);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        details: { mode: "template", files: expect.arrayContaining([expect.anything()]) },
+      });
+    });
+  });
+
+  describe("with a manifest", () => {
+    it("passes, checking only the files the manifest records", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeScaffold(dir, {
+        files: {
+          [MIDDLEWARE]: { hash: hashScaffoldFile(MANAGED_MIDDLEWARE), class: "infrastructure" },
+        },
+      });
+      await rm(join(dir, "custom-elements.d.ts"));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        details: { mode: "manifest", files: [{ path: MIDDLEWARE, state: "pristine" }] },
+      });
+    });
+
+    it("classifies a file whose hash differs from the recorded one as edited", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeScaffold(dir, {
+        files: { [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" } },
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({ status: "pass", details: { files: [{ state: "edited" }] } });
+    });
+
+    it("fails on missing infrastructure it records", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeScaffold(dir, {
+        files: { [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" } },
+      });
+      await rm(join(dir, MIDDLEWARE));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("fail");
+    });
+
+    it("warns about a missing home page a fresh scaffold recorded", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeScaffold(dir, {
+        files: { [HOME_PAGE]: { hash: EDITED_HASH, class: "presentation" } },
+        scaffolded_framework: true,
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("warn");
+    });
+  });
+
+  describe("with the dev script", () => {
+    it("passes a dev script that serves the registered port", async ({ dir }) => {
+      await aNextProjectWithDevScript(dir, "next dev --port 3456", 3456);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("flags a dev script edited to a port the project does not allow", async ({ dir }) => {
+      await aNextProjectWithDevScript(dir, "next dev --port 4000", 3456);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("unapplied managed config edit(s): package.json"),
+      });
+    });
+
+    it("warns about a dev script that declares no port", async ({ dir }) => {
+      await aNextProjectWithDevScript(dir, "next dev", 3456);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("warn");
+    });
+
+    it("warns, rather than failing, when only the convenience dev script is missing", async ({
+      dir,
+    }) => {
+      await anAngularProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
+        }),
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("unapplied managed config edit(s): package.json"),
+      });
+    });
+  });
+
+  describe("with an Angular project's config wirings", () => {
+    it("passes, saying its wirings were verified", async ({ dir }) => {
+      await anAngularProject(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        message: expect.stringContaining("wirings verified"),
+      });
+    });
+
+    it("fails when a wiring is detached though every marked file is pristine", async ({ dir }) => {
+      await anAngularProject(dir);
+      await write(dir, {
+        "angular.json": JSON.stringify({
+          projects: { demo: { architect: { serve: { options: { port: 4200 } } } } },
+        }),
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining("detached managed config wiring: angular.json"),
+      });
+    });
+
+    it("fails when a wiring's host config file is deleted outright", async ({ dir }) => {
+      await anAngularProject(dir);
+      await rm(join(dir, "angular.json"));
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining("detached managed config wiring: angular.json"),
+      });
+    });
+
+    it("warns that a wiring is unverifiable when two projects leave no default to patch", async ({
+      dir,
+    }) => {
+      await anAngularProject(dir);
+      await write(dir, { "angular.json": JSON.stringify({ projects: { a: {}, b: {} } }) });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringMatching(/unverifiable managed config wiring[\s\S]*angular\.json/),
+      });
+    });
+
+    it("warns while the managed proxy lacks the session-cookie hooks", async ({ dir }) => {
+      await anAngularProject(dir);
+      await write(dir, { [ANGULAR_PROXY]: bearerOnlyProxyConf() });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(
+          "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
+        ),
+      });
+    });
+
+    it("fails while the managed proxy knows only the bare exchange", async ({ dir }) => {
+      await anAngularProject(dir);
+      await write(dir, { [ANGULAR_PROXY]: aV2ProxyConf() });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining("detached managed config wiring: proxy.conf.cjs"),
+      });
+    });
+
+    it("fails on the session-cookie hooks from before ADR 083, offering doctor --fix", async ({
+      dir,
+    }) => {
+      await anAngularProject(dir);
+      await write(dir, { [ANGULAR_PROXY]: v1ProxyConf() });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringMatching(
+          /outdated managed config wiring: proxy\.conf\.cjs[\s\S]*doctor --fix updates them/,
+        ),
+      });
+    });
+
+    it("fails on hooks from before ADR 083 changed by hand, leaving them to the developer", async ({
+      dir,
+    }) => {
+      await anAngularProject(dir);
+      await write(dir, { [ANGULAR_PROXY]: aHandChangedV1ProxyConf() });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining("must be updated by hand"),
+      });
+    });
+
+    it("warns that the session-cookie hooks need adding by hand to a proxy changed since", async ({
+      dir,
+    }) => {
+      await anAngularProject(dir);
+      await write(dir, { [ANGULAR_PROXY]: aReformattedBearerOnlyProxyConf() });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringMatching(
+          /unverifiable managed config wiring[\s\S]*session-cookie hooks \(ADR 073\) must be added by hand/,
+        ),
+      });
+    });
+
+    it("warns when an unrecognized legacy proxy may over-forward the project secret", async ({
+      dir,
+    }) => {
+      await anAngularProject(dir);
+      await write(dir, { [ANGULAR_PROXY]: anUnguardedProxyConf() });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringMatching(
+          /proxy\.conf\.cjs[\s\S]*may forward ZITADEL_PROJECT_SECRET outside POST \/sessions\/exchange/,
+        ),
+      });
+    });
+  });
+
+  describe("with Next's request boundary", () => {
+    /**
+     * Fills `dir` with a Next 16 app whose manifest records a pristine
+     * middleware.ts, the boundary Next 16 retired.
+     *
+     * @param dir - The directory to fill.
+     */
+    const aPristineRetiredBoundary = async (dir: string): Promise<void> => {
+      await aNextProject(dir);
+      await write(dir, { "package.json": JSON.stringify(NEXT_16_PACKAGE) });
+      await writeScaffold(dir, {
+        files: {
+          [MIDDLEWARE]: { hash: hashScaffoldFile(MANAGED_MIDDLEWARE), class: "infrastructure" },
+        },
+      });
+    };
+
+    /**
+     * Fills `dir` with a Next 16 app that kept an edited middleware.ts, and is
+     * missing its sign-in page.
+     *
+     * @param dir - The directory to fill.
+     */
+    const aConflictingBoundary = async (dir: string): Promise<void> => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify(NEXT_16_PACKAGE),
+        [MIDDLEWARE]: EDITED_MIDDLEWARE,
+      });
+      await writeScaffold(dir, {
+        files: {
+          [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" },
+          [LOGIN_PAGE]: { hash: EDITED_HASH, class: "presentation" },
+        },
+      });
+      await rm(join(dir, LOGIN_PAGE));
+    };
+
+    it("warns about a pristine retired middleware.ts left over", async ({ dir }) => {
+      await aPristineRetiredBoundary(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("retired boundary middleware.ts left over"),
+      });
+    });
+
+    it("fails on conflicting request boundaries, naming middleware.ts", async ({ dir }) => {
+      await aConflictingBoundary(dir);
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringMatching(/conflicting request boundaries[\s\S]*middleware\.ts/),
+      });
+    });
+
+    describe("fix, migrating a pristine retired boundary", () => {
+      it("removes middleware.ts", async ({ dir }) => {
+        await aPristineRetiredBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(existsSync(join(dir, MIDDLEWARE))).toBe(false);
+      });
+
+      it("installs proxy.ts", async ({ dir }) => {
+        await aPristineRetiredBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, PROXY)).toContain(MANAGED_MARKER);
+      });
+
+      it("drops middleware.ts from the manifest", async ({ dir }) => {
+        await aPristineRetiredBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).not.toHaveProperty([
+          "scaffold",
+          "files",
+          MIDDLEWARE,
+        ]);
+      });
+
+      it("records proxy.ts as infrastructure in the manifest", async ({ dir }) => {
+        await aPristineRetiredBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(
+          ["scaffold", "files", PROXY, "class"],
+          "infrastructure",
+        );
+      });
+
+      it("leaves the check passing", async ({ dir }) => {
+        await aPristineRetiredBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+    });
+
+    describe("fix, beside an edited middleware.ts", () => {
+      it("restores the unrelated missing page", async ({ dir }) => {
+        await aConflictingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, LOGIN_PAGE)).toContain(MANAGED_MARKER);
+      });
+
+      it("creates no proxy.ts, which Next refuses beside middleware.ts", async ({ dir }) => {
+        await aConflictingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(existsSync(join(dir, PROXY))).toBe(false);
+      });
+
+      it("leaves the edited middleware.ts as it is", async ({ dir }) => {
+        await aConflictingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, MIDDLEWARE)).toBe(EDITED_MIDDLEWARE);
+      });
+
+      it("leaves the check failing", async ({ dir }) => {
+        await aConflictingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("fail");
+      });
+    });
+
+    describe("fix, across a Next 15 to 16 upgrade", () => {
+      /**
+       * Fills `dir` with an app scaffolded on Next 15, whose manifest demands
+       * middleware.ts, then upgraded to Next 16 with the boundary missing.
+       *
+       * @param dir - The directory to fill.
+       */
+      const anUpgradedApp = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await write(dir, { "package.json": JSON.stringify(NEXT_16_PACKAGE) });
+        await writeScaffold(dir, {
+          files: { [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" } },
+        });
+        await rm(join(dir, MIDDLEWARE));
+      };
+
+      it("restores the current boundary, proxy.ts", async ({ dir }) => {
+        await anUpgradedApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, PROXY)).toContain(MANAGED_MARKER);
+      });
+
+      it("drops middleware.ts from the manifest", async ({ dir }) => {
+        await anUpgradedApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).not.toHaveProperty([
+          "scaffold",
+          "files",
+          MIDDLEWARE,
+        ]);
+      });
+
+      it("records proxy.ts as infrastructure in the manifest", async ({ dir }) => {
+        await anUpgradedApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(
+          ["scaffold", "files", PROXY, "class"],
+          "infrastructure",
+        );
+      });
+
+      it("leaves the check passing in manifest mode", async ({ dir }) => {
+        await anUpgradedApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await new ManagedFilesCheck().run(aCheckContext(dir))).toMatchObject({
+          status: "pass",
+          details: { mode: "manifest" },
+        });
+      });
+    });
+
+    describe("fix, while a boundary conflict is unresolved in a pre-manifest app", () => {
+      /**
+       * Fills `dir` with a pre-manifest app upgraded to Next 16 that kept an
+       * edited middleware.ts.
+       *
+       * @param dir - The directory to fill.
+       */
+      const anUnresolvedConflict = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await write(dir, {
+          "package.json": JSON.stringify(NEXT_16_PACKAGE),
+          [MIDDLEWARE]: EDITED_MIDDLEWARE,
+        });
+        await writeScaffold(dir);
+      };
+
+      /**
+       * Fills `dir` as {@link anUnresolvedConflict}, repairs it once, then
+       * resolves the conflict as a developer would: middleware.ts gives way
+       * to a managed proxy.ts.
+       *
+       * @param dir - The directory to fill.
+       */
+      const aResolvedConflict = async (dir: string): Promise<void> => {
+        await anUnresolvedConflict(dir);
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+        await rm(join(dir, MIDDLEWARE));
+        await write(dir, { [PROXY]: `${MANAGED_MARKER}\nexport function proxy() {}\n` });
+      };
+
+      it("creates no proxy.ts", async ({ dir }) => {
+        await anUnresolvedConflict(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(existsSync(join(dir, PROXY))).toBe(false);
+      });
+
+      it("writes no manifest", async ({ dir }) => {
+        await anUnresolvedConflict(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).not.toHaveProperty("scaffold");
+      });
+
+      it("leaves the check failing", async ({ dir }) => {
+        await anUnresolvedConflict(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("fail");
+      });
+
+      it("records the boundary once the conflict is resolved", async ({ dir }) => {
+        await aResolvedConflict(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(
+          ["scaffold", "files", PROXY, "class"],
+          "infrastructure",
+        );
+      });
+
+      it("passes once the conflict is resolved", async ({ dir }) => {
+        await aResolvedConflict(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+    });
+  });
+
+  describe("fix", () => {
+    it("restores a deleted boundary without a manifest", async ({ dir }) => {
+      await aNextProject(dir);
+      await rm(join(dir, MIDDLEWARE));
+
+      await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+    });
+
+    it("leaves an edited page untouched without a manifest", async ({ dir }) => {
+      await aNextProject(dir);
+      const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "custom"; }\n`;
+      await write(dir, { [LOGIN_PAGE]: editedLogin });
+      await rm(join(dir, MIDDLEWARE));
+
+      await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, LOGIN_PAGE)).toBe(editedLogin);
+    });
+
+    it("leaves the check passing after restoring a boundary without a manifest", async ({
+      dir,
+    }) => {
+      await aNextProject(dir);
+      await rm(join(dir, MIDDLEWARE));
+
+      await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+      expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+    });
+
+    it("never re-pins an already-declared SDK dependency version", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies: { next: "^15", "@zitadel/sdk-next": "user-pinned-0.0.1" },
+        }),
+      });
+      await rm(join(dir, MIDDLEWARE));
+
+      await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+      expect(await readJson(dir, "package.json")).toHaveProperty(
+        ["dependencies", "@zitadel/sdk-next"],
+        "user-pinned-0.0.1",
+      );
+    });
+
+    it("restores the boundary of an app with a pinned SDK", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies: { next: "^15", "@zitadel/sdk-next": "user-pinned-0.0.1" },
+        }),
+      });
+      await rm(join(dir, MIDDLEWARE));
+
+      await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+    });
+
+    describe("with missing infrastructure the manifest records", () => {
+      /**
+       * Fills `dir` with a project whose manifest records middleware.ts,
+       * which is missing.
+       *
+       * @param dir - The directory to fill.
+       */
+      const aMissingBoundary = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await writeScaffold(dir, {
+          files: { [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" } },
+        });
+        await rm(join(dir, MIDDLEWARE));
+      };
+
+      it("restores it", async ({ dir }) => {
+        await aMissingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+      });
+
+      it("refreshes its recorded hash", async ({ dir }) => {
+        await aMissingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(
+          ["scaffold", "files", MIDDLEWARE, "hash"],
+          hashScaffoldFile(await textOf(dir, MIDDLEWARE)),
+        );
+      });
+
+      it("leaves it passing as pristine", async ({ dir }) => {
+        await aMissingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await new ManagedFilesCheck().run(aCheckContext(dir))).toMatchObject({
+          status: "pass",
+          details: {
+            files: expect.arrayContaining([
+              expect.objectContaining({ path: MIDDLEWARE, state: "pristine" }),
+            ]),
+          },
+        });
+      });
+
+      it("invents no framework home page the manifest does not say was scaffolded", async ({
+        dir,
+      }) => {
+        await aMissingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(existsSync(join(dir, HOME_PAGE))).toBe(false);
+      });
+
+      it("writes no file on a dry run", async ({ dir }) => {
+        await aMissingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+        expect(existsSync(join(dir, MIDDLEWARE))).toBe(false);
+      });
+
+      it("leaves the manifest as it was on a dry run", async ({ dir }) => {
+        await aMissingBoundary(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(
+          ["scaffold", "files", MIDDLEWARE, "hash"],
+          EDITED_HASH,
+        );
+      });
+    });
+
+    describe("with edited and adopted pages the manifest records", () => {
+      const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "edited"; }\n`;
+      const adoptedRegister = "export default function Own() {}\n";
+
+      /**
+       * Fills `dir` with a project whose manifest records an edited sign-in
+       * page, an adopted sign-up page and a missing middleware.ts.
+       *
+       * @param dir - The directory to fill.
+       */
+      const aMixedScaffold = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await write(dir, { [LOGIN_PAGE]: editedLogin, [REGISTER_PAGE]: adoptedRegister });
+        await writeScaffold(dir, {
+          files: {
+            [MIDDLEWARE]: { hash: EDITED_HASH, class: "infrastructure" },
+            [LOGIN_PAGE]: { hash: EDITED_HASH, class: "presentation" },
+            [REGISTER_PAGE]: { hash: EDITED_HASH, class: "presentation" },
+          },
+        });
+        await rm(join(dir, MIDDLEWARE));
+      };
+
+      it.for([
+        ["an edited", LOGIN_PAGE, editedLogin],
+        ["an adopted", REGISTER_PAGE, adoptedRegister],
+      ] as const)("never touches %s page", async ([, path, contents], { dir }) => {
+        await aMixedScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, path)).toBe(contents);
+      });
+
+      it("still restores the missing boundary beside them", async ({ dir }) => {
+        await aMixedScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+      });
+    });
+
+    describe("on a pre-manifest app", () => {
+      /**
+       * Fills `dir` with an app whose state has no scaffold section, whose
+       * sign-up page the user adopted and whose boundary is missing.
+       *
+       * @param dir - The directory to fill.
+       */
+      const aPreManifestApp = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await writeScaffold(dir);
+        await write(dir, { [REGISTER_PAGE]: "export default function Own() {}\n" });
+        await rm(join(dir, MIDDLEWARE));
+      };
+
+      it("materializes a manifest recording each file's class", async ({ dir }) => {
+        await aPreManifestApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toMatchObject({
+          scaffold: {
+            files: {
+              [MIDDLEWARE]: { class: "infrastructure" },
+              [LOGIN_PAGE]: { class: "presentation" },
+            },
+          },
+        });
+      });
+
+      it.for([
+        ["an adopted page", REGISTER_PAGE],
+        ["the conditionally scaffolded home page", HOME_PAGE],
+      ] as const)("leaves %s out of the manifest", async ([, path], { dir }) => {
+        await aPreManifestApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).not.toHaveProperty(["scaffold", "files", path]);
+      });
+
+      it("checks against the manifest afterwards", async ({ dir }) => {
+        await aPreManifestApp(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await new ManagedFilesCheck().run(aCheckContext(dir))).toMatchObject({
+          status: "pass",
+          details: { mode: "manifest" },
+        });
+      });
+
+      it("writes no manifest when an infrastructure file was adopted", async ({ dir }) => {
+        await aNextProject(dir);
+        await write(dir, { [MIDDLEWARE]: "export function middleware() {}\n" });
+        await writeScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).not.toHaveProperty("scaffold");
+      });
+
+      it("leaves an app with an adopted infrastructure file passing", async ({ dir }) => {
+        await aNextProject(dir);
+        await write(dir, { [MIDDLEWARE]: "export function middleware() {}\n" });
+        await writeScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+    });
+
+    describe("with a dev script that declares no port", () => {
+      it("restores the registered port, not the detected fallback", async ({ dir }) => {
+        await aNextProjectWithDevScript(dir, "next dev", 3456);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, "package.json")).toHaveProperty(
+          ["scripts", "dev"],
+          "next dev --port 3456",
+        );
+      });
+
+      it("leaves the check passing", async ({ dir }) => {
+        await aNextProjectWithDevScript(dir, "next dev", 3456);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+    });
+
+    describe("with an Angular project's config wirings", () => {
+      it("re-applies a detached wiring", async ({ dir }) => {
+        await anAngularProject(dir);
+        await write(dir, {
+          "angular.json": JSON.stringify({
+            projects: { demo: { architect: { serve: { options: { port: 4200 } } } } },
+          }),
+        });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, "angular.json")).toHaveProperty(
+          ["projects", "demo", "architect", "serve", "options", "proxyConfig"],
+          ANGULAR_PROXY,
+        );
+      });
+
+      it("leaves the check passing after re-applying a detached wiring", async ({ dir }) => {
+        await anAngularProject(dir);
+        await write(dir, {
+          "angular.json": JSON.stringify({
+            projects: { demo: { architect: { serve: { options: { port: 4200 } } } } },
+          }),
+        });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+
+      it.for([
+        ["a proxy lacking the session-cookie hooks", bearerOnlyProxyConf],
+        ["a proxy knowing only the bare exchange", aV2ProxyConf],
+        ["the session-cookie hooks from before ADR 083", v1ProxyConf],
+      ] as const)("replaces %s with the current template", async ([, proxy], { dir }) => {
+        await anAngularProject(dir);
+        await write(dir, { [ANGULAR_PROXY]: proxy() });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, ANGULAR_PROXY)).toBe(proxyConfTemplate());
+      });
+
+      it.for([
+        ["a proxy lacking the session-cookie hooks", bearerOnlyProxyConf],
+        ["a proxy knowing only the bare exchange", aV2ProxyConf],
+        ["the session-cookie hooks from before ADR 083", v1ProxyConf],
+      ] as const)("leaves the check passing after replacing %s", async ([, proxy], { dir }) => {
+        await anAngularProject(dir);
+        await write(dir, { [ANGULAR_PROXY]: proxy() });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+
+      it.for([
+        ["hooks from before ADR 083 changed by hand", aHandChangedV1ProxyConf],
+        ["a bearer-only proxy changed since", aReformattedBearerOnlyProxyConf],
+      ] as const)("leaves %s as they are", async ([, proxy], { dir }) => {
+        await anAngularProject(dir);
+        await write(dir, { [ANGULAR_PROXY]: proxy() });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, ANGULAR_PROXY)).toBe(proxy());
+      });
+    });
+
+    describe("with a fresh scaffold the manifest recorded", () => {
+      /**
+       * Fills `dir` with a project whose manifest records a fresh scaffold's
+       * home page, missing, and no route layouts, as an older setup wrote.
+       *
+       * @param dir - The directory to fill.
+       */
+      const aFreshScaffold = async (dir: string): Promise<void> => {
+        await aNextProject(dir);
+        await writeScaffold(dir, {
+          files: { [HOME_PAGE]: { hash: EDITED_HASH, class: "presentation" } },
+          scaffolded_framework: true,
+        });
+      };
+
+      it("restores the framework home page", async ({ dir }) => {
+        await aFreshScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, HOME_PAGE)).toContain(MANAGED_MARKER);
+      });
+
+      it("leaves the check passing", async ({ dir }) => {
+        await aFreshScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      });
+
+      it("writes the route layouts a newer setup adds", async ({ dir }) => {
+        await aFreshScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, LOGIN_LAYOUT)).toContain(MANAGED_MARKER);
+      });
+
+      it("records the route layouts in the manifest", async ({ dir }) => {
+        await aFreshScaffold(dir);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(["scaffold", "files", LOGIN_LAYOUT]);
+      });
+
+      it("reports a recorded route layout that goes missing", async ({ dir }) => {
+        await aFreshScaffold(dir);
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+        await rm(join(dir, LOGIN_LAYOUT));
+
+        const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+        expect(outcome.message).toContain(LOGIN_LAYOUT);
+      });
+    });
+  });
+
+  describe("on a Nuxt app from an older setup", () => {
+    it.for(RETIRED_NUXT_PLUGINS)(
+      "reports the retired %s once the user deleted it",
+      async (retired, { dir }) => {
+        await anOlderNuxtProject(dir);
+        await rm(join(dir, retired));
+
+        const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+        expect(outcome.message).toContain(retired);
+      },
+    );
+
+    it.for(RETIRED_NUXT_PLUGINS)(
+      "fix drops the retired %s record once the user deleted the file",
+      async (retired, { dir }) => {
+        await anOlderNuxtProject(dir);
+        await rm(join(dir, retired));
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).not.toHaveProperty(["scaffold", "files", retired]);
+      },
+    );
+
+    it.for(RETIRED_NUXT_PLUGINS)(
+      "fix leaves the check passing once the deleted %s is dropped",
+      async (retired, { dir }) => {
+        await anOlderNuxtProject(dir);
+        await rm(join(dir, retired));
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
+      },
+    );
+
+    it.for(RETIRED_NUXT_PLUGINS)(
+      "fix keeps the retired %s record while the file is on disk",
+      async (retired, { dir }) => {
+        await anOlderNuxtProject(dir);
+        await rm(join(dir, "app/pages/login.vue"));
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await readJson(dir, STATE_FILE)).toHaveProperty(["scaffold", "files", retired]);
+      },
+    );
+  });
 });
 
 describe("ProjectMatchCheck", () => {
-  it("passes when secret project_id matches config project", async () => {
-    const cwd = await makeProject();
-    expect((await new ProjectMatchCheck().run(ctxFor(cwd))).status).toBe("pass");
+  it("passes when the secret's project_id matches the config's project", async ({ dir }) => {
+    await aNextProject(dir);
+
+    const outcome = await new ProjectMatchCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
   });
 
-  it("fails when secret project_id disagrees with config project", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, ".zitadel/secret"),
-      JSON.stringify({ ...SECRET, project_id: "other" }),
-    );
-    await chmod(join(cwd, ".zitadel/secret"), 0o600);
-    expect((await new ProjectMatchCheck().run(ctxFor(cwd))).status).toBe("fail");
+  it("fails when the secret's project_id disagrees with the config's project", async ({ dir }) => {
+    await aNextProject(dir);
+    await writeSecret(dir, { ...SECRET, project_id: "other" });
+
+    const outcome = await new ProjectMatchCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("fail");
   });
 });
 
 describe("ClaimCheck", () => {
-  /** Rewrites `.zitadel/secret`, preserving the 0600 mode doctor asserts elsewhere. */
-  async function writeSecret(cwd: string, extra: Record<string, unknown>): Promise<void> {
-    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...SECRET, ...extra }));
-    await chmod(join(cwd, ".zitadel/secret"), 0o600);
-  }
+  it("warns that a cloud project with no owning team is temporary", async ({ dir }) => {
+    await aNextProject(dir);
 
-  /** Rewrites `zitadel.json` with a different `server`, leaving everything else intact. */
-  async function writeServer(cwd: string, server: string): Promise<void> {
-    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ ...config, server }));
-  }
+    const outcome = await new ClaimCheck().run(aCheckContext(dir));
 
-  it("warns for a cloud project with no owning team", async () => {
-    const cwd = await makeProject();
-    const outcome = await new ClaimCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("temporary and its data may be lost");
-    expect(outcome.details).toEqual({ claimable: true });
+    expect(outcome).toEqual(
+      expect.objectContaining({
+        status: "warn",
+        message: expect.stringContaining("temporary and its data may be lost"),
+        details: { claimable: true },
+      }),
+    );
   });
 
-  // Past the window the warning flips to reconciliation wording but keeps
-  // pointing at `zitadel claim`: the local record can be stale (claimed from
-  // another machine reads detached) and the server resolves the grant before
-  // the window, so the command is the safe authoritative check. The closed
-  // window still travels in details for the doctor advisory.
-  it("switches to reconciliation wording once the claim window has closed", async () => {
-    const cwd = await makeProject();
-    await writeSecret(cwd, { created_at: "2026-01-01T00:00:00.000Z" });
-    const outcome = await new ClaimCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("claim window has closed");
-    expect(outcome.message).toContain("zitadel claim");
-    expect(outcome.message).toContain("no longer be claimed");
-    expect(outcome.details).toEqual({ claimable: false });
+  it("passes and names the team once attached", async ({ dir }) => {
+    await aNextProject(dir);
+    await writeSecret(dir, {
+      ...SECRET,
+      claimed_at: "2026-01-02T00:00:00.000Z",
+      team_id: "team-001",
+    });
+
+    const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "pass", message: expect.stringContaining("team-001") });
   });
 
-  it("passes and names the team once attached", async () => {
-    const cwd = await makeProject();
-    await writeSecret(cwd, { claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" });
-    const outcome = await new ClaimCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("team-001");
+  it.for(["http://localhost:8080", "https://zitadel.example.com"])(
+    "passes without a nudge off the cloud, on %s",
+    async (server, { dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        "zitadel.json": JSON.stringify({ project: PROJECT_ID, server, framework: { id: "next" } }),
+      });
+
+      const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        message: expect.not.stringContaining("temporary"),
+      });
+    },
+  );
+
+  it("skips, rather than throwing, when the secret cannot be read", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, SECRET_FILE));
+
+    const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "pass", message: expect.stringContaining("Skipped") });
   });
 
-  // Local and self-hosted servers have no platform team, so there is nothing to
-  // nudge toward and a warning would be permanent noise.
-  it("passes without a nudge off the cloud", async () => {
-    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
-      const cwd = await makeProject();
-      await writeServer(cwd, server);
-      const outcome = await new ClaimCheck().run(ctxFor(cwd));
-      expect(outcome.status).toBe("pass");
-      expect(outcome.message).not.toContain("temporary");
-    }
+  describe("once the claim window has closed", () => {
+    it.for(["claim window has closed", "zitadel claim", "no longer be claimed"])(
+      "warns, saying %s",
+      async (said, { dir }) => {
+        await aNextProject(dir);
+        await writeSecret(dir, { ...SECRET, created_at: "2026-01-01T00:00:00.000Z" });
+
+        const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+        expect(outcome).toMatchObject({ status: "warn", message: expect.stringContaining(said) });
+      },
+    );
+
+    it("reports the project as no longer claimable", async ({ dir }) => {
+      await aNextProject(dir);
+      await writeSecret(dir, { ...SECRET, created_at: "2026-01-01T00:00:00.000Z" });
+
+      const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+      expect(outcome.details).toEqual({ claimable: false });
+    });
   });
 
-  // Nothing wraps a throw from this check (it implements SanityCheck directly),
-  // so an unreadable secret must not take the whole battery down with it — the
-  // `secret` check is the one that reports that problem.
-  it("skips instead of throwing when the secret cannot be read", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, ".zitadel/secret"));
-    const outcome = await new ClaimCheck().run(ctxFor(cwd));
-    expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("Skipped");
-  });
+  describe("fix", () => {
+    it("leaves the secret as it is, claiming needing a browser", async ({ dir }) => {
+      await aNextProject(dir);
+      const before = await textOf(dir, SECRET_FILE);
 
-  // `doctor --fix` calls fix() on every non-passing check. Claiming needs a
-  // browser, so this one must be inert rather than half-writing the record.
-  it("has no automatic repair", async () => {
-    const cwd = await makeProject();
-    const before = await readFile(join(cwd, ".zitadel/secret"), "utf8");
-    await new ClaimCheck().fix(ctxFor(cwd));
-    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(before);
-    expect((await new ClaimCheck().run(ctxFor(cwd))).status).toBe("warn");
+      await new ClaimCheck().fix(aCheckContext(dir));
+
+      expect(await textOf(dir, SECRET_FILE)).toBe(before);
+    });
+
+    it("leaves the check warning", async ({ dir }) => {
+      await aNextProject(dir);
+
+      await new ClaimCheck().fix(aCheckContext(dir));
+
+      expect((await new ClaimCheck().run(aCheckContext(dir))).status).toBe("warn");
+    });
   });
 });
 
 describe("loadPatchContext", () => {
-  it("reconstructs the patch context from on-disk project files", async () => {
-    const cwd = await makeProject();
-    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+  it("reconstructs the patch context from on-disk project files", async ({ dir }) => {
+    await aNextProject(dir);
 
-    expect(ctx.framework.id).toBe("next");
-    expect(ctx.project.id).toBe("proj-001");
-    expect(ctx.issuer).toBe("http://localhost:3000");
-    expect(ctx.cliVersion).toBe("0.1.0-alpha.0");
-    expect(ctx.preset).toBeUndefined();
-    expect(ctx.scaffoldedFramework).toBeUndefined();
+    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+
+    expect(context).toMatchObject({
+      framework: { id: "next" },
+      project: { id: PROJECT_ID },
+      issuer: ISSUER,
+      cliVersion: CHECK_CLI_VERSION,
+      preset: undefined,
+      scaffoldedFramework: undefined,
+    });
   });
 
-  it("restores preset, use case, and scaffold facts", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        project: "proj-001",
-        server: "https://api.zitadel.cloud",
+  it("restores the preset, the use case and the scaffold facts, the env file's issuer winning", async ({
+    dir,
+  }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "zitadel.json": JSON.stringify({
+        project: PROJECT_ID,
+        server: CLOUD,
         framework: { id: "next" },
         preset: "passkey-first",
         useCase: "consumer",
       }),
-    );
-    await writeScaffoldState(cwd, { files: {}, scaffolded_framework: true, dev_port: 3005 });
+    });
+    await writeScaffold(dir, { files: {}, scaffolded_framework: true, dev_port: 3005 });
 
-    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
 
-    expect(ctx.preset).toBe("passkey-first");
-    expect(ctx.useCase).toBe("consumer");
-    expect(ctx.scaffoldedFramework).toBe(true);
-    // The issuer in the env file still wins over the manifest port.
-    expect(ctx.issuer).toBe("http://localhost:3000");
+    expect(context).toMatchObject({
+      preset: "passkey-first",
+      useCase: "consumer",
+      scaffoldedFramework: true,
+      issuer: ISSUER,
+    });
   });
 
-  it("takes the issuer from the project's files, never the shell's environment", async () => {
-    const cwd = await makeProject();
+  it("takes the issuer from the project's files, never the shell's environment", async ({
+    dir,
+  }) => {
+    await aNextProject(dir);
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
-    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
-      "http://localhost:3000",
-    );
+
+    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+
+    expect(context.issuer).toBe(ISSUER);
   });
 
-  it("falls back to the manifest dev_port for the issuer", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        project: "proj-001",
-        server: "https://api.zitadel.cloud",
-        framework: { id: "next" },
-      }),
-    );
-    await rm(join(cwd, ".env.local"));
-    await writeScaffoldState(cwd, { files: {}, dev_port: 3005 });
+  it("falls back to the manifest's dev_port for the issuer", async ({ dir }) => {
+    await aNextProject(dir);
+    await rm(join(dir, ".env.local"));
+    await writeScaffold(dir, { files: {}, dev_port: 3005 });
 
-    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
 
-    expect(ctx.issuer).toBe("http://localhost:3005");
+    expect(context.issuer).toBe("http://localhost:3005");
   });
 
-  it("restores the recorded posture, defaulting absence to page (ADR 044)", async () => {
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, { files: {}, posture: "widget" });
-    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).posture).toBe("widget");
+  it.for([
+    ["the recorded posture", { files: {}, posture: "widget" }, "widget"],
+    ["page for a manifest that records none", { files: {} }, "page"],
+    [
+      "page for a manifest with an unknown posture, which it rejects whole",
+      { files: {}, posture: "split" },
+      "page",
+    ],
+  ] as const)("restores %s", async ([, scaffold, posture], { dir }) => {
+    await aNextProject(dir);
+    await writeScaffold(dir, scaffold);
 
-    // No record (legacy manifest, or none at all) restores full-page — the
-    // only posture that existed before the record.
-    await writeScaffoldState(cwd, { files: {} });
-    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).posture).toBe("page");
-  });
+    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
 
-  it("degrades an unknown posture value to template mode, restoring page", async () => {
-    const cwd = await makeProject();
-    await writeScaffoldState(cwd, {
-      files: {},
-      posture: "split",
-    } as unknown as ScaffoldManifest);
-    // A future-shaped manifest is rejected wholesale (readScaffoldManifest
-    // returns undefined), so the context falls back to the page posture.
-    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).posture).toBe("page");
+    expect(context.posture).toBe(posture);
   });
 });
 
 describe("DependencyVersionCheck", () => {
-  it("passes when exact Zitadel pins match the CLI version", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
+  it("passes when the exact Zitadel pins match the CLI version", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "package.json": JSON.stringify({
         name: "demo",
-        dependencies: { next: "^15", "@zitadel/sdk-next": "0.1.0-alpha.18" },
+        dependencies: { next: "^15", "@zitadel/sdk-next": RELEASE },
       }),
-    );
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "0.1.0-alpha.18",
     });
-    expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("1 compared");
-  });
 
-  it("warns with the exact remedy when a pin trails the CLI train", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { "@zitadel/sdk-next": "0.1.0-alpha.17" },
-        devDependencies: { "@zitadel/testing": "0.1.0-alpha.17" },
-      }),
+    const outcome = await new DependencyVersionCheck().run(
+      aCheckContext(dir, { cliVersion: RELEASE }),
     );
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "0.1.0-alpha.18",
-    });
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain("@zitadel/sdk-next@0.1.0-alpha.17");
-    // No lockfile or packageManager field in the fixture, so npm is the
-    // detected fallback; the remedy must pin exactly, not caret-float.
-    const remedy =
-      "npm install --save-exact @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18";
-    expect(outcome.details).toEqual({
-      mismatched: [
-        { name: "@zitadel/sdk-next", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
-        { name: "@zitadel/testing", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
-      ],
-      remedy_command: remedy,
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("1 compared"),
     });
   });
 
-  it("writes the remedy with the project's own package manager", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
-        name: "demo",
-        dependencies: { "@zitadel/sdk-next": "0.1.0-alpha.17" },
-      }),
-    );
-    await writeFile(join(cwd, "pnpm-lock.yaml"), "");
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "0.1.0-alpha.18",
-    });
-    expect(outcome.status).toBe("warn");
-    // A bare `npm install` on a pnpm project would switch package managers.
-    expect((outcome.details as { remedy_command?: string }).remedy_command).toBe(
-      "pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18",
-    );
-  });
-
-  it("ignores ranges, dist-tags, and file specifiers", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({
+  it("ignores ranges, dist-tags and file specifiers", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "package.json": JSON.stringify({
         name: "demo",
         dependencies: {
           "@zitadel/sdk-next": "latest",
@@ -1851,53 +2559,120 @@ describe("DependencyVersionCheck", () => {
           "@zitadel/api": "file:../local.tgz",
         },
       }),
+    });
+
+    const outcome = await new DependencyVersionCheck().run(
+      aCheckContext(dir, { cliVersion: RELEASE }),
     );
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "0.1.0-alpha.18",
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("no exactly-pinned"),
     });
-    expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("no exactly-pinned");
   });
 
-  it("skips the comparison for non-release CLI versions", async () => {
-    const cwd = await makeProject();
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "workspace-dev",
+  it("skips the comparison for a CLI version that is no release", async ({ dir }) => {
+    await aNextProject(dir);
+
+    const outcome = await new DependencyVersionCheck().run(
+      aCheckContext(dir, { cliVersion: "workspace-dev" }),
+    );
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("not an exact release"),
     });
-    expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("not an exact release");
   });
 
-  it("passes quietly when package.json is missing", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, "package.json"));
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "0.1.0-alpha.18",
-    });
-    // The dependency check owns that failure; this one only compares pins.
+  it.for([
+    [
+      "is missing, which the dependency check reports",
+      (dir: string) => {
+        return rm(join(dir, "package.json"));
+      },
+    ],
+    [
+      "is not valid JSON",
+      (dir: string) => {
+        return write(dir, { "package.json": "{ not json" });
+      },
+    ],
+  ] as const)("passes quietly when package.json %s", async ([, spoil], { dir }) => {
+    await aNextProject(dir);
+    await spoil(dir);
+
+    const outcome = await new DependencyVersionCheck().run(
+      aCheckContext(dir, { cliVersion: RELEASE }),
+    );
+
     expect(outcome.status).toBe("pass");
   });
 
-  it("passes quietly when package.json is not valid JSON", async () => {
-    const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), "{ not json");
-    const outcome = await new DependencyVersionCheck().run({
-      ...ctxFor(cwd),
-      cliVersion: "0.1.0-alpha.18",
-    });
-    expect(outcome.status).toBe("pass");
-  });
-});
+  describe("with pins trailing the CLI's release", () => {
+    /**
+     * Fills `dir` with a project pinning the SDK and the test kit one release
+     * behind {@link RELEASE}, with no lockfile, so npm is the package manager.
+     *
+     * @param dir - The directory to fill.
+     */
+    const aTrailingProject = async (dir: string): Promise<void> => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies: { "@zitadel/sdk-next": TRAILING },
+          devDependencies: { "@zitadel/testing": TRAILING },
+        }),
+      });
+    };
 
-describe("exactZitadelPins", () => {
-  it("is undefined without a package.json and rejects one that is not valid JSON", async () => {
-    const cwd = await makeProject();
-    await rm(join(cwd, "package.json"));
-    expect(await exactZitadelPins(cwd)).toBeUndefined();
-    await writeFile(join(cwd, "package.json"), "{ not json");
-    await expect(exactZitadelPins(cwd)).rejects.toThrow(SyntaxError);
+    it("warns, naming a trailing pin", async ({ dir }) => {
+      await aTrailingProject(dir);
+
+      const outcome = await new DependencyVersionCheck().run(
+        aCheckContext(dir, { cliVersion: RELEASE }),
+      );
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(`@zitadel/sdk-next@${TRAILING}`),
+      });
+    });
+
+    it("gives the exact npm remedy for every trailing pin", async ({ dir }) => {
+      await aTrailingProject(dir);
+
+      const outcome = await new DependencyVersionCheck().run(
+        aCheckContext(dir, { cliVersion: RELEASE }),
+      );
+
+      expect(outcome.details).toEqual({
+        mismatched: [
+          { name: "@zitadel/sdk-next", declared: TRAILING, expected: RELEASE },
+          { name: "@zitadel/testing", declared: TRAILING, expected: RELEASE },
+        ],
+        remedy_command: `npm install --save-exact @zitadel/sdk-next@${RELEASE} @zitadel/testing@${RELEASE}`,
+      });
+    });
+
+    it("writes the remedy with the project's own package manager", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        "package.json": JSON.stringify({
+          name: "demo",
+          dependencies: { "@zitadel/sdk-next": TRAILING },
+        }),
+        "pnpm-lock.yaml": "",
+      });
+
+      const outcome = await new DependencyVersionCheck().run(
+        aCheckContext(dir, { cliVersion: RELEASE }),
+      );
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        details: { remedy_command: `pnpm add --save-exact @zitadel/sdk-next@${RELEASE}` },
+      });
+    });
   });
 });

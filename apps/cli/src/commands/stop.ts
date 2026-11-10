@@ -4,10 +4,10 @@ import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   readRuntimeMetadata,
-} from "../lib/local-server/runtime";
-import { LocalServer } from "../lib/local-server/server";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
 import { startedServer } from "./local-server/started";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";

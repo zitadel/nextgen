@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -104,7 +104,7 @@ describe("origin rm", () => {
 
     const result = await remove(cwd);
 
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_CONFIRMATION_REQUIRED");
     expect(removed).toEqual([]);
   });
 
@@ -127,7 +127,7 @@ describe("origin rm", () => {
     const result = await remove(cwd, ["--env", "production"]);
 
     const envelope = parseJson(result.stdout) as { code: string; next_commands?: string[] };
-    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(envelope.next_commands?.[0]).toContain("--env production");
   });
 

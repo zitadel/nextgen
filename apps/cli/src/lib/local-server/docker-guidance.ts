@@ -1,6 +1,6 @@
-import { publicCliCommand } from "../public-cli";
-import { shellCommand, type SuggestedCommand, unscopedCommand } from "../suggestion";
-import { errorMessage } from "../errors";
+import { publicCliCommand } from "@/lib/public-cli";
+import { shellCommand, type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { errorMessage } from "@/lib/errors";
 
 export type DockerRuntimeGuidance = {
   hint: string;

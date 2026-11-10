@@ -1,4 +1,4 @@
-import { refusalError } from "../refusal";
+import { refusalError } from "@/lib/oclif/refusal";
 import { allows, type FieldPaths, observedPaths, suggestable } from "./paths";
 
 function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {

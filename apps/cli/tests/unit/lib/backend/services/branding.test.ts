@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BrandingService } from "../../../../../src/lib/backend/services/branding";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { BrandingService } from "@/lib/backend/services/branding";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 describe("BrandingService.list", () => {
   it("lists the revisions of the project it is bound to", async () => {

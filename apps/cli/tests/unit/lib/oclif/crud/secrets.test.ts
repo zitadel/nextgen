@@ -5,14 +5,9 @@ import {
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import {
-  findCredential,
-  isSecretKey,
-  redactCredentials,
-  type References,
-} from "../../../../../src/lib/oclif/crud";
-import { refuseSecret } from "../../../../../src/lib/oclif/crud/secrets";
-import type { ZodLike } from "../../../../../src/lib/oclif/crud/zod";
+import { findCredential, isSecretKey, redactCredentials, type References } from "@/lib/oclif/crud";
+import { refuseSecret } from "@/lib/oclif/crud/secrets";
+import type { ZodLike } from "@/lib/oclif/crud/zod";
 
 const references: References = {
   matches: (value) => /^\$\{\{ *\w+ *\}\}$/.test(value),

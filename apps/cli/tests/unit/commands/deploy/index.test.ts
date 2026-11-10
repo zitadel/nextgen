@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { Origins } from "../../../../src/lib/backend";
-import Deploy, { missingPrimaryOrigin } from "../../../../src/commands/deploy/index";
-import { parseFlag } from "../../../helpers/inputs";
+import { Origins } from "@/lib/backend";
+import Deploy, { missingPrimaryOrigin } from "@/commands/deploy/index";
+import { parseFlag } from "@tests/helpers/inputs";
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = Origins.wrap([{ pattern: ISSUER, kind: "preview" }]);

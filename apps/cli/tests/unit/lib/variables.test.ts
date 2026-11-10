@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { Variable } from "../../../src/lib/backend";
-import {
-  inventoryCell,
-  parseVariableValue,
-  readStdin,
-  variableCell,
-} from "../../../src/lib/variables";
+import { Variable } from "@/lib/backend";
+import { inventoryCell, parseVariableValue, readStdin, variableCell } from "@/lib/variables";
 
 describe("parseVariableValue", () => {
   it("keeps a string exactly as entered", () => {

@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import Api, {
-  readOperation,
-  refuseUnforced,
-  refuseUnpaged,
-} from "../../../../src/commands/api/index";
-import { parseFlag } from "../../../helpers/inputs";
-import { Operation } from "../../../../src/lib/backend";
+import Api, { readOperation, refuseUnforced, refuseUnpaged } from "@/commands/api/index";
+import { parseFlag } from "@tests/helpers/inputs";
+import { Operation } from "@/lib/backend";
 
 const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
@@ -92,7 +88,7 @@ describe("--force on a call that cannot be asked about", () => {
       refuseUnforced(withBody, forcing({ nonInteractive: true }));
     }).toThrow(
       expect.objectContaining({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot call deleteUser without --force in non-interactive mode",
       }),
     );

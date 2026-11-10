@@ -6,7 +6,7 @@ import {
   type UserAgentFacts,
   useUserAgent,
   userAgent,
-} from "../../../src/lib/user-agent";
+} from "@/lib/user-agent";
 
 const FACTS: UserAgentFacts = {
   cliVersion: "1.2.3-alpha.4",

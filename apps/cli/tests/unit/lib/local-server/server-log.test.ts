@@ -8,7 +8,7 @@ import {
   logLines,
   logText,
   renderLogLine,
-} from "../../../../src/lib/local-server/server-log";
+} from "@/lib/local-server/server-log";
 
 /** A record as the server writes it by default, in slog's text format. */
 function record(level: string, msg: string): string {

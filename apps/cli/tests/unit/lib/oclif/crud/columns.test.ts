@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { chosenColumns, readColumns } from "../../../../../src/lib/oclif/crud/columns";
-import { fieldPaths } from "../../../../../src/lib/oclif/crud/paths";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { fieldPaths } from "@/lib/oclif/crud/paths";
 
 describe("readColumns", () => {
   it("drops blanks between commas", () => {

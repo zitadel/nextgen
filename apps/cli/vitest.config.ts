@@ -3,13 +3,15 @@ import { availableParallelism } from "node:os";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "@zitadel/vitest-config";
+import { aliases } from "./tests/helpers/aliases";
 import { PORT_WORKERS } from "./tests/helpers/ports";
 
-/** Cores the pool leaves free for the rest of the machine. */
-const WORKER_HEADROOM = 3;
+/** Three quarters of the cores, at least one: 3 workers on CI's 4-core runners. */
+const WORKERS = Math.max(Math.floor((availableParallelism() * 3) / 4), 1);
 
 export default defineConfig({
   cacheDir: ".vitest",
+  resolve: { alias: aliases },
   test: {
     ...baseTest,
     name: "@zitadel/cli",
@@ -59,11 +61,12 @@ export default defineConfig({
     ],
     // Every file running at the same time takes its ports from a block of its
     // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks, so the
-    // pool stops there on a bigger machine. It also leaves three cores free
-    // instead of Vitest's one: each worker holds about 600 MB (a fresh process
-    // per file that builds the generated API schemas again), and this suite
-    // runs beside the rest of CI's task graph, where memory is the limit.
-    maxWorkers: Math.min(Math.max(availableParallelism() - WORKER_HEADROOM, 1), PORT_WORKERS),
+    // pool stops there on a bigger machine. It also leaves a quarter of the
+    // cores free instead of Vitest's one: each worker holds about 600 MB (a
+    // fresh process per file that builds the generated API schemas again), and
+    // this suite runs beside the rest of CI's task graph. A fixed headroom
+    // would leave a single worker on a 4-core runner.
+    maxWorkers: Math.min(WORKERS, PORT_WORKERS),
     // The integration specs drive the built CLI against a `usePlatformMock()`
     // HTTP server. Under CI's parallel worker pool that mock occasionally
     // isn't ready when a spec's `aSetUpApp()` arrange runs, and the

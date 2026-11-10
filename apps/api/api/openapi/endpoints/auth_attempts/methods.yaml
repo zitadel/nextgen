@@ -31,9 +31,9 @@ post:
 
     The project comes from the project secret. A body `project_id` that names
     another project answers `403` with `proj.mismatch`: send the credential's own
-    project. This operation does not refuse a revoked release. A release is the
-    configuration that `zitadel deploy` publishes, and `exchangeHandoff` refuses a
-    revoked one.
+    project. The attempt seals the project's newest primary deployment, whatever
+    the caller's `Origin`. With none it answers `409` with `rel.no_default`, and a
+    revoked release answers `409` with `rel.revoked`.
   tags:
     - Authentication Attempts
   security:

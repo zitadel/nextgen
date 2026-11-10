@@ -6,10 +6,10 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { OriginService } from "../../lib/backend";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { OriginService } from "@/lib/backend";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { prose } from "@/lib/oclif/rendering";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;

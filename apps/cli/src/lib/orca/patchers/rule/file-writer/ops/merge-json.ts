@@ -1,5 +1,9 @@
-import { deepMerge, parseJsonObject, stableStringify } from "../../../../../json";
-import { type Change, Operation, type Source } from "../operation";
+import { deepMerge, parseJsonObject, stableStringify } from "@/lib/json";
+import {
+  type Change,
+  Operation,
+  type Source,
+} from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
  * Lays a patch over a JSON file, merging objects found at the same key and

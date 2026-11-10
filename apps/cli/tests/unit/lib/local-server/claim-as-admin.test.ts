@@ -1,10 +1,10 @@
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
-import { claimProjectAsAdmin } from "../../../../src/lib/local-server/claim-as-admin";
+import type { LocalAdmin } from "@/lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
 
 const signal = new AbortController().signal;
 

@@ -8,18 +8,18 @@ import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import consola from "consola";
 
-import { toZitadelError, ZitadelError } from "../errors";
-import { isObject } from "../json";
-import { type LocalServers, PsLocalServers } from "../local-server/processes";
-import { resolveCwd } from "../paths";
-import { normalizePublicCliCommands } from "../public-cli";
-import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
-import { statusColor } from "../style";
-import { type SuggestedCommand, unscopedCommand } from "../suggestion";
-import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
-import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
-import { processUserAgent, useUserAgent } from "../user-agent";
-import { takeReportedWarnings } from "../warnings";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { isObject } from "@/lib/json";
+import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
+import { resolveCwd } from "@/lib/paths";
+import { normalizePublicCliCommands } from "@/lib/public-cli";
+import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "@/lib/server";
+import { statusColor } from "@/lib/style";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
+import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
+import { processUserAgent, useUserAgent } from "@/lib/user-agent";
+import { takeReportedWarnings } from "@/lib/warnings";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -30,7 +30,7 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
-import { escapeControlCharacters, escapeJsonControlCharacters } from "../terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
 import type {
   CommandResult,
@@ -41,7 +41,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { Cmd } from "../cmd";
+import { Cmd } from "@/lib/cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`

@@ -9,17 +9,17 @@ import {
   type JsonEnvelope,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
-} from "../../lib/oclif";
-import { ForbiddenError, OriginService, type ZitadelClient } from "../../lib/backend";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
+} from "@/lib/oclif";
+import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 
-import { filled, reads, type Refused } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { detectPreviewUrls } from "../../lib/preview";
-import { runsInCi } from "../../lib/telemetry/dimensions/ci-provider";
-import { parseTtl, type Ttl } from "../../lib/ttl";
-import { reportWarning } from "../../lib/warnings";
-import { prose } from "../../lib/oclif/rendering";
+import { filled, reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { detectPreviewUrls } from "@/lib/preview";
+import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
+import { parseTtl, type Ttl } from "@/lib/ttl";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",

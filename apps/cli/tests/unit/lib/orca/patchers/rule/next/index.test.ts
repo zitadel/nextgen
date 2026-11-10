@@ -2,15 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
-import { PAGE_SURFACE_BACKGROUND } from "../../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { NextPatcher } from "@/lib/orca/patchers/rule/next";
+import { PAGE_SURFACE_BACKGROUND } from "@/lib/orca/patchers/rule/next/renderers/react";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function ctxFor(
   appDir: "app" | "src/app",

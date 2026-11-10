@@ -5,9 +5,9 @@ import { join } from "node:path";
 import semver from "semver";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { detectors } from "../../../../../src/lib/orca/detectors";
-import { enforceVersionFloor } from "../../../../../src/lib/orca/detectors/version-floor";
+import { ZitadelError } from "@/lib/errors";
+import { detectors } from "@/lib/orca/detectors";
+import { enforceVersionFloor } from "@/lib/orca/detectors/version-floor";
 
 const dirs: string[] = [];
 

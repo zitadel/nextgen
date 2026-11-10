@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Outbox } from "../../../../src/lib/telemetry/outbox";
+import { Outbox } from "@/lib/telemetry/outbox";
 
 /** A send that stays in the air until `finish` is called. */
 function aSend(): { send: Promise<void>; finish: () => void } {

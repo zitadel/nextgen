@@ -67,7 +67,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	defer end(&err)
 
 	stmts := fd.v2Pool.Statements()
-	userSchema, err := resolveUserSchema(ctx, stmts, fd.builtinBases, req.ProjectID, req.UserSchema)
+	userSchema, err := newestUserSchema(ctx, stmts, fd.builtinBases, req.ProjectID, req.UserSchema)
 	if err != nil {
 		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
 			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)

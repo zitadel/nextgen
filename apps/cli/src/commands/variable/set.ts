@@ -1,27 +1,17 @@
 import { Args, Flags } from "@oclif/core";
-import { errorMessage, ZitadelError } from "../../lib/errors";
+import { errorMessage, ZitadelError } from "@/lib/errors";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { type Variable, VariableService, VariableWrite } from "../../lib/backend";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { type Variable, VariableService, VariableWrite } from "@/lib/backend";
 import { variableNameArg } from "./name";
-import {
-  heldCell,
-  parseVariableValue,
-  VARIABLE_TYPES,
-  type VariableType,
-} from "../../lib/variables";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { reportWarning } from "../../lib/warnings";
-import { inShell } from "../../lib/suggestion";
-import { Promptable } from "../../lib/oclif/promptable";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { painted } from "../../lib/oclif/rendering";
+import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { reportWarning } from "@/lib/warnings";
+import { inShell } from "@/lib/suggestion";
+import { Promptable } from "@/lib/oclif/promptable";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { painted } from "@/lib/oclif/rendering";
 
 /** How a secret asked to be stored as another type is refused. */
 const SECRET_AS_STRING_REFUSAL: Refusal = {

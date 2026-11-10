@@ -14,9 +14,9 @@ vi.mock("@clack/prompts", () => ({
 
 import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
 
-import { asTerminal } from "../../../../helpers/terminal";
-import { EXIT_CODES } from "../../../../../src/lib/errors";
-import { BaseCommand } from "../../../../../src/lib/oclif";
+import { asTerminal } from "@tests/helpers/terminal";
+import { EXIT_CODES } from "@/lib/errors";
+import { BaseCommand } from "@/lib/oclif";
 import {
   bindOperation,
   definitionOf,
@@ -34,7 +34,7 @@ import {
   type ResourceDescriptor,
   UpdateOperation,
   type UpdateSpec,
-} from "../../../../../src/lib/oclif/crud";
+} from "@/lib/oclif/crud";
 
 type Ctx = { token: string };
 
@@ -395,6 +395,78 @@ describe("write results", () => {
     expect(stdout.join("\n")).toContain("Zitadel command completed.");
   });
 
+  it("asks the server on a dry run of an update that can check, and never writes", async () => {
+    const call = vi.fn(async () => ({ id: "team_1" }));
+    const check = vi.fn(async () => ({ id: "team_1", name: "a" }));
+    const checked: UpdateSpec<Ctx> = { schema, call, check };
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition(checked),
+    );
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "team_1",
+      "--name",
+      "a",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(check).toHaveBeenCalledWith({ token: "t" }, "team_1", { name: "a" });
+    expect(call).not.toHaveBeenCalled();
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      data: {
+        dry_run: true,
+        id: "team_1",
+        body: { name: "a" },
+        result: { id: "team_1", name: "a" },
+      },
+    });
+  });
+
+  it("lets a server's refusal of a dry run fail the command", async () => {
+    const call = vi.fn(async () => ({}));
+    const checked: UpdateSpec<Ctx> = {
+      schema,
+      call,
+      check: () => Promise.reject(new Error("refused")),
+    };
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition(checked),
+    );
+
+    await expect(
+      (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+        "team_1",
+        "--name",
+        "a",
+        "--dry-run",
+        "--json",
+      ]),
+    ).rejects.toThrow();
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("connects to nothing on a dry run of an update that cannot check", async () => {
+    const connect = vi.fn(async () => ({ token: "t" }));
+    const command = bindOperation(UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>, {
+      ...definition(update),
+      options: { ...options, connect } as typeof options,
+    });
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "team_1",
+      "--name",
+      "a",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(connect).not.toHaveBeenCalled();
+    expect(JSON.parse(JSON.stringify(envelope)).data).not.toHaveProperty("result");
+  });
+
   it("suggests getting the resource an update answered with", async () => {
     const updated: UpdateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
     const command = bindOperation(
@@ -702,7 +774,7 @@ describe("delete confirmation", () => {
       );
 
       expect(failure).toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
         next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
       });

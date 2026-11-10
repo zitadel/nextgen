@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  escapeControlCharacters,
-  escapeJsonControlCharacters,
-} from "../../../src/lib/terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 describe("escapeControlCharacters", () => {
   it("escapes C0, DEL, C1, format and separator characters", () => {

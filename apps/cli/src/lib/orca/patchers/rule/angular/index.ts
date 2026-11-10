@@ -1,10 +1,14 @@
-import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { angularEntry, assertMountsRootComponent, type RootMount } from "../root-component";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import {
+  angularEntry,
+  assertMountsRootComponent,
+  type RootMount,
+} from "@/lib/orca/patchers/rule/root-component";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
 import {

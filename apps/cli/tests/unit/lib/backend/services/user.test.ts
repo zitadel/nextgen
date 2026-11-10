@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError, NotFoundError } from "../../../../../src/lib/backend/errors";
-import { UserService } from "../../../../../src/lib/backend/services/user";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
+import { UserService } from "@/lib/backend/services/user";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 describe("UserService.exists", () => {
   it("is true for a project that has a user", async () => {
@@ -78,5 +78,80 @@ describe("UserService.hasIdentityLink", () => {
     );
 
     await expect(userService.hasIdentityLink("usr_1")).rejects.toThrow("not allowed");
+  });
+});
+
+describe("UserService.credentials", () => {
+  const client = (overrides: Record<string, unknown> = {}) =>
+    fakeClient({
+      getUserPasswordState: async () => ({ set_at: "2026-01-01T00:00:00Z" }),
+      listUserPasskeys: async () => ({ passkeys: [] }),
+      listUserIdentityLinks: async () => ({ identity_links: [{ id: "lnk_1" }] }),
+      ...overrides,
+    });
+
+  it("returns the asked credentials the user holds", async () => {
+    const userService = new UserService(client());
+
+    await expect(userService.credentials("usr_1", ["password", "passkey", "sso"])).resolves.toEqual(
+      new Set(["password", "sso"]),
+    );
+  });
+
+  it("reads only what is asked", async () => {
+    const userService = new UserService(
+      client({
+        getUserPasswordState: async () => {
+          throw new Error("password read");
+        },
+      }),
+    );
+
+    await expect(userService.credentials("usr_1", ["passkey"])).resolves.toEqual(new Set());
+  });
+
+  it("answers a user without a password as holding none", async () => {
+    const userService = new UserService(client({ getUserPasswordState: async () => ({}) }));
+
+    await expect(userService.credentials("usr_1", ["password"])).resolves.toEqual(new Set());
+  });
+
+  it("answers a user who has gone since as holding none", async () => {
+    const userService = new UserService(
+      client({
+        listUserPasskeys: async () => {
+          throw new NotFoundError("usr_1 is gone", { status: 404 });
+        },
+      }),
+    );
+
+    await expect(userService.credentials("usr_1", ["passkey"])).resolves.toEqual(new Set());
+  });
+
+  it("discards what was read before the user went", async () => {
+    const userService = new UserService(
+      client({
+        listUserPasskeys: async () => ({ passkeys: [{ id: "pk_1" }] }),
+        getUserPasswordState: async () => {
+          throw new NotFoundError("usr_1 is gone", { status: 404 });
+        },
+      }),
+    );
+
+    await expect(userService.credentials("usr_1", ["passkey", "password"])).resolves.toEqual(
+      new Set(),
+    );
+  });
+
+  it("raises anything else, so a refused read is not read as no credential", async () => {
+    const userService = new UserService(
+      client({
+        listUserPasskeys: async () => {
+          throw new ForbiddenError("not allowed", { status: 403 });
+        },
+      }),
+    );
+
+    await expect(userService.credentials("usr_1", ["passkey"])).rejects.toThrow("not allowed");
   });
 });

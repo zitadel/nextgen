@@ -1,277 +1,249 @@
-import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { describe, expect, it } from "vitest";
 
-import type { StepContext } from "../../../../../src/lib/publish/pipeline";
-import { validateConnections } from "../../../../../src/lib/publish/steps/idp-checks";
-import {
-  DeploymentService,
-  VariableService,
-  SchemaService,
-  UserService,
-} from "../../../../../src/lib/backend";
-import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
-import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
-import { ForbiddenError } from "../../../../../src/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend/errors";
+import { ZitadelError } from "@/lib/errors";
+import { validateConnections } from "@/lib/publish/steps/idp-checks";
+import { aConfig, anOidcConnection } from "@tests/helpers/config";
+import type { ClientStubs } from "@tests/helpers/fake-client";
+import { holdingVariables, SECRET_VARIABLE } from "@tests/helpers/records";
+import { aStepContext } from "@tests/helpers/step-context";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-/** A connection the server would accept: a `${{ NAME }}` client_secret. */
-const googleBody = (over: Record<string, unknown> = {}) => ({
-  slug: "google",
-  protocol: "oidc",
-  template: "google",
-  display_name: "Google",
-  oidc: {
-    issuer: "https://accounts.google.com",
-    client_id: "111.apps.googleusercontent.com",
-    client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
-    scopes: ["openid"],
+/**
+ * A configuration holding one connection, the default `acme` one.
+ */
+const ACME = aConfig({ connections: { "acme.json": anOidcConnection() } });
+
+/**
+ * The project's variables, which this run's token may not read.
+ */
+const FORBIDDEN: ClientStubs = {
+  getVariables: async () => {
+    throw new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" });
   },
-  ...over,
-});
+};
 
-/** The connections the bundle in hand carries, with the files they came from. */
-const connections: { name: string; body: Record<string, unknown> }[] = [];
+describe("validateConnections", () => {
+  it("accepts a client_secret that references a secret variable", async () => {
+    const context = aStepContext({
+      config: ACME,
+      client: holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE }),
+    });
 
-/** Puts the connections in the bundle the checks read, as `buildBundle` would. */
-function project(files: Record<string, unknown>): string {
-  connections.splice(
-    0,
-    connections.length,
-    ...Object.entries(files).map(([name, body]) => ({
-      name,
-      body: body as Record<string, unknown>,
-    })),
-  );
-  return "/tmp/project";
-}
+    const error = await rejectionOf(() => {
+      return validateConnections(context);
+    });
 
-/** A value the API answers for a secret: named, never disclosed. */
-const SECRET: GetVariable200["primary"] = { secret: true };
+    expect(error).toBeUndefined();
+  });
 
-/** The variables the project holds unless a test says otherwise: the secret googleBody names. */
-const HELD = { GOOGLE_CLIENT_SECRET: SECRET };
+  it("accepts a connection with no oidc block", async () => {
+    const config = aConfig({ connections: { "saml.json": { slug: "saml", protocol: "saml" } } });
+    const context = aStepContext({ config, client: holdingVariables({}) });
 
-function ctx(
-  cwd: string,
-  over: Partial<StepContext> & { client?: ClientStubs },
-  held: Record<string, GetVariable200["primary"]> = HELD,
-): StepContext {
-  const { client, ...rest } = over;
-  const stubs = fakeClient({
-    // Variables read back keyed by kind: these tests hold the same values for
-    // whichever kind the run asks for, unless one stubs its own read.
-    getVariables: async (params) =>
-      Object.fromEntries(
-        Object.entries(held).map(([name, value]) => {
-          return [name, { [params.kind ?? "primary"]: value }];
+    const error = await rejectionOf(() => {
+      return validateConnections(context);
+    });
+
+    expect(error).toBeUndefined();
+  });
+
+  it("names the connection file in a refusal", async () => {
+    const config = aConfig({ connections: { "acme-workspace.json": anOidcConnection() } });
+    const context = aStepContext({ config, client: holdingVariables({}) });
+
+    const error = await rejectionOf(() => {
+      return validateConnections(context);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(".zitadel/idps/acme-workspace.json"),
+    });
+  });
+
+  it("names the file of a later connection by its place in the configuration", async () => {
+    const okta = anOidcConnection({
+      slug: "okta",
+      oidc: { client_secret: "${{ OKTA_CLIENT_SECRET }}" },
+    });
+    const config = aConfig({
+      connections: { "b-okta.json": okta, "a-acme.json": anOidcConnection() },
+    });
+    const context = aStepContext({
+      config,
+      client: holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE }),
+    });
+
+    const error = await rejectionOf(() => {
+      return validateConnections(context);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(
+        ".zitadel/idps/b-okta.json: client_secret names the variable OKTA_CLIENT_SECRET",
+      ),
+    });
+  });
+
+  describe("with a deploy", () => {
+    it("refuses a client_secret naming a variable the project lacks", async () => {
+      const context = aStepContext({ config: ACME, client: holdingVariables({}) });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+    });
+
+    it("suggests publishing a missing variable in the environment the deploy addressed", async () => {
+      const context = aStepContext({ config: ACME, client: holdingVariables({}) });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        nextCommands: ["variable set ACME_CLIENT_SECRET --secret --env staging"],
+      });
+    });
+
+    it("refuses a client_secret held in a plain variable", async () => {
+      const context = aStepContext({
+        config: ACME,
+        client: holdingVariables({ ACME_CLIENT_SECRET: "plain" }),
+      });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ message: expect.stringContaining("which is not a secret") });
+    });
+
+    it("refuses a client_id held in a secret variable", async () => {
+      const config = aConfig({
+        connections: {
+          "acme.json": anOidcConnection({ oidc: { client_id: "${{ ACME_CLIENT_ID }}" } }),
+        },
+      });
+      const context = aStepContext({
+        config,
+        client: holdingVariables({
+          ACME_CLIENT_ID: SECRET_VARIABLE,
+          ACME_CLIENT_SECRET: SECRET_VARIABLE,
         }),
-      ),
-    ...client,
-  });
-  return {
-    cwd,
-    deployments: new DeploymentService(fakeClient({}), "proj_1"),
-    variables: new VariableService(stubs, "proj_1"),
-    schemas: new SchemaService(fakeClient({}), "proj_1"),
-    users: new UserService(fakeClient({})),
-    env: {},
-    mode: "deploy",
-    dryRun: false,
-    json: true,
-    color: false,
-    bundle: {
-      schemas: [],
-      flow_definitions: [],
-      idps: connections.map((entry) => entry.body),
-      policies: [],
-    },
-    brandingSources: [],
-    idpFiles: connections.map((entry) => entry.name),
-    policyFiles: [],
-    suggest: (args) => `${args} --env staging` as SuggestedCommand,
-    ...rest,
-  };
-}
+      });
 
-describe("connection checks", () => {
-  it("rejects a literal client_secret, which must never leave the machine", async () => {
-    const cwd = project({
-      "google.json": googleBody({
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "111.apps.googleusercontent.com",
-          client_secret: "a-literal-secret",
-          scopes: ["openid"],
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ message: expect.stringContaining("which is a secret") });
+    });
+
+    it("refuses a client_id and client_secret that name the same variable", async () => {
+      const config = aConfig({
+        connections: {
+          "acme.json": anOidcConnection({ oidc: { client_id: "${{ ACME_CLIENT_SECRET }}" } }),
         },
-      }),
-    });
-    await expect(validateConnections(ctx(cwd, { dryRun: true }))).rejects.toThrow();
-  });
+      });
+      const context = aStepContext({
+        config,
+        client: holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE }),
+      });
 
-  it("refuses a connection a preview names with a variable the project lacks", async () => {
-    const cwd = project({ "google.json": googleBody() });
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
 
-    await expect(validateConnections(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
-      code: "E_CREDENTIAL_MISSING",
-    });
-  });
-
-  it("reads the preview kind for a preview, so a primary-only secret does not count", async () => {
-    const cwd = project({ "google.json": googleBody() });
-    const getVariables = vi.fn(async (params: { kind?: string }) =>
-      params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: SECRET } },
-    );
-
-    await expect(
-      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
-    ).rejects.toMatchObject({ code: "E_CREDENTIAL_MISSING" });
-  });
-
-  it("suggests setting the missing credential for the preview kind", async () => {
-    const cwd = project({ "google.json": googleBody() });
-
-    await expect(validateConnections(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
-      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --preview --env staging"],
-    });
-  });
-
-  it("counts a credential the preview kind holds", async () => {
-    const cwd = project({ "google.json": googleBody() });
-    const getVariables = vi.fn(async (params: { kind?: string }) =>
-      params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: SECRET } } : {},
-    );
-
-    await expect(
-      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
-    ).resolves.toBeUndefined();
-  });
-
-  it("leaves the variable check to the deploy when a preview's token may not read them", async () => {
-    const cwd = project({ "google.json": googleBody() });
-    const getVariables = vi
-      .fn()
-      .mockRejectedValue(
-        new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" }),
-      );
-
-    await expect(
-      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
-    ).resolves.toBeUndefined();
-  });
-
-  it("names the deploy's environment in how to publish a literal client_secret", async () => {
-    const cwd = project({
-      "google.json": googleBody({
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "111.apps.googleusercontent.com",
-          client_secret: "a-literal-secret",
-          scopes: ["openid"],
-        },
-      }),
-    });
-
-    await expect(validateConnections(ctx(cwd, {}))).rejects.toMatchObject({
-      hint: expect.stringContaining("variable set NAME --secret --env staging"),
-    });
-  });
-
-  it("refuses an oidc block that names some endpoints but not the rest", async () => {
-    const cwd = project({
-      "google.json": googleBody({
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "111.apps.googleusercontent.com",
-          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
-          authorization_endpoint: "https://accounts.google.com/auth",
-          scopes: ["openid"],
-        },
-      }),
-    });
-
-    await expect(validateConnections(ctx(cwd, {}))).rejects.toThrow(
-      /google\.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint/,
-    );
-  });
-
-  it("accepts an oidc block that names every endpoint", async () => {
-    const cwd = project({
-      "google.json": googleBody({
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "111.apps.googleusercontent.com",
-          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
-          authorization_endpoint: "https://accounts.google.com/auth",
-          jwks_uri: "https://accounts.google.com/jwks",
-          token_endpoint: "https://accounts.google.com/token",
-          userinfo_endpoint: "https://accounts.google.com/userinfo",
-          scopes: ["openid"],
-        },
-      }),
-    });
-    await expect(validateConnections(ctx(cwd, {}))).resolves.toBeUndefined();
-  });
-
-  it("refuses the whole bundle when a later connection is malformed", async () => {
-    const cwd = project({
-      "a-google.json": googleBody(),
-      "b-bad.json": { slug: "bad", protocol: "oidc" },
-    });
-
-    await expect(validateConnections(ctx(cwd, {}))).rejects.toThrow();
-  });
-
-  it("refuses a connection whose client_secret names a variable the project lacks", async () => {
-    const cwd = project({ "google.json": googleBody() });
-
-    await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toMatchObject({
-      code: "E_CREDENTIAL_MISSING",
-    });
-  });
-
-  it("suggests publishing a missing variable in the environment the deploy addressed", async () => {
-    const cwd = project({ "google.json": googleBody() });
-
-    await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toMatchObject({
-      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --env staging"],
-    });
-  });
-
-  it("refuses a client_secret held in a plain variable", async () => {
-    const cwd = project({ "google.json": googleBody() });
-
-    await expect(
-      validateConnections(ctx(cwd, {}, { GOOGLE_CLIENT_SECRET: "plain" })),
-    ).rejects.toThrow(/which is not a secret/);
-  });
-
-  it("refuses a client_id held in a secret variable", async () => {
-    const cwd = project({
-      "google.json": googleBody({
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "${{ GOOGLE_CLIENT_ID }}",
-          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
-          scopes: ["openid"],
-        },
-      }),
-    });
-
-    await expect(
-      validateConnections(
-        ctx(
-          cwd,
-          {},
-          { GOOGLE_CLIENT_ID: { secret: true }, GOOGLE_CLIENT_SECRET: { secret: true } },
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        message: expect.stringContaining(
+          "client_id and client_secret both name the variable ACME_CLIENT_SECRET",
         ),
-      ),
-    ).rejects.toThrow(/which is a secret/);
+      });
+    });
+
+    it("fails when its token may not read the variables", async () => {
+      const context = aStepContext({ config: ACME, client: FORBIDDEN });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ForbiddenError);
+    });
   });
 
-  it("names the connection file in the refusal", async () => {
-    const cwd = project({ "google-workspace.json": googleBody() });
+  describe("with a preview", () => {
+    it("refuses a connection naming a variable the project lacks", async () => {
+      const context = aStepContext({ config: ACME, mode: "preview", client: holdingVariables({}) });
 
-    await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toThrow(
-      /\.zitadel\/idps\/google-workspace\.json/,
-    );
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+    });
+
+    it("suggests setting the missing credential for the preview kind", async () => {
+      const context = aStepContext({ config: ACME, mode: "preview", client: holdingVariables({}) });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        nextCommands: ["variable set ACME_CLIENT_SECRET --secret --preview --env staging"],
+      });
+    });
+
+    it("does not count a credential only the primary kind holds", async () => {
+      const context = aStepContext({
+        config: ACME,
+        mode: "preview",
+        client: holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE }, "primary"),
+      });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+    });
+
+    it("counts a credential the preview kind holds", async () => {
+      const context = aStepContext({
+        config: ACME,
+        mode: "preview",
+        client: holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE }, "preview"),
+      });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeUndefined();
+    });
+
+    it("leaves the variable check to the deploy when its token may not read them", async () => {
+      const context = aStepContext({ config: ACME, mode: "preview", client: FORBIDDEN });
+
+      const error = await rejectionOf(() => {
+        return validateConnections(context);
+      });
+
+      expect(error).toBeUndefined();
+    });
   });
 });

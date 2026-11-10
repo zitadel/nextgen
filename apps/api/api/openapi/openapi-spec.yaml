@@ -70,8 +70,7 @@ tags:
     description: |
       Branding sets how the login looks: its layout, asset URLs and Liquid
       template. Each publish creates an immutable revision. The login renders
-      the revision the deployed release pins, or the newest one when the
-      release pins no flow.
+      the revision the deployed release pins.
   - name: Identity Providers
     description: |
       Identity providers are the external login providers a project offers.

@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot; the revision menu is `RevisionItems` (`src/components/revision-select.tsx`), shared with the schema detail's picker |
+| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot; the revision menu is `RevisionItems` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
@@ -154,10 +154,6 @@ own. Do not add a per-screen wrapper with its own padding.
 | Page bottom | 32px |
 | Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
-
-Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
-inside `Page`: capped and centred, so the table does not stretch across the
-window.
 
 `inset="panel"` is for the configuration-panel screens (Login flows, Identity
 providers, Releases), whose single card the design insets by 24px on the

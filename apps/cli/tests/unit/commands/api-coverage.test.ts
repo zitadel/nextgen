@@ -7,7 +7,7 @@ import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { RESOURCES } from "../../../src/commands/resources";
+import { RESOURCES } from "@/commands/resources";
 
 /**
  * The registry is hand-maintained, so an operation the API gains is invisible
@@ -123,7 +123,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
   evaluatePolicy:
-    "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
+    "a dry run `policies test` sends per case from commands/policies/test.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.

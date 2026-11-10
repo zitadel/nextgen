@@ -1,116 +1,73 @@
-import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
-import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
-
-import { ForbiddenError } from "../../backend";
-import { ZitadelError } from "../../errors";
-import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
-import type { StepContext } from "../pipeline";
+import { ForbiddenError, type VariableService } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
+import type { Connection } from "@/lib/zitadel";
 
 /**
- * The checks a connection file gets before the release is built.
+ * The kind of variable each publish freezes, with no fallback from one to the
+ * other (ADR 069).
+ */
+const VARIABLE_KIND = {
+  deploy: "primary",
+  preview: "preview",
+} as const satisfies Record<PipelineMode, Parameters<VariableService["heldByName"]>[0]>;
+
+/**
+ * The checks a connection gets against the project before the release is built.
  *
+ * @remarks
  * The server creates the connections from the bundle, inside the release's own
- * transaction, and holds them to the same rules. These run first anyway so a
- * bad file is named locally — with the file it came from and the command that
- * fixes it — rather than coming back as one bulk `rel.invalid`. Two of them the
- * server cannot run for us: that a `client_secret` references a variable rather
- * than holding a value, which must fail before anything leaves the machine, and
- * that the variables a connection names are the kind the engine needs.
+ * transaction, and holds them to the same rules. Every rule about the file
+ * itself, a `client_secret` held as a value included, is the configuration's,
+ * and the validate step refuses on it before this runs, so nothing here leaves
+ * the machine first. What stays here is what the server cannot check for us:
+ * that the variables a connection names are the kind the engine needs, named
+ * locally with the file and the command that fixes it rather than coming back
+ * as one bulk `rel.invalid`.
  *
  * A preview is checked the same way, except that its token may not read the
  * project's variables; that check then belongs to the deploy that merges it.
+ *
+ * @param ctx - The step's context: the connections, the variables and the
+ *   commands a refusal suggests.
+ * @returns Nothing when every connection's variables are held as it needs.
+ * @throws {@link ZitadelError} `E_VALIDATION` When a connection's client id and
+ *   secret name one variable, or a variable is not the kind its field needs.
+ * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a connection names a
+ *   variable the project does not hold.
+ * @throws {@link ForbiddenError} When a deploy's token may not read the
+ *   variables.
  */
 export async function validateConnections(ctx: StepContext): Promise<void> {
-  const files = ctx.idpFiles;
-  const named = ctx.bundle.idps.map((body, index) => ({
-    body,
-    file: `${IDPS_DIR}/${files[index] ?? "(unnamed)"}`,
-  }));
-  // Every file first: a later bad one must not be reported only after the
-  // earlier ones passed, because the whole bundle is built or none of it is.
-  for (const { body, file } of named) {
-    validateConnection(body, file, ctx.suggest);
-  }
-  if (named.length === 0) {
+  const connections = ctx.config.connections.all;
+  if (connections.length === 0) {
     return;
   }
   const held = await heldVariables(ctx);
   if (held === undefined) {
     return;
   }
-  for (const { body, file } of named) {
-    checkCredentialVariables(body, file, held, ctx.suggest, ctx.mode === "preview");
+  for (const connection of connections) {
+    checkCredentialVariables(ctx, connection, held);
   }
 }
 
 /**
- * The connection's shape, and the one mistake that would publish a credential:
- * a `client_secret` held as a value rather than a `${{ NAME }}` reference.
- */
-function validateConnection(data: object, file: string, suggest: StepContext["suggest"]): void {
-  const result = idpConnectionConfigSchema.safeParse(data);
-  if (!result.success) {
-    const literalSecret = result.error.issues.some((issue) => {
-      if (issue.path[issue.path.length - 1] !== "client_secret") {
-        return false;
-      }
-      const stored = valueAt(data, issue.path);
-      return typeof stored === "string" && !isVariableReference(stored);
-    });
-    throw new ZitadelError(
-      "E_VALIDATION",
-      literalSecret
-        ? "Connection file's client_secret must reference a variable, not hold a value"
-        : "Connection file is not a valid identity provider connection",
-      {
-        hint: literalSecret
-          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variable set NAME --secret")}\`.`
-          : undefined,
-        details: { issues: result.error.issues },
-      },
-    );
-  }
-  // A valid document is then held to the server's endpoint rule: an `oidc`
-  // block names no endpoint or every one it needs. The server refuses anything
-  // in between, so it is refused here, before a deploy could stop part-way.
-  const missing = missingEndpoints((data as { oidc?: unknown }).oidc);
-  if (missing.length > 0) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `${file}: oidc names some endpoints but not ${missing.join(", ")}`,
-      {
-        hint:
-          "Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and " +
-          "userinfo_endpoint unless id_token_mapping is true), or none to read them from " +
-          "the issuer's discovery document.",
-        details: { file, missing },
-      },
-    );
-  }
-  // A read that resolved a secret must never be sent on; validate the body too.
-  refuseResolvedSecret(data, "the connection");
-}
-
-/** The value a Zod issue path points at, or undefined when it is absent. */
-function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
-  return path.reduce<unknown>(
-    (current, key) =>
-      typeof current !== "object" || current === null
-        ? undefined
-        : (current as Record<PropertyKey, unknown>)[key],
-    data,
-  );
-}
-
-/**
- * The variables the deploy would freeze, by name, and whether each is a secret:
- * the primary kind's for a deploy and the preview kind's for a preview, with no
- * fallback from one to the other (ADR 069). A preview's token may not read them,
- * which leaves the check to the deploy that merges it.
+ * The variables the deploy would freeze, by name, and whether each is a secret.
+ *
+ * @remarks
+ * The primary kind's for a deploy and the preview kind's for a preview, with
+ * no fallback from one to the other (ADR 069). A preview's token may not read
+ * them, which leaves the check to the deploy that merges it.
+ *
+ * @param ctx - The step's context.
+ * @returns Each variable's name and whether it is a secret, or `undefined`
+ *   when a preview's token may not read them.
+ * @throws {@link ForbiddenError} When a deploy's token may not read them.
  */
 async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, boolean> | undefined> {
   try {
-    return await ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
+    return await ctx.variables.heldByName(VARIABLE_KIND[ctx.mode]);
   } catch (error) {
     if (ctx.mode === "preview" && error instanceof ForbiddenError) {
       return undefined;
@@ -120,67 +77,100 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
 }
 
 /**
- * What the engine needs from the variables a connection names: they exist,
- * the client id is a plain one it can put in the authorize URL, the client
- * secret is a secret one, and they are not one and the same.
+ * The `variable set` arguments that publish a variable as its field needs it.
+ *
+ * @remarks
+ * A preview freezes the preview kind alone, so the value it lacks is set for
+ * that kind.
+ *
+ * @param variable - The variable.
+ * @param secret - Whether the field needs a secret variable.
+ * @param mode - The publish the variable is for.
+ * @returns The arguments.
+ */
+function variableSetArgs(variable: string, secret: boolean, mode: PipelineMode): string {
+  const kindFlags = secret ? ["--secret"] : [];
+  const modeFlags = mode === "preview" ? ["--preview"] : [];
+  return ["variable", "set", variable, ...kindFlags, ...modeFlags].join(" ");
+}
+
+/**
+ * Refuse a connection whose variables are not what the engine needs: they
+ * exist, the client id is a plain one it can put in the authorize URL, the
+ * client secret is a secret one, and they are not one and the same.
+ *
+ * @param ctx - The step's context, for the commands a refusal suggests.
+ * @param connection - The connection.
+ * @param held - The project's variables, and whether each is a secret.
+ * @throws {@link ZitadelError} `E_VALIDATION` When the client id and secret
+ *   name one variable, or a variable is not the kind its field needs.
+ * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a named variable is
+ *   not held.
  */
 function checkCredentialVariables(
-  connection: object,
-  file: string,
+  ctx: StepContext,
+  connection: Connection,
   held: ReadonlyMap<string, boolean>,
-  suggest: StepContext["suggest"],
-  preview: boolean,
 ): void {
-  // A preview freezes the preview kind alone, so the value it lacks is set for
-  // that kind.
-  const setCommand = (name: string, secret: boolean) =>
-    suggest(`variable set ${name}${secret ? " --secret" : ""}${preview ? " --preview" : ""}`);
-  const body = connection as {
-    oidc?: { client_id?: unknown; client_secret?: unknown };
-  };
-  const block = body.oidc;
-  const nameOf = (value: unknown) =>
-    typeof value === "string" ? referencedVariable(value) : undefined;
-  const named = [
-    { field: "client_id", secret: false, name: nameOf(block?.client_id) },
-    { field: "client_secret", secret: true, name: nameOf(block?.client_secret) },
-  ].flatMap((credential) =>
-    credential.name === undefined ? [] : [{ ...credential, name: credential.name }],
-  );
-  const [id, secret] = named;
-  if (id !== undefined && secret !== undefined && id.name === secret.name) {
+  const file = connection.path;
+  const credentials = connection.credentials;
+  if (credentials === undefined) {
+    return;
+  }
+  const uses = [credentials.clientId, credentials.clientSecret].flatMap((credential) => {
+    if (credential.kind === "literal") {
+      return [];
+    }
+    return [credential];
+  });
+  const id = uses.find((use) => {
+    return use.field === "client_id";
+  });
+  const secret = uses.find((use) => {
+    return use.field === "client_secret";
+  });
+  // The two are branded apart, so they are compared as the names they both are.
+  const idVariable: string | undefined = id?.variable;
+  const secretVariable: string | undefined = secret?.variable;
+  if (idVariable !== undefined && idVariable === secretVariable) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${file}: client_id and client_secret both name the variable ${id.name}`,
+      `${file}: client_id and client_secret both name the variable ${idVariable}`,
       {
         hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-        details: { variable: id.name, file },
+        details: { variable: idVariable, file },
       },
     );
   }
-  for (const { field, secret: wantsSecret, name } of named) {
-    const isSecret = held.get(name);
+  for (const use of uses) {
+    const field = use.field;
+    const variable = use.variable;
+    const wantsSecret = field === "client_secret";
+    const setCommand = ctx.suggest(variableSetArgs(variable, wantsSecret, ctx.mode));
+    const isSecret = held.get(variable);
     if (isSecret === undefined) {
       throw new ZitadelError(
         "E_CREDENTIAL_MISSING",
-        `${file}: ${field} names the variable ${name}, which the project does not have`,
+        `${file}: ${field} names the variable ${variable}, which the project does not have`,
         {
           hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [setCommand(name, wantsSecret)],
-          details: { variable: name, field, file },
+          nextCommands: [setCommand],
+          details: { variable, field, file },
         },
       );
     }
     if (isSecret !== wantsSecret) {
+      const kind = isSecret ? "a secret" : "not a secret";
+      const hint = wantsSecret
+        ? "The client secret must be a secret variable: publish it with the command below."
+        : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.";
       throw new ZitadelError(
         "E_VALIDATION",
-        `${file}: ${field} names the variable ${name}, which is ${isSecret ? "a secret" : "not a secret"}`,
+        `${file}: ${field} names the variable ${variable}, which is ${kind}`,
         {
-          hint: wantsSecret
-            ? "The client secret must be a secret variable: publish it with the command below."
-            : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-          nextCommands: [setCommand(name, wantsSecret)],
-          details: { variable: name, field, file, secret: isSecret },
+          hint,
+          nextCommands: [setCommand],
+          details: { variable, field, file, secret: isSecret },
         },
       );
     }

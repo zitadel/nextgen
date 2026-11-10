@@ -5,13 +5,13 @@ import { join } from "node:path";
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import Start from "../../../../src/commands/start";
+import Start from "@/commands/start";
 import {
   localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
-} from "../../../../src/lib/local-server/runtime";
-import { parseFlag } from "../../../helpers/inputs";
+} from "@/lib/local-server/runtime";
+import { parseFlag } from "@tests/helpers/inputs";
 
 const config = {
   version: "0.0.0-test",

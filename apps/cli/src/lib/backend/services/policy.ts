@@ -10,8 +10,8 @@ import type {
 } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { pagedFunctions, type ZitadelClient } from "../client";
-import { ApiService, type Page, type PageOptions } from "../api-service";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
+import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 
 /** What narrows and pages a list of policies. */
 export type PolicyQuery = Readonly<Omit<ListPoliciesParams, "project_id">>;

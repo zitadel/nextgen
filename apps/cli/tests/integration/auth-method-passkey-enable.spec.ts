@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
 /**
+ * What a project's files look like after a command that wrote nothing.
+ */
+const NO_CHANGES = { added: [], modified: [], removed: [] };
+
+/**
  * A set-up project with passkey turned off, so enabling it has something to do.
+ *
+ * @returns The project.
  */
 async function anAppWithoutPasskey(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
-  expect(await app.disableMethod("passkey")).toSucceed();
+  await app.hasDisabledMethod("passkey");
   return app;
 }
 
@@ -21,7 +28,9 @@ describe("auth-method passkey enable", () => {
         const app = await anAppWithoutPasskey();
         platform.isNotZitadel();
 
-        expect(await app.enableMethod("passkey")).toSucceed();
+        const result = await app.enableMethod("passkey");
+
+        expect(result).toSucceed();
       });
     });
 
@@ -30,7 +39,9 @@ describe("auth-method passkey enable", () => {
         const app = await anAppWithoutPasskey();
         platform.isUnavailable();
 
-        expect(await app.enableMethod("passkey")).toSucceed();
+        const result = await app.enableMethod("passkey");
+
+        expect(result).toSucceed();
       });
     });
   });
@@ -41,48 +52,64 @@ describe("auth-method passkey enable", () => {
       platform.servesAHostileOrigin();
       const args = ["auth-method", "passkey", "enable"];
 
-      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+      await app.inEveryRendering((how) => {
+        return app.run(how.json ? [...args, "--json"] : args, how.env);
+      });
     });
 
     describe("--json", () => {
-      it("leaves the change for deploy to publish", async () => {
+      it("turns passkey on", async () => {
         const app = await anAppWithoutPasskey();
-        expect(await app.publish()).toSucceed();
 
-        expect(await app.enableMethod("passkey")).toSucceed();
+        const result = await app.enableMethod("passkey");
 
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: false });
+        expect(result).toSucceed();
       });
 
-      it("previews without writing under --dry-run", async () => {
+      it("leaves the change for deploy to publish", async () => {
         const app = await anAppWithoutPasskey();
-        const files = await app.snapshot();
+        await app.publishData();
 
-        expect(await app.enableMethod("passkey", ["--dry-run"])).toSucceed();
+        await app.enableMethod("passkey");
 
-        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        expect(await app.publishedAuthMethods()).toHaveProperty("passkey", { enabled: false });
+      });
+
+      describe("under --dry-run", () => {
+        it("succeeds", async () => {
+          const app = await anAppWithoutPasskey();
+
+          const result = await app.enableMethod("passkey", ["--dry-run"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("writes nothing", async () => {
+          const app = await anAppWithoutPasskey();
+          const files = await app.snapshot();
+
+          await app.enableMethod("passkey", ["--dry-run"]);
+
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
+        });
       });
 
       describe("once deployed", () => {
         it("publishes passkey as on", async () => {
           const app = await anAppWithoutPasskey();
-          expect(await app.enableMethod("passkey")).toSucceed();
-          expect(await app.publish()).toSucceed();
 
-          const { schema } = await app.publishedSchema();
+          await app.enableMethod("passkey");
 
-          expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: true });
+          expect(await app.authMethodsOnceDeployed()).toHaveProperty("passkey", { enabled: true });
         });
 
         it("leaves nothing left to deploy", async () => {
           const app = await anAppWithoutPasskey();
-          expect(await app.enableMethod("passkey")).toSucceed();
-          const first = await app.publishData();
 
-          const again = await app.deployData();
+          await app.enableMethod("passkey");
 
-          expect(again.release_id).toBe(first.release_id);
+          const [first, again] = await app.releasesOfTwoDeploys();
+          expect(again).toBe(first);
         });
       });
     });

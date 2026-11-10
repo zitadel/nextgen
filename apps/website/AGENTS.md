@@ -62,9 +62,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
   with `autoplay` it also plays now and then by itself (the header's and the
   footer's); never for reduced motion. Give each copy its own `id`.
-- `apps/docs/components/logo.tsx` is a copy; change the copies together.
-- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the
-  console and the docs link the same set, so a change here reaches them. A single `/favicon.ico` cannot replace the light/dark set.
+- `apps/docs/components/logo.tsx` and `apps/console/src/app-shell/logo.tsx` are
+  copies; change the copies together.
+- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
+  link the same set, so a change here reaches them. `apps/console/public/favicons/`
+  is a copy; change the copies together. A single `/favicon.ico` cannot replace
+  the light/dark set.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),

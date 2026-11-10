@@ -1,6 +1,6 @@
-import { isLoopbackHost } from "../host";
-import { DEFAULT_SERVER } from "../server";
-import type { Property } from "../telemetry/property";
+import { isLoopbackHost } from "@/lib/host";
+import { DEFAULT_SERVER } from "@/lib/server";
+import type { Property } from "@/lib/telemetry/property";
 
 /**
  * Buckets the resolved backend `source` into a coarse kind. The raw URL is never

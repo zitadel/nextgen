@@ -11,7 +11,7 @@ import {
   portableCommands,
   publicCliCommand,
   sdkVersionForCli,
-} from "../../../src/lib/public-cli";
+} from "@/lib/public-cli";
 
 describe("public CLI command formatting", () => {
   it("keeps dist-tag detection separate from alpha follow-up selectors", () => {

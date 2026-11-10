@@ -6,46 +6,21 @@
  * **Source of truth.** The connection document's shape is
  * `idp-connection.json`, the meta-schema generated from the OpenAPI spec and
  * shipped by `@zitadel/config`; the vendor knowledge a connection is built
- * from is the provider classes in `@zitadel/config/idp`. This module owns only
- * the CLI-specific concerns: locating a Project's connection files, deciding
- * whether a provider already has one, and keeping the client secret out of
- * anything committable.
+ * from is the provider classes in `@zitadel/config/idp`. Adding a provider to
+ * the configuration, and finding the connection one already has, is
+ * `lib/zitadel`'s (`config.connections.enable`). This module owns only what the
+ * command line needs around it: choosing the provider from flags and answers
+ * ({@link ProviderChoice}), the callback URI, asking for endpoints, asking for
+ * the credentials ({@link CredentialPrompt}), and publishing them to the
+ * project through a publisher the caller passes in ({@link CredentialDelivery}).
  *
- * **Dependency rule.** No upward imports (`commands/`, `sync/`). It depends
- * sideways only on shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
+ * **Dependency rule.** No upward imports (`commands/`, `sync/`), none of
+ * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
+ * depends sideways only on `lib/zitadel` (the configuration a provider is
+ * added to) and shared utilities under `apps/cli/src/lib/` — today
+ * `lib/errors` (`ZitadelError`), `lib/input` (`Asker`), `lib/warnings`
+ * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
  */
-export {
-  CONNECTION_SCHEMA_REF,
-  IDPS_DIR,
-  type ConnectionFile,
-  connectionLeftover,
-  type ConnectionLeftover,
-  type ConnectionPlan,
-  credentialVariablesOf,
-  checkCustomSlug,
-  refuseChangedIssuer,
-  storedCustomSettings,
-  type StoredVariables,
-  planConnection,
-  refuseResolvedSecret,
-  readConnectionFiles,
-} from "./connections";
-
-export {
-  applySsoToFlow,
-  applySsoToSchema,
-  generatedSsoSteps,
-  offersProvider,
-  removeSsoFromFlow,
-  removeSsoFromSchema,
-  ssoEditRefusal,
-  ssoProvidersRefusal,
-  type SsoEditTarget,
-  type SsoResult,
-  type SsoSkipped,
-} from "./documents";
-
 export {
   customFlagText,
   selectionFromFlags,
@@ -70,6 +45,21 @@ export { callbackUriFor } from "./callback";
 export { askConnectionEndpoints } from "./endpoints";
 
 export {
+  ProviderChoice,
+  type ProviderFlags,
+  type ProviderRun,
+  type ProviderTarget,
+  type StoredSettings,
+} from "./provider";
+
+export { CredentialPrompt, type PromptRun } from "./prompt";
+
+export { CredentialDelivery, type DeliveryRun } from "./delivery";
+
+export {
+  type CredentialNames,
+  type GivenCredentials,
+  type PublishedCredentials,
   publishClientId,
   type PublishState,
   reportClientIdOutcome,
@@ -81,14 +71,3 @@ export {
   type SecretPublisher,
   storeClientSecret,
 } from "./credentials";
-
-export {
-  authMethods,
-  enabledMethods,
-  type FlowFile,
-  methodsOf,
-  readFlowFiles,
-  readSchemaFiles,
-  type SchemaFile,
-  selectSchema,
-} from "./schemas";

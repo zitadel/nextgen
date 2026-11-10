@@ -2380,7 +2380,7 @@ EXAMPLES
 
 ## `zitadel policies test [OPERATION]`
 
-Run the test cases in .zitadel/policies/ against the policies
+Run the test cases in .zitadel/policies/ against the policies.
 
 ```
 USAGE
@@ -2418,7 +2418,18 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Run the test cases in .zitadel/policies/ against the policies
+  Run the test cases in .zitadel/policies/ against the policies.
+
+  A policy's cases live beside it in <operation>.test.json, such as
+  auth.factor.password.set.test.json: each case holds an input, such as a
+  password, and the decision you expect. Inputs go in that file, not on the
+  command line. https://preview.zitadel.com/docs/guides/test-policies walks
+  through an example.
+
+  The server evaluates every case, so the command needs a connection to it. By
+  default the cases run against the policy files in .zitadel/policies/;
+  --release runs them against the policies a release pins. Testing publishes
+  nothing and leaves the live policies as they are.
 
 EXAMPLES
   $ zitadel policies test

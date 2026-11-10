@@ -1,12 +1,12 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "../../../../public-cli";
-import { configCandidates } from "../config-paths";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
-import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import { configCandidates } from "@/lib/orca/patchers/rule/config-paths";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {
   appVueTemplate,

@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
 
 import config from "../../../vitest.config";
-import { PORT_WORKERS } from "../../helpers/ports";
-import { ownerIsAlive, staleFakeServers } from "../../helpers/stale-servers";
+import { PORT_WORKERS } from "@tests/helpers/ports";
+import { ownerIsAlive, staleFakeServers } from "@tests/helpers/stale-servers";
 
 const LEFT_BEHIND =
   "87289     1 node /var/folders/zb/T/zitadel-fake-server-vjZmOm/nextgen --user-file /x/admin-user.json --migrate";
@@ -66,9 +66,9 @@ describe("the vitest config", () => {
     expect(config.test?.globalSetup).toContain("./tests/helpers/stale-servers.ts");
   });
 
-  it("leaves three cores free and never outnumbers the port blocks", () => {
+  it("takes three quarters of the cores and never outnumbers the port blocks", () => {
     expect(config.test?.maxWorkers).toBe(
-      Math.min(Math.max(availableParallelism() - 3, 1), PORT_WORKERS),
+      Math.min(Math.max(Math.floor((availableParallelism() * 3) / 4), 1), PORT_WORKERS),
     );
   });
 });

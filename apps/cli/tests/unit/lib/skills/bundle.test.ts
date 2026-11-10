@@ -4,9 +4,9 @@ import { dirname, join, relative } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { bundleSkills, publicSkills } from "../../../../src/lib/skills/bundle";
+import { bundleSkills, publicSkills } from "@/lib/skills/bundle";
 
 async function aSkill(
   repo: string,

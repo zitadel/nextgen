@@ -1,9 +1,9 @@
 import { CreateTeamBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
-import { describeBody } from "../../../../../src/lib/oclif/crud";
-import { documentSchemaOf } from "../../../../../src/lib/oclif/crud/fields";
-import { resourceBody } from "../../../../../src/lib/oclif/crud/resource-body";
+import { describeBody } from "@/lib/oclif/crud";
+import { documentSchemaOf } from "@/lib/oclif/crud/fields";
+import { resourceBody } from "@/lib/oclif/crud/resource-body";
 
 const resolve = (flags: Record<string, unknown>) => {
   return resourceBody(

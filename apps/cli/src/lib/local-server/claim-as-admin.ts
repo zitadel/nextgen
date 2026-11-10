@@ -1,9 +1,9 @@
-import { CSRF_HEADER } from "../backend/transport";
+import { CSRF_HEADER } from "@/lib/backend/transport";
 
-import { createZitadelClient } from "../backend";
+import { createZitadelClient } from "@/lib/backend";
 import type { LocalAdmin } from "./admin-credential";
 import { adminSessionCookie, localAdminRequest } from "./sign-in";
-import { userAgent } from "../user-agent";
+import { userAgent } from "@/lib/user-agent";
 
 /** The team a project was attached to, and when. */
 export type ProjectOwner = { team_id: string; claimed_at: string };

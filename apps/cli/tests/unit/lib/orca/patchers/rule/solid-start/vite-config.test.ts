@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { solidStartConfigEdit } from "../../../../../../../src/lib/orca/patchers/rule/solid-start/vite-config";
+import { solidStartConfigEdit } from "@/lib/orca/patchers/rule/solid-start/vite-config";
 
 const edit = solidStartConfigEdit();
 

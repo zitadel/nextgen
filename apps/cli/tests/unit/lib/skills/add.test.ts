@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 
 vi.mock("rosie-skills", () => rosie);
 
-import { addSkills, bundledSkills, skillDirs } from "../../../../src/lib/skills/add";
+import { addSkills, bundledSkills, skillDirs } from "@/lib/skills/add";
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 

@@ -5,11 +5,11 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import { LOCAL_ADMIN_FILE } from "../../../src/lib/local-server/admin-credential";
+import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
 import {
   CONTAINER_DATA_DIR,
   LOCAL_RUNTIME_FILE,
@@ -19,16 +19,16 @@ import {
   readRuntimeMetadata,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../src/lib/local-server/runtime";
-import Reset from "../../../src/commands/reset";
+} from "@/lib/local-server/runtime";
+import Reset from "@/commands/reset";
 import {
   aMachineRunning,
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
-} from "../../helpers/run-cli";
-import { it } from "../../helpers/fixtures";
-import { asTerminal } from "../../helpers/terminal";
+} from "@tests/helpers/run-cli";
+import { it } from "@tests/helpers/fixtures";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];

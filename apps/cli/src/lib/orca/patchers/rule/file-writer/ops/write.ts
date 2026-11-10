@@ -1,5 +1,9 @@
-import { ZitadelError } from "../../../../../errors";
-import { type Change, Operation, type Source } from "../operation";
+import { ZitadelError } from "@/lib/errors";
+import {
+  type Change,
+  Operation,
+  type Source,
+} from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
  * Writes a file whole.

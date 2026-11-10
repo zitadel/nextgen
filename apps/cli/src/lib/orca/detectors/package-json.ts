@@ -3,11 +3,11 @@ import { join, resolve } from "node:path";
 
 import semver from "semver";
 
-import { isObject, parseJsonOrUndefined } from "../../json";
-import { ancestors } from "../../paths";
-import { type PackageJson, readPackageJson } from "../../npm";
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
+import { ancestors } from "@/lib/paths";
+import { type PackageJson, readPackageJson } from "@/lib/npm";
 
-export { type PackageJson, readPackageJson } from "../../npm";
+export { type PackageJson, readPackageJson } from "@/lib/npm";
 
 /**
  * Reports whether `name` appears in either `dependencies` or `devDependencies`.

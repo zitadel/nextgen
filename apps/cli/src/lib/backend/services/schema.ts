@@ -8,9 +8,9 @@ import type {
 
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { pagedFunctions, type ZitadelClient } from "../client";
-import { ApiService, type Page, type PageOptions } from "../api-service";
-import { NotFoundError } from "../errors";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
+import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;

@@ -19,8 +19,11 @@ var _ Handler = UnimplementedHandler{}
 // An origin pattern says which web origins the project accepts. A `primary`
 // pattern must be an exact URL with no wildcard. A `preview` pattern may
 // include a single DNS-label wildcard.
-// While the project has no patterns, it admits every origin, so the first
-// pattern you add restricts it to the origins that pattern matches.
+// While the project has no patterns, it admits no origin except a loopback
+// origin, so the first pattern you add opens it to the origins that
+// pattern matches. Admitting an origin is not serving it: a new `primary`
+// origin answers `rel.not_deployed` until the next deploy to primary
+// (`zitadel deploy`).
 // Adding a pattern that already exists with the same kind is idempotent and
 // answers `201` with the stored origin. If the pattern exists with the other
 // kind, the request is refused with `origin.kind_conflict`: remove it with
@@ -64,8 +67,7 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 // the same handle. Unchanged content reuses that revision, and changed
 // content allocates a new one. The request answers `201` with the new
 // release. A policy whose config matches only an older revision allocates a
-// new one too. A request that resolves no release reads the newest
-// revision, so it applies that policy as well.
+// new one too, so the policy reads back as the config the build carried.
 // A structurally malformed request is refused while decoding with
 // `req.invalid`, naming the offending fields. A well-formed bundle is then
 // checked resource by resource, as each kind's create endpoint checks it,
@@ -136,9 +138,9 @@ func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClai
 // The attempt's `attempt_id` in the response is the ID every later call takes.
 // The project comes from the project secret. A body `project_id` that names
 // another project answers `403` with `proj.mismatch`: send the credential's own
-// project. This operation does not refuse a revoked release. A release is the
-// configuration that `zitadel deploy` publishes, and `exchangeHandoff` refuses a
-// revoked one.
+// project. The attempt seals the project's newest primary deployment, whatever
+// the caller's `Origin`. With none it answers `409` with `rel.no_default`, and a
+// revoked release answers `409` with `rel.revoked`.
 //
 // POST /auth_attempts
 func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (r CreateAuthAttemptRes, _ error) {
@@ -149,9 +151,8 @@ func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAu
 //
 // Publishes a new immutable branding revision for the project, and records a
 // `branding.created` event. Branding revisions cannot be updated or deleted.
-// Every edit publishes a new revision. When the deployed release pins a
-// flow, flow responses carry the branding revision that release pins.
-// Otherwise they carry the newest revision.
+// Every edit publishes a new revision. Flow responses carry the branding
+// revision the request's release pins.
 // The `id` of the new revision is the revision ID a release pins for
 // `kind: branding`.
 // The `liquid_template` is validated lexically on save (size, encoding,
@@ -178,7 +179,17 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST
 // /releases/build`) or
 // `listReleases` (`GET /releases`) returns. The release must already exist in the project.
-// `targets` is `primary`, which means every primary origin, or preview URLs.
+// `targets` is `primary`, which means every primary origin, or a list of
+// preview URLs. `["primary"]`, which clients released before this shape
+// send, still deploys to every primary origin until 1.0.0; its answer
+// carries a `Deprecation` header (RFC 9745) and a `Link` to these docs.
+// The project's newest primary deployment also serves every request with no
+// `Origin`, such as a backend, a native app or the CLI, and the console's
+// login preview of a project that does not list the console's origin. A
+// preview URL serves only itself.
+// `primary` records the project's current primary origins. One added later
+// serves nothing until the next deployment to `primary`; one removed stops
+// being served at once.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins. The call then answers `200` with that
@@ -186,8 +197,8 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // For preview URLs, that deployment renews their previews.
 // If the request is refused, fix the cause and send it again:
 // - `400 dep.invalid`: the request names both or neither of `release_id` and
-// `content_hash`, names a primary origin exactly, mixes `primary` with
-// preview URLs, sends `primary` for a project with no primary origin, sends
+// `content_hash`, names a primary origin among the preview URLs, sends
+// `primary` for a project with no primary origin, sends
 // `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct
 // the request.
 // - `400 dep.variables_missing`: a variable the release references has no
@@ -221,24 +232,33 @@ func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDep
 // (for step-up or reauthentication on an existing session).
 // The browser `Origin` header selects which deployment serves this attempt.
 // The server checks the origin against the project's origin patterns and live
-// previews, and the newest deployment to that exact origin is the target. A
+// previews, and the deployment that origin serves is the target: the
+// project's newest primary deployment when it names a primary origin, or the
+// newest live deployment to a preview URL. A
 // deployment is a release, the immutable bundle of the project's
 // configuration, made live at an origin. The deployment's release supplies
 // flow definitions, user schemas and branding. The resolved deployment is
 // sealed into the `_zflow` cookie so later steps keep the same
 // configuration.
 // - An origin that matches no pattern answers `403` with
-// `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.
+// `proj.origin_not_allowed`, including when the project lists no origins.
+// Add the origin with `zitadel origin add`.
 // - An origin that matches a preview pattern with no live preview answers
 // `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-// - Nothing deployed to the target answers `409` with `rel.not_deployed`.
-// Run `zitadel deploy`.
+// - Nothing deployed to a listed origin or a live preview answers `409`
+// with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
+// since the last deploy serves nothing until the next one.
+// - A loopback origin the project does not list answers `409` with
+// `rel.not_deployed` too, as no deployment can name it. Add it with
+// `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
 // - A revoked release answers `409` with `rel.revoked`.
-// A request with no `Origin` passes the check and still needs a deployment
-// target. A loopback origin passes it too, and so does the server's own
-// origin, from which its console previews a project's login. A step
-// submitted from the server's own origin is still refused unless the project
-// lists it.
+// A request with no `Origin` passes the check, and so does the server's own
+// origin, from which its console previews a project's login. Both are served
+// the project's newest primary deployment unless the project lists that
+// origin; with no primary deployment they answer `409` with
+// `rel.no_default`. A loopback origin passes the check and is its own
+// target. A step submitted from the server's own origin is still refused
+// unless the project lists it.
 // The response contains an `id` field, the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -893,8 +913,8 @@ func (UnimplementedHandler) GetMyUserSchema(ctx context.Context, params GetMyUse
 
 // GetPolicy implements getPolicy operation.
 //
-// Returns a policy as its newest revision, the one that applies the next
-// time its operation runs.
+// Returns a policy as its newest revision. A revision applies once a deployed
+// release pins it.
 // A policy holds a project's rules for one operation, such as setting a
 // password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST
 // /policies`) returns.
@@ -1099,8 +1119,7 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 // ListBranding implements listBranding operation.
 //
 // Lists a project's branding revisions, newest first, capped at the 100 most
-// recent and not paginated. The first entry is the newest revision, which
-// flow responses carry when the deployed release pins no flow.
+// recent and not paginated. The first entry is the newest revision.
 // The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
 // that a release pins for `kind: branding`.
 //
@@ -1118,10 +1137,12 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 // it made the release live on. With `origin`, it is the history of that
 // origin alone.
 // With `live=true`, the list is what is served now, newest first. It holds
-// the project's newest primary deployment, narrowed to origins that are
-// still primary, and the newest deployment to each live preview URL,
-// narrowed to the URLs it still serves. Combined with `origin`, it is the
-// one deployment that origin serves, or empty.
+// the project's newest primary deployment with every origin it names, an
+// origin the project no longer lists included: that deployment also serves
+// requests with no `Origin`, so it stays live. It also holds the newest
+// deployment to each live preview URL, narrowed to the URLs it still
+// serves. Combined with `origin`, it is the one deployment that origin
+// serves, or empty, as it is for an origin the project no longer lists.
 // The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
 // /deployments/{deployment_id}`),
 // `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
@@ -1210,7 +1231,8 @@ func (UnimplementedHandler) ListMyPasskeys(ctx context.Context, params ListMyPas
 // Lists the projects the signed-in user can act on: those they hold an active
 // grant on, either directly or through a team they are a member of. For a
 // platform operator, someone who runs the deployment, that is every project of
-// the deployment. Ordered by project ID and paged with an opaque cursor.
+// the deployment. Ordered by project ID unless `order` asks for creation
+// time, and paged with an opaque cursor.
 // This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
 // one
 // project the calling credential is bound to. Here the session is the caller
@@ -1418,6 +1440,14 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 // last-write-wins.
 // To move the user, send `schema` with the `id` of a registered schema, as
 // `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes
+// the same permission and answers the same status and `details` as the real
+// request, and it changes nothing and emits no `user.updated`. The request
+// itself is still recorded as `request.api`, like any other API call. A `200`
+// holds for the moment of the check: a unique value that is free then can be
+// taken before the real request, which then answers `409`.
+// `dry_run` is a body field so that a server from before it refuses the
+// request as malformed (`400 req.invalid`) instead of applying the patch.
 //
 // PATCH /users/{user_id}
 func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (r PatchUserByIDRes, _ error) {
@@ -1427,8 +1457,8 @@ func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserReq
 // PublishPolicy implements publishPolicy operation.
 //
 // Publishes the project's policy for an operation as a new immutable
-// revision, creating the policy on its first publish. The newest revision
-// applies the next time the operation runs. Nothing already stored is
+// revision, creating the policy on its first publish. A revision applies
+// once a deployed release pins it. Nothing already stored is
 // re-evaluated, so a stricter password policy applies the next time a
 // password is set.
 // A policy holds a project's rules for one operation, such as setting a
@@ -1544,7 +1574,8 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 // Removes one origin pattern from the project's origins.
 // Requests from URLs only that pattern admitted are refused from then on.
 // Live previews and deployment history are untouched. Removing the last
-// pattern leaves an empty list, which admits every origin again.
+// pattern leaves an empty list, which admits no origin except a loopback
+// origin.
 // Removing a pattern that is already absent is idempotent and answers `204`.
 // The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 //
@@ -1630,9 +1661,11 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 
 // RollbackDeployment implements rollbackDeployment operation.
 //
-// Rolls back to an earlier deployment by deploying its release again to
-// every current primary origin, with the variable values that deployment
-// froze.
+// Rolls back to an earlier deployment by deploying its release again to the
+// same origins, with the same variable values. A listed primary origin that
+// deployment left out serves nothing until the next deployment to `primary`,
+// and one it named serves its release again, even when the live deployment
+// left it out.
 // A release is a snapshot of the project's configuration. A deployment makes
 // a release live on origins and freezes the project's variable values with
 // it.
@@ -1651,9 +1684,7 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 // would change, it answers `200` with the newest primary deployment.
 // If the request is refused:
 // - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
-// error also appears when the project has no primary origin. Add one with
-// `zitadel origin add`.
+// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
 // - `404 dep.not_found`: no deployment of the project has that ID, or that
 // deployment recorded no variables to restore, so it cannot be a rollback
 // target. List them with `listDeployments` and pick another.
@@ -1676,6 +1707,22 @@ func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollb
 // `auth.factor.password.set`. A password the project's password policy
 // refuses answers `user.password_policy_violation`; send one that meets the
 // policy.
+// The password policy is the one in the release that serves the caller's
+// `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
+// preview URL gets that preview's policy, and one on a primary origin the
+// newest primary deployment's. A request with no `Origin`, or from the
+// console when the project does not list the console's origin, gets the
+// project's newest primary deployment.
+// If the request is refused:
+// - `403 proj.origin_not_allowed`: the project admits no such origin. Add it
+// with `zitadel origin add`.
+// - `403 proj.preview_not_live`: the origin matches a preview pattern but has
+// no live preview. Run `zitadel preview` on the branch.
+// - `409 rel.not_deployed`: nothing is deployed to the origin. Run
+// `zitadel deploy`.
+// - `409 rel.no_default`: the request names no origin and the project has no
+// primary deployment. Run `zitadel deploy`.
+// - `409 rel.revoked`: the release that serves the origin is revoked.
 //
 // PUT /users/{user_id}/password
 func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (r SetUserPasswordRes, _ error) {

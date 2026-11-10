@@ -1,21 +1,13 @@
-import { VariableService, VariableWrite, type ZitadelClient } from "../../../../lib/backend";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
 import { Flags } from "@oclif/core";
-import { consola } from "consola";
-import { z } from "zod";
-
 import {
   type ClientId,
   type ClientIdVariable,
-  type ConnectionSlug,
-  credentialVariables,
+  type ClientSecretVariable,
+  type ConnectionEndpoints,
   CUSTOM_PROVIDER,
-  DEFAULT_SCOPES,
   IDP_PROVIDERS,
+  type IdpProvider,
   parseClientId,
-  parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
@@ -28,83 +20,46 @@ import {
   selectionName,
   validated,
 } from "@zitadel/config/idp";
+import { consola } from "consola";
+import { z } from "zod";
 
-import { loopbackReach } from "../../../../lib/local-server/runtime";
-import { refuseBrokenFlows } from "../../../../lib/auth-methods";
-import { isDevelopmentBuild } from "../../../../lib/build-channel";
-import { ZitadelError } from "../../../../lib/errors";
-import { stableStringify } from "../../../../lib/json";
+import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
+import { VariableService, VariableWrite, type ZitadelClient } from "@/lib/backend";
+import { isDevelopmentBuild } from "@/lib/build-channel";
+import { resolveEnvironment } from "@/lib/environment";
 import {
-  applySsoToFlow,
-  applySsoToSchema,
-  askConnectionEndpoints,
   callbackUriFor,
-  checkCustomSlug,
-  CONNECTION_SCHEMA_REF,
-  enabledMethods,
-  type ConnectionFile,
-  type ConnectionPlan,
-  type FlowFile,
-  credentialVariablesOf,
-  type CustomFlagValues,
+  CredentialDelivery,
+  type CredentialNames,
+  CredentialPrompt,
   customExample,
-  ENABLE_FLAG_KEYS,
+  type GivenCredentials,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
-  planConnection,
-  publishClientId,
+  ProviderChoice,
+  type PublishedCredentials,
   type PublishState,
-  readConnectionFiles,
-  refuseChangedIssuer,
-  reportClientIdOutcome,
-  republishArgs,
-  selectionFromFlags,
-  type StoredVariables,
-  type SsoResult,
-  type SsoSkipped,
-  reportSecretOutcome,
-  storeClientSecret,
-  storedCustomSettings,
-  type SchemaFile,
   type SecretOutcome,
   type SecretPublisher,
-} from "../../../../lib/idp";
-import { type Admitted, CommandGroups, type JsonEnvelope } from "../../../../lib/oclif";
-import { AuthMethodCommand } from "../../command";
-import type { SchemaTarget } from "../../command";
-import { environmentFlags } from "../../../../lib/oclif/environment-flags";
-import { inShell, type SuggestedCommand } from "../../../../lib/suggestion";
-import { reportWarning } from "../../../../lib/warnings";
-import { refuseUneditable } from "../../../../lib/auth-methods";
-import { resolveEnvironment } from "../../../../lib/environment";
-import {
-  customFlagValues,
-  selectionFromFlags as selectionFromGivenFlags,
-  ssoEditRefusal as editRefusalFor,
-} from "../../../../lib/idp";
-import { filled, reads, type Refused } from "../../../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
-import { escapeControlCharacters } from "../../../../lib/terminal-text";
-import { prose } from "../../../../lib/oclif/rendering";
+} from "@/lib/idp";
+import { loopbackReach } from "@/lib/local-server/runtime";
+import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { environmentFlags } from "@/lib/oclif/environment-flags";
+import { filled, reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
+import { type Change, Connection, type DocumentChange, type UserSchema } from "@/lib/zitadel";
 
 /**
- * The provider the run was asked for. `selection` is undefined for a custom
- * provider whose settings a person will be asked for once everything that can
- * fail has passed; `values` are the settings the flags gave. A person at a
- * terminal is asked for the settings they left out, but later: here the ones
- * they did give are only checked. A script, a dry run or `--non-interactive`
- * is held to the flags and told which are missing.
+ * The flags that pick the environment a run reads its issuer from.
  */
-type SsoProvider = {
-  readonly selection: ProviderSelection | undefined;
-  readonly values: CustomFlagValues;
+type EnvironmentFlags = {
+  readonly server?: string | undefined;
+  readonly env?: string | undefined;
+  readonly envFile?: string | undefined;
 };
-
-function hasAllCustomSettings(values: CustomFlagValues): boolean {
-  return (
-    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
-  );
-}
 
 /**
  * The client id a value holds, trimmed as the one a prompt would have
@@ -123,9 +78,16 @@ const CLIENT_ID: Refused<ClientId> = {
 
 /**
  * One of the settings that describe a custom connection, refused with what
- * the platform's own parser found wrong with it. The flag names itself in the
- * refusal, because a run gives four of them and the complaint belongs to one.
- * `setup` declares the same settings under its own `--sso-*` names.
+ * the platform's own parser found wrong with it.
+ *
+ * @remarks
+ * The flag names itself in the refusal, because a run gives four of them and
+ * the complaint belongs to one. `setup` declares the same settings under its
+ * own `--sso-*` names.
+ *
+ * @param flag - The flag, as the command spells it.
+ * @param parse - The platform's parser for the setting.
+ * @returns The flag's definition, waiting for its description.
  */
 function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
   return Flags.custom<string>({
@@ -162,48 +124,26 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
   hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
 };
 
-/** What the flags say about the provider to add. */
-export function ssoProvider(
-  flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
-  run: { interactive: boolean },
-): SsoProvider {
-  const provider = String(flags.provider);
-  const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
-  // Each setting was refused under its own flag on its way in, so a run that
-  // will ask for the rest has nothing left to check: the settings that were
-  // given are already good, and being turned away after typing a secret would
-  // mean typing it again.
-  const askLater = provider === CUSTOM_PROVIDER && run.interactive && !hasAllCustomSettings(values);
-  return {
-    selection: askLater
-      ? undefined
-      : selectionFromGivenFlags(
-          provider,
-          values,
-          ENABLE_FLAG_NAMES,
-          customExample(ENABLE_FLAG_NAMES),
-        ),
-    values,
-  };
-}
-
-/** What a Project with no development issuer is refused for. */
+/**
+ * What a Project with no development issuer is refused for.
+ */
 const NO_ISSUER_REFUSAL: Refusal = {
   message: "This Project has no development issuer",
   hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
 };
 
 /**
- * The origin the app serves from, as the run's environment names it. A Project
- * that has none has not been set up.
+ * The origin the app serves from, as the run's environment names it.
+ *
+ * @param cwd - The project root.
+ * @param flags - The flags that pick the environment.
+ * @param env - The process environment.
+ * @returns The issuer.
+ * @throws {@link ZitadelError} When the Project has none, so it has not been set up.
  */
 export async function developmentIssuer(
   cwd: string,
-  flags: {
-    server?: string | undefined;
-    env?: string | undefined;
-    envFile?: string | undefined;
-  },
+  flags: EnvironmentFlags,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
   const environment = await resolveEnvironment({
@@ -220,38 +160,123 @@ export async function developmentIssuer(
   return issuer;
 }
 
-/** What a schema no login flow runs against is refused for. */
-const NO_FLOW_REFUSAL: Refusal = {
-  code: "E_NOT_FOUND",
-  message: "No login flow runs against {schema}",
-  hint:
-    "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-    "names this schema. Check that the flow's user_schema names the schema's objectType.",
-  details: {
-    schema: "{path}",
-  },
+/**
+ * What a run says about the connection it adds, before any credential is
+ * asked for.
+ */
+type Summary = {
+  /**
+   * The Project the run addresses. `--json` suppresses the console line that
+   * otherwise carries it, and a result that names only the schema does not
+   * say which Project was changed.
+   */
+  readonly projectId: string;
+
+  /**
+   * The provider, as a command line names it.
+   */
+  readonly provider: ProviderName;
+
+  /**
+   * The name a sign-in button and every message show for the provider.
+   */
+  readonly displayName: string;
+
+  /**
+   * The schema the provider is added to.
+   */
+  readonly schema: string;
+
+  /**
+   * The connection the schema lists: the one created, or the one reused.
+   */
+  readonly connection: Connection;
+
+  /**
+   * Whether the connection was already in the project.
+   */
+  readonly reused: boolean;
+
+  /**
+   * The redirect URI to register with the provider.
+   */
+  readonly callbackUri: string;
 };
 
 /**
- * The flows a provider must be added to. No flow means no button however well
- * everything else went, so a run without one is refused before anything is
- * asked or written, as is a schema or flow with a region the editors cannot
- * recognise and would write over.
+ * What {@link AuthMethodSsoEnable.summarize} words the summary from.
  */
-export function ssoFlows(target: SchemaTarget): FlowFile[] {
-  const { schema, flows } = target;
-  if (flows.length === 0) {
-    throw refusalError(NO_FLOW_REFUSAL, {
-      schema: schema.name,
-      path: schema.path,
-    });
-  }
-  refuseUneditable(schema.path, editRefusalFor(schema.body, "schema"));
-  for (const flow of flows) {
-    refuseUneditable(flow.path, editRefusalFor(flow.body, "flow"));
-  }
-  return flows;
-}
+type SummaryInput = {
+  readonly projectId: string;
+  readonly selection: ProviderSelection;
+  readonly target: SchemaTarget;
+  readonly preview: DocumentChange<Connection>;
+  readonly issuer: string;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.reportOutcome} reports on.
+ */
+type Outcome = {
+  readonly change: Change;
+  readonly written: readonly string[];
+  readonly provider: IdpProvider;
+  readonly given: GivenCredentials;
+  readonly schema: UserSchema;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.result} words the result from.
+ */
+type ResultInput = {
+  readonly summary: Summary;
+  readonly change: Change;
+  readonly written: readonly string[];
+  readonly published: PublishedCredentials;
+  readonly delivery: CredentialDelivery;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.payload} words the result's data from.
+ */
+type PayloadInput = {
+  readonly summary: Summary;
+  readonly change: Change;
+  readonly published: PublishedCredentials;
+  readonly names: CredentialNames;
+};
+
+/**
+ * A credential's variable, and whether the project holds its value.
+ */
+type PublishedVariable = {
+  readonly variable: string;
+  readonly published: PublishState;
+};
+
+/**
+ * The machine-readable result. Never the secret, only whether it is held.
+ */
+type Payload = {
+  readonly project_id: string;
+  readonly provider: ProviderName;
+  readonly schema: string;
+  readonly connection: {
+    readonly action: "reuse" | "create";
+    readonly slug: string;
+    readonly file: string;
+  };
+  readonly callback_uri: string;
+  readonly changed: readonly string[];
+  readonly notices: Change["notices"];
+  readonly client_id: PublishedVariable | null;
+  readonly secret: PublishedVariable | null;
+};
+
+/**
+ * Nothing sent to the project, as a dry run reports it.
+ */
+const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: undefined };
 
 /**
  * The `auth-method sso enable` command (ADR 070) — add a provider to a
@@ -318,678 +343,446 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     environment: true,
   };
 
-  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+  /**
+   * Add the provider to the schema and its login flows, and publish its
+   * credentials to the project.
+   *
+   * @param input - The provider, its settings, the schema and the environment flags.
+   * @returns The result.
+   * @throws {@link ZitadelError} When no provider is named, a setting is
+   *   refused, the schema cannot be chosen, or no flow can offer the provider.
+   */
+  protected async execute(input: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+    const flags = input.flags;
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
-    const project = ssoProvider(flags, {
+    const choice = ProviderChoice.fromFlags(flags, {
       interactive: !this.nonInteractive && !this.dryRun,
     });
     const issuer = await developmentIssuer(this.cwd, flags, this.env);
-    const target = await this.schemaTarget(flags);
-    const flows = ssoFlows(target);
-    const connections = await readConnectionFiles(target.cwd);
+    const target = await this.loadSchemaTarget(flags);
+    // Refused before anything is asked: a provider no flow offers is no
+    // sign-in button however well everything else goes.
+    target.config.flows.resolveForSso(target.schema);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
-    const { client, projectId, server } = await this.connect({ quiet: true });
-    // The schema and flow edits for a slug, with the refusals they bring (an
-    // edit the editors cannot make, or a flow `deploy` would then reject), so
-    // the run stops with nothing changed (ADR 070 §3).
-    const editsFor = (slug: ConnectionSlug): PlannedEdits => {
-      const edits = planEdits(target.schema, slug, flows);
-      refuseBrokenFlows(
-        target.schema,
-        edits.schema.document as Record<string, unknown>,
-        edits.flows.map(({ flow, result }) => ({
-          file: flow,
-          after: result.document as Record<string, unknown>,
-        })),
-      );
-      return edits;
+    const remote = await this.connect({ quiet: true });
+    const selection = await choice.resolve(target, this.input);
+    const provider = providerOf(selection);
+    const options = {
+      clientId: flags.clientId,
+      given: choice.givenSettings(selection),
+      dryRun: this.dryRun,
     };
-    // A custom provider's settings are asked here, after the checks on the
-    // Project; the ones that need an answer run the moment the answer that
-    // decides them is given (see `askCustomSettings`).
-    const selection =
-      project.selection ??
-      selectionFromFlags(
-        CUSTOM_PROVIDER,
-        await this.askCustomSettings(project.values, connections, (slug) => {
-          editsFor(slug);
-        }),
-        ENABLE_FLAG_NAMES,
-        customExample(ENABLE_FLAG_NAMES),
-      );
-    const entry = providerOf(selection);
-    // A loopback issuer works only on a server that may fetch from this machine.
-    const loopback = loopbackIssuerWarning(selection, await loopbackReach(target.cwd, server));
+    // Worked out before anything is asked or written, so every refusal comes
+    // first: a connection that would step on another, a region the edits cannot
+    // write, or a flow `deploy` would then reject (ADR 070 §3).
+    const candidate = Connection.forProvider(provider, target.schema);
+    const preview = target.config.connections.enable(target.schema, candidate, options);
+    await this.warnOfUnreachableIssuer(target, selection, remote.server);
+    const delivery = this.deliveryFor(preview);
+    const prompt = this.promptFor(selection, preview, delivery.names);
+    const summary = this.summarize({
+      projectId: remote.projectId,
+      selection,
+      target,
+      preview,
+      issuer,
+    });
+    this.introduce(summary, target.schema, provider);
+    if (this.dryRun) {
+      return this.previewResult(summary, preview, delivery.names, flags.clientId);
+    }
+
+    const given = await prompt.ask(flags.clientId);
+    const change = this.withEndpoints(preview, given.endpoints, (endpoints) => {
+      const located = candidate.withEndpoints(endpoints).document;
+      return target.config.connections.enable(target.schema, located, options);
+    });
+    if (summary.reused) {
+      consola.success(`Reusing ${summary.connection.path}`);
+    }
+    // The credentials go before the files: saving writes the connection first,
+    // so a write that then fails would leave a connection on disk whose
+    // credentials were never stored, and the rerun would take it as reused and
+    // not ask for them again. Published first, a failed write leaves nothing
+    // behind but credentials the rerun asks for and stores again. Saving's own
+    // refusals are checked before that, so a path it would refuse leaves the
+    // project's variables alone too.
+    await change.check(target.store);
+    const published = await delivery.publish(
+      given,
+      this.publisher(remote.client, remote.projectId),
+    );
+    const written = await this.write(target, change, undefined);
+    this.reportOutcome({ change, written, provider, given, schema: target.schema });
+    return this.result({ summary, change, written, published, delivery });
+  }
+
+  /**
+   * Warn of a loopback issuer, which works only on a server that may fetch
+   * from this machine.
+   *
+   * @param target - What the run read.
+   * @param selection - The provider.
+   * @param server - The server the run targets.
+   */
+  private async warnOfUnreachableIssuer(
+    target: SchemaTarget,
+    selection: ProviderSelection,
+    server: string,
+  ): Promise<void> {
+    const reach = await loopbackReach(target.cwd, server);
+    const loopback = loopbackIssuerWarning(selection, reach);
     if (loopback !== undefined) {
       reportWarning(loopback);
     }
-    const provider = selectionName(selection);
-    // `--cwd` and the run's `--env`/`--env-file`/`--server`, so every follow-up
-    // reaches the project this run published to.
-    const scopeArgs = this.environmentSelectorArgs();
-    // What an agent can run once the missing credential is to hand. Only for a
-    // catalog provider: a custom connection needs its settings repeated too.
-    const retryFor = (clientId: string, pipe = ""): SuggestedCommand | undefined =>
-      selection.kind === "catalog"
-        ? inShell(
-            this.suggest(`auth-method sso enable --provider ${provider} --client-id ${clientId}`),
-            { before: pipe },
-          )
-        : undefined;
+  }
 
-    const plan = planConnection({
-      selection,
-      files: connections,
-      clientId: flags.clientId,
-      scopesGiven: flags.scopes !== undefined,
-      slugFlag: ENABLE_FLAG_NAMES.slug,
-    });
-    // The connection's own route, so the slug decides it: a reused connection
-    // keeps the slug it was created with.
-    const callbackUri = callbackUriFor(issuer, plan.slug);
-
-    const reusing = plan.action === "reuse";
-    if (plan.action === "create" && plan.alsoUsesIssuer !== undefined) {
-      reportWarning(
-        `${plan.alsoUsesIssuer.join(", ")} already connects to ${provider}'s issuer under another slug, so this adds a second ${provider} connection and button.`,
-      );
-    }
-    if (plan.action === "reuse" && plan.notApplied !== undefined) {
-      reportWarning(
-        `${plan.file.path} already exists, so the ${plan.notApplied.join(" and ")} you gave ${plan.notApplied.length === 1 ? "was" : "were"} not applied. Edit the file to change ${plan.notApplied.length === 1 ? "it" : "them"}.`,
-      );
-    }
-    // What a newly written connection will reference: this command writes both
-    // as `${{ NAME }}`, so on the create path the names are certain.
-    const scaffolded = credentialVariables(plan.slug);
-    // A reused connection may name its own variables — it is an editable file
-    // — so the credentials go where it actually looks rather than where this
-    // command would have put them. A name is `undefined` when the file holds
-    // that credential as a literal: there is no variable to publish to, and
-    // publishing to a derived name would report success for a value the
-    // connection never reads.
-    const names: StoredVariables = reusing
-      ? credentialVariablesOf(plan.file, plan.slug)
-      : scaffolded;
-    const variable = names.clientSecret;
-    const idVariable = names.clientId;
-
-    // Worked out before the dry-run return and before the connection is
-    // written or a credential published.
-    const edits = editsFor(plan.slug);
-    const outcome = {
-      schema: target.schema,
-      before: target.schema.body,
-      after: edits.schema.document as Record<string, unknown>,
-      flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
-    };
-
-    consola.info(`Project   ${escapeControlCharacters(projectId)}`);
-    consola.info(
-      `Schema    ${target.schema.path}${target.schema.methods.length > 0 ? ` (${target.schema.methods.join(", ")})` : ""}`,
-    );
-
-    // Before the dry-run return, so a preview is enough to register the client.
-    // Shown on reuse too: the URI moved to one per connection after the first
-    // release, and rerunning this command is how a developer finds the one to
-    // register now.
-    const registration = reusing
-      ? [`Callback URI   ${callbackUri}`]
-      : [
-          `${entry.displayName} needs an OAuth application.`,
-          `Callback URI   ${callbackUri}`,
-          // A custom provider has no console to send the developer to: it is
-          // theirs, and the issuer they gave is the only address known.
-          entry.consoleUrl === undefined
-            ? `Register it as a client at ${entry.issuer}, with the callback URI above.`
-            : `Create it at   ${entry.consoleUrl}`,
-        ];
-    for (const line of registration) {
-      consola.info(line);
-    }
-
-    // Hand-edited regions the edits leave alone, said on a dry run before
-    // anything is written and on a real run after.
-    const reportUntouched = (verb: "Would leave" | "Left") => {
-      for (const skipped of edits.skipped) {
-        const toDo =
-          skipped.step === "password"
-            ? `Add ${plan.slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, sso_user_not_found to register-sso and user_already_exists to sso-conflict.`
-            : skipped.step === "sso-conflict"
-              ? `Add ${plan.slug} to its sso_providers.`
-              : "Update it yourself.";
-        reportWarning(`${verb} ${skipped.region} alone: it has been edited by hand. ${toDo}`);
-      }
-    };
-
-    if (this.dryRun) {
-      reportUntouched("Would leave");
-      // Nothing is asked or read: a reuse publishes only the credentials it is
-      // given, and a dry run reads no piped secret, so none is listed.
-      const changed = editedFiles(target.schema, edits);
-      const toStore = reusing
-        ? flags.clientId !== undefined && idVariable !== undefined
-          ? [idVariable]
-          : []
-        : [scaffolded.clientId, scaffolded.clientSecret];
-      this.reportOutcome(outcome);
-
-      return this.emit({
-        status: "skipped",
-        reason: "dry-run",
-        data: {
-          ...this.payload({
-            projectId,
-            provider,
-            schema: target.schema.name,
-            plan,
-            callbackUri,
-            secret: undefined,
-            clientId: undefined,
-            idVariable,
-            changed,
-            skipped: edits.skipped,
-          }),
-          would_store: toStore,
-        },
-        pretty: prose(
-          [
-            `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
-            ...changed.map((file) => `Would update ${file}`),
-            ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
-          ].join("\n"),
-        ),
-      });
-    }
-    // An existing connection is reused rather than rewritten, but the schema
-    // and flow edits still run: those are the point of the command, they are
-    // per-schema, and they are idempotent. Enabling the provider for a second
-    // user type, and finishing a run interrupted after the connection file was
-    // written, both arrive here.
-    // Both are set inside whichever branch runs below, between statements that
-    // print and prompt, so neither can be built as one expression.
-    let secret: SecretOutcome | undefined;
-    let clientIdState: PublishState | undefined;
-
-    if (reusing) {
-      consola.success(`Reusing ${plan.file.path}`);
-      // The connection references its credentials rather than holding them, so
-      // reuse is not evidence they were ever published: a run interrupted
-      // between writing the file and publishing leaves the document pointing
-      // at variables that do not exist. A supplied credential is published
-      // again, which costs one call and makes the command idempotent --
-      // rerunning with a changed client id now takes effect instead of being
-      // silently ignored. Nothing is prompted for: an unattended rerun should
-      // not start asking for credentials the project already has.
-      const publish = this.publisher(client, projectId);
-      if (flags.clientId !== undefined) {
-        if (idVariable === undefined) {
-          reportWarning(
-            `${plan.file.path} holds its client id directly, so nothing was published. ` +
-              "Edit the file to change it.",
-          );
-        } else {
-          clientIdState = await publishClientId({
-            name: idVariable,
-            value: flags.clientId,
-            publish,
-          });
-        }
-      }
-      // Reuse never demands a secret: the project may already hold it, and
-      // refusing an unattended rerun for a credential that has not changed
-      // would be noise. It is only read so that a rerun can replace it.
-      const piped = await this.input({
-        kind: "secret",
-        name: "client secret",
-        message: `What is the client secret of your ${entry.displayName} OAuth app?`,
-        parse: parseClientSecret,
-        stdin: true,
-        optional: true,
-      });
-      if (piped !== undefined) {
-        if (variable === undefined) {
-          reportWarning(
-            `${plan.file.path} holds its client secret directly, so nothing was published. ` +
-              "Replace it with a ${{ NAME }} reference so the secret is not committed.",
-          );
-        } else {
-          secret = await storeClientSecret({ name: variable, value: piped, publish });
-        }
-      }
-    } else {
-      // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
-      // provider may be a local stand-in, and the client is registered with
-      // whatever answers. Not asked of a custom connection, whose issuer the
-      // developer has already given.
-      const endpoints =
-        selection.kind === "catalog"
-          ? await askConnectionEndpoints({
-              provider: selection.id,
-              developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-              ask: this.input,
-            })
-          : undefined;
-      const clientId = await this.input({
-        kind: "text",
-        name: `client id for ${entry.displayName}`,
-        message: `What is the client ID of your ${entry.displayName} OAuth app?`,
-        flag: "--client-id",
-        parse: parseClientId,
-        given: flags.clientId,
-        retry: retryFor("<client-id>"),
-      });
-      // Required, like the client id. The connection document references the
-      // secret as `${{ NAME }}` and the engine resolves that from the project's
-      // variables, so enabling a provider without one writes a sign-in button
-      // that fails at the token endpoint with `invalid_client` -- a failure
-      // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await this.input({
-        kind: "secret",
-        name: `client secret for ${scaffolded.clientSecret}`,
-        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
-        parse: parseClientSecret,
-        stdin: true,
-        retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
-      });
-
-      const publish = this.publisher(client, projectId);
-      const connection = entry.connection({
-        slug: plan.slug,
-        schemaProperties: target.schema.properties,
-        schemaRef: CONNECTION_SCHEMA_REF,
-        endpoints,
-      });
-      // A connection is scaffolded with the properties the provider maps by
-      // default, narrowed to what the schema defines. A schema that defines none
-      // of them leaves it with no mapping, and `deploy` refuses a connection that
-      // fills nothing, so say so now and not on the next command.
-      if (!("claim_mapping" in connection)) {
-        reportWarning(
-          `${target.schema.path} defines none of the properties ${entry.displayName} maps by default, so ${plan.path} has no claim_mapping ` +
-            `and no sign-in can fill a user. Add the properties your provider returns to claim_mapping in ${plan.path}.`,
-        );
-      }
-      if (endpoints?.issuer !== undefined && endpoints.issuer !== entry.issuer) {
-        // Said out loud: a connection pointing somewhere other than the
-        // vendor is not what the developer will want in the end, and nothing
-        // else in the output would show it.
-        reportWarning(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
-      }
-      const connectionFile = join(target.cwd, plan.path);
-      await mkdir(dirname(connectionFile), { recursive: true });
-      // `wx` rather than a plain write: planConnection decided this file does
-      // not exist, and anything that appeared since is not ours to overwrite.
-      await writeFile(connectionFile, `${stableStringify(connection)}\n`, { flag: "wx" });
-      // The id first: it is the half the developer can read back afterwards,
-      // and a connection missing either credential fails the same way.
-      clientIdState = await publishClientId({
-        name: scaffolded.clientId,
-        value: clientId,
-        publish,
-      });
-      secret = await storeClientSecret({
-        name: scaffolded.clientSecret,
-        value: secretValue,
-        publish,
-      });
-      consola.success(`Wrote ${plan.path}`);
-      if (selection.kind === "custom") {
-        for (const note of mappingNotes({
-          file: plan.path,
-          provider: entry.displayName,
-          connection,
-        })) {
-          consola.info(note);
-        }
-      }
-    }
-
-    const written = await this.enableInConfiguration(target.cwd, target.schema, edits);
-
-    for (const file of written) {
-      consola.success(`Updated ${file}`);
-    }
-    reportUntouched("Left");
-    if (written.length === 0 && edits.skipped.length === 0) {
-      consola.info(`${target.schema.name} and its login flow already offer ${entry.displayName}`);
-    }
-    if (clientIdState !== undefined && idVariable !== undefined) {
-      reportClientIdOutcome(idVariable, clientIdState, this.cliVersion, this.environmentSelector());
-    }
-    if (secret) {
-      // A reuse that piped nothing in had no value to publish; a create always
-      // has one, because the command refuses without it.
-      reportSecretOutcome(secret, this.cliVersion, reusing, this.environmentSelector());
-    }
-    this.reportOutcome(outcome);
-    // `variable set` first, for a credential that did not reach the project:
-    // the connection references it as `${{ NAME }}` and the engine resolves
-    // that from the project's variables, so a button whose credential never
-    // arrived fails at token exchange. Then deploy, when a file
-    // changed. All carry --cwd when the run did.
-    const recovery = republishArgs(
-      [
-        { name: idVariable, secret: false, published: clientIdState },
-        { name: variable, secret: true, published: secret?.published },
-      ],
-      scopeArgs,
-    );
-
-    // A file changed or a connection was created, which only a deploy publishes.
-    const unpublished = !reusing || written.length > 0;
-    const credentialsStored =
-      secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
-    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
-    const name = entry.displayName;
-    const followUps = this.followUps(unpublished, scopeArgs, recovery);
-
-    return this.emit({
-      status: "ok",
-      data: {
-        title: unpublished
-          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
-          : `${name} sign-in is already configured locally.`,
-        ...this.payload({
-          projectId,
-          provider,
-          schema: target.schema.name,
-          plan,
-          callbackUri,
-          secret,
-          clientId: clientIdState,
-          idVariable,
-          changed: written,
-          skipped: edits.skipped,
-        }),
-        next_args: followUps.args,
-      },
-      next: {
-        ...(unpublished
-          ? {
-              actions: [
-                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
-              ],
-            }
-          : {}),
-        commands: followUps.commands,
-      },
+  /**
+   * Where the connection's credentials go, reported the way this run reports.
+   *
+   * @param preview - The change worked out before anything was asked.
+   * @returns The delivery.
+   */
+  private deliveryFor(preview: DocumentChange<Connection>): CredentialDelivery {
+    return new CredentialDelivery({
+      connection: preview.document,
+      reused: !preview.created,
+      selector: this.environmentSelector(),
+      cliVersion: this.cliVersion,
     });
   }
 
   /**
-   * How the connection's credentials reach the project, or `undefined` when
-   * there is no project behind this run: `--source mock` answers from fixtures
-   * and has no variables to write. It publishes to the project's own variables,
-   * which is where the engine resolves a connection's `${{ NAME }}` references
-   * from.
+   * The questions that ask for the connection's credentials, the way this run
+   * asks.
+   *
+   * @param selection - The provider.
+   * @param preview - The change worked out before anything was asked.
+   * @param names - The variables the credentials go to.
+   * @returns The prompt.
+   */
+  private promptFor(
+    selection: ProviderSelection,
+    preview: DocumentChange<Connection>,
+    names: CredentialNames,
+  ): CredentialPrompt {
+    return new CredentialPrompt({
+      selection,
+      reused: !preview.created,
+      secretVariable: names.clientSecret,
+      ask: this.input,
+      developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
+      selector: this.environmentSelector(),
+      cliVersion: this.cliVersion,
+    });
+  }
+
+  /**
+   * What the run says about the connection it adds.
+   *
+   * @remarks
+   * The callback URI is the connection's own route, so its slug decides it: a
+   * reused connection keeps the slug it was created with.
+   *
+   * @param input - The project, the provider, what the run read, the change
+   *   worked out before anything was asked, and the Project's issuer.
+   * @returns The summary.
+   */
+  private summarize(input: SummaryInput): Summary {
+    const connection = input.preview.document;
+    return {
+      projectId: input.projectId,
+      provider: selectionName(input.selection),
+      displayName: providerOf(input.selection).displayName,
+      schema: input.target.schema.name,
+      connection,
+      reused: !input.preview.created,
+      callbackUri: callbackUriFor(input.issuer, connection.slug),
+    };
+  }
+
+  /**
+   * Say what the run addresses and what to register with the provider.
+   *
+   * @remarks
+   * Said before a dry run returns, so a preview is enough to register the
+   * client. The callback URI is shown on reuse too: rerunning this command is
+   * how a developer finds the URI to register.
+   *
+   * @param summary - What the run says about the connection.
+   * @param schema - The schema the provider is added to.
+   * @param provider - The provider.
+   */
+  private introduce(summary: Summary, schema: UserSchema, provider: IdpProvider): void {
+    consola.info(`Project   ${escapeControlCharacters(summary.projectId)}`);
+    if (schema.methods.length > 0) {
+      consola.info(`Schema    ${schema.path} (${schema.methods.join(", ")})`);
+    } else {
+      consola.info(`Schema    ${schema.path}`);
+    }
+    if (!summary.reused) {
+      consola.info(`${provider.displayName} needs an OAuth application.`);
+    }
+    consola.info(`Callback URI   ${summary.callbackUri}`);
+    // A custom provider has no console to send the developer to: it is
+    // theirs, and the issuer they gave is the only address known.
+    if (!summary.reused && provider.consoleUrl === undefined) {
+      consola.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
+    }
+    if (!summary.reused && provider.consoleUrl !== undefined) {
+      consola.info(`Create it at   ${provider.consoleUrl}`);
+    }
+  }
+
+  /**
+   * The result of a dry run: what would be written and stored, with nothing
+   * asked or read.
+   *
+   * @param summary - What the run says about the connection.
+   * @param change - The change worked out before anything was asked.
+   * @param names - The variables the credentials would go to.
+   * @param givenClientId - The client id `--client-id` gave, if any.
+   * @returns The skipped result.
+   */
+  private previewResult(
+    summary: Summary,
+    change: DocumentChange<Connection>,
+    names: CredentialNames,
+    givenClientId: ClientId | undefined,
+  ): JsonEnvelope {
+    this.report(change);
+    const toStore = this.wouldStore(summary.reused, names, givenClientId);
+    const writes = change.changedPaths.map((file) => {
+      return `Would write ${file}`;
+    });
+    const stores =
+      toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
+    const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
+    return this.emit({
+      status: "skipped",
+      reason: "dry-run",
+      data: { ...payload, would_store: toStore },
+      pretty: prose([...writes, ...stores].join("\n")),
+    });
+  }
+
+  /**
+   * The variables a dry run would store a credential in.
+   *
+   * @remarks
+   * Nothing is asked or read: a reuse publishes only the credentials it is
+   * given, and a dry run reads no piped secret, so none is listed.
+   *
+   * @param reused - Whether the connection was already in the project.
+   * @param names - The connection's variables.
+   * @param givenClientId - The client id `--client-id` gave, if any.
+   * @returns The variables.
+   */
+  private wouldStore(
+    reused: boolean,
+    names: CredentialNames,
+    givenClientId: ClientId | undefined,
+  ): readonly (ClientIdVariable | ClientSecretVariable | undefined)[] {
+    if (!reused) {
+      return [names.clientId, names.clientSecret];
+    }
+    if (givenClientId !== undefined && names.clientId !== undefined) {
+      return [names.clientId];
+    }
+    return [];
+  }
+
+  /**
+   * The change to write: the preview, or the same change made again with the
+   * endpoints a development run answered.
+   *
+   * @remarks
+   * The endpoints change only a new connection's body, never which files the
+   * change writes.
+   *
+   * @param preview - The change worked out before anything was asked.
+   * @param endpoints - The endpoints a development run answered, if any.
+   * @param remake - Makes the change again with the endpoints.
+   * @returns The change.
+   */
+  private withEndpoints(
+    preview: DocumentChange<Connection>,
+    endpoints: ConnectionEndpoints | undefined,
+    remake: (endpoints: ConnectionEndpoints) => DocumentChange<Connection>,
+  ): DocumentChange<Connection> {
+    if (endpoints === undefined) {
+      return preview;
+    }
+    return remake(endpoints);
+  }
+
+  /**
+   * How the connection's credentials reach the project.
+   *
+   * @remarks
+   * It writes to the project's own variables, which is where the engine
+   * resolves a connection's `${{ NAME }}` references from.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project.
+   * @returns The publisher, or `undefined` when there is no project behind this
+   *   run: `--source mock` answers from fixtures and has no variables to write.
    */
   private publisher(client: ZitadelClient, projectId: string): SecretPublisher | undefined {
     if (this.meta.source === "mock") {
       return undefined;
     }
     const variableService = new VariableService(client, projectId);
-    return async (name, value, { secret }) => {
-      await variableService.set(
-        name,
-        value,
-        VariableWrite.of({
-          secret,
-          preview: false,
-        }),
-      );
+    return async (name, value, options) => {
+      const write = VariableWrite.of({ secret: options.secret, preview: false });
+      await variableService.set(name, value, write);
     };
   }
 
-  /** Write the edits `planEdits` worked out, and say which files changed. */
-  private async enableInConfiguration(
-    cwd: string,
-    schema: SchemaFile,
-    edits: PlannedEdits,
-  ): Promise<string[]> {
-    if (edits.schema.changed) {
-      await writeFile(join(cwd, schema.path), `${stableStringify(edits.schema.document)}\n`);
-    }
-    for (const { flow, result } of edits.flows) {
-      if (result.changed) {
-        await writeFile(join(cwd, flow.path), `${stableStringify(result.document)}\n`);
-      }
-    }
-    return editedFiles(schema, edits);
-  }
-
   /**
-   * The settings of a custom connection, asking only for the ones not already
-   * given, in the order that lets each answer decide what comes next. The slug
-   * comes first because it decides the most: it names the file the connection
-   * is kept in, so everything that depends on the slug alone is checked the
-   * moment it is typed (`checkCustomSlug`, then `beforeAsking`), and a connection that already exists
-   * answers the rest from its file. A given value goes through the same parser
-   * as a typed one, and the ones given on the command line were checked under
-   * their own flag on the way in.
+   * Say what the configuration said about the change, and what else the
+   * developer would not otherwise see.
    *
-   * @param beforeAsking - Raises whatever else is known once the slug is.
+   * @param outcome - The change, the files written, the provider, the
+   *   credentials and endpoints the run was given, and the schema.
    */
-  private async askCustomSettings(
-    given: CustomFlagValues,
-    files: readonly ConnectionFile[],
-    beforeAsking: (slug: ConnectionSlug) => void,
-  ): Promise<Required<CustomFlagValues>> {
-    const slug = await this.input({
-      kind: "text",
-      name: "connection name",
-      message:
-        "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-      parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
-      given: given.slug,
-    });
-    const existing = checkCustomSlug(files, slug, ENABLE_FLAG_NAMES.slug);
-    beforeAsking(slug);
-    // An existing connection is described by its file, so nothing it already
-    // holds is asked again; reuse never applies scopes, so they are not asked.
-    const stored = existing === undefined ? undefined : usableStoredSettings(existing, slug, given);
-    // An issuer given as a flag must be the one the connection was written with:
-    // that is known now, not after the next answer.
-    const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
-    if (existing !== undefined && givenIssuer?.ok) {
-      refuseChangedIssuer(existing, slug, givenIssuer.value, ENABLE_FLAG_NAMES.slug);
+  private reportOutcome(outcome: Outcome): void {
+    const provider = outcome.provider;
+    this.report(outcome.change);
+    const endpointIssuer = outcome.given.endpoints?.issuer;
+    if (endpointIssuer !== undefined && endpointIssuer !== provider.issuer) {
+      // A connection pointing somewhere other than the vendor is not what the
+      // developer will want in the end, and nothing else would show it.
+      reportWarning(`${provider.displayName} points at ${endpointIssuer}, not the provider`);
     }
-    const displayName = await this.input({
-      kind: "text",
-      name: "display name",
-      message: "What name should the sign-in button show? For example Acme SSO.",
-      parse: parseDisplayName,
-      given: given.displayName ?? stored?.displayName,
-    });
-    const issuer = await this.input({
-      kind: "text",
-      name: "issuer",
-      message: "What is the issuer URL of the provider?",
-      parse: parseIssuer,
-      given: given.issuer ?? stored?.issuer,
-    });
-    const scopes = await this.input({
-      kind: "text",
-      name: "scopes",
-      message: "Which scopes should we request? Separate them with spaces.",
-      parse: parseScopes,
-      given: given.scopes ?? (existing === undefined ? undefined : DEFAULT_SCOPES.join(" ")),
-      initialValue: DEFAULT_SCOPES.join(" "),
-    });
-    return { slug, displayName, issuer, scopes: scopes.join(" ") };
+    if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
+      consola.info(
+        `${outcome.schema.name} and its login flow already offer ${provider.displayName}`,
+      );
+    }
   }
 
   /**
-   * The machine-readable payload. Never the secret, only whether it is held.
+   * The result of a run that wrote the configuration and published the
+   * credentials.
+   *
+   * @remarks
+   * Its next commands are `variable set` first, for a credential that did not
+   * reach the project, then deploy, when a file changed. All carry `--cwd` and
+   * the run's environment.
+   *
+   * @param input - The summary, the change, the files written, what became of
+   *   each credential, and where they went.
+   * @returns The result.
    */
-  private payload(input: {
-    /**
-     * The Project the run addresses. `--json` suppresses the console line that
-     * otherwise carries it, and a result that names only the schema does not
-     * say which Project was changed.
-     */
-    projectId: string;
-    provider: ProviderName;
-    schema: string;
-    plan: ConnectionPlan;
-    callbackUri: string;
-    secret: SecretOutcome | undefined;
-    clientId: PublishState | undefined;
-    /**
-     * The variable the connection names, which need not be the slug's, and is
-     * `undefined` when the connection holds its client id as a literal.
-     */
-    idVariable: ClientIdVariable | undefined;
-    changed?: string[];
-    skipped?: SsoSkipped[];
-  }): Record<string, unknown> {
-    return {
-      project_id: input.projectId,
-      provider: input.provider,
-      schema: input.schema,
-      connection: {
-        action: input.plan.action,
-        slug: input.plan.slug,
-        file: input.plan.action === "reuse" ? input.plan.file.path : input.plan.path,
+  private result(input: ResultInput): JsonEnvelope {
+    const summary = input.summary;
+    const name = summary.displayName;
+    const scopeArgs = this.environmentSelectorArgs();
+    const recovery = input.delivery.recoveryArgs(input.published, scopeArgs);
+    const unpublished = !summary.reused || input.written.length > 0;
+    const stored = input.delivery.areStored(input.published);
+    const followUps = this.followUps(unpublished, scopeArgs, recovery);
+    const actions = [
+      `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+    ];
+    const payload = this.payload({
+      summary,
+      change: input.change,
+      published: input.published,
+      names: input.delivery.names,
+    });
+    const next = unpublished
+      ? { actions, commands: followUps.commands }
+      : { commands: followUps.commands };
+
+    return this.emit({
+      status: "ok",
+      data: {
+        title: this.title(name, unpublished, stored),
+        ...payload,
+        next_args: followUps.args,
       },
-      callback_uri: input.callbackUri,
-      changed: input.changed ?? [],
-      untouched: (input.skipped ?? []).map((s) => s.region),
-      client_id:
-        input.clientId === undefined || input.idVariable === undefined
-          ? null
-          : { variable: input.idVariable, published: input.clientId },
-      secret:
-        input.secret === undefined
-          ? null
-          : { variable: input.secret.name, published: input.secret.published },
+      next,
+    });
+  }
+
+  /**
+   * The result's title: whether the provider is configured, and whether its
+   * credentials are stored on the Project.
+   *
+   * @param name - The provider's display name.
+   * @param unpublished - Whether the configuration has changes to deploy.
+   * @param stored - Whether both credentials reached the project.
+   * @returns The title.
+   */
+  private title(name: string, unpublished: boolean, stored: boolean): string {
+    if (!unpublished) {
+      return `${name} sign-in is already configured locally.`;
+    }
+    if (stored) {
+      return `${name} sign-in is configured locally. Provider credentials are stored on your Project.`;
+    }
+    return `${name} sign-in is configured locally.`;
+  }
+
+  /**
+   * The machine-readable result. Never the secret, only whether it is held.
+   *
+   * @param input - The summary, the change, what became of each credential,
+   *   and the variables they go to.
+   * @returns The result's data.
+   */
+  private payload(input: PayloadInput): Payload {
+    const summary = input.summary;
+    const action = summary.reused ? "reuse" : "create";
+    return {
+      project_id: summary.projectId,
+      provider: summary.provider,
+      schema: summary.schema,
+      connection: {
+        action,
+        slug: summary.connection.slug,
+        file: summary.connection.path,
+      },
+      callback_uri: summary.callbackUri,
+      changed: [...input.change.changedPaths],
+      notices: input.change.notices,
+      client_id: this.publishedClientId(input.names, input.published.clientId),
+      secret: this.storedSecret(input.published.secret),
     };
   }
-}
 
-/**
- * What the file of an existing custom connection holds, checked as a typed
- * answer is, or a refusal that names the file and the setting: a stored value
- * that cannot be used would otherwise surface as an error about a flag the
- * person never passed. A file with no issuer is not an OIDC connection to
- * reuse at all, whatever issuer is typed.
- */
-function usableStoredSettings(
-  file: ConnectionFile,
-  slug: ConnectionSlug,
-  given: CustomFlagValues,
-): CustomFlagValues {
-  const stored = storedCustomSettings(file);
-  if (stored.issuer === undefined) {
-    throw new ZitadelError(
-      "E_CONFLICT",
-      `${file.path} is already named ${slug} and is not an OIDC connection`,
-      {
-        hint: `Fix the file, or choose another ${ENABLE_FLAG_NAMES.slug}, then run the command again.`,
-        details: { file: file.path, slug },
-      },
-    );
-  }
-  // Only a stored value that will be used is held to the rules: one a flag
-  // replaces is not read at all.
-  const usable = <T>(
-    what: string,
-    value: string | undefined,
-    flag: string | undefined,
-    parse: (v: string) => Parsed<T>,
-  ) => {
-    const parsed = flag !== undefined || value === undefined ? undefined : parse(value);
-    if (parsed !== undefined && !parsed.ok) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${file.path} holds ${what} that cannot be used: ${parsed.problem}`,
-        {
-          hint: `Fix it in that file, or choose another ${ENABLE_FLAG_NAMES.slug}.`,
-          details: { file: file.path, slug },
-        },
-      );
+  /**
+   * The client id's variable and what became of it, for the result.
+   *
+   * @param names - The connection's variables.
+   * @param published - What became of the client id, if it was sent.
+   * @returns Both, or `null` when it was not sent or has no variable.
+   */
+  private publishedClientId(
+    names: CredentialNames,
+    published: PublishState | undefined,
+  ): PublishedVariable | null {
+    if (published === undefined || names.clientId === undefined) {
+      return null;
     }
-    return flag === undefined ? value : undefined;
-  };
-  return {
-    displayName: usable("a display name", stored.displayName, given.displayName, parseDisplayName),
-    issuer: usable("an issuer", stored.issuer, given.issuer, parseIssuer),
-  };
-}
-
-/** The schema and flow edits a run will make, before anything is written. */
-type PlannedEdits = {
-  readonly schema: SsoResult<object>;
-  readonly flows: ReadonlyArray<{ flow: FlowFile; result: SsoResult<object> }>;
-  /** Hand-edited regions the flow editors leave alone, named by file. */
-  readonly skipped: SsoSkipped[];
-};
-
-/**
- * Enable the provider in the schema and every login flow that runs against
- * it, without writing anything. A flow belonging to another schema is left
- * alone: enabling Google for customers must not touch the employee journey.
- * The editors are pure and throw their refusals, so calling this before any
- * write or publish is what makes those refusals leave nothing behind.
- */
-function planEdits(
-  schema: SchemaFile,
-  slug: ConnectionSlug,
-  flows: readonly FlowFile[],
-): PlannedEdits {
-  const methods = enabledMethods(schema);
-  const results = flows.map((flow) => ({ flow, result: applySsoToFlow(flow.body, slug, methods) }));
-  return {
-    schema: applySsoToSchema(schema.body, slug),
-    flows: results,
-    skipped: results.flatMap(({ flow, result }) =>
-      result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
-    ),
-  };
-}
-
-/** The project-relative files the planned edits change. */
-function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
-  return [
-    ...(edits.schema.changed ? [schema.path] : []),
-    ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
-  ];
-}
-
-/**
- * What a person needs to know about the claim mappings a custom connection was
- * written with, in two parts: the mappings (where they are, which side of each
- * line is their user schema's and which is the claim the provider must return),
- * then what verifies a value, which a mapping alone does not. Nothing here
- * edits a mapping; the connection file is where that happens.
- */
-function mappingNotes(options: { file: string; provider: string; connection: object }): string[] {
-  const { file, provider, connection } = options;
-  const document = connection as {
-    claim_mapping?: Readonly<Record<string, string>>;
-    verified_claims?: Readonly<Record<string, string | true>>;
-  };
-  const mappings = Object.entries(document.claim_mapping ?? {});
-  if (mappings.length === 0) {
-    return [];
+    return { variable: names.clientId, published };
   }
-  const verified = Object.entries(document.verified_claims ?? {});
-  return [
-    `Claim mappings in ${file}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
-    ...mappings.map(([attribute, claim]) => `  ${attribute} ← ${claim}`),
-    ...(verified.length === 0
-      ? ["Nothing is treated as verified."]
-      : [
-          "Verification, which a mapping alone does not give:",
-          ...verified.map(([attribute, how]) =>
-            how === true
-              ? `  ${attribute} is treated as verified.`
-              : `  ${attribute} is treated as verified only when ${provider} says so in the ${how} claim.`,
-          ),
-        ]),
-    "Edit the mappings in that file if your provider returns other claims.",
-  ];
+
+  /**
+   * The client secret's variable and where it ended up, for the result.
+   *
+   * @param secret - Where the secret ended up, if it was sent.
+   * @returns Both, or `null` when it was not sent.
+   */
+  private storedSecret(secret: SecretOutcome | undefined): PublishedVariable | null {
+    if (secret === undefined) {
+      return null;
+    }
+    return { variable: secret.name, published: secret.published };
+  }
 }

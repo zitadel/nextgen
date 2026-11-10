@@ -1,5 +1,5 @@
-import type { Git } from "../git";
-import type { Check } from "../operation";
+import type { Git } from "@/lib/git/git";
+import type { Check } from "@/lib/git/operation";
 
 /**
  * HEAD is a branch, so a commit is not lost on a detached HEAD.

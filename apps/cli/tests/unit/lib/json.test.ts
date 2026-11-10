@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  deepMerge,
-  parseJsonObject,
-  setTopLevelJsonKey,
-  stableStringify,
-} from "../../../src/lib/json";
+import { deepMerge, parseJsonObject, setTopLevelJsonKey, stableStringify } from "@/lib/json";
 
 describe("setTopLevelJsonKey", () => {
   it("splices one value and leaves every other byte untouched", () => {

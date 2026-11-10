@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ciProvider, runsInCi } from "../../../../../src/lib/telemetry/dimensions/ci-provider";
+import { ciProvider, runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 
 describe("ciProvider", () => {
   it("names the provider, falling back to unknown inside an unrecognized CI", () => {

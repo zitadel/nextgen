@@ -11,12 +11,12 @@ vi.mock("@oclif/table", async (importOriginal) => {
 
 import { makeTable } from "@oclif/table";
 
-import { asTerminal, offTerminal } from "../../../helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import {
   aTableDrawnByARun,
   aTabulatingCommand,
   anUnscopedTabulatingCommand,
-} from "../../../helpers/tabulate";
+} from "@tests/helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
 

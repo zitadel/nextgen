@@ -186,8 +186,12 @@ export class Repository {
   }
 
   /** {@link diffSince}, uncoloured and split into one entry per changed file. */
-  diffFilesSince(commit: string, paths: readonly string[]): Promise<DiffedFile[] | null> {
-    return this.perform(new DiffFilesSince(commit, paths));
+  diffFilesSince(
+    commit: string,
+    paths: readonly string[],
+    options: Omit<DiffOptions, "color"> = {},
+  ): Promise<DiffedFile[] | null> {
+    return this.perform(new DiffFilesSince(commit, paths, options));
   }
 
   /** Runs `operation` once all its checks hold; what it returns when refused, otherwise. */

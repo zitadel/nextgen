@@ -29,7 +29,12 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	input := service.DeployInput{
 		ProjectID: string(params.ProjectID),
 		ReleaseID: string(req.ReleaseID.Value),
-		Targets:   req.Targets,
+	}
+	if urls, ok := req.Targets.GetDeploymentPreviewUrls(); ok {
+		input.To = domain.DeployToPreviews(urls)
+	}
+	if _, ok := req.Targets.GetDeploymentPrimaryTarget(); ok {
+		input.To = domain.DeployToPrimary()
 	}
 	if ttl, ok := req.TTL.Get(); ok {
 		input.TTL = new(time.Duration(ttl))

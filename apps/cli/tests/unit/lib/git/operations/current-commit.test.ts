@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CurrentCommit } from "../../../../../src/lib/git/operations/current-commit";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { CurrentCommit } from "@/lib/git/operations/current-commit";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 describe("CurrentCommit", () => {
   it("gives HEAD's commit", async () => {

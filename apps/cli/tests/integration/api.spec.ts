@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -141,7 +141,7 @@ describe("api", () => {
 
           const result = await app.api("deleteVariable", "FOO");
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {
@@ -194,7 +194,7 @@ describe("api", () => {
 
         const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
 
-        expect(result).toHintAt("Run the same command again");
+        expect(result).toHintAt("Once they agree, run the same command again");
       });
 
       it("sends a merge patch with a null without asking, as before", async () => {

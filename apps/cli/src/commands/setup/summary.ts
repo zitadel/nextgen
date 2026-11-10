@@ -1,22 +1,21 @@
 import { basename, join } from "node:path";
 
-import {
-  getDefaultHumanUserSchemaBody,
-  type SetupPreset,
-  type SetupUseCase,
-} from "@zitadel/config/defaults";
-import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
-import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import semver from "semver";
 
-import { pathExists } from "../../lib/fs";
-import { applySsoToSchema } from "../../lib/idp/documents";
-import { detectors } from "../../lib/orca/detectors";
-import type { Detector } from "../../lib/orca/detectors/types";
-import { readPackageJson } from "../../lib/npm";
-import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import { arrow, dim, mark } from "../../lib/style";
-import type { PasswordMinLength } from "../../lib/policies";
+import { pathExists } from "@/lib/fs";
+import { detectors } from "@/lib/orca/detectors";
+import {
+  type ScaffoldedProvider,
+  TOGGLEABLE_METHODS,
+  type ToggleableMethod,
+  ZitadelConfig,
+} from "@/lib/zitadel";
+import type { Detector } from "@/lib/orca/detectors/types";
+import { readPackageJson } from "@/lib/npm";
+import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
+import { arrow, dim, mark } from "@/lib/style";
+import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -162,7 +161,10 @@ export function fileNameOf(p: string): string {
 export type SignIn = {
   /** The method the login flow's entry step offers. */
   starts_with: "password" | "passkey";
-  /** The methods the user schema enables, in the schema's order. */
+  /**
+   * The methods the user schema enables: the one sign-in starts with, the
+   * other, then `sso` when a provider is on.
+   */
   methods: string[];
   /** What registration asks for, in order, and whether each is required. */
   fields: { name: string; required: boolean }[];
@@ -172,39 +174,56 @@ export type SignIn = {
   providers: string[];
 };
 
+/**
+ * The sign-in configuration setup's answers add up to, read off the
+ * configuration setup scaffolds for them.
+ *
+ * @remarks
+ * Scaffolded on an empty configuration, so a password policy `--force` keeps
+ * is not read: the caller reports the minimum it wrote in its place.
+ *
+ * @param answers - The preset, use case, providers and minimum password
+ *   length setup was given.
+ * @returns What sign-in and registration are configured to do.
+ */
 export function signInOf(answers: {
   preset: SetupPreset;
   useCase: SetupUseCase;
-  sso: ReadonlyArray<{ selection: ProviderSelection }>;
+  sso: readonly ScaffoldedProvider[];
   passwordMinLength?: PasswordMinLength;
 }): SignIn {
-  // The schema setup publishes: the preset and use case's template with each
+  // The schema setup writes: the preset and use case's template with each
   // chosen provider enabled, so `methods` names `sso` when it is on.
-  const slugs = answers.sso.map((draft) => providerOf(draft.selection).slug);
-  const schema = slugs.reduce<Record<string, unknown>>(
-    (document, slug) => applySsoToSchema(document, slug).document,
-    getDefaultHumanUserSchemaBody({ preset: answers.preset, useCase: answers.useCase }) as Record<
-      string,
-      unknown
-    >,
-  );
-  const methods = Object.entries((schema["x-auth-methods"] ?? {}) as Record<string, unknown>)
-    .filter(([, value]) => (value as { enabled?: unknown } | null)?.enabled === true)
-    .map(([name]) => name);
-  const required = new Set((schema.required ?? []) as string[]);
+  const scaffolded = ZitadelConfig.empty().scaffold({
+    preset: answers.preset,
+    useCase: answers.useCase,
+    sso: answers.sso,
+    passwordMinLength: answers.passwordMinLength,
+    force: false,
+  });
+  const schema = scaffolded.schema;
+  const policy = scaffolded.policy;
+  const startsWith: ToggleableMethod = answers.preset === "passkey-first" ? "passkey" : "password";
+  const order: readonly ToggleableMethod[] = [
+    startsWith,
+    ...TOGGLEABLE_METHODS.filter((method) => {
+      return method !== startsWith;
+    }),
+  ];
+  const required: readonly string[] = schema.requiredPaths;
   return {
-    starts_with: answers.preset === "passkey-first" ? "passkey" : "password",
-    methods,
-    fields: Object.keys((schema.properties ?? {}) as Record<string, unknown>).map((name) => ({
-      name,
-      required: required.has(name),
-    })),
-    // None given is the recommended minimum, which setup writes in its place.
-    password_min_length:
-      answers.passwordMinLength === null
-        ? null
-        : (answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH),
-    providers: slugs,
+    starts_with: startsWith,
+    methods: [
+      ...order.filter((method) => {
+        return schema.enabledMethods[method];
+      }),
+      ...(schema.isSsoEnabled ? ["sso"] : []),
+    ],
+    fields: schema.propertyNames.map((name) => {
+      return { name, required: required.includes(name) };
+    }),
+    password_min_length: policy.minLength ?? null,
+    providers: [...schema.providers],
   };
 }
 
@@ -214,8 +233,8 @@ export function signInSummary(signIn: SignIn, providerNames: readonly string[]):
   const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
   return [
     signIn.starts_with === "passkey"
-      ? "Sign-in starts with a passkey, with email and password as the fallback."
-      : "Sign-in starts with email and password.",
+      ? "Users see a passkey first, with email and password as the alternative."
+      : "Users see email and password first; passkeys are enabled but not shown at sign-in.",
     `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
     `Registration requires ${listOf(required)}` +
       (optional.length === 0

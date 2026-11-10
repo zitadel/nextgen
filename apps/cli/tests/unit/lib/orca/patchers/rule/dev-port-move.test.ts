@@ -4,7 +4,7 @@ import {
   configIssuerEdit,
   envValueEdit,
   replaceOrigin,
-} from "../../../../../../src/lib/orca/patchers/rule/dev-port-move";
+} from "@/lib/orca/patchers/rule/dev-port-move";
 
 describe("envValueEdit", () => {
   const edit = envValueEdit("ZITADEL_ISSUER", "http://localhost:3101");

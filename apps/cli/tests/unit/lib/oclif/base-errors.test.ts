@@ -1,8 +1,8 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { ZitadelError } from "@/lib/errors";
+import { BaseCommand } from "@/lib/oclif/base";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {

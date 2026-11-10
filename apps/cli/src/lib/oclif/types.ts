@@ -1,6 +1,6 @@
-import type { ZitadelClient } from "../backend";
-import type { Environment } from "../environment";
-import type { SuggestedCommand } from "../suggestion";
+import type { ZitadelClient } from "@/lib/backend";
+import type { Environment } from "@/lib/environment";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BaseCommand } from "./base";
 import type { NextSteps, StepsShown } from "./next-steps";
 import type { Rendering } from "./rendering";

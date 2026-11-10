@@ -1,5 +1,5 @@
-import { command, dim, strong } from "../style";
-import { escapeControlCharacters } from "../terminal-text";
+import { command, dim, strong } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * What a command suggests doing next, and the one place it is shown.

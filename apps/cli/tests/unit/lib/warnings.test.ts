@@ -3,8 +3,8 @@ import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sourceFiles } from "../../helpers/source-files";
-import { reportWarning, takeReportedWarnings } from "../../../src/lib/warnings";
+import { sourceFiles } from "@tests/helpers/source-files";
+import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
 
 const SRC = join(import.meta.dirname, "../../../src");
 

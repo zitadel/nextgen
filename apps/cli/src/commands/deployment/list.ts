@@ -1,4 +1,4 @@
-import { DeploymentService } from "../../lib/backend";
+import { DeploymentService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -8,10 +8,10 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import { Cmd } from "../../lib/cmd";
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { Cmd } from "@/lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;

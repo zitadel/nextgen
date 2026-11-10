@@ -1,12 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { type Assignment, readAssignment } from "../assign";
-import { nonBlankString } from "../../flags";
-import { named } from "../../names";
+import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
+import { nonBlankString } from "@/lib/oclif/flags";
+import { named } from "@/lib/oclif/names";
 
-import { type Refusal, refusalError } from "../../refusal";
-import { resourceBody } from "../resource-body";
-import type { CommandResult } from "../../types";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { resourceBody } from "@/lib/oclif/crud/resource-body";
+import type { CommandResult } from "@/lib/oclif/types";
 import {
   type BodyField,
   bodyFieldFlags,
@@ -14,8 +14,8 @@ import {
   documentSchemaOf,
   fieldExample,
   flagsAloneMayBeIncomplete,
-} from "../fields";
-import { article, dryRunResult, idArg, idName } from "../shared";
+} from "@/lib/oclif/crud/fields";
+import { article, dryRunResult, idArg, idName } from "@/lib/oclif/crud/shared";
 import type {
   CreateSpec,
   Json,
@@ -24,9 +24,9 @@ import type {
   UpdateSpec,
   WriteResult,
   WriteShape,
-} from "../types";
-import type { ZodLike } from "../zod";
-import { json } from "../../rendering";
+} from "@/lib/oclif/crud/types";
+import type { ZodLike } from "@/lib/oclif/crud/zod";
+import { json } from "@/lib/oclif/rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -139,7 +139,7 @@ const describeWrite = <
       `${command} --file ${exampleFile(resource.singular)}`,
     ],
     flags: { ...bodyFieldFlags(fields), ...rawBodyFlags(document, fields), ...options.flags },
-    args: verb === "create" ? {} : idArg(resource),
+    args: verb === "create" ? {} : idArg(resource, topic),
   };
 };
 
@@ -200,6 +200,7 @@ abstract class WriteOperation<
         topic,
         id,
         body,
+        checked: (await this.check(body, id)) ?? undefined,
         context: {
           schema: spec.schema as ZodLike,
           references: options.references,
@@ -228,6 +229,11 @@ abstract class WriteOperation<
   }
 
   protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult>;
+
+  /** The server's answer to a dry run of this write, where it can give one. */
+  protected check(_body: Json, _id: string | undefined): Promise<WriteResult> {
+    return Promise.resolve(undefined);
+  }
 }
 
 /** `<topic> create`. */
@@ -253,6 +259,11 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult> {
     return this.definition.spec.call(ctx, id ?? "", body);
+  }
+
+  protected override async check(body: Json, id: string | undefined): Promise<WriteResult> {
+    const { check } = this.definition.spec;
+    return check === undefined ? undefined : check(await this.context(), id ?? "", body);
   }
 }
 

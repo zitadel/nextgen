@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
+
+/**
+ * What a project's files look like after a command that wrote nothing.
+ */
+const NO_CHANGES = { added: [], modified: [], removed: [] };
 
 describe("auth-method password enable", () => {
   describe("against an invalid server", () => {
@@ -12,7 +17,9 @@ describe("auth-method password enable", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        expect(await app.enableMethod("password")).toSucceed();
+        const result = await app.enableMethod("password");
+
+        expect(result).toSucceed();
       });
     });
 
@@ -21,7 +28,9 @@ describe("auth-method password enable", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        expect(await app.enableMethod("password")).toSucceed();
+        const result = await app.enableMethod("password");
+
+        expect(result).toSucceed();
       });
     });
   });
@@ -32,54 +41,60 @@ describe("auth-method password enable", () => {
       platform.servesAHostileOrigin();
       const args = ["auth-method", "password", "enable"];
 
-      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+      await app.inEveryRendering((how) => {
+        return app.run(how.json ? [...args, "--json"] : args, how.env);
+      });
     });
 
     describe("--json", () => {
       it("refuses a schema with no x-identifier to check a password against", async () => {
         const app = await aSetUpApp();
-        await app.editUserSchema((schema) => {
-          delete (schema as { "x-identifier"?: string })["x-identifier"];
-          schema["x-auth-methods"] = { ...schema["x-auth-methods"], password: { enabled: false } };
+        await app.lacksAnIdentifier();
+        await app.hasTurnedOffByHand("password");
+
+        const result = await app.enableMethod("password");
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      describe("when password is already on", () => {
+        it("succeeds", async () => {
+          const app = await aSetUpApp();
+
+          const result = await app.enableMethod("password");
+
+          expect(result).toSucceed();
         });
 
-        expect(await app.enableMethod("password")).toFailWith("E_VALIDATION");
-      });
+        it("changes nothing", async () => {
+          const app = await aSetUpApp();
+          const files = await app.snapshot();
 
-      it("changes nothing when password is already on", async () => {
-        const app = await aSetUpApp();
-        const files = await app.snapshot();
+          await app.enableMethod("password");
 
-        expect(await app.enableMethod("password")).toSucceed();
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
+        });
 
-        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
+        it("leaves nothing to publish", async () => {
+          const app = await aSetUpApp();
+          const before = await app.publishData();
 
-      it("leaves nothing to publish when password is already on", async () => {
-        const app = await aSetUpApp();
-        const before = await app.publishData();
+          await app.enableMethod("password");
 
-        expect(await app.enableMethod("password")).toSucceed();
-
-        const after = await app.deployData();
-        expect(after.content_hash).toBe(before.content_hash);
+          expect((await app.deployData()).content_hash).toBe(before.content_hash);
+        });
       });
 
       describe("once deployed", () => {
         it("publishes password as on after it was switched off by hand", async () => {
           const app = await aSetUpApp();
-          await app.editUserSchema((schema) => {
-            schema["x-auth-methods"] = {
-              ...schema["x-auth-methods"],
-              password: { enabled: false },
-            };
+          await app.hasTurnedOffByHand("password");
+
+          await app.enableMethod("password");
+
+          expect(await app.authMethodsOnceDeployed()).toHaveProperty("password", {
+            enabled: true,
           });
-          expect(await app.enableMethod("password")).toSucceed();
-          expect(await app.publish()).toSucceed();
-
-          const { schema } = await app.publishedSchema();
-
-          expect(schema["x-auth-methods"]?.password).toEqual({ enabled: true });
         });
       });
     });

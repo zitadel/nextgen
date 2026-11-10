@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { UncommittedFiles } from "../../../../../src/lib/git/operations/uncommitted-files";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { UncommittedFiles } from "@/lib/git/operations/uncommitted-files";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 /** The files listed when `status` prints `stdout`, from the directory at `prefix`. */
 function listed(prefix: string, stdout: string) {

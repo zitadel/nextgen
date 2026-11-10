@@ -1,15 +1,19 @@
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
-import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
+import {
+  assertMountsRootComponent,
+  type RootMount,
+  viteEntry,
+} from "@/lib/orca/patchers/rule/root-component";
 import {
   type ViteSupport,
   buildViteApiPrefixOp,
   buildViteProxyOp,
   buildViteSessionCookieOp,
-} from "../vite-support";
+} from "@/lib/orca/patchers/rule/vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-solid";

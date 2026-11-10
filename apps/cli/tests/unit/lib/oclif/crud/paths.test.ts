@@ -6,7 +6,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
-import { allows, fieldPaths, suggestable } from "../../../../../src/lib/oclif/crud";
+import { allows, fieldPaths, suggestable } from "@/lib/oclif/crud";
 
 /** Narrowed once here, so the assertions read without `!` on every line. */
 const pathsOf = (schema: Parameters<typeof fieldPaths>[0]) => {

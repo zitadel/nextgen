@@ -49,6 +49,7 @@ export {
   type DeploymentQuery,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,
+  type ExtendPrimaryResult,
   type LiveOnResult,
   type RollbackInput,
   type RollbackPlan,
@@ -63,6 +64,7 @@ export {
   type FlowQuery,
   type FlowRecord,
 } from "./services/flow";
+export { IdpService, type IdpSummary } from "./services/idp";
 export {
   Operation,
   OperationService,
@@ -116,6 +118,7 @@ export {
   type SchemaRecord,
 } from "./services/schema";
 export {
+  type Credential,
   type IdentityLinks,
   type QueriedUser,
   type UserQuery,

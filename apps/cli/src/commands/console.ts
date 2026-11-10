@@ -1,13 +1,13 @@
 import { Flags } from "@oclif/core";
 import consola from "consola";
 
-import { openInBrowser } from "../lib/browser";
-import { findLocalAdminDir, readLocalAdmin } from "../lib/local-server/admin-credential";
-import { consoleSignInUrl } from "../lib/local-server/sign-in";
-import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
-import { LocalServer } from "../lib/local-server/server";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { type Refusal, refusalError } from "../lib/oclif/refusal";
+import { openInBrowser } from "@/lib/browser";
+import { findLocalAdminDir, readLocalAdmin } from "@/lib/local-server/admin-credential";
+import { consoleSignInUrl } from "@/lib/local-server/sign-in";
+import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL: Refusal = {

@@ -1,23 +1,43 @@
-import { brandingReferencePaths } from "../../branding";
-import type { DiffedFile } from "../../git";
-import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
-import type { Step, StepContext, StepResult } from "../pipeline";
+import type { DiffedFile } from "@/lib/git";
+import { diffConfigAgainst, diffConfigFilesAgainst } from "@/lib/publish/git";
+import type { Learned, Step, StepContext, StepResult } from "@/lib/publish/pipeline";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+
+/**
+ * The directories whose changes can lock existing users out, which decide
+ * whether the lockout step reads them.
+ *
+ * @remarks
+ * Branding, policies and connections cannot lock anyone out.
+ */
+const LOCKOUT_DIRECTORIES = [CONFIG_DIRECTORIES.schemas, CONFIG_DIRECTORIES.flows] as const;
+
+/**
+ * How many characters of a commit sha a message shows.
+ */
+const SHORT_SHA = 12;
 
 /**
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,
  * split by file.
  */
-export interface ConfigDiff {
-  /** The commit of the release the primary origins serve: what the diff is against. */
+export type ConfigDiff = {
+  /**
+   * The commit of the release the primary origins serve: what the diff is against.
+   */
   readonly against: string | null;
+
   /**
    * One entry per changed file: empty when nothing changed, null when no diff
    * can be shown, with `note` saying why.
    */
   readonly files: readonly DiffedFile[] | null;
-  /** The line the terminal prints instead of the diff, or above it. */
+
+  /**
+   * The line the terminal prints instead of the diff, or above it.
+   */
   readonly note?: string;
-}
+};
 
 /**
  * Show what `.zitadel/` changed since the release the target serves now.
@@ -30,6 +50,9 @@ export interface ConfigDiff {
  * suppressed under `--no-color` and a non-terminal. Under `--json` nothing is
  * printed, so the envelope travels alone on stdout: the diff, split by file, or
  * the line saying why there is none, is reported as `diff` instead.
+ *
+ * Whether the schemas or flows changed is handed to the steps after it as
+ * `learned`.
  */
 export const diffStep: Step = {
   name: "diff",
@@ -47,6 +70,7 @@ export const diffStep: Step = {
         "No diff available: nothing is deployed yet, or the live release has no commit.",
       );
     }
+    const short = sha.slice(0, SHORT_SHA);
     // A release built from an uncommitted tree records the commit it was built
     // from, not the content it pinned, so a diff against it can come back empty
     // while this deploy would still change what is live.
@@ -54,7 +78,7 @@ export const diffStep: Step = {
       return noDiff(
         ctx,
         sha,
-        `No reliable diff available: the live release was built from an uncommitted tree at ${sha.slice(0, 12)}.`,
+        `No reliable diff available: the live release was built from an uncommitted tree at ${short}.`,
       );
     }
 
@@ -66,48 +90,97 @@ export const diffStep: Step = {
         return entry.release_id;
       }),
     );
-    const note =
-      releases.size > 1
-        ? `The primary origins serve ${releases.size} different releases; the diff is against the newest, ${sha.slice(0, 12)}.`
-        : undefined;
-    const unknown = `No diff available: ${sha.slice(0, 12)} is not in this repository's history.`;
+    const note = noteOnReleases(releases.size, short);
+    const unknown = `No diff available: ${short} is not in this repository's history.`;
 
     const touched = await diffConfigFilesAgainst(ctx.cwd, sha, []);
     // Origins serving different releases each move from their own baseline, so
     // a diff against the newest says nothing about the others.
-    if (touched !== null && releases.size === 1 && ctx.learned !== undefined) {
-      ctx.learned.schemasOrFlowsChanged = touched.some(
-        (file) =>
-          file.path.startsWith(".zitadel/schemas/") ||
-          file.path.startsWith(".zitadel/flows/") ||
-          (file.previous_path ?? "").startsWith(".zitadel/schemas/") ||
-          (file.previous_path ?? "").startsWith(".zitadel/flows/"),
-      );
-    }
+    const learned = learnedFrom(touched, releases.size);
 
-    const referenced = ctx.brandingSources.flatMap((descriptor) =>
-      brandingReferencePaths(ctx.cwd, descriptor),
-    );
+    const referenced = ctx.config.branding.all.flatMap((branding) => {
+      return branding.listReferencedPaths(ctx.store);
+    });
     if (ctx.json) {
       const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
       if (files === null) {
-        return noDiff(ctx, sha, unknown);
+        return { ...noDiff(ctx, sha, unknown), learned };
       }
-      const diff: ConfigDiff = { against: sha, files, ...(note === undefined ? {} : { note }) };
-      return { data: { diff } };
+      const diff: ConfigDiff = { against: sha, files, note };
+      return { data: { diff }, learned };
     }
 
     const notices = note === undefined ? [] : [`${note}\n`];
     const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color, referenced);
     if (diff === null) {
-      return { notices: [...notices, `${unknown}\n`] };
+      return { notices: [...notices, `${unknown}\n`], learned };
     }
-    const shown = diff.trim() === "" ? `No changes to .zitadel/ since ${sha.slice(0, 12)}.` : diff;
-    return { notices: [...notices, shown.endsWith("\n") ? shown : `${shown}\n`] };
+    return { notices: [...notices, shownDiff(diff, short)], learned };
   },
 };
 
-/** No diff to show: the line saying why, printed, or reported under `--json`. */
+/**
+ * The line that says the primary origins serve more than one release.
+ *
+ * @param releases - How many releases the primary origins serve.
+ * @param short - The short sha the diff is against.
+ * @returns The line, or `undefined` when they serve one.
+ */
+function noteOnReleases(releases: number, short: string): string | undefined {
+  if (releases <= 1) {
+    return undefined;
+  }
+  return `The primary origins serve ${releases} different releases; the diff is against the newest, ${short}.`;
+}
+
+/**
+ * What the lockout step may build on: whether a schema or a flow changed.
+ *
+ * @param touched - The files that changed, or null when no diff could be made.
+ * @param releases - How many releases the primary origins serve.
+ * @returns Whether a schema or flow changed, or nothing when the diff cannot
+ *   say: there was none, or the origins serve different releases.
+ */
+function learnedFrom(touched: readonly DiffedFile[] | null, releases: number): Learned {
+  if (touched === null || releases !== 1) {
+    return {};
+  }
+  const changed = touched.some((file) => {
+    const paths = [file.path, file.previous_path ?? ""];
+    return paths.some((path) => {
+      return LOCKOUT_DIRECTORIES.some((directory) => {
+        return path.startsWith(`${directory}/`);
+      });
+    });
+  });
+  return { schemasOrFlowsChanged: changed };
+}
+
+/**
+ * The diff as the terminal shows it, ending in a newline.
+ *
+ * @param diff - The coloured diff.
+ * @param short - The short sha it is against.
+ * @returns The diff, or a line saying nothing changed.
+ */
+function shownDiff(diff: string, short: string): string {
+  if (diff.trim() === "") {
+    return `No changes to .zitadel/ since ${short}.\n`;
+  }
+  if (diff.endsWith("\n")) {
+    return diff;
+  }
+  return `${diff}\n`;
+}
+
+/**
+ * No diff to show: the line saying why, printed, or reported under `--json`.
+ *
+ * @param ctx - The step's context.
+ * @param against - The commit there is no diff against, if known.
+ * @param note - Why there is no diff.
+ * @returns The step's result.
+ */
 function noDiff(ctx: StepContext, against: string | null, note: string): StepResult {
   if (!ctx.json) {
     return { notices: [`${note}\n`] };

@@ -1,6 +1,6 @@
-import type { FrameworkFacts } from "../detectors/types";
-import type { CreatedProject } from "../../backend";
-import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
+import type { FrameworkFacts } from "@/lib/orca/detectors/types";
+import type { CreatedProject } from "@/lib/backend";
+import type { ScaffoldFileClass, ScaffoldPosture } from "@/lib/sync/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files

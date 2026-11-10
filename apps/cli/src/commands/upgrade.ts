@@ -4,26 +4,26 @@ import { join } from "node:path";
 import { execa } from "execa";
 import semver from "semver";
 
-import { ZitadelError, errorMessage } from "../lib/errors";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import {
   addExactCommandFor,
   detectPackageManager,
   inDirectory,
   type PackageCommand,
   runPackageCommand,
-} from "../lib/package-manager";
-import { Cmd } from "../lib/cmd";
-import { hasZitadelConfig } from "../lib/project";
-import { newestCliCommand } from "../lib/public-cli";
-import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "../lib/release-notes";
-import { SHARED_SKILLS_DIR } from "../lib/skills/add";
-import { arrow, command, dim, mark, strong, url } from "../lib/style";
-import { escapeControlCharacters } from "../lib/terminal-text";
-import { painted } from "../lib/oclif/rendering";
-import { type SuggestedCommand, shellCommand, unscopedCommand } from "../lib/suggestion";
-import { isNewerVersion, latestCliVersion } from "../lib/update-check";
-import { exactZitadelPins, floatingZitadelSpecs } from "./doctor/checks/dependency-version";
+} from "@/lib/package-manager";
+import { Cmd } from "@/lib/cmd";
+import { hasZitadelConfig } from "@/lib/project";
+import { newestCliCommand } from "@/lib/public-cli";
+import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
+import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
+import { arrow, command, dim, mark, strong, url } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { painted } from "@/lib/oclif/rendering";
+import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
+import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
+import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
 
 const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
 

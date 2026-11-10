@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { responseFailure } from "../../../src/lib/backend";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  UnavailableError,
-} from "../../../src/lib/backend/errors";
+import { responseFailure } from "@/lib/backend";
+import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
 import {
   EXIT_CODES,
   ZitadelError,
@@ -13,8 +9,9 @@ import {
   isCancellation,
   isErrno,
   toZitadelError,
-} from "../../../src/lib/errors";
-import { unscopedCommand } from "../../../src/lib/suggestion";
+} from "@/lib/errors";
+import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
+import { unscopedCommand } from "@/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -29,6 +26,7 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
+      E_CONFIRMATION_REQUIRED: 3,
       E_CREDENTIAL_MISSING: 3,
       E_NOT_IMPLEMENTED: 2,
       E_CANCELLED: 130,
@@ -103,6 +101,44 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_VALIDATION");
     expect(result.message).toBe("missing");
     expect(result.hint).toBe("A required file or directory is missing.");
+  });
+
+  it.each([
+    ["a ConflictError", new ConflictError("two with one slug"), "E_CONFLICT"],
+    ["a NotFoundError", new NotFoundError("no such connection"), "E_NOT_FOUND"],
+    ["any other ConfigError", new ConfigError("not valid"), "E_VALIDATION"],
+    [
+      "a ConfigError for a file the OS refused to read",
+      new ConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for a file the OS would not let it touch",
+      new ConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for any other errno",
+      new ConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
+      "E_VALIDATION",
+    ],
+  ])("maps %s to %s", (_name, err, code) => {
+    expect(toZitadelError(err).code).toBe(code);
+  });
+
+  it("passes a ConfigError's message, hint and details on", () => {
+    const err = new ConfigError("boom", { hint: "do this", details: { file: "a.json" } });
+    const result = toZitadelError(err);
+    expect([result.message, result.hint, result.details]).toEqual([
+      "boom",
+      "do this",
+      { file: "a.json" },
+    ]);
+  });
+
+  it("leaves out the hint and details a ConfigError has none of", () => {
+    const result = toZitadelError(new ConfigError("boom"));
+    expect([result.hint, result.details]).toEqual([undefined, undefined]);
   });
 
   it.each([

@@ -1,10 +1,10 @@
 import wrapAnsi from "wrap-ansi";
 
-import { type NextSteps, renderNextSteps } from "../../lib/oclif/next-steps";
-import { Cmd } from "../../lib/cmd";
-import { publicCliCommand } from "../../lib/public-cli";
-import { arrow, command, dim, mark, statusColor, strong } from "../../lib/style";
-import { escapeControlCharacters } from "../../lib/terminal-text";
+import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
+import { Cmd } from "@/lib/cmd";
+import { publicCliCommand } from "@/lib/public-cli";
+import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { CheckOutcome } from "./checks";
 
 /** The question a check answers, which also tells who fixes it and how. On the wire, so `snake_case`. */

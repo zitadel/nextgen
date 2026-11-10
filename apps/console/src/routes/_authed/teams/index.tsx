@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { Box, Plus } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { AddTeamSheet } from "@/components/add-team-sheet";
+import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -26,9 +26,10 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
-import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { Page } from "@/components/layout";
 import { PAGE_TITLE_ROW } from "@/components/typography";
+import { LIST_PAGE_SIZE } from "@/lib/paging";
 
 /**
  * The two states `team-status` defines. The tabs filter on exactly these, so the
@@ -53,20 +54,13 @@ export const Route = createFileRoute("/_authed/teams/")({
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const page = await api.queryTeams(
-      { limit: PAGE_SIZE, filter: teamFilter(deps) },
+      { limit: LIST_PAGE_SIZE, filter: teamFilter(deps) },
       { project_id: requireProjectScope(deps.project) },
     );
     return { teams: page.teams, nextPageToken: page.next_page_token ?? undefined };
   },
   component: TeamsScreen,
 });
-
-/**
- * One page of teams. `POST /teams/query` is cursor-paginated, so this is a page
- * size rather than a cap on what the operator can reach — `Load more` walks the
- * rest (design decisions log D5: a button, not pagination controls).
- */
-const PAGE_SIZE = 25;
 
 /**
  * The design lays this table on a fixed 248px grid, so a long team name
@@ -97,7 +91,7 @@ function TeamsScreen() {
         // The same filter the token was issued under: a page token answers one
         // question, and asking a different one with it is not a narrower list
         // but a meaningless one.
-        { limit: PAGE_SIZE, page_token: pageToken, filter: teamFilter(search) },
+        { limit: LIST_PAGE_SIZE, page_token: pageToken, filter: teamFilter(search) },
         { project_id: projectId },
       );
       return { items: page.teams, nextPageToken: page.next_page_token ?? undefined };

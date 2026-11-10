@@ -1,4 +1,4 @@
-import { escapeControlCharacters, escapeJsonControlCharacters } from "../terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 /**
  * What a command printed, ready to print.

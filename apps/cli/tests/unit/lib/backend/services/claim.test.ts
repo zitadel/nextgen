@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "../../../../../src/lib/backend/errors";
-import { ClaimService } from "../../../../../src/lib/backend/services/claim";
-import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
+import { BackendError } from "@/lib/backend/errors";
+import { ClaimService } from "@/lib/backend/services/claim";
+import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */
 function service(stubs: ClientStubs): ClaimService {

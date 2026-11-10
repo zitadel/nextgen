@@ -1,17 +1,12 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import {
-  buildRequest,
-  pathValuesOf,
-  schemaOf,
-  withPathValues,
-} from "../../../../../src/lib/api-request";
-import { createZitadelClient, Operation, OperationService } from "../../../../../src/lib/backend";
-import { toZitadelError } from "../../../../../src/lib/errors";
-import { forcedConsent } from "../../../../helpers/consent";
+import { buildRequest, pathValuesOf, schemaOf, withPathValues } from "@/lib/api-request";
+import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
+import { toZitadelError } from "@/lib/errors";
+import { forcedConsent } from "@tests/helpers/consent";
 
 const signal = new AbortController().signal;
 

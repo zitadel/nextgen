@@ -1,10 +1,10 @@
 import { Flags } from "@oclif/core";
 
-import { deletedData, mutatedData } from "../../envelope";
-import type { CommandResult } from "../../types";
-import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
-import type { DeleteSpec, Json } from "../types";
-import { prose } from "../../rendering";
+import { deletedData, mutatedData } from "@/lib/oclif/envelope";
+import type { CommandResult } from "@/lib/oclif/types";
+import { article, capitalize, dryRunResult, idArg, idValue } from "@/lib/oclif/crud/shared";
+import type { DeleteSpec, Json } from "@/lib/oclif/crud/types";
+import { prose } from "@/lib/oclif/rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -46,7 +46,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
         }),
         ...options.flags,
       },
-      args: idArg(resource),
+      args: idArg(resource, topic),
     };
   }
 

@@ -1,14 +1,14 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { asStepsShown } from "../../../../src/lib/oclif/next-steps";
-import { asTerminal, offTerminal } from "../../../helpers/terminal";
-import { publicCliCommand } from "../../../../src/lib/public-cli";
-import { json, prose, rows } from "../../../../src/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { type SuggestedCommand, unscopedCommand } from "../../../../src/lib/suggestion";
-import { takeReportedWarnings } from "../../../../src/lib/warnings";
+import { BaseCommand } from "@/lib/oclif/base";
+import { asStepsShown } from "@/lib/oclif/next-steps";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { publicCliCommand } from "@/lib/public-cli";
+import { json, prose, rows } from "@/lib/oclif/rendering";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 /** A command that records what `emit` prints, per stream, instead of writing it. */
 class NextStepsCommand extends BaseCommand {

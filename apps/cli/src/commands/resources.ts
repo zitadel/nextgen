@@ -9,7 +9,7 @@ import {
   QuerySessionsBodyFilterItemOperation,
   QueryTeamsBodyFilterItemOperation,
   QueryUsersBodyFilterItemOperation,
-} from "../lib/backend/model";
+} from "@/lib/backend/model";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -22,8 +22,11 @@ import {
   QueryTeamsBody,
   QueryUsersBody,
   UpdateTeamBody,
-} from "../lib/backend/schemas";
+} from "@/lib/backend/schemas";
 import {
+  GetReleaseByIdParams,
+  GetSessionParams,
+  GetUserByIDParams,
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
@@ -50,7 +53,7 @@ import {
   QuerySessionsResponse,
   QueryTeamsResponse,
   QueryUsersResponse,
-} from "../lib/backend/schemas";
+} from "@/lib/backend/schemas";
 import { isVariableReference } from "@zitadel/config/idp";
 
 import {
@@ -60,9 +63,9 @@ import {
   FlowService,
   PolicyService,
   SchemaService,
-} from "../lib/backend";
-import { CommandGroups } from "../lib/oclif/groups";
-import { ZitadelError } from "../lib/errors";
+} from "@/lib/backend";
+import { CommandGroups } from "@/lib/oclif/groups";
+import { ZitadelError } from "@/lib/errors";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -77,8 +80,11 @@ import {
   type UpdateSpec,
   type WriteResult,
   type WriteShape,
-} from "../lib/oclif/crud";
-import type { Tabulate } from "../lib/oclif/tabulatable";
+} from "@/lib/oclif/crud";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
+
+/** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
+const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -99,7 +105,7 @@ export const create = <B, C>(
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
-  shape: WriteShape = {},
+  shape: WriteShape & Pick<UpdateSpec<Platform, B, U>, "check"> = {},
 ): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
@@ -310,6 +316,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndTeams,
     groupOrder: 1,
     singular: "user",
+    idSchema: GetUserByIDParams.shape.user_id,
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
     // schema); the schema URL it replaced is identical on every row.
@@ -347,7 +354,12 @@ export const RESOURCES = {
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
-    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
+    // dry_run is the global --dry-run's, never a body field of its own.
+    update: update(USER_UPDATE_BODY, ({ client }, id, body) => client.patchUserByID(id, body), {
+      // A server from before dry_run refuses the field rather than applying
+      // the patch, so a dry run needs no check of the server first.
+      check: ({ client }, id, body) => client.patchUserByID(id, { ...body, dry_run: true }),
+    }),
     delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),
 
@@ -388,6 +400,7 @@ export const RESOURCES = {
   sessions: resource({
     group: CommandGroups.authentication,
     singular: "session",
+    idSchema: GetSessionParams.shape.session_id,
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
     heading: "session_id",
@@ -629,6 +642,7 @@ export const RESOURCES = {
   release: resource({
     group: CommandGroups.configuration,
     singular: "release",
+    idSchema: GetReleaseByIdParams.shape.release_id,
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",

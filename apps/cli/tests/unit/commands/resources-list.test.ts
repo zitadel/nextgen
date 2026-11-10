@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { RESOURCES } from "../../../src/commands/resources";
-import { asTerminal } from "../../helpers/project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { RESOURCES } from "@/commands/resources";
+import { asTerminal } from "@tests/helpers/project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 type Json = Record<string, unknown>;
 

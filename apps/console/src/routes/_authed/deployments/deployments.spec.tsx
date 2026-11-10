@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { ALREADY_LIVE_MESSAGE } from "@/components/deploy-sheet";
+import { ALREADY_LIVE_MESSAGE } from "@/features/deployments/components/deploy-sheet";
 import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -253,7 +253,7 @@ describe("new deployment", () => {
       projectId: "proj_test",
       body: {
         release_id: "rel_2",
-        targets: ["primary"],
+        targets: "primary",
         message: "Ship it",
         expected_deployment_id: "dep_live",
       },
@@ -291,7 +291,7 @@ describe("new deployment", () => {
     expect(screen.queryByText("Release deployed")).not.toBeInTheDocument();
     expect(posted).toEqual({
       release_id: "rel_2",
-      targets: ["primary"],
+      targets: "primary",
       expected_deployment_id: "dep_live",
     });
     expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
@@ -393,6 +393,7 @@ describe("rollback from a row", () => {
   });
 
   it("rolls back to a superseded deployment, naming the live one", async () => {
+    serveProject([{ pattern: "https://app.acme.com", kind: "primary" }]);
     const history = [
       deployment("dep_live", { release_id: "rel_2" }),
       deployment("dep_old", { status: "inactive" }),
@@ -445,7 +446,85 @@ describe("rollback from a row", () => {
     expect(rows[1]).toHaveTextContent("rel_1");
   });
 
+  it("offers the live release on other origins, as rolling back to it restores them", async () => {
+    serveProject([
+      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: "https://new.acme.com", kind: "primary" },
+    ]);
+    serveDeployments([
+      deployment("dep_live", {
+        release_id: "rel_2",
+        targets: [{ origin: "https://app.acme.com" }, { origin: "https://new.acme.com" }],
+      }),
+      deployment("dep_narrow", {
+        release_id: "rel_2",
+        status: "inactive",
+        targets: [{ origin: "https://app.acme.com" }],
+      }),
+    ]);
+    await renderAt("/deployments");
+
+    await pick("dep_narrow", "Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+
+    expect(
+      await within(drawer).findByRole("radio", {
+        name: `rel_2, deployed ${formatDateTime(DEPLOYED_AT)}`,
+      }),
+    ).toBeChecked();
+  });
+
+  it("names a listed origin the restored deployment leaves out", async () => {
+    serveProject([
+      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: "https://new.acme.com", kind: "primary" },
+    ]);
+    serveDeployments([
+      deployment("dep_live", {
+        release_id: "rel_2",
+        targets: [{ origin: "https://app.acme.com" }, { origin: "https://new.acme.com" }],
+      }),
+      deployment("dep_old", { status: "inactive" }),
+    ]);
+    await renderAt("/deployments");
+
+    await pick("dep_old", "Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+
+    expect(
+      await within(drawer).findByText(
+        "https://new.acme.com will refuse sign-in until the next deploy.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("names a listed origin the restored deployment serves again", async () => {
+    serveProject([
+      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: "https://new.acme.com", kind: "primary" },
+    ]);
+    serveDeployments([
+      deployment("dep_live", {
+        release_id: "rel_2",
+        targets: [{ origin: "https://app.acme.com" }],
+      }),
+      deployment("dep_old", {
+        status: "inactive",
+        targets: [{ origin: "https://app.acme.com" }, { origin: "https://new.acme.com" }],
+      }),
+    ]);
+    await renderAt("/deployments");
+
+    await pick("dep_old", "Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+
+    expect(
+      await within(drawer).findByText("https://new.acme.com will serve this release again."),
+    ).toBeInTheDocument();
+  });
+
   it("opens the choice of what to go back to from the live row", async () => {
+    serveProject([{ pattern: "https://app.acme.com", kind: "primary" }]);
     serveDeployments([
       deployment("dep_live", { release_id: "rel_2" }),
       deployment("dep_old", { status: "inactive" }),
@@ -505,7 +584,7 @@ describe("redeploy from a row", () => {
     await userEvent.click(inDrawer.getByRole("button", { name: "Redeploy release" }));
 
     expect(await screen.findByText("Release redeployed")).toBeInTheDocument();
-    expect(posted).toEqual({ release_id: "rel_1", targets: ["primary"], message: "Again" });
+    expect(posted).toEqual({ release_id: "rel_1", targets: "primary", message: "Again" });
   });
 
   it("offers no redeploy on a preview row", async () => {

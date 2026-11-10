@@ -1,10 +1,10 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { prose } from "../../../../src/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { reportWarning, takeReportedWarnings } from "../../../../src/lib/warnings";
+import { BaseCommand } from "@/lib/oclif/base";
+import { prose } from "@/lib/oclif/rendering";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
 
 /** A command that records what `emit` prints instead of writing it. */
 class WarningCommand extends BaseCommand {

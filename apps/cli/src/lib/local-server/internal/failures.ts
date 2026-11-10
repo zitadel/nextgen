@@ -1,8 +1,11 @@
-import { ZitadelError, toZitadelError } from "../../errors";
-import { unscopedCommand } from "../../suggestion";
-import { listenersForPort, type TcpListener } from "../../prober/ports";
-import { dockerRuntimeGuidance, dockerUnavailableMessage } from "../docker-guidance";
-import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "../runtime";
+import { ZitadelError, toZitadelError } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
+import {
+  dockerRuntimeGuidance,
+  dockerUnavailableMessage,
+} from "@/lib/local-server/docker-guidance";
+import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "@/lib/local-server/runtime";
 import { DockerLauncher } from "./docker-launcher";
 import {
   NoFreePortError,

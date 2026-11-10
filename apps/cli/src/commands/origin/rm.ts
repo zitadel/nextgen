@@ -6,14 +6,14 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { OriginService } from "../../lib/backend";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { reportWarning } from "../../lib/warnings";
-import { Destructive } from "../../lib/oclif/destructive";
-import { errorMessage } from "../../lib/errors";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { OriginService } from "@/lib/backend";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { deletedData } from "@/lib/oclif/envelope";
+import { reportWarning } from "@/lib/warnings";
+import { Destructive } from "@/lib/oclif/destructive";
+import { errorMessage } from "@/lib/errors";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -78,13 +78,13 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               // Named in the text, not as a next command: the URL is the developer's
               // to fill in, and a `<url>` placeholder is a shell redirection.
               reportWarning(
-                `${removal.pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+                `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
               );
               return {
                 status: "ok",
                 data,
                 pretty: prose(
-                  `Removed ${removal.pattern}; the project has no origins left and admits every origin`,
+                  `Removed ${removal.pattern}; the project has no origins left and admits no origin except a loopback origin`,
                 ),
               };
             }

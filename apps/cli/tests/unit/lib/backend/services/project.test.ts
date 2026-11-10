@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectService } from "../../../../../src/lib/backend/services/project";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { ProjectService } from "@/lib/backend/services/project";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 describe("ProjectService.get", () => {
   it("reads the project it was asked for", async () => {

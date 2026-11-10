@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { serverKind } from "../../../../src/lib/oclif/server-kind";
+import { serverKind } from "@/lib/oclif/server-kind";
 
 describe("serverKind", () => {
   it("buckets sources without leaking the URL", () => {
