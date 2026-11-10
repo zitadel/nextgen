@@ -1,11 +1,11 @@
 import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
-import { it, type Serve } from "../../../helpers/fixtures";
+import { it, type Serve } from "@tests/helpers/fixtures";
 
-import { ZitadelError } from "../../../../src/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   LOCAL_RUNTIME_FILE,
   checkLocalServerHealth,
@@ -17,6 +17,7 @@ import {
   localRuntimePaths,
   loopbackReach,
   readNearestRuntimeMetadata,
+  readPlatformRuntime,
   readRuntimeMetadata,
   removeLocalData,
   resolveRuntimeBackend,
@@ -24,7 +25,7 @@ import {
   sameLocalServer,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../../src/lib/local-server/runtime";
+} from "@/lib/local-server/runtime";
 
 describe("local server runtime metadata", () => {
   it.each([
@@ -267,7 +268,48 @@ describe("checkLocalServerHealth", () => {
       false,
     );
   });
+
+  it("reads the health response body to the end", async () => {
+    const { response, isRead } = aResponseWhoseBodyIsRead(200);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+
+    await checkLocalServerHealth("http://localhost:8081");
+
+    expect(isRead()).toBe(true);
+  });
 });
+
+describe("readPlatformRuntime", () => {
+  it("reads a refused runtime document body to the end", async () => {
+    const { response, isRead } = aResponseWhoseBodyIsRead(404);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+
+    await readPlatformRuntime("http://localhost:8081");
+
+    expect(isRead()).toBe(true);
+  });
+});
+
+/** A response whose body reports, once a reader has read it to the end, that it was read. */
+function aResponseWhoseBodyIsRead(status: number): { response: Response; isRead: () => boolean } {
+  let pulls = 0;
+  let read = false;
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulls += 1;
+        if (pulls === 1) {
+          controller.enqueue(new TextEncoder().encode("ok"));
+          return;
+        }
+        read = true;
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { response: new Response(body, { status }), isRead: () => read };
+}
 
 describe("retargetMalformedRuntime", () => {
   const malformed = new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {

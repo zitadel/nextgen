@@ -3,7 +3,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { NEUTRAL_MESSAGE, SELF_MESSAGE } from "@/components/add-admin-dialog";
+import {
+  NEUTRAL_MESSAGE,
+  SELF_MESSAGE,
+} from "@/features/project-settings/components/add-admin-dialog";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
@@ -115,8 +118,8 @@ function stubProject(
     // The page's variables and policy cards read alongside; none keeps these
     // tests about the admins.
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/v1/policies", () =>
-      HttpResponse.json({ policies: [], next_page_token: null }),
+    http.get("http://localhost/api/v1/deployments", () =>
+      HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
     http.get(`${PROJECTS_URL}/:id/admins`, ({ params }) => {
       adminReads.push(params.id as string);

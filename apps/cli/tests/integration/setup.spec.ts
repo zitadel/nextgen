@@ -1,57 +1,160 @@
-import { realpath } from "node:fs/promises";
-
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
+  aCommittedApp,
   aMissingAppDirectory,
   aNewAppDirectory,
   anApp,
-  type ScaffoldedApp,
+  type CliResult,
+  type Credentials,
+  type CustomConnection,
   PASSWORD_POLICY,
+  type ScaffoldedApp,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
-/** The part of setup's envelope that says what it committed and published. */
+useLocalServers();
+
+/**
+ * The part of setup's envelope that says what it committed.
+ */
 type SetupGitData = {
   git: { initialized: boolean; commit: string | null };
 };
-useLocalServers();
 
-const SOCIAL_CREDENTIALS = {
+/**
+ * The part of setup's envelope that says what to do next.
+ */
+type NextActionsData = { next_actions: string[] };
+
+/**
+ * The part of setup's envelope that says which files it wrote.
+ */
+type FilesWrittenData = { files_written: string[] };
+
+/**
+ * A full commit sha.
+ */
+const SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * What a project's files look like after a command that wrote nothing.
+ */
+const NO_CHANGES = { added: [], modified: [], removed: [] };
+
+/**
+ * The user schema setup writes and commits.
+ */
+const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
+
+/**
+ * The login flow setup writes.
+ */
+const FLOW_FILE = ".zitadel/flows/default-login.json";
+
+/**
+ * Google's client id and secret.
+ */
+const SOCIAL_CREDENTIALS: Credentials = {
   clientId: "1234-abc.apps.googleusercontent.com",
   secret: "the-client-secret",
 };
 
+/**
+ * The pages setup scaffolds into a Next.js app.
+ */
 const SCAFFOLDED_PAGES = ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"];
 
-const ACME = {
+/**
+ * A connection the catalog does not list, described by the developer.
+ */
+const ACME: CustomConnection = {
   slug: "acme-sso",
   displayName: "Acme SSO",
   issuer: "https://sso.acme.example",
 };
-const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
 
-/** The providers setup can enable, with how to ask for each and what it publishes. */
-const PROVIDERS = [
+/**
+ * The custom connection's client id and secret.
+ */
+const ACME_CREDENTIALS: Credentials = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+/**
+ * The flags describing the Acme connection, without a client id.
+ */
+const ACME_FLAGS = [
+  "--sso",
+  "custom",
+  "--sso-slug",
+  ACME.slug,
+  "--sso-display-name",
+  ACME.displayName,
+  "--sso-issuer",
+  ACME.issuer,
+];
+
+/**
+ * The flags describing the Acme connection with its client id.
+ */
+const ACME_FLAGS_WITH_CLIENT_ID = [...ACME_FLAGS, "--sso-client-id", ACME_CREDENTIALS.clientId];
+
+/**
+ * The Acme connection's flags under a slug the server would refuse.
+ */
+const ACME_FLAGS_WITH_A_BAD_SLUG = ACME_FLAGS_WITH_CLIENT_ID.map((flag) => {
+  return flag === ACME.slug ? "Acme" : flag;
+});
+
+/**
+ * A provider setup can enable, with how to ask for it and what it publishes.
+ */
+type Provider = {
+  readonly name: string;
+  readonly slug: string;
+  readonly variables: string;
+  readonly credentials: Credentials;
+  readonly setUp: (app: ScaffoldedApp) => Promise<CliResult>;
+};
+
+/**
+ * The providers setup can enable.
+ */
+const PROVIDERS: readonly Provider[] = [
   {
     name: "a social provider",
     slug: "google",
     variables: "GOOGLE",
     credentials: SOCIAL_CREDENTIALS,
-    setUp: (app: ScaffoldedApp) => app.setupWithSso("google", SOCIAL_CREDENTIALS),
+    setUp: (app) => {
+      return app.setupWithSso("google", SOCIAL_CREDENTIALS);
+    },
   },
   {
     name: "a custom OpenID Connect provider",
-    slug: "acme-sso",
+    slug: ACME.slug,
     variables: "ACME_SSO",
     credentials: ACME_CREDENTIALS,
-    setUp: (app: ScaffoldedApp) => app.setupWithCustomSso(ACME, ACME_CREDENTIALS),
+    setUp: (app) => {
+      return app.setupWithCustomSso(ACME, ACME_CREDENTIALS);
+    },
   },
 ];
+
+/**
+ * The entries a list holds more than once.
+ *
+ * @param list - The list.
+ * @returns Each repeated entry, once per repeat.
+ */
+function duplicatesIn(list: readonly string[]): string[] {
+  return list.filter((entry, at) => {
+    return list.indexOf(entry) !== at;
+  });
+}
 
 describe("setup", () => {
   describe("against an invalid server", () => {
@@ -63,6 +166,15 @@ describe("setup", () => {
         const result = await app.setup();
 
         expect(result).toFailWith("E_NOT_FOUND");
+      });
+
+      it("does not claim to be configured", async () => {
+        const app = await anApp();
+        platform.isNotZitadel();
+
+        await app.setup();
+
+        expect(await app.hasBeenConfigured()).toBe(false);
       });
     });
 
@@ -80,23 +192,20 @@ describe("setup", () => {
         const app = await anApp();
         platform.isUnavailable();
 
-        const result = await app.setupSsoWith(
-          [
-            "--sso",
-            "custom",
-            "--sso-slug",
-            "Acme",
-            "--sso-display-name",
-            "Acme SSO",
-            "--sso-issuer",
-            "https://sso.acme.example",
-            "--sso-client-id",
-            "acme-client-id",
-          ],
-          "acme-client-secret",
-        );
+        const result = await app.setupSsoWith(ACME_FLAGS_WITH_A_BAD_SLUG, ACME_CREDENTIALS.secret);
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("leaves the directory start ran in as it was", async () => {
+        const app = await aNewAppDirectory();
+        await app.startLocalServer();
+        const before = await app.snapshot();
+        platform.isUnavailable();
+
+        await app.setupNewApp();
+
+        expect(await before.changes()).toMatchObject(NO_CHANGES);
       });
     });
 
@@ -113,7 +222,45 @@ describe("setup", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await anApp();
+      platform.mintsAHostileProjectId();
+
+      await app.inEveryRendering((how) => {
+        return how.json ? app.setup([], {}, how.env) : app.setupRendered([], how.env);
+      });
+    });
+
     describe("--json", () => {
+      it("succeeds", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(result).toSucceed();
+      });
+
+      it("scaffolds the login, register and profile pages", async () => {
+        const app = await anApp();
+        const before = await app.snapshot();
+
+        await app.setup();
+
+        expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+      });
+
+      it.each(["business", "minimal"])(
+        "scaffolds the pages for the %s use case",
+        async (useCase) => {
+          const app = await anApp();
+          const before = await app.snapshot();
+
+          await app.setup(["--use-case", useCase]);
+
+          expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+        },
+      );
+
       it("deploys what it wrote, so the first sign-in is served a release", async () => {
         const app = await anApp();
 
@@ -122,155 +269,199 @@ describe("setup", () => {
         expect(await app.liveDeploymentCount()).toBe(1);
       });
 
-      it("names the deploy that publishes an edit", async () => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        expect(
-          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
-        ).toContain("deploy -m '<what changed>'");
-      });
-
-      it("says an edit takes effect once it is deployed", async () => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        expect(
-          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
-        ).toContain("serves only what is deployed");
-      });
-
-      it("reports the commit it made", async () => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
-          initialized: true,
-          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
-        });
-      });
-
-      it("reports the repository it created when it could not commit", async () => {
-        const app = await anApp();
-
-        const result = await app.setupWithGitThatCannotCommit();
-
-        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
-          initialized: true,
-          commit: null,
-        });
-      });
-
-      it("warns that it could not commit and left a new repository", async () => {
-        const app = await anApp();
-
-        const result = await app.setupWithGitThatCannotCommit();
-
-        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
-          "Setup created a new, empty git repository here.",
-        );
-      });
-
-      it("keeps the project secret it wrote out of the commit it makes", async () => {
+      it("registers the schema with the platform", async () => {
         const app = await anApp();
 
         await app.setup();
 
-        expect(await app.trackedFiles()).not.toContain(".zitadel/secret");
+        expect(await app.publishedSchemas()).toHaveLength(1);
       });
 
-      it.each([".env.development.local", ".env.local", ".env"])(
-        "keeps %s out of the commit it makes",
-        async (name) => {
+      it("registers the flow with the platform", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.publishedFlows()).toHaveLength(1);
+      });
+
+      it("leaves nothing to reconcile", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        const data = await app.deployDryRunData();
+
+        expect(data.diff?.files).toEqual([]);
+      });
+
+      it.each([
+        "deploy -m '<what changed>'",
+        "serves only what is deployed",
+        "auth-method sso enable --provider google",
+      ])("says %s in its next actions", async (said) => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<NextActionsData>(result).data.next_actions.join("\n")).toContain(
+          said,
+        );
+      });
+
+      it.each([SCHEMA_FILE, FLOW_FILE])("reports writing %s", async (file) => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<FilesWrittenData>(result).data.files_written).toContain(file);
+      });
+
+      it("reports each written file once", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(duplicatesIn(app.envelopeOf<FilesWrittenData>(result).data.files_written)).toEqual(
+          [],
+        );
+      });
+
+      describe("with git", () => {
+        it("reports the commit it made", async () => {
+          const app = await anApp();
+
+          const result = await app.setup();
+
+          expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
+            initialized: true,
+            commit: expect.stringMatching(SHA),
+          });
+        });
+
+        it("keeps the project secret it wrote out of the commit it makes", async () => {
           const app = await anApp();
 
           await app.setup();
 
-          expect(await app.trackedFiles()).not.toContain(name);
-        },
-      );
+          expect(await app.trackedFiles()).not.toContain(".zitadel/secret");
+        });
 
-      it("commits the configuration it wrote, which the release is built from", async () => {
-        const app = await anApp();
+        it.each([".env.development.local", ".env.local", ".env"])(
+          "keeps %s out of the commit it makes",
+          async (name) => {
+            const app = await anApp();
 
-        await app.setup();
+            await app.setup();
 
-        expect(await app.trackedFiles()).toContain(".zitadel/schemas/default-human-user.json");
-      });
+            expect(await app.trackedFiles()).not.toContain(name);
+          },
+        );
 
-      it("adds one commit on top of an existing repository's history", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
+        it("commits the configuration it wrote, which the release is built from", async () => {
+          const app = await anApp();
 
-        await app.setup();
+          await app.setup();
 
-        expect(await app.commitSubjects()).toHaveLength(2);
-      });
+          expect(await app.trackedFiles()).toContain(SCHEMA_FILE);
+        });
 
-      it("reports that it committed without having made the repository", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
+        it("reports the repository it created when it could not commit", async () => {
+          const app = await anApp();
 
-        const result = await app.setup();
+          const result = await app.setupWithGitThatCannotCommit();
 
-        expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
-          initialized: false,
-          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
+          expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+            initialized: true,
+            commit: null,
+          });
+        });
+
+        it("warns that it could not commit and left a new repository", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithGitThatCannotCommit();
+
+          expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+            "Setup created a new, empty git repository here.",
+          );
         });
       });
 
-      it("refuses a repository with uncommitted work", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
-        await app.withUncommittedWork();
+      describe("in an existing repository", () => {
+        it("adds one commit on top of its history", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
 
-        const result = await app.setup();
+          await app.setup();
 
-        expect(result).toFailWith("E_CONFLICT");
+          expect(await app.commitSubjects()).toHaveLength(2);
+        });
+
+        it("reports that it committed without having made the repository", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
+
+          const result = await app.setup();
+
+          expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
+            initialized: false,
+            commit: expect.stringMatching(SHA),
+          });
+        });
+
+        it("refuses a detached HEAD, where its commit would be on no branch", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
+          await app.onADetachedHead();
+
+          const result = await app.setup();
+
+          expect(result).toFailWith("E_CONFLICT");
+        });
       });
 
-      it("refuses a detached HEAD, where its commit would be on no branch", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
-        await app.onADetachedHead();
+      describe("in a repository with uncommitted work", () => {
+        it("refuses", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
+          await app.withUncommittedWork();
 
-        const result = await app.setup();
+          const result = await app.setup();
 
-        expect(result).toFailWith("E_CONFLICT");
-      });
+          expect(result).toFailWith("E_CONFLICT");
+        });
 
-      it("names the untracked file it refused over", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
-        await app.withUncommittedWork();
+        it("names the untracked file it refused over", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
+          await app.withUncommittedWork();
 
-        const result = await app.setup();
+          const result = await app.setup();
 
-        expect(result).toExplain("untracked file");
-      });
+          expect(result).toExplain("untracked file");
+        });
 
-      it("writes nothing into a project it refuses", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
-        await app.withUncommittedWork();
-        const before = await app.snapshot();
+        it("writes nothing into the project", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
+          await app.withUncommittedWork();
+          const before = await app.snapshot();
 
-        await app.setup();
+          await app.setup();
 
-        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
+          expect(await before.changes()).toMatchObject(NO_CHANGES);
+        });
 
-      it("sets up a dirty repository anyway under --no-git", async () => {
-        const app = await anApp();
-        await app.underVersionControl();
-        await app.withUncommittedWork();
+        it("sets the project up anyway under --no-git", async () => {
+          const app = await anApp();
+          await app.underVersionControl();
+          await app.withUncommittedWork();
 
-        const result = await app.setup(["--no-git"]);
+          const result = await app.setup(["--no-git"]);
 
-        expect(result).toSucceed();
+          expect(result).toSucceed();
+        });
       });
 
       it("records no commit under --no-git", async () => {
@@ -284,302 +475,288 @@ describe("setup", () => {
         });
       });
 
-      it("scaffolds the project", async () => {
-        const app = await anApp();
-        const before = await app.snapshot();
+      describe("when it publishes the password policy", () => {
+        it("publishes the recommended minimum length", async () => {
+          const app = await anApp();
 
-        const result = await app.setup();
+          await app.setup();
 
-        expect(result).toSucceed();
-        expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
-      });
+          expect(await app.publishedPolicies()).toEqual([
+            expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+          ]);
+        });
 
-      it("publishes a password policy with the recommended minimum length", async () => {
-        const app = await anApp();
+        it("puts a given minimum length into the policy", async () => {
+          const app = await anApp();
 
-        await app.setup();
+          await app.setup(["--password-min-length", "12"]);
 
-        expect(await app.publishedPolicies()).toEqual([
-          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
-        ]);
-      });
+          expect(await app.publishedPolicies()).toEqual([
+            expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+          ]);
+        });
 
-      it("puts a given minimum password length into the policy", async () => {
-        const app = await anApp();
+        it("reads a minimum length of 0 as none", async () => {
+          const app = await anApp();
 
-        await app.setup(["--password-min-length", "12"]);
+          await app.setup(["--password-min-length", "0"]);
 
-        expect(await app.publishedPolicies()).toEqual([
-          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
-        ]);
-      });
+          expect(await app.publishedPolicies()).toEqual([
+            expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+          ]);
+        });
 
-      it("reads a minimum password length of 0 as none", async () => {
-        const app = await anApp();
+        it("refuses a minimum length outside the bounds before creating anything", async () => {
+          const app = await anApp();
 
-        await app.setup(["--password-min-length", "0"]);
+          const result = await app.setup(["--password-min-length", "65"]);
 
-        expect(await app.publishedPolicies()).toEqual([
-          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
-        ]);
-      });
-
-      it("refuses a minimum password length outside the bounds before creating anything", async () => {
-        const app = await anApp();
-
-        const result = await app.setup(["--password-min-length", "65"]);
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
-
-      it("creates a new app in the directory start ran in", async () => {
-        const app = await aNewAppDirectory();
-        await app.startLocalServer();
-
-        const result = await app.setupNewApp();
-
-        expect(result).toSucceed();
-      });
-
-      it("creates a new app in a directory that does not exist yet", async () => {
-        const app = await aMissingAppDirectory();
-
-        const result = await app.setupNewApp();
-
-        expect(result).toSucceed();
-      });
-
-      it("previews a new app on a dry run", async () => {
-        const app = await aNewAppDirectory();
-
-        const result = await app.setupNewApp(["--dry-run"]);
-
-        expect(result).toSucceed();
-      });
-
-      it("creates no app on a dry run", async () => {
-        const app = await aNewAppDirectory();
-        const before = await app.snapshot();
-
-        await app.setupNewApp(["--dry-run"]);
-
-        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
-
-      it.each([
-        ["the platform is down", () => platform.isUnavailable()],
-        ["the schema upload fails", () => platform.rejectsSchemaUploads()],
-      ])("leaves the directory start ran in as it was when %s", async (_failure, fail) => {
-        const app = await aNewAppDirectory();
-        await app.startLocalServer();
-        const before = await app.snapshot();
-        fail();
-
-        await app.setupNewApp();
-
-        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
-
-      it("sets a new app up as new when rerun after a failed run", async () => {
-        const app = await aNewAppDirectory();
-        platform.isUnavailable();
-        await app.setupNewApp();
-        platform.recovers();
-
-        const rerun = await app.setupNewApp();
-
-        const { data } = app.envelopeOf<{ files_written: string[] }>(rerun);
-        expect(data.files_written).toContain("app/page.tsx");
-      });
-
-      it("reports the configuration files it wrote", async () => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        const { data } = app.envelopeOf<{ files_written: string[] }>(result);
-        expect(data.files_written).toContain(".zitadel/schemas/default-human-user.json");
-        expect(data.files_written).toContain(".zitadel/flows/default-login.json");
-      });
-
-      it("reports each written file once", async () => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        const { data } = app.envelopeOf<{ files_written: string[] }>(result);
-        expect(new Set(data.files_written).size).toBe(data.files_written.length);
-      });
-
-      it("registers the schema and the flow with the platform", async () => {
-        const app = await anApp();
-
-        expect(await app.setup()).toSucceed();
-
-        expect(await app.publishedSchemas()).toHaveLength(1);
-        expect(await app.publishedFlows()).toHaveLength(1);
-      });
-
-      it("leaves nothing to reconcile", async () => {
-        const app = await anApp();
-
-        expect(await app.setup()).toSucceed();
-
-        expect(await app.deployDryRun()).toSucceed();
-      });
-
-      it("installs the dependencies it added", async () => {
-        const app = await anApp();
-
-        expect(await app.setup([], { install: true })).toSucceed();
-
-        expect(await app.installInvocation()).toEqual({
-          cwd: await realpath(app.path),
-          args: ["install"],
+          expect(result).toFailWith("E_VALIDATION");
         });
       });
 
-      it("keeps the package manager's own output off stdout", async () => {
-        const app = await anApp();
+      describe("in a directory without an app", () => {
+        it("creates a new app in the directory start ran in", async () => {
+          const app = await aNewAppDirectory();
+          await app.startLocalServer();
 
-        const result = await app.setup([], { install: true });
-
-        expect(result.stdout).not.toContain("fake npm stdout");
-        expect(result.stderr).toContain("fake npm stdout");
-      });
-
-      it("refuses an app below the supported framework version", async () => {
-        const app = await anApp({ nextVersion: "^14.2.0" });
-
-        const result = await app.setup();
-
-        expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
-        expect(result).toExplain("below the supported floor");
-      });
-
-      it("writes nothing to an app it refuses", async () => {
-        const app = await anApp({ nextVersion: "^14.2.0" });
-        const before = await app.snapshot();
-
-        await app.setup();
-
-        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
-
-      it("skips a rerun", async () => {
-        const app = await anApp();
-        expect(await app.setup()).toSucceed();
-
-        const rerun = await app.setup();
-
-        expect(rerun).toBeSkipped();
-      });
-
-      describe("--dev-port without --force when no one can be asked", () => {
-        it("still succeeds", async () => {
-          const app = await anApp();
-          expect(await app.setup()).toSucceed();
-
-          const result = await app.setup(["--dev-port", "3001"]);
+          const result = await app.setupNewApp();
 
           expect(result).toSucceed();
         });
 
-        it("says to pass --force", async () => {
-          const app = await anApp();
-          expect(await app.setup()).toSucceed();
+        it("creates a new app in a directory whose name is not a valid package name", async () => {
+          const app = await aNewAppDirectory("Tmp.W4SK1wDYDb");
 
-          const result = await app.setup(["--dev-port", "3001"]);
+          const result = await app.setupNewApp();
 
-          expect(result).toSay("origin rm http://localhost:3000 --force");
+          expect(result).toSucceed();
         });
 
-        it("suggests removing the previous origin with --force", async () => {
-          const app = await anApp();
-          expect(await app.setup()).toSucceed();
+        it("creates a new app in a directory that does not exist yet", async () => {
+          const app = await aMissingAppDirectory();
 
-          const result = await app.setup(["--dev-port", "3001"]);
+          const result = await app.setupNewApp();
 
-          expect(result).toSuggestExactly(
-            `origin rm http://localhost:3000 --force --env-file ${app.path}/.env.development.local --cwd ${app.path}`,
+          expect(result).toSucceed();
+        });
+
+        it("previews a new app on a dry run", async () => {
+          const app = await aNewAppDirectory();
+
+          const result = await app.setupNewApp(["--dry-run"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("creates no app on a dry run", async () => {
+          const app = await aNewAppDirectory();
+          const before = await app.snapshot();
+
+          await app.setupNewApp(["--dry-run"]);
+
+          expect(await before.changes()).toMatchObject(NO_CHANGES);
+        });
+
+        it("sets a new app up as new when rerun after a failed run", async () => {
+          const app = await aNewAppDirectory();
+          platform.isUnavailable();
+          await app.setupNewApp();
+          platform.recovers();
+
+          const rerun = await app.setupNewApp();
+
+          expect(app.envelopeOf<FilesWrittenData>(rerun).data.files_written).toContain(
+            "app/page.tsx",
           );
         });
+      });
 
-        it("removes nothing", async () => {
+      describe("with the install", () => {
+        it("installs the dependencies it added", async () => {
           const app = await anApp();
-          expect(await app.setup()).toSucceed();
 
-          await app.setup(["--dev-port", "3001"]);
+          await app.setup([], { install: true });
 
-          expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+          expect(await app.installInvocation()).toMatchObject({ args: ["install"] });
+        });
+
+        it("installs in the app's directory", async () => {
+          const app = await anApp();
+
+          await app.setup([], { install: true });
+
+          expect(await app.installInvocation()).toMatchObject({ cwd: await app.realPath() });
+        });
+
+        it("keeps the package manager's own output off stdout", async () => {
+          const app = await anApp();
+
+          const result = await app.setup([], { install: true });
+
+          expect(result).not.toPrint("fake npm stdout");
+        });
+
+        it("passes the package manager's own output on", async () => {
+          const app = await anApp();
+
+          const result = await app.setup([], { install: true });
+
+          expect(result).toSay("fake npm stdout");
         });
       });
 
-      it("replaces the previous origin when --dev-port moves the app with --force", async () => {
-        const app = await anApp();
-        expect(await app.setup()).toSucceed();
+      describe("in an app below the supported framework version", () => {
+        it("refuses", async () => {
+          const app = await anApp({ nextVersion: "^14.2.0" });
 
-        await app.setup(["--dev-port", "3001", "--force"]);
+          const result = await app.setup();
 
-        expect(await app.projectOrigins()).toEqual([
-          { pattern: "http://localhost:3001", kind: "primary" },
-        ]);
-      });
-
-      it("leaves the developer's edits in place on a rerun", async () => {
-        const app = await anApp();
-        expect(await app.setup()).toSucceed();
-        await app.editUserSchema((schema) => {
-          schema.properties.company = { type: "string" };
+          expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
         });
 
-        expect(await app.setup()).toBeSkipped();
+        it("says the version is below the supported floor", async () => {
+          const app = await anApp({ nextVersion: "^14.2.0" });
 
-        expect(await app.deployDryRun()).toSucceed();
+          const result = await app.setup();
+
+          expect(result).toExplain("below the supported floor");
+        });
+
+        it("writes nothing to the app", async () => {
+          const app = await anApp({ nextVersion: "^14.2.0" });
+          const before = await app.snapshot();
+
+          await app.setup();
+
+          expect(await before.changes()).toMatchObject(NO_CHANGES);
+        });
       });
 
-      it("does not claim to be configured after a failed run", async () => {
-        const app = await anApp();
-        platform.isNotZitadel();
+      describe("on a rerun", () => {
+        it("skips", async () => {
+          const app = await aCommittedApp();
 
-        expect(await app.setup()).toFail();
+          const rerun = await app.setup();
 
-        expect(await app.hasBeenConfigured()).toBe(false);
+          expect(rerun).toBeSkipped();
+        });
+
+        it("skips after the developer edited the schema", async () => {
+          const app = await aCommittedApp();
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+
+          const rerun = await app.setup();
+
+          expect(rerun).toBeSkipped();
+        });
+
+        it("leaves the developer's edits in place", async () => {
+          const app = await aCommittedApp();
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+
+          await app.setup();
+
+          const data = await app.deployDryRunData();
+
+          expect(data.diff?.files).toEqual([
+            expect.objectContaining({ patch: expect.stringContaining('"company"') }),
+          ]);
+        });
+
+        it("replaces the previous origin when --dev-port moves the app with --force", async () => {
+          const app = await aCommittedApp();
+
+          await app.setup(["--dev-port", "3001", "--force"]);
+
+          expect(await app.projectOrigins()).toEqual([
+            { pattern: "http://localhost:3001", kind: "primary" },
+          ]);
+        });
+
+        describe("with --dev-port, without --force, when no one can be asked", () => {
+          it("still succeeds", async () => {
+            const app = await aCommittedApp();
+
+            const result = await app.setup(["--dev-port", "3001"]);
+
+            expect(result).toSucceed();
+          });
+
+          it("says to pass --force", async () => {
+            const app = await aCommittedApp();
+
+            const result = await app.setup(["--dev-port", "3001"]);
+
+            expect(result).toSay("origin rm http://localhost:3000 --force");
+          });
+
+          it("suggests removing the previous origin with --force", async () => {
+            const app = await aCommittedApp();
+
+            const result = await app.setup(["--dev-port", "3001"]);
+
+            expect(result).toSuggestExactly(
+              app.asSetupSuggests("origin rm http://localhost:3000 --force"),
+            );
+          });
+
+          it("removes nothing", async () => {
+            const app = await aCommittedApp();
+
+            await app.setup(["--dev-port", "3001"]);
+
+            expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+          });
+        });
       });
 
-      it("rolls back the credential env file a failed run created", async () => {
-        const app = await anApp();
-        platform.rejectsSchemaUploads();
+      describe("when its first deploy is refused", () => {
+        it("succeeds", async () => {
+          const app = await anApp();
+          platform.rejectsASchema();
 
-        expect(await app.setup()).toFail();
+          const result = await app.setup();
 
-        // setup created `.env.development.local` with the project it had to
-        // abandon; the rollback removes it so a rerun does not inherit the
-        // abandoned project's id (`merge-env` only adds missing keys).
-        await expect(app.readProjectFile(".env.development.local")).rejects.toThrow();
-      });
+          expect(result).toSucceed();
+        });
 
-      it("lets a rerun finish what a failed run started", async () => {
-        const app = await anApp();
-        platform.rejectsSchemaUploads();
-        expect(await app.setup()).toFail();
-        platform.recovers();
+        it("deploys nothing", async () => {
+          const app = await anApp();
+          platform.rejectsASchema();
 
-        expect(await app.setup(["--force"])).toSucceed();
+          await app.setup();
 
-        expect(await app.deployDryRun()).toSucceed();
+          expect(await app.liveDeploymentCount()).toBe(0);
+        });
+
+        it("leaves what it wrote for deploy to publish", async () => {
+          const app = await anApp();
+          platform.rejectsASchema();
+
+          await app.setup();
+
+          platform.recovers();
+          expect(await app.deploy()).toSucceed();
+        });
       });
 
       it.each([
-        { preset: "passkey-first", entersOn: "passkey-first", method: "passkey" },
-        { preset: "password-first", entersOn: "identifier", method: "password" },
+        { preset: "passkey-first", entersOn: "passkey-first" },
+        { preset: "password-first", entersOn: "identifier" },
       ])("enters the $preset journey on $entersOn", async ({ preset, entersOn }) => {
         const app = await anApp();
 
-        expect(await app.setup(["--preset", preset])).toSucceed();
+        await app.setup(["--preset", preset]);
 
-        const { flow_definition } = await app.publishedFlow();
-        expect(flow_definition.purposes).toMatchObject({ login: entersOn, register: "register" });
+        expect((await app.publishedFlow()).flow_definition.purposes).toMatchObject({
+          login: entersOn,
+          register: "register",
+        });
       });
 
       it.each([
@@ -588,102 +765,112 @@ describe("setup", () => {
       ])("enables $method for the $preset preset", async ({ preset, method }) => {
         const app = await anApp();
 
-        expect(await app.setup(["--preset", preset])).toSucceed();
+        await app.setup(["--preset", preset]);
 
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]).toMatchObject({ [method]: { enabled: true } });
+        expect((await app.publishedSchema()).schema["x-auth-methods"]).toMatchObject({
+          [method]: { enabled: true },
+        });
       });
 
-      it.each(["business", "minimal"])(
-        "scaffolds the pages for the %s use case",
-        async (useCase) => {
-          const app = await anApp();
-          const before = await app.snapshot();
-
-          expect(await app.setup(["--use-case", useCase])).toSucceed();
-
-          expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
-        },
-      );
-
       describe.each(PROVIDERS)("with $name", (provider) => {
-        it("registers the connection under its slug", async () => {
+        it("succeeds", async () => {
           const app = await anApp();
 
           const result = await provider.setUp(app);
 
           expect(result).toSucceed();
-          expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual([provider.slug]);
+        });
+
+        it("registers the connection under its slug", async () => {
+          const app = await anApp();
+
+          await provider.setUp(app);
+
+          expect(
+            (await app.registeredIdps()).map((idp) => {
+              return idp.slug;
+            }),
+          ).toEqual([provider.slug]);
         });
 
         it("publishes the client id as a readable project variable", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const published = await app.projectVariables();
+          await provider.setUp(app);
 
-          expect(published).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({
-                name: `${provider.variables}_CLIENT_ID`,
-                value: provider.credentials.clientId,
-              }),
-            ]),
+          expect(await app.projectVariables()).toContainEqual(
+            expect.objectContaining({
+              name: `${provider.variables}_CLIENT_ID`,
+              value: provider.credentials.clientId,
+            }),
           );
         });
 
-        it("publishes the secret without its value", async () => {
+        it("publishes the client secret as a secret", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const published = await app.projectVariables();
+          await provider.setUp(app);
 
-          const held = published.find(
-            (variable) => variable.name === `${provider.variables}_CLIENT_SECRET`,
+          expect(await app.projectVariables()).toContainEqual(
+            expect.objectContaining({ name: `${provider.variables}_CLIENT_SECRET`, secret: true }),
           );
-          expect(held).toMatchObject({ secret: true });
-          expect(held).not.toHaveProperty("value");
+        });
+
+        it("publishes the client secret without its value", async () => {
+          const app = await anApp();
+
+          await provider.setUp(app);
+
+          expect(await app.projectVariables()).not.toContainEqual(
+            expect.objectContaining({
+              name: `${provider.variables}_CLIENT_SECRET`,
+              value: expect.anything(),
+            }),
+          );
         });
 
         it("commits a reference to the client id", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const connection = await app.committed.idpConnection(provider.slug);
+          await provider.setUp(app);
 
-          expect(connection.oidc.client_id).toBe(`\${{ ${provider.variables}_CLIENT_ID }}`);
+          expect((await app.committed.idpConnection(provider.slug)).oidc.client_id).toBe(
+            `\${{ ${provider.variables}_CLIENT_ID }}`,
+          );
         });
 
         it("commits a reference to the client secret", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const connection = await app.committed.idpConnection(provider.slug);
+          await provider.setUp(app);
 
-          expect(connection.oidc.client_secret).toBe(`\${{ ${provider.variables}_CLIENT_SECRET }}`);
+          expect((await app.committed.idpConnection(provider.slug)).oidc.client_secret).toBe(
+            `\${{ ${provider.variables}_CLIENT_SECRET }}`,
+          );
         });
 
         it("keeps the secret out of every file in the project", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
+
+          await provider.setUp(app);
 
           expect(await app.filesContaining(provider.credentials.secret)).toEqual([]);
         });
 
         it("keeps the client id out of every file in the project", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
+
+          await provider.setUp(app);
 
           expect(await app.filesContaining(provider.credentials.clientId)).toEqual([]);
         });
 
         it("names the connection among the published auth methods", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const { schema } = await app.publishedSchema();
+          await provider.setUp(app);
 
-          expect(schema["x-auth-methods"]?.sso).toEqual({
+          expect((await app.publishedSchema()).schema["x-auth-methods"]?.sso).toEqual({
             enabled: true,
             providers: [provider.slug],
           });
@@ -691,69 +878,66 @@ describe("setup", () => {
 
         it("offers the connection on the steps a sign-in starts from", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const offering = await app.stepsOfferingSso();
+          await provider.setUp(app);
 
-          expect(offering.map((step) => step.name)).toEqual(
-            expect.arrayContaining(["identifier", "register"]),
-          );
+          expect(
+            (await app.stepsOfferingSso()).map((step) => {
+              return step.name;
+            }),
+          ).toEqual(expect.arrayContaining(["identifier", "register"]));
         });
 
         it("offers the connection on the conflict step too", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          const offering = await app.stepsOfferingSso();
+          await provider.setUp(app);
 
-          expect(offering.map((step) => step.name)).toContain("sso-conflict");
+          expect(
+            (await app.stepsOfferingSso()).map((step) => {
+              return step.name;
+            }),
+          ).toContain("sso-conflict");
         });
 
         it("offers only the connection on every step that offers one", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          for (const step of await app.stepsOfferingSso()) {
-            expect(step.sso_providers, step.name).toEqual([provider.slug]);
-          }
+          await provider.setUp(app);
+
+          expect(await app.stepsOfferingSso()).not.toContainEqual(
+            expect.not.objectContaining({ sso_providers: [provider.slug] }),
+          );
         });
 
         it("says where each offering step returns from the provider", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          for (const step of await app.stepsOfferingSso()) {
-            expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
-          }
+          await provider.setUp(app);
+
+          expect(await app.stepsOfferingSso()).not.toContainEqual(
+            expect.not.objectContaining({
+              transitions: expect.objectContaining({ sso_authenticated: expect.anything() }),
+            }),
+          );
         });
 
         it("leaves nothing to reconcile", async () => {
           const app = await anApp();
-          expect(await provider.setUp(app)).toSucceed();
 
-          expect(await app.deployDryRun()).toSucceed();
+          await provider.setUp(app);
+
+          const data = await app.deployDryRunData();
+
+          expect(data.diff?.files).toEqual([]);
         });
       });
 
       describe("with a custom provider but not both credentials", () => {
-        const flags = [
-          "--sso",
-          "custom",
-          "--sso-slug",
-          "acme-sso",
-          "--sso-display-name",
-          "Acme SSO",
-          "--sso-issuer",
-          "https://sso.acme.example",
-        ];
-
         it("will not set up the provider without a client secret", async () => {
           const app = await anApp();
 
-          const result = await app.setupSsoWith(
-            [...flags, "--sso-client-id", "acme-client-id"],
-            "",
-          );
+          const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
 
           expect(result).toFailWith("E_VALIDATION");
         });
@@ -761,45 +945,48 @@ describe("setup", () => {
         it("names the secret as what is missing", async () => {
           const app = await anApp();
 
-          const result = await app.setupSsoWith(
-            [...flags, "--sso-client-id", "acme-client-id"],
-            "",
-          );
+          const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
 
           expect(result).toExplain("No client secret supplied");
+        });
+
+        it("hints at piping the secret in", async () => {
+          const app = await anApp();
+
+          const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
+
           expect(result).toHintAt("Pipe it in on stdin.");
         });
 
-        it("suggests piping the secret in, without carrying one", async () => {
-          const app = await anApp();
+        it.each([`printf '%s' "$CLIENT_SECRET" | `, "setup --sso custom --sso-client-id <id>"])(
+          "suggests piping the secret in, without carrying one: %s",
+          async (suggested) => {
+            const app = await anApp();
 
-          const result = await app.setupSsoWith(
-            [...flags, "--sso-client-id", "acme-client-id"],
-            "",
-          );
+            const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
 
-          expect(result).toSuggest(`printf '%s' "$CLIENT_SECRET" | `);
-          expect(result).toSuggest("setup --sso custom --sso-client-id <id>");
-        });
+            expect(result).toSuggest(suggested);
+          },
+        );
 
         it("will not set up the provider without a client id", async () => {
           const app = await anApp();
 
-          const result = await app.setupSsoWith(flags, "acme-client-secret");
+          const result = await app.setupSsoWith(ACME_FLAGS, ACME_CREDENTIALS.secret);
 
           expect(result).toExplain("--sso-client-id");
         });
 
         it.each([
-          ["a client secret", [...flags, "--sso-client-id", "acme-client-id"], ""],
-          ["a client id", flags, "acme-client-secret"],
+          ["a client secret", ACME_FLAGS_WITH_CLIENT_ID, ""],
+          ["a client id", ACME_FLAGS, ACME_CREDENTIALS.secret],
         ])("writes nothing when it is refused for want of %s", async (_missing, args, secret) => {
           const app = await anApp();
           const before = await app.snapshot();
 
           await app.setupSsoWith(args, secret);
 
-          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          expect(await before.changes()).toMatchObject(NO_CHANGES);
         });
       });
     });

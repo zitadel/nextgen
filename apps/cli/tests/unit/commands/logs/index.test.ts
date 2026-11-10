@@ -1,9 +1,9 @@
 import type { Config } from "@oclif/core";
 import { describe, expect } from "vitest";
 
-import Logs from "../../../../src/commands/logs";
-import { it } from "../../../helpers/fixtures";
-import { parseFlag } from "../../../helpers/inputs";
+import Logs from "@/commands/logs";
+import { it } from "@tests/helpers/fixtures";
+import { parseFlag } from "@tests/helpers/inputs";
 
 const config = {
   version: "0.0.0-test",

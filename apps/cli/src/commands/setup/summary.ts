@@ -1,17 +1,21 @@
 import { basename, join } from "node:path";
 
-import type { SetupPreset } from "@zitadel/config/defaults";
-import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
-import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
-import pc from "picocolors";
+import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import semver from "semver";
 
-import { pathExists } from "../../lib/fs";
-import { detectors } from "../../lib/orca/detectors";
-import type { Detector } from "../../lib/orca/detectors/types";
-import { readPackageJson } from "../../lib/npm";
-import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import type { PasswordMinLength } from "../../lib/policies";
+import { pathExists } from "@/lib/fs";
+import { detectors } from "@/lib/orca/detectors";
+import {
+  type ScaffoldedProvider,
+  TOGGLEABLE_METHODS,
+  type ToggleableMethod,
+  ZitadelConfig,
+} from "@/lib/zitadel";
+import type { Detector } from "@/lib/orca/detectors/types";
+import { readPackageJson } from "@/lib/npm";
+import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
+import { arrow, dim, mark } from "@/lib/style";
+import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -49,34 +53,26 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  * Renders the section list as a single multi-line string. Labels are
  * padded to a common width per section so the `✓ label  value` columns
  * line up, the title prints in dim gray, and `✓` is green. Values come
- * in pre-styled — use the helpers below ({@link path}, {@link url},
- * {@link id}, {@link dim}) to keep the colour palette consistent with
- * the mock.
+ * in pre-styled — use the palette in `lib/style` to keep the colours
+ * consistent with the mock. That is also what spells a value out: this box is
+ * written straight to the terminal rather than through `emit`, so a value put
+ * in raw reaches the reader as it came.
  */
 export function renderSummary(sections: Section[]): string {
   const lines: string[] = [];
   for (const section of sections) {
     if (section.rows.length === 0) continue;
     if (lines.length > 0) lines.push("");
-    lines.push(pc.dim(section.title.toUpperCase()));
+    lines.push(dim(section.title.toUpperCase()));
     const labelWidth = Math.max(...section.rows.map((r) => r.label.length)) + 3;
     for (const row of section.rows) {
       const labelCol = row.label.padEnd(labelWidth);
-      const secondary = row.secondary ? `   ${pc.dim("→")} ${row.secondary}` : "";
-      lines.push(`${pc.green("✓")} ${labelCol}${row.value}${secondary}`);
+      const secondary = row.secondary ? `   ${arrow} ${row.secondary}` : "";
+      lines.push(`${mark.pass} ${labelCol}${row.value}${secondary}`);
     }
   }
   return lines.join("\n");
 }
-
-/** Cyan, for filesystem paths the user can open. */
-export const path = (s: string): string => pc.cyan(s);
-/** Cyan, for URLs (browser-clickable in most terminals). */
-export const url = (s: string): string => pc.cyan(s);
-/** Yellow, for opaque ids the user shouldn't try to read. */
-export const id = (s: string): string => pc.yellow(s);
-/** Dim, for separators and secondary detail. */
-export const dim = (s: string): string => pc.dim(s);
 
 /**
  * Detected facts about the user's project, surfaced in the `DETECTED`
@@ -121,7 +117,7 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   segments.push(facts.frameworkVersion ? `${pretty} ${facts.frameworkVersion}` : pretty);
   if (facts.typescript) segments.push("TypeScript");
   segments.push(facts.packageManager);
-  return segments.join(` ${pc.dim("·")} `);
+  return segments.join(` ${dim("·")} `);
 }
 
 function detectorFor(framework: string): Detector | undefined {
@@ -156,30 +152,109 @@ export function fileNameOf(p: string): string {
 }
 
 /**
- * The sign-in configuration the wizard's answers add up to, said once so the
- * preset, the password policy and the providers need not be pieced together.
- * It describes what will be configured, not that sign-in works: an enabled
- * method is not a credential a user has registered. Both presets enable
- * password and passkey in the schema and differ in which the login flow starts
- * with.
+ * The sign-in configuration setup's answers add up to, as `data.sign_in`
+ * reports it. Read off the schema setup renders rather than inferred from the
+ * preset's name: `password-first` enables passkeys too, and a use case's
+ * profile fields are optional. It describes what is configured, not that
+ * sign-in works: an enabled method is not a credential a user has registered.
  */
-export function signInSummary(answers: {
+export type SignIn = {
+  /** The method the login flow's entry step offers. */
+  starts_with: "password" | "passkey";
+  /**
+   * The methods the user schema enables: the one sign-in starts with, the
+   * other, then `sso` when a provider is on.
+   */
+  methods: string[];
+  /** What registration asks for, in order, and whether each is required. */
+  fields: { name: string; required: boolean }[];
+  /** `null` when passwords have no minimum length. */
+  password_min_length: number | null;
+  /** The external providers' slugs, in the order they were chosen. */
+  providers: string[];
+};
+
+/**
+ * The sign-in configuration setup's answers add up to, read off the
+ * configuration setup scaffolds for them.
+ *
+ * @remarks
+ * Scaffolded on an empty configuration, so a password policy `--force` keeps
+ * is not read: the caller reports the minimum it wrote in its place.
+ *
+ * @param answers - The preset, use case, providers and minimum password
+ *   length setup was given.
+ * @returns What sign-in and registration are configured to do.
+ */
+export function signInOf(answers: {
   preset: SetupPreset;
-  sso: ReadonlyArray<{ selection: ProviderSelection }>;
+  useCase: SetupUseCase;
+  sso: readonly ScaffoldedProvider[];
   passwordMinLength?: PasswordMinLength;
-}): string {
-  const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
+}): SignIn {
+  // The schema setup writes: the preset and use case's template with each
+  // chosen provider enabled, so `methods` names `sso` when it is on.
+  const scaffolded = ZitadelConfig.empty().scaffold({
+    preset: answers.preset,
+    useCase: answers.useCase,
+    sso: answers.sso,
+    passwordMinLength: answers.passwordMinLength,
+    force: false,
+  });
+  const schema = scaffolded.schema;
+  const policy = scaffolded.policy;
+  const startsWith: ToggleableMethod = answers.preset === "passkey-first" ? "passkey" : "password";
+  const order: readonly ToggleableMethod[] = [
+    startsWith,
+    ...TOGGLEABLE_METHODS.filter((method) => {
+      return method !== startsWith;
+    }),
+  ];
+  const required: readonly string[] = schema.requiredPaths;
+  return {
+    starts_with: startsWith,
+    methods: [
+      ...order.filter((method) => {
+        return schema.enabledMethods[method];
+      }),
+      ...(schema.isSsoEnabled ? ["sso"] : []),
+    ],
+    fields: schema.propertyNames.map((name) => {
+      return { name, required: required.includes(name) };
+    }),
+    password_min_length: policy.minLength ?? null,
+    providers: [...schema.providers],
+  };
+}
+
+/** The wizard's closing note: {@link SignIn} as sentences. */
+export function signInSummary(signIn: SignIn, providerNames: readonly string[]): string {
+  const required = signIn.fields.filter((field) => field.required).map((f) => f.name);
+  const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
   return [
-    answers.preset === "passkey-first"
-      ? "Sign-in starts with a passkey, with email and password as the fallback."
-      : "Sign-in starts with email and password.",
-    "Password and passkey are enabled in the user schema.",
-    // None given is the recommended minimum, which setup writes in its place.
-    answers.passwordMinLength === null
+    signIn.starts_with === "passkey"
+      ? "Users see a passkey first, with email and password as the alternative."
+      : "Users see email and password first; passkeys are enabled but not shown at sign-in.",
+    `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
+    `Registration requires ${listOf(required)}` +
+      (optional.length === 0
+        ? "."
+        : `; ${listOf(optional)} ${optional.length === 1 ? "is" : "are"} optional.`),
+    signIn.password_min_length === null
       ? "Passwords have no minimum length."
-      : `Passwords need at least ${answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH} characters.`,
-    providers.length === 0
+      : `Passwords need at least ${signIn.password_min_length} characters.`,
+    providerNames.length === 0
       ? "No external providers will be added."
-      : `External providers: ${providers.join(", ")}.`,
+      : `External providers: ${providerNames.join(", ")}.`,
   ].join("\n");
+}
+
+/** `["a"]` → "a", `["a", "b"]` → "a and b", `["a", "b", "c"]` → "a, b and c". */
+function listOf(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+function capitalise(text: string): string {
+  return text.length > 0 ? `${text[0]?.toUpperCase()}${text.slice(1)}` : text;
 }

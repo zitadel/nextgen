@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   dependencySpecProvablyBelow,
   installedVersionBelow,

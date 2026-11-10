@@ -1,27 +1,25 @@
 import { spinner } from "@clack/prompts";
 import { z } from "zod";
 import { Flags } from "@oclif/core";
-import { Paging } from "@zitadel/api/runtime/paging";
+import { Paging } from "@/lib/backend/transport";
 
-import { sanitizeResponse } from "../../../api-client";
+import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
 
-import { nonBlankString, type Refused, reads, whole } from "../../flags";
-
-import type { CommandResult } from "../../types";
-import { plainFlag } from "../../tabulatable";
-import { wireOf } from "../wire";
+import type { CommandResult } from "@/lib/oclif/types";
+import { plainFlag } from "@/lib/oclif/tabulatable";
+import { wireOf } from "@/lib/oclif/crud/wire";
 import {
   type ParsedFilter,
   parseFilter,
   parseSort,
   type TypedFilter,
   type TypedSort,
-} from "../query";
-import { parseOrThrow } from "../shared";
-import { chosenColumns, readColumns } from "../columns";
-import { Cmd } from "../../../cmd";
-import { type FieldPaths, fieldPaths } from "../paths";
-import type { FilterField, Json, ListSpec } from "../types";
+} from "@/lib/oclif/crud/query";
+import { parseOrThrow } from "@/lib/oclif/crud/shared";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { Cmd } from "@/lib/cmd";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -176,9 +174,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
     const shape = fieldPaths(spec.item);
-    // Every list's pages arrive as the server sent them, so the walk below
-    // sends each cursor back unchanged and escapes only what the list answers.
-    const ctx = await this.context({ verbatim: true });
+    // The pages arrive as the server sent them, cursor included, so a token
+    // goes back exactly as it came. Nothing here spells out what could drive a
+    // terminal, because nothing here prints: a row reaches a person through
+    // `emitList`, whose cells are spelled out as they are read, and reaches a
+    // script through the envelope, which the serialiser escapes.
+    const ctx = await this.context();
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
@@ -243,7 +244,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     progress?.start(`Fetching ${topic}`);
     const paging = new Paging({
       items: (response) => {
-        return sanitizeResponse(spec.items(response));
+        return spec.items(response);
       },
       next: (response) => {
         return spec.next?.(response);
@@ -263,7 +264,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
       throw error;
     });
     const { items } = collected;
-    const next = sanitizeResponse(collected.next);
+    const next = collected.next;
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     const rows = items;

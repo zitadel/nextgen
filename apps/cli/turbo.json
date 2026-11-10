@@ -54,8 +54,9 @@
     //
     // Its inputs replace the shared shape's: tests/unit/docs reads README.md
     // and skills/, which the shape leaves out. tests/unit/scripts tests the
-    // root scripts (and the journey scripts they import; check-pr-title reads
-    // .github/semantic.yml), and the release manifest's test reads
+    // root scripts (and the journey scripts they import, never their own
+    // tests; check-pr-title reads .github/semantic.yml), and the release
+    // manifest's test reads
     // .changeset/config.json, .moon/workspace.yml and every package's
     // package.json and moon.yml. The local runtime's launcher test reads the
     // Dockerfile, the IdP document tests the design docs' scaffold schemas,
@@ -77,6 +78,8 @@
         "$TURBO_ROOT$/vercel.json",
         "$TURBO_ROOT$/scripts/**/*.mjs",
         "$TURBO_ROOT$/e2e/journey/scripts/*.mjs",
+        "!$TURBO_ROOT$/scripts/**/*.test.mjs",
+        "!$TURBO_ROOT$/e2e/journey/scripts/*.test.mjs",
         "$TURBO_ROOT$/.github/semantic.yml",
         "$TURBO_ROOT$/Dockerfile",
         "$TURBO_ROOT$/docs/design/idp/schemas/**",
@@ -90,6 +93,7 @@
     // It asks the npm advisory database, whose answer changes when an
     // advisory is published, with no input changing.
     "check-advisories": {
+      "dependsOn": ["@zitadel/api#generate"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"]
     },

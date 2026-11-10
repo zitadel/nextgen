@@ -1,10 +1,12 @@
+import { PreviewService } from "@/lib/backend";
 import { Args, Flags } from "@oclif/core";
 
-import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { Destructive, Settled } from "../../lib/oclif/destructive";
-import { filled, type Refused, taken } from "../../lib/oclif/flags";
+import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { deletedData } from "@/lib/oclif/envelope";
+import { Destructive, Settled } from "@/lib/oclif/destructive";
+import { filled, type Refused, taken } from "@/lib/oclif/flags";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -58,34 +60,43 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
         name: `remove ${args.url} from the project`,
         message: `Remove ${args.url} from the project?`,
         preview: () => {
-          const result = dryRunResult("remove", "preview", args.url);
-          return { ...result, pretty: `${result.pretty} from the project` };
+          return dryRunResult({
+            verb: "remove",
+            topic: "preview",
+            id: args.url,
+            clause: "from the project",
+          });
         },
         prepare: async () => {
           const connection = await this.connect();
+          const previewService = new PreviewService(connection.client, connection.projectId);
+          const previews = await previewService.list();
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
           // nobody confirms removing what is not there.
           if (
-            !(await connection.client.listPreviews.all(connection.projectId)).some(
-              (preview) => preview.origin === args.url,
-            )
+            !previews.some((preview) => {
+              return preview.origin === args.url;
+            })
           ) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
-              pretty: `${args.url} is not a live preview of the project; nothing was removed`,
+              pretty: prose(
+                `${args.url} is not a live preview of the project; nothing was removed`,
+              ),
               next: { commands: [this.suggest("preview list")] },
             });
           }
           return connection;
         },
         apply: async (consent, { client, projectId }) => {
-          await consent.unlock(client).removePreview(projectId, { origin: args.url });
+          const previewService = new PreviewService(consent.unlock(client), projectId);
+          await previewService.remove(args.url);
           return {
             status: "ok",
             data: deletedData({ url: args.url }),
-            pretty: `Stopped serving ${args.url}`,
+            pretty: prose(`Stopped serving ${args.url}`),
           };
         },
       }),

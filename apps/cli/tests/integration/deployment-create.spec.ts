@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp, SETUP_ORIGIN } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp, SETUP_ORIGIN } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -33,6 +33,15 @@ describe("deployment create", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const args = ["deployment", "create", "--release", await aRelease(app)];
+      platform.servesAHostileOrigin();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("makes an existing release live on every primary origin", async () => {
         const app = await aSetUpApp();
@@ -52,6 +61,26 @@ describe("deployment create", () => {
         const data = app.envelopeOf<{ release_id: string; origins: string[] }>(result).data;
         expect(data.release_id).toBe(releaseId);
         expect(data.origins).toEqual([SETUP_ORIGIN.pattern, "https://app.acme.com"]);
+      });
+
+      // The summary names the origins the server answered with, and a
+      // rendering never goes through the envelope, so it is spelled out.
+      it("spells out an escape sequence the server put in an origin", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+        const releaseId = await aRelease(app);
+        platform.servesAHostileOrigin();
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--non-interactive",
+        ]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
       });
 
       it("writes no deployment on a dry run", async () => {

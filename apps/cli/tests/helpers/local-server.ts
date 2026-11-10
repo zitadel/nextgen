@@ -19,8 +19,10 @@ export const LOGGED_LINES = {
   info: 'time=2026-10-22T07:58:44.765-07:00 level=INFO msg="server listening for requests" address=:8080',
   warning:
     'time=2026-10-22T07:58:52.102-07:00 level=WARN msg="sso provider unavailable" stream=service project_id=proj_1 slug=acme error="idp.discovery_failed"',
+  // The message carries an OSC sequence, because the server's text is the
+  // server's: `logs` has to spell it out rather than let it retitle the window.
   error:
-    'time=2026-10-22T07:58:52.104-07:00 level=ERROR msg="request failed" stream=request request.status_code=500',
+    'time=2026-10-22T07:58:52.104-07:00 level=ERROR msg="request failed \u001b]0;pwned\u0007" stream=request request.status_code=500',
 } as const;
 
 /** The `logging` server's first statement: it writes {@link LOGGED_LINES} to its log. */

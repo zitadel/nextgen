@@ -1,8 +1,8 @@
 import { consola } from "consola";
 
-import { createZitadelClient } from "../api-client";
-import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
-import { resolveCwd } from "../paths";
+import { createZitadelClient } from "@/lib/backend";
+import { type Environment, requireValueInteractive, resolveEnvironment } from "@/lib/environment";
+import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
 import { byName } from "./names";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -14,9 +14,10 @@ import {
 import type { ConnectOptions, Connection, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
-import { optionArgs } from "../public-cli";
-import { Cmd } from "../cmd";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { optionArgs } from "@/lib/public-cli";
+import { Cmd } from "@/lib/cmd";
+import { userAgent } from "@/lib/user-agent";
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -159,8 +160,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * terminal: on a pipe the result travels alone, and `--json` silences them
    * either way. `quiet` is for a command whose own output is that summary.
    *
-   * `verbatim` is for a caller that stores, compares or sends back what it
-   * reads (see `SanitizeOptions`).
    * One connection is opened per set of options and shared by every caller,
    * a requirement that needs the project and the command's own `execute`
    * alike. `prompt: false` is for a best-effort probe that must never stop to ask
@@ -213,10 +212,17 @@ export abstract class EnvironmentCommand extends BaseCommand {
       consola.info(`Server    ${server}`);
     }
     return {
-      client: createZitadelClient(
-        { baseUrl: server, token, signal: this.signal },
-        { verbatim: options.verbatim },
-      ),
+      client: createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token,
+        signal: this.signal,
+        ...(options.timeoutMs === undefined
+          ? {}
+          : {
+              timeoutMs: options.timeoutMs,
+            }),
+      }),
       projectId,
       server,
       environment,

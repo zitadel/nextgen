@@ -1,226 +1,88 @@
-import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-
 import type { Parsed } from "@zitadel/config/idp";
 
-import { escapeControlCharacters } from "./api-client";
-import type { Tabulate } from "./oclif/tabulatable";
-
-/** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
-export type VariableKind = "primary" | "preview";
-
-/**
- * The query a variable write or delete takes: the project and, for `--preview`,
- * the kind. Without a kind the platform's default applies: a plain value is
- * stored for both kinds and a secret for the primary kind only, and a delete
- * removes both.
- */
-export type VariableScope = { project_id: string; kind?: "preview" };
-
-/** The scope a variable write or delete addresses, from the project and `--preview`. */
-export function variableScope(projectId: string, preview: boolean): VariableScope {
-  return preview ? { project_id: projectId, kind: "preview" } : { project_id: projectId };
-}
-
-/**
- * The scope of a read. A read names one kind, because the platform answers a
- * name with a value per kind and the two are never merged: `--preview` reads the
- * preview values, and without it the primary ones.
- */
-export function variableReadScope(
-  projectId: string,
-  preview: boolean,
-): { project_id: string; kind: VariableKind } {
-  return { project_id: projectId, kind: preview ? "preview" : "primary" };
-}
-
-/**
- * A variable as the platform reports it. A non-secret carries its value; a
- * secret carries none, because a read answers `{"secret": true}` and never
- * discloses what is stored (ADR 062 §7).
- */
-export type VariableRow = {
-  name: string;
-  secret: boolean;
-  value?: string | number | boolean;
-  /**
-   * What the name's preview kind holds, on the inventory the default `list`
-   * prints. Absent means the name holds no preview value — which is not the
-   * same as holding an empty one, so the two render differently (#1617).
-   */
-  preview?: { secret: boolean; value?: string | number | boolean };
-};
-
-/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
-export type VariableValue = NonNullable<GetVariable200["primary"]>;
-
-/** The values of one kind in a read, keyed by name. */
-export function valuesOfKind(
-  body: GetVariables200,
-  kind: VariableKind,
-): Record<string, VariableValue> {
-  return Object.fromEntries(
-    Object.entries(body).flatMap(([name, byKind]) =>
-      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
-    ),
-  );
-}
-
-/** The primary values of a read, keyed by name. */
-export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
-  return valuesOfKind(body, "primary");
-}
-
-/**
- * Project one wire value into a row. Both endpoints answer in the same two
- * forms — a bare scalar for a non-secret, `{"secret": true}` for a secret — so
- * the collection and the single-name read share this.
- */
-export function toVariableRow(name: string, value: VariableValue): VariableRow {
-  return typeof value === "object" && value !== null
-    ? { name, secret: true }
-    : { name, secret: false, value };
-}
-
-/**
- * Project the values into rows, sorted by name so output is stable between
- * runs.
- */
-export function toVariableRows(values: Record<string, VariableValue>): VariableRow[] {
-  return Object.entries(values)
-    .map(([name, value]) => toVariableRow(name, value))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+import type { Held, Scalar, Variable } from "./backend";
 
 /** Stands in for a secret's value, which the platform never discloses. */
 const SECRET_MARKER = "(secret)";
-
-/**
- * The variables a deployment froze, as `deployment get` shows them: the
- * `variable resolve` table, indented under a heading.
- */
-export async function frozenVariables(
-  rows: readonly VariableRow[],
-  tabulate: Tabulate,
-): Promise<string> {
-  if (rows.length === 0) {
-    return "  variables  none";
-  }
-  const table = (await tabulate(["name", "value"], variableCells(rows)))
-    .split("\n")
-    .map((line) => `    ${line}`);
-  return ["  variables", ...table].join("\n");
-}
 
 /** Stands in for a kind the name holds no value for at all. */
 const NO_VALUE = "-";
 
 /**
- * Every name on the project with the primary value it holds and the preview
- * value beside it, sorted by name. A read without a kind answers both, so one
- * request covers the inventory; a name is listed when either kind holds a
- * value, so a preview-only name does not disappear (#1617).
- */
-export function toInventoryRows(body: GetVariables200): VariableRow[] {
-  return Object.entries(body)
-    .map(([name, byKind]) => {
-      const primary =
-        byKind.primary === undefined ? undefined : toVariableRow(name, byKind.primary);
-      const preview =
-        byKind.preview === undefined ? undefined : toVariableRow(name, byKind.preview);
-      return {
-        name,
-        secret: primary?.secret ?? false,
-        ...(primary?.value === undefined ? {} : { value: primary.value }),
-        ...(preview === undefined
-          ? {}
-          : {
-              preview: {
-                secret: preview.secret,
-                ...(preview.value === undefined ? {} : { value: preview.value }),
-              },
-            }),
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * {@link variableCells} plus the preview column, for the inventory. A kind the
- * name holds nothing for prints `-`: an empty cell would read as an empty
- * value, and a secret prints its marker in either column.
- */
-export function variableInventoryCells(
-  rows: ReadonlyArray<VariableRow>,
-): Array<{ name: string; value: string; preview: string }> {
-  const cell = (
-    held: { secret: boolean; value?: string | number | boolean } | undefined,
-  ): string =>
-    held === undefined
-      ? NO_VALUE
-      : held.secret
-        ? SECRET_MARKER
-        : held.value === undefined
-          ? NO_VALUE
-          : renderScalar(held.value);
-  return rows.map((row) => ({
-    name: row.name,
-    value: cell(row.value === undefined && !row.secret ? undefined : row),
-    preview: cell(row.preview),
-  }));
-}
-
-/**
- * Render a stored scalar for a terminal.
+ * A stored scalar as text. It is the value the server holds, unescaped: the
+ * render boundary escapes what it prints, so what a caller stores or compares
+ * is the real value.
  *
- * A value is attacker-influenceable — anyone holding `variable.write` chooses
- * it — so it is never interpolated raw. The client already escapes what could
- * drive the terminal; this also escapes a newline and a tab, which would
- * break the table out of its own row or split a tab-separated line.
+ * @param value - The scalar, or undefined.
+ * @returns The value as text.
  */
-export function renderScalar(value: string | number | boolean | undefined): string {
-  if (typeof value !== "string") {
-    return String(value);
-  }
-  return escapeControlCharacters(value, { keepLayout: false });
+function render(value: Scalar | undefined): string {
+  return typeof value === "string" ? value : String(value);
 }
 
 /**
- * The rows as the cells the resource commands' renderers print, one per
- * column. Those renderers print a string verbatim, so every value is escaped
- * here first: a stored value is chosen by whoever holds `variable.write`, and a
- * newline or an ESC byte must not reach the reader's terminal. A secret prints
- * a marker rather than a value — there is none to print, and an empty cell would
- * read as an empty value rather than a withheld one.
+ * What one kind of a name shows: its value, the secret marker, or `-` when the
+ * name holds nothing for that kind, because an empty cell would read as an
+ * empty value.
+ *
+ * @param held - What the kind holds, or undefined when it holds nothing.
+ * @returns The cell's text.
  */
-export function variableCells(
-  rows: ReadonlyArray<VariableRow>,
-): Array<{ name: string; value: string }> {
-  return rows.map((row) => ({
-    name: row.name,
-    value: row.secret ? SECRET_MARKER : renderScalar(row.value),
-  }));
+function shown(held: Held | undefined): string {
+  if (held === undefined) {
+    return NO_VALUE;
+  }
+  if (held.secret) {
+    return SECRET_MARKER;
+  }
+  return held.value === undefined ? NO_VALUE : render(held.value);
 }
 
 /**
- * Names the platform accepts, from `variable-name.yaml`: word characters only,
- * which is exactly what the `${{ NAME }}` reference syntax can address
- * (ADR 062 §2). Checked before the patch so one bad line in a `.env` file is
- * named locally rather than failing the whole transaction at the edge.
+ * One kind's value as a single cell: the value, or the secret marker. An empty
+ * string shows as a pair of quotes, so it is not mistaken for nothing at all.
+ *
+ * @param held - What the kind holds.
+ * @returns The cell's text.
  */
-const VARIABLE_NAME = /^\w+$/;
+export function heldCell(held: Held): string {
+  const text = shown(held);
+  return text === "" ? '""' : text;
+}
 
-/** Longest name the same schema accepts. */
-export const VARIABLE_NAME_MAX = 255;
+/**
+ * The cells of a table with one value column, where a secret shows its marker.
+ *
+ * @param variable - The variable to show.
+ * @returns The name and the value, ready to print.
+ */
+export function variableCell(variable: Variable): {
+  name: string;
+  value: string;
+} {
+  return {
+    name: variable.name,
+    value: variable.secret ? SECRET_MARKER : render(variable.value),
+  };
+}
 
-/** Why the platform would refuse `name`, or `undefined` when it would not. */
-export function variableNameProblem(name: string): "invalid" | "too-long" | undefined {
-  if (!VARIABLE_NAME.test(name)) {
-    return "invalid";
-  }
-  if (name.length > VARIABLE_NAME_MAX) {
-    return "too-long";
-  }
-  return undefined;
+/**
+ * The cells of a table with a preview column beside the value, as the project's
+ * own set of variables is listed.
+ *
+ * @param variable - The variable to show.
+ * @returns The name, the primary value and the preview value, ready to print.
+ */
+export function inventoryCell(variable: Variable): {
+  name: string;
+  value: string;
+  preview: string;
+} {
+  return {
+    name: variable.name,
+    value: shown(variable.value === undefined && !variable.secret ? undefined : variable),
+    preview: shown(variable.preview),
+  };
 }
 
 /**

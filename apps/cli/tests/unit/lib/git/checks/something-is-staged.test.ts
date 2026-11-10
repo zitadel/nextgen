@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { SomethingIsStaged } from "../../../../../src/lib/git/checks/something-is-staged";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 describe("SomethingIsStaged", () => {
   it("passes when something is staged", async () => {

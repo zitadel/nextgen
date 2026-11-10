@@ -23,3 +23,9 @@ func ErrGrantPrincipalNotFound() Error {
 func ErrGrantPermissionDenied() Error {
 	return newError(PrefixGrant.ErrorCodePrefix("permission_denied"), "insufficient permissions to manage grants", nil, nil)
 }
+
+// ErrGrantProjectUnclaimed refuses a grant to a principal from another project
+// while the granting project has no owning team (ADR 054 §4 amendment).
+func ErrGrantProjectUnclaimed() Error {
+	return newError(PrefixGrant.ErrorCodePrefix("project_unclaimed"), "claim the project before granting access to it", nil, nil)
+}

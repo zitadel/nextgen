@@ -1,8 +1,8 @@
 import type { Callback, Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
 import { describe, expect, it, vi } from "vitest";
 
-import { Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
-import type { Identity } from "../../../../src/lib/telemetry/identity";
+import { Telemetry, type TelemetryDeps } from "@/lib/telemetry";
+import type { Identity } from "@/lib/telemetry/identity";
 
 type Tracked = { event: string; properties: Properties };
 

@@ -1,6 +1,6 @@
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
-import type { UncommittedFile } from "../types";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
+import type { UncommittedFile } from "@/lib/git/types";
 
 /**
  * The uncommitted files under the directory, untracked ones included, each file of an untracked directory listed.

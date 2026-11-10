@@ -1,4 +1,4 @@
-import { Paging } from "@zitadel/api/runtime/paging";
+import { PreviewService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -8,10 +8,9 @@ import {
   type JsonEnvelope,
   nonBlankString,
   PreviewCommand,
-} from "../../lib/oclif";
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import { pagedFunctions } from "../../lib/api-client";
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -72,28 +71,31 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
   protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const params = {
-      limit: flags.limit,
-      page_token: flags.pageToken,
-    };
-    // One page unless `--all`, as every list does; the walk starts at
-    // `--page-token`, and a drain leaves no next page to report.
-    const paging = new Paging(pagedFunctions.listPreviews);
-    const { items, next } = await paging.collect(client.listPreviews.pages(projectId, params), {
-      all: flags.all === true,
-    });
+    const previewService = new PreviewService(client, projectId);
+    const listed = await previewService.page(
+      {
+        limit: flags.limit,
+        page_token: flags.pageToken,
+      },
+      {
+        all: flags.all,
+      },
+    );
 
-    const rows = items.map((preview) => ({
-      url: preview.origin,
-      expires: preview.expires_at,
-      created: preview.created_at,
-    }));
+    const items = listed.items;
+    const rows = items.map((preview) => {
+      return {
+        url: preview.origin,
+        expires: preview.expires_at,
+        created: preview.created_at,
+      };
+    });
 
     const columns = COLUMNS;
     const empty = "No live previews.";
     const footer: string[] = [];
     const page = {
-      token: next,
+      token: listed.next,
       command: "preview list",
       flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
     };

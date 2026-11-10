@@ -1,6 +1,6 @@
-import { ZitadelError } from "../../../../errors";
-import { withLfLineEnds } from "../utils/line-ends";
-import { ConfigModule } from "../utils/config-module";
+import { ZitadelError } from "@/lib/errors";
+import { withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 /**
  * The settings the hook passes to `createNextgenHandle`, read from

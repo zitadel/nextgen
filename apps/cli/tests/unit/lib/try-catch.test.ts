@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tryCatch } from "../../../src/lib/try-catch";
+import { tryCatch } from "@/lib/try-catch";
 
 describe("tryCatch", () => {
   it("returns the result with no error when the function returns", () => {

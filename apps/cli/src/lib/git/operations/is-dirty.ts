@@ -1,5 +1,5 @@
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
 
 /**
  * Whether anything in the whole repository is uncommitted, not only under the directory.

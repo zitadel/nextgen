@@ -103,6 +103,10 @@ A button that switches between signing in and signing up is a `navigate` action 
 
 The transition goes to the entry step of that purpose, the step `purposes` names for it, so it needs no `target`. The purpose must be one the flow's `purposes` lists.
 
+## Offer a password or a passkey
+
+A step offers a password when its `fields` list `x-auth-methods#password`, and a passkey through a `passkey` or `passkey_register` action. The method must also be enabled in the user schema. [Turn password and passkey sign-in on and off](/docs/guides/sign-in-methods) shows the edit for each, and the `zitadel auth-method` commands that switch the schema.
+
 ## Add a second flow, selected by name
 
 Copy `default-login.json` to a new file in `.zitadel/flows/`, give it its own `name`, and edit its steps. A name starts with a lowercase letter and holds only lowercase letters, digits and hyphens:
@@ -127,7 +131,7 @@ Then select it by name on the login component, here in React:
 
 On the plain element, set the `flow-name` attribute: `<zitadel-login flow-name="kiosk-login">`.
 
-Every deploy publishes every file in `.zitadel/flows/`. A login without `flowName` runs the project default: the newest active flow without an `audience` that serves its purpose. A new flow without an `audience` becomes that default the moment it deploys, for every login that names no flow. To keep a flow you select by name out of the default, give it an `audience` before its first deploy, as above, with a team ID from `zitadel teams list`. The login component sends no team, so the flow then runs only where `flowName` names it.
+Every deploy publishes every file in `.zitadel/flows/`. A login without `flowName` runs the project default: the newest flow the deployed release pins that has no `audience` and serves its purpose. A new flow without an `audience` becomes that default the moment it deploys, for every login that names no flow. To keep a flow you select by name out of the default, give it an `audience` before its first deploy, as above, with a team ID from `zitadel teams list`. The login component sends no team, so the flow then runs only where `flowName` names it.
 
 A login whose `flowName` names no deployed flow, or a flow that does not serve its `purpose`, shows the reason in place of the form.
 

@@ -11,6 +11,7 @@ import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
   SERVER_PLATFORM_PACKAGES,
+  hostOnlyPackageDirs,
 } from "./release-manifest.mjs";
 import {
   assertServerBuildPackage,
@@ -408,8 +409,10 @@ export async function verifyLocalArtifacts(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
+  // A host-only snapshot has no archives and packs one server platform.
+  const hostOnly = options.hostOnly ?? false;
   const missing = [];
-  for (const platform of SERVER_PLATFORMS) {
+  for (const platform of hostOnly ? [] : SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
     const archive = join(
       outDir,
@@ -421,11 +424,12 @@ export async function verifyLocalArtifacts(options = {}) {
     }
   }
   const checksumPath = join(outDir, "archives", "checksums.txt");
-  if (!(await exists(checksumPath))) {
+  if (!hostOnly && !(await exists(checksumPath))) {
     missing.push(checksumPath);
   }
   const npmTarballs = (await exists(join(outDir, "npm"))) ? await readdir(join(outDir, "npm")) : [];
-  if (npmTarballs.length < PUBLIC_PACKAGE_DIRS.length) {
+  const packageDirs = hostOnly ? hostOnlyPackageDirs() : PUBLIC_PACKAGE_DIRS;
+  if (npmTarballs.length < packageDirs.length) {
     missing.push(`${join(outDir, "npm")}/*`);
   }
   if (missing.length > 0) {

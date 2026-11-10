@@ -1,7 +1,7 @@
-import { type Admitted, BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { plainFlag, Tabulatable } from "../lib/oclif/tabulatable";
-import { describeRegistry } from "../lib/oclif/crud";
-import { CommandGroups } from "../lib/oclif/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { describeRegistry } from "@/lib/oclif/crud";
+import { CommandGroups } from "@/lib/oclif/groups";
 import { RESOURCES } from "./resources";
 
 /** The columns `resources` renders, in order. */

@@ -28,6 +28,7 @@ func TestGrantService_Create_EventUsesAssignmentProject(t *testing.T) {
 	var got *domain.Event
 	svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 		expectActiveUserPrincipal(s, userID)
+		expectClaimedProject(s, "proj_customer")
 		s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, a *domain.AuthzAssignment) error {
 				a.ID = "asgn_test01"

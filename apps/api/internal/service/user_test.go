@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -733,6 +734,77 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 
 	svcPool := service.NewPool(pool)
 	return service.NewUserService(svcPool, schemaStore, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
+}
+
+// A dry run answers what the patch would answer and stops before the
+// transaction: the fixture holds no PatchUser, so a write fails the test, and
+// the event is emitted only inside that transaction.
+func TestUserService_PatchUserDryRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a valid patch answers the user it would leave", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newTakenAttributesFixture(t, nil, nil)
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{}, nil)
+
+		user, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+			ProjectID:  "proj_1",
+			UserID:     "user_1",
+			Attributes: map[string]any{"email": "alice@example.com"},
+			DryRun:     true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "user_1", user.ID)
+		assert.Equal(t, "https://example.test/schema.json", user.SchemaURL)
+		attributes, err := user.Attributes.ToMap()
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"email": "alice@example.com", "givenName": "Alice"}, attributes)
+	})
+
+	t.Run("an invalid patch answers the real refusal", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newTakenAttributesFixture(t, nil, nil)
+
+		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+			ProjectID:  "proj_1",
+			UserID:     "user_1",
+			Attributes: map[string]any{"email": 5},
+			DryRun:     true,
+		})
+		require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
+		var derr domain.Error
+		require.ErrorAs(t, err, &derr)
+		assert.Equal(t, domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}}, derr.Details)
+	})
+
+	t.Run("a value another user holds now answers the conflict", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newTakenAttributesFixture(t, map[domain.AttributeKey]string{
+			"email":    "user_1", // the user's own claim
+			"username": "user_2",
+		}, nil)
+
+		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+			ProjectID:  "proj_1",
+			UserID:     "user_1",
+			Attributes: map[string]any{"email": "alice@example.com", "username": "taken"},
+			DryRun:     true,
+		})
+		requireTakenFields(t, err, "username")
+	})
+
+	t.Run("a failed lookup is a server fault, not a yes", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newTakenAttributesFixture(t, nil, errors.New("database down"))
+
+		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+			ProjectID:  "proj_1",
+			UserID:     "user_1",
+			Attributes: map[string]any{"email": "alice@example.com"},
+			DryRun:     true,
+		})
+		require.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
 }
 
 func requireTakenFields(t *testing.T, err error, keys ...domain.AttributeKey) {

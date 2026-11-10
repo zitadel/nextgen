@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextPort, PORT_WORKERS } from "../../helpers/ports";
+import { nextPort, PORT_WORKERS } from "@tests/helpers/ports";
 
 const BLOCK = 50;
 

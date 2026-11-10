@@ -39,7 +39,7 @@ type FlowOnSuccessInput struct {
 // FlowOnSuccessResult is what a handler returns. StepError keeps the
 // user on the current step.
 type FlowOnSuccessResult struct {
-	StepError *string
+	StepError *FlowStepFailure
 	// UserID is set when a handler creates a new user. The state machine
 	// only records it in flow state — a handler returning a UserID MUST
 	// have persisted the user's verified factors on the auth attempt

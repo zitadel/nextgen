@@ -5,8 +5,8 @@ import {
   aProjectDirectory,
   PLATFORM_URL,
   usePlatformServer,
-} from "../../../helpers/platform-project";
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+} from "@tests/helpers/platform-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();

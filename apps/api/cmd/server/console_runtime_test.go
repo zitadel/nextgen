@@ -75,8 +75,10 @@ func TestConsoleRuntimeHandlerAnswers500OnResolverError(t *testing.T) {
 	require.Len(t, records.records, 1)
 	logged := records.records[0]
 	assert.Equal(t, slog.LevelError, logged.Level)
-	assert.Equal(t, "console runtime resolution failed", logged.Message)
-	assert.Contains(t, recordAttrs(logged), "err=db down")
+	assert.Equal(t, "api error", logged.Message)
+	attrs := recordAttrs(logged)
+	assert.Contains(t, attrs, "path="+consoleRuntimePath)
+	assert.Contains(t, attrs, "error=[code=internal message=An unexpected error occurred. parent=db down]")
 }
 
 // recordingHandler captures emitted records so tests can assert on them.
@@ -98,7 +100,7 @@ func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
 func recordAttrs(r slog.Record) []string {
 	var attrs []string
 	r.Attrs(func(attr slog.Attr) bool {
-		attrs = append(attrs, attr.Key+"="+attr.Value.String())
+		attrs = append(attrs, attr.Key+"="+attr.Value.Resolve().String())
 		return true
 	})
 	return attrs

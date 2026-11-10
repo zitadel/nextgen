@@ -4,12 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { AngularScaffolder } from "../../../../../src/lib/orca/scaffolders/angular";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { AngularScaffolder } from "@/lib/orca/scaffolders/angular";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));

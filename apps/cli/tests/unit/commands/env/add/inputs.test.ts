@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import EnvAdd, { readAppUrl } from "../../../../../src/commands/env/add/index";
-import { parseArg, parseFlag } from "../../../../helpers/inputs";
+import EnvAdd, { readAppUrl } from "@/commands/env/add/index";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
 
 describe("the environment name argument", () => {
   it.each(["production", "staging-2", "a.b", "team_a"])("accepts %j", async (name) => {

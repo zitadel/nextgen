@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../src/lib/errors";
-import { formatTtl, isoDuration, parseTtl } from "../../../src/lib/ttl";
+import { ZitadelError } from "@/lib/errors";
+import { formatTtl, isoDuration, parseTtl } from "@/lib/ttl";
 
 describe("parseTtl", () => {
   it("keeps a whole unit as it is written", () => {

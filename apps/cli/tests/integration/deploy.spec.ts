@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aCommittedApp,
   anUndeployedEnvironment,
@@ -11,7 +11,7 @@ import {
   type DeployResult,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,15 @@ describe("deploy", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["deploy", "-m", "in every rendering"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("deploys the config to every primary origin", async () => {
         const app = await aSetUpApp();
@@ -179,7 +188,7 @@ describe("deploy", () => {
         await app.addPrimaryOrigin();
         platform.holdsAUserWithoutAnEmail();
 
-        const result = await app.deployDryRun();
+        const result = await app.deployDryRun(["--force"]);
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           '1 of 1 existing user of "human-user" has no "email"',
@@ -191,7 +200,7 @@ describe("deploy", () => {
         await app.addPrimaryOrigin();
         platform.holdsAUserWithoutAnEmail();
 
-        const result = await app.deployDryRun();
+        const result = await app.deployDryRun(["--force"]);
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           '1 of 1 existing user of "human-user" has no "email"',
@@ -226,7 +235,7 @@ describe("deploy", () => {
         await app.addPrimaryOrigin();
         platform.holdsASsoUserOnAnotherSchema();
 
-        const result = await app.deployDryRun();
+        const result = await app.deployDryRun(["--force"]);
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain("has an SSO link");
       });
@@ -241,6 +250,57 @@ describe("deploy", () => {
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           "Could not finish checking existing users",
         );
+      });
+
+      it("refuses a deploy that leaves existing users unable to sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+      });
+
+      it("deploys nothing when it refuses a lockout", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+        const before = await app.liveDeploymentCount();
+
+        await app.deploy();
+
+        expect(await app.liveDeploymentCount()).toBe(before);
+      });
+
+      it("deploys a release that leaves existing users unable to sign in with --force", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deploy(["--force"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a dry run that would leave existing users unable to sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+      });
+
+      it("previews a release that leaves existing users unable to sign in with --force", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun(["--force"]);
+
+        expect(result).toSucceed();
       });
 
       it("still deploys when the users cannot be read", async () => {
@@ -351,6 +411,23 @@ describe("deploy", () => {
         await app.deployData();
 
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
+
+      it("does not warn that the subject claim can change once the connection is deployed", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+        await app.editConnection("google", (connection) => {
+          connection.subject_claim = "email";
+        });
+        await app.deployData();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
       });
 
       it("writes no connection when the deploy never reaches the release", async () => {
@@ -507,6 +584,47 @@ describe("deploy", () => {
             patch: expect.stringContaining('"nickname"'),
           }),
         ]);
+      });
+
+      it("suggests committing what it deployed, in the directory it deployed", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest(`git -C '${app.path}' add .zitadel`);
+      });
+
+      it("puts the deploy's own message in the commit it suggests", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy(["-m", "add a nickname"]);
+
+        expect(result).toSuggest("commit -m 'add a nickname' -- .zitadel");
+      });
+
+      it("suggests no commit when only files outside .zitadel are uncommitted", async () => {
+        const app = await aCommittedApp();
+        await app.editPackageJson((pkg) => {
+          pkg.dependencies.left = "1.0.0";
+        });
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git");
+      });
+
+      it("suggests no commit after deploying from a clean tree", async () => {
+        const app = await aCommittedApp();
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git commit");
       });
     });
 

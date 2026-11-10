@@ -7,8 +7,12 @@ description: |
   preview deploy may register. It may include at most one `*` inside a single
   host label; `*` matches one or more characters, none of them a dot. A
   literal beats a wildcard. Unknown hosts are accepted as written.
-  An empty list admits every origin until the first pattern is added.
-  Loopback origins are admitted without a pattern.
+  An empty list admits no origin except a loopback origin, which is admitted
+  without a pattern.
+
+  A loopback origin is on the local machine: `localhost`, a name under
+  `.localhost`, or a loopback IP such as `127.0.0.1` or `[::1]`, on any port
+  and over `http` or `https`. It is never a preview URL.
 required:
   - pattern
   - kind

@@ -8,9 +8,9 @@ import {
   mergeDocuments,
   readAssignment,
   readAssignments,
-} from "../../../../../src/lib/oclif/crud";
-import { fragmentOf } from "../../../../../src/lib/oclif/crud/assign";
-import type { ZodLike } from "../../../../../src/lib/oclif/crud/zod";
+} from "@/lib/oclif/crud";
+import { fragmentOf } from "@/lib/oclif/crud/assign";
+import type { ZodLike } from "@/lib/oclif/crud/zod";
 
 const connection = documentSchemaOf(CreateIdpBody, "idp");
 const connectionFields = describeBody(CreateIdpBody, { root: "idp" });

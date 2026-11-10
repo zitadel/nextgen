@@ -31,57 +31,24 @@ content:
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       flowdef.invalid:
-        summary: flowdef.invalid
-        value:
-          code: flowdef.invalid
-          message: 'flow definition: invalid'
+        $ref: '../../components/examples/errors/flowdef-invalid.yaml'
       flowdef.not_found:
-        summary: flowdef.not_found
-        value:
-          code: flowdef.not_found
-          message: 'flow definition: not found'
+        $ref: '../../components/examples/errors/flowdef-not_found.yaml'
       flowdef.permission_denied:
-        summary: flowdef.permission_denied
-        value:
-          code: flowdef.permission_denied
-          message: 'flow definition: the flow definition management API requires the project secret'
+        $ref: '../../components/examples/errors/flowdef-permission_denied.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       sch.not_found:
-        summary: sch.not_found
-        value:
-          code: sch.not_found
-          message: 'schema not found'
+        $ref: '../../components/examples/errors/sch-not_found.yaml'
       sch.permission_denied:
-        summary: sch.permission_denied
-        value:
-          code: sch.permission_denied
-          message: 'the schema management API requires the project secret'
+        $ref: '../../components/examples/errors/sch-permission_denied.yaml'
       flowdef.missing_project_id:
-        summary: flowdef.missing_project_id
-        value:
-          code: flowdef.missing_project_id
-          message: 'flow definition: missing project id'
+        $ref: '../../components/examples/errors/flowdef-missing_project_id.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../components/examples/errors/not_implemented.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../components/examples/errors/unavailable.yaml'

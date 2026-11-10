@@ -3,8 +3,8 @@ get:
   x-zitadel-cli: policies get
   summary: Get a policy by ID
   description: |
-    Returns a policy as its newest revision, the one that applies the next
-    time its operation runs.
+    Returns a policy as its newest revision. A revision applies once a deployed
+    release pins it.
 
     A policy holds a project's rules for one operation, such as setting a
     password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.

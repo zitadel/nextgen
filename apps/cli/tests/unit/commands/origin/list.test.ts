@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -60,16 +61,6 @@ function list(cwd: string, extra: string[] = []) {
 }
 
 /** Runs `run` with stdout reporting as a terminal, so the aligned table renders. */
-async function onATerminal<T>(run: () => Promise<T>): Promise<T> {
-  const original = process.stdout.isTTY;
-  process.stdout.isTTY = true;
-  try {
-    return await run();
-  } finally {
-    process.stdout.isTTY = original;
-  }
-}
-
 describe("origin list", () => {
   it("returns the origins in the --json envelope", async () => {
     const cwd = await anAppDir();
@@ -86,7 +77,7 @@ describe("origin list", () => {
     const cwd = await anAppDir();
     origins.push({ pattern: "https://app.acme.com", kind: "primary" });
 
-    const result = await onATerminal(() => list(cwd));
+    const result = await asTerminal(() => list(cwd));
 
     const text = stripAnsi(result.stdout);
     expect(text).toContain("pattern");
@@ -98,7 +89,7 @@ describe("origin list", () => {
   it("says the project has no origins when the list is empty", async () => {
     const cwd = await anAppDir();
 
-    const result = await onATerminal(() => list(cwd));
+    const result = await asTerminal(() => list(cwd));
 
     expect(stripAnsi(result.stdout)).toContain("No origins on the project.");
   });

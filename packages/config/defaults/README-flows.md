@@ -86,6 +86,42 @@ Add a step object to `steps[]` and point a transition at it. The order of
 Keep the step's other transitions, such as `user_already_exists`. To
 remove a step, remove it and every transition that targets it.
 
+### Offer a password or a passkey
+
+A step offers a password when its `fields` list
+`x-auth-methods#password`; its `submit` checks the password, or sets it
+on a step with `"on_success": "create_user"`. A step offers a passkey
+through an action: `kind: passkey` signs an existing user in,
+`kind: passkey_register` creates the user with a passkey at sign-up.
+Each needs a transition with the action's name:
+
+```json
+{
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true },
+    { "name": "passkey", "kind": "passkey", "primary": false }
+  ],
+  "transitions": {
+    "submit": { "target": "password" },
+    "passkey": { "target": "done" }
+  }
+}
+```
+
+A step offers social sign-in through `sso_providers`, which
+`zitadel auth-method sso enable` writes.
+
+The schema must enable the method as well: run
+`zitadel auth-method password|passkey enable`. Before
+`zitadel auth-method password|passkey disable`, remove the method from
+the flow: the steps that collect `x-auth-methods#password` (removing only
+the field leaves a step that signs nobody in), or the passkey actions.
+Retarget every transition that targets a removed step, or remove it
+with the action it belongs to. If you remove the login entry step, point
+`purposes.login` at another step.
+
+Guide: https://preview.zitadel.com/docs/guides/sign-in-methods
+
 ### Link sign-in and sign-up
 
 Pair a `kind: navigate` action with a transition that declares a local

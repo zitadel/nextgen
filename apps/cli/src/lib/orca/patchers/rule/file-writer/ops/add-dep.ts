@@ -1,8 +1,12 @@
 import sortKeys from "sort-keys";
 
-import { ZitadelError } from "../../../../../errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../../json";
-import { type Change, Operation, type Source } from "../operation";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
+import {
+  type Change,
+  Operation,
+  type Source,
+} from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
  * Adds a dependency to `package.json`.

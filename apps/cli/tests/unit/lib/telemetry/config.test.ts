@@ -7,7 +7,7 @@ import {
   resolveChannel,
   resolveTelemetryEndpoint,
   resolveTelemetryToken,
-} from "../../../../src/lib/telemetry/config";
+} from "@/lib/telemetry/config";
 
 describe("resolveChannel", () => {
   it("defaults to production (single generic build, no channel stamp)", () => {

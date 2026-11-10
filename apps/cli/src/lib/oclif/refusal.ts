@@ -1,5 +1,5 @@
-import { ZitadelError, type ZitadelErrorCode } from "../errors";
-import type { SuggestedCommand } from "../suggestion";
+import { ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * How a command refuses, written once as text. Every placeholder is written

@@ -1,9 +1,9 @@
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { isErrno, ZitadelError } from "../errors";
-import { pathExists, readDirIfExists } from "../fs";
-import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
+import { isErrno, ZitadelError } from "@/lib/errors";
+import { pathExists, readDirIfExists } from "@/lib/fs";
+import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
@@ -153,11 +153,10 @@ export class Orca {
    * Describes the new `framework` app {@link scaffold} would create in `cwd`,
    * without touching the directory, so a caller can ask its questions first and
    * create the app only once it has every answer. Refuses up front what would
-   * stop the app later: a directory name npm does not accept, or a framework
-   * no scaffolder can create or no patcher can integrate.
+   * stop the app later: a framework no scaffolder can create or no patcher can
+   * integrate.
    */
   async planScaffold(cwd: string, framework: string): Promise<PlannedApp> {
-    assertNpmSafeScaffoldDirectoryName(cwd);
     this.scaffolderFor(framework);
     this.patcherFor(framework);
     return { framework, devPort: await detectDevPort(cwd, {}) };
@@ -191,7 +190,6 @@ export class Orca {
         details: { entries: target.entries },
       });
     }
-    assertNpmSafeScaffoldDirectoryName(cwd);
     // A directory that does not exist yet is created only now, so a refusal or
     // a dry run leaves no trace of it, and an undo removes it again with any
     // parent it took to create it.
@@ -283,53 +281,6 @@ export class Orca {
   }
 }
 
-function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
-  const name = basename(cwd);
-  const errors = npmPackageNameErrors(name);
-  if (errors.length === 0) {
-    return;
-  }
-
-  throw new ZitadelError(
-    "E_VALIDATION",
-    `Fresh app directory name "${name}" is not npm-package-safe`,
-    {
-      hint: "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
-      details: { cwd, name, validation_errors: errors },
-    },
-  );
-}
-
-function npmPackageNameErrors(name: string): string[] {
-  // This local preflight catches common package-name failures before the
-  // scaffolder mutates disk; framework generators still own stricter checks.
-  const errors: string[] = [];
-  if (name.length === 0) {
-    errors.push("name is empty");
-  }
-  if (name.length > 214) {
-    errors.push("name is longer than 214 characters");
-  }
-  if (name !== name.trim()) {
-    errors.push("name contains leading or trailing whitespace");
-  }
-  if (/[A-Z]/.test(name)) {
-    errors.push("name can no longer contain capital letters");
-  }
-  if (name.startsWith(".") || name.startsWith("_")) {
-    errors.push("name cannot start with a period or underscore");
-  }
-  if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
-    errors.push(
-      "name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens",
-    );
-  }
-  if (name === "node_modules" || name === "favicon.ico") {
-    errors.push(`name "${name}" is reserved`);
-  }
-  return [...new Set(errors)];
-}
-
 /** {@link Orca} wired with the default detector, scaffolder, and patcher registries. */
 export function createOrca(): Orca {
   return new Orca(detectors, scaffolders, patchers);
@@ -416,7 +367,7 @@ async function stashScaffoldDir(
 
   const root = join(
     dirname(cwd),
-    `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+    `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
   );
   await mkdir(root, { mode: 0o700 });
   const moved: string[] = [];

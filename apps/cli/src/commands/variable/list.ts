@@ -1,20 +1,9 @@
 import { Flags } from "@oclif/core";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import {
-  toInventoryRows,
-  toVariableRows,
-  valuesOfKind,
-  variableCells,
-  variableInventoryCells,
-  variableReadScope,
-} from "../../lib/variables";
+import { VariableService } from "@/lib/backend";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { inventoryCell, variableCell } from "@/lib/variables";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;
@@ -47,20 +36,43 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
 
   protected async execute({ flags }: Admitted<typeof VariableList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-    const scope = variableReadScope(projectId, flags.preview);
+    const variableService = new VariableService(client, projectId);
 
-    // The inventory reads both kinds, which a read without a kind answers in
-    // one request; `--preview` reads that kind alone.
-    const items = flags.preview
-      ? toVariableRows(valuesOfKind(await client.getVariables(scope), scope.kind))
-      : toInventoryRows(await client.getVariables({ project_id: projectId }));
-    this.recordTelemetry({ variable_count: items.length });
+    if (flags.preview) {
+      const items = await variableService.previews();
+      this.recordTelemetry({
+        variable_count: items.length,
+      });
+      const rows = items.map((item) => {
+        return variableCell(item);
+      });
+      const columns = PREVIEW_COLUMNS;
+      const empty = "No preview values on the project.";
+      const footer: string[] = [];
+      const page = null;
+      const extra = {};
 
-    const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);
-    const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
-    const empty = flags.preview
-      ? "No preview values on the project."
-      : "No variables on the project.";
+      return this.emitList(flags, {
+        columns,
+        rows,
+        items,
+        singular: "variable",
+        empty,
+        footer,
+        page,
+        extra,
+      });
+    }
+
+    const items = await variableService.inventory();
+    this.recordTelemetry({
+      variable_count: items.length,
+    });
+    const rows = items.map((item) => {
+      return inventoryCell(item);
+    });
+    const columns = COLUMNS;
+    const empty = "No variables on the project.";
     const footer: string[] = [];
     const page = null;
     const extra = {};

@@ -8,16 +8,16 @@ import {
   SESSION_COOKIE_MARKER,
   viteSessionCookieStatements,
   viteSessionCookieStatementsV1,
-} from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
+} from "@/lib/orca/patchers/rule/session-cookie";
 import {
   viteApiPrefixEdit,
   viteApiPrefixVerdict,
   viteProxyEdit,
   viteSessionCookieEdit,
   viteSessionCookieVerdict,
-} from "../../../../../../src/lib/orca/patchers/rule/vite-support";
-import { REMOTE_HOST, useRemoteServer } from "../../../../../helpers/remote-server";
-import { aViteApp, type DevApp } from "../../../../../helpers/vite";
+} from "@/lib/orca/patchers/rule/vite-support";
+import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
+import { aViteApp, type DevApp } from "@tests/helpers/vite";
 
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 const sessionCookieEdit = viteSessionCookieEdit();

@@ -3,8 +3,8 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
-import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-server/processes";
-import { publicCliCommand } from "../../src/lib/public-cli";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
+import { publicCliCommand } from "@/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
 export const cliVersion = JSON.parse(
@@ -104,7 +104,7 @@ async function commandSeeing(
   // Loaded here, not at the top: this module is loaded by the test setup, ahead
   // of any test's mocks, and the commands must not be.
   if (name === "doctor") {
-    const { default: Doctor } = await import("../../src/commands/doctor");
+    const { default: Doctor } = await import("@/commands/doctor");
     return class extends Doctor {
       protected override localServers(): LocalServers {
         return machine;
@@ -112,7 +112,7 @@ async function commandSeeing(
     };
   }
   if (name === "stop") {
-    const { default: Stop } = await import("../../src/commands/stop");
+    const { default: Stop } = await import("@/commands/stop");
     return class extends Stop {
       protected override localServers(): LocalServers {
         return machine;

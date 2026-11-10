@@ -1,4 +1,5 @@
-import { isPortableShellWord, publicCliCommand } from "./public-cli";
+import { Cmd } from "./cmd";
+import { isPortableShellWord, newestCliCommand, publicCliCommand } from "./public-cli";
 
 declare const suggestedCommand: unique symbol;
 
@@ -14,6 +15,13 @@ declare const suggestedCommand: unique symbol;
  * string does not typecheck where a suggestion is expected, so forgetting the
  * selector means choosing {@link unscopedCommand} by name, not by accident.
  */
+/**
+ * The arguments of a suggested publish. A non-interactive `deploy` with no
+ * message to fall back on refuses to run without `-m`, so a suggested deploy
+ * carries one for the reader to fill in.
+ */
+export const DEPLOY_ARGS = "deploy -m '<what changed>'";
+
 export type SuggestedCommand = string & { readonly [suggestedCommand]: true };
 
 declare const environmentSelector: unique symbol;
@@ -63,7 +71,7 @@ export function unscopedCommand(args: string, cliVersion?: string): SuggestedCom
  * carry whatever selector the command needs: they are the arguments as run.
  */
 export function portableSuggestions(
-  argLists: readonly string[][],
+  argLists: readonly (readonly string[])[],
   cliVersion: string,
   /** Arguments the caller fills in (`<what changed>`): quoted in the command, not portable words. */
   placeholders: readonly string[] = [],
@@ -84,6 +92,12 @@ export function portableSuggestions(
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */
 export function shellCommand(command: string): SuggestedCommand {
   return command as SuggestedCommand;
+}
+
+/** `upgrade` on the CLI's dist-tag, so the newest release does the upgrading. */
+export function upgradeCommand(cliVersion: string, typedCwd?: string): SuggestedCommand {
+  const args = typedCwd === undefined ? "upgrade" : `upgrade ${Cmd.option("--cwd", typedCwd)}`;
+  return newestCliCommand(args, cliVersion) as SuggestedCommand;
 }
 
 /**

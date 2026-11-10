@@ -11,12 +11,12 @@ vi.mock("@oclif/table", async (importOriginal) => {
 
 import { makeTable } from "@oclif/table";
 
-import { asTerminal, offTerminal } from "../../../helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import {
   aTableDrawnByARun,
   aTabulatingCommand,
   anUnscopedTabulatingCommand,
-} from "../../../helpers/tabulate";
+} from "@tests/helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
 
@@ -34,7 +34,9 @@ const printed = async (
   if (result.status !== "ok") {
     throw new Error(`expected an ok result, got ${result.status}`);
   }
-  return result.pretty ?? "";
+  // A list arrives spelled out: its table is painted, its plain records are
+  // what a pipe reads, and either way nothing escapes it again on the way out.
+  return result.pretty?.text ?? "";
 };
 
 describe("tabulate", () => {
@@ -176,6 +178,23 @@ describe("a list for a person", () => {
     expect(await asTerminal(() => printed({ plain: false }, { ...view, rows: [] }))).toBe(
       "No things.",
     );
+  });
+
+  it("escapes a footer line, which names what the server answered", async () => {
+    const footer = ["Frozen by dep_1\u001b[2J for https://a.example"];
+
+    const list = await asTerminal(() => printed({ plain: false }, { ...view, footer }));
+
+    expect(list).not.toContain("\u001b");
+    expect(list).toContain("Frozen by dep_1\\x1b[2J for https://a.example");
+  });
+
+  it("escapes the empty line, which names what the server answered", async () => {
+    const empty = "dep_1\u001b[2J froze no variables.";
+
+    const list = await asTerminal(() => printed({ plain: false }, { ...view, rows: [], empty }));
+
+    expect(list).toBe("dep_1\\x1b[2J froze no variables.");
   });
 
   it("pluralises the count, with the plural when one is given", async () => {
@@ -364,13 +383,13 @@ describe("emitList", () => {
   it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
     const result = await draw().drawList({ plain: true }, view);
 
-    expect(result).toMatchObject({ pretty: "a", machineReadable: true });
+    expect(result).toMatchObject({ pretty: { kind: "piped", text: "a" } });
   });
 
   it("keeps the next steps with the table for a person", async () => {
     const result = await asTerminal(() => draw().drawList({ plain: false }, view));
 
-    expect(result).toMatchObject({ machineReadable: false });
+    expect(result).toMatchObject({ pretty: { kind: "painted" } });
   });
 
   it("reports the next page's cursor, its command and a footer that names it", async () => {
@@ -394,7 +413,7 @@ describe("emitList", () => {
     );
 
     expect(result).toMatchObject({
-      pretty: expect.stringContaining("More available: --page-token p2 (or --all)"),
+      pretty: { text: expect.stringContaining("More available: --page-token p2 (or --all)") },
     });
   });
 
@@ -406,7 +425,7 @@ describe("emitList", () => {
       ),
     );
 
-    expect(result).toMatchObject({ pretty: expect.stringContaining("--page-token=-p2") });
+    expect(result).toMatchObject({ pretty: { text: expect.stringContaining("--page-token=-p2") } });
   });
 });
 
@@ -428,6 +447,12 @@ describe("tabulateDetail", () => {
         "status      active",
         "created_at  2026-01-01T00:00:00Z",
       ].join("\n"),
+    );
+  });
+
+  it("spells out what the server wrote into the field it is headed by", () => {
+    expect(draw().drawDetail("ada\u001b]0;pwned\u0007@example.com", ["id"], user)).toBe(
+      ["ada\\x1b]0;pwned\\x07@example.com", "", "id  user_1"].join("\n"),
     );
   });
 

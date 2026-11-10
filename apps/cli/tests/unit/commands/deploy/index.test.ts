@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import Deploy, { missingPrimaryOrigin } from "../../../../src/commands/deploy/index";
-import { parseFlag } from "../../../helpers/inputs";
+import { Origins } from "@/lib/backend";
+import Deploy, { missingPrimaryOrigin } from "@/commands/deploy/index";
+import { parseFlag } from "@tests/helpers/inputs";
 
 const ISSUER = "http://localhost:3000";
-const PREVIEW_ISSUER = [{ pattern: ISSUER, kind: "preview" }];
+const PREVIEW_ISSUER = Origins.wrap([{ pattern: ISSUER, kind: "preview" }]);
 
 function outcomeFor(input: Partial<Parameters<typeof missingPrimaryOrigin>[0]>) {
   return missingPrimaryOrigin({
-    origins: [],
+    origins: Origins.wrap([]),
     issuer: ISSUER,
     setupProject: true,
     suggest: (command) => `zitadel ${command}` as never,
@@ -42,7 +43,7 @@ describe("missingPrimaryOrigin", () => {
 
   it("suggests adding the issuer as primary when the project does not hold it", () => {
     const outcome = outcomeFor({
-      origins: [{ pattern: "https://*-acme.vercel.app", kind: "preview" }],
+      origins: Origins.wrap([{ pattern: "https://*-acme.vercel.app", kind: "preview" }]),
     });
 
     expect(outcome.next).toEqual([`origin add ${ISSUER} --kind primary`]);

@@ -1,11 +1,12 @@
-import type {
-  CreateFlow201,
-  CreateFlow201Step,
-  CreateFlow201StepFieldsItem,
+import {
+  type CreateFlow201,
+  type CreateFlow201Step,
+  type CreateFlow201StepFieldsItem,
+  type CreateFlowBody,
   CreateFlowBodyPurpose,
-  SubmitFlowStepBody,
-  SubmitFlowStepBodyChallengeResponse,
-  SubmitFlowStepBodyFields,
+  type SubmitFlowStepBody,
+  type SubmitFlowStepBodyChallengeResponse,
+  type SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
@@ -179,6 +180,82 @@ function apiErrorCode(error: unknown): string {
   return typeof body === "object" && body !== null && "code" in body
     ? String((body as { code: unknown }).code)
     : "";
+}
+
+/**
+ * The request fields a `req.invalid` envelope names (`details.details.fields`),
+ * or none for any other error.
+ */
+function apiErrorFields(error: unknown): string[] {
+  if (!(error instanceof ApiError)) return [];
+  const details = (error.body as { details?: { details?: { fields?: unknown } } } | null)?.details;
+  const fields = details?.details?.fields;
+  return Array.isArray(fields) ? fields.filter((field) => typeof field === "string") : [];
+}
+
+/** Where a `<zitadel-login>` gets its project id, for errors about it. */
+const PROJECT_ID_FIX =
+  "Check the `project-id` attribute, `configureZitadel({ projectId })` or the `project` handle.";
+
+/**
+ * The server's envelope names what was wrong (a code, and for `req.invalid`
+ * the fields), but not that the value came from one of the element's
+ * attributes. Rewraps the codes a misconfigured element produces with the
+ * attribute, the value `request` sent and the fix, and the codes a project
+ * with nothing deployed produces with the deploy that fixes it, keeping the
+ * envelope as `cause`; every other error passes through.
+ */
+function describeStartError(error: unknown, request: CreateFlowBody): unknown {
+  const { project_id: projectId, purpose, flow_definition_name: flowName } = request;
+  const described = (message: string) => new Error(`<zitadel-login> ${message}`, { cause: error });
+  const code = apiErrorCode(error);
+  if (code === "req.invalid") {
+    const fields = apiErrorFields(error);
+    if (fields.includes("purpose")) {
+      return described(
+        `purpose="${purpose}" is not a flow purpose. ` +
+          `Use one of: ${Object.values(CreateFlowBodyPurpose).join(", ")}.`,
+      );
+    }
+    if (fields.includes("flow_definition_name")) {
+      return described(
+        `flow-name="${flowName}" is not a flow name. A name starts with a lowercase ` +
+          `letter and holds only lowercase letters, digits and hyphens, as the \`name\` ` +
+          `in your flow file does.`,
+      );
+    }
+    if (fields.includes("project_id")) {
+      return described(`"${projectId}" is not a project id. ${PROJECT_ID_FIX}`);
+    }
+  } else if (code === "proj.not_found") {
+    return described(`no project "${projectId}" exists on this server. ${PROJECT_ID_FIX}`);
+  } else if (code === "flowdef.not_found") {
+    return described(
+      flowName
+        ? `flow-name="${flowName}" does not match any active flow definition in this ` +
+            `project. Check the \`name\` in your flow file and that it has been deployed ` +
+            `(\`zitadel deploy\`).`
+        : `no active flow definition serves purpose "${purpose}" in this project. ` +
+            `Deploy one whose \`purposes\` include "${purpose}" (\`zitadel deploy\`).`,
+    );
+  } else if (code === "flowdef.purpose_mismatch") {
+    return described(
+      `flow-name="${flowName}" matched a flow definition that does not serve ` +
+        `purpose "${purpose}".`,
+    );
+  } else if (code === "rel.no_default") {
+    return described(
+      `project "${projectId}" has nothing deployed to its primary origins. Deploy its ` +
+        `configuration (\`zitadel deploy\`).`,
+    );
+  } else if (code === "rel.not_deployed") {
+    return described(
+      `project "${projectId}" has nothing deployed to this page's origin. Deploy its ` +
+        `configuration (\`zitadel deploy\`); an origin the project does not list needs ` +
+        `\`zitadel origin add <origin> --kind primary\` first.`,
+    );
+  }
+  return error;
 }
 
 /**
@@ -684,7 +761,7 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(`${rendered}<!--${this.errorRevision}-->`)}
     </form>`;
   }
 
@@ -844,10 +921,13 @@ export class ZitadelLogin extends ZitadelSurface {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, {
+        const request: CreateFlowBody = {
           project_id: cfg.projectId,
           purpose: this.purpose,
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+        };
+        wire = await apiStartFlow(api, request).catch((error: unknown) => {
+          throw describeStartError(error, request);
         });
       }
       if (this.restarting) {
@@ -861,7 +941,7 @@ export class ZitadelLogin extends ZitadelSurface {
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
-      this.handleTransportError(this.describeFlowSelectionError(error));
+      this.handleTransportError(error);
     } finally {
       this.loading = false;
     }
@@ -917,31 +997,6 @@ export class ZitadelLogin extends ZitadelSurface {
     clearFlowIdFromLocation();
     await this.startFlow();
     return true;
-  }
-
-  /**
-   * When a `flow-name` lookup fails, the server's envelope only says
-   * "not found" / "purpose mismatch" — it cannot know the name came from
-   * an attribute. Rewrap those two codes with the attribute and the fix;
-   * every other error passes through untouched.
-   */
-  private describeFlowSelectionError(error: unknown): unknown {
-    if (!this.flowName) return error;
-    const code = apiErrorCode(error);
-    if (code === "flowdef.not_found") {
-      return new Error(
-        `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
-          `definition in this project. Check the \`name\` in your flow file and that ` +
-          `it has been deployed (\`zitadel deploy\`).`,
-      );
-    }
-    if (code === "flowdef.purpose_mismatch") {
-      return new Error(
-        `<zitadel-login> flow-name="${this.flowName}" matched a flow definition that ` +
-          `does not serve purpose "${this.purpose}".`,
-      );
-    }
-    return error;
   }
 
   private async applyResponse(wire: CreateFlow201): Promise<void> {
@@ -1263,38 +1318,54 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Names of the current step's `required` fields whose captured value is
-   * empty. Reads each atom's live `formValue` (the getter reflects the native
-   * control, so autofill that skipped `input` events is still seen), so this
-   * is browser-independent and does not rely on native constraint validation.
+   * The validation error keys the current step's captured values earn, in the
+   * server's own dialect: `error.<field>_required` for an empty required
+   * field, `_min_length` / `_max_length` for a value outside the field's
+   * declared bounds. Reads the live values through {@link captureFieldValues},
+   * so autofill that skipped `input` events is both judged and kept when the
+   * error rebuilds the step. The server checks the same rules again.
    */
-  private missingRequiredFields(): string[] {
-    const values = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) values.set(name, atom.formValue);
-    }
-    return this.response
-      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
-      : [];
+  private fieldRuleErrors(): string[] {
+    const values = this.captureFieldValues();
+    return this.response ? fieldRuleErrorKeys(this.response.step, values) : [];
   }
 
   /**
-   * Surface a client-side required-field error using the server's own
-   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
-   * through the same localisation and inline/banner routing as a real
-   * backend rejection — no native browser bubble. Idempotent: re-running with
-   * the same keys (both submit entry points fire on one click) is a no-op.
+   * Surface client-side field errors (keys from {@link fieldRuleErrors},
+   * "; "-joined), so they flow through the same localisation and
+   * inline/banner routing as a real backend rejection — no native browser
+   * bubble. The same keys again are a no-op while their error still shows;
+   * once the user edited it away they show it again, through
+   * {@link errorRevision}.
    */
-  private reportRequiredErrors(fields: readonly string[]): void {
+  private reportFieldErrors(keys: readonly string[]): void {
     if (!this.response) return;
-    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
-    if (this.response.step.error === errorKey) return;
+    const errorKey = keys.join("; ");
+    if (this.response.step.error === errorKey && !this.stepErrorDismissed) return;
     this.stepErrorDismissed = false;
+    this.errorRevision += 1;
     this.response = {
       ...this.response,
       step: { ...this.response.step, error: errorKey },
     };
+  }
+
+  /**
+   * Read every rendered field atom's live `formValue` (the getter reflects the
+   * native control, so autofill that skipped `input` events is still seen)
+   * and fold the values into `formValues`, which a step rebuild restores.
+   * Tag-agnostic: every form-participating atom is read the same way.
+   */
+  private captureFieldValues(): Map<string, string> {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
+    }
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+    }
+    return current;
   }
 
   /**
@@ -1307,14 +1378,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * cross-step identity (the signed-in greeting) and post-error restoration.
    */
   private collectSubmitFields(): SubmitFlowStepBodyFields {
-    const current = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) current.set(name, atom.formValue);
-    }
-    if (current.size > 0) {
-      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
-    }
+    const current = this.captureFieldValues();
     const fields: SubmitFlowStepBodyFields = {};
     for (const f of this.response?.step.fields ?? []) {
       const value = current.get(f.name) ?? "";
@@ -1337,7 +1401,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // "required" error instead of an enum mismatch. Other fields keep the ""
       // default so required-checks and challenge dispatch still run.
       if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
-      fields[f.name] = value;
+      fields[f.name] = f.type === "date_time" ? localDateTimeToRfc3339(value) : value;
     }
     return fields;
   }
@@ -1353,6 +1417,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * anyway.
    */
   private stepErrorDismissed = false;
+
+  /**
+   * Bumped by every client-side error report that is not a no-op, whether its
+   * keys are new or the same keys the user had edited away. The step markup
+   * carries it, so `unsafeHTML`, which keeps a subtree whose markup is
+   * unchanged, rebuilds the step and an error {@link clearStaleErrors} removed
+   * comes back. With new keys the step would rebuild anyway, so the bump is
+   * harmless there.
+   */
+  private errorRevision = 0;
 
   private handleAtomInput = (event: CustomEvent<ZlFieldInputDetail>): void => {
     if (!event.detail) return;
@@ -1480,9 +1554,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // empty required value for the server to reject. Secondary actions (back,
     // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
     // never gated.
-    const missing = this.missingRequiredFields();
-    if (missing.length > 0) {
-      this.reportRequiredErrors(missing);
+    const ruleErrors = this.fieldRuleErrors();
+    if (ruleErrors.length > 0) {
+      this.reportFieldErrors(ruleErrors);
       return;
     }
     // `submitter` is the button that triggered the submit. When the user
@@ -1697,6 +1771,28 @@ export class ZitadelLogin extends ZitadelSurface {
 }
 
 /**
+ * What a `date_time` field submits: `datetime-local` yields local time with no
+ * offset (`2026-11-03T12:00`), which the server's `date-time` format refuses.
+ * An empty or unparsable value goes as it is, for the server to judge.
+ */
+function localDateTimeToRfc3339(value: string): string {
+  const parsed = new Date(value);
+  return value === "" || Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+}
+
+/**
+ * What a `date_time` field shows for a value the server prefills: an RFC 3339
+ * timestamp is no valid `datetime-local` value, so the browser would blank it
+ * and the next submit would clear it. Anything else goes as it is.
+ */
+function rfc3339ToLocalDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) || Number.isNaN(parsed.getTime())) return value;
+  const shifted = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  return shifted.toISOString().slice(0, -1);
+}
+
+/**
  * Whether `value` is a member of a select field's closed `enum`. A select
  * with no explicit enum has no submittable value, so this returns `false`
  * and the caller omits the field. Because the enum never contains "" unless
@@ -1778,6 +1874,31 @@ function requiredFieldNames(step: CreateFlow201Step): string[] {
 }
 
 /**
+ * The error keys `values` earn against `step`'s required fields and length
+ * bounds. Length counts code points, as the server does; an empty value is
+ * judged only by `required`, and a checkbox not at all, since the server
+ * applies no string rules to a boolean.
+ */
+function fieldRuleErrorKeys(
+  step: CreateFlow201Step,
+  values: ReadonlyMap<string, string>,
+): string[] {
+  return (step.fields ?? []).flatMap((field) => {
+    if (field.type === "checkbox") return [];
+    const value = values.get(field.name) ?? "";
+    if (value === "") return field.required ? [`error.${field.name}_required`] : [];
+    // A password is measured after NFC normalization, as the server and
+    // its password policy measure it.
+    const measured = field.type === "password" ? value.normalize("NFC") : value;
+    const length = Array.from(measured).length;
+    const { min_length: min, max_length: max } = field.validation ?? {};
+    if (min && length < min) return [`error.${field.name}_min_length`];
+    if (max && length > max) return [`error.${field.name}_max_length`];
+    return [];
+  });
+}
+
+/**
  * Whether a terminal step ends in a navigation rather than a screen: a
  * `redirect` with a URI, or a `show` whose handoff the widget exchanges before
  * sending the browser to `post-sign-in-url`. A `show` without a
@@ -1799,7 +1920,8 @@ function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const field of step.fields) {
-    values[field.name] = typeof field.value === "string" ? field.value : "";
+    const value = typeof field.value === "string" ? field.value : "";
+    values[field.name] = field.type === "date_time" ? rfc3339ToLocalDateTime(value) : value;
   }
   return values;
 }

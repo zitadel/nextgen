@@ -208,6 +208,7 @@ func TestGrantErrorResponse(t *testing.T) {
 		{"principal_not_found", domain.ErrGrantPrincipalNotFound(), http.StatusNotFound},
 		{"already_exists", domain.ErrGrantAlreadyExists(), http.StatusConflict},
 		{"permission_denied", domain.ErrGrantPermissionDenied(), http.StatusForbidden},
+		{"project_unclaimed", domain.ErrGrantProjectUnclaimed(), http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,9 +235,10 @@ func TestQueryGrants_PrincipalExpandCeiling(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj,
 		PrincipalID:   "proj_customer",
 	})
+	customerOnly := map[string]bool{"proj_customer": true}
 
-	t.Run("session user without read scopes may expand", func(t *testing.T) {
-		h := queryGrantsHandler(t, true, true, true)
+	t.Run("session user with read on the home project may expand", func(t *testing.T) {
+		h := queryGrantsHandler(t, map[string]bool{"proj_customer": true, "proj_platform": true}, true, true)
 		resp, err := h.QueryGrants(userCtx, expand, params)
 		if err != nil {
 			t.Fatalf("user expand: %v", err)
@@ -246,38 +248,44 @@ func TestQueryGrants_PrincipalExpandCeiling(t *testing.T) {
 		}
 	})
 
-	t.Run("operator secret may expand via project.write", func(t *testing.T) {
-		h := queryGrantsHandler(t, true, true, true)
-		resp, err := h.QueryGrants(secretCtx, expand, params)
-		if err != nil {
-			t.Fatalf("secret expand: %v", err)
-		}
-		if _, ok := resp.(*api.QueryGrantsResponse); !ok {
-			t.Fatalf("got %T, want QueryGrantsResponse", resp)
-		}
+	t.Run("project.write on the protected project does not expand", func(t *testing.T) {
+		h := queryGrantsHandler(t, customerOnly, false, true)
+		_, err := h.QueryGrants(secretCtx, expand, params)
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 	})
 
-	t.Run("session user still needs Check before expand skip", func(t *testing.T) {
-		h := queryGrantsHandler(t, false, true, false)
+	t.Run("session user without read on the home project does not expand", func(t *testing.T) {
+		h := queryGrantsHandler(t, customerOnly, false, true)
+		_, err := h.QueryGrants(userCtx, expand, params)
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+	})
+
+	t.Run("session user still needs Check before expand", func(t *testing.T) {
+		h := queryGrantsHandler(t, nil, true, false)
 		_, err := h.QueryGrants(userCtx, expand, params)
 		assertDomainCode(t, err, domain.ErrGrantPermissionDenied().Code)
 	})
 
 	t.Run("session user without foothold is not found", func(t *testing.T) {
-		h := queryGrantsHandler(t, false, false, false)
+		h := queryGrantsHandler(t, nil, false, false)
 		_, err := h.QueryGrants(userCtx, expand, params)
 		assertDomainCode(t, err, domain.ErrGrantNotFound().Code)
 	})
 }
 
-func queryGrantsHandler(t *testing.T, allowed, foothold, expectList bool) Handler {
+// queryGrantsHandler answers Check with allowed[project]; a denied Check has
+// a foothold when foothold is set.
+func queryGrantsHandler(t *testing.T, allowed map[string]bool, foothold, expectList bool) Handler {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil).AnyTimes()
-	stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(allowed, foothold, nil).AnyTimes()
+	stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, p domain.AuthzCheckParams) (bool, bool, error) {
+			return allowed[p.ProjectID], foothold, nil
+		}).AnyTimes()
 	if expectList {
 		stmts.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 			&database.ListResult[*domain.AuthzAssignment]{}, nil)

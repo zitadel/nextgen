@@ -5,14 +5,16 @@ import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { CREDENTIALS } from "../../../../src/lib/oclif/credentials";
-import { EnvironmentCommand, PreviewCommand } from "../../../../src/lib/oclif/environment-command";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
-import { asTerminal } from "../../../helpers/terminal";
+import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
+import { CREDENTIALS } from "@/lib/oclif/credentials";
+import { EnvironmentCommand, PreviewCommand } from "@/lib/oclif/environment-command";
+import type { ConnectOptions } from "@/lib/oclif/types";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { asTerminal } from "@tests/helpers/terminal";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 /** Connects with the project secret, the default credential. */
 class ProjectProbe extends EnvironmentCommand {
@@ -24,6 +26,19 @@ class ProjectProbe extends EnvironmentCommand {
     const { flags } = await this.parse(ProjectProbe);
     await this.toMeta(flags);
     return { connection: await this.connect(), telemetry: this.telemetryProps };
+  }
+}
+
+/** Connects with the options it is given, as a best-effort probe does. */
+class OptionedProbe extends EnvironmentCommand {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async probe(options: ConnectOptions) {
+    const { flags } = await this.parse(OptionedProbe);
+    await this.toMeta(flags);
+    return this.connect(options);
   }
 }
 
@@ -128,6 +143,30 @@ describe("EnvironmentCommand.connect", () => {
     );
 
     expect(opened[0]).toBe(opened[1]);
+  });
+
+  it("gives a probe's connection the deadline it asked for, so its request is given up on", async ({
+    dir,
+  }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
+
+    const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe({
+      quiet: true,
+      prompt: false,
+      timeoutMs: 1500,
+    });
+
+    expect(connectionOf(connection.client).timeoutMs).toBe(1500);
+  });
+
+  it("leaves a connection nobody hurried on the default deadline", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
+
+    const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe({
+      quiet: true,
+    });
+
+    expect(connectionOf(connection.client).timeoutMs).toBe(REQUEST_TIMEOUT_MS);
   });
 
   it("forgets a connection that failed, so a second attempt is made", async ({ dir }) => {

@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 )
 
 // WithRecover turns a handler panic into the standard internal error
@@ -32,12 +33,12 @@ func WithRecover(next http.Handler) http.Handler {
 			// The domain error takes the panic's stack from its parent,
 			// whatever the stack trace setting says, and the panic names it.
 			pe := panicError{value: p, stack: debug.Stack()}
-			logAPIError(context.WithoutCancel(r.Context()), http.StatusInternalServerError,
-				domain.ErrInternal(pe).WithMessage(pe.Error()))
+			ctx := context.WithoutCancel(r.Context())
+			errlog.LogFault(ctx, domain.ErrInternal(pe).WithMessage(pe.Error()))
 			if tw.wroteHeader {
 				panic(http.ErrAbortHandler)
 			}
-			writeErrorResponse(w, internalErrorResponse(domain.ErrInternal(nil)))
+			writeErrorResponse(ctx, w, internalErrorResponse(domain.ErrInternal(nil)))
 		}()
 		next.ServeHTTP(tw, r)
 	})

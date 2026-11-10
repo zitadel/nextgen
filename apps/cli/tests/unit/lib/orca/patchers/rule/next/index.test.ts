@@ -2,15 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
-import { PAGE_SURFACE_BACKGROUND } from "../../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { NextPatcher } from "@/lib/orca/patchers/rule/next";
+import { PAGE_SURFACE_BACKGROUND } from "@/lib/orca/patchers/rule/next/renderers/react";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function ctxFor(
   appDir: "app" | "src/app",
@@ -268,6 +265,25 @@ describe("NextPatcher.plan for a scaffolded app", () => {
 });
 
 describe("NextPatcher.artifacts", () => {
+  it.each([
+    ["login", "Sign in"],
+    ["register", "Create account"],
+    ["profile", "Profile"],
+  ])("gives the %s route a managed layout that titles the browser tab %s", (route, title) => {
+    const plan = new NextPatcher().plan(ctxFor("app", 15, true));
+    const layout = writeContents(plan, `app/${route}/layout.tsx`);
+    expect(layout).toContain(MANAGED_MARKER);
+    expect(layout).toContain(`export const metadata: Metadata = { title: "${title}" };`);
+    expect(layout).toContain("return children;");
+  });
+
+  it("leaves an existing app's route layouts alone", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    for (const route of ["login", "register", "profile"]) {
+      expect(writeContents(plan, `app/${route}/layout.tsx`)).toBeUndefined();
+    }
+  });
+
   it("lists managed files, the config file, the dir, and the env backup", () => {
     const artifacts = new NextPatcher().artifacts({
       framework: { id: "next", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
@@ -276,8 +292,11 @@ describe("NextPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toEqual([
       "app/page.tsx",
       "app/login/page.tsx",
+      "app/login/layout.tsx",
       "app/register/page.tsx",
+      "app/register/layout.tsx",
       "app/profile/page.tsx",
+      "app/profile/layout.tsx",
       "middleware.ts",
       "custom-elements.d.ts",
     ]);

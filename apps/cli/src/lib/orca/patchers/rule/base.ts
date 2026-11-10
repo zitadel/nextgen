@@ -1,12 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
+import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
-import { stableStringify } from "../../../json";
-import { projectMetaSchemas } from "../../../meta-schemas";
-import { DEFAULT_SERVER } from "../../../server";
-import { portFromIssuer } from "../../detectors/port";
+import { Origins } from "@/lib/backend";
+import { stableStringify } from "@/lib/json";
+import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
+import { DEFAULT_SERVER } from "@/lib/server";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { FileWriter } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
@@ -25,7 +27,7 @@ import type {
   PatchExecOptions,
   PatchResult,
   PatchView,
-} from "../types";
+} from "@/lib/orca/patchers/types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
@@ -58,10 +60,51 @@ const LOCAL_SERVER_ENV_COMMENT = [
 export abstract class AbstractRulePatcher implements Patcher {
   abstract canPatch(framework: string): boolean;
 
-  /** Apply the full plan (base `.zitadel/` files + framework routes). */
+  /**
+   * Apply the full plan (base `.zitadel/` files + framework routes), then
+   * write the editor meta-schemas into `.zitadel/meta/`.
+   *
+   * The meta-schemas are CLI-owned generated output, so they are not in the
+   * plan: {@link writeMetaSchemas} writes them, as it does for `doctor --fix`
+   * and `branding eject`, replacing an outdated copy without `force` and
+   * never writing through a symlink. What it wrote joins the plan's result,
+   * with paths on disk as the file-writer reports them.
+   *
+   * @param ctx - What the integration is applied with.
+   * @param opts - Where, and whether to write or only report.
+   * @returns Every file the run touched or skipped, and every dependency it added.
+   * @throws `E_CONFLICT` when {@link preflight} refuses the project, or a
+   *   planned file holds something else and `force` is not set.
+   */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     await this.preflight(ctx, opts.cwd);
-    return new FileWriter(opts).scaffold(this.plan(ctx));
+    const result = await new FileWriter(opts).scaffold(this.plan(ctx));
+    const meta = await writeMetaSchemas(opts.cwd, projectMetaSchemas(ctx.cliVersion), {
+      dryRun: opts.dryRun,
+    });
+    const metaFiles = meta.written.map((artifact) => {
+      return { ...artifact, path: join(opts.cwd, artifact.path) };
+    });
+    return {
+      ...result,
+      files: [...result.files, ...metaFiles],
+      filesWritten: [
+        ...result.filesWritten,
+        ...metaFiles
+          .filter((artifact) => {
+            return artifact.kind === "file";
+          })
+          .map((artifact) => {
+            return artifact.path;
+          }),
+      ],
+      filesSkipped: [
+        ...result.filesSkipped,
+        ...meta.unchanged.map((path) => {
+          return join(opts.cwd, path);
+        }),
+      ],
+    };
   }
 
   /**
@@ -277,8 +320,8 @@ export abstract class AbstractRulePatcher implements Patcher {
   private baseOps(ctx: PatchContext): ReadonlyArray<FileOp> {
     return [
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
-      { kind: "mkdir", path: ".zitadel/flows" },
-      { kind: "mkdir", path: ".zitadel/schemas" },
+      { kind: "mkdir", path: CONFIG_DIRECTORIES.flows },
+      { kind: "mkdir", path: CONFIG_DIRECTORIES.schemas },
       { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
       {
         kind: "write",
@@ -288,12 +331,8 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          primary_origins: ctx.project.origins
-            .filter((origin) => origin.kind === "primary")
-            .map((origin) => origin.pattern),
-          preview_origins: ctx.project.origins
-            .filter((origin) => origin.kind === "preview")
-            .map((origin) => origin.pattern),
+          primary_origins: Origins.wrap(ctx.project.origins).primary,
+          preview_origins: Origins.wrap(ctx.project.origins).preview,
           created_at: ctx.project.created_at,
         })}\n`,
       },
@@ -345,19 +384,8 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "write",
         path: ".zitadel/state.json",
-        contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
+        contents: `${stableStringify({ framework: ctx.framework.id })}\n`,
       },
-      // The dialect meta-schemas, committed with the project so the relative
-      // `$schema` pointers of `zitadel.json` and the flow files resolve
-      // offline (editor validation) and agents can read the flow/schema
-      // dialect without the docs site. Their
-      // descriptions become editor tooltips inside the generated app, so the
-      // `zitadel …` mentions are rewritten to the runnable public form on the
-      // way out — the shared source keeps the bare spelling the server wants.
-      { kind: "mkdir", path: META_SCHEMA_DIR },
-      ...projectMetaSchemas(ctx.cliVersion).map(
-        (file): FileOp => ({ kind: "write", path: file.path, contents: file.contents }),
-      ),
       ...guidanceOps(ctx),
     ];
   }

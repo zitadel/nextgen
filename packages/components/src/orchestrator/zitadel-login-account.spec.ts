@@ -174,7 +174,10 @@ describe("<zitadel-login> around the step", () => {
       type(element, PASSWORD_FIELD, "not-the-password");
       submit(element);
 
-      await waitFor(() => query(element, "zl-alert"));
+      // A wrong password is reported on the password field itself.
+      await waitFor(() =>
+        query(element, `zl-field[name="${PASSWORD_FIELD}"]`)?.getAttribute("error") ? true : null,
+      );
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
       const password = query(element, `zl-field[name="${PASSWORD_FIELD}"]`) as HTMLElement & {
         value?: string;

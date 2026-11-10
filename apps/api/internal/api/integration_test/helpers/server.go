@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package helpers
 
@@ -55,13 +55,13 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		)))
 		// The same paths as the production mux (buildHTTPMux), not its
 		// middleware chain: the callback on both its spellings, then the API's
-		// mounts, under the prefix, the probes and the root alias.
+		// mounts (prefix, OpenAPI document, probes and root alias).
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPattern, callback)
 		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
 			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
-		}, h.EnsureAPIServers(t))
+		}, h.withServerLog, h.EnsureAPIServers(t))
 		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value

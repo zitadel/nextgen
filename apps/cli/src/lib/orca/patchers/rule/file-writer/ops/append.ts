@@ -1,4 +1,8 @@
-import { type Change, Operation, type Source } from "../operation";
+import {
+  type Change,
+  Operation,
+  type Source,
+} from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
  * Adds contents at the end of a file, unless the file already holds the op's

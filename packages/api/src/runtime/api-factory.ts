@@ -92,6 +92,11 @@ export type ZitadelClientOptions = {
    */
   timeoutMs?: number;
   /**
+   * The `User-Agent` every request this client makes carries, so a server and
+   * its logs can tell one caller from another. Unset: the runtime's own.
+   */
+  userAgent?: string;
+  /**
    * Applied to every response this client resolves with, each page of a
    * paged function's included, before the caller sees it. A paged function
    * reads its cursor from the page as the server sent it, and its items from
@@ -145,7 +150,11 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       const send = (...args: unknown[]) => {
         setProxyPath(baseUrl);
         setApiAuthToken(opts.token);
-        setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
+        setRequestPolicy({
+          signal: opts.signal,
+          timeoutMs: opts.timeoutMs,
+          userAgent: opts.userAgent,
+        });
         return (value as (...a: unknown[]) => unknown)(...args);
       };
       // The URL builders orval exports beside the requests return strings, so

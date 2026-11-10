@@ -1,21 +1,21 @@
 import { execa } from "execa";
 
-import { ZitadelError, isErrno } from "../../errors";
-import { unscopedCommand } from "../../suggestion";
+import { ZitadelError, isErrno } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
 import {
   EMPTY_ENV,
   EMPTY_SUMMARY,
   type EnvSummary,
   type ResolvedEnv,
   envSummary,
-} from "../env-vars";
+} from "@/lib/local-server/env-vars";
 import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
   type ContainerIdentity,
   type DockerRuntimeMetadata,
-} from "../runtime";
-import type { LogSink } from "../server-log";
+} from "@/lib/local-server/runtime";
+import type { LogSink } from "@/lib/local-server/server-log";
 import { stopSignal } from "./clock";
 import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
 

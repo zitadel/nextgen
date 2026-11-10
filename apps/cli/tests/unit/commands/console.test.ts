@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ensureLocalAdmin } from "../../../src/lib/local-server/admin-credential";
+import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import {
   localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
-} from "../../../src/lib/local-server/runtime";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+} from "@/lib/local-server/runtime";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const tempDirs: string[] = [];
 

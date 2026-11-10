@@ -1,8 +1,8 @@
 import { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { named } from "../../../../src/lib/oclif/names";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
+import { named } from "@/lib/oclif/names";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 const config = await Config.load(cliPackageRoot);
 

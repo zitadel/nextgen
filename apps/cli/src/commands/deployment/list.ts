@@ -1,4 +1,4 @@
-import { Paging } from "@zitadel/api/runtime/paging";
+import { DeploymentService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -8,11 +8,10 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import { pagedFunctions } from "../../lib/api-client";
-import { Cmd } from "../../lib/cmd";
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { Cmd } from "@/lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
@@ -76,34 +75,36 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const params = {
-      project_id: projectId,
-      origin: flags.origin,
-      live: flags.live,
-      limit: flags.limit,
-      page_token: flags.pageToken,
-    };
-    // One page unless `--all`, as every list does; the walk starts at
-    // `--page-token`, and a drain leaves no next page to report.
-    const paging = new Paging(pagedFunctions.listDeployments);
-    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
-      all: flags.all === true,
-    });
+    const deploymentService = new DeploymentService(client, projectId);
+    const listed = await deploymentService.page(
+      {
+        origin: flags.origin,
+        live: flags.live,
+        limit: flags.limit,
+        page_token: flags.pageToken,
+      },
+      {
+        all: flags.all,
+      },
+    );
 
+    const items = listed.items;
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = items.map((deployment) => ({
-      id: deployment.id,
-      release_id: deployment.release_id,
-      reason: deployment.metadata.reason,
-      origins: deployment.targets.map((target) => target.origin).join(", "),
-      deployed_at: deployment.deployed_at,
-    }));
+    const rows = items.map((deployment) => {
+      return {
+        id: deployment.id,
+        release_id: deployment.release_id,
+        reason: deployment.metadata.reason,
+        origins: deployment.origins.join(", "),
+        deployed_at: deployment.deployed_at,
+      };
+    });
 
     const columns = COLUMNS;
     const empty = "No deployments yet.";
     const footer: string[] = [];
     const page = {
-      token: next,
+      token: listed.next,
       command: "deployment list",
       flags: [
         ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),

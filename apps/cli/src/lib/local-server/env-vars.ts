@@ -19,8 +19,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { ZitadelError, errorMessage } from "../errors";
-import { isObject } from "../json";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { isObject } from "@/lib/json";
 
 /** Highest priority first. */
 export const ENV_FILES = [".env.local", ".env"] as const;

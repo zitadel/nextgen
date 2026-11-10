@@ -7,20 +7,20 @@ import { fileURLToPath } from "node:url";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { confirm, text } from "@clack/prompts";
 
-import EnvAdd from "../../../../../src/commands/env/add";
+import EnvAdd from "@/commands/env/add";
 import {
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
   stripAnsi,
-} from "../../../../helpers/run-cli";
-import { asTerminal } from "../../../../helpers/terminal";
+} from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -210,7 +210,7 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd));
 
       expect(out).toContain(
-        "Nothing is deployed to production yet, so it serves the server's defaults rather than .zitadel/.",
+        "Nothing is deployed to production yet, so sign-in is refused until .zitadel/ is deployed.",
       );
     });
 

@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { VueDetector } from "../../../../../src/lib/orca/detectors/vue";
-import { rejectionOf } from "../../../../helpers/thrown-value";
+import { ZitadelError } from "@/lib/errors";
+import { VueDetector } from "@/lib/orca/detectors/vue";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const dirs: string[] = [];
 

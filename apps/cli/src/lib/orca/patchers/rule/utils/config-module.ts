@@ -2,8 +2,8 @@ import { generateCode, parseModule } from "magicast";
 import { getDefaultExportOptions } from "magicast/helpers";
 import type { ProxifiedArray, ProxifiedModule, ProxifiedObject } from "magicast";
 
-import { ZitadelError, errorMessage } from "../../../../errors";
-import { tryCatch } from "../../../../try-catch";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { tryCatch } from "@/lib/try-catch";
 
 /**
  * A magicast object literal edited by dynamic key. magicast's own types don't

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { QwikDetector } from "../../../../../src/lib/orca/detectors/qwik";
+import { QwikDetector } from "@/lib/orca/detectors/qwik";
 
 const dirs: string[] = [];
 

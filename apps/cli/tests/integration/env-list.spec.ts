@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, MOCK_SERVER_URL, onATerminal } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, asTerminal, MOCK_SERVER_URL } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -35,6 +35,16 @@ describe("env list", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["env", "list"];
+
+      await app.inEveryRendering((how) =>
+        app.runWithoutServer(how.json ? [...args, "--json"] : args, how.env),
+      );
+    });
+
     describe("--json", () => {
       it("lists the environments bound in this directory", async () => {
         const app = await aSetUpApp();
@@ -91,7 +101,7 @@ describe("env list", () => {
       it("says which environment resolves now", async () => {
         const app = await aSetUpApp();
 
-        const result = await onATerminal(() => app.run(["env", "list"]));
+        const result = await asTerminal(() => app.run(["env", "list"]));
 
         expect(result).toPrint("Resolved now: development");
       });
@@ -100,7 +110,7 @@ describe("env list", () => {
         const app = await aSetUpApp();
         await app.deleteProjectFile(".env.development.local");
 
-        const result = await onATerminal(() => app.run(["env", "list"]));
+        const result = await asTerminal(() => app.run(["env", "list"]));
 
         expect(result).toPrint("zitadel env add");
       });

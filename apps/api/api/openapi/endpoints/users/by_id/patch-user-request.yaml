@@ -32,6 +32,16 @@ properties:
       `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the
       current schema. The schema must already be registered and be a revision
       of the user's current schema.
+  # No default: a client that fills one in would send dry_run: false on every
+  # patch, and a server from before this field refuses that.
+  dry_run:
+    type: boolean
+    description: |
+      Set to `true` to check the patch without applying it. The response is
+      what the real request would answer now; a `200` holds the user as the
+      patch would leave them, with `metadata.updated_at` unchanged. Leave it
+      out to apply the patch. A server from before this field refuses the
+      request with `400` and changes nothing.
   attributes:
     type: object
     additionalProperties: true

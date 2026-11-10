@@ -7304,28 +7304,8 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/sanitiser.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "createSanitiser",
-          "return": {
-            "type": {
-              "text": "(html: string) => string"
-            }
-          },
-          "description": "Returns a sanitiser bound to the current manifest registry. Callers should\ncache the result; rebuilding is cheap but allocates a fresh DOMPurify config."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "createSanitiser",
-          "declaration": {
-            "name": "createSanitiser",
-            "module": "src/orchestrator/sanitiser.ts"
-          }
-        }
-      ]
+      "declarations": [],
+      "exports": []
     },
     {
       "kind": "javascript-module",
@@ -8143,6 +8123,10 @@
       "path": "src/orchestrator/zitadel-login.ts",
       "declarations": [
         {
+          "kind": "variable",
+          "name": "fields"
+        },
+        {
           "kind": "class",
           "description": "Orchestrator element `<zitadel-login>` — drives a login flow end to end and\nsurfaces its progress through the public `zitadel-*` events.",
           "name": "ZitadelLogin",
@@ -8605,25 +8589,6 @@
             },
             {
               "kind": "method",
-              "name": "describeFlowSelectionError",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "unknown"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "error",
-                  "type": {
-                    "text": "unknown"
-                  }
-                }
-              ],
-              "description": "When a `flow-name` lookup fails, the server's envelope only says\n\"not found\" / \"purpose mismatch\" — it cannot know the name came from\nan attribute. Rewrap those two codes with the attribute and the fix;\nevery other error passes through untouched."
-            },
-            {
-              "kind": "method",
               "name": "applyResponse",
               "privacy": "private",
               "return": {
@@ -8766,18 +8731,18 @@
             },
             {
               "kind": "method",
-              "name": "missingRequiredFields",
+              "name": "fieldRuleErrors",
               "privacy": "private",
               "return": {
                 "type": {
                   "text": "string[]"
                 }
               },
-              "description": "Names of the current step's `required` fields whose captured value is\nempty. Reads each atom's live `formValue` (the getter reflects the native\ncontrol, so autofill that skipped `input` events is still seen), so this\nis browser-independent and does not rely on native constraint validation."
+              "description": "The validation error keys the current step's captured values earn, in the\nserver's own dialect: `error.<field>_required` for an empty required\nfield, `_min_length` / `_max_length` for a value outside the field's\ndeclared bounds. Reads the live values through captureFieldValues,\nso autofill that skipped `input` events is both judged and kept when the\nerror rebuilds the step. The server checks the same rules again."
             },
             {
               "kind": "method",
-              "name": "reportRequiredErrors",
+              "name": "reportFieldErrors",
               "privacy": "private",
               "return": {
                 "type": {
@@ -8786,13 +8751,24 @@
               },
               "parameters": [
                 {
-                  "name": "fields",
+                  "name": "keys",
                   "type": {
                     "text": "readonly string[]"
                   }
                 }
               ],
-              "description": "Surface a client-side required-field error using the server's own\nvalidation dialect (`error.<field>_required`, \"; \"-joined), so it flows\nthrough the same localisation and inline/banner routing as a real\nbackend rejection — no native browser bubble. Idempotent: re-running with\nthe same keys (both submit entry points fire on one click) is a no-op."
+              "description": "Surface client-side field errors (keys from fieldRuleErrors,\n\"; \"-joined), so they flow through the same localisation and\ninline/banner routing as a real backend rejection — no native browser\nbubble. The same keys again are a no-op while their error still shows;\nonce the user edited it away they show it again, through\nerrorRevision."
+            },
+            {
+              "kind": "method",
+              "name": "captureFieldValues",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Map<string, string>"
+                }
+              },
+              "description": "Read every rendered field atom's live `formValue` (the getter reflects the\nnative control, so autofill that skipped `input` events is still seen)\nand fold the values into `formValues`, which a step rebuild restores.\nTag-agnostic: every form-participating atom is read the same way."
             },
             {
               "kind": "method",
@@ -8814,6 +8790,16 @@
               "privacy": "private",
               "default": "false",
               "description": "True once the user retired the current step error by editing a field or\ndismissing the alert. Deliberately NON-reactive: consulting reactive\nstate in `renderStep` would change its output string on the first\npost-dismiss keystroke, and `unsafeHTML` would rebuild the whole step\nsubtree — wiping typed values (`hydrateStepAfterRender` only re-applies\nthem on response changes) and reconnecting atoms. Reset on every new\nresponse; consulted only by the `loading` re-render, which rebuilds\nanyway."
+            },
+            {
+              "kind": "field",
+              "name": "errorRevision",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "0",
+              "description": "Bumped by every client-side error report that is not a no-op, whether its\nkeys are new or the same keys the user had edited away. The step markup\ncarries it, so `unsafeHTML`, which keeps a subtree whose markup is\nunchanged, rebuilds the step and an error clearStaleErrors removed\ncomes back. With new keys the step would rebuild anyway, so the bump is\nharmless there."
             },
             {
               "kind": "field",
@@ -9382,10 +9368,6 @@
           },
           "tagName": "zitadel-login",
           "customElement": true
-        },
-        {
-          "kind": "variable",
-          "name": "fields"
         },
         {
           "kind": "variable",

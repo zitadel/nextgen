@@ -1,8 +1,9 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -60,6 +61,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -226,16 +228,10 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 	t.Run("owning-team assignment get and delete are not found", func(t *testing.T) {
 		t.Parallel()
 
-		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-			ProjectID: platform.ID,
-			Name:      helpers.TeamName(),
-		})
-		require.NoError(t, err)
-
+		// The project's claim: claimProject wrote it.
 		stmts := harness.EnsureServiceDB(t).Statements()
-		asgn := domain.NewClaimTeamAssignment(project.ID, team.ID)
-		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
-		require.NotEmpty(t, asgn.ID)
+		asgn, err := stmts.GetActiveOwningTeamGrant(t.Context(), project.ID)
+		require.NoError(t, err)
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
 			ID:        asgn.ID,
@@ -264,6 +260,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -319,6 +316,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		// would otherwise make a global QueryGrants length assertion race.
 		isolated, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
+		claimProject(t, isolated.ID)
 		isolatedClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, isolatedClient, isolated)
@@ -484,6 +482,48 @@ func grantsForUser(t *testing.T, client *helpers.ApiClient, projectID, userID st
 	return page.Grants
 }
 
+// claimProject gives the project an owning team from the platform project,
+// as claim/complete does: a project needs one before it grants a platform
+// user or team (ADR 054 §4 amendment).
+func claimProject(t *testing.T, projectID string) {
+	t.Helper()
+	ownerID, teamID := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+	cleanupPlatformUserAndTeam(t, ownerID)
+	harness.SeedOwningTeam(t, projectID, teamID)
+}
+
+// cleanupPlatformUserAndTeam removes a user the test created in the shared
+// platform project, outside the test's own project: the user is deleted and
+// the team created with it deactivated, as teams have no delete.
+func cleanupPlatformUserAndTeam(t *testing.T, userID string) {
+	t.Helper()
+	platformID := harness.EnsurePlatformProject(t).ID
+	t.Cleanup(func() {
+		ctx := context.Background()
+		stmts := harness.EnsureServiceDB(t).Statements()
+		if membership, err := stmts.GetEarliestTeamMembership(ctx, platformID, userID); err == nil {
+			_, err = stmts.DeactivateTeam(ctx, platformID, membership.TeamID)
+			assert.NoError(t, err)
+		}
+		_ = stmts.DeleteUserByID(ctx, platformID, userID)
+	})
+}
+
+// platformReader signs in a platform user who may read the project's grants
+// and the platform project's users: the caller expand=principal admits.
+func platformReader(t *testing.T, projectID string) *helpers.ApiClient {
+	t.Helper()
+	platform := harness.EnsurePlatformProject(t)
+	readerID := harness.CreateUserWithTeam(t, platform.ID)
+	cleanupPlatformUserAndTeam(t, readerID)
+	harness.SeedProjectViewer(t, projectID, readerID)
+	platformViewer := harness.SeedProjectViewer(t, platform.ID, readerID)
+	t.Cleanup(func() {
+		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, platformViewer.ID)
+	})
+	return sessionClientForUser(t, readerID)
+}
+
 func TestGrantQuery(t *testing.T) {
 	t.Parallel()
 
@@ -494,6 +534,20 @@ func TestGrantQuery(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	// The claim the grants below need, and a row the list must not show.
+	stmts := harness.EnsureServiceDB(t).Statements()
+	owningTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: platform.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := stmts.DeactivateTeam(context.Background(), platform.ID, owningTeam.ID)
+		assert.NoError(t, err)
+	})
+	owning := domain.NewClaimTeamAssignment(project.ID, owningTeam.ID)
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), owning))
 
 	params := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
 	getParams := func(id string) api.GetGrantParams {
@@ -528,7 +582,6 @@ func TestGrantQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 
-	stmts := harness.EnsureServiceDB(t).Statements()
 	expiredUserID := harness.CreateUserWithTeam(t, platform.ID)
 	expiredAt := time.Now().Add(-time.Hour)
 	expiredAsgn := &domain.AuthzAssignment{
@@ -542,14 +595,6 @@ func TestGrantQuery(t *testing.T) {
 	}
 	expiredAsgn.ApplyScope(domain.NewProjectAssignmentScope())
 	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), expiredAsgn))
-
-	owningTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-		ProjectID: platform.ID,
-		Name:      helpers.TeamName(),
-	})
-	require.NoError(t, err)
-	owning := domain.NewClaimTeamAssignment(project.ID, owningTeam.ID)
-	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), owning))
 
 	setupAsgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
 	require.NoError(t, err)
@@ -664,6 +709,7 @@ func TestGrantQueryExpand(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -709,9 +755,12 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteUserByIDNoContent{}, delUser, helpers.MustMarshal(t, delUser))
 
+	// The project's own secret may not expand (ADR 059 amendment); a platform
+	// user with read on both projects may.
+	reader := platformReader(t, project.ID)
 	queryGrants := func(t *testing.T, req *api.QueryGrantsRequest) *api.QueryGrantsResponse {
 		t.Helper()
-		resp, err := client.QueryGrants(t.Context(), req, params)
+		resp, err := reader.QueryGrants(t.Context(), req, params)
 		require.NoError(t, err)
 		require.IsType(t, &api.QueryGrantsResponse{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.QueryGrantsResponse)
@@ -811,8 +860,24 @@ func TestGrantQueryExpand(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("grant.permission_denied"), resp.(*api.QueryGrantsForbidden).Code)
 	})
 
-	t.Run("GET expand inlines extras", func(t *testing.T) {
+	t.Run("project secret expand is 403", func(t *testing.T) {
+		resp, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{Expand: expandPrincipal}, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryGrantsForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryGrantsForbidden).Code)
+
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
+			ID:        userGrant.ID,
+			ProjectID: api.ProjectID(project.ID),
+			Expand:    expandPrincipal,
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetGrantForbidden{}, getResp, helpers.MustMarshal(t, getResp))
+		assert.Equal(t, api.ErrorCode("user.permission_denied"), getResp.(*api.GetGrantForbidden).Code)
+	})
+
+	t.Run("GET expand inlines extras", func(t *testing.T) {
+		getResp, err := reader.GetGrant(t.Context(), api.GetGrantParams{
 			ID:        userGrant.ID,
 			ProjectID: api.ProjectID(project.ID),
 			Expand:    expandPrincipal,
@@ -894,6 +959,7 @@ func TestGrantSessionCaller(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	operatorID := harness.CreateUserWithTeam(t, platform.ID)
 	harness.SeedProjectAdmin(t, project.ID, operatorID)
@@ -930,16 +996,14 @@ func TestGrantSessionCaller(t *testing.T) {
 	listedGrant := grantByID(t, listed.Grants, created.ID)
 	assert.False(t, listedGrant.User.Value.Schema.IsSet())
 
+	// Admin on the project is not read on the platform project, where the
+	// subject's profile lives.
 	expandResp, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
 		Expand: []api.GrantExpand{api.GrantExpandPrincipal},
 	}, queryParams)
 	require.NoError(t, err)
-	expanded, ok := expandResp.(*api.QueryGrantsResponse)
-	require.True(t, ok, helpers.MustMarshal(t, expandResp))
-	expandedGrant := grantByID(t, expanded.Grants, created.ID)
-	require.True(t, expandedGrant.User.IsSet())
-	assert.True(t, expandedGrant.User.Value.Schema.IsSet())
-	assert.Equal(t, api.UserID(subjectID), expandedGrant.User.Value.UserID)
+	require.IsType(t, &api.QueryGrantsForbidden{}, expandResp, helpers.MustMarshal(t, expandResp))
+	assert.Equal(t, api.ErrorCode("user.permission_denied"), expandResp.(*api.QueryGrantsForbidden).Code)
 
 	delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
 		ID:        created.ID,
@@ -988,5 +1052,204 @@ func TestGrantSessionCaller(t *testing.T) {
 		}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		assertGrantNotFound(t, queryResp)
+	})
+}
+
+// TestGrantAnonymousProjectCannotReadPlatformUser follows zitadel/nextgen#2653
+// step by step: a project created without a credential grants a platform user
+// with the secret the create answered, then reads that user. Granting needs a
+// claimed project (ADR 054 §4 amendment), and once claimed the project reads
+// the grant's label only: the profile needs read on the platform project
+// (ADR 059 amendment).
+func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	platformClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, platformClient, platform)
+
+	anonymous, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	created, err := anonymous.CreateProject(t.Context(), &api.CreateProjectRequest{Name: helpers.ProjectName()})
+	require.NoError(t, err)
+	project, ok := created.(*api.CreateProjectResponse)
+	require.True(t, ok, helpers.MustMarshal(t, created))
+	harness.CleanupProject(t, project.ID)
+	// The secret from the response body: what whoever created the project holds.
+	attacker, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	attacker.SetToken(project.ProjectSecret)
+
+	// A schema that designates a display, so the label carries one as well as
+	// the identifier; the seeded default designates no display properties.
+	// It lives in the shared platform project, so it goes when the test ends.
+	suffix := strings.ToLower(helpers.RandString(8))
+	displaySchema := harness.CreateUserSchema(t, platform, `{
+		"title": "GrantLabelSchema",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://grant-label-`+suffix+`.example.com/schemas/human-user.json",
+		"kind": "user-schema",
+		"objectType": "grant-label-`+suffix+`",
+		"type": "object",
+		"x-identifier": "email",
+		"x-display": ["givenName", "familyName"],
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project"},
+			"givenName": {"type": "string"},
+			"familyName": {"type": "string"}
+		}
+	}`)
+	var createUser api.CreateUserRequest
+	require.NoError(t, createUser.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+		"schema": displaySchema,
+		"attributes": map[string]any{
+			"email":      helpers.RandString(8) + "@example.com",
+			"givenName":  "Ada",
+			"familyName": "Lovelace",
+		},
+	}))))
+	createdUser, err := platformClient.CreateUser(t.Context(), &createUser, api.CreateUserParams{ProjectID: api.ProjectID(platform.ID)})
+	require.NoError(t, err)
+	createdTarget, ok := createdUser.(*api.User)
+	require.True(t, ok, helpers.MustMarshal(t, createdUser))
+	targetID := string(createdTarget.ID)
+	t.Cleanup(func() {
+		stmts := harness.EnsureServiceDB(t).Statements()
+		_ = stmts.DeleteUserByID(context.Background(), platform.ID, targetID)
+		_ = stmts.DeleteJSONSchemaByID(context.Background(), platform.ID, displaySchema)
+	})
+	targetResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(targetID)})
+	require.NoError(t, err)
+	target, ok := targetResp.(*api.User)
+	require.True(t, ok, helpers.MustMarshal(t, targetResp))
+	require.True(t, target.Identifier.IsSet())
+	require.True(t, target.Display.IsSet())
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: platform.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(context.Background(), platform.ID, team.ID)
+		assert.NoError(t, err)
+	})
+
+	createParams := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}
+	getParams := func(id string, expand ...api.GrantExpand) api.GetGrantParams {
+		return api.GetGrantParams{ID: id, ProjectID: api.ProjectID(project.ID), Expand: expand}
+	}
+	queryParams := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
+	expandPrincipal := []api.GrantExpand{api.GrantExpandPrincipal}
+
+	t.Run("an unclaimed project cannot grant a platform principal", func(t *testing.T) {
+		for name, req := range map[string]*api.CreateGrantRequest{
+			"user_id":    userIDGrant(targetID, api.CreateGrantRequestRelationViewer),
+			"identifier": userIdentifierGrant(target.Identifier.Value, api.CreateGrantRequestRelationViewer),
+			"team_id":    teamIDGrant(team.ID, api.CreateGrantRequestRelationViewer),
+			"team name":  teamNameGrant(team.Name, api.CreateGrantRequestRelationViewer),
+		} {
+			resp, err := attacker.CreateGrant(t.Context(), req, createParams)
+			require.NoError(t, err)
+			forbidden, ok := resp.(*api.CreateGrantForbidden)
+			if assert.True(t, ok, "%s: %s", name, helpers.MustMarshal(t, resp)) {
+				assert.Equal(t, api.ErrorCode("grant.project_unclaimed"), forbidden.Code, name)
+			}
+		}
+	})
+
+	// Claimed the way claim/complete leaves it: an owning team from the
+	// platform project.
+	claimProject(t, project.ID)
+
+	createResp, err := attacker.CreateGrant(t.Context(), userIDGrant(targetID, api.CreateGrantRequestRelationEditor), createParams)
+	require.NoError(t, err)
+	grant, ok := createResp.(*api.Grant)
+	require.True(t, ok, helpers.MustMarshal(t, createResp))
+
+	assertLabelOnly := func(t *testing.T, got api.Grant) {
+		t.Helper()
+		require.True(t, got.User.IsSet(), helpers.MustMarshal(t, got))
+		user := got.User.Value
+		assert.Equal(t, api.UserID(targetID), user.UserID)
+		assert.Equal(t, target.Identifier, user.Identifier)
+		assert.Equal(t, target.Display, user.Display)
+		assert.False(t, user.Schema.IsSet())
+		assert.False(t, user.Attributes.IsSet())
+		assert.False(t, user.Metadata.IsSet())
+	}
+
+	t.Run("the project secret reads the label only", func(t *testing.T) {
+		getResp, err := attacker.GetGrant(t.Context(), getParams(grant.ID))
+		require.NoError(t, err)
+		got, ok := getResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, getResp))
+		assertLabelOnly(t, *got)
+
+		listed := grantsForUser(t, attacker, project.ID, targetID)
+		require.Len(t, listed, 1)
+		assertLabelOnly(t, listed[0])
+	})
+
+	t.Run("the project secret cannot expand the principal", func(t *testing.T) {
+		getResp, err := attacker.GetGrant(t.Context(), getParams(grant.ID, expandPrincipal...))
+		require.NoError(t, err)
+		forbidden, ok := getResp.(*api.GetGrantForbidden)
+		if assert.True(t, ok, helpers.MustMarshal(t, getResp)) {
+			assert.Equal(t, api.ErrorCode("user.permission_denied"), forbidden.Code)
+		}
+
+		queryResp, err := attacker.QueryGrants(t.Context(), &api.QueryGrantsRequest{Expand: expandPrincipal}, queryParams)
+		require.NoError(t, err)
+		queryForbidden, ok := queryResp.(*api.QueryGrantsForbidden)
+		if assert.True(t, ok, helpers.MustMarshal(t, queryResp)) {
+			assert.Equal(t, api.ErrorCode("user.permission_denied"), queryForbidden.Code)
+		}
+	})
+
+	t.Run("the project secret cannot read the user", func(t *testing.T) {
+		userResp, err := attacker.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(targetID)})
+		require.NoError(t, err)
+		notFound, ok := userResp.(*api.GetUserByIDNotFound)
+		require.True(t, ok, helpers.MustMarshal(t, userResp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), notFound.Code)
+
+		queryResp, err := attacker.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
+		require.NoError(t, err)
+		listed, ok := queryResp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, queryResp))
+		for _, u := range listed.Users {
+			assert.NotEqual(t, targetID, userID(t, u))
+		}
+	})
+
+	t.Run("a session with read on the platform project expands", func(t *testing.T) {
+		reader := platformReader(t, project.ID)
+		getResp, err := reader.GetGrant(t.Context(), getParams(grant.ID, expandPrincipal...))
+		require.NoError(t, err)
+		got, ok := getResp.(*api.Grant)
+		require.True(t, ok, helpers.MustMarshal(t, getResp))
+		require.True(t, got.User.IsSet())
+		assert.Equal(t, target.Schema, got.User.Value.Schema.Value)
+		assert.Equal(t, target.Attributes, got.User.Value.Attributes.Value)
+	})
+
+	t.Run("a session without read on the platform project gets the label only", func(t *testing.T) {
+		operatorID := harness.CreateUserWithTeam(t, platform.ID)
+		cleanupPlatformUserAndTeam(t, operatorID)
+		harness.SeedProjectAdmin(t, project.ID, operatorID)
+		operator := sessionClientForUser(t, operatorID)
+
+		getResp, err := operator.GetGrant(t.Context(), getParams(grant.ID, expandPrincipal...))
+		require.NoError(t, err)
+		forbidden, ok := getResp.(*api.GetGrantForbidden)
+		if assert.True(t, ok, helpers.MustMarshal(t, getResp)) {
+			assert.Equal(t, api.ErrorCode("user.permission_denied"), forbidden.Code)
+		}
+
+		listed := grantsForUser(t, operator, project.ID, targetID)
+		require.Len(t, listed, 1)
+		assertLabelOnly(t, listed[0])
 	})
 }

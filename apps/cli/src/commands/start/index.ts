@@ -1,11 +1,11 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { serverLogAction } from "../../lib/journey-guidance";
-import { ensureLocalAdmin } from "../../lib/local-server/admin-credential";
-import { EMPTY_SUMMARY, loadProjectEnv } from "../../lib/local-server/env-vars";
-import { startedServer } from "../local-server/started";
-import { type Refused, reads, whole } from "../../lib/oclif/flags";
+import { serverLogAction } from "@/lib/journey-guidance";
+import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
+import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
+import { startedServer } from "@/commands/local-server/started";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
@@ -17,18 +17,18 @@ import {
   resolveRuntimeBackend,
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
-} from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import type { NextSteps } from "../../lib/oclif/next-steps";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import type { SuggestedCommand } from "../../lib/suggestion";
+} from "@/lib/oclif";
+import type { NextSteps } from "@/lib/oclif/next-steps";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * How an image beside the binary runtime is refused: an image is a container's,
@@ -156,11 +156,12 @@ export default class Start extends BaseCommand {
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.
     this.meta = { ...this.meta, source: runtime.server_url };
+
+    // Setup reads the server from the directory start ran in, so a run from
+    // elsewhere carries it: `setup --server local` from the shell's directory
+    // finds no server and scaffolds into the wrong place.
     return this.emit({
       status: "ok",
-      // Setup reads the server from the directory start ran in, so a run from
-      // elsewhere carries it: `setup --server local` from the shell's directory
-      // finds no server and scaffolds into the wrong place.
       data: readyData(runtime, alreadyRunning),
       next: readyNext(this.cliVersion, this.suggestUnscoped("setup --server local")),
     });

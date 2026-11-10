@@ -1,7 +1,4 @@
-import type { ZitadelClient as FullClient } from "@zitadel/api/client";
-import { destructiveOperations } from "@zitadel/api/generated/operations";
-
-import type { ZitadelClient } from "./api-client";
+import { allowDestructive, type ZitadelClient } from "./backend";
 import { ZitadelError } from "./errors";
 import { input } from "./input";
 import type { SuggestedCommand } from "./suggestion";
@@ -15,6 +12,7 @@ export type Verb =
   | "call"
   | "deactivate"
   | "delete"
+  | "deploy"
   | "disable"
   | "eject"
   | "remove"
@@ -44,6 +42,7 @@ export type Gate = Readonly<{
   /**
    * Refuses in place of the default "Cannot … without --force" when nobody
    * can be asked and `--force` was not given, for a refusal that says more.
+   * It throws an `E_CONFIRMATION_REQUIRED` too, or {@link isRefusal} misses it.
    */
   refuse?: () => never;
 }>;
@@ -62,44 +61,6 @@ const refusals = new WeakSet<object>();
 
 /** Every consent {@link Consent.request} made, which {@link Consent.assert} checks for. */
 const granted = new WeakSet<object>();
-
-/** The client functions a narrowed client refuses. */
-const WITHHELD: ReadonlySet<string> = new Set(destructiveOperations);
-
-/** Each narrowed client's full client, which only {@link Consent.unlock} reads. */
-const fullClients = new WeakMap<object, FullClient>();
-
-/**
- * The client without its destructive operations, at run time as in its type:
- * reaching one throws, however it is reached (a cast, `Reflect.get`, a
- * property descriptor, an `any`). Only {@link Consent.unlock} hands back the
- * full client. `createZitadelClient` narrows every client it makes.
- *
- * Updates are not withheld, as they were not before: a merge-patch `null`
- * (`updateVariables`, the user and project patches) still removes what it
- * names without asking. Guarding writes is the `Mutating` tier's to do.
- */
-export function withholdDestructive(client: FullClient): ZitadelClient {
-  const refuse = (what: string): never => {
-    throw new Error(`${what} is destructive: reach it through a Consent`);
-  };
-  const narrowed = new Proxy(client, {
-    get(target, property, receiver) {
-      if (typeof property === "string" && WITHHELD.has(property)) {
-        refuse(property);
-      }
-      return Reflect.get(target, property, receiver);
-    },
-    getOwnPropertyDescriptor(target, property) {
-      if (typeof property === "string" && WITHHELD.has(property)) {
-        refuse(property);
-      }
-      return Reflect.getOwnPropertyDescriptor(target, property);
-    },
-  });
-  fullClients.set(narrowed, client);
-  return narrowed;
-}
 
 /**
  * Proof that a person, or `--force`, agreed to one destructive action. Every
@@ -124,7 +85,8 @@ export class Consent {
 
   /**
    * Ask for consent. `--force` gives it without asking; with nobody to ask
-   * and no `--force` the gate refuses (an `E_VALIDATION` naming `--force`);
+   * and no `--force` the gate refuses (an `E_CONFIRMATION_REQUIRED` naming
+   * `--force`, which only a person may agree to);
    * otherwise the person is asked, and `undefined` is their no. Ctrl-C
    * throws `E_CANCELLED`, as every prompt does.
    *
@@ -152,7 +114,7 @@ export class Consent {
       granted.add(consent);
       return consent;
     } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_VALIDATION") {
+      if (error instanceof ZitadelError && error.code === "E_CONFIRMATION_REQUIRED") {
         refusals.add(error);
       }
       throw error;
@@ -167,13 +129,9 @@ export class Consent {
   }
 
   /** The client with its destructive operations, which only consent reaches. */
-  unlock(client: ZitadelClient): FullClient {
+  unlock(client: ZitadelClient): ZitadelClient {
     Consent.assert(this);
-    const full = fullClients.get(client);
-    if (full === undefined) {
-      throw new Error("Only a client createZitadelClient made can be unlocked");
-    }
-    return full;
+    return allowDestructive(client);
   }
 }
 

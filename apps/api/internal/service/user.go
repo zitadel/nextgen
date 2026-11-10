@@ -67,6 +67,8 @@ type PatchUserInput struct {
 	SchemaURL *string
 	// Attributes is the partial attribute patch; nil values delete.
 	Attributes map[string]any
+	// DryRun answers what the patch would answer now and writes nothing.
+	DryRun bool
 }
 
 type PatchMyUserInput struct {
@@ -658,6 +660,10 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *d
 	ctx, end := startSpan(ctx, "UserService.PatchUser")
 	defer end(&err)
 
+	if input.DryRun {
+		return s.dryRunPatchUser(ctx, input)
+	}
+
 	const maxPatchAttempts = 3
 	for attempt := 1; ; attempt++ {
 		action := NewPatchUserAction(input, s.v2Pool, s.schemaStore)
@@ -684,6 +690,34 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *d
 	// The patch statement does not report the row's new updated_at, so the
 	// response is a read-back, same as create.
 	return s.GetUserByID(ctx, GetUserInput{ProjectID: input.ProjectID, UserID: input.UserID})
+}
+
+// dryRunPatchUser answers what PatchUser would answer now, and stops where the
+// transaction would start: nothing is written and nothing is emitted. A unique
+// value is checked by reading who holds it, since only the write itself claims
+// it, so the answer cannot promise the value stays free until the real patch.
+func (s *userService) dryRunPatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error) {
+	action := NewPatchUserAction(input, s.v2Pool, s.schemaStore)
+	if err := action.Prepare(ctx); err != nil {
+		return nil, err
+	}
+	patch := action.patch
+	taken, err := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
+		patch.ProjectID, patch.UserID, patch.Attributes, patch.RegistryTeamScopes)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up unique attributes in the database")
+	}
+	if len(taken) > 0 {
+		return nil, domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: taken})
+	}
+
+	patched := *action.current
+	patched.SchemaURL = patch.SchemaURL
+	patched.Attributes = patch.Attributes.Attributes()
+	if err := s.attachUserRefs(ctx, input.ProjectID, &patched); err != nil {
+		return nil, err
+	}
+	return &patched, nil
 }
 
 func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (_ *domain.User, err error) {
@@ -893,6 +927,8 @@ type PatchUserAction struct {
 	// schemaJSON is the target schema document, kept from Prepare so Apply can
 	// filter emitted attribute values to x-audit fields (same rule as create).
 	schemaJSON []byte
+	// current is the user as Prepare read them, for a dry run's answer.
+	current *domain.User
 
 	patch *domain.PatchUser
 	// stale reports that Apply found the row moved past the updated_at the
@@ -967,6 +1003,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 	}
 
 	o.schemaJSON = targetSchema.Schema
+	o.current = user
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
 		SchemaURL:            targetSchema.URL,

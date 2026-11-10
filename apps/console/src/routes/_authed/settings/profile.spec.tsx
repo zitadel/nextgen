@@ -65,7 +65,7 @@ describe("settings profile", () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
 
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     const email = screen.getByLabelText("Email");
     expect(email).toHaveValue("maya@example.com");
     expect(email).toBeDisabled();
@@ -77,7 +77,7 @@ describe("settings profile", () => {
     // field shown cannot change, so the screen has no Save.
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
-    await screen.findByRole("heading", { name: "Settings" });
+    await screen.findByRole("heading", { name: "Profile" });
 
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByDisplayValue("Maya")).not.toBeInTheDocument();
@@ -103,15 +103,16 @@ describe("settings profile", () => {
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("marks Settings, the account nav's only row", async () => {
+  it("marks Profile in the Settings list, under the heading that leads back", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
-    await screen.findByRole("heading", { name: "Settings" });
+    await screen.findByRole("heading", { name: "Profile" });
 
-    const nav = screen.getByRole("navigation", { name: "Account settings" });
+    const nav = screen.getByRole("navigation", { name: "Settings" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Settings"]);
-    expect(links[0]).toHaveAttribute("aria-current", "page");
+    expect(links.map((link) => link.textContent)).toEqual(["Settings", "Profile"]);
+    expect(links[1]).toHaveAttribute("aria-current", "page");
+    expect(links[0]).not.toHaveAttribute("aria-current");
   });
 
   it("offers the name the schema designates for display, and saves it", async () => {
@@ -369,7 +370,7 @@ describe("settings profile, generated from the schema", () => {
     );
     await renderAt("/settings/profile");
 
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     expect(screen.getByText("Could not be loaded")).toBeInTheDocument();
     expect(screen.getByText("No identity provider account is linked to you.")).toBeInTheDocument();
   });

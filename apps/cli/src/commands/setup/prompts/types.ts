@@ -1,4 +1,4 @@
-import type { PasswordMinLength } from "../../../lib/policies";
+import type { PasswordMinLength } from "@/lib/zitadel";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -7,9 +7,9 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "../../../lib/input";
-import type { FrameworkChoice } from "../../../lib/orca";
-import type { SuggestedCommand } from "../../../lib/suggestion";
+import type { Asker } from "@/lib/input";
+import type { FrameworkChoice } from "@/lib/orca";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -93,7 +93,7 @@ export type SetupAnswers = {
   /**
    * The minimum password length to put into the password policy setup
    * writes: a number, `null` for an explicit "none", or `undefined` when none
-   * was given, which writes the recommended minimum (`passwordPolicyFile`).
+   * was given, which writes the recommended minimum (`PasswordPolicy.initial`).
    * Chosen by {@link import("./password-policy").PasswordPolicyPrompt} or
    * `--password-min-length`.
    */

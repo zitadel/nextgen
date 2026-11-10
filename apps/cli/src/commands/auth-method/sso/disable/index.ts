@@ -1,78 +1,45 @@
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { Flags } from "@oclif/core";
-import { consola } from "consola";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import {
-  listedProviders,
-  refuseBrokenFlows,
-  refuseUneditable,
-  usableSignInMethods,
-} from "../../../../lib/auth-methods";
-import {
-  type FlowFile,
-  removeSsoFromFlow,
-  removeSsoFromSchema,
-  ssoEditRefusal,
-  ssoProvidersRefusal,
-} from "../../../../lib/idp";
-import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
-import { stableStringify } from "../../../../lib/json";
-import {
-  type Admitted,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../../../lib/oclif";
-import { optionArgs } from "../../../../lib/public-cli";
-import { AuthMethodCommand } from "../../command";
-import type { SchemaTarget } from "../../command";
+import { AuthMethodCommand } from "@/commands/auth-method/command";
+import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { prose } from "@/lib/oclif/rendering";
+import { optionArgs } from "@/lib/public-cli";
+import { projectCommand } from "@/lib/suggestion";
+import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
-/** What a run that names no provider is refused for. */
+/**
+ * What a run that names no provider is refused for. The provider is always
+ * named, because removing every provider at once would be a different, larger
+ * change; the refusal lists the providers the schema offers, well-formed or
+ * not.
+ */
 const NAME_PROVIDER_REFUSAL: Refusal = {
   message: "Name the provider to remove",
   hint: "Pass --provider, e.g. --provider {example}. {schema} offers: {offered}.",
 };
 
 /**
- * The provider to remove. It is always named, because removing every provider
- * at once would be a different, larger change; the refusal lists the providers
- * the schema offers, well-formed or not.
+ * The flags that name the project a removal's `variable rm` commands reach.
  */
-export function providerToRemove(given: string | undefined, target: SchemaTarget): string {
-  if (given !== undefined) {
-    return given;
-  }
-  throw refusalError(NAME_PROVIDER_REFUSAL, {
-    example: IDP_PROVIDERS[0],
-    schema: target.schema.name,
-    offered: listedProviders(target.schema.body).join(", ") || "none",
-  });
-}
-
-/**
- * The flows a provider is removed from, once the schema and each flow are in
- * the shapes the editors write: a region that is not what they write is
- * someone's, and is not overwritten.
- */
-export function removableFlows(target: SchemaTarget): FlowFile[] {
-  refuseUneditable(target.schema.path, ssoEditRefusal(target.schema.body, "schema"));
-  for (const flow of target.flows) {
-    refuseUneditable(flow.path, ssoProvidersRefusal(flow.body));
-  }
-  return target.flows;
-}
+type SelectorFlags = {
+  readonly cwd?: string | undefined;
+  readonly env?: string | undefined;
+  readonly envFile?: string | undefined;
+  readonly server?: string | undefined;
+};
 
 /**
  * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the
- * provider again does not ask for them. The routes and steps
- * `auth-method sso enable` added stay in the flows; without a provider they
- * are never reached.
+ * provider again does not ask for them, and the server cannot delete a
+ * connection yet anyway. The routes and steps `auth-method sso enable` added
+ * stay in the flows too. The result says what was kept and how to remove what
+ * can be removed today.
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
@@ -93,102 +60,133 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }),
   };
 
-  protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
-    const target = await this.schemaTarget(flags);
-    const provider = providerToRemove(flags.provider, target);
-    const flows = removableFlows(target);
-    const { cwd, cwdArgs, schema } = target;
-
-    const schemaChange = removeSsoFromSchema(schema.body, provider);
-    const after = schemaChange.document as Record<string, unknown>;
-    const flowChanges = flows.map((file) => {
-      const change = removeSsoFromFlow(file.body, provider);
-      return {
-        file,
-        after: change.document as Record<string, unknown>,
-        changed: change.changed,
-      };
-    });
-    const changedFlows = flowChanges.filter((change) => change.changed);
-    const changed = [
-      ...(schemaChange.changed ? [schema.path] : []),
-      ...changedFlows.map(({ file }) => file.path),
+  /**
+   * Remove the provider from the schema and its login flows.
+   *
+   * @param input - The provider, the schema and the environment flags.
+   * @returns The result, with how to remove a connection nothing offers any more.
+   * @throws {@link ZitadelError} When no provider is named, the schema cannot be
+   *   chosen, or the change would leave no way to sign in and nobody agreed to it.
+   */
+  protected async execute(input: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
+    const flags = input.flags;
+    const target = await this.loadSchemaTarget(flags);
+    const config = target.config;
+    const schema = target.schema;
+    const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
+    const retryArgs = [
+      "auth-method",
+      "sso",
+      "disable",
+      ...optionArgs("--provider", provider),
+      ...optionArgs("--schema", target.schemaFlag),
     ];
-
-    if (changed.length > 0) {
-      // Before the last-method guard: these refusals have no override, so
-      // nobody should be asked to confirm a change that fails anyway.
-      refuseBrokenFlows(schema, after, flowChanges);
-    }
-    const permit = await this.lastMethodPermit({
-      schema,
-      after,
-      disabling: provider,
-      retryArgs: [
-        "auth-method",
-        "sso",
-        "disable",
-        ...optionArgs("--provider", provider),
-        ...optionArgs("--schema", schema.name),
-      ],
-      cwdArgs,
+    const confirmed = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
+      return config.connections.disable(schema, provider, options);
     });
-    if (permit === undefined) {
-      return this.emit({ status: "skipped", reason: "disable-cancelled" });
+    if (confirmed === undefined) {
+      return this.emit({
+        status: "skipped",
+        reason: "disable-cancelled",
+      });
     }
+    const change = confirmed.change;
 
+    const edited = change.after.schemas.get(schema.path) ?? schema;
     // When only a flow still offered the provider, say so: the schema itself
     // did not change.
-    const where = schemaChange.changed ? schema.name : `the login flows of ${schema.name}`;
+    const where = change.changedPaths.includes(schema.path)
+      ? schema.name
+      : `the login flows of ${schema.name}`;
     const data = {
       schema: schema.name,
       file: schema.path,
       method: "sso",
-      provider,
-      changed,
-      usable: usableSignInMethods(after),
+      provider: provider,
+      changed: [...change.changedPaths],
+      usable: [...edited.usableMethods],
+      notices: change.notices,
     };
-    const outcome = {
-      schema,
-      before: schema.body,
-      after,
-      flowsAfter: flowChanges.map(({ after: body }) => body),
-    };
+    const unchanged = `${schema.name} does not offer ${provider}, so nothing changed`;
 
     if (this.dryRun) {
-      this.reportOutcome(outcome);
+      this.report(change);
+      const preview = change.changed ? `Would remove ${provider} from ${where}` : unchanged;
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty:
-          changed.length > 0
-            ? `Would remove ${provider} from ${where}`
-            : `${schema.name} does not offer ${provider}`,
+        pretty: prose(preview),
       });
     }
-    if (schemaChange.changed) {
-      await this.writeSchema(cwd, schema, after, permit);
-    }
-    for (const { file, after: body } of changedFlows) {
-      await writeFile(join(cwd, file.path), `${stableStringify(body)}\n`);
-    }
-    for (const path of changed) {
-      consola.success(`Updated ${path}`);
-    }
-    if (changed.length === 0) {
-      consola.info(`${schema.name} does not offer ${provider}`);
-    }
-    this.reportOutcome(outcome);
-    const followUps = this.followUps(changed.length > 0, cwdArgs);
+    await this.write(target, change, confirmed.consent);
+    this.report(change);
+    const followUps = this.followUps(change.changed, target.cwdArgs);
+    const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
+    const actions = unused === undefined ? [] : this.removalActions(unused, flags);
+    const summary = change.changed ? `Removed ${provider} from ${where}` : unchanged;
+    const next =
+      actions.length > 0
+        ? { actions, commands: followUps.commands }
+        : { commands: followUps.commands };
+
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
-      next: { commands: followUps.commands },
-      pretty:
-        changed.length > 0
-          ? `Removed ${provider} from ${where}`
-          : `${schema.name} does not offer ${provider}`,
+      next,
+      pretty: prose(summary),
     });
+  }
+
+  /**
+   * Refuse a run that names no provider. It is always named, because removing
+   * every provider at once would be a different, larger change; the refusal
+   * lists the providers the schema offers, well-formed or not.
+   *
+   * @param schema - The schema the run is about.
+   * @returns Never: it always throws.
+   * @throws {@link ZitadelError} Always, naming the providers the schema offers.
+   */
+  private refuseUnnamedProvider(schema: UserSchema): never {
+    const offered = schema.providers.join(", ") || "none";
+    throw refusalError(NAME_PROVIDER_REFUSAL, {
+      example: IDP_PROVIDERS[0],
+      schema: schema.name,
+      offered,
+    });
+  }
+
+  /**
+   * How to remove a connection nothing offers any more: the file before the
+   * next deploy, and its variables once that deploy is live.
+   *
+   * @remarks
+   * In the other order the live release would offer a provider whose
+   * credentials are gone, and the deploy would refuse a connection whose
+   * variables are missing. The `variable rm` commands carry the run's
+   * `--env`/`--env-file`/`--server`, so they reach the project this run named.
+   *
+   * @param unused - The connection, and the variables only it reads.
+   * @param flags - The run's `--cwd` and environment flags.
+   * @returns The actions, the file's deletion first.
+   */
+  private removalActions(unused: UnusedConnection, flags: SelectorFlags): readonly string[] {
+    const deletion = `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`;
+    if (unused.variables.length === 0) {
+      return [deletion];
+    }
+    const selector = environmentSelectorSuffix({
+      cwd: flags.cwd,
+      envFile: flags.envFile,
+      envName: flags.env,
+      server: flags.server,
+    });
+    const commands = unused.variables.map((name) => {
+      return `\`${projectCommand(`variable rm ${name}`, selector, this.cliVersion)}\``;
+    });
+    return [
+      deletion,
+      `Once that deploy is live, remove its credentials: ${commands.join(" and ")}`,
+    ];
   }
 }

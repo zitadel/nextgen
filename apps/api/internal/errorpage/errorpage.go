@@ -8,13 +8,14 @@ import (
 	"bytes"
 	_ "embed"
 	"html/template"
-	"log/slog"
 	"mime"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	designtokens "github.com/zitadel/nextgen/packages/design-tokens"
 )
@@ -113,7 +114,7 @@ func Write(w http.ResponseWriter, r *http.Request, p Page) {
 	if err := pageTemplate.Execute(&body, data); err != nil {
 		// The template is parsed at start-up and fed only the fields above, so
 		// this is a bug: answer with the status at least.
-		slog.ErrorContext(r.Context(), "render error page", slog.Any("error", err))
+		errlog.LogFault(r.Context(), domain.ErrInternal(err).WithMessage("failed to render the error page"))
 		http.Error(w, http.StatusText(p.Status), p.Status)
 		return
 	}

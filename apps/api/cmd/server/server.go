@@ -962,8 +962,16 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	// binary serves the console, because a console served elsewhere reads it
 	// from here: the hosted cloud's console service, and the console's dev
 	// server through its proxy. Registered as an exact path, so it wins over
-	// the catch-all API mount below.
-	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
+	// the catch-all API mount below. It takes the request ID and the request
+	// line, which its error lines join, but none of the middleware a
+	// client's API request passes.
+	mux.Handle(consoleRuntimePath, middleware.Chain(newConsoleRuntimeHandler(runtime),
+		func(next http.Handler) http.Handler {
+			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+		},
+		middleware.WithLogging,
+		api.WithRecover,
+	))
 
 	chain := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
@@ -987,33 +995,34 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
-	// The event retention trigger, when a scheduler outside the process runs
-	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
-	// not the API's, so it takes the request ID and the request line but none
-	// of the middleware a client's request passes.
-	if retentionTrigger != nil {
-		mux.Handle(audit.RetentionTriggerPath, middleware.Chain(retentionTrigger,
+	// Request ID, access log and panic recovery — shared by mounts that sit
+	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
+	// embedded OpenAPI document).
+	observe := func(h http.Handler) http.Handler {
+		return middleware.Chain(h,
 			func(next http.Handler) http.Handler {
 				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
 			},
 			middleware.WithLogging,
 			api.WithRecover,
-		))
+		)
+	}
+	// The event retention trigger, when a scheduler outside the process runs
+	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
+	// not the API's, so it takes the request ID and the request line but none
+	// of the middleware a client's request passes.
+	if retentionTrigger != nil {
+		mux.Handle(audit.RetentionTriggerPath, observe(retentionTrigger))
 	}
 	// Where browsers post the violations of the console's and the error
 	// page's policies, and on the hosted cloud those of every service's
 	// pages. Outside the API's chain: a browser posts it without the CSRF
 	// token or a session, and nobody's audit trail needs it.
-	mux.Handle(securityheaders.ReportPath, middleware.Chain(securityheaders.Report(),
-		func(next http.Handler) http.Handler {
-			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
-		},
-		middleware.WithLogging,
-		api.WithRecover,
-	))
-	// The API under /api/v1, the probes at the root, and the root alias for
-	// every other path until 1.0.0 (ADR 077).
-	api.MountAPI(mux, chain, apiServers)
+	mux.Handle(securityheaders.ReportPath, observe(securityheaders.Report()))
+	// The API under /api/v1 (including the embedded OpenAPI document), the
+	// probes at the root, and the root alias for every other path until
+	// 1.0.0 (ADR 077).
+	api.MountAPI(mux, chain, observe, apiServers)
 	return securityheaders.Middleware(mux), nil
 }
 

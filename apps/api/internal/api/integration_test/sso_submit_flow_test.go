@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -25,6 +25,7 @@ import (
 func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	t.Parallel()
 	f := newIdpFixture(t)
+	admitLoginOrigin(t, f.project.ID)
 	// Static endpoints: the client is built without a discovery fetch.
 	connection := helpers.OIDCConnection("google")
 	oidcConn := connection.Oidc.Value
@@ -42,6 +43,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	}, api.UpdateVariablesParams{ProjectID: f.projectID()})
 	require.NoError(t, err)
 	require.IsType(t, &api.VariablesByKind{}, varsResp, helpers.MustMarshal(t, varsResp))
+	// A deployment freezes the variables, so these need one of their own.
 
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
@@ -50,6 +52,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, string(f.projectID()))
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: f.projectID(),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

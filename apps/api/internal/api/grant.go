@@ -48,22 +48,11 @@ func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.
 		return nil, err
 	}
 	includePrincipal := slices.Contains(params.Expand, api.GrantExpandPrincipal)
-	if includePrincipal {
-		scope, ok := GetScopeContext(ctx)
-		if !ok || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
-			// Constructors stay in this function so gen_openapi_errors can see
-			// user.permission_denied / team.permission_denied on the operation.
-			if !hasGranularOrOperator(ctx, "user.read") {
-				return nil, domain.ErrUserPermissionDenied().
-					WithMessage("expanding a grant principal requires user.read")
-			}
-			if !hasGranularOrOperator(ctx, "team.read") {
-				return nil, domain.ErrTeamPermissionDenied().
-					WithMessage("expanding a grant principal requires team.read")
-			}
-		}
-	}
-	grant, err := h.grantService.Get(ctx, string(params.ProjectID), params.ID, includePrincipal)
+	// A literal, not the method value: gen_openapi_errors follows a func
+	// literal argument, so the operation lists user.permission_denied.
+	grant, err := h.grantService.Get(ctx, string(params.ProjectID), params.ID, includePrincipal, func(ctx context.Context, home string) error {
+		return h.requirePrincipalRead(ctx, home)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -75,22 +64,9 @@ func (h *Handler) QueryGrants(ctx context.Context, req *api.QueryGrantsRequest, 
 		return nil, err
 	}
 	svcReq := mapQueryGrantsToService(string(params.ProjectID), req)
-	if svcReq.IncludePrincipal {
-		scope, ok := GetScopeContext(ctx)
-		if !ok || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
-			// Constructors stay in this function so gen_openapi_errors can see
-			// user.permission_denied / team.permission_denied on the operation.
-			if !hasGranularOrOperator(ctx, "user.read") {
-				return nil, domain.ErrUserPermissionDenied().
-					WithMessage("expanding a grant principal requires user.read")
-			}
-			if !hasGranularOrOperator(ctx, "team.read") {
-				return nil, domain.ErrTeamPermissionDenied().
-					WithMessage("expanding a grant principal requires team.read")
-			}
-		}
-	}
-	listed, err := h.grantService.List(ctx, svcReq)
+	listed, err := h.grantService.List(ctx, svcReq, func(ctx context.Context, home string) error {
+		return h.requirePrincipalRead(ctx, home)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +83,23 @@ func (h *Handler) QueryGrants(ctx context.Context, req *api.QueryGrantsRequest, 
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
 	}
 	return resp, nil
+}
+
+// requirePrincipalRead allows expand=principal only to a caller who may read
+// the users of the principal's home project: the same resolver Check, one per
+// home. User read and team read both resolve to the project's viewer
+// relation, so it covers team principals too. project.write on the protected
+// project does not satisfy it, and a session is not exempt (ADR 059).
+func (h *Handler) requirePrincipalRead(ctx context.Context, homeProjectID string) error {
+	err := h.requireProjectAccess(ctx, homeProjectID, userAccess, opRead)
+	if err == nil {
+		return nil
+	}
+	if domain.IsServerFault(err) {
+		return err
+	}
+	return domain.ErrUserPermissionDenied().WithParent(err).
+		WithMessage("expanding a grant principal requires read access to its home project")
 }
 
 func mapQueryGrantsToService(projectID string, req *api.QueryGrantsRequest) service.ListGrantsRequest {
@@ -258,7 +251,7 @@ func grantErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrGrantAlreadyExists().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrGrantPermissionDenied().Code:
+	case domain.ErrGrantPermissionDenied().Code, domain.ErrGrantProjectUnclaimed().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)

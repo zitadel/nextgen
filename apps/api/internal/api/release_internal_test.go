@@ -130,13 +130,15 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 // A revoked release and one still served are both conflicts.
 func TestReleaseErrorResponseConflicts(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseNotDeployed(nil)).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseNoDefault()).StatusCode)
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
 }
 
 // The 409 names every origin still serving the release, so the caller can
 // deploy elsewhere or roll back before revoking again.
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
-	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+	resp, ok := releaseInUseResponse(t.Context(), domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
 	}}))
 	require.True(t, ok)
@@ -148,7 +150,7 @@ func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
 
 // Without the origins the 409 cannot name them, so the generic envelope answers.
 func TestReleaseInUseResponseNeedsOrigins(t *testing.T) {
-	_, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
+	_, ok := releaseInUseResponse(t.Context(), domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
 	assert.False(t, ok)
 }
 

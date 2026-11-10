@@ -51,6 +51,10 @@ fileGroups:
     - "/apps/cloud/build-launcher.sh"
     - "/apps/cloud/go-import/**/*"
     - "/apps/console/index.html"
+    # TestDocsOriginCopies reads DocsOrigin's TypeScript copies.
+    - "/packages/api/scripts/docs-links.ts"
+    - "/apps/console/src/lib/docs.ts"
+    - "/apps/cli/src/lib/orca/patchers/rule/guidance.ts"
 
 # Go's own cache accounts for the effective compiler and target defaults.
 # Runner result caches do not; native commands must run when selected.
@@ -90,25 +94,32 @@ tasks:
     # Not `go generate ./...`: that runs every directive serially, and the cost
     # is per-invocation (mockgen type-loads a package whether it mocks one
     # interface or twenty). The script runs packages in parallel behind the one
-    # ordering constraint that matters — see scripts/go-generate.mjs.
+    # ordering constraint that matters — see scripts/go-generate.mjs. The api
+    # package's last //go:generate writes bundled/openapi.json
+    # (scripts/bundle-openapi.mjs).
     command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
       - "!/**/*_test.go"
       - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
+      - "/scripts/map-all.mjs"
+      - "/scripts/bundle-openapi.mjs"
       - "/scripts/server-build.mjs"
       - "/scripts/dev-process.mjs"
+      - "/redocly.yaml"
     # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
     # what `clean-generated` deletes. Change both together.
     outputs:
       - "/apps/api/internal/api/generated/**"
       - "/apps/api/api/openapi/components/schemas/errors/**"
+      - "/apps/api/api/openapi/components/examples/errors/*.yaml"
       - "/apps/api/api/openapi/endpoints/**/*-error-response.yaml"
       - "/apps/api/api/openapi/endpoints/events/event.yaml"
       - "/apps/api/api/openapi/endpoints/events/types/*.yaml"
       - "/apps/api/api/openapi/endpoints/events/webhooks/*.yaml"
       - "/apps/api/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/api/openapi/bundled/openapi.json"
       - "/apps/api/internal/**/*_enumer.go"
       - "/apps/api/internal/**/*.mock.go"
       - "/packages/go/api/*_gen.go"
@@ -141,8 +152,11 @@ tasks:
       - "!/**/*_test.go"
       - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
+      - "/scripts/map-all.mjs"
+      - "/scripts/bundle-openapi.mjs"
       - "/scripts/server-build.mjs"
       - "/scripts/dev-process.mjs"
+      - "/redocly.yaml"
       # Imported at module scope, not only under --prune: GENERATED_GLOBS is
       # what this task's git comparison looks at, so a glob edit that does not
       # invalidate here would cache-hit and pass against the old pathspecs.
@@ -164,9 +178,13 @@ tasks:
       - "!/**/*_test.go"
       - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
+      - "/scripts/map-all.mjs"
+      - "/scripts/bundle-openapi.mjs"
+      - "/scripts/server-build.mjs"
       - "/scripts/clean-generated.mjs"
       - "/scripts/generated-outputs.mjs"
       - "/scripts/dev-process.mjs"
+      - "/redocly.yaml"
     options:
       runFromWorkspaceRoot: true
       mutex: "generated-sources"

@@ -20,6 +20,7 @@ content:
         - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../components/schemas/errors/rel-no_default.yaml'
         - $ref: '../../components/schemas/errors/rel-not_deployed.yaml'
         - $ref: '../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-revoked.yaml'
@@ -45,6 +46,7 @@ content:
           proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
           proj.preview_not_live: '../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.no_default: '../../components/schemas/errors/rel-no_default.yaml'
           rel.not_deployed: '../../components/schemas/errors/rel-not_deployed.yaml'
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
@@ -53,112 +55,48 @@ content:
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       att.invalid_request:
-        summary: att.invalid_request
-        value:
-          code: att.invalid_request
-          message: 'invalid request'
+        $ref: '../../components/examples/errors/att-invalid_request.yaml'
       enc_key.decrypt_failed:
-        summary: enc_key.decrypt_failed
-        value:
-          code: enc_key.decrypt_failed
-          message: 'failed to decrypt data'
+        $ref: '../../components/examples/errors/enc_key-decrypt_failed.yaml'
       enc_key.encrypt_failed:
-        summary: enc_key.encrypt_failed
-        value:
-          code: enc_key.encrypt_failed
-          message: 'failed to encrypt data'
+        $ref: '../../components/examples/errors/enc_key-encrypt_failed.yaml'
       enc_key.not_found:
-        summary: enc_key.not_found
-        value:
-          code: enc_key.not_found
-          message: 'encryption key not found'
+        $ref: '../../components/examples/errors/enc_key-not_found.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../components/examples/errors/evt-invalid.yaml'
       flowdef.not_found:
-        summary: flowdef.not_found
-        value:
-          code: flowdef.not_found
-          message: 'flow definition: not found'
+        $ref: '../../components/examples/errors/flowdef-not_found.yaml'
       flowdef.purpose_mismatch:
-        summary: flowdef.purpose_mismatch
-        value:
-          code: flowdef.purpose_mismatch
-          message: 'flow definition: does not serve requested purpose'
+        $ref: '../../components/examples/errors/flowdef-purpose_mismatch.yaml'
       flow.integrity:
-        summary: flow.integrity
-        value:
-          code: flow.integrity
-          message: 'flow state integrity violation'
+        $ref: '../../components/examples/errors/flow-integrity.yaml'
       flow.invalid_purpose:
-        summary: flow.invalid_purpose
-        value:
-          code: flow.invalid_purpose
-          message: 'unknown or unsupported flow purpose'
+        $ref: '../../components/examples/errors/flow-invalid_purpose.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       tkn.invalid:
-        summary: tkn.invalid
-        value:
-          code: tkn.invalid
-          message: 'the token is not valid'
+        $ref: '../../components/examples/errors/tkn-invalid.yaml'
       tkn.invalid_tknid:
-        summary: tkn.invalid_tknid
-        value:
-          code: tkn.invalid_tknid
-          message: 'token identifiers do not match token type'
+        $ref: '../../components/examples/errors/tkn-invalid_tknid.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../components/examples/errors/not_implemented.yaml'
       proj.not_found:
-        summary: proj.not_found
-        value:
-          code: proj.not_found
-          message: 'project not found'
+        $ref: '../../components/examples/errors/proj-not_found.yaml'
       proj.origin_not_allowed:
-        summary: proj.origin_not_allowed
-        value:
-          code: proj.origin_not_allowed
-          message: 'the request origin is not an origin of this project'
+        $ref: '../../components/examples/errors/proj-origin_not_allowed.yaml'
       proj.preview_not_live:
-        summary: proj.preview_not_live
-        value:
-          code: proj.preview_not_live
-          message: 'no live preview for this origin; run zitadel preview on this branch'
+        $ref: '../../components/examples/errors/proj-preview_not_live.yaml'
+      rel.no_default:
+        $ref: '../../components/examples/errors/rel-no_default.yaml'
       rel.not_deployed:
-        summary: rel.not_deployed
-        value:
-          code: rel.not_deployed
-          message: 'nothing is deployed to this origin'
+        $ref: '../../components/examples/errors/rel-not_deployed.yaml'
       rel.not_found:
-        summary: rel.not_found
-        value:
-          code: rel.not_found
-          message: 'release: not found'
+        $ref: '../../components/examples/errors/rel-not_found.yaml'
       rel.revoked:
-        summary: rel.revoked
-        value:
-          code: rel.revoked
-          message: 'the release this attempt runs on was revoked'
+        $ref: '../../components/examples/errors/rel-revoked.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'
       enc_key.unknown_alg:
-        summary: enc_key.unknown_alg
-        value:
-          code: enc_key.unknown_alg
-          message: 'unsupported encryption algorithm'
+        $ref: '../../components/examples/errors/enc_key-unknown_alg.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../components/examples/errors/unavailable.yaml'

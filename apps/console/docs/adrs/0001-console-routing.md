@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -141,10 +141,14 @@ endpoint.
 
 > **Amendment (2026-09-28, #1299):** screens now act on a **selected project**
 > carried as `?project=<id>` on the `_authed` layout, which validates it and
-> retains it on every navigation (`src/lib/project-scope.ts`). `projects/index.tsx`
+> retains it on every navigation (`src/features/projects/project-scope.ts`). `projects/index.tsx`
 > is the Projects overview, where a project is selected; the project's own page
 > moved to the scoped `project/index.tsx` (Project settings), and
 > `projects/$projectId.tsx` only redirects there with that project selected.
+
+> **Amendment (2026-11-05):** where the code behind a route lives is
+> [ADR 0007](0007-console-code-layout.md). The pending, error and not-found
+> boundaries are in `src/app-shell/boundaries.tsx`.
 
 ### 5. Data loading: route loaders, with three required boundaries
 
@@ -208,6 +212,18 @@ the sidebar.
 > sidebar entry (`staticData.nav`); it is the console's home, opened by the
 > logo and the project switcher's `All projects`, and the shell draws it
 > without the sidebar. The sidebar holds the selected project's screens only.
+
+> **Amendment (2026-11-09, design decision D27):** the shell draws one frame
+> for every screen, and the route picks which of two lists the sidebar shows.
+> Projects and `/settings` are above every project and show the account's
+> (`staticData.nav.view: "account"`), which Projects heads; every other route
+> shows the selected project's. The Settings view's own header is gone.
+
+> **Amendment (2026-11-09, design decision D29):** the route picks between
+> three lists. Projects shows the account's (`view: "account"`): Projects and
+> one Settings row, the `/settings` route's own entry. `/settings` with
+> anything beneath it shows Settings' (`view: "settings"`), under a heading
+> row that leads back to Projects.
 
 ## Consequences
 

@@ -2,17 +2,17 @@ import { join } from "node:path";
 
 import { Flags } from "@oclif/core";
 
-import { LOCAL_ADMIN_FILE } from "../lib/local-server/admin-credential";
+import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   localRuntimePaths,
   readRuntimeMetadata,
-} from "../lib/local-server/runtime";
-import { LocalServer } from "../lib/local-server/server";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
 import { startedServer } from "./local-server/started";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { Destructive } from "../lib/oclif/destructive";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
 
 export default class Reset extends Destructive(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";

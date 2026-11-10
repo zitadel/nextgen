@@ -3,6 +3,7 @@ import type { Properties } from "mixpanel";
 import { Outbox } from "./outbox";
 import { type TelemetrySink, trace } from "./sink";
 import { resolveVercelEndpoint, type VercelTarget, vercelEventBody } from "./vercel";
+import { userAgent } from "@/lib/user-agent";
 
 /** What {@link VercelSink.from} needs to make a sink. */
 export type VercelSettings = {
@@ -64,9 +65,12 @@ export class VercelSink implements TelemetrySink {
       .then(() => {
         return this.post(this.target.endpoint, {
           method: "POST",
-          // The global dispatcher sets the CLI's User-Agent; `x-va-server`
-          // is what `@vercel/analytics/server` sends.
-          headers: { "content-type": "application/json", "x-va-server": "1" },
+          // `x-va-server` is what `@vercel/analytics/server` sends.
+          headers: {
+            "content-type": "application/json",
+            "user-agent": userAgent(),
+            "x-va-server": "1",
+          },
           body,
         });
       })

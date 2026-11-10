@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { NextDetector } from "../../../../../src/lib/orca/detectors/next";
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { rejectionOf } from "../../../../helpers/thrown-value";
+import { NextDetector } from "@/lib/orca/detectors/next";
+import { ZitadelError } from "@/lib/errors";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const detector = new NextDetector();
 

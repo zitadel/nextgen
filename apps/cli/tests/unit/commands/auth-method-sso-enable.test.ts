@@ -1,13 +1,187 @@
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, vi } from "vitest";
 
-import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
-import { usePlatformServer } from "../../helpers/platform-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import type { JsonObject } from "@/lib/zitadel";
+import {
+  authMethodJson,
+  authMethodText,
+  LOGIN_FLOW_FILE,
+  SCHEMA_FILE,
+  schemaIdOf,
+} from "@tests/helpers/auth-method";
+import { aGoogleConnection, type DocumentsByName } from "@tests/helpers/config";
+import { it } from "@tests/helpers/fixtures";
+import { withStep } from "@tests/helpers/flows";
+import {
+  defaultSchema,
+  loginFlow,
+  makeProject,
+  readJson,
+  setUpProject,
+  withStdin,
+  writeJson,
+} from "@tests/helpers/local-project";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+
+/**
+ * The subcommand and provider every Google run names.
+ */
+const GOOGLE = ["sso", "enable", "--provider", "google"] as const;
+
+/**
+ * The subcommand and settings of the custom `acme-sso` connection.
+ */
+const ACME = [
+  "sso",
+  "enable",
+  "--provider",
+  "custom",
+  "--slug",
+  "acme-sso",
+  "--display-name",
+  "Acme SSO",
+  "--issuer",
+  "https://sso.acme.example",
+] as const;
+
+/**
+ * The client id of the Google OAuth application a developer registered.
+ */
+const CLIENT_ID = "1234-abc.apps.googleusercontent.com";
+
+/**
+ * A client id other than {@link CLIENT_ID}, of another OAuth application.
+ */
+const OTHER_CLIENT_ID = "5678-def.apps.googleusercontent.com";
+
+/**
+ * The client id of the `acme-sso` OAuth application.
+ */
+const ACME_CLIENT_ID = "acme-client-id";
+
+/**
+ * The client secret a scripted run pipes in on stdin. Both credentials are
+ * required, so a scripted run without one is refused before it writes anything.
+ */
+const SECRET = "piped-secret";
+
+/**
+ * Where the Google connection is written.
+ */
+const CONNECTION_FILE = ".zitadel/idps/google.json";
+
+/**
+ * The URI the developer registers with Google for the connection.
+ */
+const CALLBACK_URI = "http://localhost:3000/__nextgen/idp/google/callback";
+
+/**
+ * The project the linked Project publishes to.
+ */
+const PROJECT_ID = "proj_01TEST";
+
+/**
+ * What the run says of a region it left alone because someone edited it.
+ */
+const HAND_EDITED = "has been edited by hand";
+
+/**
+ * The files a first run changes, in the order it reports them.
+ */
+const CHANGED = [SCHEMA_FILE, LOGIN_FLOW_FILE, CONNECTION_FILE];
+
+/**
+ * A Project as `zitadel setup` leaves it, each schema carrying the `$id` its
+ * login flow names it by.
+ *
+ * @param dir - The directory to write the Project into.
+ * @param schemas - The schemas, by file name without `.json`.
+ * @returns The Project's directory.
+ */
+function aProject(
+  dir: string,
+  schemas: DocumentsByName = { "default-human-user": defaultSchema },
+): Promise<string> {
+  const named = Object.entries(schemas).map(([name, body]) => {
+    return [name, { $id: schemaIdOf(name), ...body }];
+  });
+  return setUpProject(dir, Object.fromEntries(named));
+}
+
+/**
+ * A Project where Google was already enabled with {@link CLIENT_ID}.
+ *
+ * @param dir - The directory to write the Project into.
+ * @returns The Project's directory.
+ */
+async function aProjectWithGoogle(dir: string): Promise<string> {
+  const cwd = await aProject(dir);
+  await withStdin(SECRET, () => {
+    return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+  });
+  return cwd;
+}
+
+/**
+ * A password step someone wrote by hand, with copy of their own.
+ */
+const EDITED_PASSWORD_STEP = {
+  name: "password",
+  fields: ["x-auth-methods#password"],
+  actions: [{ name: "submit", kind: "submit", primary: true, text_key: "my.own.copy" }],
+  transitions: { submit: { target: "done" } },
+};
+
+/**
+ * A Project whose login flow has {@link EDITED_PASSWORD_STEP} in place of its
+ * password step.
+ *
+ * @param dir - The directory to write the Project into.
+ * @returns The Project's directory.
+ */
+async function aProjectWithAnEditedPasswordStep(dir: string): Promise<string> {
+  const cwd = await aProject(dir);
+  await writeJson(
+    cwd,
+    LOGIN_FLOW_FILE,
+    withStep(loginFlow("default-human-user"), "password", () => {
+      return EDITED_PASSWORD_STEP;
+    }),
+  );
+  return cwd;
+}
+
+/**
+ * A step that collects the staff number in place of the email.
+ *
+ * @param step - The step.
+ * @returns The step, collecting `staffNumber` alone.
+ */
+function collectingStaffNumber(step: JsonObject): JsonObject {
+  return { ...step, fields: ["staffNumber"] };
+}
+
+/**
+ * A Project holding a Google connection someone wrote by hand.
+ *
+ * @param dir - The directory to write the Project into.
+ * @param oidc - The `oidc` keys the hand-written connection holds.
+ * @returns The Project's directory.
+ */
+async function aProjectWithAHandWrittenConnection(
+  dir: string,
+  oidc: Record<string, string>,
+): Promise<string> {
+  const cwd = await aProject(dir);
+  await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+  await writeJson(cwd, CONNECTION_FILE, aGoogleConnection({ oidc }));
+  return cwd;
+}
 
 /**
  * The platform the credentials are published to. No test names a server, so
@@ -16,920 +190,1162 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helper
  */
 const { server: platform } = usePlatformServer();
 
-/** Makes every publish fail before it reaches the project, as an unreachable server would. */
-function refusePublishes(): void {
-  platform.use(http.patch("*/variables", () => HttpResponse.error()));
-}
-
 /**
- * Run the command with a secret on stdin, the way a scripted caller must:
- * both credentials are required, so a run without one is refused before it
- * writes anything. Tests about that refusal drive the CLI directly.
+ * Makes every publish fail before it reaches the project, as an unreachable
+ * server would.
  */
-function enable(cwd: string, ...extra: string[]) {
-  return withStdin("piped-secret", () =>
-    runCliForTest([
-      "auth-method",
-      "sso",
-      "enable",
-      "--cwd",
-      cwd,
-      "--provider",
-      "google",
-      "--json",
-      "--non-interactive",
-      ...extra,
-    ]),
-  );
-}
-
-/** The same, rendered for a terminal, which is where the warnings are said. */
-function enableRendered(cwd: string, ...extra: string[]) {
-  return withStdin("piped-secret", () =>
-    runCliForTest([
-      "auth-method",
-      "sso",
-      "enable",
-      "--cwd",
-      cwd,
-      "--provider",
-      "google",
-      "--non-interactive",
-      ...extra,
-    ]),
+function refusePublishes(): void {
+  platform.use(
+    http.patch("*/variables", () => {
+      return HttpResponse.error();
+    }),
   );
 }
 
 describe("auth-method sso enable", () => {
-  it("writes the connection and reports what changed", async () => {
-    const cwd = await setUpProject();
-    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    expect(result.exitCode).toBe(0);
+  describe("with a Project as setup leaves it", () => {
+    it("reports the connection it created", async ({ dir }) => {
+      const cwd = await aProject(dir);
 
-    const payload = parseJson(result.stdout) as { data: Record<string, unknown> };
-    expect(payload.data.connection).toMatchObject({
-      action: "create",
-      slug: "google",
-      file: ".zitadel/idps/google.json",
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        data: { connection: { action: "create", slug: "google", file: CONNECTION_FILE } },
+      });
     });
-    expect(payload.data.callback_uri).toBe("http://localhost:3000/__nextgen/idp/google/callback");
 
-    const written = JSON.parse(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"));
-    // Neither credential is a literal: each environment registers its own
-    // OAuth application, so both are references to project variables and one
-    // connection file serves every environment.
-    expect(written.oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
-    // Only a reference, whatever the developer typed.
-    expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
-    // The default schema defines only email, so the name claims are dropped.
-    expect(written.claim_mapping).toEqual({ email: "email" });
+    it("reports the callback URI to register", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ data: { callback_uri: CALLBACK_URI } });
+    });
+
+    it("lists the files it changed", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ data: { changed: CHANGED } });
+    });
+
+    it.for([
+      ["client_id", "${{ GOOGLE_CLIENT_ID }}"],
+      ["client_secret", "${{ GOOGLE_CLIENT_SECRET }}"],
+    ] as const)(
+      "writes the %s as a reference to a project variable",
+      async ([key, reference], { dir }) => {
+        const cwd = await aProject(dir);
+
+        await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+        });
+
+        expect(await readJson(cwd, CONNECTION_FILE)).toMatchObject({ oidc: { [key]: reference } });
+      },
+    );
+
+    it("maps only the claims the schema defines", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect((await readJson(cwd, CONNECTION_FILE)).claim_mapping).toEqual({ email: "email" });
+    });
+
+    it("writes the vendor's own issuer", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(await readJson(cwd, CONNECTION_FILE)).toMatchObject({
+        oidc: { issuer: "https://accounts.google.com" },
+      });
+    });
+
+    it.for(["authorization_endpoint", "token_endpoint"])(
+      "writes no %s, leaving it to the vendor's discovery document",
+      async (endpoint, { dir }) => {
+        const cwd = await aProject(dir);
+
+        await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+        });
+
+        expect(await readJson(cwd, CONNECTION_FILE)).not.toHaveProperty(["oidc", endpoint]);
+      },
+    );
+
+    it("stores the piped secret on the project", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { secret: { variable: "GOOGLE_CLIENT_SECRET", published: "stored" } },
+      });
+    });
+
+    it("writes the secret to no file in the Project", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain(SECRET);
+    });
+
+    it.for(["stdout", "stderr"] as const)("keeps the secret out of %s", async (stream, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result[stream]).not.toContain(SECRET);
+    });
+
+    it("suggests a dry run and a deploy, each with --cwd", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_args: [
+            ["deploy", "--dry-run", "--cwd", cwd],
+            ["deploy", "-m", "<what changed>", "--cwd", cwd],
+          ],
+        },
+      });
+    });
+
+    it.for([
+      ["a run", []],
+      ["a dry run", ["--dry-run"]],
+    ] as const)(
+      "names the project it changes on %s, since --json prints no line naming it",
+      async ([_, mode], { dir }) => {
+        const cwd = await aProject(dir);
+
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, ...mode));
+        });
+
+        expect(parseJson(result.stdout)).toMatchObject({ data: { project_id: PROJECT_ID } });
+      },
+    );
+
+    it.for([
+      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
+      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+      `  $ ${expectedPublicCliCommand("deploy --dry-run")}`,
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain(line);
+    });
   });
 
-  describe("a password step edited by hand", () => {
-    async function aProjectWithAnEditedPasswordStep(): Promise<string> {
-      const cwd = await setUpProject();
-      const path = join(cwd, ".zitadel/flows/default-human-user-login.json");
-      const flow = JSON.parse(await readFile(path, "utf8")) as {
-        steps: Array<Record<string, unknown>>;
-      };
-      // Reached from the identifier step, or the flow would not validate.
-      const identifier = flow.steps.find((step) => step.name === "identifier");
-      if (identifier !== undefined) {
-        identifier.transitions = {
-          ...(identifier.transitions as object),
-          submit: { target: "password" },
-        };
-      }
-      flow.steps.splice(flow.steps.length - 1, 0, {
-        name: "password",
-        fields: ["x-auth-methods#password"],
-        actions: [{ name: "submit", kind: "submit", primary: true, text_key: "my.own.copy" }],
-        transitions: { submit: { target: "done" } },
+  describe("when publishing the credentials fails", () => {
+    it("says the provider is configured locally", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      refusePublishes();
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
-      await writeFile(path, `${JSON.stringify(flow)}\n`);
+
+      expect(result.stdout).toContain("Google sign-in is configured locally.");
+    });
+
+    it("does not say the credentials are stored", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      refusePublishes();
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).not.toContain("stored on your Project");
+    });
+
+    it("reports the secret the project never received", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      refusePublishes();
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        data: { secret: { variable: "GOOGLE_CLIENT_SECRET", published: "failed" } },
+      });
+    });
+
+    it("suggests the command that publishes the secret again", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      refusePublishes();
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: expect.arrayContaining([
+            expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
+          ]),
+        },
+      });
+    });
+
+    it("renders every follow-up as a command an agent can run", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      refusePublishes();
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { next_commands: expect.not.arrayContaining([expect.not.stringMatching(/^npx /)]) },
+      });
+    });
+
+    it("suggests publishing the client id again first, with --cwd", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      refusePublishes();
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toHaveProperty(
+        ["data", "next_args", 0],
+        ["variable", "set", "GOOGLE_CLIENT_ID", "--cwd", cwd],
+      );
+    });
+  });
+
+  describe("when the password step was edited by hand", () => {
+    it.for(["Add google to its sso_providers", "user_already_exists to sso-conflict"])(
+      "says %s",
+      async (line, { dir }) => {
+        const cwd = await aProjectWithAnEditedPasswordStep(dir);
+
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+        });
+
+        expect(result.stderr).toContain(line);
+      },
+    );
+
+    it("leaves the step alone, and says so once, by step name", async ({ dir }) => {
+      const cwd = await aProjectWithAnEditedPasswordStep(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          notices: [
+            {
+              message: expect.stringMatching(
+                /^\.zitadel\/flows\/default-human-user-login\.json steps\.password has been edited by hand, so it was left alone\./,
+              ),
+            },
+          ],
+        },
+      });
+    });
+
+    it("names the step on a dry run too", async ({ dir }) => {
+      const cwd = await aProjectWithAnEditedPasswordStep(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(result.stderr).toContain(
+        `${LOGIN_FLOW_FILE} steps.password has been edited by hand, so it would be left alone.`,
+      );
+    });
+  });
+
+  describe("when a method was enabled after the conflict step was written", () => {
+    it("reports no step as edited by hand", async ({ dir }) => {
+      const cwd = await aProject(dir, {
+        "default-human-user": {
+          ...defaultSchema,
+          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+        },
+      });
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+      await writeJson(cwd, SCHEMA_FILE, {
+        ...defaultSchema,
+        $id: schemaIdOf("default-human-user"),
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE));
+      });
+
+      expect(result.stdout).not.toContain(HAND_EDITED);
+    });
+
+    it("offers the newly enabled method on the conflict step", async ({ dir }) => {
+      const cwd = await aProject(dir, {
+        "default-human-user": {
+          ...defaultSchema,
+          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+        },
+      });
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+      await writeJson(cwd, SCHEMA_FILE, {
+        ...defaultSchema,
+        $id: schemaIdOf("default-human-user"),
+      });
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE));
+      });
+
+      expect(await readJson(cwd, LOGIN_FLOW_FILE)).toMatchObject({
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            name: "sso-conflict",
+            actions: expect.arrayContaining([expect.objectContaining({ name: "passkey" })]),
+          }),
+        ]),
+      });
+    });
+  });
+
+  describe("with a custom provider", () => {
+    it.for([
+      "Acme SSO sign-in is configured locally.",
+      "then reload your app and test Acme SSO sign-in.",
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain(line);
+    });
+  });
+
+  describe("when the schema defines nothing the provider maps", () => {
+    it("warns that the connection has no claim mapping", async ({ dir }) => {
+      const cwd = await aProject(dir, {
+        "default-human-user": { ...defaultSchema, properties: { staffNumber: { type: "string" } } },
+      });
+      const flow = withStep(
+        withStep(loginFlow("default-human-user"), "identifier", collectingStaffNumber),
+        "register",
+        collectingStaffNumber,
+      );
+      await writeJson(cwd, LOGIN_FLOW_FILE, flow);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        warnings: expect.arrayContaining([expect.stringContaining("has no claim_mapping")]),
+      });
+    });
+  });
+
+  describe("when rerun on a configured Project", () => {
+    it("reuses the connection", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { connection: { action: "reuse" } },
+      });
+    });
+
+    it("leaves the connection file as it was", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+      const before = await readFile(join(cwd, CONNECTION_FILE), "utf8");
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE));
+      });
+
+      expect(await readFile(join(cwd, CONNECTION_FILE), "utf8")).toBe(before);
+    });
+
+    it("reuses the connection given the same client id, which the file only references", async ({
+      dir,
+    }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        data: { connection: { action: "reuse" } },
+      });
+    });
+
+    it("publishes a different client id rather than ignoring it", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", OTHER_CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        data: { connection: { action: "reuse" }, client_id: { variable: "GOOGLE_CLIENT_ID" } },
+      });
+    });
+
+    it("says the provider is already configured", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE));
+      });
+
+      expect(result.stdout).toContain("Google sign-in is already configured locally.");
+    });
+
+    it("does not offer a deploy, since nothing changed", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE));
+      });
+
+      expect(result.stdout).not.toContain("Deploy the configuration");
+    });
+
+    it("prints the callback URI to register, without --json", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE));
+      });
+
+      expect(result.stdout).toContain(CALLBACK_URI);
+    });
+  });
+
+  describe("with more than one schema", () => {
+    it.for(["customers", "employees"])(
+      "names the %s schema when none is chosen",
+      async (name, { dir }) => {
+        const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+        });
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          status: "error",
+          hint: expect.stringContaining(name),
+        });
+      },
+    );
+
+    it("changes the schema --schema names", async ({ dir }) => {
+      const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(
+          authMethodJson(cwd, ...GOOGLE, "--schema", "employees", "--client-id", CLIENT_ID),
+        );
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ data: { schema: "employees" } });
+    });
+  });
+
+  describe("when a second schema is configured with the connection already on disk", () => {
+    it.for(["customers", "employees"])(
+      "enables the provider on the %s schema rather than reporting a no-op",
+      async (name, { dir }) => {
+        const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+        await withStdin(SECRET, () => {
+          return runCliForTest(
+            authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--schema", "customers"),
+          );
+        });
+
+        await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--schema", "employees"));
+        });
+
+        expect(await readJson(cwd, `.zitadel/schemas/${name}.json`)).toMatchObject({
+          "x-auth-methods": { sso: { providers: ["google"] } },
+        });
+      },
+    );
+
+    it.for(["customers", "employees"])(
+      "offers the provider on the %s login flow's entry step",
+      async (name, { dir }) => {
+        const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+        await withStdin(SECRET, () => {
+          return runCliForTest(
+            authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--schema", "customers"),
+          );
+        });
+
+        await withStdin(SECRET, () => {
+          return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--schema", "employees"));
+        });
+
+        expect(await readJson(cwd, `.zitadel/flows/${name}-login.json`)).toMatchObject({
+          steps: expect.arrayContaining([
+            expect.objectContaining({ name: "identifier", sso_providers: ["google"] }),
+          ]),
+        });
+      },
+    );
+  });
+
+  describe("with --dry-run", () => {
+    it("reports the run as skipped", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped" });
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+
+    it("lists the files it would change", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ data: { changed: CHANGED } });
+    });
+
+    it("lists the credentials it would store", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { would_store: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+      });
+    });
+  });
+
+  describe("with --dry-run and no credentials", () => {
+    it.for([
+      "Google needs an OAuth application.",
+      `Callback URI   ${CALLBACK_URI}`,
+      "Create it at   https://console.cloud.google.com/apis/credentials",
+      `Would write ${CONNECTION_FILE}`,
+      `Would write ${SCHEMA_FILE}`,
+      `Would write ${LOGIN_FLOW_FILE}`,
+      "Would store GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the project",
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
+
+      expect(result.stdout).toContain(line);
+    });
+
+    it("publishes nothing", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      const publish = vi.fn(() => {
+        return HttpResponse.json({});
+      });
+      platform.use(http.patch("*/variables", publish));
+
+      await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
+
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it("leaves the schema as it was", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      const before = await readFile(join(cwd, SCHEMA_FILE), "utf8");
+
+      await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
+
+      expect(await readFile(join(cwd, SCHEMA_FILE), "utf8")).toBe(before);
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await runCliForTest(authMethodText(cwd, ...GOOGLE, "--dry-run"));
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
+  describe("with --dry-run on a configured Project", () => {
+    it.for([`Callback URI   ${CALLBACK_URI}`, "Would store GOOGLE_CLIENT_ID on the project"])(
+      "says %s",
+      async (line, { dir }) => {
+        const cwd = await aProjectWithGoogle(dir);
+
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(
+            authMethodText(cwd, ...GOOGLE, "--client-id", OTHER_CLIENT_ID, "--dry-run"),
+          );
+        });
+
+        expect(result.stdout).toContain(line);
+      },
+    );
+
+    it.for(["needs an OAuth application", `Would write ${CONNECTION_FILE}`])(
+      "does not say %s",
+      async (line, { dir }) => {
+        const cwd = await aProjectWithGoogle(dir);
+
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(
+            authMethodText(cwd, ...GOOGLE, "--client-id", OTHER_CLIENT_ID, "--dry-run"),
+          );
+        });
+
+        expect(result.stdout).not.toContain(line);
+      },
+    );
+
+    it("would store only the credential it was given", async ({ dir }) => {
+      const cwd = await aProjectWithGoogle(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(
+          authMethodJson(cwd, ...GOOGLE, "--client-id", OTHER_CLIENT_ID, "--dry-run"),
+        );
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { would_store: ["GOOGLE_CLIENT_ID"] },
+      });
+    });
+  });
+
+  describe("with --dry-run for a custom provider", () => {
+    it.for([
+      "Callback URI   http://localhost:3000/__nextgen/idp/acme-sso/callback",
+      "Register it as a client at https://sso.acme.example, with the callback URI above.",
+      "Would write .zitadel/idps/acme-sso.json",
+      "Would store ACME_SSO_CLIENT_ID and ACME_SSO_CLIENT_SECRET on the project",
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await runCliForTest(authMethodText(cwd, ...ACME, "--dry-run"));
+
+      expect(result.stdout).toContain(line);
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await runCliForTest(authMethodText(cwd, ...ACME, "--dry-run"));
+
+      expect(existsSync(join(cwd, ".zitadel/idps/acme-sso.json"))).toBe(false);
+    });
+  });
+
+  describe("with no client id to ask for", () => {
+    it("refuses, naming --client-id", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "error",
+        hint: expect.stringContaining("--client-id"),
+      });
+    });
+
+    it("keeps the run's server in the retry it suggests", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(
+          authMethodJson(cwd, ...GOOGLE, "--server", "https://api.zitadel.cloud"),
+        );
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: [
+          expect.stringContaining(
+            "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+          ),
+        ],
+      });
+    });
+  });
+
+  describe("with a blank --client-id", () => {
+    it("refuses it rather than taking it as one", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", "   "));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining("--client-id"),
+      });
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", "   "));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
+  describe("with no provider", () => {
+    it("refuses, naming the next move", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(undefined, () => {
+        return runCliForTest(["auth-method", "sso", "enable", "--cwd", cwd, "--json"]);
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("--provider google"),
+      });
+    });
+  });
+
+  describe("with nothing piped in", () => {
+    it("refuses, naming stdin", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin("", () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("stdin"),
+      });
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin("", () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
+  describe("with a hand-written connection", () => {
+    it("refuses a client id other than the literal one it holds", async ({ dir }) => {
+      const cwd = await aProjectWithAHandWrittenConnection(dir, { client_id: "literal-one" });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", "a-different-one"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION" });
+    });
+
+    it("publishes to the variables the connection names", async ({ dir }) => {
+      const cwd = await aProjectWithAHandWrittenConnection(dir, {
+        client_id: "${{ ACME_GOOGLE_ID }}",
+        client_secret: "${{ ACME_GOOGLE_SECRET }}",
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "ok",
+        data: {
+          client_id: { variable: "ACME_GOOGLE_ID" },
+          secret: { variable: "ACME_GOOGLE_SECRET" },
+        },
+      });
+    });
+  });
+
+  describe("when an earlier run was interrupted after writing the connection", () => {
+    it("enables the provider on the schema", async ({ dir }) => {
+      const cwd = await aProjectWithAHandWrittenConnection(dir, { client_id: "abc" });
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE));
+      });
+
+      expect(await readJson(cwd, SCHEMA_FILE)).toMatchObject({
+        "x-auth-methods": { sso: { enabled: true } },
+      });
+    });
+  });
+
+  describe("when no login flow runs against the schema", () => {
+    it("refuses, naming where flows live", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await rm(join(cwd, LOGIN_FLOW_FILE));
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_NOT_FOUND",
+        hint: expect.stringContaining(".zitadel/flows/"),
+      });
+    });
+
+    it("refuses a dry run for the same reason", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await rm(join(cwd, LOGIN_FLOW_FILE));
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ code: "E_NOT_FOUND" });
+    });
+
+    it("leaves the schema as it was", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await rm(join(cwd, LOGIN_FLOW_FILE));
+      const before = await readFile(join(cwd, SCHEMA_FILE), "utf8");
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(await readFile(join(cwd, SCHEMA_FILE), "utf8")).toBe(before);
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await rm(join(cwd, LOGIN_FLOW_FILE));
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
+  describe("when the schemas directory cannot be listed", () => {
+    it("refuses, without reporting it as holding no schemas", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await rm(join(cwd, ".zitadel/schemas"), { recursive: true });
+      await writeFile(join(cwd, ".zitadel/schemas"), "not a directory");
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "error",
+        code: expect.not.stringMatching(/^E_NOT_FOUND$/),
+      });
+    });
+  });
+
+  describe("when the flow names the schema by its objectType", () => {
+    it("offers the provider on that flow", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: {
+          "default-human-user": {
+            ...defaultSchema,
+            $id: "https://a.example/default-human-user.json",
+            objectType: "human-user",
+          },
+        },
+        flows: {
+          "default-human-user-login": {
+            ...loginFlow("default-human-user"),
+            user_schema: "human-user",
+          },
+        },
+        linked: true,
+      });
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(await readJson(cwd, LOGIN_FLOW_FILE)).toMatchObject({
+        steps: expect.arrayContaining([
+          expect.objectContaining({ name: "identifier", sso_providers: ["google"] }),
+        ]),
+      });
+    });
+  });
+
+  describe("when the only flow names a different schema with the same file name", () => {
+    it("refuses rather than wire the provider into the wrong sign-in", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: {
+          "default-human-user": {
+            ...defaultSchema,
+            $id: "https://a.example/default-human-user.json",
+          },
+        },
+        flows: {
+          "default-human-user-login": {
+            ...loginFlow("default-human-user"),
+            user_schema: "https://b.example/default-human-user.json",
+          },
+        },
+        linked: true,
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ code: "E_NOT_FOUND" });
+    });
+  });
+
+  describe("when the flow cannot be checked against the changed schema", () => {
+    it("refuses, saying so", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        message: expect.stringContaining("cannot be checked against the changed schema"),
+      });
+    });
+
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+
+    it("refuses a dry run too", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION" });
+    });
+  });
+
+  describe("when saving would refuse the connection's path", () => {
+    /**
+     * A Project whose connections directory leads outside `.zitadel/`.
+     *
+     * @param dir - The directory to write the Project into.
+     * @returns The Project's directory.
+     */
+    async function aProjectWithAnEscapingConnectionsDirectory(dir: string): Promise<string> {
+      const cwd = await aProject(dir);
+      const outside = join(dir, "outside-idps");
+      await mkdir(outside, { recursive: true });
+      await symlink(outside, join(cwd, ".zitadel/idps"));
       return cwd;
     }
 
-    it("is told to add the connection's slug, not its display name", async () => {
-      const cwd = await aProjectWithAnEditedPasswordStep();
+    it("refuses", async ({ dir }) => {
+      const cwd = await aProjectWithAnEscapingConnectionsDirectory(dir);
 
-      const result = await enableRendered(
-        cwd,
-        "--client-id",
-        "1234-abc.apps.googleusercontent.com",
-      );
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-      expect(result.stderr).toContain("Add google to its sso_providers");
+      expect(parseJson(result.stdout)).toMatchObject({ status: "error" });
     });
 
-    it("is told where each provider outcome should go", async () => {
-      const cwd = await aProjectWithAnEditedPasswordStep();
+    it("publishes no credentials", async ({ dir }) => {
+      const cwd = await aProjectWithAnEscapingConnectionsDirectory(dir);
+      const publish = vi.fn(() => {
+        return HttpResponse.json({});
+      });
+      platform.use(http.patch("*/variables", publish));
 
-      const result = await enableRendered(
-        cwd,
-        "--client-id",
-        "1234-abc.apps.googleusercontent.com",
-      );
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-      expect(result.stderr).toContain("user_already_exists to sso-conflict");
-    });
-
-    it("is left alone, and said so once, by step name", async () => {
-      const cwd = await aProjectWithAnEditedPasswordStep();
-
-      const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-      const payload = parseJson(result.stdout) as { data: { untouched: string[] } };
-      expect(payload.data.untouched).toEqual([
-        ".zitadel/flows/default-human-user-login.json steps.password",
-      ]);
+      expect(publish).not.toHaveBeenCalled();
     });
   });
 
-  it("brings the conflict step up to date when a method was enabled after it was written", async () => {
-    const cwd = await setUpProject({
-      "default-human-user": {
-        ...structuredClone(defaultSchema),
-        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
-      },
-    });
-    const first = await enable(cwd, "--client-id", "abc");
-    expect(first.exitCode).toBe(0);
-    await writeFile(
-      join(cwd, ".zitadel/schemas/default-human-user.json"),
-      JSON.stringify({
-        ...defaultSchema,
-        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
-      }),
-    );
+  describe("when the flow's steps are not a list", () => {
+    it("refuses, naming the flow file", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        steps: "broken",
+      });
 
-    const second = await enable(cwd);
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-    expect(second.exitCode).toBe(0);
-    const payload = parseJson(second.stdout) as { data: { untouched: string[] } };
-    expect(payload.data.untouched).toEqual([]);
-    const flow = JSON.parse(
-      await readFile(join(cwd, ".zitadel/flows/default-human-user-login.json"), "utf8"),
-    ) as { steps: Array<{ name: string; actions?: Array<{ name: string }> }> };
-    const conflict = flow.steps.find((step) => step.name === "sso-conflict");
-    expect(conflict?.actions?.map((action) => action.name)).toContain("passkey");
-  });
-
-  it("says the provider is configured locally and how to deploy it", async () => {
-    const cwd = await setUpProject();
-
-    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    expect(result.stdout).toContain(
-      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
-    );
-    expect(result.stdout).toContain(
-      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
-    );
-    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("deploy --dry-run")}`);
-  });
-
-  it("does not say the credentials are stored when publishing them failed", async () => {
-    const cwd = await setUpProject();
-    refusePublishes();
-
-    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    expect(result.stdout).toContain("Google sign-in is configured locally.");
-    expect(result.stdout).not.toContain("stored on your Project");
-  });
-
-  it("names a custom provider by its display name", async () => {
-    const cwd = await setUpProject();
-
-    const result = await withStdin("piped-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--non-interactive",
-        "--provider",
-        "custom",
-        "--slug",
-        "acme-sso",
-        "--display-name",
-        "Acme SSO",
-        "--issuer",
-        "https://sso.acme.example",
-        "--client-id",
-        "acme-client-id",
-      ]),
-    );
-
-    expect(result.stdout).toContain("Acme SSO sign-in is configured locally.");
-    expect(result.stdout).toContain("then reload your app and test Acme SSO sign-in.");
-  });
-
-  it("does not offer a deploy when rerunning changed nothing", async () => {
-    const cwd = await setUpProject();
-    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    const result = await enableRendered(cwd);
-
-    expect(result.stdout).toContain("Google sign-in is already configured locally.");
-    expect(result.stdout).not.toContain("Deploy the configuration");
-  });
-
-  it("prints the callback URI on reuse in text mode", async () => {
-    // The URI moved to one per connection after the first release; rerunning
-    // the command on the existing connection is how a developer finds the one
-    // to register now, without reaching for --json.
-    const cwd = await setUpProject();
-    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    const result = await withStdin("piped-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--provider",
-        "google",
-        "--non-interactive",
-      ]),
-    );
-
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout + result.stderr).toContain(
-      "http://localhost:3000/__nextgen/idp/google/callback",
-    );
-  });
-
-  it("warns when the schema defines nothing the provider maps, so the connection has no mapping", async () => {
-    const cwd = await setUpProject({
-      "default-human-user": {
-        ...defaultSchema,
-        properties: { staffNumber: { type: "string" } },
-      },
-    });
-    // The flow collects what the schema defines, so it validates as it is.
-    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
-    await writeFile(
-      flowPath,
-      (await readFile(flowPath, "utf8")).replaceAll('"email"', '"staffNumber"'),
-    );
-
-    const result = await withStdin("piped-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--json",
-        "--non-interactive",
-        "--provider",
-        "custom",
-        "--slug",
-        "acme-sso",
-        "--display-name",
-        "Acme SSO",
-        "--issuer",
-        "https://sso.acme.example",
-        "--client-id",
-        "acme-client-id",
-      ]),
-    );
-
-    expect(result.exitCode).toBe(0);
-    const payload = parseJson(result.stdout) as { warnings?: string[] };
-    expect(payload.warnings?.join("\n")).toContain("has no claim_mapping");
-  });
-
-  it("reuses the connection on a second run and writes nothing new", async () => {
-    const cwd = await setUpProject();
-    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    const before = await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8");
-
-    const result = await enable(cwd);
-    const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
-    expect(payload.data.connection.action).toBe("reuse");
-    expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
-  });
-
-  it("publishes a changed client id on reuse rather than ignoring it", async () => {
-    // The connection references the id rather than holding it, so a rerun with
-    // a different one has nothing in the file to disagree with. Republishing
-    // is what makes the second invocation mean what it says; the previous
-    // refusal only made sense while the id lived in the document.
-    const cwd = await setUpProject();
-    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    const result = await enable(cwd, "--client-id", "999-zzz.apps.googleusercontent.com");
-
-    expect(result.exitCode).toBe(0);
-    const json = parseJson(result.stdout) as {
-      data: { connection: { action: string }; client_id: { variable: string } | null };
-    };
-    expect(json.data.connection.action).toBe("reuse");
-    // Attempted, not skipped: the payload names the variable it went to.
-    expect(json.data.client_id?.variable).toBe("GOOGLE_CLIENT_ID");
-  });
-
-  it("names the schemas when the Project has more than one", async () => {
-    const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
-    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    expect(result.exitCode).not.toBe(0);
-    const out = result.stdout + result.stderr;
-    expect(out).toContain("customers");
-    expect(out).toContain("employees");
-  });
-
-  it("changes the named schema when several exist", async () => {
-    const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
-    const result = await enable(
-      cwd,
-      "--schema",
-      "employees",
-      "--client-id",
-      "1234-abc.apps.googleusercontent.com",
-    );
-    const payload = parseJson(result.stdout) as { data: Record<string, unknown> };
-    expect(payload.data.schema).toBe("employees");
-  });
-
-  it("changes nothing on a dry run", async () => {
-    const cwd = await setUpProject();
-    const result = await enable(
-      cwd,
-      "--client-id",
-      "1234-abc.apps.googleusercontent.com",
-      "--dry-run",
-    );
-    const payload = parseJson(result.stdout) as { status: string };
-    expect(payload.status).toBe("skipped");
-    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
-  });
-
-  /**
-   * `--json` suppresses the console line that otherwise names the Project, so
-   * an agent reading only the payload has to find it there.
-   */
-  it("names the project it changed in both output modes", async () => {
-    const cwd = await setUpProject();
-    const done = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    expect((parseJson(done.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
-      "proj_01TEST",
-    );
-
-    const preview = await enable(cwd, "--client-id", "abc", "--dry-run");
-    expect((parseJson(preview.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
-      "proj_01TEST",
-    );
-  });
-
-  it("requires a client id when there is no one to ask", async () => {
-    const cwd = await setUpProject();
-    const result = await enable(cwd);
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("--client-id");
-  });
-
-  it("never puts the secret in its output", async () => {
-    const cwd = await setUpProject();
-    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    expect(result.stdout).not.toContain("GOCSPX");
-    expect(result.stderr).not.toContain("GOCSPX");
-  });
-
-  it("names the next move when no provider was given", async () => {
-    // oclif's own "Missing required flag provider" would be the one refusal in
-    // this command carrying no hint, and every other error here says what to
-    // do next.
-    const cwd = await setUpProject();
-
-    const result = await withStdin(undefined, () =>
-      runCliForTest(["auth-method", "sso", "enable", "--cwd", cwd, "--json"]),
-    );
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; hint?: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("--provider google");
-  });
-
-  it("writes the vendor's own connection on a scripted run", async () => {
-    // Where a provider lives is asked for, and only on a development build:
-    // the question belongs to whoever is working on the CLI, and a scripted
-    // run has nobody to ask, so it gets the catalog's own issuer.
-    const cwd = await setUpProject();
-
-    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    expect(result.exitCode).toBe(0);
-    const written = JSON.parse(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")) as {
-      oidc: Record<string, unknown>;
-    };
-    expect(written.oidc.issuer).toBe("https://accounts.google.com");
-    // No endpoints: the vendor's are resolved from its discovery document.
-    expect(written.oidc.authorization_endpoint).toBeUndefined();
-    expect(written.oidc.token_endpoint).toBeUndefined();
-    expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
-  });
-
-  it("reuses the connection when rerun with the same client id", async () => {
-    // A scaffolded connection stores `${{ GOOGLE_CLIENT_ID }}`, not an id, so
-    // there is nothing in the file for a supplied id to disagree with. Reading
-    // the reference as a literal made every rerun a conflict.
-    const cwd = await setUpProject();
-    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    const again = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    expect(again.exitCode).toBe(0);
-    const json = parseJson(again.stdout) as { data: { connection: { action: string } } };
-    expect(json.data.connection.action).toBe("reuse");
-  });
-
-  it("still refuses a different client id on a hand-written connection", async () => {
-    // A connection someone wrote by hand may hold a literal id, and reusing it
-    // for another client would be silently wrong.
-    const cwd = await setUpProject();
-    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
-    await writeFile(
-      join(cwd, ".zitadel/idps/google.json"),
-      `${JSON.stringify({
-        slug: "google",
-        template: "google",
-        protocol: "oidc",
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "literal-one",
-          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
-        },
-      })}\n`,
-    );
-
-    const result = await enable(cwd, "--client-id", "a-different-one");
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string };
-    expect(json.code).toBe("E_VALIDATION");
-  });
-
-  it("publishes to the variables the reused connection actually names", async () => {
-    // A connection is an editable file and may point at its own variables.
-    // Publishing to a slug-derived name would store the credential where the
-    // connection never looks, and report it stored.
-    const cwd = await setUpProject();
-    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
-    await writeFile(
-      join(cwd, ".zitadel/idps/google.json"),
-      `${JSON.stringify({
-        slug: "google",
-        template: "google",
-        protocol: "oidc",
-        oidc: {
-          issuer: "https://accounts.google.com",
-          client_id: "${{ ACME_GOOGLE_ID }}",
-          client_secret: "${{ ACME_GOOGLE_SECRET }}",
-        },
-      })}\n`,
-    );
-
-    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-
-    expect(result.exitCode).toBe(0);
-    const json = parseJson(result.stdout) as {
-      data: { client_id: { variable: string } | null; secret: { variable: string } | null };
-    };
-    expect(json.data.client_id?.variable).toBe("ACME_GOOGLE_ID");
-    expect(json.data.secret?.variable).toBe("ACME_GOOGLE_SECRET");
-  });
-});
-
-describe("auth-method sso enable secret handling", () => {
-  it("stores a secret piped in on a scripted run", async () => {
-    const cwd = await setUpProject();
-
-    const result = await withStdin("piped-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--provider",
-        "google",
-        "--json",
-        "--client-id",
-        "1234-abc.apps.googleusercontent.com",
-        "--non-interactive",
-      ]),
-    );
-
-    expect(result.exitCode).toBe(0);
-    // Nothing is written to disk: the secret goes to the project's variables
-    // and nowhere else, so there is no copy in the working tree to leak.
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain("piped-secret");
-    expect(result.stdout).not.toContain("piped-secret");
-    expect(result.stderr).not.toContain("piped-secret");
-  });
-
-  it("reports a publish the project never received, and how to retry it", async () => {
-    // The platform cannot be reached here, which is the shape of every
-    // failure that matters: the connection references the secret as
-    // `${{ NAME }}`, so a button whose credential never arrived fails at
-    // token exchange rather than at enable time. The command must say so and
-    // hand back the command that fixes it, not exit 0 quietly.
-    const cwd = await setUpProject();
-    refusePublishes();
-
-    const result = await withStdin("piped-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--provider",
-        "google",
-        "--json",
-        "--client-id",
-        "1234-abc.apps.googleusercontent.com",
-        "--non-interactive",
-      ]),
-    );
-
-    expect(result.exitCode).toBe(0);
-    const json = parseJson(result.stdout) as {
-      data: { secret: { published: string; mirrored: string }; next_commands: string[] };
-    };
-    expect(json.data.secret).toEqual({
-      variable: "GOOGLE_CLIENT_SECRET",
-      published: "failed",
-    });
-    // Rendered as a command an agent can run, like every other result's.
-    expect(json.data.next_commands).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
-      ]),
-    );
-    expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
-  });
-
-  it("refuses a scripted run that pipes nothing in, before writing anything", async () => {
-    // Enabling a provider without its secret scaffolds a sign-in button that
-    // fails at the token endpoint with invalid_client — in a browser, long
-    // after this command reported success. Refusing here is the cheaper
-    // failure, and it must leave no half-written connection behind.
-    const cwd = await setUpProject();
-
-    const result = await withStdin("", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--provider",
-        "google",
-        "--json",
-        "--client-id",
-        "1234-abc.apps.googleusercontent.com",
-        "--non-interactive",
-      ]),
-    );
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; hint?: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("stdin");
-    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
-  });
-
-  it("keeps the run's server in the retry it suggests for a missing client id", async () => {
-    // Following a retry without it would publish the credentials to whichever
-    // project the default environment resolves to.
-    const cwd = await setUpProject();
-
-    const result = await enable(cwd, "--server", "https://api.zitadel.cloud");
-
-    const json = parseJson(result.stdout) as { next_commands?: string[] };
-    expect(json.next_commands?.[0]).toContain(
-      "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
-    );
-  });
-});
-
-describe("auth-method sso enable with a connection already on disk", () => {
-  it("still configures a second schema, rather than reporting a no-op", async () => {
-    // The command's own example advertises `--schema customers`. Reusing the
-    // connection must not skip the schema and flow edits: they are per-schema
-    // and they are the point of the command.
-    const cwd = await setUpProject({
-      customers: structuredClone(defaultSchema),
-      employees: structuredClone(defaultSchema),
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
+      });
     });
 
-    const first = await enable(cwd, "--client-id", "abc", "--schema", "customers");
-    expect(first.exitCode).toBe(0);
-    const second = await enable(cwd, "--schema", "employees");
-    expect(second.exitCode).toBe(0);
+    it("leaves the flow's steps as they were rather than overwriting them", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        steps: "broken",
+      });
 
-    for (const name of ["customers", "employees"]) {
-      const schema = JSON.parse(
-        await readFile(join(cwd, `.zitadel/schemas/${name}.json`), "utf8"),
-      ) as { "x-auth-methods": { sso?: { providers: string[] } } };
-      expect(schema["x-auth-methods"].sso?.providers, name).toEqual(["google"]);
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-      const flow = JSON.parse(
-        await readFile(join(cwd, `.zitadel/flows/${name}-login.json`), "utf8"),
-      ) as { steps: Array<{ name: string; sso_providers?: string[] }> };
-      const entry = flow.steps.find((s) => s.name === "identifier");
-      expect(entry?.sso_providers, name).toEqual(["google"]);
-    }
-  });
+      expect(await readJson(cwd, LOGIN_FLOW_FILE)).toMatchObject({ steps: "broken" });
+    });
 
-  it("finishes a run interrupted after the connection file was written", async () => {
-    const cwd = await setUpProject();
-    // What a Ctrl-C between the file write and the schema edit leaves behind.
-    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
-    await writeFile(
-      join(cwd, ".zitadel/idps/google.json"),
-      `${JSON.stringify({ slug: "google", template: "google", protocol: "oidc", oidc: { issuer: "https://accounts.google.com", client_id: "abc", client_secret: "${{ GOOGLE_CLIENT_SECRET }}" } })}\n`,
-    );
+    it("writes no connection", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        steps: "broken",
+      });
 
-    const result = await enable(cwd);
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-    expect(result.exitCode).toBe(0);
-    const schema = JSON.parse(
-      await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
-    ) as { "x-auth-methods": { sso?: { enabled: boolean } } };
-    expect(schema["x-auth-methods"].sso?.enabled).toBe(true);
-  });
-
-  it("refuses when no flow runs against the schema, without touching anything", async () => {
-    // The schema is the first thing the command would rewrite, so finding the
-    // failure after writing it would leave `x-auth-methods.sso` enabled for a
-    // provider the sign-in screen can never offer.
-    const cwd = await setUpProject();
-    await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
-    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
-    const before = await readFile(schemaPath, "utf8");
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; hint?: string };
-    expect(json.code).toBe("E_NOT_FOUND");
-    expect(json.hint).toContain(".zitadel/flows/");
-    expect(await readFile(schemaPath, "utf8")).toBe(before);
-    // Nor the connection, which is written before the schema is: failing after
-    // it would leave a file and two published variables behind for a provider
-    // the sign-in screen can never offer.
-    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
-  });
-
-  it("refuses a blank --client-id rather than taking it as one", async () => {
-    // `--client-id "$CLIENT_ID"` with the variable unset is the common way
-    // here. Taking it would bypass the prompt on create and, on reuse,
-    // overwrite the project's variable with nothing.
-    const cwd = await setUpProject();
-
-    const result = await enable(cwd, "--client-id", "   ");
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("--client-id");
-    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
-  });
-
-  it("reports only a missing schema directory as no schemas", async () => {
-    const cwd = await setUpProject();
-    // A directory that cannot be listed is not an empty one.
-    await rm(join(cwd, ".zitadel/schemas"), { recursive: true });
-    await writeFile(join(cwd, ".zitadel/schemas"), "not a directory");
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    expect(result.exitCode).not.toBe(0);
-    expect((parseJson(result.stdout) as { code: string }).code).not.toBe("E_NOT_FOUND");
-  });
-
-  it("finds the flow naming the schema by its objectType", async () => {
-    const cwd = await setUpProject();
-    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
-    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
-    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
-    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
-    await writeFile(
-      schemaPath,
-      JSON.stringify(
-        { ...schema, $id: "https://a.example/default-human-user.json", objectType: "human-user" },
-        null,
-        2,
-      ),
-    );
-    await writeFile(flowPath, JSON.stringify({ ...flow, user_schema: "human-user" }, null, 2));
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    expect(result.exitCode).toBe(0);
-    expect(JSON.parse(await readFile(flowPath, "utf8"))).not.toEqual({
-      ...flow,
-      user_schema: "human-user",
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
     });
   });
 
-  it("does not match a flow naming a different schema with the same file name", async () => {
-    // Two Projects' schemas can share a file name. The `$id` is the schema's
-    // own statement of what flows name it by, so a flow pointing somewhere
-    // else is about a different schema, and editing it would wire the
-    // provider into the wrong sign-in.
-    const cwd = await setUpProject();
-    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
-    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
-    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
-    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
-    await writeFile(
-      schemaPath,
-      JSON.stringify({ ...schema, $id: "https://a.example/default-human-user.json" }, null, 2),
-    );
-    await writeFile(
-      flowPath,
-      JSON.stringify(
-        { ...flow, user_schema: "https://b.example/default-human-user.json" },
-        null,
-        2,
-      ),
-    );
+  describe("when no active flow offers a way to sign in", () => {
+    it("warns that nobody can sign in", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        status: "draft",
+      });
 
-    const result = await enable(cwd, "--client-id", "abc");
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
 
-    expect(result.exitCode).not.toBe(0);
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
-  });
-});
-
-describe("auth-method sso enable preflight", () => {
-  it("refuses a flow it cannot check before writing or publishing anything", async () => {
-    const cwd = await setUpProject();
-    await writeFile(
-      join(cwd, ".zitadel/flows/default-human-user-login.json"),
-      `${JSON.stringify({ ...loginFlow("default-human-user"), purposes: { login: "missing" } })}\n`,
-    );
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    expect((parseJson(result.stdout) as { message: string }).message).toContain(
-      "cannot be checked against the changed schema",
-    );
-    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+      expect(parseJson(result.stdout)).toMatchObject({
+        warnings: expect.arrayContaining([
+          "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+        ]),
+      });
+    });
   });
 
-  it("refuses a flow it cannot check on a dry run too", async () => {
-    const cwd = await setUpProject();
-    await writeFile(
-      join(cwd, ".zitadel/flows/default-human-user-login.json"),
-      `${JSON.stringify({ ...loginFlow("default-human-user"), purposes: { login: "missing" } })}\n`,
-    );
+  describe("when the Project's path needs quoting", () => {
+    it("leaves the follow-ups out of next_commands", async ({ dir }) => {
+      const cwd = await aProject(join(dir, "my project"));
 
-    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
-  });
+      expect(parseJson(result.stdout)).toMatchObject({ data: { next_commands: [] } });
+    });
 
-  it("warns when no active flow will offer a way to sign in", async () => {
-    const cwd = await setUpProject();
-    await writeFile(
-      join(cwd, ".zitadel/flows/default-human-user-login.json"),
-      `${JSON.stringify({ ...loginFlow("default-human-user"), status: "draft" })}\n`,
-    );
+    it("still lists them as next_args", async ({ dir }) => {
+      const cwd = await aProject(join(dir, "my project"));
 
-    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
 
-    expect((parseJson(result.stdout) as { warnings: string[] }).warnings).toContain(
-      "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
-    );
-  });
-
-  it("lists a dry run and a deploy, with --cwd, as next_args", async () => {
-    const cwd = await setUpProject();
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
-    expect(data.next_args).toEqual(
-      expect.arrayContaining([
-        ["deploy", "--dry-run", "--cwd", expect.any(String)],
-        ["deploy", "-m", "<what changed>", "--cwd", expect.any(String)],
-      ]),
-    );
-    for (const args of data.next_args) {
-      expect(args).toContain("--cwd");
-    }
-  });
-
-  it("lists the credential to publish again first, with --cwd", async () => {
-    const cwd = await setUpProject();
-    refusePublishes();
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
-    expect(data.next_args[0]).toEqual([
-      "variable",
-      "set",
-      "GOOGLE_CLIENT_ID",
-      "--cwd",
-      expect.any(String),
-    ]);
-  });
-
-  it("lists the schema and flow files it changed", async () => {
-    const cwd = await setUpProject();
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    const { data } = parseJson(result.stdout) as { data: { changed: string[] } };
-    expect(data.changed).toEqual([
-      ".zitadel/schemas/default-human-user.json",
-      ".zitadel/flows/default-human-user-login.json",
-    ]);
-  });
-
-  it("lists the files a dry run would change", async () => {
-    const cwd = await setUpProject();
-
-    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
-
-    const { data } = parseJson(result.stdout) as { data: { changed: string[] } };
-    expect(data.changed).toEqual([
-      ".zitadel/schemas/default-human-user.json",
-      ".zitadel/flows/default-human-user-login.json",
-    ]);
-  });
-
-  it("leaves the follow-ups out of next_commands when the path needs quoting", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel sso enable "));
-    const cwd = join(parent, "my project");
-    await rename(await setUpProject(), cwd);
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    const { data } = parseJson(result.stdout) as {
-      data: { next_commands: string[]; next_args: string[][] };
-    };
-    expect(data.next_commands).toEqual([]);
-    expect(data.next_args.length).toBeGreaterThan(0);
-  });
-
-  it("fails a dry run for the same reason the real run would", async () => {
-    // A preview that reports "would create" for an invocation that cannot
-    // succeed is worse than no preview: it is checked precisely to find this
-    // out before committing to it.
-    const cwd = await setUpProject();
-    await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
-
-    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
-
-    expect(result.exitCode).not.toBe(0);
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
-  });
-
-  it("reports a malformed state file rather than matching flows by filename", async () => {
-    // The fallback matches on a URL suffix rather than a synced id, so a
-    // corrupt state file could silently point the command at a flow bound to
-    // another schema.
-    const cwd = await setUpProject();
-    await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
-
-    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("state.json");
-  });
-
-  it("refuses a flow it cannot edit instead of overwriting the region", async () => {
-    // `steps: "broken"` would otherwise read as no steps and be written back
-    // as two generated ones, destroying whatever was there.
-    const cwd = await setUpProject();
-    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
-    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
-    await writeFile(flowPath, JSON.stringify({ ...flow, steps: "broken" }, null, 2));
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("steps is not a list");
-    // Nothing written, nothing published: the flow keeps the value it had.
-    expect((JSON.parse(await readFile(flowPath, "utf8")) as { steps: unknown }).steps).toBe(
-      "broken",
-    );
-    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { next_args: expect.arrayContaining([expect.arrayContaining(["--cwd"])]) },
+      });
+    });
   });
 });

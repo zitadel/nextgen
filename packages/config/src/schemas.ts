@@ -6,13 +6,68 @@ import {
   EvaluatePolicyBody,
   PublishPolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { distance } from "fastest-levenshtein";
 import { z } from "zod";
 
 import defaultPasswordPolicy from "../defaults/default-password-policy.json" with { type: "json" };
 import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
-import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
-export const schemaConfigSchema = CreateSchemaBody;
+const [userSchemaBody, schemaUrlBody] = CreateSchemaBody.options;
+const authMethodsBody = userSchemaBody.shape["x-auth-methods"];
+const AUTH_METHODS = Object.keys(authMethodsBody.shape);
+
+/** Why `key` is refused under `x-auth-methods`, with the method it is closest to. */
+function unknownAuthMethod(key: string): string {
+  const [near] = AUTH_METHODS.map((method) => ({ method, cost: distance(key, method) }))
+    .filter(({ cost }) => cost <= 2)
+    .sort((a, b) => a.cost - b.cost);
+  return (
+    `${key} is not an authentication method.` +
+    (near ? ` Did you mean ${near.method}?` : "") +
+    ` Allowed: ${AUTH_METHODS.join(", ")}.`
+  );
+}
+
+/**
+ * `x-auth-methods` as `auth-methods.json` states it, unlike the generated body:
+ * strict about its own keys and each method's, and at least one method. The
+ * generated Zod drops an unknown key, so a misspelt `pasword` would pass
+ * `deploy --dry-run` and the server would refuse the request with a
+ * `req.invalid` that names no field. Built from the generated shape, so a
+ * method the API adds is allowed here without an edit; the cast keeps the
+ * generated types, which strictness does not change.
+ */
+const strictAuthMethods = z
+  .strictObject(
+    Object.fromEntries(
+      Object.entries(authMethodsBody.shape).map(([name, method]) => [
+        name,
+        z.strictObject(method.unwrap().shape).optional(),
+      ]),
+    ) as typeof authMethodsBody.shape,
+    {
+      error: (issue) =>
+        issue.code === "unrecognized_keys"
+          ? issue.keys.map(unknownAuthMethod).join(" ")
+          : undefined,
+    },
+  )
+  .refine((methods) => Object.keys(methods).length > 0, {
+    message: "must list at least one authentication method",
+    // Only when every key was a method: a lone `pasword` already has its issue.
+    when: ({ issues }) => issues.length === 0,
+  });
+
+/**
+ * A `.zitadel/schemas/*.json` file: the create body, told apart by `kind` so
+ * an issue is reported at its key rather than as no union branch matching,
+ * with {@link strictAuthMethods} in place of the generated `x-auth-methods`.
+ */
+export const schemaConfigSchema = z.discriminatedUnion("kind", [
+  userSchemaBody.extend({ "x-auth-methods": strictAuthMethods }),
+  schemaUrlBody,
+]);
+
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
 export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
 
@@ -42,8 +97,7 @@ export const policyConfigSchema = z.strictObject({
 
 /**
  * The minimum password length NIST SP 800-63B-4 sets for a password that is
- * the only factor. `setup` writes it when given none, and the console warns
- * on a policy under it.
+ * the only factor. `setup` recommends it and writes it when given none.
  */
 export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
 
@@ -94,161 +148,169 @@ export const brandingWireSchema = CreateBrandingBody;
  */
 export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1) });
 
+const BRANDING_THEME = CreateBrandingBody.shape.theme.unwrap();
+const BRANDING_PALETTE = BRANDING_THEME.shape.light.unwrap().shape.palette;
+
+/**
+ * Run a check only when the checks before it found nothing wrong with the
+ * value, so a value is refused once, by the first check that says so.
+ *
+ * @param payload - What the checks before it found.
+ * @returns True when they found nothing.
+ */
+function whenNothingElseIsWrong(payload: { readonly issues: readonly unknown[] }): boolean {
+  return payload.issues.length === 0;
+}
+
+/**
+ * Hold a URL field to the server's byte limit.
+ *
+ * @remarks
+ * The spec's `maxLength` counts characters while the server counts bytes, so a
+ * URL with non-ASCII characters can be short in characters and still too long,
+ * and the spec has no way to say bytes. It speaks only for a value the
+ * generated checks accepted, so a value is refused once.
+ *
+ * @param field - The generated URL field.
+ * @returns The field, refused at its own path above the limit.
+ */
+function withinUrlBytes(field: z.ZodOptional<z.ZodString>): z.ZodOptional<z.ZodString> {
+  return field
+    .unwrap()
+    .refine(
+      (value) => {
+        return new TextEncoder().encode(value).length <= MAX_BRANDING_URL_BYTES;
+      },
+      {
+        message: `must be at most ${MAX_BRANDING_URL_BYTES} bytes`,
+        when: whenNothingElseIsWrong,
+      },
+    )
+    .optional();
+}
+
+/**
+ * One theme side, with its logo held to the server's byte limit and its
+ * colours to the colour functions the server allows.
+ *
+ * @param side - The generated light or dark side.
+ * @returns The side.
+ */
+function brandingThemeSide(
+  side: typeof BRANDING_THEME.shape.light,
+): typeof BRANDING_THEME.shape.light {
+  return side
+    .unwrap()
+    .extend({
+      logo_url: withinUrlBytes(side.unwrap().shape.logo_url),
+      palette: withAllowedColours(side.unwrap().shape.palette),
+    })
+    .optional();
+}
+
+/**
+ * Hold every palette colour to the colour functions the server allows.
+ *
+ * @remarks
+ * The spec's pattern is deliberately a superset of the server's allowlist: it
+ * pins the shape of a value, so it cannot leave its CSS declaration, and the
+ * domain decides which functions are colours (`ValidateBrandingColor`; see
+ * `branding_pattern_internal_test.go`). A value of the right shape that is not
+ * one, such as `var(--brand)`, reaches the server and comes back refused, so
+ * `plan` refuses it too. It speaks only for a value the generated checks
+ * accepted, so a value is refused once.
+ *
+ * @param palette - The generated palette of a theme side.
+ * @returns The palette, each colour refused at its own path.
+ */
+function withAllowedColours(palette: typeof BRANDING_PALETTE): typeof BRANDING_PALETTE {
+  const shape = palette.unwrap().shape;
+  const checked = Object.fromEntries(
+    Object.entries(shape).map(([key, colour]) => {
+      if (!(colour instanceof z.ZodOptional)) {
+        return [key, colour];
+      }
+      return [
+        key,
+        colour
+          .unwrap()
+          .refine(isBrandingColor, {
+            message:
+              "must be hex (#4F46E5), a CSS colour name, or one of the colour functions rgb(), rgba(), hsl(), hsla(), hwb(), lab(), lch(), oklab(), oklch(), color() or color-mix()",
+            when: whenNothingElseIsWrong,
+          })
+          .optional(),
+      ];
+    }),
+  ) as typeof shape;
+  return palette.unwrap().extend(checked).optional();
+}
+
 /**
  * The local `.zitadel/branding/*.json` dialect: the wire shape, where
  * `liquid_template` may also be a `$file` reference to the sibling `.liquid`
  * template (the meta-schema `branding.json` mirrors this).
+ *
+ * @remarks
+ * The values the server gates are held to the spec's own patterns, which carry
+ * their messages (`x-zitadel-pattern-message`), so a refusal names its field
+ * and says what a valid value looks like. What the spec cannot say is checked
+ * at the field it is about: a URL's byte limit, the
+ * colour functions the server allows, and the pair of a stylesheet and its
+ * font stack, which the server rejects as a pair (validateBrandingFontURL), or
+ * apply fails after schemas and flows have already been written.
  */
-export const brandingConfigSchema = z
-  .strictObject({
-    // Strict, unlike the generated wire schema: a typo like `hero_urll`
-    // must fail plan, not silently pass and get ignored by the server. The
-    // editor meta-schema already rejects unknown keys; the CLI gate has to
-    // agree.
-    ...CreateBrandingBody.shape,
-    // Raw strings instead of the generated uri fields: those trim and
-    // normalize before refinement runs, hiding exactly the forms the wire
-    // body still carries verbatim and Go's url.Parse rejects.
-    logo_url: z.string().optional(),
-    hero_url: z.string().optional(),
-    $schema: z.string().optional(),
-    liquid_template: z
-      .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
-      .optional(),
-  })
-  .superRefine((value, ctx) => {
-    // A stylesheet alone names no face to render in, so the server rejects the
-    // pair as a pair (validateBrandingFontURL in
-    // internal/domain/branding_validator.go). plan has to agree, or apply
-    // fails after schemas and flows have already been written.
-    validateBrandingAssetUrl(value.typography?.font_url, "typography.font_url", ctx, {
-      loopback: false,
-    });
-    if (value.typography?.font_url !== undefined && value.typography.font_family === undefined) {
-      ctx.addIssue({
-        code: "custom",
+export const brandingConfigSchema = z.strictObject({
+  // Strict, unlike the generated wire schema: a typo like `hero_urll`
+  // must fail plan, not silently pass and get ignored by the server. The
+  // editor meta-schema already rejects unknown keys; the CLI gate has to
+  // agree.
+  ...CreateBrandingBody.shape,
+  logo_url: withinUrlBytes(CreateBrandingBody.shape.logo_url),
+  hero_url: withinUrlBytes(CreateBrandingBody.shape.hero_url),
+  theme: BRANDING_THEME.extend({
+    light: brandingThemeSide(BRANDING_THEME.shape.light),
+    dark: brandingThemeSide(BRANDING_THEME.shape.dark),
+  }).optional(),
+  typography: CreateBrandingBody.shape.typography
+    .unwrap()
+    .extend({
+      // The spec's pattern allows a comma inside a quoted name, but the server
+      // splits the stack on every comma (ValidateBrandingFontFamily), so
+      // `"Acme, Inc", sans-serif` reaches it and comes back refused.
+      font_family: CreateBrandingBody.shape.typography
+        .unwrap()
+        .shape.font_family.unwrap()
+        .refine(isBrandingFontFamily, {
+          message:
+            'must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural") with no comma inside the quotes',
+          when: whenNothingElseIsWrong,
+        })
+        .optional(),
+      font_url: withinUrlBytes(CreateBrandingBody.shape.typography.unwrap().shape.font_url),
+    })
+    .refine(
+      (value) => {
+        // `when: () => true` runs this even when the value is not an object,
+        // such as `null`, which the object check has already refused.
+        if (typeof value !== "object" || value === null) {
+          return true;
+        }
+        return (
+          value.font_url === undefined || value.font_url === "" || value.font_family !== undefined
+        );
+      },
+      {
         message:
-          "typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in.",
-      });
-    }
-    // Mirror the server's asset URL gate (validateBrandingAssetURL in
-    // internal/domain/branding_validator.go) so plan rejects what apply would.
-    // Apply mutates schemas and flows before branding, so a late 400 here would
-    // leave a half-applied run.
-    validateBrandingAssetUrl(value.logo_url, "logo_url", ctx);
-    validateBrandingAssetUrl(value.hero_url, "hero_url", ctx);
-    validateBrandingAssetUrl(value.theme?.light?.logo_url, "theme.light.logo_url", ctx);
-    validateBrandingAssetUrl(value.theme?.dark?.logo_url, "theme.dark.logo_url", ctx);
-    // The appearance values land in a CSS declaration, so the server stores
-    // only forms it recognises (ValidateBrandingColor / ValidateBrandingFontFamily
-    // in internal/domain/branding_css.go).
-    validateBrandingPalette(value.theme?.light?.palette, "theme.light", ctx);
-    validateBrandingPalette(value.theme?.dark?.palette, "theme.dark", ctx);
-    if (
-      value.typography?.font_family !== undefined &&
-      !isBrandingFontFamily(value.typography.font_family)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          'typography.font_family must be comma-separated font names, each an identifier (Inter, ui-sans-serif) or a quoted name ("APK Futural").',
-      });
-    }
-  });
-
-function validateBrandingPalette(
-  palette: Record<string, unknown> | undefined,
-  side: string,
-  ctx: z.RefinementCtx,
-): void {
-  if (!palette) {
-    return;
-  }
-  for (const [key, colour] of Object.entries(palette)) {
-    // A non-string never reaches here: the generated object schema types every
-    // palette value as a string, and Zod skips refinements once the base parse
-    // has failed. The check is what narrows `unknown` for the call below.
-    if (typeof colour !== "string") {
-      continue;
-    }
-    if (isBrandingColor(colour)) {
-      continue;
-    }
-    ctx.addIssue({
-      code: "custom",
-      message: `${side}.palette.${key} must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch().`,
-    });
-  }
-}
-
-function validateBrandingAssetUrl(
-  value: string | undefined,
-  field: string,
-  ctx: z.RefinementCtx,
-  options: { loopback?: boolean } = {},
-): void {
-  if (value === undefined || value === "") {
-    return;
-  }
-  // The server counts bytes (validateBrandingAssetURL), so a URL with
-  // non-ASCII characters can be short in characters and still too long.
-  if (new TextEncoder().encode(value).length > MAX_BRANDING_URL_BYTES) {
-    ctx.addIssue({
-      code: "custom",
-      message: `${field} must be at most ${MAX_BRANDING_URL_BYTES} bytes.`,
-    });
-    return;
-  }
-  // Stricter-or-equal than the Go gate (validateBrandingAssetURL): the WHATWG
-  // parser forgives what Go's url.Parse rejects — `https:example.com`,
-  // backslashes, and whitespace all get silently normalized. plan must never
-  // accept what apply would reject (the reverse is harmless), so reject the
-  // raw forms before parsing.
-  if (/[\s\\]/.test(value)) {
-    ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
-    return;
-  }
-  if (!/^https?:\/\//i.test(value)) {
-    ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
-    return;
-  }
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
-    return;
-  }
-  // Fetched by every visitor's browser, so userinfo in it is a credential in
-  // every access log — the server refuses it and so must plan.
-  if (parsed.username !== "" || parsed.password !== "") {
-    ctx.addIssue({
-      code: "custom",
-      message: `${field} must not carry credentials; the URL is fetched by every visitor's browser.`,
-    });
-    return;
-  }
-  // Loopback HTTP is the dev-posture carve-out (assets served from the app's
-  // own dev server), and it covers images only: a stylesheet is styling rather
-  // than an image, so it stays https everywhere. Check the raw URL so WHATWG
-  // normalisation cannot make plan accept a host spelling that the Go save
-  // gate rejects.
-  if (
-    options.loopback !== false &&
-    parsed.protocol === "http:" &&
-    isCanonicalLoopbackHttpUrl(value)
-  ) {
-    return;
-  }
-  if (parsed.protocol !== "https:" || parsed.host === "") {
-    // Worded as the server words it (validateBrandingFontURL,
-    // validateBrandingAssetURL): only a field with the carve-out mentions it.
-    ctx.addIssue({
-      code: "custom",
-      message:
-        options.loopback === false
-          ? `${field} must be an absolute https URL.`
-          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
-    });
-  }
-}
+          "needs a typography.font_family to load; a stylesheet alone names no face to render in",
+        path: ["font_url"],
+        // A mistake of type in another typography field must not hide it.
+        when: () => true,
+      },
+    )
+    .optional(),
+  $schema: z.string().optional(),
+  liquid_template: z
+    .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
+    .optional(),
+});

@@ -95,24 +95,38 @@ func TestReportLogsAViolationWithoutItsQuery(t *testing.T) {
 	assert.NotContains(t, logs.String(), "secret")
 }
 
+// A report it cannot use is answered 204 all the same and logs no violation.
+// One it could not read gets the API error line, at Info with the 204 it
+// answered; one it read and set aside gets nothing.
 func TestReportAnswers204ToWhatItCannotUse(t *testing.T) {
 	t.Parallel()
-	for name, body := range map[string]string{
-		"not JSON":     "{",
-		"no violation": `{"csp-report":{}}`,
-		"an extension's code": `{"csp-report":{"effective-directive":"script-src-elem",` +
-			`"blocked-uri":"chrome-extension://abc/inject.js"}}`,
-		"too large": `{"csp-report":{"effective-directive":"` + strings.Repeat("x", 32<<10) + `"}}`,
+	for name, tc := range map[string]struct {
+		body    string
+		refused bool
+	}{
+		"not JSON":     {body: "{", refused: true},
+		"no violation": {body: `{"csp-report":{}}`},
+		"an extension's code": {body: `{"csp-report":{"effective-directive":"script-src-elem",` +
+			`"blocked-uri":"chrome-extension://abc/inject.js"}}`},
+		"too large": {body: `{"csp-report":{"effective-directive":"` + strings.Repeat("x", 32<<10) + `"}}`, refused: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var logs bytes.Buffer
 			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 
-			rec := post(t, ctx, "application/csp-report", body)
+			rec := post(t, ctx, "application/csp-report", tc.body)
 
 			assert.Equal(t, http.StatusNoContent, rec.Code)
-			assert.Empty(t, logs.String())
+			if !tc.refused {
+				assert.Empty(t, logs.String())
+				return
+			}
+			var line map[string]any
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &line), "one line: %q", logs.String())
+			assert.Equal(t, "api error", line["msg"])
+			assert.Equal(t, "INFO", line["level"])
+			assert.Equal(t, "req.invalid", line["error"].(map[string]any)["code"])
 		})
 	}
 }

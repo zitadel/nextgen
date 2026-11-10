@@ -1,4 +1,4 @@
-import { type Asker, input as askInput } from "../input";
+import { type Asker, input as askInput } from "@/lib/input";
 import type { BaseCommand } from "./base";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */

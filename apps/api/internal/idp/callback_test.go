@@ -1,6 +1,7 @@
 package idp
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -177,6 +180,15 @@ func tokenHandler(t *testing.T, check func(t *testing.T, r *http.Request)) http.
 	}
 }
 
+// jsonResponse answers every request with the status and the JSON body.
+func jsonResponse(status int, body string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}
+}
+
 func TestExchange(t *testing.T) {
 	tests := []struct {
 		name string
@@ -185,6 +197,8 @@ func TestExchange(t *testing.T) {
 		authMethod   TokenEndpointAuthMethod
 		pkce         bool
 		pkceVerifier string
+		// code replaces the fixture's authorization code.
+		code string
 		// emptySecret passes no client secret instead of the fixture's.
 		emptySecret bool
 		// timeout bounds the call; zero means none.
@@ -248,23 +262,55 @@ func TestExchange(t *testing.T) {
 			wantCauseMsg: `unknown token endpoint auth method "private_key_jwt"`,
 		},
 		{
-			name: "an error response fails",
+			name:         "an error response fails",
+			handler:      jsonResponse(http.StatusBadRequest, `{"error":"invalid_grant","error_description":"code expired"}`),
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 400, error "invalid_grant", description "code expired"`,
+		},
+		{
+			name:         "an error description that echoes the code is left out",
+			handler:      jsonResponse(http.StatusUnauthorized, `{"error":"invalid_client","error_description":"code the-code expired"}`),
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 401, error "invalid_client"`,
+		},
+		{
+			name:         "an error description that echoes the form-encoded code is left out",
+			handler:      jsonResponse(http.StatusBadRequest, `{"error":"invalid_grant","error_description":"code 4%2Fthe-code expired"}`),
+			authMethod:   ClientSecretPost,
+			code:         "4/the-code",
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 400, error "invalid_grant"`,
+		},
+		{
+			name: "an error description that echoes the Basic credential is left out",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"code expired"}`))
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = fmt.Fprintf(w, `{"error":"invalid_client","error_description":"Invalid Authorization header: %s"}`, r.Header.Get("Authorization"))
 			},
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 401, error "invalid_client"`,
+		},
+		{
+			name:         "an error description that echoes the code past the cap is left out",
+			handler:      jsonResponse(http.StatusBadRequest, fmt.Sprintf(`{"error":"invalid_grant","error_description":%q}`, strings.Repeat("x", maxErrorDescription)+" the-code")),
 			authMethod:   ClientSecretBasic,
 			wantErr:      domain.ErrIDPExchangeFailed(nil),
 			wantCauseMsg: `token endpoint: status 400, error "invalid_grant"`,
 		},
 		{
-			name: "an error response whose code is not a plain token loses it",
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte(`{"error":"the-code"}`))
-			},
+			name:         "an error description is cut at the cap",
+			handler:      jsonResponse(http.StatusBadRequest, fmt.Sprintf(`{"error":"invalid_grant","error_description":%q}`, strings.Repeat("x", maxErrorDescription+1))),
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 400, error "invalid_grant", description "` + strings.Repeat("x", maxErrorDescription) + `"`,
+		},
+		{
+			name:         "an error response whose code is not a plain token loses it",
+			handler:      jsonResponse(http.StatusBadRequest, `{"error":"the-code"}`),
 			authMethod:   ClientSecretBasic,
 			wantErr:      domain.ErrIDPExchangeFailed(nil),
 			wantCauseMsg: `token endpoint: status 400, error ""`,
@@ -316,7 +362,8 @@ func TestExchange(t *testing.T) {
 			if tt.emptySecret {
 				secret = ""
 			}
-			token, err := c.exchange(ctx, "the-code", tt.pkceVerifier, secret)
+			code := cmp.Or(tt.code, "the-code")
+			token, err := c.exchange(ctx, code, tt.pkceVerifier, secret)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -906,12 +953,15 @@ func TestCoerceSubject(t *testing.T) {
 
 // TestCallbackLeaksNothing runs every failing step with planted values and
 // checks that none reach the user-facing text, the details, or the log-only
-// cause.
+// cause. The planted values are what the server sent or holds; text the
+// provider writes on its own reaches the log.
 func TestCallbackLeaksNothing(t *testing.T) {
+	// The secret, the verifier and the code carry characters form encoding
+	// changes, so an echo of the wire form is distinct from the raw value.
 	const (
-		secret   = "planted-secret"
-		verifier = "planted-verifier"
-		code     = "planted-code"
+		secret   = "planted+secret/="
+		verifier = "planted+verifier"
+		code     = "planted/code"
 		nonce    = "planted-nonce"
 		access   = "planted-access-token"
 		email    = "planted@example.test"
@@ -939,13 +989,57 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "the token endpoint echoes the exchange in its error response",
+			name: "the token endpoint echoes the exchange as received in its error response",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					// The Authorization header and the form body, in which the
+					// secret, the code and the verifier are encoded.
+					body, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+					description := fmt.Sprintf("%s %s", r.Header.Get("Authorization"), body)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = fmt.Fprintf(w, `{"error":%q,"error_description":%q,"error_uri":"https://idp.example.test/?%s"}`, code, description, query)
+				}
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the verifier inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return jsonResponse(http.StatusBadRequest, fmt.Sprintf(`{"error":"invalid_grant","error_description":"verifier %s is invalid"}`, verifier))
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the secret inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return jsonResponse(http.StatusUnauthorized, fmt.Sprintf(`{"error":"invalid_client","error_description":"secret %s is invalid"}`, secret))
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the form-encoded secret inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return jsonResponse(http.StatusUnauthorized, fmt.Sprintf(`{"error":"invalid_client","error_description":"secret %s is invalid"}`, url.QueryEscape(secret)))
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the Basic credential inside its error description",
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusBadRequest)
-					_, _ = fmt.Fprintf(w, `{"error":%q,"error_description":%q,"error_uri":"https://idp.example.test/?%s"}`, code, secret, query)
+					w.WriteHeader(http.StatusUnauthorized)
+					_, _ = fmt.Fprintf(w, `{"error":"invalid_client","error_description":"header %s is invalid"}`, r.Header.Get("Authorization"))
 				}
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the form-encoded verifier inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return jsonResponse(http.StatusBadRequest, fmt.Sprintf(`{"error":"invalid_grant","error_description":"verifier %s is invalid"}`, url.QueryEscape(verifier)))
 			},
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},
@@ -1043,11 +1137,13 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			de, ok := errors.AsType[domain.Error](err)
 			require.True(t, ok)
 			visible := de.Error() + fmt.Sprint(de.Details)
-			for _, planted := range []string{secret, verifier, code, nonce, access, email, query, "eyJ"} {
-				assert.NotContains(t, visible, planted, "user-facing text")
-			}
-			for _, planted := range []string{secret, verifier, code, nonce, access, email, query, "eyJ"} {
-				assert.NotContains(t, de.Parent.Error(), planted, "log-only cause")
+			// The token request carried the secret, the verifier and the code
+			// form-encoded, and the secret inside the Basic credential.
+			credential := base64.StdEncoding.EncodeToString([]byte("client:" + url.QueryEscape(secret)))
+			planted := []string{secret, url.QueryEscape(secret), credential, verifier, url.QueryEscape(verifier), code, url.QueryEscape(code), nonce, access, email, query, "eyJ"}
+			for _, v := range planted {
+				assert.NotContains(t, visible, v, "user-facing text")
+				assert.NotContains(t, de.Parent.Error(), v, "log-only cause")
 			}
 		})
 	}

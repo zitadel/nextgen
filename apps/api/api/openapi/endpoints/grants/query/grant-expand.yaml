@@ -8,10 +8,13 @@ description: |
   `team_id`) is always present. If the user or team cannot be loaded, the
   object stays id-only — the same shape as not expanding.
 
-  Expanding requires `user.read` and `team.read` in addition to
-  `project.read` for project secrets. Both are checked once for the whole
-  request. If the caller lacks either, the request is `403`, and the extras
-  are not omitted silently. A user-bound console session that already passed
-  the project check may expand without those scopes.
+  Expanding requires read on the whole of the principal's home project (the
+  platform project when the server has one), checked once per home project.
+  A project secret of another project never has it, and a session has it
+  only with a grant that covers the whole of that project. A caller without
+  it gets 403 `user.permission_denied`; extras
+  are never omitted silently. Without `expand`, every caller who may read
+  the grants sees `user_id`, `identifier` and `display`, or the team's
+  `name`.
 enum:
   - principal

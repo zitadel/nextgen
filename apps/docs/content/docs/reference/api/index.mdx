@@ -5,7 +5,7 @@ description: How to call the Zitadel API, and every operation it has, generated 
 
 import { Card, Cards } from "fumadocs-ui/components/card";
 
-The API reference is generated from the server's OpenAPI document, one page per operation, grouped by the document's tags. The whole document is at [`/docs/openapi.json`](/docs/openapi.json), for client generators, API tools, and agents. This page covers what every operation shares: where to send a request, how to authenticate it, and what errors and lists look like.
+The API reference is generated from the server's OpenAPI document, one page per operation, grouped by the document's tags. The whole document is at [`/docs/openapi.json`](/docs/openapi.json), for client generators, API tools, and agents. A running server also serves the contract it was built from at `/api/v1/openapi.json` on its origin, with no authentication. This page covers what every operation shares: where to send a request, how to authenticate it, and what errors and lists look like.
 
 Each operation shows its request as a call through [`@zitadel/api`](/docs/sdks/api-client), the generated TypeScript client, as the [CLI command](/docs/reference/cli) that runs it where there is one, and as cURL. All of them follow the example you pick and what you enter in the playground. An operation's Markdown, its URL plus `.md`, has the same samples for its default request, cURL against a local server at `http://localhost:8080/api/v1`.
 
@@ -26,7 +26,7 @@ The API lives under `/api/v1` on the server's origin, and an operation's path fo
 
 Setup writes the server your app uses to `.env.local` as `ZITADEL_URL`, its origin without the prefix, which the SDKs and the samples on these pages read.
 
-The health probes stay at the root of the origin, `/livez` and `/readyz`, where orchestrators look for them; they answer under `/api/v1` too.
+The health probes stay at the root of the origin, `/livez` and `/readyz`, where orchestrators look for them; they answer under `/api/v1` too. The OpenAPI document for that deployment is `GET /api/v1/openapi.json`.
 
 Until 1.0.0 the server also answers every operation at its path without the prefix, `https://preview.zitadel.com/projects` for one. Such a response carries a `Deprecation` header ([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745)) with the date the prefix shipped, and a `Link` with `rel="deprecation"` to this section. Move a client that still calls those paths to the prefix: from 1.0.0 they answer `404` with `req.not_found`.
 

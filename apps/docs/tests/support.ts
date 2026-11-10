@@ -82,13 +82,28 @@ export function markdownUrl(url: string): string {
   return url === "/docs" ? "/docs/index.md" : `${url}.md`;
 }
 
-/** The site's pages a Markdown text links to, without anchors and queries, each once. */
-export function siteLinks(markdown: string): string[] {
+/**
+ * The site's pages a Markdown text links to on `origin`, the deployment that
+ * served it (lib/absolute-links.ts), as paths without anchors and queries,
+ * each once.
+ */
+export function siteLinks(markdown: string, origin: string): string[] {
   const links = new Set<string>();
-  for (const [, link = ""] of markdown.matchAll(/\]\((\/docs(?:\/[^)\s#?]*)?)/g)) {
-    links.add(link.replace(/\/$/, "") || "/docs");
+  for (const [, host, link = ""] of markdown.matchAll(
+    /\]\((https?:\/\/[^/)\s]+)(\/docs(?:\/[^)\s#?]*)?)/g,
+  )) {
+    if (host === origin) links.add(link.replace(/\/$/, "") || "/docs");
   }
   return [...links];
+}
+
+/**
+ * The first reference to a docs page a text makes root-relative, if any: a
+ * Markdown link, an `href` or a page's `# Title (/docs/…)` heading. The docs
+ * make them absolute in what agents download (lib/absolute-links.ts).
+ */
+export function rootRelativeDocsLink(text: string): string | undefined {
+  return /(?:\]\(|href="|^# .* \()\/docs[/#)"][^)"\s]*/m.exec(text)?.[0];
 }
 
 /** A title as React renders it into `<title>`. */

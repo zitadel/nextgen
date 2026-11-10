@@ -100,7 +100,8 @@ func TestError_logValue_nonGCPIncludesLocationWhenEnabled(t *testing.T) {
 }
 
 // A brief line keeps the root cause of a nested domain error, which its
-// Error() text alone would drop, and no location or stack at any depth.
+// Error() text alone would drop, and where each was raised, but no stack at
+// any depth.
 func TestError_briefLogValue_keepsNestedCause(t *testing.T) {
 	errreport.EnableLocation(true)
 	errreport.EnableStack(true)
@@ -121,8 +122,30 @@ func TestError_briefLogValue_keepsNestedCause(t *testing.T) {
 	assert.Equal(t, "internal", parent["code"])
 	assert.Equal(t, "failed to load project", parent["message"])
 	assert.Equal(t, "pq: connection reset", parent["parent"])
-	assert.NotContains(t, out.String(), "reportLocation")
+	assert.NotEmpty(t, record["error"].(map[string]any)["reportLocation"])
+	assert.NotEmpty(t, parent["reportLocation"])
 	assert.NotContains(t, out.String(), "stackTrace")
+}
+
+// The brief shape names the location in GCP mode too: the brief error hides
+// the origin interfaces from the handler, so the value must carry it.
+func TestError_briefLogValue_gcpKeepsLocation(t *testing.T) {
+	errreport.EnableLocation(true)
+	errreport.EnableStack(true)
+	errreport.GCPReporting(true)
+	t.Cleanup(func() {
+		errreport.GCPReporting(false)
+		errreport.EnableLocation(true)
+		errreport.EnableStack(true)
+	})
+
+	var keys []string
+	for _, attr := range logValueAttrs(t, domain.ErrInternal(errors.New("cause")).BriefLogValue()) {
+		keys = append(keys, attr.Key)
+	}
+
+	assert.Contains(t, keys, "reportLocation")
+	assert.NotContains(t, keys, "stackTrace")
 }
 
 func TestIsServerFault(t *testing.T) {

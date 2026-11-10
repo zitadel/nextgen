@@ -1,29 +1,22 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 import pRetry, { AbortError } from "p-retry";
 
-import type { ZitadelClient } from "../../lib/api-client";
-import { wrapForBox } from "../../lib/box";
-import { openInBrowser } from "../../lib/browser";
-import { CLAIM_WINDOW_DAYS, isAttached } from "../../lib/claim-state";
-import { requireValue } from "../../lib/environment";
-import { ZitadelError } from "../../lib/errors";
-import { isObject } from "../../lib/json";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../lib/project";
-import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { ClaimService } from "@/lib/backend";
+import { BOX_STYLE, wrapForBox } from "@/lib/box";
+import { openInBrowser } from "@/lib/browser";
+import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
+import { requireValue } from "@/lib/environment";
+import { ZitadelError } from "@/lib/errors";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
+import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { isLoopbackUrl } from "../../lib/server";
-import { reportWarning } from "../../lib/warnings";
-import type { SuggestedCommand } from "../../lib/suggestion";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { isLoopbackUrl } from "@/lib/server";
+import { reportWarning } from "@/lib/warnings";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -224,6 +217,7 @@ export default class Claim extends EnvironmentCommand {
           ? "Open a browser to claim this project"
           : "Wait for the link to be used to claim this project";
       this.recordTelemetry({ claim_outcome: "dry_run" });
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -246,28 +240,28 @@ export default class Claim extends EnvironmentCommand {
     }
 
     const { client } = prompted ?? (await this.connect());
+    const claimService = new ClaimService(client, projectId);
 
     // Set by whichever branch runs: minting a link has early returns and prompts
     // in the middle, so it cannot be one expression.
     let waitFor: { challengeId: string; deadline: number };
     let opened: boolean | undefined;
     if (flags.challengeId === undefined) {
-      const init = await client.initClaim(projectId).then(
-        (minted) => ({ challenge: minted }),
-        (error: unknown) => ({ failure: error }),
-      );
-      if ("failure" in init) {
-        const claimed = alreadyClaimedDetails(init.failure);
-        if (claimed) {
-          return this.alreadyClaimed({ project_id: projectId, ...claimed });
-        }
-        if (isClaimWindowExpired(init.failure)) {
+      const started = await claimService.start();
+      switch (started.outcome) {
+        case "already-claimed":
+          return this.alreadyClaimed({
+            project_id: projectId,
+            team_id: started.teamId,
+            dashboard_url: started.dashboardUrl,
+          });
+        case "window-expired":
           this.recordTelemetry({ claim_outcome: "window_expired" });
           throw claimWindowExpiredError();
-        }
-        throw init.failure;
+        case "started":
+          break;
       }
-      const { challenge } = init;
+      const { challenge } = started;
 
       // A local server left on the default public base advertises a claim page
       // on a remote origin — the exact confusion this warning names. Cloud
@@ -295,7 +289,7 @@ export default class Claim extends EnvironmentCommand {
         message: wrapForBox(
           "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
         ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
+        style: BOX_STYLE.info,
       });
       consola.log(challenge.claim_url);
 
@@ -327,8 +321,7 @@ export default class Claim extends EnvironmentCommand {
     consola.start("Waiting for the browser step to finish");
 
     const completed = await this.poll(
-      client,
-      projectId,
+      claimService,
       waitFor.challengeId,
       waitFor.deadline,
       startOver,
@@ -352,6 +345,7 @@ export default class Claim extends EnvironmentCommand {
     consola.success("Project claimed");
 
     this.recordTelemetry({ claim_outcome: "completed", browser_opened: opened });
+
     return this.emit({
       status: "ok",
       data: {
@@ -361,7 +355,6 @@ export default class Claim extends EnvironmentCommand {
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
       },
-      // Two entries so the URL is printed on its own line.
       next: {
         actions: ["Manage your Project and collaborate in the Console:", completed.dashboard_url],
       },
@@ -377,8 +370,7 @@ export default class Claim extends EnvironmentCommand {
    * we stopped waiting first. `startOver` is how this run gets a new link.
    */
   private async poll(
-    client: ZitadelClient,
-    projectId: string,
+    claimService: ClaimService,
     challengeId: string,
     deadline: number,
     startOver: SuggestedCommand,
@@ -391,29 +383,23 @@ export default class Claim extends EnvironmentCommand {
           throw new NotFinished(attempt - 1);
         }
 
-        try {
-          const status = await client.getClaimStatus(projectId, { challenge_id: challengeId });
-          if (status.status === "completed") {
+        const progress = await claimService.status(challengeId).catch((error: unknown) => {
+          this.recordTelemetry({ poll_count: attempt });
+          throw new AbortError(error instanceof Error ? error : new Error(String(error)));
+        });
+        switch (progress.outcome) {
+          case "completed":
             this.recordTelemetry({ poll_count: attempt });
-            return status;
-          }
-        } catch (error) {
-          // The window can close between init and poll (a challenge minted in
-          // the window's last minutes); the status route reports that as its
-          // own 410 code, and it must not read as the retryable link expiry.
-          if (isClaimWindowExpired(error)) {
+            return progress.claim;
+          case "window-expired":
             this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
             throw new AbortError(claimWindowExpiredError());
-          }
-          if (error instanceof ApiError && error.status === 410) {
+          case "expired":
             this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
             throw new AbortError(
               expiredError("The link expired before the browser step finished.", startOver),
             );
-          }
-          // Only a resumed wait can name a challenge the platform never minted
-          // for this project.
-          if (isChallengeNotFound(error)) {
+          case "not-found":
             this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
             throw new AbortError(
               new ZitadelError(
@@ -425,14 +411,9 @@ export default class Claim extends EnvironmentCommand {
                 },
               ),
             );
-          }
-          // A 429 is polled again like an unfinished claim: the wait grows anyway.
-          if (!(error instanceof ApiError && error.status === 429)) {
-            this.recordTelemetry({ poll_count: attempt });
-            throw new AbortError(error instanceof Error ? error : new Error(String(error)));
-          }
+          case "pending":
+            throw new NotFinished(attempt);
         }
-        throw new NotFinished(attempt);
       },
       {
         // Never sleeps past the deadline: the last wait ends the retries.
@@ -463,6 +444,7 @@ export default class Claim extends EnvironmentCommand {
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
+
     return this.emit({
       status: "ok",
       data: {
@@ -492,59 +474,13 @@ export default class Claim extends EnvironmentCommand {
   }): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
     consola.info(`This project already belongs to team ${data.team_id}.`);
+
     return this.emit({
       status: "skipped",
       reason: "already-claimed",
       data: { title: "Zitadel project already belongs to a team.", ...data },
     });
   }
-}
-
-/**
- * Extracts the owning team from a `409 proj.already_claimed` envelope. Reads
- * the body defensively rather than casting to the generated type: this is the
- * one place a malformed error body would otherwise turn a clean skip into a
- * crash.
- */
-function alreadyClaimedDetails(
-  error: unknown,
-): { team_id: string; dashboard_url?: string } | undefined {
-  if (!(error instanceof ApiError) || error.status !== 409 || !isObject(error.body)) {
-    return undefined;
-  }
-  const details = error.body.details;
-  if (!isObject(details) || typeof details.team_id !== "string") {
-    return undefined;
-  }
-  return {
-    team_id: details.team_id,
-    dashboard_url: typeof details.dashboard_url === "string" ? details.dashboard_url : undefined,
-  };
-}
-
-/**
- * A `410 proj.claim_window_expired` from `claim/init`: the project outlived
- * domain.ClaimWindow before anyone claimed it. Distinct from the plain 410 the
- * poll maps to "the link expired", which a new link fixes; this one nothing
- * fixes.
- */
-function isClaimWindowExpired(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    error.status === 410 &&
-    isObject(error.body) &&
-    error.body.code === "proj.claim_window_expired"
-  );
-}
-
-/** A `404 claim_challenge.not_found` from `claim/status`. */
-function isChallengeNotFound(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    error.status === 404 &&
-    isObject(error.body) &&
-    error.body.code === "claim_challenge.not_found"
-  );
 }
 
 function expiredError(message: string, claimAgain: SuggestedCommand): ZitadelError {

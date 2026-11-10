@@ -1,6 +1,6 @@
-import { Consent, type Gate } from "../consent";
-import { Cmd } from "../cmd";
-import { inShell } from "../suggestion";
+import { Consent, type Gate } from "@/lib/consent";
+import { Cmd } from "@/lib/cmd";
+import { inShell } from "@/lib/suggestion";
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";

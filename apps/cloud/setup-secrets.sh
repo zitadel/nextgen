@@ -66,8 +66,12 @@ done
 for tool in openssl node jq; do
   command -v "$tool" >/dev/null 2>&1 || { echo "setup-secrets: $tool is required" >&2; exit 69; }
 done
+(cd "$here" && node -e 'import("@zitadel/config/bootstrap-user")') >/dev/null 2>&1 || {
+  echo "setup-secrets: run corepack pnpm install --frozen-lockfile from the repository root first" >&2
+  exit 69
+}
 
-vc() { npx --yes vercel@63.1.2 "$@"; }
+vc() { npx --yes vercel@64.5.0 "$@" --project "$project" --scope "$team"; }
 keys='["MASTER_KEY_PEM_B64","MASTER_KEY_ID","MASTER_KEY_PREVIOUS_PEM_B64","MASTER_KEY_PREVIOUS_ID","BOOTSTRAP_ADMIN_USER_JSON_B64"]'
 requested="$(printf '%s\n' $targets | jq -R . | jq -sc .)"
 
@@ -75,9 +79,18 @@ requested="$(printf '%s\n' $targets | jq -R . | jq -sc .)"
 # run does not redo cannot be replaced for one environment alone.
 envs=
 if [ -z "$skip_vercel" ]; then
-  envs="$(vc api "/v9/projects/$project/env?slug=$team")"
+  envs="$(vc env ls --json)"
+  overrides="$(printf '%s' "$envs" | jq -r --argjson req "$requested" '
+    .envs[] | select(.gitBranch != null and (.key | startswith("MASTER_KEY_"))
+        and ((.target - (.target - $req)) | length > 0))
+    | "  \(.key) (branch \(.gitBranch))"')"
+  if [ -n "$overrides" ]; then
+    echo "setup-secrets: remove branch-specific master-key overrides in the Vercel dashboard before setup:" >&2
+    echo "$overrides" >&2
+    exit 65
+  fi
   shared="$(printf '%s' "$envs" | jq -r --argjson keys "$keys" --argjson req "$requested" '
-    .envs[]
+    .envs[] | select(.gitBranch == null)
     | select((.key as $k | $keys | index($k) != null)
         and ((.target - (.target - $req)) | length > 0)
         and ((.target - $req) | length > 0))
@@ -149,32 +162,36 @@ done
 
 [ -n "$skip_vercel" ] && exit 0
 
-printf '%s' "$envs" | jq -r --argjson keys "$keys" --argjson req "$requested" '
-  .envs[]
-  | select((.key as $k | $keys | index($k) != null) and ((.target - (.target - $req)) | length > 0))
-  | "\(.id) \(.key) \(.target | join(","))"' |
-while read -r id key env_targets; do
-  echo "deleting $key ($env_targets)"
-  vc api "/v9/projects/$project/env/$id?slug=$team" -X DELETE --dangerously-skip-permissions --raw >/dev/null
-done
-
+# Upsert one variable at a time; a failed update never deletes the existing
+# configuration. Values reach the CLI only over stdin, never as arguments.
 add() { # name type file target
-  jq -n --arg key "$1" --arg type "$2" --rawfile value "$3" --arg t "$4" \
-    '{key: $key, value: ($value | rtrimstr("\n")), type: $type, target: [$t]}' |
-    vc api "/v10/projects/$project/env?slug=$team" -X POST --input - --raw >/dev/null
+  printf '%s' "$(cat "$3")" | vc env add "$1" "$4" --force --yes --type "$2" >/dev/null
 }
 for target in $targets; do
   dir="$out/$target"
   eval "previous=\"\$previous_$target\""
-  echo "adding MASTER_KEY_PEM_B64, MASTER_KEY_ID=$(cat "$dir/master-key.id"), BOOTSTRAP_ADMIN_USER_JSON_B64 ($target)"
-  add MASTER_KEY_PEM_B64 sensitive "$dir/master-key.b64" "$target"
-  add MASTER_KEY_ID encrypted "$dir/master-key.id" "$target"
-  add BOOTSTRAP_ADMIN_USER_JSON_B64 sensitive "$dir/admin-user.b64" "$target"
   if [ -n "$previous" ]; then
-    echo "adding MASTER_KEY_PREVIOUS_PEM_B64, MASTER_KEY_PREVIOUS_ID=$(cat "$previous/master-key.id") ($target)"
-    add MASTER_KEY_PREVIOUS_PEM_B64 sensitive "$previous/master-key.b64" "$target"
-    add MASTER_KEY_PREVIOUS_ID encrypted "$previous/master-key.id" "$target"
+    # Preserve the decryption key before changing the encryption key.
+    add MASTER_KEY_PREVIOUS_PEM_B64 secret "$previous/master-key.b64" "$target"
+    add MASTER_KEY_PREVIOUS_ID config "$previous/master-key.id" "$target"
   fi
+  echo "setting master key and root admin ($target)"
+  add MASTER_KEY_PEM_B64 secret "$dir/master-key.b64" "$target"
+  add MASTER_KEY_ID config "$dir/master-key.id" "$target"
+  add BOOTSTRAP_ADMIN_USER_JSON_B64 secret "$dir/admin-user.b64" "$target"
+done
+
+# Remove stale rotation variables only after every replacement succeeded.
+# The preflight above rules out branch-specific master-key overrides.
+for target in $targets; do
+  eval "previous=\"\$previous_$target\""
+  [ -z "$previous" ] || continue
+  for key in MASTER_KEY_PREVIOUS_PEM_B64 MASTER_KEY_PREVIOUS_ID; do
+    if printf '%s' "$envs" | jq -e --arg key "$key" --arg target "$target" '
+      any(.envs[]; .key == $key and .gitBranch == null and (.target | index($target) != null))' >/dev/null; then
+      vc env rm "$key" "$target" --yes >/dev/null
+    fi
+  done
 done
 
 echo

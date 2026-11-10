@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CommitIsHere } from "../../../../../src/lib/git/checks/commit-is-here";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { CommitIsHere } from "@/lib/git/checks/commit-is-here";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 const SHA = "a".repeat(40);
 

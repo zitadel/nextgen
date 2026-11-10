@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { FieldPath } from "../../../../../src/lib/oclif/crud";
+import type { FieldPath } from "@/lib/oclif/crud";
 
 describe("FieldPath", () => {
   type User = { id: string; metadata: { status: string; created_at?: string }; teams: string[] };

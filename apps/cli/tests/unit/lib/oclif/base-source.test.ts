@@ -1,12 +1,12 @@
 import { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { CLI_COMMAND_STARTED } from "../../../../src/lib/oclif/command-telemetry";
-import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
-import type { Properties, Telemetry, TelemetryDeps } from "../../../../src/lib/telemetry";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
-import { onTerminalReadingAFile } from "../../../helpers/terminal";
+import { BaseCommand } from "@/lib/oclif/base";
+import { CLI_COMMAND_STARTED } from "@/lib/oclif/command-telemetry";
+import type { JsonEnvelope } from "@/lib/oclif/types";
+import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { onTerminalReadingAFile } from "@tests/helpers/terminal";
 
 const config = await Config.load(cliPackageRoot);
 

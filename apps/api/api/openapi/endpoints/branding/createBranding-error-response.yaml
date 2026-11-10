@@ -29,52 +29,22 @@ content:
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       brnd.invalid:
-        summary: brnd.invalid
-        value:
-          code: brnd.invalid
-          message: 'branding: invalid'
+        $ref: '../../components/examples/errors/brnd-invalid.yaml'
       brnd.missing_project_id:
-        summary: brnd.missing_project_id
-        value:
-          code: brnd.missing_project_id
-          message: 'branding: missing project id'
+        $ref: '../../components/examples/errors/brnd-missing_project_id.yaml'
       brnd.not_found:
-        summary: brnd.not_found
-        value:
-          code: brnd.not_found
-          message: 'branding: not found'
+        $ref: '../../components/examples/errors/brnd-not_found.yaml'
       brnd.permission_denied:
-        summary: brnd.permission_denied
-        value:
-          code: brnd.permission_denied
-          message: 'branding: requires an operator-grade token bound to the project (project.write or a branding.* scope)'
+        $ref: '../../components/examples/errors/brnd-permission_denied.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../components/examples/errors/evt-invalid.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../components/examples/errors/not_implemented.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../components/examples/errors/unavailable.yaml'

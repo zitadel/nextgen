@@ -25,42 +25,18 @@ content:
           var.permission_denied: '../../../components/schemas/errors/var-permission_denied.yaml'
     examples:
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../../components/examples/errors/evt-invalid.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../../components/examples/errors/internal.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../../components/examples/errors/not_implemented.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../../components/examples/errors/req-invalid.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../../components/examples/errors/unavailable.yaml'
       var.not_found:
-        summary: var.not_found
-        value:
-          code: var.not_found
-          message: 'variable: not found'
+        $ref: '../../../components/examples/errors/var-not_found.yaml'
       var.permission_denied:
-        summary: var.permission_denied
-        value:
-          code: var.permission_denied
-          message: 'variable: permission denied'
+        $ref: '../../../components/examples/errors/var-permission_denied.yaml'

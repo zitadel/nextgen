@@ -10,11 +10,11 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { ZitadelError, errorMessage, isErrno } from "../../errors";
-import { shellCommand } from "../../suggestion";
-import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
-import type { BinaryRuntimeMetadata } from "../runtime";
-import type { LogSink } from "../server-log";
+import { ZitadelError, errorMessage, isErrno } from "@/lib/errors";
+import { shellCommand } from "@/lib/suggestion";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/local-server/env-vars";
+import type { BinaryRuntimeMetadata } from "@/lib/local-server/runtime";
+import type { LogSink } from "@/lib/local-server/server-log";
 import { type Clock, realClock, stopSignal } from "./clock";
 import { type Launched, type Launcher, launched } from "./lifecycle";
 

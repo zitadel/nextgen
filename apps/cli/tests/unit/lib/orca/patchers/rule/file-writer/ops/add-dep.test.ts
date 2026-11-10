@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../../../../helpers/fixtures";
-import { rejectionOf } from "../../../../../../../helpers/thrown-value";
+import { it } from "@tests/helpers/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { AddDepOp } from "../../../../../../../../src/lib/orca/patchers/rule/file-writer/ops/add-dep";
-import { Workspace } from "../../../../../../../../src/lib/orca/patchers/rule/file-writer/workspace";
+import { AddDepOp } from "@/lib/orca/patchers/rule/file-writer/ops/add-dep";
+import { Workspace } from "@/lib/orca/patchers/rule/file-writer/workspace";
 
 function workspaceIn(cwd: string) {
   return new Workspace({ cwd, dryRun: false, force: false });

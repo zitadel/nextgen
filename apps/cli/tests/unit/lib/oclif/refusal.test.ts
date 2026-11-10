@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { interpolate, refusalError, unmetBy } from "../../../../src/lib/oclif/refusal";
-import { unscopedCommand } from "../../../../src/lib/suggestion";
+import { interpolate, refusalError, unmetBy } from "@/lib/oclif/refusal";
+import { unscopedCommand } from "@/lib/suggestion";
 
 describe("interpolate", () => {
   it("fills each placeholder from the values", () => {

@@ -1,179 +1,301 @@
-import { chmod, mkdtemp, rename } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { COMMANDS } from "../../../src/index";
-import { makeProject as writeProject, readJson } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { COMMANDS } from "@/index";
+import {
+  aPasswordFlow,
+  aProject,
+  aSchema,
+  authMethodJson,
+  authMethodText,
+  DEFAULT_SCHEMA,
+  DONE_STEP,
+  IDENTIFIER_STEP,
+  LOGIN_FLOW_FILE,
+  PASSWORD_STEP,
+  SCHEMA_FILE,
+  SUBMIT_ACTION,
+  writeProject,
+} from "@tests/helpers/auth-method";
+import { authMethods, type ConfigDocuments } from "@tests/helpers/config";
+import { it } from "@tests/helpers/fixtures";
+import { readJson } from "@tests/helpers/local-project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
-type Envelope = {
-  status: string;
-  code?: string;
-  message?: string;
-  hint?: string;
-  data?: Record<string, unknown>;
-  warnings?: string[];
-  next_commands?: string[];
-  details?: {
-    issues?: Array<{ rule: string; step?: string }>;
-    usable?: string[];
-    suggested_args?: string[][];
-  };
+/**
+ * A schema with both password and passkey enabled.
+ */
+const BOTH = authMethods("password", "passkey");
+
+/**
+ * A schema whose only enabled method is password.
+ */
+const PASSWORD_ONLY = { password: { enabled: true }, passkey: { enabled: false } };
+
+/**
+ * A schema whose only enabled method is passkey.
+ */
+const PASSKEY_ONLY = { password: { enabled: false }, passkey: { enabled: true } };
+
+/**
+ * Where a schema records whether passkey is enabled.
+ */
+const PASSKEY_ENTRY = ["x-auth-methods", "passkey"];
+
+/**
+ * The action that signs in with a passkey.
+ */
+const PASSKEY_ACTION = { name: "passkey", kind: "passkey", primary: true };
+
+/**
+ * A login flow whose only way in is a passkey on the identifier step.
+ */
+const PASSKEY_FLOW = {
+  ...aPasswordFlow(),
+  steps: [
+    { ...IDENTIFIER_STEP, actions: [PASSKEY_ACTION], transitions: { passkey: { target: "done" } } },
+    DONE_STEP,
+  ],
 };
 
-const passwordSchema = (name = "default-human-user") => ({
-  $id: `https://schemas.test.invalid/${name}.json`,
-  type: "object",
-  "x-identifier": "email",
-  required: ["email"],
-  properties: { email: { type: "string", format: "email" } },
-  "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
-});
+/**
+ * A login flow that collects the email and finishes, offering no method.
+ */
+const NO_METHOD_FLOW = {
+  ...aPasswordFlow(),
+  steps: [{ ...IDENTIFIER_STEP, transitions: { submit: { target: "done" } } }, DONE_STEP],
+};
 
-/** The shipped password flow, cut to what the validator needs. */
-const passwordFlow = (schemaName = "default-human-user") => ({
-  name: `${schemaName}-login`,
-  status: "active",
-  user_schema: `https://schemas.test.invalid/${schemaName}.json`,
-  purposes: { login: "identifier" },
-  steps: [
-    {
-      name: "identifier",
-      fields: ["email"],
-      actions: [{ name: "submit", kind: "submit", primary: true }],
-      transitions: { submit: { target: "password" } },
-    },
-    {
-      name: "password",
-      fields: ["x-auth-methods#password"],
-      actions: [{ name: "submit", kind: "submit", primary: true }],
-      transitions: { submit: { target: "done" } },
-    },
-    { name: "done", complete: "show" },
-  ],
-});
+/**
+ * A login flow whose register purpose names a step that does not exist, so it
+ * cannot be checked.
+ */
+const BROKEN_FLOW = { ...aPasswordFlow(), purposes: { login: "identifier", register: "missing" } };
 
-/** A Project with the given schemas, each with its own login flow. */
-function makeProject(
-  schemas: Record<string, Record<string, unknown>> = { "default-human-user": passwordSchema() },
-  flows: Record<string, unknown> = { "default-human-user-login": passwordFlow() },
-): Promise<string> {
-  return writeProject({ schemas, flows });
+/**
+ * The warning for enabling passkey on the default Project, whose flow offers only a password.
+ */
+const PASSKEY_NOT_OFFERED =
+  "No login flow for default-human-user offers passkey yet. " +
+  'In .zitadel/flows/default-human-user-login.json, add a "kind": "passkey" action to a step reached from purposes.login, ' +
+  'plus a transition under the action\'s name. A "kind": "passkey_register" action does the same for sign-up. ' +
+  "See .zitadel/flows/README.md.";
+
+/**
+ * The warning for enabling password on a Project whose flow offers only a passkey.
+ */
+const PASSWORD_NOT_OFFERED =
+  "No login flow for default-human-user offers password yet. " +
+  'In .zitadel/flows/default-human-user-login.json, add "x-auth-methods#password" ' +
+  'to the fields of a step reached from purposes.login, with a "kind": "submit" action ' +
+  "and a transition under its name. See .zitadel/flows/README.md.";
+
+/**
+ * The warning for a schema no active flow lets anyone sign in to.
+ */
+const NOBODY_CAN_SIGN_IN =
+  "No active login flow for default-human-user offers a method it enables, " +
+  "so nobody can sign in until one does.";
+
+/**
+ * The warning for a schema left with no way to sign in.
+ */
+const LEFT_WITHOUT_SIGN_IN =
+  "default-human-user is left with no way to sign in. Its users can only be managed through the API.";
+
+/**
+ * The warning a dry run gives for a schema that would be left with no way to sign in.
+ */
+const WOULD_BE_LEFT_WITHOUT_SIGN_IN =
+  "default-human-user would be left with no way to sign in. Its users can only be managed through the API.";
+
+/**
+ * The refusal to remove the last way to sign in to the default schema, which a
+ * dry run gives as the real run does.
+ */
+const LAST_WAY_REFUSAL = {
+  code: "E_CONFIRMATION_REQUIRED",
+  message: ".zitadel/schemas/default-human-user.json would have no way to sign in left",
+  hint:
+    "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
+    "If the schema's users are only managed through the API, ask a person first: Disable passkey anyway? " +
+    "Nobody will be able to sign in to default-human-user. " +
+    "Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).",
+};
+
+/**
+ * Root ignores file modes, so a read-only file is still written when the tests
+ * run as root.
+ */
+const RUNS_AS_ROOT = process.getuid?.() === 0;
+
+/**
+ * The ids, such as `auth-method:password:enable`, of the commands a run
+ * suggests: the refusal's at the top of the envelope, the change's under `data`.
+ *
+ * @param envelope - The parsed `--json` envelope.
+ * @returns The command ids, in the order the commands are suggested.
+ */
+function suggestedCommandIds(envelope: unknown): string[] {
+  const commands = [...nextCommandsOf(envelope)];
+  if (typeof envelope === "object" && envelope !== null && "data" in envelope) {
+    commands.push(...nextCommandsOf(envelope.data));
+  }
+  return commands.map((command) => {
+    const words = command.replace(/^npx \S+ /, "").split(" ");
+    const firstFlag = words.findIndex((word) => {
+      return word.startsWith("-");
+    });
+    if (firstFlag === -1) {
+      return words.join(":");
+    }
+    return words.slice(0, firstFlag).join(":");
+  });
 }
 
-async function run(
-  cwd: string,
-  method: "password" | "passkey",
-  verb: "enable" | "disable",
-  ...args: string[]
-) {
-  const result = await runCliForTest([
-    "auth-method",
-    method,
-    verb,
-    "--cwd",
-    cwd,
-    "--json",
-    "--non-interactive",
-    ...args,
-  ]);
-  return { exitCode: result.exitCode, envelope: parseJson(result.stdout) as Envelope };
-}
-
-/** A suggested command with the CLI prefix and the temp --cwd path left out. */
-function suggested(command: string): string {
-  return command.replace(/^.*? auth-method /, "").replace(/--cwd \S+/, "--cwd <cwd>");
-}
-
-/** A schema whose only enabled method is passkey. */
-function passkeyOnlySchema() {
-  return {
-    "default-human-user": {
-      ...passwordSchema(),
-      "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
-    },
-  };
-}
-
-async function readSchema(cwd: string, name = "default-human-user") {
-  return (await readJson(cwd, `.zitadel/schemas/${name}.json`)) as {
-    "x-auth-methods": Record<string, { enabled: boolean }>;
-  };
+/**
+ * The `next_commands` of one level of an envelope.
+ *
+ * @param level - The envelope or its `data`.
+ * @returns The commands, or none when the level lists none.
+ */
+function nextCommandsOf(level: unknown): string[] {
+  if (typeof level !== "object" || level === null || !("next_commands" in level)) {
+    return [];
+  }
+  if (!Array.isArray(level.next_commands)) {
+    return [];
+  }
+  return level.next_commands.filter((command) => {
+    return typeof command === "string";
+  });
 }
 
 describe("auth-method password and passkey", () => {
-  describe("the envelope", () => {
-    it("reports the schema, the method, whether it changed and what is left", async () => {
-      const cwd = await makeProject();
+  describe("when it changes a schema", () => {
+    it("reports the schema, the method, whether it changed and what is left", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(cwd, "passkey", "disable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-      expect(envelope.data).toMatchObject({
-        schema: "default-human-user",
-        file: ".zitadel/schemas/default-human-user.json",
-        method: "passkey",
-        changed: [".zitadel/schemas/default-human-user.json"],
-        usable: ["password"],
-        not_offered: [],
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          schema: DEFAULT_SCHEMA,
+          file: SCHEMA_FILE,
+          method: "passkey",
+          changed: [SCHEMA_FILE],
+          usable: ["password"],
+          not_offered: [],
+        },
       });
     });
 
-    it("lists a dry run and a deploy as the next commands after a change", async () => {
-      const cwd = await makeProject();
+    it("lists a dry run and a deploy as the next commands", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(cwd, "passkey", "disable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-      const next = envelope.data?.next_commands as string[];
-      expect(
-        next.map((command) => command.replace(/^.*?@\S+ /, "").replace(/--cwd \S+/, "--cwd <cwd>")),
-      ).toEqual(["deploy --dry-run --cwd <cwd>", "deploy -m '<what changed>' --cwd <cwd>"]);
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expectedPublicCliCommand(`deploy --dry-run --cwd ${dir}`),
+            expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${dir}`),
+          ],
+        },
+      });
     });
 
-    it("hands over the follow-ups as argument lists when the path needs quoting", async () => {
-      const parent = await mkdtemp(join(tmpdir(), "zitadel auth method "));
-      const cwd = await makeProject();
-      const spaced = join(parent, "my project");
-      await rename(cwd, spaced);
+    it("hands over the follow-ups as argument lists when the path needs quoting", async ({
+      dir,
+    }) => {
+      const cwd = join(dir, "my project");
+      await writeProject(cwd, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(spaced, "passkey", "disable");
+      const result = await runCliForTest(authMethodJson(cwd, "passkey", "disable"));
 
-      expect(envelope.data?.next_commands).toEqual([]);
-      expect(envelope.data?.next_args).toEqual([
-        ["deploy", "--dry-run", "--cwd", expect.stringContaining("my project")],
-        ["deploy", "-m", "<what changed>", "--cwd", expect.stringContaining("my project")],
-      ]);
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [],
+          next_args: [
+            ["deploy", "--dry-run", "--cwd", cwd],
+            ["deploy", "-m", "<what changed>", "--cwd", cwd],
+          ],
+        },
+      });
     });
 
-    it("works with a local server that is not running", async () => {
-      const cwd = await makeProject();
+    it("works with a local server that is not running", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { exitCode } = await run(cwd, "passkey", "disable", "--server", "local");
+      const result = await runCliForTest(
+        authMethodJson(dir, "passkey", "disable", "--server", "local"),
+      );
 
-      expect(exitCode).toBe(0);
+      expect(result.exitCode).toBe(0);
     });
 
-    it("lists no next commands when nothing changed", async () => {
-      const cwd = await makeProject();
+    it("lists no next commands when nothing changed", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(cwd, "password", "enable");
+      const result = await runCliForTest(authMethodJson(dir, "password", "enable"));
 
-      expect(envelope.data).toMatchObject({ changed: [], next_commands: [], next_args: [] });
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { changed: [], next_commands: [], next_args: [] },
+      });
+    });
+  });
+
+  describe("when no flow offers the method", () => {
+    it.for([
+      { method: "passkey", methods: PASSWORD_ONLY, flow: aPasswordFlow(), flags: [] },
+      { method: "password", methods: PASSKEY_ONLY, flow: PASSKEY_FLOW, flags: ["--dry-run"] },
+    ])("lists $method as not offered", async ({ method, methods, flow, flags }, { dir }) => {
+      await writeProject(dir, aProject(methods, flow));
+
+      const result = await runCliForTest(authMethodJson(dir, method, "enable", ...flags));
+
+      expect(parseJson(result.stdout)).toMatchObject({ data: { not_offered: [method] } });
     });
 
-    it("does not count a register step that only enrols a passkey", async () => {
-      const flow = passwordFlow();
+    it.for([
+      {
+        method: "passkey",
+        methods: PASSWORD_ONLY,
+        flow: aPasswordFlow(),
+        flags: [],
+        warning: PASSKEY_NOT_OFFERED,
+      },
+      {
+        method: "password",
+        methods: PASSKEY_ONLY,
+        flow: PASSKEY_FLOW,
+        flags: ["--dry-run"],
+        warning: PASSWORD_NOT_OFFERED,
+      },
+    ])(
+      "says what a flow needs to offer $method",
+      async ({ method, methods, flow, flags, warning }, { dir }) => {
+        await writeProject(dir, aProject(methods, flow));
+
+        const result = await runCliForTest(authMethodJson(dir, method, "enable", ...flags));
+
+        expect(parseJson(result.stdout)).toMatchObject({ warnings: [warning] });
+      },
+    );
+
+    it("does not count a register step that only enrols a passkey", async ({ dir }) => {
       const enrolling = {
-        ...flow,
+        ...aPasswordFlow(),
         purposes: { login: "identifier", register: "register" },
         steps: [
-          // A combined flow must route each purpose to the other.
           {
-            ...flow.steps[0],
-            transitions: { ...flow.steps[0]?.transitions, user_not_found: { target: "register" } },
+            ...IDENTIFIER_STEP,
+            transitions: { ...IDENTIFIER_STEP.transitions, user_not_found: { target: "register" } },
           },
-          ...flow.steps.slice(1),
+          PASSWORD_STEP,
+          DONE_STEP,
           {
             name: "register",
             fields: ["email"],
@@ -185,566 +307,638 @@ describe("auth-method password and passkey", () => {
           },
         ],
       };
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
-          },
-        },
-        { "default-human-user-login": enrolling },
-      );
+      await writeProject(dir, aProject(PASSWORD_ONLY, enrolling));
 
-      const { envelope } = await run(cwd, "passkey", "enable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
 
-      expect(envelope.data?.not_offered).toEqual(["passkey"]);
+      expect(parseJson(result.stdout)).toMatchObject({ data: { not_offered: ["passkey"] } });
     });
 
-    it("does not count a draft flow as offering the method", async () => {
+    describe("with a draft flow that offers it", () => {
       const draft = {
-        ...passwordFlow(),
+        ...aPasswordFlow(),
         name: "draft-login",
         status: "draft",
+        purposes: { login: "passkey-first" },
         steps: [
           {
             name: "passkey-first",
             fields: [],
-            actions: [{ name: "passkey", kind: "passkey", primary: true }],
+            actions: [PASSKEY_ACTION],
             transitions: { passkey: { target: "done" } },
           },
-          { name: "done", complete: "show" },
+          DONE_STEP,
         ],
-        purposes: { login: "passkey-first" },
       };
-      const cwd = await makeProject(undefined, {
-        "default-human-user-login": passwordFlow(),
-        "draft-login": draft,
+      const documents: ConfigDocuments = {
+        schemas: { "default-human-user.json": aSchema(BOTH) },
+        flows: { "default-human-user-login.json": aPasswordFlow(), "draft-login.json": draft },
+      };
+
+      it("does not count the draft flow as offering the method", async ({ dir }) => {
+        await writeProject(dir, documents);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({ data: { not_offered: ["passkey"] } });
       });
 
-      const { envelope } = await run(cwd, "passkey", "enable");
+      it("names only the active flow as the place to add it", async ({ dir }) => {
+        await writeProject(dir, documents);
 
-      expect(envelope.data?.not_offered).toEqual(["passkey"]);
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
+      });
     });
 
-    it("warns when no active flow offers any method the schema enables", async () => {
-      // Password steps removed from the flow, passkey enabled but never
-      // offered, then password disabled: nobody is left a way in.
-      const noPassword = {
-        ...passwordFlow(),
-        steps: [
-          {
-            name: "identifier",
-            fields: ["email"],
-            actions: [{ name: "submit", kind: "submit", primary: true }],
-            transitions: { submit: { target: "done" } },
+    it("warns when no active flow offers any method the schema enables", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, NO_METHOD_FLOW));
+
+      const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({ warnings: [NOBODY_CAN_SIGN_IN] });
+    });
+
+    it("does not name a flow without a login entry", async ({ dir }) => {
+      await writeProject(dir, {
+        schemas: { "default-human-user.json": aSchema(PASSWORD_ONLY) },
+        flows: {
+          "default-human-user-login.json": aPasswordFlow(),
+          "signup.json": {
+            ...aPasswordFlow(),
+            name: "signup",
+            purposes: { register: "identifier" },
           },
-          { name: "done", complete: "show" },
-        ],
-      };
-      const cwd = await makeProject(undefined, { "default-human-user-login": noPassword });
-
-      const { envelope } = await run(cwd, "password", "disable");
-
-      expect(envelope.warnings).toEqual([
-        "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
-      ]);
-    });
-
-    it("warns about a method no flow offers", async () => {
-      const cwd = await makeProject({
-        "default-human-user": {
-          ...passwordSchema(),
-          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
         },
       });
 
-      const { envelope } = await run(cwd, "passkey", "enable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable", "--dry-run"));
 
-      expect(envelope.data?.not_offered).toEqual(["passkey"]);
-      expect(envelope.warnings).toEqual([
-        "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
-      ]);
+      expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
+    });
+
+    it("points at the flows folder when no flow is active", async ({ dir }) => {
+      await writeProject(dir, aProject(PASSWORD_ONLY, { ...aPasswordFlow(), status: "draft" }));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable", "--dry-run"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        warnings: [
+          "No login flow for default-human-user offers passkey yet. " +
+            "In an active login flow for default-human-user in .zitadel/flows/, " +
+            'add a "kind": "passkey" action to a step reached from purposes.login, ' +
+            'plus a transition under the action\'s name. A "kind": "passkey_register" action does the same for sign-up. ' +
+            "See .zitadel/flows/README.md.",
+          NOBODY_CAN_SIGN_IN,
+        ],
+      });
     });
   });
 
-  describe("--schema", () => {
-    it("changes only the named schema", async () => {
-      const cwd = await makeProject(
-        { customers: passwordSchema("customers"), staff: passwordSchema("staff") },
-        { "customers-login": passwordFlow("customers"), "staff-login": passwordFlow("staff") },
-      );
+  describe("with --schema", () => {
+    const twoSchemas: ConfigDocuments = {
+      schemas: {
+        "customers.json": aSchema(BOTH, "customers"),
+        "staff.json": aSchema(BOTH, "staff"),
+      },
+      flows: {
+        "customers-login.json": aPasswordFlow("customers"),
+        "staff-login.json": aPasswordFlow("staff"),
+      },
+    };
 
-      const { exitCode } = await run(cwd, "passkey", "disable", "--schema", "staff");
+    it("changes the named schema", async ({ dir }) => {
+      await writeProject(dir, twoSchemas);
 
-      expect(exitCode).toBe(0);
-      expect((await readSchema(cwd, "staff"))["x-auth-methods"].passkey).toEqual({
+      await runCliForTest(authMethodJson(dir, "passkey", "disable", "--schema", "staff"));
+
+      expect(await readJson(dir, ".zitadel/schemas/staff.json")).toHaveProperty(PASSKEY_ENTRY, {
         enabled: false,
       });
-      expect((await readSchema(cwd, "customers"))["x-auth-methods"].passkey).toEqual({
+    });
+
+    it("leaves the other schemas alone", async ({ dir }) => {
+      await writeProject(dir, twoSchemas);
+
+      await runCliForTest(authMethodJson(dir, "passkey", "disable", "--schema", "staff"));
+
+      expect(await readJson(dir, ".zitadel/schemas/customers.json")).toHaveProperty(PASSKEY_ENTRY, {
         enabled: true,
       });
     });
 
-    it("is required when the Project has more than one schema", async () => {
-      const cwd = await makeProject(
-        { customers: passwordSchema("customers"), staff: passwordSchema("staff") },
-        {},
-      );
+    it("is required when the Project has more than one schema", async ({ dir }) => {
+      await writeProject(dir, { schemas: twoSchemas.schemas });
 
-      const { envelope } = await run(cwd, "passkey", "disable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-      expect(envelope).toMatchObject({ status: "error", code: "E_VALIDATION" });
-      expect(envelope.hint).toContain("Name the one to change with --schema");
+      expect(parseJson(result.stdout)).toMatchObject({
+        status: "error",
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("Name the one to change with --schema"),
+      });
     });
   });
 
-  describe("refusals", () => {
-    it("refuses a schema that points at an external url", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            kind: "schema-url",
-            url: "https://schemas.test.invalid/customers.json",
-          },
-        },
-        {},
-      );
+  describe("when it refuses", () => {
+    it("refuses a schema that points at an external url", async ({ dir }) => {
+      const url = "https://schemas.test.invalid/customers.json";
+      await writeProject(dir, {
+        schemas: { "default-human-user.json": { kind: "schema-url", url } },
+      });
 
-      const { envelope } = await run(cwd, "passkey", "disable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-      expect(envelope).toMatchObject({
+      expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION", details: { url } });
+    });
+
+    it("refuses a schema its contract refuses, naming the file", async ({ dir }) => {
+      await writeProject(dir, aProject([]));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        details: { url: "https://schemas.test.invalid/customers.json" },
+        details: { problems: [expect.objectContaining({ path: SCHEMA_FILE })] },
       });
     });
 
-    it("names the rule and step a disabled method would break", async () => {
-      const cwd = await makeProject();
+    it("says to fix the file it names before running again", async ({ dir }) => {
+      await writeProject(dir, aProject([]));
 
-      const { envelope } = await run(cwd, "password", "disable");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
 
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.details?.issues).toEqual([
-        expect.objectContaining({ rule: "schema/fields-resolve", step: "password" }),
-      ]);
+      expect(parseJson(result.stdout)).toMatchObject({
+        hint: "Fix the files named above, then run the command again; nothing was changed.",
+      });
     });
 
-    it("refuses to enable while a flow has errors that prevent checking it", async () => {
-      const broken = { ...passwordFlow(), purposes: { login: "identifier", register: "missing" } };
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+    it("refuses password on a schema with no x-identifier", async ({ dir }) => {
+      const { "x-identifier": _, ...noIdentifier } = aSchema(PASSKEY_ONLY);
+      await writeProject(dir, { schemas: { "default-human-user.json": noIdentifier } });
+
+      const result = await runCliForTest(authMethodJson(dir, "password", "enable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        details: { method: "password" },
+      });
+    });
+
+    describe("when a flow still uses the method", () => {
+      it("names the rule and step a disabled method would break", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+        const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          code: "E_VALIDATION",
+          details: {
+            issues: [expect.objectContaining({ rule: "schema/fields-resolve", step: "password" })],
           },
-        },
-        { "default-human-user-login": broken },
-      );
+        });
+      });
 
-      const { envelope } = await run(cwd, "passkey", "enable");
+      it("says which step uses the method and what it keeps without it", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.details?.issues).toEqual([expect.objectContaining({ rule: "definition" })]);
-    });
+        const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
 
-    it("refuses to disable while a flow has errors that prevent checking it", async () => {
-      const broken = { ...passwordFlow(), purposes: { login: "identifier", register: "missing" } };
-      const cwd = await makeProject(undefined, { "default-human-user-login": broken });
+        expect(parseJson(result.stdout)).toMatchObject({
+          message:
+            "Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
+            '  - .zitadel/flows/default-human-user-login.json: step "password" collects password\n' +
+            "    Left with no field or sign-in method. Targeted by identifier.submit.",
+        });
+      });
 
-      const { envelope } = await run(cwd, "password", "disable");
+      it("says only the edits the steps need", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.details?.issues).toEqual([expect.objectContaining({ rule: "definition" })]);
-    });
+        const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
 
-    it("refuses to remove the last way to sign in and says how to add another", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+        expect(parseJson(result.stdout)).toMatchObject({
+          hint:
+            "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
+            "Delete a step left with no field or sign-in method: retarget the transitions listed for it. " +
+            "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+        });
+      });
+
+      it("lists each step with what it keeps and what leads to it", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+        const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          details: {
+            steps: [
+              {
+                path: LOGIN_FLOW_FILE,
+                step: "password",
+                keeps: [],
+                entry_for: [],
+                targeted_by: [{ step: "identifier", transition: "submit" }],
+              },
+            ],
           },
-        },
-        {},
-      );
+        });
+      });
 
-      const { envelope } = await run(cwd, "passkey", "disable");
+      it("refuses under --dry-run too", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.details?.usable).toEqual(["passkey"]);
-      expect(envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force",
-        "password enable --schema default-human-user --cwd <cwd>",
-      ]);
+        const result = await runCliForTest(authMethodJson(dir, "password", "disable", "--dry-run"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          details: {
+            issues: [expect.objectContaining({ rule: "schema/fields-resolve", step: "password" })],
+          },
+        });
+      });
+
+      it("writes nothing when it refuses", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+        await runCliForTest(authMethodJson(dir, "password", "disable"));
+
+        expect(await readJson(dir, SCHEMA_FILE)).toEqual(aSchema(BOTH));
+      });
     });
 
-    it("does not suggest password on a schema with no x-identifier", async () => {
-      const { "x-identifier": _, ...noIdentifier } = passwordSchema();
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...noIdentifier,
-            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+    describe("when disabling passkey would empty an entry step", () => {
+      const passkeyFirst = {
+        ...aPasswordFlow(),
+        purposes: { login: "passkey-first" },
+        steps: [
+          {
+            name: "passkey-first",
+            actions: [PASSKEY_ACTION, { name: "email_fallback", kind: "navigate" }],
+            transitions: { passkey: { target: "done" }, email_fallback: { target: "identifier" } },
           },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force",
-      ]);
-    });
-
-    it("leaves a schema name that needs quoting out of runnable commands", async () => {
-      const cwd = await makeProject(
-        {
-          "my users&calc": {
-            ...passwordSchema("my users&calc"),
-            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+          {
+            ...IDENTIFIER_STEP,
+            actions: [SUBMIT_ACTION, { name: "passkey", kind: "passkey" }],
+            transitions: { ...IDENTIFIER_STEP.transitions, passkey: { target: "done" } },
           },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope.next_commands ?? []).toEqual([]);
-      expect(envelope.details).toMatchObject({
-        suggested_args: [
-          [
-            "auth-method",
-            "passkey",
-            "disable",
-            "--schema",
-            "my users&calc",
-            "--cwd",
-            expect.any(String),
-            "--force",
-          ],
-          [
-            "auth-method",
-            "password",
-            "enable",
-            "--schema",
-            "my users&calc",
-            "--cwd",
-            expect.any(String),
-          ],
+          PASSWORD_STEP,
+          DONE_STEP,
         ],
-      });
-    });
-
-    it("refuses a method entry with no enabled value", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { password: { enabled: true }, passkey: {} },
-          },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope).toMatchObject({
-        code: "E_VALIDATION",
-        details: { region: "x-auth-methods.passkey.enabled is not a boolean" },
-      });
-    });
-
-    it("refuses to disable while a flow file does not match the flow schema", async () => {
-      const flow = passwordFlow();
-      const malformed = {
-        ...flow,
-        steps: flow.steps.map((step) =>
-          step.name === "password" ? { ...step, fields: "x-auth-methods#password" } : step,
-        ),
       };
-      const cwd = await makeProject(undefined, { "default-human-user-login": malformed });
 
-      const { envelope } = await run(cwd, "password", "disable");
+      it("names the purpose whose entry step it empties, and not what leads from it", async ({
+        dir,
+      }) => {
+        await writeProject(dir, aProject(BOTH, passkeyFirst));
 
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.details?.issues).toEqual([
-        expect.objectContaining({
-          rule: "definition",
-          path: ".zitadel/flows/default-human-user-login.json",
-        }),
-      ]);
-    });
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-    it("joins a schema name that starts with a dash to its option", async () => {
-      const cwd = await makeProject(
-        {
-          "--force": {
-            ...passwordSchema("--force"),
-            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
-          },
-        },
-        {},
-      );
+        expect(parseJson(result.stdout)).toMatchObject({
+          message:
+            "Disabling passkey in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
+            '  - .zitadel/flows/default-human-user-login.json: step "passkey-first" offers passkey (action "passkey")\n' +
+            "    Left with no field or sign-in method. Entry step of purposes.login.\n" +
+            '  - .zitadel/flows/default-human-user-login.json: step "identifier" offers passkey (action "passkey")\n' +
+            '    Still has field "email".',
+        });
+      });
 
-      const { envelope } = await run(cwd, "passkey", "disable");
+      it("says to point the purpose at another step", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, passkeyFirst));
 
-      expect(envelope.next_commands ?? []).toEqual([]);
-      expect(envelope.details?.suggested_args?.[0]).toEqual(
-        expect.arrayContaining(["--schema=--force", "--force"]),
-      );
-      expect(envelope.details?.suggested_args?.[0]).toEqual(
-        expect.not.arrayContaining(["--schema"]),
-      );
-    });
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-    it("says how to fix a region that is not the shape it edits", async () => {
-      const cwd = await makeProject(
-        { "default-human-user": { ...passwordSchema(), "x-auth-methods": [] } },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "enable");
-
-      expect(envelope.hint).toBe(
-        "This command edits that region, and it is not the shape it edits. " +
-          "Fix it against the dialect in .zitadel/meta/, then run the command again.",
-      );
-    });
-
-    it("refuses an enabled value that is not a boolean", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: "true" } },
-          },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope).toMatchObject({
-        code: "E_VALIDATION",
-        details: { region: "x-auth-methods.passkey.enabled is not a boolean" },
+        expect(parseJson(result.stdout)).toMatchObject({
+          hint:
+            "Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. " +
+            "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step. " +
+            "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+        });
       });
     });
 
-    it("refuses an x-auth-methods that is not an object rather than overwrite it", async () => {
-      const cwd = await makeProject(
-        { "default-human-user": { ...passwordSchema(), "x-auth-methods": [] } },
-        {},
-      );
+    it.for([
+      { verb: "enable", method: "passkey", methods: PASSWORD_ONLY },
+      { verb: "disable", method: "password", methods: BOTH },
+    ])(
+      "refuses to $verb while a flow has errors that prevent checking it",
+      async ({ verb, method, methods }, { dir }) => {
+        await writeProject(dir, aProject(methods, BROKEN_FLOW));
 
-      const { envelope } = await run(cwd, "passkey", "enable");
+        const result = await runCliForTest(authMethodJson(dir, method, verb));
 
-      expect(envelope).toMatchObject({
-        code: "E_VALIDATION",
-        details: { region: "x-auth-methods is not an object" },
-      });
-    });
-
-    it("refuses a method entry that is not an object rather than overwrite it", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { password: true, passkey: { enabled: true } },
-          },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "password", "disable");
-
-      expect(envelope).toMatchObject({
-        code: "E_VALIDATION",
-        details: { region: "x-auth-methods.password is not an object" },
-      });
-    });
-
-    it("does not count otp as a way to sign in", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...passwordSchema(),
-            "x-auth-methods": { passkey: { enabled: true }, otp: { enabled: true } },
-          },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope.message).toBe(
-        ".zitadel/schemas/default-human-user.json would have no way to sign in left",
-      );
-    });
-
-    it("refuses password on a schema with no x-identifier", async () => {
-      const { "x-identifier": _, ...noIdentifier } = passwordSchema();
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            ...noIdentifier,
-            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
-          },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "password", "enable");
-
-      expect(envelope).toMatchObject({ code: "E_VALIDATION", details: { method: "password" } });
-    });
-
-    it("points at the arguments of the --force re-run", async () => {
-      const cwd = await makeProject(passkeyOnlySchema(), {});
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope.hint).toContain("details.suggested_args");
-    });
-
-    it("refuses under --dry-run too", async () => {
-      const cwd = await makeProject();
-
-      const { envelope } = await run(cwd, "password", "disable", "--dry-run");
-
-      expect(envelope.details?.issues).toEqual([
-        expect.objectContaining({ rule: "schema/fields-resolve", step: "password" }),
-      ]);
-    });
-
-    it("writes nothing when it refuses", async () => {
-      const cwd = await makeProject();
-      const before = await readSchema(cwd);
-
-      await run(cwd, "password", "disable");
-
-      expect(await readSchema(cwd)).toEqual(before);
-    });
-  });
-
-  describe("--force", () => {
-    const passkeyOnly = () => ({
-      "default-human-user": {
-        ...passwordSchema(),
-        "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
-      },
-    });
-
-    it("disables the last method, which the server allows", async () => {
-      const cwd = await makeProject(passkeyOnly(), {});
-
-      const { exitCode } = await run(cwd, "passkey", "disable", "--force");
-
-      expect(exitCode).toBe(0);
-      expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: false });
-    });
-
-    it("warns that nobody can sign in afterwards", async () => {
-      const cwd = await makeProject(passkeyOnly(), {});
-
-      const { envelope } = await run(cwd, "passkey", "disable", "--force");
-
-      expect(envelope.warnings).toEqual([
-        "default-human-user has no way to sign in left. Its users can only be managed through the API.",
-      ]);
-    });
-
-    // Root ignores file modes, so a read-only file is still written there.
-    it.skipIf(process.getuid?.() === 0)(
-      "does not claim the change when the schema cannot be written",
-      async () => {
-        const cwd = await makeProject(passkeyOnly(), {});
-        await chmod(join(cwd, ".zitadel/schemas/default-human-user.json"), 0o444);
-
-        const { envelope } = await run(cwd, "passkey", "disable", "--force");
-
-        expect(envelope.status).toBe("error");
-        expect(envelope).not.toHaveProperty("warnings");
+        expect(parseJson(result.stdout)).toMatchObject({
+          code: "E_VALIDATION",
+          details: { issues: [expect.objectContaining({ rule: "definition" })] },
+        });
       },
     );
 
-    it("does not override a flow that still uses the method", async () => {
-      const cwd = await makeProject();
+    it("refuses to disable while a flow file does not match the flow schema", async ({ dir }) => {
+      const malformed = {
+        ...aPasswordFlow(),
+        steps: [
+          IDENTIFIER_STEP,
+          { ...PASSWORD_STEP, fields: "x-auth-methods#password" },
+          DONE_STEP,
+        ],
+      };
+      await writeProject(dir, aProject(BOTH, malformed));
 
-      const { envelope } = await run(cwd, "password", "disable", "--force");
+      const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
 
-      expect(envelope.details?.issues).toEqual([
-        expect.objectContaining({ rule: "schema/fields-resolve", step: "password" }),
-      ]);
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
+      });
+    });
+
+    describe("when it would remove the last way to sign in", () => {
+      it("refuses, naming the method left", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          code: "E_CONFIRMATION_REQUIRED",
+          details: { usable: ["passkey"] },
+        });
+      });
+
+      it("suggests the --force re-run and enabling password", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: [
+            expectedPublicCliCommand(
+              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force`,
+            ),
+            expectedPublicCliCommand(
+              `auth-method password enable --schema default-human-user --cwd ${dir}`,
+            ),
+          ],
+        });
+      });
+
+      it("does not suggest password on a schema with no x-identifier", async ({ dir }) => {
+        const { "x-identifier": _, ...noIdentifier } = aSchema(PASSKEY_ONLY);
+        await writeProject(dir, { schemas: { "default-human-user.json": noIdentifier } });
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: [
+            expectedPublicCliCommand(
+              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force`,
+            ),
+          ],
+        });
+      });
+
+      it.for(["my users&calc", "--force"])(
+        "leaves the schema name %s out of runnable commands",
+        async (name, { dir }) => {
+          await writeProject(dir, { schemas: { [`${name}.json`]: aSchema(PASSKEY_ONLY, name) } });
+
+          const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+          expect(parseJson(result.stdout)).toMatchObject({ next_commands: [] });
+        },
+      );
+
+      it("hands over the re-runs as argument lists for a schema name that needs quoting", async ({
+        dir,
+      }) => {
+        const name = "my users&calc";
+        await writeProject(dir, { schemas: { [`${name}.json`]: aSchema(PASSKEY_ONLY, name) } });
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          details: {
+            suggested_args: [
+              ["auth-method", "passkey", "disable", "--schema", name, "--cwd", dir, "--force"],
+              ["auth-method", "password", "enable", "--schema", name, "--cwd", dir],
+            ],
+          },
+        });
+      });
+
+      it("joins a schema name that starts with a dash to its option", async ({ dir }) => {
+        await writeProject(dir, { schemas: { "--force.json": aSchema(PASSKEY_ONLY, "--force") } });
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toHaveProperty(
+          ["details", "suggested_args", 0],
+          ["auth-method", "passkey", "disable", "--schema=--force", "--cwd", dir, "--force"],
+        );
+      });
+
+      it("does not count otp as a way to sign in", async ({ dir }) => {
+        await writeProject(dir, aProject({ passkey: { enabled: true }, otp: { enabled: true } }));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          message: ".zitadel/schemas/default-human-user.json would have no way to sign in left",
+        });
+      });
+
+      it("points at the arguments of the --force re-run", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          hint: expect.stringContaining("details.suggested_args"),
+        });
+      });
+
+      it("exits 3 in its text output", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodText(dir, "passkey", "disable"));
+
+        expect(result.exitCode).toBe(3);
+      });
+
+      it("tells a person to re-run with --force only once they agree", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodText(dir, "passkey", "disable"));
+
+        expect(result.stdout + result.stderr).toContain(
+          "Re-run with --force only once they agree.",
+        );
+      });
+
+      it("leaves details.suggested_args out of the human hint", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodText(dir, "passkey", "disable"));
+
+        expect(result.stdout + result.stderr).not.toContain("suggested_args");
+      });
     });
   });
 
-  describe("--dry-run", () => {
-    it("still reports the warnings", async () => {
-      const cwd = await makeProject({
-        "default-human-user": {
-          ...passwordSchema(),
-          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+  describe("with --force", () => {
+    it("disables the last method, which the server allows", async ({ dir }) => {
+      await writeProject(dir, aProject(PASSKEY_ONLY));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--force"));
+
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("writes the last method disabled", async ({ dir }) => {
+      await writeProject(dir, aProject(PASSKEY_ONLY));
+
+      await runCliForTest(authMethodJson(dir, "passkey", "disable", "--force"));
+
+      expect(await readJson(dir, SCHEMA_FILE)).toHaveProperty(PASSKEY_ENTRY, { enabled: false });
+    });
+
+    it("warns that nobody can sign in afterwards", async ({ dir }) => {
+      await writeProject(dir, aProject(PASSKEY_ONLY));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--force"));
+
+      expect(parseJson(result.stdout)).toMatchObject({ warnings: [LEFT_WITHOUT_SIGN_IN] });
+    });
+
+    describe.skipIf(RUNS_AS_ROOT)("when the schema cannot be written", () => {
+      it("fails", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+        await chmod(join(dir, SCHEMA_FILE), 0o444);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--force"));
+
+        expect(parseJson(result.stdout)).toMatchObject({ status: "error" });
+      });
+
+      it("does not claim the change", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+        await chmod(join(dir, SCHEMA_FILE), 0o444);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--force"));
+
+        expect(parseJson(result.stdout)).not.toHaveProperty("warnings");
+      });
+    });
+
+    it("does not override a flow that still uses the method", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "password", "disable", "--force"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        details: {
+          issues: [expect.objectContaining({ rule: "schema/fields-resolve", step: "password" })],
         },
       });
+    });
+  });
 
-      const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
+  describe("with --dry-run", () => {
+    it("still reports the warnings", async ({ dir }) => {
+      await writeProject(dir, aProject(PASSWORD_ONLY, aPasswordFlow()));
 
-      expect(envelope.warnings).toEqual([
-        "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
-      ]);
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable", "--dry-run"));
+
+      expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
     });
 
-    it("previews the change without writing it", async () => {
-      const cwd = await makeProject();
+    it("reports a skipped preview", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
 
-      expect(envelope).toMatchObject({ status: "skipped", reason: "dry-run" });
-      expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: true });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped", reason: "dry-run" });
     });
 
-    it("lists the file it would change", async () => {
-      const cwd = await makeProject();
+    it("writes nothing", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+      await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
 
-      expect(envelope.data?.changed).toEqual([".zitadel/schemas/default-human-user.json"]);
+      expect(await readJson(dir, SCHEMA_FILE)).toHaveProperty(PASSKEY_ENTRY, { enabled: true });
     });
 
-    it("previews removing the last way to sign in rather than refusing, and warns", async () => {
-      const cwd = await makeProject(passkeyOnlySchema(), {});
+    it("lists the file it would change", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
 
-      expect(envelope).toMatchObject({
-        status: "skipped",
-        reason: "dry-run",
-        warnings: [
-          "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
-        ],
+      expect(parseJson(result.stdout)).toMatchObject({ data: { changed: [SCHEMA_FILE] } });
+    });
+
+    describe("when it would remove the last way to sign in", () => {
+      it("exits 3, as the real run does", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+        expect(result.exitCode).toBe(3);
+      });
+
+      it("refuses as the real run does", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+        expect(parseJson(result.stdout)).toMatchObject(LAST_WAY_REFUSAL);
+      });
+
+      it("keeps the --force re-run a preview and suggests the real run's alternatives", async ({
+        dir,
+      }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: [
+            expectedPublicCliCommand(
+              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force --dry-run`,
+            ),
+            expectedPublicCliCommand(
+              `auth-method password enable --schema default-human-user --cwd ${dir}`,
+            ),
+          ],
+        });
+      });
+
+      it("previews it with --force, and warns", async ({ dir }) => {
+        await writeProject(dir, aProject(PASSKEY_ONLY));
+
+        const result = await runCliForTest(
+          authMethodJson(dir, "passkey", "disable", "--dry-run", "--force"),
+        );
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          status: "skipped",
+          reason: "dry-run",
+          warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
+        });
       });
     });
   });
 
-  // Every suggestion is meant to be run as written, so each must name a real
-  // command: a renamed command would otherwise leave dead suggestions behind.
-  it("only suggests commands that exist", async () => {
-    const cwd = await makeProject(passkeyOnlySchema(), {});
-    const refused = await run(cwd, "passkey", "disable");
-    const changed = await run(await makeProject(), "passkey", "disable");
+  it.for([
+    { case: "a refusal", documents: aProject(PASSKEY_ONLY) },
+    { case: "a change", documents: aProject(BOTH, aPasswordFlow()) },
+  ])("only suggests commands that exist after $case", async ({ documents }, { dir }) => {
+    await writeProject(dir, documents);
 
-    const suggested = [
-      ...(refused.envelope.next_commands ?? []),
-      ...((changed.envelope.data?.next_commands as string[]) ?? []),
-    ];
+    const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-    expect(suggested.length).toBeGreaterThan(0);
-    for (const command of suggested) {
-      const words = command.replace(/^npx \S+ /, "").split(" ");
-      const firstFlag = words.findIndex((word) => word.startsWith("-"));
-      const id = words.slice(0, firstFlag === -1 ? words.length : firstFlag).join(":");
-      expect(Object.keys(COMMANDS), command).toContain(id);
-    }
+    const suggested = suggestedCommandIds(parseJson(result.stdout));
+    expect(suggested).not.toHaveLength(0);
+    expect(Object.keys(COMMANDS)).toEqual(expect.arrayContaining(suggested));
   });
 });

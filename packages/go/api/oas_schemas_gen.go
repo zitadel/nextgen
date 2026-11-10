@@ -1034,40 +1034,6 @@ func (s *AttStaleChallengeDetails) init() AttStaleChallengeDetails {
 
 type AttemptID string
 
-// AuthAttemptCreated2XX is 2XX pattern response for AuthAttemptCreated operation.
-type AuthAttemptCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptCreated2XX) authAttemptCreatedRes() {}
-
-// AuthAttemptCreatedDef is default response for AuthAttemptCreated operation.
-type AuthAttemptCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptCreatedDef) authAttemptCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthAttemptCreatedEvent struct {
@@ -1514,40 +1480,6 @@ func (s *AuthAttemptCreatedEventDelegationType) UnmarshalText(data []byte) error
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// AuthAttemptHandedOff2XX is 2XX pattern response for AuthAttemptHandedOff operation.
-type AuthAttemptHandedOff2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptHandedOff2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptHandedOff2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptHandedOff2XX) authAttemptHandedOffRes() {}
-
-// AuthAttemptHandedOffDef is default response for AuthAttemptHandedOff operation.
-type AuthAttemptHandedOffDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptHandedOffDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptHandedOffDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptHandedOffDef) authAttemptHandedOffRes() {}
 
 // Merged schema.
 // Ref: #
@@ -2205,40 +2137,6 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
-// AuthCheckFailed2XX is 2XX pattern response for AuthCheckFailed operation.
-type AuthCheckFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckFailed2XX) authCheckFailedRes() {}
-
-// AuthCheckFailedDef is default response for AuthCheckFailed operation.
-type AuthCheckFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckFailedDef) authCheckFailedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthCheckFailedEvent struct {
@@ -2727,40 +2625,6 @@ func (s *AuthCheckPayload) SetCheckType(val OptString) {
 func (s *AuthCheckPayload) SetAuthAttemptID(val OptString) {
 	s.AuthAttemptID = val
 }
-
-// AuthCheckSucceeded2XX is 2XX pattern response for AuthCheckSucceeded operation.
-type AuthCheckSucceeded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckSucceeded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckSucceeded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckSucceeded2XX) authCheckSucceededRes() {}
-
-// AuthCheckSucceededDef is default response for AuthCheckSucceeded operation.
-type AuthCheckSucceededDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckSucceededDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckSucceededDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckSucceededDef) authCheckSucceededRes() {}
 
 // Merged schema.
 // Ref: #
@@ -3262,40 +3126,6 @@ func (s *AuthCsrfInvalidDetails) init() AuthCsrfInvalidDetails {
 	return m
 }
 
-// AuthFactorPasskeyEnrolled2XX is 2XX pattern response for AuthFactorPasskeyEnrolled operation.
-type AuthFactorPasskeyEnrolled2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolled2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolled2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasskeyEnrolled2XX) authFactorPasskeyEnrolledRes() {}
-
-// AuthFactorPasskeyEnrolledDef is default response for AuthFactorPasskeyEnrolled operation.
-type AuthFactorPasskeyEnrolledDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolledDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolledDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasskeyEnrolledDef) authFactorPasskeyEnrolledRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthFactorPasskeyEnrolledEvent struct {
@@ -3742,40 +3572,6 @@ func (s *AuthFactorPasskeyEnrolledEventDelegationType) UnmarshalText(data []byte
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// AuthFactorPasswordSet2XX is 2XX pattern response for AuthFactorPasswordSet operation.
-type AuthFactorPasswordSet2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasswordSet2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasswordSet2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasswordSet2XX) authFactorPasswordSetRes() {}
-
-// AuthFactorPasswordSetDef is default response for AuthFactorPasswordSet operation.
-type AuthFactorPasswordSetDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasswordSetDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasswordSetDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasswordSetDef) authFactorPasswordSetRes() {}
 
 // Merged schema.
 // Ref: #
@@ -5669,142 +5465,6 @@ func (s *AuthSSOExchangeSucceededEventDelegationType) UnmarshalText(data []byte)
 	}
 }
 
-// AuthSsoAuthorizationFailed2XX is 2XX pattern response for AuthSsoAuthorizationFailed operation.
-type AuthSsoAuthorizationFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoAuthorizationFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoAuthorizationFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoAuthorizationFailed2XX) authSsoAuthorizationFailedRes() {}
-
-// AuthSsoAuthorizationFailedDef is default response for AuthSsoAuthorizationFailed operation.
-type AuthSsoAuthorizationFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoAuthorizationFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoAuthorizationFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoAuthorizationFailedDef) authSsoAuthorizationFailedRes() {}
-
-// AuthSsoExchangeFailed2XX is 2XX pattern response for AuthSsoExchangeFailed operation.
-type AuthSsoExchangeFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeFailed2XX) authSsoExchangeFailedRes() {}
-
-// AuthSsoExchangeFailedDef is default response for AuthSsoExchangeFailed operation.
-type AuthSsoExchangeFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeFailedDef) authSsoExchangeFailedRes() {}
-
-// AuthSsoExchangeSucceeded2XX is 2XX pattern response for AuthSsoExchangeSucceeded operation.
-type AuthSsoExchangeSucceeded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeSucceeded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeSucceeded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeSucceeded2XX) authSsoExchangeSucceededRes() {}
-
-// AuthSsoExchangeSucceededDef is default response for AuthSsoExchangeSucceeded operation.
-type AuthSsoExchangeSucceededDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeSucceededDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeSucceededDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeSucceededDef) authSsoExchangeSucceededRes() {}
-
-// AuthTokenIssued2XX is 2XX pattern response for AuthTokenIssued operation.
-type AuthTokenIssued2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenIssued2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenIssued2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenIssued2XX) authTokenIssuedRes() {}
-
-// AuthTokenIssuedDef is default response for AuthTokenIssued operation.
-type AuthTokenIssuedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenIssuedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenIssuedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenIssuedDef) authTokenIssuedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthTokenIssuedEvent struct {
@@ -6267,40 +5927,6 @@ func (s *AuthTokenIssuedPayload) GetScopes() []string {
 func (s *AuthTokenIssuedPayload) SetScopes(val []string) {
 	s.Scopes = val
 }
-
-// AuthTokenRevoked2XX is 2XX pattern response for AuthTokenRevoked operation.
-type AuthTokenRevoked2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenRevoked2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenRevoked2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenRevoked2XX) authTokenRevokedRes() {}
-
-// AuthTokenRevokedDef is default response for AuthTokenRevoked operation.
-type AuthTokenRevokedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenRevokedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenRevokedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenRevokedDef) authTokenRevokedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -6840,40 +6466,6 @@ func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
 func (*AuthUnauthorizedHeaders) getMySessionCsrfTokenRes() {}
 func (*AuthUnauthorizedHeaders) getMySessionRes()          {}
 
-// AuthzGranted2XX is 2XX pattern response for AuthzGranted operation.
-type AuthzGranted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzGranted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzGranted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzGranted2XX) authzGrantedRes() {}
-
-// AuthzGrantedDef is default response for AuthzGranted operation.
-type AuthzGrantedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzGrantedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzGrantedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzGrantedDef) authzGrantedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthzGrantedEvent struct {
@@ -7358,40 +6950,6 @@ func (s *AuthzGrantedPayload) SetPrincipalID(val OptString) {
 func (s *AuthzGrantedPayload) SetRelation(val OptString) {
 	s.Relation = val
 }
-
-// AuthzRevoked2XX is 2XX pattern response for AuthzRevoked operation.
-type AuthzRevoked2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzRevoked2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzRevoked2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzRevoked2XX) authzRevokedRes() {}
-
-// AuthzRevokedDef is default response for AuthzRevoked operation.
-type AuthzRevokedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzRevokedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzRevokedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzRevokedDef) authzRevokedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -8371,7 +7929,7 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // template. It has one shape in two places: the request body of
 // `createBranding` (`POST /branding`), which publishes it as a new immutable
 // revision, and a read-only copy on flow responses, which carries the
-// project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+// revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
 // that `zitadel deploy` publishes.
 // Every field is optional. An omitted key uses Zitadel's default, so a
 // revision carrying one color is as valid as one carrying the whole object.
@@ -8488,40 +8046,6 @@ func (s *Branding) SetShape(val OptBrandingShape) {
 }
 
 type BrandingColor string
-
-// BrandingCreated2XX is 2XX pattern response for BrandingCreated operation.
-type BrandingCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *BrandingCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *BrandingCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*BrandingCreated2XX) brandingCreatedRes() {}
-
-// BrandingCreatedDef is default response for BrandingCreated operation.
-type BrandingCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *BrandingCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *BrandingCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*BrandingCreatedDef) brandingCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -12624,17 +12148,24 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
-	Type                CreateAuthAttemptErrorResponseType // switch on this field
-	AttInvalidRequest   AttInvalidRequest
-	AuthUnauthorized    AuthUnauthorized
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjMismatch        ProjMismatch
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
+	Type                 CreateAuthAttemptErrorResponseType // switch on this field
+	AttInvalidRequest    AttInvalidRequest
+	AuthUnauthorized     AuthUnauthorized
+	EncKeyDecryptFailed  EncKeyDecryptFailed
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjMismatch         ProjMismatch
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	ProjPreviewNotLive   ProjPreviewNotLive
+	RelNoDefault         RelNoDefault
+	RelNotDeployed       RelNotDeployed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	EncKeyUnknownAlg     EncKeyUnknownAlg
+	Unavailable          Unavailable
 }
 
 // CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
@@ -12642,16 +12173,23 @@ type CreateAuthAttemptErrorResponseType string
 
 // Possible values for CreateAuthAttemptErrorResponseType.
 const (
-	AttInvalidRequestCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "att.invalid_request"
-	AuthUnauthorizedCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "auth.unauthorized"
-	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
-	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
-	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
-	NotImplementedCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "not_implemented"
-	ProjMismatchCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "proj.mismatch"
-	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
-	UnavailableCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "unavailable"
+	AttInvalidRequestCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "att.invalid_request"
+	AuthUnauthorizedCreateAuthAttemptErrorResponse     CreateAuthAttemptErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateAuthAttemptErrorResponse  CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
+	EvtInvalidCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "evt.invalid"
+	InternalCreateAuthAttemptErrorResponse             CreateAuthAttemptErrorResponseType = "internal"
+	NotImplementedCreateAuthAttemptErrorResponse       CreateAuthAttemptErrorResponseType = "not_implemented"
+	ProjMismatchCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "proj.mismatch"
+	ProjNotFoundCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "rel.no_default"
+	RelNotDeployedCreateAuthAttemptErrorResponse       CreateAuthAttemptErrorResponseType = "rel.not_deployed"
+	RelNotFoundCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "rel.not_found"
+	RelRevokedCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "rel.revoked"
+	ReqInvalidCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateAuthAttemptErrorResponse     CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "unavailable"
 )
 
 // IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
@@ -12687,6 +12225,41 @@ func (s CreateAuthAttemptErrorResponse) IsNotImplemented() bool {
 // IsProjMismatch reports whether CreateAuthAttemptErrorResponse is ProjMismatch.
 func (s CreateAuthAttemptErrorResponse) IsProjMismatch() bool {
 	return s.Type == ProjMismatchCreateAuthAttemptErrorResponse
+}
+
+// IsProjNotFound reports whether CreateAuthAttemptErrorResponse is ProjNotFound.
+func (s CreateAuthAttemptErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateAuthAttemptErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateAuthAttemptErrorResponse is ProjOriginNotAllowed.
+func (s CreateAuthAttemptErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether CreateAuthAttemptErrorResponse is ProjPreviewNotLive.
+func (s CreateAuthAttemptErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+}
+
+// IsRelNoDefault reports whether CreateAuthAttemptErrorResponse is RelNoDefault.
+func (s CreateAuthAttemptErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultCreateAuthAttemptErrorResponse
+}
+
+// IsRelNotDeployed reports whether CreateAuthAttemptErrorResponse is RelNotDeployed.
+func (s CreateAuthAttemptErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedCreateAuthAttemptErrorResponse
+}
+
+// IsRelNotFound reports whether CreateAuthAttemptErrorResponse is RelNotFound.
+func (s CreateAuthAttemptErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateAuthAttemptErrorResponse
+}
+
+// IsRelRevoked reports whether CreateAuthAttemptErrorResponse is RelRevoked.
+func (s CreateAuthAttemptErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
@@ -12848,6 +12421,153 @@ func (s CreateAuthAttemptErrorResponse) GetProjMismatch() (v ProjMismatch, ok bo
 func NewProjMismatchCreateAuthAttemptErrorResponse(v ProjMismatch) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetProjMismatch(v)
+	return s
+}
+
+// SetProjNotFound sets CreateAuthAttemptErrorResponse to ProjNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateAuthAttemptErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateAuthAttemptErrorResponse is ProjNotFound.
+func (s CreateAuthAttemptErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateAuthAttemptErrorResponse(v ProjNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateAuthAttemptErrorResponse to ProjOriginNotAllowed.
+func (s *CreateAuthAttemptErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateAuthAttemptErrorResponse is ProjOriginNotAllowed.
+func (s CreateAuthAttemptErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateAuthAttemptErrorResponse(v ProjOriginNotAllowed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets CreateAuthAttemptErrorResponse to ProjPreviewNotLive.
+func (s *CreateAuthAttemptErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if CreateAuthAttemptErrorResponse is ProjPreviewNotLive.
+func (s CreateAuthAttemptErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveCreateAuthAttemptErrorResponse(v ProjPreviewNotLive) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets CreateAuthAttemptErrorResponse to RelNoDefault.
+func (s *CreateAuthAttemptErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultCreateAuthAttemptErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if CreateAuthAttemptErrorResponse is RelNoDefault.
+func (s CreateAuthAttemptErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNoDefault.
+func NewRelNoDefaultCreateAuthAttemptErrorResponse(v RelNoDefault) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNoDefault(v)
+	return s
+}
+
+// SetRelNotDeployed sets CreateAuthAttemptErrorResponse to RelNotDeployed.
+func (s *CreateAuthAttemptErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedCreateAuthAttemptErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if CreateAuthAttemptErrorResponse is RelNotDeployed.
+func (s CreateAuthAttemptErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNotDeployed.
+func NewRelNotDeployedCreateAuthAttemptErrorResponse(v RelNotDeployed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets CreateAuthAttemptErrorResponse to RelNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateAuthAttemptErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateAuthAttemptErrorResponse is RelNotFound.
+func (s CreateAuthAttemptErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNotFound.
+func NewRelNotFoundCreateAuthAttemptErrorResponse(v RelNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateAuthAttemptErrorResponse to RelRevoked.
+func (s *CreateAuthAttemptErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateAuthAttemptErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateAuthAttemptErrorResponse is RelRevoked.
+func (s CreateAuthAttemptErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelRevoked.
+func NewRelRevokedCreateAuthAttemptErrorResponse(v RelRevoked) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -14513,6 +14233,7 @@ type CreateFlowErrorResponse struct {
 	ProjNotFound           ProjNotFound
 	ProjOriginNotAllowed   ProjOriginNotAllowed
 	ProjPreviewNotLive     ProjPreviewNotLive
+	RelNoDefault           RelNoDefault
 	RelNotDeployed         RelNotDeployed
 	RelNotFound            RelNotFound
 	RelRevoked             RelRevoked
@@ -14542,6 +14263,7 @@ const (
 	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
 	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultCreateFlowErrorResponse           CreateFlowErrorResponseType = "rel.no_default"
 	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
@@ -14626,6 +14348,11 @@ func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether CreateFlowErrorResponse is ProjPreviewNotLive.
 func (s CreateFlowErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveCreateFlowErrorResponse
+}
+
+// IsRelNoDefault reports whether CreateFlowErrorResponse is RelNoDefault.
+func (s CreateFlowErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultCreateFlowErrorResponse
 }
 
 // IsRelNotDeployed reports whether CreateFlowErrorResponse is RelNotDeployed.
@@ -14991,6 +14718,27 @@ func (s CreateFlowErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, 
 func NewProjPreviewNotLiveCreateFlowErrorResponse(v ProjPreviewNotLive) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets CreateFlowErrorResponse to RelNoDefault.
+func (s *CreateFlowErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultCreateFlowErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if CreateFlowErrorResponse is RelNoDefault.
+func (s CreateFlowErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNoDefault.
+func NewRelNoDefaultCreateFlowErrorResponse(v RelNoDefault) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNoDefault(v)
 	return s
 }
 
@@ -15385,6 +15133,7 @@ type CreateGrantErrorResponse struct {
 	GrantNotFound          GrantNotFound
 	GrantPermissionDenied  GrantPermissionDenied
 	GrantPrincipalNotFound GrantPrincipalNotFound
+	GrantProjectUnclaimed  GrantProjectUnclaimed
 	Internal               Internal
 	NotImplemented         NotImplemented
 	ReqInvalid             ReqInvalid
@@ -15404,6 +15153,7 @@ const (
 	GrantNotFoundCreateGrantErrorResponse          CreateGrantErrorResponseType = "grant.not_found"
 	GrantPermissionDeniedCreateGrantErrorResponse  CreateGrantErrorResponseType = "grant.permission_denied"
 	GrantPrincipalNotFoundCreateGrantErrorResponse CreateGrantErrorResponseType = "grant.principal_not_found"
+	GrantProjectUnclaimedCreateGrantErrorResponse  CreateGrantErrorResponseType = "grant.project_unclaimed"
 	InternalCreateGrantErrorResponse               CreateGrantErrorResponseType = "internal"
 	NotImplementedCreateGrantErrorResponse         CreateGrantErrorResponseType = "not_implemented"
 	ReqInvalidCreateGrantErrorResponse             CreateGrantErrorResponseType = "req.invalid"
@@ -15448,6 +15198,11 @@ func (s CreateGrantErrorResponse) IsGrantPermissionDenied() bool {
 // IsGrantPrincipalNotFound reports whether CreateGrantErrorResponse is GrantPrincipalNotFound.
 func (s CreateGrantErrorResponse) IsGrantPrincipalNotFound() bool {
 	return s.Type == GrantPrincipalNotFoundCreateGrantErrorResponse
+}
+
+// IsGrantProjectUnclaimed reports whether CreateGrantErrorResponse is GrantProjectUnclaimed.
+func (s CreateGrantErrorResponse) IsGrantProjectUnclaimed() bool {
+	return s.Type == GrantProjectUnclaimedCreateGrantErrorResponse
 }
 
 // IsInternal reports whether CreateGrantErrorResponse is Internal.
@@ -15635,6 +15390,27 @@ func (s CreateGrantErrorResponse) GetGrantPrincipalNotFound() (v GrantPrincipalN
 func NewGrantPrincipalNotFoundCreateGrantErrorResponse(v GrantPrincipalNotFound) CreateGrantErrorResponse {
 	var s CreateGrantErrorResponse
 	s.SetGrantPrincipalNotFound(v)
+	return s
+}
+
+// SetGrantProjectUnclaimed sets CreateGrantErrorResponse to GrantProjectUnclaimed.
+func (s *CreateGrantErrorResponse) SetGrantProjectUnclaimed(v GrantProjectUnclaimed) {
+	s.Type = GrantProjectUnclaimedCreateGrantErrorResponse
+	s.GrantProjectUnclaimed = v
+}
+
+// GetGrantProjectUnclaimed returns GrantProjectUnclaimed and true boolean if CreateGrantErrorResponse is GrantProjectUnclaimed.
+func (s CreateGrantErrorResponse) GetGrantProjectUnclaimed() (v GrantProjectUnclaimed, ok bool) {
+	if !s.IsGrantProjectUnclaimed() {
+		return v, false
+	}
+	return s.GrantProjectUnclaimed, true
+}
+
+// NewGrantProjectUnclaimedCreateGrantErrorResponse returns new CreateGrantErrorResponse from GrantProjectUnclaimed.
+func NewGrantProjectUnclaimedCreateGrantErrorResponse(v GrantProjectUnclaimed) CreateGrantErrorResponse {
+	var s CreateGrantErrorResponse
+	s.SetGrantProjectUnclaimed(v)
 	return s
 }
 
@@ -17052,9 +16828,8 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// The origins the project starts with. An omitted or empty list admits
-	// every origin until the first pattern is added. Loopback origins are
-	// admitted without a pattern.
+	// The origins the project starts with. An omitted or empty list admits no
+	// origin except a loopback origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// Whether the server creates a default user schema and flow for the project.
 	// CLI-managed projects set this to `false` and upload their local `.zitadel/`
@@ -17104,8 +16879,8 @@ type CreateProjectResponse struct {
 	// The secret that authenticates previewing and testing the project. Only
 	// this response returns it.
 	PreviewSecret string `json:"preview_secret"`
-	// The project's origins. An empty list admits every origin until the
-	// first pattern is added. Loopback origins are admitted without a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -21088,8 +20863,9 @@ func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 // is a snapshot of the project's configuration, and a deployment freezes the
 // project's variable values with it. Deploying and rolling back each append
 // one, so the history is the audit trail.
-// All primary origins serve the project's newest primary deployment. An origin
-// added after it serves nothing until the next deployment to `primary`. A
+// A primary origin serves the project's newest primary deployment if that
+// deployment names it, so one added later serves nothing until the next
+// deployment to `primary`. Requests with no origin get the same deployment. A
 // preview URL serves the newest deployment to it while its preview is live.
 // Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
@@ -21280,40 +21056,6 @@ func NewReleaseRevokedConflictDeploymentConflict(v ReleaseRevokedConflict) Deplo
 
 func (*DeploymentConflict) createDeploymentRes()   {}
 func (*DeploymentConflict) rollbackDeploymentRes() {}
-
-// DeploymentCreated2XX is 2XX pattern response for DeploymentCreated operation.
-type DeploymentCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *DeploymentCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *DeploymentCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*DeploymentCreated2XX) deploymentCreatedRes() {}
-
-// DeploymentCreatedDef is default response for DeploymentCreated operation.
-type DeploymentCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *DeploymentCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *DeploymentCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*DeploymentCreatedDef) deploymentCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -22087,6 +21829,44 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
+type DeploymentPreviewUrls []string
+
+// Every primary origin of the project, and every request with no `Origin`.
+// Ref: #
+type DeploymentPrimaryTarget string
+
+const (
+	DeploymentPrimaryTargetPrimary DeploymentPrimaryTarget = "primary"
+)
+
+// AllValues returns all DeploymentPrimaryTarget values.
+func (DeploymentPrimaryTarget) AllValues() []DeploymentPrimaryTarget {
+	return []DeploymentPrimaryTarget{
+		DeploymentPrimaryTargetPrimary,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentPrimaryTarget) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentPrimaryTargetPrimary:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentPrimaryTarget) UnmarshalText(data []byte) error {
+	switch DeploymentPrimaryTarget(data) {
+	case DeploymentPrimaryTargetPrimary:
+		*s = DeploymentPrimaryTargetPrimary
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Why the deployment was created: `deploy`, or `rollback` when an earlier
 // release goes live again. The rollback operation always records `rollback`;
 // `POST /deployments` may too, and then `rollback_to` is null.
@@ -22133,9 +21913,10 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 }
 
 // Whether the deployment serves its release now.
-// - `live`: at least one of its targets serves it now.
-// - `inactive`: none does, because a later deployment replaced it or its
-// previews expired or were removed.
+// - `live`: the project's newest primary deployment, or a preview deployment
+// that one of its preview URLs still serves.
+// - `inactive`: a later deployment replaced it, or its previews expired or
+// were removed.
 // Ref: #
 type DeploymentStatus string
 
@@ -22207,7 +21988,76 @@ func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
 	s.ExpiresAt = val
 }
 
-type DeploymentTargetsRequest []string
+// Where the release goes live: `primary`, every primary origin of the project,
+// or a list of preview URLs.
+// Ref: #
+// DeploymentTargetsRequest represents sum type.
+type DeploymentTargetsRequest struct {
+	Type                    DeploymentTargetsRequestType // switch on this field
+	DeploymentPrimaryTarget DeploymentPrimaryTarget
+	DeploymentPreviewUrls   DeploymentPreviewUrls
+}
+
+// DeploymentTargetsRequestType is oneOf type of DeploymentTargetsRequest.
+type DeploymentTargetsRequestType string
+
+// Possible values for DeploymentTargetsRequestType.
+const (
+	DeploymentPrimaryTargetDeploymentTargetsRequest DeploymentTargetsRequestType = "DeploymentPrimaryTarget"
+	DeploymentPreviewUrlsDeploymentTargetsRequest   DeploymentTargetsRequestType = "DeploymentPreviewUrls"
+)
+
+// IsDeploymentPrimaryTarget reports whether DeploymentTargetsRequest is DeploymentPrimaryTarget.
+func (s DeploymentTargetsRequest) IsDeploymentPrimaryTarget() bool {
+	return s.Type == DeploymentPrimaryTargetDeploymentTargetsRequest
+}
+
+// IsDeploymentPreviewUrls reports whether DeploymentTargetsRequest is DeploymentPreviewUrls.
+func (s DeploymentTargetsRequest) IsDeploymentPreviewUrls() bool {
+	return s.Type == DeploymentPreviewUrlsDeploymentTargetsRequest
+}
+
+// SetDeploymentPrimaryTarget sets DeploymentTargetsRequest to DeploymentPrimaryTarget.
+func (s *DeploymentTargetsRequest) SetDeploymentPrimaryTarget(v DeploymentPrimaryTarget) {
+	s.Type = DeploymentPrimaryTargetDeploymentTargetsRequest
+	s.DeploymentPrimaryTarget = v
+}
+
+// GetDeploymentPrimaryTarget returns DeploymentPrimaryTarget and true boolean if DeploymentTargetsRequest is DeploymentPrimaryTarget.
+func (s DeploymentTargetsRequest) GetDeploymentPrimaryTarget() (v DeploymentPrimaryTarget, ok bool) {
+	if !s.IsDeploymentPrimaryTarget() {
+		return v, false
+	}
+	return s.DeploymentPrimaryTarget, true
+}
+
+// NewDeploymentPrimaryTargetDeploymentTargetsRequest returns new DeploymentTargetsRequest from DeploymentPrimaryTarget.
+func NewDeploymentPrimaryTargetDeploymentTargetsRequest(v DeploymentPrimaryTarget) DeploymentTargetsRequest {
+	var s DeploymentTargetsRequest
+	s.SetDeploymentPrimaryTarget(v)
+	return s
+}
+
+// SetDeploymentPreviewUrls sets DeploymentTargetsRequest to DeploymentPreviewUrls.
+func (s *DeploymentTargetsRequest) SetDeploymentPreviewUrls(v DeploymentPreviewUrls) {
+	s.Type = DeploymentPreviewUrlsDeploymentTargetsRequest
+	s.DeploymentPreviewUrls = v
+}
+
+// GetDeploymentPreviewUrls returns DeploymentPreviewUrls and true boolean if DeploymentTargetsRequest is DeploymentPreviewUrls.
+func (s DeploymentTargetsRequest) GetDeploymentPreviewUrls() (v DeploymentPreviewUrls, ok bool) {
+	if !s.IsDeploymentPreviewUrls() {
+		return v, false
+	}
+	return s.DeploymentPreviewUrls, true
+}
+
+// NewDeploymentPreviewUrlsDeploymentTargetsRequest returns new DeploymentTargetsRequest from DeploymentPreviewUrls.
+func NewDeploymentPreviewUrlsDeploymentTargetsRequest(v DeploymentPreviewUrls) DeploymentTargetsRequest {
+	var s DeploymentTargetsRequest
+	s.SetDeploymentPreviewUrls(v)
+	return s
+}
 
 // The release references variables the project holds no value for.
 // Ref: #
@@ -25228,9 +25078,12 @@ type Field struct {
 	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
-	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-	// `select` from a closed `enum`. For other formats (for example uuid) the
-	// type is `text` and `validation.format` carries the rule.
+	// `date`, `date_time` come from `format`; `checkbox` from JSON
+	// `type: boolean`; `select` from a closed `enum`. For other formats (for
+	// example uuid) the type is `text` and `validation.format` carries the
+	// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+	// submitted, which a `datetime-local` input neither shows nor produces on
+	// its own.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -25357,9 +25210,12 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 
 // The input kind the client should render. Encodes the formats and
 // JSON types that map to a familiar HTML input: `email`, `url`,
-// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-// `select` from a closed `enum`. For other formats (for example uuid) the
-// type is `text` and `validation.format` carries the rule.
+// `date`, `date_time` come from `format`; `checkbox` from JSON
+// `type: boolean`; `select` from a closed `enum`. For other formats (for
+// example uuid) the type is `text` and `validation.format` carries the
+// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+// submitted, which a `datetime-local` input neither shows nor produces on
+// its own.
 type FieldType string
 
 const (
@@ -25370,6 +25226,7 @@ const (
 	FieldTypeNumber   FieldType = "number"
 	FieldTypeURL      FieldType = "url"
 	FieldTypeDate     FieldType = "date"
+	FieldTypeDateTime FieldType = "date_time"
 	FieldTypeHidden   FieldType = "hidden"
 	FieldTypeCheckbox FieldType = "checkbox"
 	FieldTypeSelect   FieldType = "select"
@@ -25385,6 +25242,7 @@ func (FieldType) AllValues() []FieldType {
 		FieldTypeNumber,
 		FieldTypeURL,
 		FieldTypeDate,
+		FieldTypeDateTime,
 		FieldTypeHidden,
 		FieldTypeCheckbox,
 		FieldTypeSelect,
@@ -25407,6 +25265,8 @@ func (s FieldType) MarshalText() ([]byte, error) {
 	case FieldTypeURL:
 		return []byte(s), nil
 	case FieldTypeDate:
+		return []byte(s), nil
+	case FieldTypeDateTime:
 		return []byte(s), nil
 	case FieldTypeHidden:
 		return []byte(s), nil
@@ -25442,6 +25302,9 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 		return nil
 	case FieldTypeDate:
 		*s = FieldTypeDate
+		return nil
+	case FieldTypeDateTime:
+		*s = FieldTypeDateTime
 		return nil
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
@@ -26724,7 +26587,7 @@ type FlowDefinition struct {
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
 	// The user schema this flow operates on, named by its `objectType`. The
-	// flow runs against the project's newest revision of that schema, so
+	// flow runs against the revision of that schema its release pins, so
 	// publishing a schema revision needs no change to the flow. A schema ID
 	// as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
 	// schema's `objectType`; reading the definition back returns the
@@ -28919,40 +28782,6 @@ func (s *FlowUnsupportedDetails) init() FlowUnsupportedDetails {
 	return m
 }
 
-// FlowdefCreated2XX is 2XX pattern response for FlowdefCreated operation.
-type FlowdefCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefCreated2XX) flowdefCreatedRes() {}
-
-// FlowdefCreatedDef is default response for FlowdefCreated operation.
-type FlowdefCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefCreatedDef) flowdefCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type FlowdefCreatedEvent struct {
@@ -29399,40 +29228,6 @@ func (s *FlowdefCreatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// FlowdefDeleted2XX is 2XX pattern response for FlowdefDeleted operation.
-type FlowdefDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefDeleted2XX) flowdefDeletedRes() {}
-
-// FlowdefDeletedDef is default response for FlowdefDeleted operation.
-type FlowdefDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefDeletedDef) flowdefDeletedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -30402,40 +30197,6 @@ func (s *FlowdefSchemaFetchFailedDetails) init() FlowdefSchemaFetchFailedDetails
 	}
 	return m
 }
-
-// FlowdefUpdated2XX is 2XX pattern response for FlowdefUpdated operation.
-type FlowdefUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefUpdated2XX) flowdefUpdatedRes() {}
-
-// FlowdefUpdatedDef is default response for FlowdefUpdated operation.
-type FlowdefUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefUpdatedDef) flowdefUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -33086,6 +32847,7 @@ type GetFlowStepErrorResponse struct {
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
 	ProjLastOwner               ProjLastOwner
+	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -33132,6 +32894,7 @@ const (
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
 	ProjLastOwnerGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_owner"
+	RelNotDeployedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "rel.not_deployed"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
@@ -33279,6 +33042,11 @@ func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 // IsProjLastOwner reports whether GetFlowStepErrorResponse is ProjLastOwner.
 func (s GetFlowStepErrorResponse) IsProjLastOwner() bool {
 	return s.Type == ProjLastOwnerGetFlowStepErrorResponse
+}
+
+// IsRelNotDeployed reports whether GetFlowStepErrorResponse is RelNotDeployed.
+func (s GetFlowStepErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedGetFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
@@ -33908,6 +33676,27 @@ func NewProjLastOwnerGetFlowStepErrorResponse(v ProjLastOwner) GetFlowStepErrorR
 	return s
 }
 
+// SetRelNotDeployed sets GetFlowStepErrorResponse to RelNotDeployed.
+func (s *GetFlowStepErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedGetFlowStepErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if GetFlowStepErrorResponse is RelNotDeployed.
+func (s GetFlowStepErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelNotDeployed.
+func NewRelNotDeployedGetFlowStepErrorResponse(v RelNotDeployed) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
 // SetRelNotFound sets GetFlowStepErrorResponse to RelNotFound.
 func (s *GetFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
 	s.Type = RelNotFoundGetFlowStepErrorResponse
@@ -34205,7 +33994,6 @@ type GetGrantErrorResponse struct {
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
-	TeamPermissionDenied  TeamPermissionDenied
 	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
@@ -34221,7 +34009,6 @@ const (
 	InternalGetGrantErrorResponse              GetGrantErrorResponseType = "internal"
 	NotImplementedGetGrantErrorResponse        GetGrantErrorResponseType = "not_implemented"
 	ReqInvalidGetGrantErrorResponse            GetGrantErrorResponseType = "req.invalid"
-	TeamPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "team.permission_denied"
 	UnavailableGetGrantErrorResponse           GetGrantErrorResponseType = "unavailable"
 	UserPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "user.permission_denied"
 )
@@ -34251,11 +34038,6 @@ func (s GetGrantErrorResponse) IsNotImplemented() bool {
 
 // IsReqInvalid reports whether GetGrantErrorResponse is ReqInvalid.
 func (s GetGrantErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetGrantErrorResponse }
-
-// IsTeamPermissionDenied reports whether GetGrantErrorResponse is TeamPermissionDenied.
-func (s GetGrantErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedGetGrantErrorResponse
-}
 
 // IsUnavailable reports whether GetGrantErrorResponse is Unavailable.
 func (s GetGrantErrorResponse) IsUnavailable() bool {
@@ -34390,27 +34172,6 @@ func (s GetGrantErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetGrantErrorResponse(v ReqInvalid) GetGrantErrorResponse {
 	var s GetGrantErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets GetGrantErrorResponse to TeamPermissionDenied.
-func (s *GetGrantErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedGetGrantErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if GetGrantErrorResponse is TeamPermissionDenied.
-func (s GetGrantErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedGetGrantErrorResponse returns new GetGrantErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedGetGrantErrorResponse(v TeamPermissionDenied) GetGrantErrorResponse {
-	var s GetGrantErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
@@ -39205,11 +38966,14 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 // `status`, `created_at`, and `updated_at` on `team`. The id (`user_id` /
 // `team_id`) is always present. If the user or team cannot be loaded, the
 // object stays id-only — the same shape as not expanding.
-// Expanding requires `user.read` and `team.read` in addition to
-// `project.read` for project secrets. Both are checked once for the whole
-// request. If the caller lacks either, the request is `403`, and the extras
-// are not omitted silently. A user-bound console session that already passed
-// the project check may expand without those scopes.
+// Expanding requires read on the whole of the principal's home project (the
+// platform project when the server has one), checked once per home project.
+// A project secret of another project never has it, and a session has it
+// only with a grant that covers the whole of that project. A caller without
+// it gets 403 `user.permission_denied`; extras
+// are never omitted silently. Without `expand`, every caller who may read
+// the grants sees `user_id`, `identifier` and `display`, or the team's
+// `name`.
 // Ref: #
 type GrantExpand string
 
@@ -39553,6 +39317,59 @@ func (s *GrantPrincipalNotFound) SetDetails(val OptGrantPrincipalNotFoundDetails
 type GrantPrincipalNotFoundDetails map[string]jx.Raw
 
 func (s *GrantPrincipalNotFoundDetails) init() GrantPrincipalNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type GrantProjectUnclaimed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptGrantProjectUnclaimedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *GrantProjectUnclaimed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *GrantProjectUnclaimed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *GrantProjectUnclaimed) GetDetails() OptGrantProjectUnclaimedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *GrantProjectUnclaimed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *GrantProjectUnclaimed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *GrantProjectUnclaimed) SetDetails(val OptGrantProjectUnclaimedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type GrantProjectUnclaimedDetails map[string]jx.Raw
+
+func (s *GrantProjectUnclaimedDetails) init() GrantProjectUnclaimedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -40490,40 +40307,6 @@ func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedCla
 	return s
 }
 
-// IdpCreated2XX is 2XX pattern response for IdpCreated operation.
-type IdpCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpCreated2XX) idpCreatedRes() {}
-
-// IdpCreatedDef is default response for IdpCreated operation.
-type IdpCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpCreatedDef) idpCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type IdpCreatedEvent struct {
@@ -41175,40 +40958,6 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// IdpIdentityLinkCreated2XX is 2XX pattern response for IdpIdentityLinkCreated operation.
-type IdpIdentityLinkCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpIdentityLinkCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpIdentityLinkCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpIdentityLinkCreated2XX) idpIdentityLinkCreatedRes() {}
-
-// IdpIdentityLinkCreatedDef is default response for IdpIdentityLinkCreated operation.
-type IdpIdentityLinkCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpIdentityLinkCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpIdentityLinkCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpIdentityLinkCreatedDef) idpIdentityLinkCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -42142,40 +41891,6 @@ func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
 	}
 	return m
 }
-
-// IdpUpdated2XX is 2XX pattern response for IdpUpdated operation.
-type IdpUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpUpdated2XX) idpUpdatedRes() {}
-
-// IdpUpdatedDef is default response for IdpUpdated operation.
-type IdpUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpUpdatedDef) idpUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -54699,6 +54414,52 @@ func (o OptGrantPrincipalNotFoundDetails) Or(d GrantPrincipalNotFoundDetails) Gr
 	return d
 }
 
+// NewOptGrantProjectUnclaimedDetails returns new OptGrantProjectUnclaimedDetails with value set to v.
+func NewOptGrantProjectUnclaimedDetails(v GrantProjectUnclaimedDetails) OptGrantProjectUnclaimedDetails {
+	return OptGrantProjectUnclaimedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGrantProjectUnclaimedDetails is optional GrantProjectUnclaimedDetails.
+type OptGrantProjectUnclaimedDetails struct {
+	Value GrantProjectUnclaimedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptGrantProjectUnclaimedDetails was set.
+func (o OptGrantProjectUnclaimedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGrantProjectUnclaimedDetails) Reset() {
+	var v GrantProjectUnclaimedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGrantProjectUnclaimedDetails) SetTo(v GrantProjectUnclaimedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGrantProjectUnclaimedDetails) Get() (v GrantProjectUnclaimedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGrantProjectUnclaimedDetails) Or(d GrantProjectUnclaimedDetails) GrantProjectUnclaimedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptGrantTeam returns new OptGrantTeam with value set to v.
 func NewOptGrantTeam(v GrantTeam) OptGrantTeam {
 	return OptGrantTeam{
@@ -62067,6 +61828,52 @@ func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
 	return d
 }
 
+// NewOptRelNoDefaultDetails returns new OptRelNoDefaultDetails with value set to v.
+func NewOptRelNoDefaultDetails(v RelNoDefaultDetails) OptRelNoDefaultDetails {
+	return OptRelNoDefaultDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelNoDefaultDetails is optional RelNoDefaultDetails.
+type OptRelNoDefaultDetails struct {
+	Value RelNoDefaultDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelNoDefaultDetails was set.
+func (o OptRelNoDefaultDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelNoDefaultDetails) Reset() {
+	var v RelNoDefaultDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelNoDefaultDetails) SetTo(v RelNoDefaultDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelNoDefaultDetails) Get() (v RelNoDefaultDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelNoDefaultDetails) Or(d RelNoDefaultDetails) RelNoDefaultDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelNotDeployedDetails returns new OptRelNotDeployedDetails with value set to v.
 func NewOptRelNotDeployedDetails(v RelNotDeployedDetails) OptRelNotDeployedDetails {
 	return OptRelNotDeployedDetails{
@@ -63855,6 +63662,52 @@ func (o OptSessionProofToken) Get() (v SessionProofToken, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessionProofToken) Or(d SessionProofToken) SessionProofToken {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSortDirection returns new OptSortDirection with value set to v.
+func NewOptSortDirection(v SortDirection) OptSortDirection {
+	return OptSortDirection{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSortDirection is optional SortDirection.
+type OptSortDirection struct {
+	Value SortDirection
+	Set   bool
+}
+
+// IsSet returns true if OptSortDirection was set.
+func (o OptSortDirection) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSortDirection) Reset() {
+	var v SortDirection
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSortDirection) SetTo(v SortDirection) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSortDirection) Get() (v SortDirection, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSortDirection) Or(d SortDirection) SortDirection {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -66301,40 +66154,6 @@ func (o OptVariableSetPayloadKind) Or(d VariableSetPayloadKind) VariableSetPaylo
 
 type Origin string
 
-// OriginAdded2XX is 2XX pattern response for OriginAdded operation.
-type OriginAdded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginAdded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginAdded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginAdded2XX) originAddedRes() {}
-
-// OriginAddedDef is default response for OriginAdded operation.
-type OriginAddedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginAddedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginAddedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginAddedDef) originAddedRes() {}
-
 // Merged schema.
 // Ref: #
 type OriginAddedEvent struct {
@@ -67114,40 +66933,6 @@ func (s *OriginPrimaryNotExactDetails) init() OriginPrimaryNotExactDetails {
 	}
 	return m
 }
-
-// OriginRemoved2XX is 2XX pattern response for OriginRemoved operation.
-type OriginRemoved2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginRemoved2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginRemoved2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginRemoved2XX) originRemovedRes() {}
-
-// OriginRemovedDef is default response for OriginRemoved operation.
-type OriginRemovedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginRemovedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginRemovedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginRemovedDef) originRemovedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -69967,6 +69752,12 @@ type PatchUserRequest struct {
 	// current schema. The schema must already be registered and be a revision
 	// of the user's current schema.
 	Schema OptString `json:"schema"`
+	// Set to `true` to check the patch without applying it. The response is
+	// what the real request would answer now; a `200` holds the user as the
+	// patch would leave them, with `metadata.updated_at` unchanged. Leave it
+	// out to apply the patch. A server from before this field refuses the
+	// request with `400` and changes nothing.
+	DryRun OptBool `json:"dry_run"`
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.
 	Attributes OptPatchUserRequestAttributes `json:"attributes"`
@@ -69977,6 +69768,11 @@ func (s *PatchUserRequest) GetSchema() OptString {
 	return s.Schema
 }
 
+// GetDryRun returns the value of DryRun.
+func (s *PatchUserRequest) GetDryRun() OptBool {
+	return s.DryRun
+}
+
 // GetAttributes returns the value of Attributes.
 func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
 	return s.Attributes
@@ -69985,6 +69781,11 @@ func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
 // SetSchema sets the value of Schema.
 func (s *PatchUserRequest) SetSchema(val OptString) {
 	s.Schema = val
+}
+
+// SetDryRun sets the value of DryRun.
+func (s *PatchUserRequest) SetDryRun(val OptBool) {
+	s.DryRun = val
 }
 
 // SetAttributes sets the value of Attributes.
@@ -70262,40 +70063,6 @@ func NewPasswordSetPolicyPolicy(v PasswordSetPolicy) Policy {
 func (*Policy) getPolicyRes()         {}
 func (*Policy) getPolicyRevisionRes() {}
 func (*Policy) publishPolicyRes()     {}
-
-// PolicyCreated2XX is 2XX pattern response for PolicyCreated operation.
-type PolicyCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyCreated2XX) policyCreatedRes() {}
-
-// PolicyCreatedDef is default response for PolicyCreated operation.
-type PolicyCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyCreatedDef) policyCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -70840,40 +70607,6 @@ func (s *PolicyPayloadConfig) init() PolicyPayloadConfig {
 
 type PolicyRevisionID string
 
-// PolicyUpdated2XX is 2XX pattern response for PolicyUpdated operation.
-type PolicyUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyUpdated2XX) policyUpdatedRes() {}
-
-// PolicyUpdatedDef is default response for PolicyUpdated operation.
-type PolicyUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyUpdatedDef) policyUpdatedRes() {}
-
 // Merged schema.
 // Ref: #
 type PolicyUpdatedEvent struct {
@@ -71368,40 +71101,6 @@ func (s *Preview) SetExpiresAt(val time.Time) {
 func (s *Preview) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
-
-// PreviewRemoved2XX is 2XX pattern response for PreviewRemoved operation.
-type PreviewRemoved2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PreviewRemoved2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PreviewRemoved2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PreviewRemoved2XX) previewRemovedRes() {}
-
-// PreviewRemovedDef is default response for PreviewRemoved operation.
-type PreviewRemovedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PreviewRemovedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PreviewRemovedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PreviewRemovedDef) previewRemovedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -72741,40 +72440,6 @@ func NewProjectAdminGrantSourceProjectAdminSource(v ProjectAdminGrantSource) Pro
 	return s
 }
 
-// ProjectCreated2XX is 2XX pattern response for ProjectCreated operation.
-type ProjectCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectCreated2XX) projectCreatedRes() {}
-
-// ProjectCreatedDef is default response for ProjectCreated operation.
-type ProjectCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectCreatedDef) projectCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type ProjectCreatedEvent struct {
@@ -73221,40 +72886,6 @@ func (s *ProjectCreatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// ProjectDeleted2XX is 2XX pattern response for ProjectDeleted operation.
-type ProjectDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectDeleted2XX) projectDeletedRes() {}
-
-// ProjectDeletedDef is default response for ProjectDeleted operation.
-type ProjectDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectDeletedDef) projectDeletedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -73710,8 +73341,8 @@ type ProjectDetailResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list admits every origin until the
-	// first pattern is added. Loopback origins are admitted without a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -73810,8 +73441,11 @@ type ProjectID string
 // preview deploy may register. It may include at most one `*` inside a single
 // host label; `*` matches one or more characters, none of them a dot. A
 // literal beats a wildcard. Unknown hosts are accepted as written.
-// An empty list admits every origin until the first pattern is added.
-// Loopback origins are admitted without a pattern.
+// An empty list admits no origin except a loopback origin, which is admitted
+// without a pattern.
+// A loopback origin is on the local machine: `localhost`, a name under
+// `.localhost`, or a loopback IP such as `127.0.0.1` or `[::1]`, on any port
+// and over `http` or `https`. It is never a preview URL.
 // Ref: #
 type ProjectOrigin struct {
 	// The origin pattern: an exact origin for `primary`, or an origin with at
@@ -73934,8 +73568,8 @@ type ProjectResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list admits every origin until the
-	// first pattern is added. Loopback origins are admitted without a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -74005,40 +73639,6 @@ func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
 func (s *ProjectResponse) SetPasswordHash(val OptNilPasswordHashPolicy) {
 	s.PasswordHash = val
 }
-
-// ProjectUpdated2XX is 2XX pattern response for ProjectUpdated operation.
-type ProjectUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectUpdated2XX) projectUpdatedRes() {}
-
-// ProjectUpdatedDef is default response for ProjectUpdated operation.
-type ProjectUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectUpdatedDef) projectUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -74867,7 +74467,6 @@ type QueryGrantsErrorResponse struct {
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
-	TeamPermissionDenied  TeamPermissionDenied
 	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
@@ -74885,7 +74484,6 @@ const (
 	InternalQueryGrantsErrorResponse              QueryGrantsErrorResponseType = "internal"
 	NotImplementedQueryGrantsErrorResponse        QueryGrantsErrorResponseType = "not_implemented"
 	ReqInvalidQueryGrantsErrorResponse            QueryGrantsErrorResponseType = "req.invalid"
-	TeamPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "team.permission_denied"
 	UnavailableQueryGrantsErrorResponse           QueryGrantsErrorResponseType = "unavailable"
 	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
 )
@@ -74928,11 +74526,6 @@ func (s QueryGrantsErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether QueryGrantsErrorResponse is ReqInvalid.
 func (s QueryGrantsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryGrantsErrorResponse
-}
-
-// IsTeamPermissionDenied reports whether QueryGrantsErrorResponse is TeamPermissionDenied.
-func (s QueryGrantsErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedQueryGrantsErrorResponse
 }
 
 // IsUnavailable reports whether QueryGrantsErrorResponse is Unavailable.
@@ -75110,27 +74703,6 @@ func (s QueryGrantsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryGrantsErrorResponse(v ReqInvalid) QueryGrantsErrorResponse {
 	var s QueryGrantsErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets QueryGrantsErrorResponse to TeamPermissionDenied.
-func (s *QueryGrantsErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if QueryGrantsErrorResponse is TeamPermissionDenied.
-func (s QueryGrantsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedQueryGrantsErrorResponse(v TeamPermissionDenied) QueryGrantsErrorResponse {
-	var s QueryGrantsErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
@@ -77656,6 +77228,59 @@ func (s *RelInvalidDetails) init() RelInvalidDetails {
 
 // Merged schema.
 // Ref: #
+type RelNoDefault struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelNoDefaultDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelNoDefault) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelNoDefault) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelNoDefault) GetDetails() OptRelNoDefaultDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelNoDefault) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelNoDefault) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelNoDefault) SetDetails(val OptRelNoDefaultDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelNoDefaultDetails map[string]jx.Raw
+
+func (s *RelNoDefaultDetails) init() RelNoDefaultDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type RelNotDeployed struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -78176,40 +77801,6 @@ func (*Release) revokeReleaseRes()  {}
 
 type ReleaseContentHash string
 
-// ReleaseCreated2XX is 2XX pattern response for ReleaseCreated operation.
-type ReleaseCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseCreated2XX) releaseCreatedRes() {}
-
-// ReleaseCreatedDef is default response for ReleaseCreated operation.
-type ReleaseCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseCreatedDef) releaseCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type ReleaseCreatedEvent struct {
@@ -78659,7 +78250,7 @@ func (s *ReleaseCreatedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Payload for `release.created`. The release ID is the event's `entity_id`.
 // The payload repeats the pinned set, the revisions the
-// [release](/docs/concepts/repo-config) freezes, so the event stream shows
+// [release](https://preview.zitadel.com/docs/concepts/repo-config) freezes, so the event stream shows
 // what a release contained without reading the release itself.
 // Ref: #
 type ReleaseCreatedPayload struct {
@@ -79029,23 +78620,6 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 	}
 }
 
-// ReleaseRevoked2XX is 2XX pattern response for ReleaseRevoked operation.
-type ReleaseRevoked2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseRevoked2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseRevoked2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseRevoked2XX) releaseRevokedRes() {}
-
 // The release is revoked and cannot be deployed.
 // Ref: #
 type ReleaseRevokedConflict struct {
@@ -79073,23 +78647,6 @@ func (s *ReleaseRevokedConflict) SetCode(val string) {
 func (s *ReleaseRevokedConflict) SetMessage(val string) {
 	s.Message = val
 }
-
-// ReleaseRevokedDef is default response for ReleaseRevoked operation.
-type ReleaseRevokedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseRevokedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseRevokedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseRevokedDef) releaseRevokedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -79540,7 +79097,7 @@ func (s *ReleaseRevokedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Payload for `release.revoked`. The release ID is the event's `entity_id`.
 // The payload repeats the content hash, which is how the CLI prints a
-// [release](/docs/concepts/repo-config) and how builds pin it.
+// [release](https://preview.zitadel.com/docs/concepts/repo-config) and how builds pin it.
 // Ref: #
 type ReleaseRevokedPayload struct {
 	ContentHash ReleaseContentHash `json:"content_hash"`
@@ -80946,40 +80503,6 @@ func (s *RequestAPIPayloadMethod) UnmarshalText(data []byte) error {
 	}
 }
 
-// RequestApi2XX is 2XX pattern response for RequestApi operation.
-type RequestApi2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *RequestApi2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *RequestApi2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*RequestApi2XX) requestApiRes() {}
-
-// RequestApiDef is default response for RequestApi operation.
-type RequestApiDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *RequestApiDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *RequestApiDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*RequestApiDef) requestApiRes() {}
-
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
 	Type                RevokeMySessionErrorResponseType // switch on this field
@@ -82002,25 +81525,24 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
-	Type                 RollbackDeploymentErrorResponseType // switch on this field
-	AuthCsrfInvalid      AuthCsrfInvalid
-	AuthUnauthorized     AuthUnauthorized
-	DepConflict          DepConflict
-	DepInvalid           DepInvalid
-	DepNotFound          DepNotFound
-	DepPermissionDenied  DepPermissionDenied
-	DepVariablesMissing  DepVariablesMissing
-	EnvProjectNotFound   EnvProjectNotFound
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	NotImplemented       NotImplemented
-	ProjNotFound         ProjNotFound
-	ProjOriginNotAllowed ProjOriginNotAllowed
-	RelNotFound          RelNotFound
-	RelRevoked           RelRevoked
-	ReqInvalid           ReqInvalid
-	Unavailable          Unavailable
-	VarDocumentTooDeep   VarDocumentTooDeep
+	Type                RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	DepVariablesMissing DepVariablesMissing
+	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+	VarDocumentTooDeep  VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -82028,24 +81550,23 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	DepVariablesMissingRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.variables_missing"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "proj.not_found"
-	ProjOriginNotAllowedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "proj.origin_not_allowed"
-	RelNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
-	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
-	VarDocumentTooDeepRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.document_too_deep"
+	AuthCsrfInvalidRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_missing"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
+	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -82106,11 +81627,6 @@ func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
 func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
-}
-
-// IsProjOriginNotAllowed reports whether RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
-	return s.Type == ProjOriginNotAllowedRollbackDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
@@ -82387,27 +81903,6 @@ func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok b
 func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetProjNotFound(v)
-	return s
-}
-
-// SetProjOriginNotAllowed sets RollbackDeploymentErrorResponse to ProjOriginNotAllowed.
-func (s *RollbackDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
-	s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
-	s.ProjOriginNotAllowed = v
-}
-
-// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
-	if !s.IsProjOriginNotAllowed() {
-		return v, false
-	}
-	return s.ProjOriginNotAllowed, true
-}
-
-// NewProjOriginNotAllowedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjOriginNotAllowed.
-func NewProjOriginNotAllowedRollbackDeploymentErrorResponse(v ProjOriginNotAllowed) RollbackDeploymentErrorResponse {
-	var s RollbackDeploymentErrorResponse
-	s.SetProjOriginNotAllowed(v)
 	return s
 }
 
@@ -83230,40 +82725,6 @@ func (s *Schema) SetMetadata(val SchemaMetadata) {
 }
 
 func (*Schema) getSchemaByIdRes() {}
-
-// SchemaCreated2XX is 2XX pattern response for SchemaCreated operation.
-type SchemaCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SchemaCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SchemaCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SchemaCreated2XX) schemaCreatedRes() {}
-
-// SchemaCreatedDef is default response for SchemaCreated operation.
-type SchemaCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SchemaCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SchemaCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SchemaCreatedDef) schemaCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -84439,40 +83900,6 @@ func (s *SessionCookie) SetRoles(val []string) {
 	s.Roles = val
 }
 
-// SessionDeleted2XX is 2XX pattern response for SessionDeleted operation.
-type SessionDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionDeleted2XX) sessionDeletedRes() {}
-
-// SessionDeletedDef is default response for SessionDeleted operation.
-type SessionDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionDeletedDef) sessionDeletedRes() {}
-
 // Merged schema.
 // Ref: #
 type SessionDeletedEvent struct {
@@ -84935,40 +84362,6 @@ func (s *SessionDeletedPayload) GetReason() OptString {
 func (s *SessionDeletedPayload) SetReason(val OptString) {
 	s.Reason = val
 }
-
-// SessionEstablished2XX is 2XX pattern response for SessionEstablished operation.
-type SessionEstablished2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionEstablished2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionEstablished2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionEstablished2XX) sessionEstablishedRes() {}
-
-// SessionEstablishedDef is default response for SessionEstablished operation.
-type SessionEstablishedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionEstablishedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionEstablishedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionEstablishedDef) sessionEstablishedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -85920,6 +85313,13 @@ type SetUserPasswordErrorResponse struct {
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
 	NotImplemented              NotImplemented
+	ProjNotFound                ProjNotFound
+	ProjOriginNotAllowed        ProjOriginNotAllowed
+	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNoDefault                RelNoDefault
+	RelNotDeployed              RelNotDeployed
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	Unavailable                 Unavailable
 	UserConflict                UserConflict
@@ -85940,6 +85340,13 @@ const (
 	EvtInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "evt.invalid"
 	InternalSetUserPasswordErrorResponse                    SetUserPasswordErrorResponseType = "internal"
 	NotImplementedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "not_implemented"
+	ProjNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "rel.no_default"
+	RelNotDeployedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "rel.not_deployed"
+	RelNotFoundSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "rel.not_found"
+	RelRevokedSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "rel.revoked"
 	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
 	UnavailableSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "unavailable"
 	UserConflictSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.conflict"
@@ -85969,6 +85376,41 @@ func (s SetUserPasswordErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether SetUserPasswordErrorResponse is NotImplemented.
 func (s SetUserPasswordErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSetUserPasswordErrorResponse
+}
+
+// IsProjNotFound reports whether SetUserPasswordErrorResponse is ProjNotFound.
+func (s SetUserPasswordErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundSetUserPasswordErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether SetUserPasswordErrorResponse is ProjOriginNotAllowed.
+func (s SetUserPasswordErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedSetUserPasswordErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether SetUserPasswordErrorResponse is ProjPreviewNotLive.
+func (s SetUserPasswordErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveSetUserPasswordErrorResponse
+}
+
+// IsRelNoDefault reports whether SetUserPasswordErrorResponse is RelNoDefault.
+func (s SetUserPasswordErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultSetUserPasswordErrorResponse
+}
+
+// IsRelNotDeployed reports whether SetUserPasswordErrorResponse is RelNotDeployed.
+func (s SetUserPasswordErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedSetUserPasswordErrorResponse
+}
+
+// IsRelNotFound reports whether SetUserPasswordErrorResponse is RelNotFound.
+func (s SetUserPasswordErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundSetUserPasswordErrorResponse
+}
+
+// IsRelRevoked reports whether SetUserPasswordErrorResponse is RelRevoked.
+func (s SetUserPasswordErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedSetUserPasswordErrorResponse
 }
 
 // IsReqInvalid reports whether SetUserPasswordErrorResponse is ReqInvalid.
@@ -86097,6 +85539,153 @@ func (s SetUserPasswordErrorResponse) GetNotImplemented() (v NotImplemented, ok 
 func NewNotImplementedSetUserPasswordErrorResponse(v NotImplemented) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets SetUserPasswordErrorResponse to ProjNotFound.
+func (s *SetUserPasswordErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundSetUserPasswordErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if SetUserPasswordErrorResponse is ProjNotFound.
+func (s SetUserPasswordErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjNotFound.
+func NewProjNotFoundSetUserPasswordErrorResponse(v ProjNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets SetUserPasswordErrorResponse to ProjOriginNotAllowed.
+func (s *SetUserPasswordErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedSetUserPasswordErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if SetUserPasswordErrorResponse is ProjOriginNotAllowed.
+func (s SetUserPasswordErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedSetUserPasswordErrorResponse(v ProjOriginNotAllowed) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets SetUserPasswordErrorResponse to ProjPreviewNotLive.
+func (s *SetUserPasswordErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveSetUserPasswordErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if SetUserPasswordErrorResponse is ProjPreviewNotLive.
+func (s SetUserPasswordErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveSetUserPasswordErrorResponse(v ProjPreviewNotLive) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets SetUserPasswordErrorResponse to RelNoDefault.
+func (s *SetUserPasswordErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultSetUserPasswordErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if SetUserPasswordErrorResponse is RelNoDefault.
+func (s SetUserPasswordErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNoDefault.
+func NewRelNoDefaultSetUserPasswordErrorResponse(v RelNoDefault) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNoDefault(v)
+	return s
+}
+
+// SetRelNotDeployed sets SetUserPasswordErrorResponse to RelNotDeployed.
+func (s *SetUserPasswordErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedSetUserPasswordErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if SetUserPasswordErrorResponse is RelNotDeployed.
+func (s SetUserPasswordErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNotDeployed.
+func NewRelNotDeployedSetUserPasswordErrorResponse(v RelNotDeployed) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets SetUserPasswordErrorResponse to RelNotFound.
+func (s *SetUserPasswordErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundSetUserPasswordErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if SetUserPasswordErrorResponse is RelNotFound.
+func (s SetUserPasswordErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNotFound.
+func NewRelNotFoundSetUserPasswordErrorResponse(v RelNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets SetUserPasswordErrorResponse to RelRevoked.
+func (s *SetUserPasswordErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedSetUserPasswordErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if SetUserPasswordErrorResponse is RelRevoked.
+func (s SetUserPasswordErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelRevoked.
+func NewRelRevokedSetUserPasswordErrorResponse(v RelRevoked) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -86594,6 +86183,7 @@ type SubmitFlowStepErrorResponse struct {
 	ProjLastOwner               ProjLastOwner
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -86642,6 +86232,7 @@ const (
 	ProjLastOwnerSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_owner"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
+	RelNotDeployedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "rel.not_deployed"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
@@ -86799,6 +86390,11 @@ func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether SubmitFlowStepErrorResponse is ProjPreviewNotLive.
 func (s SubmitFlowStepErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveSubmitFlowStepErrorResponse
+}
+
+// IsRelNotDeployed reports whether SubmitFlowStepErrorResponse is RelNotDeployed.
+func (s SubmitFlowStepErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedSubmitFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether SubmitFlowStepErrorResponse is RelNotFound.
@@ -87470,6 +87066,27 @@ func NewProjPreviewNotLiveSubmitFlowStepErrorResponse(v ProjPreviewNotLive) Subm
 	return s
 }
 
+// SetRelNotDeployed sets SubmitFlowStepErrorResponse to RelNotDeployed.
+func (s *SubmitFlowStepErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedSubmitFlowStepErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if SubmitFlowStepErrorResponse is RelNotDeployed.
+func (s SubmitFlowStepErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelNotDeployed.
+func NewRelNotDeployedSubmitFlowStepErrorResponse(v RelNotDeployed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
 // SetRelNotFound sets SubmitFlowStepErrorResponse to RelNotFound.
 func (s *SubmitFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
 	s.Type = RelNotFoundSubmitFlowStepErrorResponse
@@ -87806,40 +87423,6 @@ func (s *TeamAlreadyExistsDetails) init() TeamAlreadyExistsDetails {
 	}
 	return m
 }
-
-// TeamCreated2XX is 2XX pattern response for TeamCreated operation.
-type TeamCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamCreated2XX) teamCreatedRes() {}
-
-// TeamCreatedDef is default response for TeamCreated operation.
-type TeamCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamCreatedDef) teamCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -88287,40 +87870,6 @@ func (s *TeamCreatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// TeamDeactivated2XX is 2XX pattern response for TeamDeactivated operation.
-type TeamDeactivated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamDeactivated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamDeactivated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamDeactivated2XX) teamDeactivatedRes() {}
-
-// TeamDeactivatedDef is default response for TeamDeactivated operation.
-type TeamDeactivatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamDeactivatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamDeactivatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamDeactivatedDef) teamDeactivatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -89282,40 +88831,6 @@ func (s *TeamTeamNotFoundDetails) init() TeamTeamNotFoundDetails {
 	}
 	return m
 }
-
-// TeamUpdated2XX is 2XX pattern response for TeamUpdated operation.
-type TeamUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamUpdated2XX) teamUpdatedRes() {}
-
-// TeamUpdatedDef is default response for TeamUpdated operation.
-type TeamUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamUpdatedDef) teamUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -91139,40 +90654,6 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 	return m
 }
 
-// UserCreateFailed2XX is 2XX pattern response for UserCreateFailed operation.
-type UserCreateFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreateFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreateFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreateFailed2XX) userCreateFailedRes() {}
-
-// UserCreateFailedDef is default response for UserCreateFailed operation.
-type UserCreateFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreateFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreateFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreateFailedDef) userCreateFailedRes() {}
-
 // Merged schema.
 // Ref: #
 type UserCreateFailedEvent struct {
@@ -91636,40 +91117,6 @@ func (s *UserCreateFailedPayload) GetKeyName() OptString {
 func (s *UserCreateFailedPayload) SetKeyName(val OptString) {
 	s.KeyName = val
 }
-
-// UserCreated2XX is 2XX pattern response for UserCreated operation.
-type UserCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreated2XX) userCreatedRes() {}
-
-// UserCreatedDef is default response for UserCreated operation.
-type UserCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreatedDef) userCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -92167,40 +91614,6 @@ func (s *UserCreatedPayloadAttributes) init() UserCreatedPayloadAttributes {
 	}
 	return m
 }
-
-// UserDeleted2XX is 2XX pattern response for UserDeleted operation.
-type UserDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserDeleted2XX) userDeletedRes() {}
-
-// UserDeletedDef is default response for UserDeleted operation.
-type UserDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserDeletedDef) userDeletedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -93415,9 +92828,13 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // The meta-schema that one property of a user schema is validated against.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
-// are accepted without being listed below. `writeOnly: true` is reserved for a
+// are accepted without being listed below. Any other key is refused, unless it
+// is one of the annotations listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
+// `format` is enforced on user writes for the standard JSON Schema names, such
+// as `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as
+// `phone`, is only an annotation; use `pattern` to enforce one.
 // Ref: #
 type UserProperty struct {
 	// The scope in which this property's value must be unique, if applicable. `unspecified` enforces no
@@ -93959,40 +93376,6 @@ func (s *UserTeamMembershipStatus) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// UserUpdated2XX is 2XX pattern response for UserUpdated operation.
-type UserUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserUpdated2XX) userUpdatedRes() {}
-
-// UserUpdatedDef is default response for UserUpdated operation.
-type UserUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserUpdatedDef) userUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -95105,40 +94488,6 @@ func (s *VariableKind) UnmarshalText(data []byte) error {
 
 type VariableName string
 
-// VariableRemoved2XX is 2XX pattern response for VariableRemoved operation.
-type VariableRemoved2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableRemoved2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableRemoved2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableRemoved2XX) variableRemovedRes() {}
-
-// VariableRemovedDef is default response for VariableRemoved operation.
-type VariableRemovedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableRemovedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableRemovedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableRemovedDef) variableRemovedRes() {}
-
 // Merged schema.
 // Ref: #
 type VariableRemovedEvent struct {
@@ -95739,40 +95088,6 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	s.SetBool(v)
 	return s
 }
-
-// VariableSet2XX is 2XX pattern response for VariableSet operation.
-type VariableSet2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableSet2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableSet2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableSet2XX) variableSetRes() {}
-
-// VariableSetDef is default response for VariableSet operation.
-type VariableSetDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableSetDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableSetDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableSetDef) variableSetRes() {}
 
 // Merged schema.
 // Ref: #
@@ -97008,3 +96323,123 @@ func NewPasskeyProofVerifyChallengeRequestSum(v PasskeyProof) VerifyChallengeReq
 	s.SetPasskeyProof(v)
 	return s
 }
+
+// Ref: #
+type WebhookDelivered struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *WebhookDelivered) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *WebhookDelivered) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*WebhookDelivered) authAttemptCreatedRes()         {}
+func (*WebhookDelivered) authAttemptHandedOffRes()       {}
+func (*WebhookDelivered) authCheckFailedRes()            {}
+func (*WebhookDelivered) authCheckSucceededRes()         {}
+func (*WebhookDelivered) authFactorPasskeyEnrolledRes()  {}
+func (*WebhookDelivered) authFactorPasswordSetRes()      {}
+func (*WebhookDelivered) authSsoAuthorizationFailedRes() {}
+func (*WebhookDelivered) authSsoExchangeFailedRes()      {}
+func (*WebhookDelivered) authSsoExchangeSucceededRes()   {}
+func (*WebhookDelivered) authTokenIssuedRes()            {}
+func (*WebhookDelivered) authTokenRevokedRes()           {}
+func (*WebhookDelivered) authzGrantedRes()               {}
+func (*WebhookDelivered) authzRevokedRes()               {}
+func (*WebhookDelivered) brandingCreatedRes()            {}
+func (*WebhookDelivered) deploymentCreatedRes()          {}
+func (*WebhookDelivered) flowdefCreatedRes()             {}
+func (*WebhookDelivered) flowdefDeletedRes()             {}
+func (*WebhookDelivered) flowdefUpdatedRes()             {}
+func (*WebhookDelivered) idpCreatedRes()                 {}
+func (*WebhookDelivered) idpIdentityLinkCreatedRes()     {}
+func (*WebhookDelivered) idpUpdatedRes()                 {}
+func (*WebhookDelivered) originAddedRes()                {}
+func (*WebhookDelivered) originRemovedRes()              {}
+func (*WebhookDelivered) policyCreatedRes()              {}
+func (*WebhookDelivered) policyUpdatedRes()              {}
+func (*WebhookDelivered) previewRemovedRes()             {}
+func (*WebhookDelivered) projectCreatedRes()             {}
+func (*WebhookDelivered) projectDeletedRes()             {}
+func (*WebhookDelivered) projectUpdatedRes()             {}
+func (*WebhookDelivered) releaseCreatedRes()             {}
+func (*WebhookDelivered) releaseRevokedRes()             {}
+func (*WebhookDelivered) requestApiRes()                 {}
+func (*WebhookDelivered) schemaCreatedRes()              {}
+func (*WebhookDelivered) sessionDeletedRes()             {}
+func (*WebhookDelivered) sessionEstablishedRes()         {}
+func (*WebhookDelivered) teamCreatedRes()                {}
+func (*WebhookDelivered) teamDeactivatedRes()            {}
+func (*WebhookDelivered) teamUpdatedRes()                {}
+func (*WebhookDelivered) userCreateFailedRes()           {}
+func (*WebhookDelivered) userCreatedRes()                {}
+func (*WebhookDelivered) userDeletedRes()                {}
+func (*WebhookDelivered) userUpdatedRes()                {}
+func (*WebhookDelivered) variableRemovedRes()            {}
+func (*WebhookDelivered) variableSetRes()                {}
+
+// Ref: #
+type WebhookNotDelivered struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *WebhookNotDelivered) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *WebhookNotDelivered) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*WebhookNotDelivered) authAttemptCreatedRes()         {}
+func (*WebhookNotDelivered) authAttemptHandedOffRes()       {}
+func (*WebhookNotDelivered) authCheckFailedRes()            {}
+func (*WebhookNotDelivered) authCheckSucceededRes()         {}
+func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()  {}
+func (*WebhookNotDelivered) authFactorPasswordSetRes()      {}
+func (*WebhookNotDelivered) authSsoAuthorizationFailedRes() {}
+func (*WebhookNotDelivered) authSsoExchangeFailedRes()      {}
+func (*WebhookNotDelivered) authSsoExchangeSucceededRes()   {}
+func (*WebhookNotDelivered) authTokenIssuedRes()            {}
+func (*WebhookNotDelivered) authTokenRevokedRes()           {}
+func (*WebhookNotDelivered) authzGrantedRes()               {}
+func (*WebhookNotDelivered) authzRevokedRes()               {}
+func (*WebhookNotDelivered) brandingCreatedRes()            {}
+func (*WebhookNotDelivered) deploymentCreatedRes()          {}
+func (*WebhookNotDelivered) flowdefCreatedRes()             {}
+func (*WebhookNotDelivered) flowdefDeletedRes()             {}
+func (*WebhookNotDelivered) flowdefUpdatedRes()             {}
+func (*WebhookNotDelivered) idpCreatedRes()                 {}
+func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()     {}
+func (*WebhookNotDelivered) idpUpdatedRes()                 {}
+func (*WebhookNotDelivered) originAddedRes()                {}
+func (*WebhookNotDelivered) originRemovedRes()              {}
+func (*WebhookNotDelivered) policyCreatedRes()              {}
+func (*WebhookNotDelivered) policyUpdatedRes()              {}
+func (*WebhookNotDelivered) previewRemovedRes()             {}
+func (*WebhookNotDelivered) projectCreatedRes()             {}
+func (*WebhookNotDelivered) projectDeletedRes()             {}
+func (*WebhookNotDelivered) projectUpdatedRes()             {}
+func (*WebhookNotDelivered) releaseCreatedRes()             {}
+func (*WebhookNotDelivered) releaseRevokedRes()             {}
+func (*WebhookNotDelivered) requestApiRes()                 {}
+func (*WebhookNotDelivered) schemaCreatedRes()              {}
+func (*WebhookNotDelivered) sessionDeletedRes()             {}
+func (*WebhookNotDelivered) sessionEstablishedRes()         {}
+func (*WebhookNotDelivered) teamCreatedRes()                {}
+func (*WebhookNotDelivered) teamDeactivatedRes()            {}
+func (*WebhookNotDelivered) teamUpdatedRes()                {}
+func (*WebhookNotDelivered) userCreateFailedRes()           {}
+func (*WebhookNotDelivered) userCreatedRes()                {}
+func (*WebhookNotDelivered) userDeletedRes()                {}
+func (*WebhookNotDelivered) userUpdatedRes()                {}
+func (*WebhookNotDelivered) variableRemovedRes()            {}
+func (*WebhookNotDelivered) variableSetRes()                {}

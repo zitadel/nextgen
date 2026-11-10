@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  envTemplate,
-  envVarsEdit,
-} from "../../../../../../../src/lib/orca/patchers/rule/sveltekit/env-vars";
+import { envTemplate, envVarsEdit } from "@/lib/orca/patchers/rule/sveltekit/env-vars";
 
 const NAMES = ["ZITADEL_URL", "ZITADEL_PROJECT_SECRET", "ZITADEL_PROJECT_ID"];
 

@@ -30,9 +30,12 @@ func ErrUserInvalid() Error {
 	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
 
+// ErrUserAttributesInvalid carries the validator's failures as its parent,
+// as [SchemaValidationCause] renders them: a user's values never reach the
+// log (ADR 030).
 func ErrUserAttributesInvalid(validationErr error) Error {
 	return newError(PrefixUser.ErrorCodePrefix("attributes_invalid"),
-		"the user's attributes do not satisfy the user schema", nil, validationErr)
+		"the user's attributes do not satisfy the user schema", nil, SchemaValidationCause(validationErr))
 }
 
 func IsUserInvalid(err error) bool {
@@ -320,8 +323,9 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	if err := json.Unmarshal(schema, &jschema); err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
-	if err := jschema.Validate(doc); err != nil {
+	if err := jschema.ValidateWithOpts(doc, attributeValidation); err != nil {
 		if jsonschema.IsValidationError(err) {
+			err = locateItemFailures(&jschema, doc, err)
 			return nil, ErrUserAttributesInvalid(err).
 				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
 		}

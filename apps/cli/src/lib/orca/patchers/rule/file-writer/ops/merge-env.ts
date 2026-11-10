@@ -1,5 +1,9 @@
-import { envLine } from "../../../../../fs-safe";
-import { type Change, Operation, type Source } from "../operation";
+import { envLine } from "@/lib/fs-safe";
+import {
+  type Change,
+  Operation,
+  type Source,
+} from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
  * Adds the entries an `.env` file does not hold yet.

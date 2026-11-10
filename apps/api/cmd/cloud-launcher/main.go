@@ -60,9 +60,12 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/zitadel/nextgen/cmd/server"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/crypto"
 )
 
 const (
@@ -338,12 +341,12 @@ func prepareMigration(extra []string) ([]string, error) {
 // parses it, so the build refuses what the function would refuse.
 type serving struct {
 	keyID string
-	pem   []string
+	pem   string
 	// previousID and previousPEM are the key being rotated out, configured
 	// for decryption only so the server can re-wrap what it wrapped. Empty
 	// outside a rotation.
 	previousID  string
-	previousPEM []string
+	previousPEM string
 	// dsn is the URL the function serves from: the pooled URL with a
 	// preview's own database swapped in and the pool parameters added. Empty
 	// in a local run without CLOUD_DATABASE_URL, which keeps the server's
@@ -480,7 +483,11 @@ func prepareServer(extra []string) ([]string, error) {
 		return nil, err
 	}
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	if err := os.WriteFile(configPath, renderConfig(s), 0o600); err != nil {
+	config, err := renderConfig(s)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(configPath, config, 0o600); err != nil {
 		return nil, err
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
@@ -639,13 +646,13 @@ func setDefault(key, value string) error {
 	return os.Setenv(key, value)
 }
 
-// decodePEM returns the key's PEM lines, normalized: no carriage returns, no
-// blank lines, no stray indentation, as pasted keys arrive. name is the
-// variable the key came from, for the error.
-func decodePEM(name, b64 string) ([]string, error) {
+// decodePEM validates an RSA private key with the server's parser and normalizes
+// pasted PEM: no carriage returns, blank lines or stray indentation. name is
+// the variable the key came from, for the error.
+func decodePEM(name, b64 string) (string, error) {
 	raw, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		return nil, fmt.Errorf("%s is not base64: %w", name, err)
+		return "", fmt.Errorf("%s is not base64: %w", name, err)
 	}
 	var lines []string
 	for _, line := range strings.Split(strings.ReplaceAll(string(raw), "\r", ""), "\n") {
@@ -653,10 +660,11 @@ func decodePEM(name, b64 string) ([]string, error) {
 			lines = append(lines, line)
 		}
 	}
-	if len(lines) < 2 || !strings.HasPrefix(lines[0], "-----BEGIN ") || !strings.HasPrefix(lines[len(lines)-1], "-----END ") {
-		return nil, fmt.Errorf("%s does not decode to a PEM block", name)
+	normalized := strings.Join(lines, "\n") + "\n"
+	if _, err := crypto.ParsePrivatePEMKey(normalized); err != nil {
+		return "", fmt.Errorf("%s is not an RSA private key: %w", name, err)
 	}
-	return lines, nil
+	return normalized, nil
 }
 
 // renderConfig writes what cannot come from the environment or should not
@@ -664,29 +672,19 @@ func decodePEM(name, b64 string) ([]string, error) {
 // cron job's secret. The current key encrypts; a previous key, during a
 // rotation, only decrypts until the server has re-wrapped everything it
 // wrapped. With the secret, the server leaves the purge to the cron job.
-func renderConfig(s *serving) []byte {
-	var b strings.Builder
-	b.WriteString("server:\n")
-	b.WriteString("  generate_master_key: false\n")
-	b.WriteString("  master_keys:\n")
-	writeKey := func(id string, pem []string, encrypts bool) {
-		fmt.Fprintf(&b, "    %s:\n", id)
-		fmt.Fprintf(&b, "      use_for_encryption: %t\n", encrypts)
-		b.WriteString("      private_key: |\n")
-		for _, line := range pem {
-			b.WriteString("        " + line + "\n")
-		}
+func renderConfig(s *serving) ([]byte, error) {
+	key := func(pem string, encrypts bool) map[string]any {
+		return map[string]any{"private_key": pem, "use_for_encryption": encrypts}
 	}
-	writeKey(s.keyID, s.pem, true)
+	keys := map[string]any{s.keyID: key(s.pem, true)}
 	if s.previousID != "" {
-		writeKey(s.previousID, s.previousPEM, false)
+		keys[s.previousID] = key(s.previousPEM, false)
+	}
+	config := map[string]any{
+		"server": map[string]any{"generate_master_key": false, "master_keys": keys},
 	}
 	if s.cronSecret != "" {
-		// Single quotes: parseServing let through printable ASCII only, and a
-		// quote is the one character to escape.
-		b.WriteString("events:\n")
-		b.WriteString("  retention:\n")
-		b.WriteString("    trigger_secret: '" + strings.ReplaceAll(s.cronSecret, "'", "''") + "'\n")
+		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
 	}
-	return []byte(b.String())
+	return yaml.Marshal(config)
 }

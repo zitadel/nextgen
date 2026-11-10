@@ -182,7 +182,8 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out.StepError)
-	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, *out.StepError)
+	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, out.StepError.Key)
+	assert.ErrorIs(t, out.StepError.Cause, domain.ErrUserAlreadyExists())
 	assert.Empty(t, out.UserID)
 }
 
@@ -218,7 +219,8 @@ func TestFlowCreateUserWithPassword_PolicyViolationShowsStepError(t *testing.T) 
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out.StepError)
-	assert.Equal(t, "error.x-auth-methods#password_min_length", *out.StepError)
+	assert.Equal(t, "error.x-auth-methods#password_min_length", out.StepError.Key)
+	assert.ErrorIs(t, out.StepError.Cause, domain.ErrUserPasswordPolicyViolation(nil))
 	assert.Empty(t, out.UserID)
 }
 

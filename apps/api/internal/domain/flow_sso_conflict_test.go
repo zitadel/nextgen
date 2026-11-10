@@ -255,16 +255,16 @@ func ssoConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *do
 	w, def, state := ssoRenderWorld(t)
 	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "sso-conflict"}
 	step := conflictStep()
-	step.SSOProviders = []string{"google", "github"}
+	step.SSOProviders = []string{"github", "google"}
 	step.Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
 	delete(step.Transitions, "sign_in")
 	step.Actions = step.Actions[:2]
 	def.Steps = append(def.Steps, step)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "sso-conflict", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"github", "google"}).
 		Return([]domain.FlowSSOProvider{
-			{ID: "google", Name: "Google", ConnectionID: "idp-1"},
 			{ID: "github", Name: "GitHub", ConnectionID: "idp-2"},
+			{ID: "google", Name: "Google", ConnectionID: "idp-1"},
 		}, nil).
 		AnyTimes()
 	return w, def, state

@@ -74,6 +74,9 @@ const RESERVED_PURPOSES = new Set(["recovery", "profiling", "reauth", "link_acco
 /** Action kinds a flow author may declare; `back` is engine-injected. */
 const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register", "navigate"]);
 
+/** Action kinds that offer a passkey: an assertion, or an enrolment. */
+const PASSKEY_ACTION_KINDS = new Set(["passkey", "passkey_register"]);
+
 /**
  * Action names the engine claims, with the reason the validator reports.
  * Mirrors `flowBackActionName` and `FlowActionSSO` in flow_state_machine.go,
@@ -892,7 +895,7 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   if (!authMethodEnabled(raw, "passkey")) {
     for (const step of def.steps) {
       for (const action of step.actions) {
-        if (action.kind === "passkey" || action.kind === "passkey_register") {
+        if (PASSKEY_ACTION_KINDS.has(action.kind)) {
           issues.push(
             error(
               "schema/passkey-actions",
@@ -965,7 +968,81 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
         ),
       );
     }
+    issues.push(...warnLoginWithoutCredential(def, loginEntry, challengesByStep));
   }
 
   return issues;
+}
+
+/** SSO outcomes: the provider signed the visitor in, so a route ends there. */
+const SSO_OUTCOMES = new Set(["sso_authenticated", "sso_user_not_found"]);
+
+/**
+ * CLI-only guidance (no Go counterpart): a terminal step the login reaches
+ * with a user resolved but no credential verified. The engine completes an
+ * attempt only on a password, passkey or SSO factor (`hasVerifiedCredential`
+ * in auth_attempt.go), so handoff stops there with `att.not_completed`; with
+ * no user resolved it renders the step and hands nothing off.
+ *
+ * Walked forward from the login entry, carrying the purpose and whether a
+ * user is resolved. A user is resolved by submitting an identifier while
+ * signing in, or by `user_already_exists`. A route ends at a password step's
+ * submit, a passkey action, or an SSO outcome. `user_not_found` and
+ * `user_already_exists` switch the purpose as {@link PURPOSE_FLIP_TARGETS}
+ * says, and a transition that names a purpose switches to it.
+ */
+function warnLoginWithoutCredential(
+  def: FlowDef,
+  loginEntry: string,
+  challengesByStep: ReadonlyMap<string, ReadonlySet<FieldChallenge>>,
+): FlowValidationIssue[] {
+  type Route = { step: string; purpose: string; resolved: boolean; from: string };
+  const byName = new Map(def.steps.map((step) => [step.name, step]));
+  const seen = new Set<string>();
+  // Each terminal reached with a user and no credential, and the steps it is
+  // reached from.
+  const stuck = new Map<string, Set<string>>();
+  const queue: Route[] = [{ step: loginEntry, purpose: "login", resolved: false, from: "" }];
+  for (let head = 0; head < queue.length; head += 1) {
+    const route = queue[head];
+    // The graph phase refused an unknown target: `undefined` is for the types.
+    const step = route === undefined ? undefined : byName.get(route.step);
+    if (route === undefined || step === undefined) continue;
+    if (step.terminal) {
+      if (route.resolved) {
+        stuck.set(step.name, (stuck.get(step.name) ?? new Set()).add(route.from));
+      }
+      continue;
+    }
+    const key = `${step.name}\n${route.purpose}\n${route.resolved}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const challenges = challengesByStep.get(step.name);
+    for (const [event, t] of step.transitions) {
+      const kind = step.actions.find((action) => action.name === event)?.kind;
+      const submits = kind === "submit";
+      if (
+        !isCurrentFlow(t) ||
+        SSO_OUTCOMES.has(event) ||
+        (kind !== undefined && PASSKEY_ACTION_KINDS.has(kind)) ||
+        (submits && challenges?.has("password"))
+      ) {
+        continue;
+      }
+      const purpose = t.purpose ?? PURPOSE_FLIP_TARGETS[route.purpose]?.[event] ?? route.purpose;
+      const resolved =
+        purpose === "login" &&
+        (route.resolved ||
+          event === "user_already_exists" ||
+          (submits && route.purpose === "login" && challenges?.has("identifier") === true));
+      queue.push({ step: transitionTarget(def, t), purpose, resolved, from: step.name });
+    }
+  }
+  return [...stuck].map(([terminal, from]) =>
+    warning(
+      "warn/login-without-credential",
+      `step ${q(terminal)} is reached from ${[...from].map(q).join(", ")} once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the ${AUTH_METHOD_PREFIX}password field, a passkey action or sso_providers on the way`,
+      terminal,
+    ),
+  );
 }

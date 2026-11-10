@@ -1,7 +1,8 @@
 import pc from "picocolors";
 
-import { escapeControlCharacters } from "../api-client";
-import { isObject, parseJsonOrUndefined } from "../json";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
 
 /** The levels `zitadel logs --level` takes, lowest first. */
 export const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
@@ -143,9 +144,9 @@ export function logText(lines: readonly LogLine[]): string {
 const paint = pc.createColors(true);
 
 /**
- * A line as `zitadel logs` prints it for a person. Characters that could drive
- * the terminal are escaped, as everywhere the CLI prints text it did not write.
- * With `color`, a warning is yellow and an error red, so they stand out from the
+ * A line as `zitadel logs` prints it for a person. The server wrote the text,
+ * so what could drive the terminal is spelled out before anything paints it:
+ * escaping a painted line would spell out the paint as well. With `color`, a warning is yellow and an error red, so they stand out from the
  * requests that make up most of the log, and a debug line is dimmed.
  */
 export function renderLogLine(line: LogLine, color: boolean): string {

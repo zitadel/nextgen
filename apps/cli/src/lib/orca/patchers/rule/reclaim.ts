@@ -1,8 +1,8 @@
 import { join } from "node:path";
 
-import { pathExists } from "../../../fs";
-import { readPackageJson } from "../../../npm";
-import { MANAGED_MARKER } from "../../../paths";
+import { pathExists } from "@/lib/fs";
+import { readPackageJson } from "@/lib/npm";
+import { MANAGED_MARKER } from "@/lib/paths";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
 /**

@@ -466,6 +466,10 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
+	// The key travels with the rejection that produced it, for the log.
+	require.NotNil(t, result.Step.Failure)
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, result.Step.Failure.Key)
+	assert.ErrorIs(t, result.Step.Failure.Cause, domain.ErrAuthAttemptProofRejected(nil))
 }
 
 // A collision on a step that declares create_user never runs the mutation,
@@ -603,6 +607,15 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 	if assert.NotNil(t, result.Step.Error) {
 		assert.Equal(t, "error.email_required", *result.Step.Error)
 	}
+	// No error produced the key: the log gets a refusal naming it, with the
+	// violations as its cause.
+	require.NotNil(t, result.Step.Failure)
+	refused, ok := errors.AsType[domain.Error](result.Step.Failure.Cause)
+	require.True(t, ok)
+	assert.Equal(t, "flow.step_refused", refused.Code)
+	assert.Contains(t, refused.Message, "error.email_required")
+	var violations domain.FlowFieldValidationErrors
+	assert.ErrorAs(t, result.Step.Failure.Cause, &violations)
 }
 
 // The passkey-register issue leg collects the step's fields, so an omitted
@@ -763,7 +776,7 @@ func TestFlowStateMachine_Process_UndeclaredActionRefusedBeforeIdentifierLookup(
 				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 				AnyTimes()
 			w.ssoProviders.EXPECT().
-				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
 				AnyTimes()
 			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
@@ -798,7 +811,7 @@ func startSSOStepFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
 
 	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -923,7 +936,7 @@ func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testin
 	w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).
 		Return(domain.FlowSSORedirectOutput{}, domain.ErrFlowSSOUnavailable(errors.New("discovery timed out")))
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
 
 	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
@@ -1003,7 +1016,7 @@ func TestFlowStateMachine_Start_RendersSSOProvidersInStepOrder(t *testing.T) {
 	google := domain.FlowSSOProvider{ID: "google", Name: "Google", Template: "google"}
 	github := domain.FlowSSOProvider{ID: "github", Name: "GitHub", Template: "github"}
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{google, github}, nil)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1027,7 +1040,7 @@ func TestFlowStateMachine_Start_AsksForTheSSODescriptionOnAStepOfferingProviders
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google", Template: "google"}}, nil)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1051,7 +1064,7 @@ func TestFlowStateMachine_Start_KeepsThePlainDescriptionWhenNoListedProviderReso
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return(nil, nil)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1098,10 +1111,10 @@ func TestFlowStateMachine_Process_ReRenderResolvesSSOProvidersAgain(t *testing.T
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	gomock.InOrder(
 		w.ssoProviders.EXPECT().
-			Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+			Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 			Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google", Template: "google"}}, nil),
 		w.ssoProviders.EXPECT().
-			Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+			Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 			Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, nil),
 	)
 
@@ -1133,7 +1146,7 @@ func TestFlowStateMachine_Start_SSOProviderResolverErrorFailsRender(t *testing.T
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return(nil, errors.New("connection store unavailable"))
 
 	_, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1283,6 +1296,8 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorPasskeyInvalid, *rejected.Step.Error)
+	require.NotNil(t, rejected.Step.Failure)
+	assert.ErrorIs(t, rejected.Step.Failure.Cause, domain.ErrAuthAttemptProofRejected(nil))
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
 }
@@ -4795,6 +4810,7 @@ const ssoSchemaContent string = `{
 			"employee_id": { "type": "integer", "x-unique": "project" },
 			"age":         { "type": ["string", "integer"] },
 			"locale":      { "type": "string", "enum": ["en", "de", "fr"] },
+			"homepage":    { "type": "string", "format": "uri" },
 			"account": {
 				"type": "object",
 				"properties": { "handle": { "type": "string", "x-unique": "project" } }
@@ -5131,7 +5147,7 @@ func ssoRenderWorldWithSchema(t *testing.T, schema string) (*flowTestWorld, *dom
 		Return(mustUnmarshal[jsonschema.Schema](t, schema), nil).
 		AnyTimes()
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", gomock.Any()).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
 		AnyTimes()
 	state := &domain.FlowState{
@@ -5410,6 +5426,12 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 		},
 		"verified unique claim": {
 			edit:     func(claims map[string]any, _ map[string]bool) { claims["username"] = long },
+			probes:   3,
+			wantStep: "credentials",
+			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		"verified unique claim failing its format": {
+			edit:     func(claims map[string]any, _ map[string]bool) { claims["email"] = "not-an-email" },
 			probes:   3,
 			wantStep: "credentials",
 			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
@@ -6900,6 +6922,13 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 				"email": "alice@example.com", "username": "alice", "given_name": "Typed", "family_name": "Liddell", "badge": "b-7",
 			},
 		},
+		"hidden claim failing its format": {
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "homepage": "no scheme"},
+			edit:   func(map[string]any) {},
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+			},
+		},
 		// The typed leaf wins, and the hidden ones are stored beside it.
 		"hidden leaves beside a shown one": {
 			fields: []domain.Field{"email", "username", "given_name", "family_name", "address.street_address"},
@@ -7143,6 +7172,22 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)
 				w.expectCreateLinked(complete, "", "", domain.ErrUserInvalid())
+			},
+			wantErr: domain.FlowStepErrorSSOUserInvalid,
+		},
+		// No step shows a property of an array item, so this one was not
+		// left out of the step.
+		"property an array item requires": {
+			expect: func(w *flowTestWorld) {
+				_, err := domain.NewCreateUser(domain.CreateUserParams{
+					ProjectID:  "proj_1",
+					SchemaURL:  "https://example.test/schema.json",
+					Schema:     []byte(`{"properties": {"phones": {"items": {"required": ["fax"]}}}}`),
+					Attributes: map[string]any{"phones": []any{map[string]any{}}},
+				})
+				require.Error(t, err)
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", err)
 			},
 			wantErr: domain.FlowStepErrorSSOUserInvalid,
 		},

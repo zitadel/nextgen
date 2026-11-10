@@ -33,62 +33,26 @@ content:
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.csrf_invalid:
-        summary: auth.csrf_invalid
-        value:
-          code: auth.csrf_invalid
-          message: 'The request failed cross-site request forgery validation.'
+        $ref: '../../components/examples/errors/auth-csrf_invalid.yaml'
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../components/examples/errors/evt-invalid.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../components/examples/errors/not_implemented.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'
       team.already_exists:
-        summary: team.already_exists
-        value:
-          code: team.already_exists
-          message: 'a team with this name already exists in the project'
+        $ref: '../../components/examples/errors/team-already_exists.yaml'
       team.name_invalid:
-        summary: team.name_invalid
-        value:
-          code: team.name_invalid
-          message: 'The team name is invalid. Expected a non-empty string of at most 200 characters.'
+        $ref: '../../components/examples/errors/team-name_invalid.yaml'
       team.team_not_found:
-        summary: team.team_not_found
-        value:
-          code: team.team_not_found
-          message: 'team not found'
+        $ref: '../../components/examples/errors/team-team_not_found.yaml'
       team.permission_denied:
-        summary: team.permission_denied
-        value:
-          code: team.permission_denied
-          message: 'the team management API requires the project secret'
+        $ref: '../../components/examples/errors/team-permission_denied.yaml'
       team.project_not_found:
-        summary: team.project_not_found
-        value:
-          code: team.project_not_found
-          message: 'project not found'
+        $ref: '../../components/examples/errors/team-project_not_found.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../components/examples/errors/unavailable.yaml'

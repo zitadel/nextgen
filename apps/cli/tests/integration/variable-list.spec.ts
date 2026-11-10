@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
-import { pressCtrlC } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
+import { pressCtrlC } from "@tests/helpers/run-cli";
+import { asTerminal, offTerminal, RENDERINGS } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
 
@@ -56,6 +57,15 @@ describe("variable list", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.setVariable("BANNER", "a\u001b[2Jwiped");
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["variable", "list", "--json"] : ["variable", "list"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("shows a variable that was entered", async () => {
         const app = await aSetUpApp();
@@ -100,30 +110,40 @@ describe("variable list", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("prints a variable that was entered", async () => {
+      it.each(RENDERINGS)("prints a variable that was entered, %s", async (_how, colour) => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.run(["variable", "list"]);
+        const result = await asTerminal(() => app.run(["variable", "list"], colour));
 
-        expect(result).toPrint("FOO");
+        expect(result).toPrintRow("FOO", "bar");
+      });
+
+      it.each(RENDERINGS)("spells out a value the server answered, %s", async (_how, colour) => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("BANNER", "a\u009bb")).toSucceed();
+
+        const result = await asTerminal(() => app.run(["variable", "list"], colour));
+
+        expect(result).toSucceed();
+        expect(result.stdout).not.toContain("\u009b");
       });
     });
 
     describe("--plain", () => {
-      it("prints each variable as a tab-separated record", async () => {
+      it("prints each variable as a tab-separated record, piped", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.run(["variable", "list", "--plain"]);
+        const result = await offTerminal(() => app.run(["variable", "list", "--plain"]));
 
         expect(result).toPrintPlainRows(["FOO", "bar", /.*/]);
       });
 
-      it("prints nothing when no variable is entered", async () => {
+      it("prints nothing when no variable is entered, piped", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["variable", "list", "--plain"]);
+        const result = await offTerminal(() => app.run(["variable", "list", "--plain"]));
 
         expect(result).toSucceed();
         expect(result).toPrintPlainRows();

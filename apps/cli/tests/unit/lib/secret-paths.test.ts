@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isLocalRuntimePath, isSecretPath } from "../../../src/lib/secret-paths";
+import { isLocalRuntimePath, isSecretPath } from "@/lib/secret-paths";
 
 describe("isLocalRuntimePath", () => {
   it.each([".zitadel/local/admin.json", "apps/web/.zitadel/local"])(

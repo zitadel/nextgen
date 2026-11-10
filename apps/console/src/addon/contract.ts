@@ -13,7 +13,7 @@ import type { ComponentType, ReactNode } from "react";
 export interface ConsoleAddon {
   /** Rendered once beside the routes, on every page: page-wide scripts such as analytics. */
   Root?: ComponentType<AddonPage>;
-  /** Receives every custom event the console reports, as `src/lib/analytics.ts` types them. */
+  /** Receives every custom event the console reports, as `src/addon/analytics.ts` types them. */
   track?: (
     event: string,
     properties: Readonly<Record<string, string | number | boolean | null>>,
@@ -36,7 +36,7 @@ export interface ConsoleAddon {
  * screen's is (Console ADR 0001): a build without the add-on has neither.
  */
 export interface AddonScreen {
-  /** The router-relative path: `/settings/billing`. One beneath `/settings` renders in the Settings view. */
+  /** The router-relative path: `/settings/billing`. One beneath `/settings` renders with the Settings sidebar. */
   path: `/${string}`;
   /** Its entry in the sidebar its view names. */
   nav: AddonNav;
@@ -68,9 +68,12 @@ export interface AddonScreenProps<Data> {
 /** A sidebar entry, as the console's `staticData.nav` holds one. */
 export interface AddonNav {
   label: string;
-  /** `settings` lists it in the Settings view's sidebar; `portal` beside the project's screens. */
-  view: "portal" | "settings";
-  /** Its place in that sidebar; the console's own entries start at 1. */
+  /**
+   * `settings` lists it under Settings, after Profile; `account` above every
+   * project, between Projects and Settings; `portal` beside the project's screens.
+   */
+  view: "portal" | "account" | "settings";
+  /** Its place in that list; the console's own entries start at 1, and the account list's Settings is 9. */
   order: number;
   /** A Lucide icon, or a component of the same shape. */
   icon: ComponentType<{ size?: number | string; className?: string; "aria-hidden"?: boolean }>;

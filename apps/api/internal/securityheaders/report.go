@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -42,6 +44,7 @@ func Report() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
+			errlog.Log(r.Context(), domain.ErrRequestMethodNotAllowed())
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
@@ -49,6 +52,10 @@ func Report() http.Handler {
 			Violation violation `json:"csp-report"`
 		}
 		err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxReportBytes)).Decode(&report)
+		if err != nil {
+			// Refused, though the answer does not say so.
+			errlog.Log(r.Context(), domain.ErrRequestInvalid().WithParent(err))
+		}
 		if v := report.Violation; err == nil && v.EffectiveDirective+v.ViolatedDirective != "" && !v.fromExtension() {
 			zlog.Warn(r.Context(), "content security policy violation",
 				slog.String("document", withoutQuery(v.DocumentURI)),

@@ -4,18 +4,20 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { LOCAL_IMPORT, resolveFromSrc } from "@tests/helpers/source-imports";
+
 const root = fileURLToPath(new URL("../../../../src", import.meta.url));
 const LAYER = posix.join("lib", "oclif");
 
 /**
  * The modules outside the layer that the glue may reach for, each standing for
  * itself and everything under it: the envelope and its errors, the command
- * line, the suggestion builders, the telemetry and process plumbing every
- * command pays for, and the API client the generated resource commands speak
- * through.
+ * line, the palette, the spelling it is printed in, the suggestion builders,
+ * the telemetry and process plumbing every command pays for, and the backend
+ * the generated resource commands speak through.
  */
 const GENERIC = [
-  "lib/api-client",
+  "lib/backend",
   "lib/cmd",
   "lib/consent",
   "lib/errors",
@@ -25,8 +27,10 @@ const GENERIC = [
   "lib/paths",
   "lib/public-cli",
   "lib/server",
+  "lib/style",
   "lib/suggestion",
   "lib/telemetry",
+  "lib/terminal-text",
   "lib/user-agent",
   "lib/warnings",
 ];
@@ -42,7 +46,19 @@ const LEAKS = [
   "lib/skills-hint",
 ];
 
-const IMPORT = /\bfrom\s+"(\.[^"]*)"/g;
+/**
+ * Domain libs that still reach into the layer, each one a dependency pointing
+ * the wrong way. The list only shrinks: a new one fails the test. `lib/server`
+ * and `lib/telemetry/consent` want a type the envelope owns, `lib/claim-state`
+ * wants the server-kind bucket, and `lib/api-request` is the `zitadel api`
+ * argument parser, which reads the generated commands' own helpers.
+ */
+const INBOUND = [
+  "lib/api-request.ts",
+  "lib/claim-state.ts",
+  "lib/server.ts",
+  "lib/telemetry/consent.ts",
+];
 
 /**
  * A path as this file reads one: `readdir` answers in the platform's
@@ -67,14 +83,12 @@ async function layerFiles(): Promise<string[]> {
 async function reachesOutside(file: string): Promise<string[]> {
   const source = await readFile(join(root, file), "utf8");
   const outside: string[] = [];
-  for (const match of source.matchAll(IMPORT)) {
+  for (const match of source.matchAll(LOCAL_IMPORT)) {
     const specifier = match[1];
     if (specifier === undefined) {
       continue;
     }
-    const target = posix
-      .normalize(posix.join(posix.dirname(file), specifier))
-      .replace(/\.(ts|js)$/, "");
+    const target = resolveFromSrc(file, specifier).replace(/\.(ts|js)$/, "");
     if (!target.startsWith(`${LAYER}/`) && target !== LAYER) {
       outside.push(target);
     }
@@ -135,5 +149,31 @@ describe("the oclif layer", () => {
     }
 
     expect(bagged).toEqual([]);
+  });
+
+  it("is imported by no domain lib, so the dependency runs one way only", async () => {
+    const inbound: string[] = [];
+    const libs = (await readdir(join(root, "lib"), { recursive: true }))
+      .filter((file) => {
+        return file.endsWith(".ts");
+      })
+      .map((file) => {
+        return posix.join("lib", asSpecifier(file));
+      })
+      .filter((file) => {
+        return !file.startsWith(`${LAYER}/`) && !INBOUND.includes(file);
+      });
+
+    for (const file of libs) {
+      const source = await readFile(join(root, file), "utf8");
+      for (const match of source.matchAll(LOCAL_IMPORT)) {
+        const target = resolveFromSrc(file, match[1] ?? "");
+        if (target === LAYER || target.startsWith(`${LAYER}/`)) {
+          inbound.push(`${file} -> ${target}`);
+        }
+      }
+    }
+
+    expect(inbound).toEqual([]);
   });
 });

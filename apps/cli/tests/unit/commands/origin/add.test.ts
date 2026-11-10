@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
 

@@ -13,12 +13,6 @@ content:
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'

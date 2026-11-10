@@ -1,10 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { type EscapeOptions, escapeControlCharacters } from "../api-client";
-import { isObject } from "../json";
-import { Cmd } from "../cmd";
+import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
+import { isObject } from "@/lib/json";
+import { Cmd } from "@/lib/cmd";
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
+import { painted, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
@@ -197,10 +198,13 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // screen to draw a table on.
       const plain = flags.plain === true || !this.isOnScreen;
       // The cursor is opaque text from the server: `Cmd.option` quotes it so
-      // whitespace or shell metacharacters cannot run from a copied command.
+      // whitespace or shell metacharacters cannot run from a copied command,
+      // and it is spelled out so what drives a terminal cannot either. The
+      // data keeps the cursor as it came, so paging with it still works.
       const token = view.page?.token || null;
+      const shown = token === null ? null : escapeControlCharacters(token);
       const more =
-        token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
+        shown === null ? [] : [`More available: ${Cmd.option("--page-token", shown)} (or --all)`];
       // A paged list asks for its follow-up command whether or not there is a
       // next page, so a command that cannot suggest one fails on its first run
       // and not on the first result that spans two pages.
@@ -211,6 +215,9 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
               [
                 view.page.command,
                 ...view.page.flags,
+                // The raw cursor: this command reaches the envelope, where a
+                // script reads it to page, and `renderNextSteps` spells it out
+                // for the copy a person sees.
                 Cmd.option("--page-token", token ?? ""),
                 "--json",
               ].join(" "),
@@ -220,8 +227,10 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-        machineReadable: plain,
-        pretty: await this.renderList(plain, view, more),
+        // Plain records are what a script reads, so they keep stdout to
+        // themselves; the aligned table is painted. Either way every fragment
+        // the rendering is composed of was spelled out where it was read.
+        pretty: (plain ? rows : painted)(await this.renderList(plain, view, more)),
       };
     }
 
@@ -259,8 +268,11 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (plain) {
         return tabulateRows(view.columns, view.rows);
       }
+      // A view's words carry what the server answered as readily as a cell
+      // does — an id in the empty line, the origins a footer names — so they
+      // are spelled out here, where the cells and the cursor already are.
       if (view.rows.length === 0) {
-        return view.empty;
+        return escapeControlCharacters(view.empty);
       }
       const plural = view.plural ?? `${view.singular}s`;
       const count = `${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`;
@@ -268,7 +280,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         await this.tabulate(view.columns, view.rows),
         "",
         count,
-        ...view.footer,
+        ...view.footer.map((line) => escapeControlCharacters(line)),
         ...more,
       ].join("\n");
     }
@@ -292,7 +304,10 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         .filter(([, value]) => value !== "");
       const width = Math.max(0, ...rows.map(([label]) => label.length));
       const body = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
-      return [...(heading ? [heading, ""] : []), ...body].join("\n");
+      // The heading is a field of the record, so it is the server's text as
+      // much as any cell is, and `readCell` spells out only the cells.
+      const headed = heading === undefined ? [] : [escapeControlCharacters(heading), ""];
+      return [...headed, ...body].join("\n");
     }
   }
   return TabulatableCommand;
