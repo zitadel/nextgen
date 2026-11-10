@@ -380,7 +380,7 @@ function SearchPalette({
             <CommandInput
               value={query}
               onValueChange={onQueryChange}
-              placeholder="Go to a page, user, team or project"
+              placeholder="Go to a page, user, team or project, or run an action"
               aria-label="Search"
               className="h-12 pr-12 text-[15px]"
             />
