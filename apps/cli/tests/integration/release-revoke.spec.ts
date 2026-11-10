@@ -183,18 +183,7 @@ describe("release revoke", () => {
       });
 
       it("refuses to revoke a release an origin still serves", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const served = await app.deployData();
-
-        const result = await app.run([
-          "release",
-          "revoke",
-          served.release_id ?? "",
-          "--force",
-          "--non-interactive",
-          "--json",
-        ]);
+        const { result } = await aRefusedRevoke();
 
         expect(result).toFailWith("E_CONFLICT");
       });
@@ -216,8 +205,11 @@ describe("release revoke", () => {
 
         const { message, origins } = app.servedRefusalOf(result);
         expect(origins.length).toBeGreaterThan(3);
-        for (const [index, origin] of origins.entries()) {
-          expect(message.includes(origin) === index < 3).toBe(true);
+        for (const origin of origins.slice(0, 3)) {
+          expect(message).toContain(origin);
+        }
+        for (const origin of origins.slice(3)) {
+          expect(message).not.toContain(origin);
         }
       });
 

@@ -5,7 +5,6 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
-  RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
 import { z } from "zod";
 
@@ -31,6 +30,11 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 /** The kind of resource a release pins a revision of. */
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
+/**
+ * The origins a `rel.in_use` refusal names, each with the deployment that pins
+ * the release there. An empty list is rejected: a refusal naming no origin has
+ * nothing to show, so it stays the plain conflict.
+ */
 const IN_USE_ORIGINS = z
   .array(
     z.object({
@@ -59,7 +63,7 @@ const RELEASE_IN_USE_BODY = z.object({
  */
 export type RevokeOutcome =
   | Readonly<{ outcome: "revoked"; release: Release }>
-  | Readonly<{ outcome: "in-use"; origins: readonly RevokeRelease409DetailsOriginsItem[] }>;
+  | Readonly<{ outcome: "in-use"; origins: readonly z.infer<typeof IN_USE_ORIGINS>[number][] }>;
 
 /**
  * The releases of one project: reading one, building one from a configuration
