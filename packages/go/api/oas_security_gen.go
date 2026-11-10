@@ -44,6 +44,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	BuildReleaseOperation: []string{
 		"release.write",
 	},
+	CreateApplicationOperation: []string{
+		"application.write",
+	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
 	},
@@ -100,6 +103,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	FinishUserPasskeyRegistrationOperation: []string{
 		"user.write",
+	},
+	GetApplicationByIdOperation: []string{
+		"application.read",
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempt.read",

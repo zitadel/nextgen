@@ -608,6 +608,384 @@ func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseD
 	return m
 }
 
+// An application that authenticates its users via Zitadel, with its OAuth
+// clients. The document is the `application` field of the `createApplication`
+// (`POST /applications`) body.
+// Ref: #
+type Application struct {
+	// Editor affordance: path or URL of this schema so editors validate and autocomplete the file.
+	// Ignored by the platform.
+	Schema OptString `json:"$schema"`
+	// Stable identifier of the application, unique within the project and
+	// fixed for its life. Flows and other documents reference it.
+	Slug string `json:"slug"`
+	// The application's name, shown to the user when consent is asked.
+	Name string `json:"name"`
+	// The application's OAuth clients. Each slug is unique within the application.
+	Clients []ApplicationClient `json:"clients"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *Application) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetSlug returns the value of Slug.
+func (s *Application) GetSlug() string {
+	return s.Slug
+}
+
+// GetName returns the value of Name.
+func (s *Application) GetName() string {
+	return s.Name
+}
+
+// GetClients returns the value of Clients.
+func (s *Application) GetClients() []ApplicationClient {
+	return s.Clients
+}
+
+// SetSchema sets the value of Schema.
+func (s *Application) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *Application) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetName sets the value of Name.
+func (s *Application) SetName(val string) {
+	s.Name = val
+}
+
+// SetClients sets the value of Clients.
+func (s *Application) SetClients(val []ApplicationClient) {
+	s.Clients = val
+}
+
+// One OAuth client of the application: one way it talks to Zitadel, such as
+// its web backend. Its `redirect_uris` and `grant_types` are its OAuth
+// settings. OpenID Connect is OAuth plus the `openid` scope, so one shape
+// serves both.
+// Ref: #
+type ApplicationClient struct {
+	// Stable identifier of the client, unique among the application's clients
+	// and fixed for the client's life. A revision matches each client to the
+	// stored one by its slug, which is how a client keeps its `client_id`.
+	// Other documents refer to it as `<application>/<client>`.
+	Slug string `json:"slug"`
+	// Shown to the user in place of the application's name. Optional.
+	Name OptString `json:"name"`
+	// The `client_id` the client presents. Leave it out and the server
+	// generates one the first time the client is written and fills it into
+	// the stored document. Set it to keep an id the client already has: one
+	// a Zitadel v4 issued (`<id>@<project>`), or one the CLI generated before
+	// any deploy. Once set, the id never changes: a later revision may leave it
+	// out, but may not provide a different one. No two clients in the project
+	// share an id, and an id is never reused once a client has held it. A
+	// new client may not supply an id that starts with `client_` or `dcr_`:
+	// those prefixes mark ids the server generates. A server-generated id
+	// sent back unchanged in a revision is accepted.
+	ClientID OptString `json:"client_id"`
+	// A `confidential` client runs where a secret can be kept, such as a web
+	// app's backend, and authenticates with one at the token endpoint. Public
+	// clients, which hold no secret, are not available yet.
+	Type ApplicationClientType `json:"type"`
+	// The grant types the client may use, named as in RFC 7591.
+	// `authorization_code` signs a user in and needs `redirect_uris`.
+	// `refresh_token` lets the client renew its access tokens without a new
+	// sign-in; a refresh token is issued on sign-in, so it is only valid
+	// together with `authorization_code`.
+	GrantTypes []ApplicationClientGrantTypesItem `json:"grant_types"`
+	// Where the authorization endpoint may send the user back. Required with
+	// `authorization_code`; omit it otherwise, an empty list is refused. Each
+	// is an `https` URL, or an `http` URL on a loopback host for local
+	// development: `localhost`, a name under `.localhost`, or a loopback IP
+	// such as `127.0.0.1` or `[::1]`. A URI is written as the client will
+	// send it, with a lowercase host and no fragment, since it is matched
+	// exactly; a loopback URI matches on any port (RFC 8252 §7.3).
+	RedirectUris []string `json:"redirect_uris"`
+	// A first-party client belongs to the project's own product and skips
+	// consent unless the request asks for it. An application registered
+	// through the API is third-party unless this says otherwise.
+	FirstParty OptBool `json:"first_party"`
+}
+
+// GetSlug returns the value of Slug.
+func (s *ApplicationClient) GetSlug() string {
+	return s.Slug
+}
+
+// GetName returns the value of Name.
+func (s *ApplicationClient) GetName() OptString {
+	return s.Name
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationClient) GetClientID() OptString {
+	return s.ClientID
+}
+
+// GetType returns the value of Type.
+func (s *ApplicationClient) GetType() ApplicationClientType {
+	return s.Type
+}
+
+// GetGrantTypes returns the value of GrantTypes.
+func (s *ApplicationClient) GetGrantTypes() []ApplicationClientGrantTypesItem {
+	return s.GrantTypes
+}
+
+// GetRedirectUris returns the value of RedirectUris.
+func (s *ApplicationClient) GetRedirectUris() []string {
+	return s.RedirectUris
+}
+
+// GetFirstParty returns the value of FirstParty.
+func (s *ApplicationClient) GetFirstParty() OptBool {
+	return s.FirstParty
+}
+
+// SetSlug sets the value of Slug.
+func (s *ApplicationClient) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetName sets the value of Name.
+func (s *ApplicationClient) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationClient) SetClientID(val OptString) {
+	s.ClientID = val
+}
+
+// SetType sets the value of Type.
+func (s *ApplicationClient) SetType(val ApplicationClientType) {
+	s.Type = val
+}
+
+// SetGrantTypes sets the value of GrantTypes.
+func (s *ApplicationClient) SetGrantTypes(val []ApplicationClientGrantTypesItem) {
+	s.GrantTypes = val
+}
+
+// SetRedirectUris sets the value of RedirectUris.
+func (s *ApplicationClient) SetRedirectUris(val []string) {
+	s.RedirectUris = val
+}
+
+// SetFirstParty sets the value of FirstParty.
+func (s *ApplicationClient) SetFirstParty(val OptBool) {
+	s.FirstParty = val
+}
+
+type ApplicationClientGrantTypesItem string
+
+const (
+	ApplicationClientGrantTypesItemAuthorizationCode ApplicationClientGrantTypesItem = "authorization_code"
+	ApplicationClientGrantTypesItemRefreshToken      ApplicationClientGrantTypesItem = "refresh_token"
+)
+
+// AllValues returns all ApplicationClientGrantTypesItem values.
+func (ApplicationClientGrantTypesItem) AllValues() []ApplicationClientGrantTypesItem {
+	return []ApplicationClientGrantTypesItem{
+		ApplicationClientGrantTypesItemAuthorizationCode,
+		ApplicationClientGrantTypesItemRefreshToken,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientGrantTypesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientGrantTypesItemAuthorizationCode:
+		return []byte(s), nil
+	case ApplicationClientGrantTypesItemRefreshToken:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientGrantTypesItem) UnmarshalText(data []byte) error {
+	switch ApplicationClientGrantTypesItem(data) {
+	case ApplicationClientGrantTypesItemAuthorizationCode:
+		*s = ApplicationClientGrantTypesItemAuthorizationCode
+		return nil
+	case ApplicationClientGrantTypesItemRefreshToken:
+		*s = ApplicationClientGrantTypesItemRefreshToken
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A client secret the server generated, returned once.
+// Ref: #
+type ApplicationClientSecret struct {
+	// The slug of the client the secret belongs to.
+	Client string `json:"client"`
+	// The `client_id` the client presents together with the secret.
+	ClientID string `json:"client_id"`
+	// The secret, shown only in this response. Save it securely: the server cannot return it again.
+	Secret string `json:"secret"`
+}
+
+// GetClient returns the value of Client.
+func (s *ApplicationClientSecret) GetClient() string {
+	return s.Client
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationClientSecret) GetClientID() string {
+	return s.ClientID
+}
+
+// GetSecret returns the value of Secret.
+func (s *ApplicationClientSecret) GetSecret() string {
+	return s.Secret
+}
+
+// SetClient sets the value of Client.
+func (s *ApplicationClientSecret) SetClient(val string) {
+	s.Client = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationClientSecret) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *ApplicationClientSecret) SetSecret(val string) {
+	s.Secret = val
+}
+
+// A `confidential` client runs where a secret can be kept, such as a web
+// app's backend, and authenticates with one at the token endpoint. Public
+// clients, which hold no secret, are not available yet.
+type ApplicationClientType string
+
+const (
+	ApplicationClientTypeConfidential ApplicationClientType = "confidential"
+)
+
+// AllValues returns all ApplicationClientType values.
+func (ApplicationClientType) AllValues() []ApplicationClientType {
+	return []ApplicationClientType{
+		ApplicationClientTypeConfidential,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientTypeConfidential:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientType) UnmarshalText(data []byte) error {
+	switch ApplicationClientType(data) {
+	case ApplicationClientTypeConfidential:
+		*s = ApplicationClientTypeConfidential
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An application at its newest revision, with its document as `definition`.
+// It never carries a client secret.
+// Ref: #
+type ApplicationResponse struct {
+	// A unique ID, generated when the application is created and shared by
+	// every revision.
+	ID string `json:"id"`
+	// The ID of the revision this entry holds. `getApplicationById`
+	// (`GET /applications/{id}`) returns the newest one.
+	RevisionID string `json:"revision_id"`
+	// The identifier by which other documents reference the application.
+	// Fixed for the life of the application.
+	Slug string `json:"slug"`
+	// When the application was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was created. On the newest revision, that is when
+	// the application was last revised.
+	UpdatedAt time.Time `json:"updated_at"`
+	// The stored application document, with each client's `client_id`.
+	Definition Application `json:"definition"`
+}
+
+// GetID returns the value of ID.
+func (s *ApplicationResponse) GetID() string {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *ApplicationResponse) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetSlug returns the value of Slug.
+func (s *ApplicationResponse) GetSlug() string {
+	return s.Slug
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *ApplicationResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetDefinition returns the value of Definition.
+func (s *ApplicationResponse) GetDefinition() Application {
+	return s.Definition
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *ApplicationResponse) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *ApplicationResponse) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *ApplicationResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetDefinition sets the value of Definition.
+func (s *ApplicationResponse) SetDefinition(val Application) {
+	s.Definition = val
+}
+
+func (*ApplicationResponse) getApplicationByIdRes() {}
+
 // Merged schema.
 // Ref: #
 type AttAlreadyHandedOff struct {
@@ -12145,6 +12523,330 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	s.SetSchemaURL(v)
 	return s
 }
+
+type CreateApplicationBadRequest ErrorDetails
+
+func (*CreateApplicationBadRequest) createApplicationRes() {}
+
+type CreateApplicationConflict ErrorDetails
+
+func (*CreateApplicationConflict) createApplicationRes() {}
+
+type CreateApplicationCreated CreateApplicationResponse
+
+func (*CreateApplicationCreated) createApplicationRes() {}
+
+// CreateApplicationErrorResponse represents sum type.
+type CreateApplicationErrorResponse struct {
+	Type             CreateApplicationErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// CreateApplicationErrorResponseType is oneOf type of CreateApplicationErrorResponse.
+type CreateApplicationErrorResponseType string
+
+// Possible values for CreateApplicationErrorResponseType.
+const (
+	AuthUnauthorizedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "auth.unauthorized"
+	InternalCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "internal"
+	NotImplementedCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "not_implemented"
+	ReqInvalidCreateApplicationErrorResponse       CreateApplicationErrorResponseType = "req.invalid"
+	UnavailableCreateApplicationErrorResponse      CreateApplicationErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether CreateApplicationErrorResponse is AuthUnauthorized.
+func (s CreateApplicationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateApplicationErrorResponse
+}
+
+// IsInternal reports whether CreateApplicationErrorResponse is Internal.
+func (s CreateApplicationErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateApplicationErrorResponse
+}
+
+// IsNotImplemented reports whether CreateApplicationErrorResponse is NotImplemented.
+func (s CreateApplicationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateApplicationErrorResponse
+}
+
+// IsReqInvalid reports whether CreateApplicationErrorResponse is ReqInvalid.
+func (s CreateApplicationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateApplicationErrorResponse
+}
+
+// IsUnavailable reports whether CreateApplicationErrorResponse is Unavailable.
+func (s CreateApplicationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateApplicationErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateApplicationErrorResponse to AuthUnauthorized.
+func (s *CreateApplicationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateApplicationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateApplicationErrorResponse is AuthUnauthorized.
+func (s CreateApplicationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateApplicationErrorResponse(v AuthUnauthorized) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateApplicationErrorResponse to Internal.
+func (s *CreateApplicationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateApplicationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateApplicationErrorResponse is Internal.
+func (s CreateApplicationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from Internal.
+func NewInternalCreateApplicationErrorResponse(v Internal) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CreateApplicationErrorResponse to NotImplemented.
+func (s *CreateApplicationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateApplicationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateApplicationErrorResponse is NotImplemented.
+func (s CreateApplicationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from NotImplemented.
+func NewNotImplementedCreateApplicationErrorResponse(v NotImplemented) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets CreateApplicationErrorResponse to ReqInvalid.
+func (s *CreateApplicationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateApplicationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateApplicationErrorResponse is ReqInvalid.
+func (s CreateApplicationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ReqInvalid.
+func NewReqInvalidCreateApplicationErrorResponse(v ReqInvalid) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateApplicationErrorResponse to Unavailable.
+func (s *CreateApplicationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateApplicationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateApplicationErrorResponse is Unavailable.
+func (s CreateApplicationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from Unavailable.
+func NewUnavailableCreateApplicationErrorResponse(v Unavailable) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// CreateApplicationErrorResponseStatusCode wraps CreateApplicationErrorResponse with StatusCode.
+type CreateApplicationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateApplicationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateApplicationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateApplicationErrorResponseStatusCode) GetResponse() CreateApplicationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateApplicationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateApplicationErrorResponseStatusCode) SetResponse(val CreateApplicationErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateApplicationErrorResponseStatusCode) createApplicationRes() {}
+
+type CreateApplicationForbidden ErrorDetails
+
+func (*CreateApplicationForbidden) createApplicationRes() {}
+
+type CreateApplicationNotFound ErrorDetails
+
+func (*CreateApplicationNotFound) createApplicationRes() {}
+
+type CreateApplicationOK CreateApplicationResponse
+
+func (*CreateApplicationOK) createApplicationRes() {}
+
+// The request body for creating or revising a registered application.
+// Ref: #
+type CreateApplicationRequest struct {
+	// The application document. If its slug does not already exist in the
+	// project, a new application is created. If one with that
+	// slug already exists, this becomes a new revision of it. The document is
+	// validated against the `application.json` schema, and returned as the
+	// `definition` in the response with each client's `client_id` filled in.
+	Application Application `json:"application"`
+}
+
+// GetApplication returns the value of Application.
+func (s *CreateApplicationRequest) GetApplication() Application {
+	return s.Application
+}
+
+// SetApplication sets the value of Application.
+func (s *CreateApplicationRequest) SetApplication(val Application) {
+	s.Application = val
+}
+
+// Merged schema.
+// Ref: #
+type CreateApplicationResponse struct {
+	// A unique ID, generated when the application is created and shared by
+	// every revision.
+	ID string `json:"id"`
+	// The ID of the revision this entry holds. `getApplicationById`
+	// (`GET /applications/{id}`) returns the newest one.
+	RevisionID string `json:"revision_id"`
+	// The identifier by which other documents reference the application.
+	// Fixed for the life of the application.
+	Slug string `json:"slug"`
+	// When the application was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was created. On the newest revision, that is when
+	// the application was last revised.
+	UpdatedAt time.Time `json:"updated_at"`
+	// The stored application document, with each client's `client_id`.
+	Definition Application `json:"definition"`
+	// The secrets this write generated, one for each client it created,
+	// each with the client's `client_id`. Absent when the write created
+	// no client. Each secret is shown only once.
+	ClientSecrets []ApplicationClientSecret `json:"client_secrets"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateApplicationResponse) GetID() string {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *CreateApplicationResponse) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetSlug returns the value of Slug.
+func (s *CreateApplicationResponse) GetSlug() string {
+	return s.Slug
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateApplicationResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *CreateApplicationResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetDefinition returns the value of Definition.
+func (s *CreateApplicationResponse) GetDefinition() Application {
+	return s.Definition
+}
+
+// GetClientSecrets returns the value of ClientSecrets.
+func (s *CreateApplicationResponse) GetClientSecrets() []ApplicationClientSecret {
+	return s.ClientSecrets
+}
+
+// SetID sets the value of ID.
+func (s *CreateApplicationResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *CreateApplicationResponse) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *CreateApplicationResponse) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateApplicationResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *CreateApplicationResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetDefinition sets the value of Definition.
+func (s *CreateApplicationResponse) SetDefinition(val Application) {
+	s.Definition = val
+}
+
+// SetClientSecrets sets the value of ClientSecrets.
+func (s *CreateApplicationResponse) SetClientSecrets(val []ApplicationClientSecret) {
+	s.ClientSecrets = val
+}
+
+type CreateApplicationUnauthorized ErrorDetails
+
+func (*CreateApplicationUnauthorized) createApplicationRes() {}
 
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
@@ -31826,6 +32528,198 @@ func (s *GateKind) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// GetApplicationByIdErrorResponse represents sum type.
+type GetApplicationByIdErrorResponse struct {
+	Type             GetApplicationByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// GetApplicationByIdErrorResponseType is oneOf type of GetApplicationByIdErrorResponse.
+type GetApplicationByIdErrorResponseType string
+
+// Possible values for GetApplicationByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "internal"
+	NotImplementedGetApplicationByIdErrorResponse   GetApplicationByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationByIdErrorResponse       GetApplicationByIdErrorResponseType = "req.invalid"
+	UnavailableGetApplicationByIdErrorResponse      GetApplicationByIdErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetApplicationByIdErrorResponse is AuthUnauthorized.
+func (s GetApplicationByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetApplicationByIdErrorResponse
+}
+
+// IsInternal reports whether GetApplicationByIdErrorResponse is Internal.
+func (s GetApplicationByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetApplicationByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetApplicationByIdErrorResponse is NotImplemented.
+func (s GetApplicationByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetApplicationByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetApplicationByIdErrorResponse is ReqInvalid.
+func (s GetApplicationByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetApplicationByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetApplicationByIdErrorResponse is Unavailable.
+func (s GetApplicationByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetApplicationByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetApplicationByIdErrorResponse to AuthUnauthorized.
+func (s *GetApplicationByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetApplicationByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetApplicationByIdErrorResponse is AuthUnauthorized.
+func (s GetApplicationByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetApplicationByIdErrorResponse(v AuthUnauthorized) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetApplicationByIdErrorResponse to Internal.
+func (s *GetApplicationByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetApplicationByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetApplicationByIdErrorResponse is Internal.
+func (s GetApplicationByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from Internal.
+func NewInternalGetApplicationByIdErrorResponse(v Internal) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetApplicationByIdErrorResponse to NotImplemented.
+func (s *GetApplicationByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetApplicationByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetApplicationByIdErrorResponse is NotImplemented.
+func (s GetApplicationByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetApplicationByIdErrorResponse(v NotImplemented) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetApplicationByIdErrorResponse to ReqInvalid.
+func (s *GetApplicationByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetApplicationByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetApplicationByIdErrorResponse is ReqInvalid.
+func (s GetApplicationByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetApplicationByIdErrorResponse(v ReqInvalid) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetApplicationByIdErrorResponse to Unavailable.
+func (s *GetApplicationByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetApplicationByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetApplicationByIdErrorResponse is Unavailable.
+func (s GetApplicationByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from Unavailable.
+func NewUnavailableGetApplicationByIdErrorResponse(v Unavailable) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetApplicationByIdErrorResponseStatusCode wraps GetApplicationByIdErrorResponse with StatusCode.
+type GetApplicationByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetApplicationByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetApplicationByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetApplicationByIdErrorResponseStatusCode) GetResponse() GetApplicationByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetApplicationByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetApplicationByIdErrorResponseStatusCode) SetResponse(val GetApplicationByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetApplicationByIdErrorResponseStatusCode) getApplicationByIdRes() {}
+
+type GetApplicationByIdForbidden ErrorDetails
+
+func (*GetApplicationByIdForbidden) getApplicationByIdRes() {}
+
+type GetApplicationByIdNotFound ErrorDetails
+
+func (*GetApplicationByIdNotFound) getApplicationByIdRes() {}
+
+type GetApplicationByIdUnauthorized ErrorDetails
+
+func (*GetApplicationByIdUnauthorized) getApplicationByIdRes() {}
 
 // GetAuthAttemptErrorResponse represents sum type.
 type GetAuthAttemptErrorResponse struct {

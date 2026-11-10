@@ -354,6 +354,12 @@ Each invocation prints one JSON object:
   blank `-m` is refused. A release keeps the message of
   the run that first built its content, usually the pull request's `preview`.
   `deployment rollback -m` records why on the rollback.
+- `deployment get`, `deployment rollback`, `deployment create --release`,
+  `release revoke` and the `users`, `sessions` and `release` commands that take
+  an id refuse a value that is not that kind of id (surrounding whitespace is
+  trimmed) before they ask or call the server, saying what one looks like and
+  suggesting the list command. `claim --challenge-id` refuses a malformed
+  challenge id the same way.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
@@ -425,6 +431,11 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+  A file under `.zitadel/` that cannot be written because a directory it needs
+  is a file fails with `<path> cannot be written (ENOTDIR)`; `details.blocker`
+  is that file. Remove it, then run the command again. A directory where a
+  file is to be removed fails with `<path> cannot be removed (EISDIR)`; remove
+  the directory, then run the command again.
 - `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
   see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
@@ -485,7 +496,10 @@ Ask about:
   sign-on. If they want SSO, which providers? A provider the CLI does not list
   by name is still possible: run `zitadel auth-method sso enable --help` to see
   whether the installed CLI takes one, and which settings it needs, and ask for
-  those too.
+  those too. In an interactive `setup`, Space ticks a provider and Enter
+  continues; pressing Enter with none ticked asks whether to continue without
+  setting up SSO, where No goes back to the list, so nothing is skipped by accident.
+  A non-interactive run names the providers with `--sso` instead.
 - **Profile fields** — which attributes sign-up collects. The starting field
   set depends on the use-case you pick (see *Presets and use-cases* below) —
   the default (`minimal`) is the login identifier only, **not** names. Confirm
@@ -706,6 +720,14 @@ must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 `auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
 provider or an older CLI version does not work.
+
+In a terminal, `setup --sso custom` asks for the name the sign-in button shows
+first, then offers a connection name made from it (`Zitadel Cloud` offers
+`zitadel-cloud`) for the user to accept or edit; a name that would be a built-in
+provider's (`google`, `custom`) is offered empty. A scripted, `--json` or
+`--non-interactive` run asks nothing and still needs `--sso-slug`,
+`--sso-display-name` and `--sso-issuer`. `auth-method sso enable` keeps asking for
+the connection name first.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user at `/register`,

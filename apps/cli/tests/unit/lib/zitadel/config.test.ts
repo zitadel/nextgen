@@ -11,7 +11,6 @@ import {
   ConnectionExistsError,
   FileExistsError,
   Flow,
-  MemoryStore,
   PasswordPolicy,
   Policy,
   PolicyTest,
@@ -19,10 +18,10 @@ import {
   type ConfigKind,
   type ScaffoldOptions,
   type StoredFile,
-  UnparsedFile,
   UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { withoutKey } from "@/lib/zitadel/utils/json";
 import {
   aBranding,
@@ -33,7 +32,9 @@ import {
   anOidcConnection,
   aPasswordPolicy,
   aStore,
+  aStoreHolding,
   aUserSchema,
+  bodyAt,
   type ConfigDocuments,
   type DocumentsByName,
 } from "@tests/helpers/config";
@@ -198,7 +199,7 @@ function pathsOf(documents: readonly { path: string }[]): readonly string[] {
  * @returns The store.
  */
 function aStoreWithUnparsed(path: string): MemoryStore {
-  return new MemoryStore([UnparsedFile.invalidJson(path, "{ not json")]);
+  return aStoreHolding([], { [path]: "{ not json" });
 }
 
 describe("ZitadelConfig.of", () => {
@@ -686,7 +687,7 @@ describe("ZitadelConfig.scaffold", () => {
       PasswordPolicy.PATH,
       SignupPolicy.PATH,
     ])("refuses %s without force", async (path) => {
-      const config = await ZitadelConfig.loadUnchecked(new MemoryStore([{ path, body: {} }]));
+      const config = await ZitadelConfig.loadUnchecked(aStoreHolding([{ path, body: {} }]));
 
       const error = thrownBy(() => {
         return config.scaffold(MINIMAL);
@@ -697,7 +698,7 @@ describe("ZitadelConfig.scaffold", () => {
     });
 
     it("replaces the default schema and flow under force", async () => {
-      const store = new MemoryStore([
+      const store = aStoreHolding([
         { path: DEFAULT_SCHEMA_CONFIG_PATH, body: aUserSchema({ objectType: "old" }) },
         { path: DEFAULT_FLOW_CONFIG_PATH, body: aLoginFlow({ name: "old" }) },
       ]);
@@ -706,10 +707,10 @@ describe("ZitadelConfig.scaffold", () => {
 
       await scaffold.change.save(store, { overwrite: true });
 
-      expect([store.get(DEFAULT_SCHEMA_CONFIG_PATH), store.get(DEFAULT_FLOW_CONFIG_PATH)]).toEqual([
-        scaffold.schema.body,
-        scaffold.flow.body,
-      ]);
+      expect([
+        bodyAt(store, DEFAULT_SCHEMA_CONFIG_PATH),
+        bodyAt(store, DEFAULT_FLOW_CONFIG_PATH),
+      ]).toEqual([scaffold.schema.body, scaffold.flow.body]);
     });
   });
 
@@ -929,7 +930,7 @@ describe("ZitadelConfig.bundle", () => {
   });
 
   it("inlines the branding's $file template and drops its $schema pointer", () => {
-    const store = new MemoryStore([], { ".zitadel/branding/login.liquid": "<main></main>" });
+    const store = aStoreHolding([], { ".zitadel/branding/login.liquid": "<main></main>" });
     const config = aConfig({
       branding: {
         "branding.json": {

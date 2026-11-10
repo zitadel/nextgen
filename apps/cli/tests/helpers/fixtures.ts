@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, readdir, rm } from "node:fs/promises";
 import { createServer, type RequestListener, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,10 +11,34 @@ import { nextPort } from "./ports";
 /** Starts an HTTP server on a free port, answers with `handler`, and returns its base URL. */
 export type Serve = (handler: RequestListener, host?: string) => Promise<string>;
 
+/**
+ * Give every directory under a path its owner's permissions back, so a test
+ * that took them away (to see how a directory no one may read is refused) does
+ * not leave a tree that cannot be removed. A file needs none: removing one
+ * depends only on the directory it is in.
+ *
+ * @param path - The path to unlock, with everything under it.
+ */
+async function unlock(path: string): Promise<void> {
+  const stats = await lstat(path).catch(() => {
+    return undefined;
+  });
+  if (stats === undefined || !stats.isDirectory()) {
+    return;
+  }
+  await chmod(path, 0o755);
+  for (const name of await readdir(path)) {
+    await unlock(join(path, name));
+  }
+}
+
 async function withTempDir(use: (dir: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-"));
   await use(dir);
-  await rm(dir, { recursive: true, force: true });
+  await rm(dir, { recursive: true, force: true }).catch(async () => {
+    await unlock(dir);
+    await rm(dir, { recursive: true, force: true });
+  });
 }
 
 /**
