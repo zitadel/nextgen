@@ -305,14 +305,20 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
+- A filtered `events list` page can hold fewer items than `--limit`, or none,
+  and still carry `next_page_token`: the server matches some filters over a
+  bounded number of events per request. Follow the token, or pass `--all`,
+  before you report that nothing matched.
 - `deploy` emits `data.content_hash` (the release digest), `data.origins`
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
 - When the server refuses a release, `deploy` fails with `E_VALIDATION` and
   the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
-  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
-  only `message` (`release: invalid`); the same entries are in
+  as `schema human-user: …` or `flow default-login: …`. A connection's line
+  ends with the fields it may not change or the endpoints it left out, as in
+  `idp acme-sso: …: oidc.issuer`. Read the hint, not only `message`
+  (`release: invalid`); the same entries are in
   `details.body.details.resources`.
 - `deploy`, `deploy --dry-run` and `doctor` check each user schema against
   the meta-schema the server uses. On the schema's root or a property, a key

@@ -271,7 +271,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);
-    const empty = nothingFound(plural);
+    const empty = next ? `No ${plural} on this page.` : nothingFound(plural);
     const footer: string[] = [];
     const page = {
       token: next,
