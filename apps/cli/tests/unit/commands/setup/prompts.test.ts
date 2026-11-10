@@ -85,7 +85,7 @@ const ACME_ISSUER = "https://sso.acme.example";
 /**
  * The order the custom connection's questions are asked in.
  */
-const QUESTION = { slug: 0, displayName: 1, issuer: 2, scopes: 3 } as const;
+const QUESTION = { displayName: 0, slug: 1, issuer: 2, scopes: 3 } as const;
 
 /**
  * A custom connection's settings, every one of them given.
@@ -160,8 +160,8 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
  */
 function describesAcme(overrides: { issuer?: string; clientId?: string } = {}): void {
   vi.mocked(text)
-    .mockResolvedValueOnce(" acme-sso ")
     .mockResolvedValueOnce(" Acme SSO ")
+    .mockResolvedValueOnce(" acme-sso ")
     .mockResolvedValueOnce(overrides.issuer ?? ` ${ACME_ISSUER} `)
     .mockResolvedValueOnce("openid profile email groups")
     .mockResolvedValueOnce(overrides.clientId ?? "acme-client-id");
@@ -1402,7 +1402,7 @@ describe("askCustomSettings", () => {
       ["slug", "issuer"],
     ],
     [["slug", "displayName", "issuer"], ["scopes"]],
-    [[], ["slug", "displayName", "issuer", "scopes"]],
+    [[], ["displayName", "slug", "issuer", "scopes"]],
   ] as const)("given %j asks only for %j, in that order", async (givenKeys, askedKeys) => {
     const given = Object.fromEntries(
       givenKeys.map((key) => {
@@ -1447,6 +1447,25 @@ describe("askCustomSettings", () => {
 
       expect(text).not.toHaveBeenCalled();
     });
+  });
+
+  it("suggests the slug from the display name it was asked first", async () => {
+    vi.mocked(text).mockResolvedValueOnce("Zitadel Cloud").mockResolvedValueOnce("zitadel-cloud");
+
+    await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+    expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({
+      message: expect.stringContaining("What would you like to call this connection?"),
+      initialValue: "zitadel-cloud",
+    });
+  });
+
+  it("suggests no slug when the display name has nothing a slug can keep", async () => {
+    vi.mocked(text).mockResolvedValueOnce("!!!").mockResolvedValueOnce("slug");
+
+    await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+    expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({ initialValue: "" });
   });
 
   it("returns the scopes that were given as one string", async () => {

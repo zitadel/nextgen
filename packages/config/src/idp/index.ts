@@ -115,6 +115,7 @@ export {
   parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
+  slugFromDisplayName,
   parseIssuer,
   parseScopes,
   validated,

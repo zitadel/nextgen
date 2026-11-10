@@ -15,6 +15,7 @@ import {
   parseIssuer,
   parseScopes,
   type Scopes,
+  slugFromDisplayName,
   variableReference,
 } from "./index.js";
 import { slug } from "./test-support.js";
@@ -45,6 +46,27 @@ describe("parseConnectionSlug", () => {
       ok: false,
       problem: expect.stringContaining("built-in provider"),
     });
+  });
+});
+
+describe("slugFromDisplayName", () => {
+  it("lowercases the name and turns each run of other characters into one dash", () => {
+    expect(slugFromDisplayName("Zitadel Cloud")).toBe("zitadel-cloud");
+    expect(slugFromDisplayName("Acme  -  SSO!")).toBe("acme-sso");
+  });
+
+  it("drops the dashes at either end", () => {
+    expect(slugFromDisplayName("  (Acme) ")).toBe("acme");
+  });
+
+  it("suggests only a slug the parser accepts", () => {
+    for (const name of ["Zitadel Cloud", "Acme SSO", "1Password", "a".repeat(200)]) {
+      expect(parseConnectionSlug(slugFromDisplayName(name)).ok, name).toBe(true);
+    }
+  });
+
+  it("suggests nothing when the name has no letter or digit", () => {
+    expect(slugFromDisplayName("!!!")).toBe("");
   });
 });
 
