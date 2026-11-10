@@ -45,6 +45,8 @@ import {
   update,
 } from "@/commands/resources";
 import { COMMANDS } from "@/index";
+import { idArg } from "@/lib/oclif/crud/shared";
+import { parseArg } from "@tests/helpers/inputs";
 import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
@@ -2597,5 +2599,38 @@ describe("the paged resources' lists", () => {
     const list = RESOURCES[topic].list;
 
     expect([list?.items, list?.next]).toEqual([readers.items, readers.next]);
+  });
+});
+
+describe("the id of a resource whose id has a format", () => {
+  const IDS = {
+    users: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "user", "a user"],
+    sessions: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "session", "a session"],
+    release: ["rel_01M6KPFXAE68N6G2X1HN5XD29R", "release", "a release"],
+  } as const;
+  const TOPICS = Object.keys(IDS) as Array<keyof typeof IDS>;
+
+  it.each(TOPICS)("takes a %s id, trimmed", async (topic) => {
+    const [id] = IDS[topic];
+
+    await expect(parseArg(idArg(RESOURCES[topic]).id!, ` ${id}\n`, "id")).resolves.toBe(id);
+  });
+
+  it.each(
+    TOPICS.flatMap((topic) => {
+      const other = TOPICS.find((candidate) => candidate !== topic) as keyof typeof IDS;
+      const prefix = IDS[topic][0].split("_")[0];
+      return [
+        [topic, "another resource's id", IDS[other][0]],
+        [topic, "a blank", "   "],
+        [topic, "a prefix alone", `${prefix}_`],
+        [topic, "a space inside", `${prefix}_has space`],
+      ] as const;
+    }),
+  )("%s refuses %s, saying what its id is", async (topic, _, value) => {
+    await expect(parseArg(idArg(RESOURCES[topic]).id!, value, "id")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining(`must be ${IDS[topic][2]} ID`),
+    });
   });
 });

@@ -199,6 +199,20 @@ describe("resources", () => {
       });
     });
 
+    describe("a resource id of the wrong kind", () => {
+      it.each([
+        [["users", "get", "rel_01M6KPFXAE68N6G2X1HN5XD29R"]],
+        [["sessions", "get", "user_01KX5N7C9D2E7F0N9WD3P2E4YM6"]],
+        [["release", "get", "sess_01KX5N7C9D2E7F0N9WD3P2E4YM6"]],
+      ])("is refused by %j", async (args) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([...args, "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+    });
+
     describe("--plain", () => {
       it("prints each topic as a tab-separated record", async () => {
         const app = await aSetUpApp();

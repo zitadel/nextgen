@@ -1,4 +1,7 @@
-import { nonBlankArg } from "@/lib/oclif/flags";
+import { Args } from "@oclif/core";
+import { z } from "zod";
+
+import { nonBlankArg, taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/oclif/names";
 
 import { ZitadelError } from "@/lib/errors";
@@ -17,7 +20,22 @@ export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resour
 export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
   const name = idName(resource);
   const description = resource.idDescription ?? `${resource.singular} ${name}`;
-  return { [name]: nonBlankArg({ required: true, description }) };
+  const take =
+    resource.idSchema === undefined
+      ? nonBlankArg
+      : Args.custom<string>({
+          parse: taken({
+            schema: z.string().trim().pipe(resource.idSchema),
+            refusal: {
+              message: "Invalid {input}: {problem}",
+              hint: "Pass the id exactly as it was listed.",
+              details: {
+                argument: "{input}",
+              },
+            },
+          }),
+        });
+  return { [name]: take({ required: true, description }) };
 };
 
 /** The value the caller passed for that argument, read as a command reads it. */

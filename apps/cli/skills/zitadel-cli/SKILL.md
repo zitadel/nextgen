@@ -356,7 +356,8 @@ Each invocation prints one JSON object:
   `deployment rollback -m` records why on the rollback.
 - `deployment get`, `deployment rollback`, `deployment create --release` and
   `release revoke` refuse a value that is not a deployment or release id
-  (surrounding whitespace is trimmed) before they ask or call the server,
+  (surrounding whitespace is trimmed) before they ask or call the server, as
+  do the `users`, `sessions` and `release` commands that take an id,
   saying what one looks like and suggesting the list command.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
