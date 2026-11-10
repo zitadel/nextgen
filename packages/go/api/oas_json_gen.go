@@ -132844,11 +132844,139 @@ func (s SearchErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowdefInvalidSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefNotFoundSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.not_found")
+		{
+			s := s.FlowdefNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefPermissionDeniedSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.permission_denied")
+		{
+			s := s.FlowdefPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpNotFoundSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.not_found")
+		{
+			s := s.IdpNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpPermissionDeniedSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.permission_denied")
+		{
+			s := s.IdpPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalSearchErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchNotFoundSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.not_found")
+		{
+			s := s.SchNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchPermissionDeniedSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.permission_denied")
+		{
+			s := s.SchPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefMissingProjectIDSearchErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.missing_project_id")
+		{
+			s := s.FlowdefMissingProjectID
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -133052,8 +133180,32 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedSearchErrorResponse
 					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidSearchErrorResponse
+					found = true
+				case "flowdef.not_found":
+					s.Type = FlowdefNotFoundSearchErrorResponse
+					found = true
+				case "flowdef.permission_denied":
+					s.Type = FlowdefPermissionDeniedSearchErrorResponse
+					found = true
+				case "idp.not_found":
+					s.Type = IdpNotFoundSearchErrorResponse
+					found = true
+				case "idp.permission_denied":
+					s.Type = IdpPermissionDeniedSearchErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalSearchErrorResponse
+					found = true
+				case "sch.not_found":
+					s.Type = SchNotFoundSearchErrorResponse
+					found = true
+				case "sch.permission_denied":
+					s.Type = SchPermissionDeniedSearchErrorResponse
+					found = true
+				case "flowdef.missing_project_id":
+					s.Type = FlowdefMissingProjectIDSearchErrorResponse
 					found = true
 				case "not_implemented":
 					s.Type = NotImplementedSearchErrorResponse
@@ -133107,8 +133259,40 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case FlowdefInvalidSearchErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefNotFoundSearchErrorResponse:
+		if err := s.FlowdefNotFound.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefPermissionDeniedSearchErrorResponse:
+		if err := s.FlowdefPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case IdpNotFoundSearchErrorResponse:
+		if err := s.IdpNotFound.Decode(d); err != nil {
+			return err
+		}
+	case IdpPermissionDeniedSearchErrorResponse:
+		if err := s.IdpPermissionDenied.Decode(d); err != nil {
+			return err
+		}
 	case InternalSearchErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchNotFoundSearchErrorResponse:
+		if err := s.SchNotFound.Decode(d); err != nil {
+			return err
+		}
+	case SchPermissionDeniedSearchErrorResponse:
+		if err := s.SchPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefMissingProjectIDSearchErrorResponse:
+		if err := s.FlowdefMissingProjectID.Decode(d); err != nil {
 			return err
 		}
 	case NotImplementedSearchErrorResponse:
@@ -133700,6 +133884,12 @@ func (s *SearchResultType) Decode(d *jx.Decoder) error {
 		*s = SearchResultTypeUser
 	case SearchResultTypeTeam:
 		*s = SearchResultTypeTeam
+	case SearchResultTypeSchema:
+		*s = SearchResultTypeSchema
+	case SearchResultTypeFlowDefinition:
+		*s = SearchResultTypeFlowDefinition
+	case SearchResultTypeIdp:
+		*s = SearchResultTypeIdp
 	default:
 		*s = SearchResultType(v)
 	}

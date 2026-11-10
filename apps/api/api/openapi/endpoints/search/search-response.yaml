@@ -16,7 +16,8 @@ properties:
     uniqueItems: true
     description: |
       The requested types whose matches are not all in `results`: there were
-      more than `limit_per_type`, or the text was too short to search that
-      type. Empty when every requested type is complete.
+      more than `limit_per_type`, the text was too short to search that type,
+      or the project holds more of that type than one search reads. Empty when
+      every requested type is complete.
     items:
       $ref: search-result-type.yaml

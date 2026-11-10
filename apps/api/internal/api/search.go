@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"slices"
+	"strings"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -55,6 +56,12 @@ func (h *Handler) Search(ctx context.Context, req *api.SearchRequest, params api
 			candidates, incomplete, err = h.searchUsers(ctx, projectID, query, limit)
 		case domain.SearchResultTypeTeam:
 			candidates, incomplete, err = h.searchTeams(ctx, projectID, query)
+		case domain.SearchResultTypeSchema:
+			candidates, incomplete, err = h.searchSchemas(ctx, projectID, query)
+		case domain.SearchResultTypeFlowDefinition:
+			candidates, incomplete, err = h.searchFlowDefinitions(ctx, projectID, query)
+		case domain.SearchResultTypeIDP:
+			candidates, incomplete, err = h.searchIDPs(ctx, projectID, query)
 		}
 		if err != nil {
 			return nil, err
@@ -198,6 +205,148 @@ func (h *Handler) listTeamsForSearch(ctx context.Context, projectID, query strin
 		}
 		if team.ID != query {
 			result.Rank = min(domain.RankSearchText(query, team.Name), domain.SearchRankContains)
+		}
+		candidates = append(candidates, result)
+	}
+	return candidates, listed.NextPageToken != "", nil
+}
+
+// rankListedRow ranks a row of a list that has no text filter: by its id,
+// else by the best of its names. The bool is false for a row that does not
+// match.
+func rankListedRow(query, id string, names ...string) (domain.SearchRank, bool) {
+	if id == query {
+		return domain.SearchRankID, true
+	}
+	rank := domain.RankSearchText(query, names...)
+	return rank, rank != domain.SearchRankNone
+}
+
+// searchSchemas matches the newest revision of each user schema on its title
+// and object type. The schema list filters on neither, so one page of it is
+// matched here; a project with more schemas than that is reported incomplete.
+func (h *Handler) searchSchemas(ctx context.Context, projectID, query string) (_ []domain.SearchResult, incomplete bool, _ error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
+	if err != nil {
+		return nil, false, err
+	}
+	// Without the kind the list also returns the schemas user schemas refer to.
+	kind := domain.JSONSchemaKindUserSchema
+	listed, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+		ProjectID:                   projectID,
+		Kind:                        &kind,
+		LatestRevisionPerObjectType: true,
+		Limit:                       domain.SearchReadLimit,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	var candidates []domain.SearchResult
+	for _, schema := range listed.Items {
+		title := schema.Title()
+		var objectType string
+		if schema.ObjectType != nil {
+			objectType = *schema.ObjectType
+		}
+		rank, ok := rankListedRow(query, schema.URL, title, objectType)
+		if !ok {
+			continue
+		}
+		result := domain.SearchResult{
+			Type:      domain.SearchResultTypeSchema,
+			ID:        schema.URL,
+			ProjectID: schema.ProjectID,
+			Title:     schema.URL,
+			Rank:      rank,
+		}
+		switch {
+		case title != "":
+			result.Title = title
+			if objectType != title {
+				result.Subtitle = objectType
+			}
+		case objectType != "":
+			result.Title = objectType
+		}
+		candidates = append(candidates, result)
+	}
+	return candidates, listed.NextPageToken != "", nil
+}
+
+// searchFlowDefinitions matches the newest revision of each flow definition
+// on its name, over one page of the list, which matches a name only whole.
+func (h *Handler) searchFlowDefinitions(ctx context.Context, projectID, query string) (_ []domain.SearchResult, incomplete bool, _ error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, flowDefinitionAccess, domain.ResourceKindFlowDefinition)
+	if err != nil {
+		return nil, false, err
+	}
+	listed, err := h.flowDefinitionService.List(ctx, service.ListFlowDefinitionsRequest{
+		ProjectID:             projectID,
+		LatestRevisionPerName: true,
+		Limit:                 domain.SearchReadLimit,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	var candidates []domain.SearchResult
+	for _, definition := range listed.Items {
+		rank, ok := rankListedRow(query, definition.ID, definition.Name)
+		if !ok {
+			continue
+		}
+		purposes := make([]string, 0, len(definition.Purposes))
+		for purpose := range definition.Purposes {
+			purposes = append(purposes, purpose.String())
+		}
+		slices.Sort(purposes)
+		candidates = append(candidates, domain.SearchResult{
+			Type:      domain.SearchResultTypeFlowDefinition,
+			ID:        definition.ID,
+			ProjectID: definition.ProjectID,
+			Title:     definition.Name,
+			Subtitle:  strings.Join(purposes, ", "),
+			Rank:      rank,
+		})
+	}
+	return candidates, listed.NextPageToken != "", nil
+}
+
+// searchIDPs matches identity provider connections on their slug and display
+// name. The display name lives in the connection's document, which the list
+// cannot filter on, so one page of it is matched here.
+func (h *Handler) searchIDPs(ctx context.Context, projectID, query string) (_ []domain.SearchResult, incomplete bool, _ error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, idpAccess, domain.ResourceKindIDPConnection)
+	if err != nil {
+		return nil, false, err
+	}
+	listed, err := h.idpConnectionService.List(ctx, service.ListIDPConnectionsInput{
+		ProjectID: projectID,
+		Limit:     domain.SearchReadLimit,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	var candidates []domain.SearchResult
+	for _, connection := range listed.Items {
+		// A document that cannot be read still has its slug to match on.
+		var displayName string
+		if document, err := domain.ParseIDPConnectionDocument(connection.Document); err == nil {
+			displayName = document.DisplayName
+		}
+		rank, ok := rankListedRow(query, connection.ID, connection.Slug, displayName)
+		if !ok {
+			continue
+		}
+		result := domain.SearchResult{
+			Type:      domain.SearchResultTypeIDP,
+			ID:        connection.ID,
+			ProjectID: connection.ProjectID,
+			Title:     connection.Slug,
+			Rank:      rank,
+		}
+		if displayName != "" && displayName != connection.Slug {
+			result.Title = displayName
+			result.Subtitle = connection.Slug
 		}
 		candidates = append(candidates, result)
 	}

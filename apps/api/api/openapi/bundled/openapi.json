@@ -5609,7 +5609,7 @@
       "post": {
         "operationId": "search",
         "summary": "Search a project",
-        "description": "Finds the users and teams of a project that match a text.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, `GetUserByID` (`GET /users/{user_id}`) or\n`getTeam` (`GET /teams/{team_id}`).\n\nA user matches when the value they carry as `identifier`, or a part of\ntheir `display` name, starts with the text, from three characters on. A\nteam matches when its name contains it. Matching ignores case. A `query`\nthat is the `id` of a user or a team finds that one. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's query operation, `queryUsers`\n(`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use a query operation.\n",
+        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
         "tags": [
           "Search"
         ],
@@ -18659,10 +18659,13 @@
       },
       "search-result-type": {
         "type": "string",
-        "description": "A type of result `search` (`POST /search`) finds:\n- `user`: a user, matched on the start of the value they carry as\n  `identifier` or of a part of their `display` name\n- `team`: a team, matched on its name\n",
+        "description": "A type of result `search` (`POST /search`) finds:\n- `user`: a user, matched on the start of the value they carry as\n  `identifier` or of a part of their `display` name\n- `team`: a team, matched on its name\n- `schema`: a user schema at its newest revision, matched on its `title`\n  and its `objectType`\n- `flow_definition`: a flow definition at its newest revision, matched on\n  its name\n- `idp`: an identity provider connection, matched on its `slug` and its\n  `display_name`\n",
         "enum": [
           "user",
-          "team"
+          "team",
+          "schema",
+          "flow_definition",
+          "idp"
         ]
       },
       "search-request": {
@@ -18702,6 +18705,26 @@
           }
         }
       },
+      "idp-permission_denied": {
+        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "idp.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "search-result": {
         "type": "object",
         "description": "One match: a reference to a resource, not the resource. Every type has this\nshape.\n",
@@ -18717,7 +18740,7 @@
           },
           "id": {
             "type": "string",
-            "description": "The resource's `id`, as its type's own operations take it.",
+            "description": "The resource's `id`, as its type's own operations take it. For a schema\nand a flow definition, the `id` of the newest revision.\n",
             "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
           },
           "project_id": {
@@ -18726,12 +18749,12 @@
           },
           "title": {
             "type": "string",
-            "description": "What to call the resource. For a user, their `display`, else their\n`identifier`, else their `id`. For a team, its name.\n",
+            "description": "What to call the resource:\n- a user: their `display`, else their `identifier`, else their `id`\n- a team: its name\n- a schema: its `title`, else its `objectType`, else its `id`\n- a flow definition: its name\n- an identity provider connection: its `display_name`, else its `slug`\n",
             "example": "Ann Lee"
           },
           "subtitle": {
             "type": "string",
-            "description": "A second line that tells two titles apart. For a user shown by their\n`display`, their `identifier`. Absent when there is nothing to add.\n",
+            "description": "A second line that tells two titles apart, absent when there is nothing\nto add:\n- a user shown by their `display`: their `identifier`\n- a schema shown by its `title`: its `objectType`\n- a flow definition: the purposes it handles\n- an identity provider connection shown by its `display_name`: its\n  `slug`\n",
             "example": "ann@example.com"
           }
         }
@@ -18754,7 +18777,7 @@
           "incomplete_types": {
             "type": "array",
             "uniqueItems": true,
-            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, or the text was too short to search that\ntype. Empty when every requested type is complete.\n",
+            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\nor the project holds more of that type than one search reads. Empty when\nevery requested type is complete.\n",
             "items": {
               "$ref": "#/components/schemas/search-result-type"
             }
@@ -19134,26 +19157,6 @@
               "code": {
                 "type": "string",
                 "const": "idp.field_immutable"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "idp-permission_denied": {
-        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "idp.permission_denied"
               }
             },
             "required": [
@@ -25379,6 +25382,13 @@
           "message": "the team still owns a project and cannot be deactivated while it does"
         }
       },
+      "idp-permission_denied": {
+        "summary": "idp.permission_denied",
+        "value": {
+          "code": "idp.permission_denied",
+          "message": "identity provider connection: the caller's project role does not allow this operation"
+        }
+      },
       "brnd-not_found": {
         "summary": "brnd.not_found",
         "value": {
@@ -25412,13 +25422,6 @@
         "value": {
           "code": "idp.field_immutable",
           "message": "identity provider connection: the field is fixed for the life of the connection"
-        }
-      },
-      "idp-permission_denied": {
-        "summary": "idp.permission_denied",
-        "value": {
-          "code": "idp.permission_denied",
-          "message": "identity provider connection: the caller's project role does not allow this operation"
         }
       },
       "idp-revision_conflict": {
@@ -31536,7 +31539,31 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/flowdef-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/idp-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/idp-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/sch-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/sch-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-missing_project_id"
                 },
                 {
                   "$ref": "#/components/schemas/not_implemented"
@@ -31574,7 +31601,15 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "flowdef.invalid": "#/components/schemas/flowdef-invalid",
+                  "flowdef.not_found": "#/components/schemas/flowdef-not_found",
+                  "flowdef.permission_denied": "#/components/schemas/flowdef-permission_denied",
+                  "idp.not_found": "#/components/schemas/idp-not_found",
+                  "idp.permission_denied": "#/components/schemas/idp-permission_denied",
                   "internal": "#/components/schemas/internal",
+                  "sch.not_found": "#/components/schemas/sch-not_found",
+                  "sch.permission_denied": "#/components/schemas/sch-permission_denied",
+                  "flowdef.missing_project_id": "#/components/schemas/flowdef-missing_project_id",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.not_found": "#/components/schemas/proj-not_found",
                   "proj.permission_denied": "#/components/schemas/proj-permission_denied",
@@ -31595,8 +31630,32 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "flowdef.invalid": {
+                "$ref": "#/components/examples/flowdef-invalid"
+              },
+              "flowdef.not_found": {
+                "$ref": "#/components/examples/flowdef-not_found"
+              },
+              "flowdef.permission_denied": {
+                "$ref": "#/components/examples/flowdef-permission_denied"
+              },
+              "idp.not_found": {
+                "$ref": "#/components/examples/idp-not_found"
+              },
+              "idp.permission_denied": {
+                "$ref": "#/components/examples/idp-permission_denied"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "sch.not_found": {
+                "$ref": "#/components/examples/sch-not_found"
+              },
+              "sch.permission_denied": {
+                "$ref": "#/components/examples/sch-permission_denied"
+              },
+              "flowdef.missing_project_id": {
+                "$ref": "#/components/examples/flowdef-missing_project_id"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
