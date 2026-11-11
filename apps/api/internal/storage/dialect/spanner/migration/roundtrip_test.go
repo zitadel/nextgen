@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/pressly/goose/v3"
@@ -40,14 +41,20 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		migrationtest.RoundTrip(t, p, snap, known)
 		return
 	}
+	// Each walk runs from a goroutine of its own, not as a parallel subtest:
+	// -parallel (GOMAXPROCS, 4 on CI's runner) would hold the others back
+	// until the first ones had claimed every migration.
 	claims := new(migrationtest.Claims)
+	var walks sync.WaitGroup
 	for walk := range roundTripWalks {
-		t.Run(fmt.Sprintf("walk %d of %d", walk+1, roundTripWalks), func(t *testing.T) {
-			t.Parallel()
-			p, snap := openRoundTrip(t)
-			migrationtest.RoundTripClaimed(t, p, snap, known, claims.Next)
+		walks.Go(func() {
+			t.Run(fmt.Sprintf("walk %d of %d", walk+1, roundTripWalks), func(t *testing.T) {
+				p, snap := openRoundTrip(t)
+				migrationtest.RoundTripClaimed(t, p, snap, known, claims.Next)
+			})
 		})
 	}
+	walks.Wait()
 }
 
 // openRoundTrip provisions a database and returns a provider over it and the
