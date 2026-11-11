@@ -156,11 +156,13 @@ The hosted cloud calls it from a Vercel Cron Job
 
 ## Webhook delivery
 
-| YAML key                         | Environment                              | Default | Description                                                   |
-| -------------------------------- | ---------------------------------------- | ------- | ------------------------------------------------------------- |
-| `events.webhooks.enabled`        | `NEXTGEN_EVENTS_WEBHOOKS_ENABLED`        | `true`  | Send each project's events to its webhooks                    |
-| `events.webhooks.interval`       | `NEXTGEN_EVENTS_WEBHOOKS_INTERVAL`       | `5s`    | How often the server looks for events to send                 |
-| `events.webhooks.trigger_secret` | `NEXTGEN_EVENTS_WEBHOOKS_TRIGGER_SECRET` | (empty) | Leaves the schedule to a scheduler outside the server (below) |
+| YAML key                         | Environment                              | Default | Description                                                         |
+| -------------------------------- | ---------------------------------------- | ------- | ------------------------------------------------------------------- |
+| `events.webhooks.enabled`        | `NEXTGEN_EVENTS_WEBHOOKS_ENABLED`        | `true`  | Send each project's events to its webhooks                          |
+| `events.webhooks.interval`       | `NEXTGEN_EVENTS_WEBHOOKS_INTERVAL`       | `5s`    | How often the server looks for events to send, besides its wake-ups |
+| `events.webhooks.trigger_secret` | `NEXTGEN_EVENTS_WEBHOOKS_TRIGGER_SECRET` | (empty) | Leaves the schedule to a scheduler outside the server (below)       |
+| `events.webhooks.wake.url`       | `NEXTGEN_EVENTS_WEBHOOKS_WAKE_URL`       | (empty) | Where a server with a trigger says a project has events to send     |
+| `events.webhooks.wake.secret`    | `NEXTGEN_EVENTS_WEBHOOKS_WAKE_SECRET`    | (empty) | The bearer token of those calls                                     |
 
 The server sends a project's events to the webhooks the project created with
 `POST /webhooks`, signed, and retries a webhook that fails. It reaches them
@@ -170,25 +172,91 @@ through the client the `httpclient` settings configure, so `deny_list` and
 one database, one of them sends each webhook's events at a time; keep their
 clocks in step.
 
-The server sends on its own timer. As for the purge above, set
-`trigger_secret` to at least 16 printable ASCII characters on a server that
-runs only while it serves a request. The server then stops its timer and
-sends once per `GET` or `POST` to `/cron/events-webhooks` that carries the
-secret as a bearer token:
+A deployment chooses one of three ways to start a delivery:
+
+| Settings                       | An event is sent                                         | Retries and anything missed       | For                                                |
+| ------------------------------ | -------------------------------------------------------- | --------------------------------- | -------------------------------------------------- |
+| none (the default)             | as it is stored, within about a tenth of a second        | the server's timer, each `interval` | a server that runs until it is stopped             |
+| `trigger_secret`               | at the scheduler's next call                             | the scheduler's next call         | a server that runs only while it serves a request  |
+| `trigger_secret` and `wake.*`  | when what answers the wake hook calls the trigger for it | the wake hook, and the scheduler  | the same, with events sent soon after they happen  |
+
+### The server's own timer
+
+With no settings the server sends an event as soon as the request that caused
+it has stored it: the server that stored it starts a round for that project.
+Events stored within the same moment share a round, and a project gets at
+most one such round a second. The timer still runs every `interval`: it makes
+the retries, and sends what another server of the deployment stored while
+this one held the webhook.
+
+### A scheduler's trigger
+
+As for the purge above, set `trigger_secret` to at least 16 printable ASCII
+characters on a server that runs only while it serves a request. The server
+then keeps no timer and sends once per `GET` or `POST` to
+`/cron/events-webhooks` that carries the secret as a bearer token:
 
 ```sh
 curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com/cron/events-webhooks
 # {"webhooks":3}
+curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" "https://zitadel.example.com/cron/events-webhooks?project_id=proj_…"
+# {"webhooks":1}
 ```
 
+- With `project_id` the call sends for that project's webhooks only. Without
+  it, it sends for every project's.
 - The answer counts the webhooks the call looked at, not the events it sent.
+  `0` is no error: nothing was due, or another call holds the webhook.
 - A request without the secret gets `401`. A webhook whose endpoint fails is
   not a failed call: the call fails with `500` only when the server can't read
   its webhooks.
 - A call runs for at most 4½ minutes and works on one webhook for at most 30
   seconds. What is left waits for the next call.
-- An event waits for the next call, so call as often as the scheduler allows.
-  Two calls at once are safe: each webhook is sent to by one of them.
+- Without a wake hook an event waits for the next call, so call as often as
+  the scheduler allows. Two calls at once are safe: each webhook is sent to
+  by one of them.
+
+### A wake hook
+
+A scheduler that runs once a minute, or once an hour, makes a webhook that
+late. Set `wake.url` and `wake.secret` beside `trigger_secret`, and the server
+tells that URL when a project has events to send:
+
+```http
+POST /your/wake/endpoint
+Authorization: Bearer <events.webhooks.wake.secret>
+Content-Type: application/json
+
+{ "project_id": "proj_…", "not_before": "2026-11-11T10:00:05Z" }
+```
+
+What answers there calls `/cron/events-webhooks?project_id=…` with the trigger
+secret: at once, or at `not_before` when the body has it. Put a queue in
+between, so that a call the server refuses is made again.
+
+- `not_before` is present after a delivery failed, and names when the next
+  attempt is due. The server makes no attempt before that time, whenever it is
+  called.
+- The call carries no event. The events and each webhook's position are in
+  the database, so a call that is lost, doubled or late changes when an event
+  is sent, never which. Keep a scheduler calling the trigger without
+  `project_id`, once an hour for example, for whatever a lost call left.
+- The server calls only for a project that has an enabled webhook taking one
+  of the event types just stored. It remembers a project's webhooks for 5
+  seconds, so the first event after a webhook is created on another server
+  may not be announced; the next one is.
+- The call is made in the request that stored the event, after the event is
+  committed, and never fails it. It takes at most 2 seconds; after a call
+  that fails, the server makes none for 10 seconds.
+- A round also calls the hook when it ends with events left: those past its
+  4½ minutes or a webhook's 30 seconds, and those stored while it worked.
+- Answer with any `2xx`. `wake.url` is `https` and yours, so the server calls
+  it with its ordinary client, not the one `httpclient` restricts.
+- `wake.url` without `trigger_secret` is refused at startup, as is a
+  `wake.secret` under 16 printable ASCII characters.
+
+The hosted cloud answers the hook with a Vercel queue
+([runbook](../runbooks/cloud.md#operating)).
 
 ## Logging
 

@@ -61,7 +61,19 @@
       "root": "apps/cloud-functions",
       "framework": "nextjs",
       "installCommand": "pnpm -w run install:cloud",
-      "buildCommand": "turbo run build --filter=@zitadel/cloud-functions"
+      "buildCommand": "turbo run build --filter=@zitadel/cloud-functions",
+      "functions": {
+        "app/queues/webhook-wake/route.ts": {
+          "experimentalTriggers": [
+            {
+              "type": "queue/v2beta",
+              "topic": "webhook-wake",
+              "retryAfterSeconds": 30,
+              "maxDeliveries": 20
+            }
+          ]
+        }
+      }
     },
     "go-import": {
       "root": "apps/cloud/go-import",
@@ -251,6 +263,12 @@
       }
     },
     {
+      "source": "/cron/events-webhooks",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
       "source": "/idp/:slug/callback",
       "destination": {
         "service": "server"
@@ -279,6 +297,10 @@
     {
       "path": "/cron/events-retention",
       "schedule": "17 * * * *"
+    },
+    {
+      "path": "/cron/events-webhooks",
+      "schedule": "47 * * * *"
     }
   ],
   "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],

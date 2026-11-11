@@ -74,6 +74,7 @@ catalog:
   "@types/sanitize-html": ^2.16.2
   "@types/semver": ^7.7.1
   "@vercel/analytics": ^2.0.1
+  "@vercel/queue": ^0.11.0
   "@vercel/speed-insights": ^2.0.0
   "@vitejs/plugin-react": ^6.0.1
   "@vitest/browser": ^4.1.12

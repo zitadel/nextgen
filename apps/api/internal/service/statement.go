@@ -1024,15 +1024,16 @@ type WebhookStatements interface {
 	// webhook as stored.
 	RotateWebhookSecret(ctx context.Context, projectID, id, secret string, previousExpiresAt time.Time) (*domain.Webhook, error)
 
-	// LeaseDueWebhooks hands holder up to limit enabled webhooks, of any
-	// project, to deliver until leaseUntil: those whose next attempt is due
+	// LeaseDueWebhooks hands holder up to limit enabled webhooks, of
+	// projectID or with it empty of any project, to deliver until
+	// leaseUntil: those whose next attempt is due
 	// by dueBy and that nobody holds a lease on that is still running at now,
 	// longest due first. No other caller gets one of them before leaseUntil,
 	// also when calls race, unless the holder gives it back first; a holder
 	// that crashed loses it at leaseUntil. The times are the caller's clock,
 	// so the servers of a deployment must agree on it to well within the
 	// length of a lease.
-	LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error)
+	LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error)
 	// RecordWebhookProgress moves the cursor of a webhook holder has leased
 	// to the event (cursorCreatedAt, cursorEventID), keeping the lease. With
 	// deliveredAt the move includes a delivery that succeeded then: it

@@ -4999,18 +4999,18 @@ func (c *MockAllStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context,
 }
 
 // LeaseDueWebhooks mocks base method.
-func (m *MockAllStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+func (m *MockAllStatements) LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LeaseDueWebhooks", ctx, holder, dueBy, now, leaseUntil, limit)
+	ret := m.ctrl.Call(m, "LeaseDueWebhooks", ctx, projectID, holder, dueBy, now, leaseUntil, limit)
 	ret0, _ := ret[0].([]*domain.Webhook)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // LeaseDueWebhooks indicates an expected call of LeaseDueWebhooks.
-func (mr *MockAllStatementsMockRecorder) LeaseDueWebhooks(ctx, holder, dueBy, now, leaseUntil, limit any) *MockAllStatementsLeaseDueWebhooksCall {
+func (mr *MockAllStatementsMockRecorder) LeaseDueWebhooks(ctx, projectID, holder, dueBy, now, leaseUntil, limit any) *MockAllStatementsLeaseDueWebhooksCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaseDueWebhooks", reflect.TypeOf((*MockAllStatements)(nil).LeaseDueWebhooks), ctx, holder, dueBy, now, leaseUntil, limit)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaseDueWebhooks", reflect.TypeOf((*MockAllStatements)(nil).LeaseDueWebhooks), ctx, projectID, holder, dueBy, now, leaseUntil, limit)
 	return &MockAllStatementsLeaseDueWebhooksCall{Call: call}
 }
 
@@ -5026,13 +5026,13 @@ func (c *MockAllStatementsLeaseDueWebhooksCall) Return(arg0 []*domain.Webhook, a
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsLeaseDueWebhooksCall) Do(f func(context.Context, string, time.Time, time.Time, time.Time, uint32) ([]*domain.Webhook, error)) *MockAllStatementsLeaseDueWebhooksCall {
+func (c *MockAllStatementsLeaseDueWebhooksCall) Do(f func(context.Context, string, string, time.Time, time.Time, time.Time, uint32) ([]*domain.Webhook, error)) *MockAllStatementsLeaseDueWebhooksCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsLeaseDueWebhooksCall) DoAndReturn(f func(context.Context, string, time.Time, time.Time, time.Time, uint32) ([]*domain.Webhook, error)) *MockAllStatementsLeaseDueWebhooksCall {
+func (c *MockAllStatementsLeaseDueWebhooksCall) DoAndReturn(f func(context.Context, string, string, time.Time, time.Time, time.Time, uint32) ([]*domain.Webhook, error)) *MockAllStatementsLeaseDueWebhooksCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

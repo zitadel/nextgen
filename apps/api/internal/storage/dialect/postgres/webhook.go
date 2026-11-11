@@ -73,6 +73,7 @@ RETURNING ` + webhook.Columns
 WITH due AS MATERIALIZED (
     SELECT project_id, id FROM zitadel_nextgen.webhooks
     WHERE enabled
+      AND ($6 = '' OR project_id = $6)
       AND (next_attempt_at IS NULL OR next_attempt_at <= $2)
       AND (lease_expires_at IS NULL OR lease_expires_at <= $3)
     ORDER BY next_attempt_at NULLS FIRST, project_id, id
@@ -220,8 +221,8 @@ func (s webhookStatements) RotateWebhookSecret(ctx context.Context, projectID, i
 }
 
 // LeaseDueWebhooks implements [service.WebhookStatements].
-func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
-	rows, err := s.client.Query(ctx, leaseDueWebhooksStmt, holder, dueBy.UTC(), now.UTC(), leaseUntil.UTC(), limit)
+func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+	rows, err := s.client.Query(ctx, leaseDueWebhooksStmt, holder, dueBy.UTC(), now.UTC(), leaseUntil.UTC(), limit, projectID)
 	if err != nil {
 		return nil, wrapError(err)
 	}

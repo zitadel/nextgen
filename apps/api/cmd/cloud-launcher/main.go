@@ -23,6 +23,13 @@
 //     (repo-root vercel.json) calls the server's retention trigger instead,
 //     with CRON_SECRET as its bearer token, which becomes
 //     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
+//   - Delivery to the projects' webhooks. For the same reason the server's
+//     delivery loop cannot run here: CRON_SECRET also becomes
+//     events.webhooks.trigger_secret, and a second cron job calls that
+//     trigger once an hour. With WEBHOOK_WAKE_SECRET the server also calls
+//     the cloud's functions (apps/cloud-functions) when a project has
+//     something to deliver, which put the call to the trigger on a queue
+//     (events.webhooks.wake, ADR 088 §4).
 //   - The request audit events. For the same reason a request waits until
 //     its event is written (events.request.flush_wait), where a server that
 //     keeps running writes it up to a second after the response.
@@ -81,6 +88,10 @@ const (
 	// server's /ui/console. The server derives the console's URLs (claim,
 	// dashboard) from it, so the three must agree; a test holds them together.
 	consolePath = "/console"
+
+	// webhookWakePath is the route of the cloud's functions that takes the
+	// server's wake hook (apps/cloud-functions/app/cloud/hooks/webhook-wake).
+	webhookWakePath = "/cloud/hooks/webhook-wake"
 
 	// requestEventFlushWait bounds how long a request waits for its audit
 	// event (events.request.flush_wait). The write takes milliseconds; the
@@ -373,8 +384,13 @@ type serving struct {
 	adminID string
 	// cronSecret is what the cron job that runs the audit event purge sends
 	// as its bearer token. Empty in a local run, which keeps the server's own
-	// purge loop.
+	// purge loop. It is the trigger secret of webhook delivery too.
 	cronSecret string
+	// wakeURL and wakeSecret are the wake hook of webhook delivery, empty
+	// unless WEBHOOK_WAKE_SECRET turns it on: without it webhooks are
+	// delivered by the hourly cron job alone.
+	wakeURL    string
+	wakeSecret string
 }
 
 func parseServing(env string) (*serving, error) {
@@ -462,6 +478,29 @@ func parseServing(env string) (*serving, error) {
 			return nil, fmt.Errorf("CRON_SECRET %w", err)
 		}
 	}
+
+	if s.wakeSecret = os.Getenv("WEBHOOK_WAKE_SECRET"); s.wakeSecret != "" {
+		if err := audit.CheckTriggerSecret(s.wakeSecret); err != nil {
+			return nil, fmt.Errorf("WEBHOOK_WAKE_SECRET %w", err)
+		}
+		if s.cronSecret == "" {
+			return nil, errors.New("WEBHOOK_WAKE_SECRET needs CRON_SECRET: what the wake hook wakes calls the server's trigger with it")
+		}
+		// The deployment's own functions, unless the operator names another
+		// address for them, as a preview behind Vercel Authentication needs.
+		s.wakeURL = os.Getenv("WEBHOOK_WAKE_URL")
+		if s.wakeURL == "" {
+			base := publicBase(env)
+			if base == "" {
+				return nil, errors.New("WEBHOOK_WAKE_SECRET is set, but the deployment has no URL to call its functions at; set WEBHOOK_WAKE_URL")
+			}
+			s.wakeURL = base + webhookWakePath
+		}
+		wake := audit.WebhookConfig{TriggerSecret: s.cronSecret, Wake: audit.WebhookWakeConfig{URL: s.wakeURL, Secret: s.wakeSecret}}
+		if err := wake.Validate(); err != nil {
+			return nil, fmt.Errorf("WEBHOOK_WAKE_URL: %w", err)
+		}
+	}
 	return s, nil
 }
 
@@ -505,6 +544,8 @@ func prepareServer(extra []string) ([]string, error) {
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
 	_ = os.Unsetenv("MASTER_KEY_PREVIOUS_PEM_B64")
 	_ = os.Unsetenv("CRON_SECRET")
+	_ = os.Unsetenv("WEBHOOK_WAKE_SECRET")
+	_ = os.Unsetenv("WEBHOOK_WAKE_URL")
 	if s.previousID != "" {
 		fmt.Fprintf(os.Stderr, "launcher: master key %s, re-wrapping what %s wrapped; delete MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID once this deployment has started\n", s.keyID, s.previousID)
 	}
@@ -712,7 +753,9 @@ func decodePEM(name, b64 string) (string, error) {
 // stay in it: the master keys as YAML block scalars under their ids, and the
 // cron job's secret. The current key encrypts; a previous key, during a
 // rotation, only decrypts until the server has re-wrapped everything it
-// wrapped. With the secret, the server leaves the purge to the cron job.
+// wrapped. With the secret, the server leaves the purge and the delivery to
+// webhooks to the cron jobs, and with a wake hook it says when a project has
+// something to deliver.
 func renderConfig(s *serving) ([]byte, error) {
 	key := func(pem string, encrypts bool) map[string]any {
 		return map[string]any{"private_key": pem, "use_for_encryption": encrypts}
@@ -725,7 +768,14 @@ func renderConfig(s *serving) ([]byte, error) {
 		"server": map[string]any{"generate_master_key": false, "master_keys": keys},
 	}
 	if s.cronSecret != "" {
-		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
+		webhooks := map[string]any{"trigger_secret": s.cronSecret}
+		if s.wakeSecret != "" {
+			webhooks["wake"] = map[string]any{"url": s.wakeURL, "secret": s.wakeSecret}
+		}
+		config["events"] = map[string]any{
+			"retention": map[string]any{"trigger_secret": s.cronSecret},
+			"webhooks":  webhooks,
+		}
 	}
 	return yaml.Marshal(config)
 }

@@ -312,7 +312,7 @@ func TestWebhookStatements_CursorStartsAtNow(t *testing.T) {
 // also take what another test left behind.
 func leaseDue(t *testing.T, stmts service.AllStatements, projectID, holder string, now time.Time, ttl time.Duration) []string {
 	t.Helper()
-	leased, err := stmts.LeaseDueWebhooks(t.Context(), holder, now, now, now.Add(ttl), 1000)
+	leased, err := stmts.LeaseDueWebhooks(t.Context(), "", holder, now, now, now.Add(ttl), 1000)
 	require.NoError(t, err)
 	var ids []string
 	for _, hook := range leased {
@@ -388,7 +388,7 @@ func TestWebhookStatements_LeaseHoldsUnderConcurrentCalls(t *testing.T) {
 		var wg sync.WaitGroup
 		for i := range racers {
 			wg.Go(func() {
-				leased[i], errs[i] = d.stmts.LeaseDueWebhooks(context.Background(), "server-"+string(rune('a'+i)), now, now, now.Add(time.Minute), 1000)
+				leased[i], errs[i] = d.stmts.LeaseDueWebhooks(context.Background(), "", "server-"+string(rune('a'+i)), now, now, now.Add(time.Minute), 1000)
 			})
 		}
 		wg.Wait()
@@ -414,13 +414,45 @@ func TestWebhookStatements_LeaseLimit(t *testing.T) {
 			createWebhook(t, d.stmts, projectID, testWebhookURL)
 		}
 		now := time.Now().UTC()
-		leased, err := d.stmts.LeaseDueWebhooks(t.Context(), "server-a", now, now, now.Add(time.Minute), 2)
+		leased, err := d.stmts.LeaseDueWebhooks(t.Context(), "", "server-a", now, now, now.Add(time.Minute), 2)
 		require.NoError(t, err)
 		assert.Len(t, leased, 2)
 		// Give back what the call took, another test's webhooks included.
 		for _, hook := range leased {
 			require.NoError(t, d.stmts.ReleaseWebhookLease(t.Context(), hook.ProjectID, hook.ID, "server-a", now))
 		}
+	})
+}
+
+// A lease that names a project takes that project's due webhooks and no
+// other's, however many are due elsewhere.
+func TestWebhookStatements_LeaseOfOneProject(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, otherID := ensureProject(t, d.stmts), ensureProject(t, d.stmts)
+		want := []string{
+			createWebhook(t, d.stmts, projectID, testWebhookURL).ID,
+			createWebhook(t, d.stmts, projectID, testWebhookURL).ID,
+		}
+		other := createWebhook(t, d.stmts, otherID, testWebhookURL)
+		now := time.Now().UTC()
+
+		leased, err := d.stmts.LeaseDueWebhooks(t.Context(), projectID, "server-a", now, now, now.Add(time.Minute), 1000)
+		require.NoError(t, err)
+		var got []string
+		for _, hook := range leased {
+			assert.Equal(t, projectID, hook.ProjectID)
+			got = append(got, hook.ID)
+		}
+		assert.ElementsMatch(t, want, got)
+
+		// Leased, they are no longer due; the other project's still is.
+		leased, err = d.stmts.LeaseDueWebhooks(t.Context(), projectID, "server-b", now, now, now.Add(time.Minute), 1000)
+		require.NoError(t, err)
+		assert.Empty(t, leased)
+		leased, err = d.stmts.LeaseDueWebhooks(t.Context(), otherID, "server-b", now, now, now.Add(time.Minute), 1000)
+		require.NoError(t, err)
+		require.Len(t, leased, 1)
+		assert.Equal(t, other.ID, leased[0].ID)
 	})
 }
 

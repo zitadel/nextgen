@@ -13,6 +13,10 @@ tasks:
     deps:
       # The specs import @zitadel/api's dist/, as Next does.
       - "api:build"
+    inputs:
+      - "**/*"
+      # The queue trigger src/vercel/queue.spec.ts holds against its topic.
+      - "/vercel.json"
 
   typecheck:
     deps:

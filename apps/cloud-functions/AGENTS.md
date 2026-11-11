@@ -5,6 +5,8 @@ a Next.js app of route handlers, no pages, served under `/cloud/` on the
 cloud's origin (repo-root [`vercel.json`](../../vercel.json)). It answers the
 console add-on's RPC, checks BotID in front of the sign-in widget's calls,
 takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
+It also carries the server's webhook wake-ups over a Vercel queue
+([root ADR 088](../../docs/adrs/088-project-webhooks.md) §4, `src/webhook-wake.ts`).
 
 - Keep vendor SDKs behind the ports in `src/ports.ts`; a route or a workflow
   names a port, never Stripe or HubSpot.
@@ -32,6 +34,10 @@ takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
 - Start the dev server through moon, whose task points the sign-in calls at
   `console:dev-real`'s instance; bare `next dev` sends them back to itself.
 
-- Secrets (Stripe, HubSpot, `CRON_SECRET`, the bypass secret) live in the
-  `cloud` project's environment; the [runbook](../../docs/runbooks/cloud.md)
-  lists them.
+- Keep a queue message a hint that names a project, never an event: the
+  server's tables decide what is sent, so a lost or doubled message is safe.
+- Declare a queue's consumer in the repo-root `vercel.json` and keep its
+  route outside `/cloud/`, where no rewrite leads to it.
+- Secrets (Stripe, HubSpot, `CRON_SECRET`, `WEBHOOK_WAKE_SECRET`, the bypass
+  secret) live in the `cloud` project's environment; the
+  [runbook](../../docs/runbooks/cloud.md) lists them.

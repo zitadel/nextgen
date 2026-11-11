@@ -210,3 +210,26 @@ func TestWebhookDeliveryAdapter_DisableWebhookWritesNoEventWithoutTheWrite(t *te
 	err := f.adapter.DisableWebhook(t.Context(), &domain.Webhook{ProjectID: "proj_1", ID: "hook_1"}, "server-a", time.Now(), nil, domain.WebhookDisabledReasonFailing)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
+
+// What a wake-up is weighed against: the filters of the enabled webhooks,
+// read in one page, which holds all a project may have.
+func TestWebhookDeliveryAdapter_WebhookEventTypes(t *testing.T) {
+	f := newWebhookDeliveryFixture(t)
+	f.statements.EXPECT().
+		ListWebhooks(gomock.Any(), "proj_a", database.Page[domain.WebhookField]{Limit: domain.WebhookProjectLimit}).
+		Return(&database.ListResult[*domain.Webhook]{Items: []*domain.Webhook{
+			{ID: "hook_1", Enabled: true, EventTypes: []string{"user.created"}},
+			{ID: "hook_2", Enabled: false, EventTypes: []string{"*"}},
+			{ID: "hook_3", Enabled: true, EventTypes: []string{"user.deleted", "request.api"}},
+		}}, nil)
+
+	eventTypes, err := f.adapter.WebhookEventTypes(t.Context(), "proj_a")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"user.created", "user.deleted", "request.api"}, eventTypes)
+
+	f.statements.EXPECT().ListWebhooks(gomock.Any(), "proj_none", gomock.Any()).
+		Return(&database.ListResult[*domain.Webhook]{}, nil)
+	eventTypes, err = f.adapter.WebhookEventTypes(t.Context(), "proj_none")
+	require.NoError(t, err)
+	assert.Empty(t, eventTypes)
+}
