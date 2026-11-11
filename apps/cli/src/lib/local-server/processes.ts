@@ -20,6 +20,8 @@ export type ManagedRuntimeDiscovery = Readonly<{
 
 type ProcessRow = Readonly<{
   command: string;
+  /** The command as reported: its arguments alone, never the environment it ran with. */
+  shown?: string;
   pid: number;
   ppid?: number;
 }>;
@@ -68,7 +70,8 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     candidates.map(async (row) => {
       return {
         ...row,
-        command: await hydrateCommand(row.pid, row.command, opts?.timeoutMs ?? 1000),
+        command: await hydrateCommand("eww", row.pid, row.command, opts?.timeoutMs ?? 1000),
+        shown: await hydrateCommand("ww", row.pid, row.command, opts?.timeoutMs ?? 1000),
       };
     }),
   );
@@ -84,9 +87,18 @@ async function runPs(args: string[], timeoutMs: number): Promise<string> {
   return (await execa("ps", args, { timeout: timeoutMs })).stdout;
 }
 
-async function hydrateCommand(pid: number, fallback: string, timeoutMs: number): Promise<string> {
+/**
+ * The full command of `pid`: `eww` adds the environment it ran with, which only
+ * tells a managed runtime apart and is never reported; `ww` gives its arguments.
+ */
+async function hydrateCommand(
+  flags: "eww" | "ww",
+  pid: number,
+  fallback: string,
+  timeoutMs: number,
+): Promise<string> {
   try {
-    const hydrated = await runPs(["eww", "-p", String(pid), "-o", "command="], timeoutMs);
+    const hydrated = await runPs([flags, "-p", String(pid), "-o", "command="], timeoutMs);
     return hydrated.trim() || fallback;
   } catch {
     return fallback;
@@ -126,7 +138,7 @@ function toManagedRuntimeProcess(row: ProcessRow): ManagedRuntimeProcess | undef
   return {
     pid: row.pid,
     ppid: row.ppid,
-    command: stripEnvironmentNoise(row.command),
+    command: stripEnvironmentNoise(row.shown ?? row.command),
     kind: wrapper ? "server-wrapper" : "server-binary",
     ...(dataDir ? { data_dir: dataDir } : {}),
   };
