@@ -4,7 +4,7 @@ import { useMatch, useRouter, useSearch } from "@tanstack/react-router";
 import { withoutTrailingSlash } from "@/lib/base-path";
 import type { NavMeta, NavView } from "@/nav";
 
-/** Route prefix of the selected project's Settings, whose pages have a list of their own (D37). */
+/** Route prefix of the selected project's Settings, whose pages have a list of their own (D39). */
 export const PROJECT_SETTINGS_PATH = "/project";
 
 export interface NavItem {

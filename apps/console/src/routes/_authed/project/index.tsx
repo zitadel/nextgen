@@ -3,7 +3,7 @@ import { Settings } from "lucide-react";
 
 /**
  * The project's Settings row: the last of the project's list, and the way into
- * its own list (D37), as the root Settings row is above every project (D29).
+ * its own list (D39), as the root Settings row is above every project (D29).
  *
  * It has no page of its own: it forwards to the list's first page, General.
  */
