@@ -231,6 +231,12 @@ the sidebar.
 > link with `project: undefined`, so `_authed` does not retain the selection
 > and the guard asks for a project as D22 has it.
 
+> **Amendment (2026-11-11, design decision D36):** a selected project stays
+> selected above every project. This replaces D34's `project: undefined` links
+> and D27's pill: on Projects and `/settings` the account list's rows open in
+> the selected project, and the pill names it. With none selected the pill
+> says `All projects` and a project's row asks for one (D22, D31).
+
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
 > project's Overview, declaring `scope: "project"` and the portal list's first
 > entry. The `_authed` guard sends it to Projects without `?next=` when no

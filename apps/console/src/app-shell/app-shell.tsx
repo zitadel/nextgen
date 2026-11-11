@@ -36,9 +36,9 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
  *
  * Every screen is drawn in this one frame (D27). What changes with where the
- * person is is the sidebar's list and what the project pill says
- * (`useShellView`), never the frame, so going from a project to Projects, and
- * from there into Settings, moves nothing but the list. Opening a list from a
+ * person is is the sidebar's list (`useShellView`), never the frame or the
+ * selected project (D36), so going from a project to Projects, and from there
+ * into Settings, moves nothing but the list. Opening a list from a
  * row of another slides it in from the right, and the way back from the left
  * (`useListEntrance`).
  */
@@ -81,7 +81,7 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
-/** Logs, whose list replaces the project's on the screen and on an event's page. */
+/** Logs, whose list replaces the project's on the screen and under an event's drawer. */
 const LOGS_PATH = "/events";
 
 /**
@@ -101,7 +101,11 @@ function useShellView(): NavView {
   return atHome ? "account" : "portal";
 }
 
-/** Home is Projects, the list of every project, from any screen. */
+/**
+ * Home is Projects, the list of every project, from any screen. The selected
+ * project rides along (`_authed` retains `?project=`) and stays selected there
+ * (D36).
+ */
 function HomeLink({ className }: { className: string }) {
   return (
     <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
@@ -195,9 +199,9 @@ const NAV_LABEL: Record<NavView, string> = {
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
  * Console ADR 0001). Portal is the project's screens. Account is what sits
  * above every project: Projects, the home, then the project's screens, then
- * what an add-on lists, then Settings (D34). The pill there names no project,
- * so a project's screen chosen from it drops the selection the URL still
- * carries and asks for one (D31), marking its row while it asks (D22).
+ * what an add-on lists, then Settings (D34). A project's screen chosen from it
+ * opens in the selected project (D36); with none selected it asks for one
+ * (D31), marking its row while it asks (D22).
  * Settings is that row's own list, under a heading that leads back:
  * the person's profile, alone while accounts are not surfaced (Console ADR
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
@@ -214,8 +218,7 @@ const NAV_LABEL: Record<NavView, string> = {
 function NavList({ view }: { view: NavView }) {
   const own = useNavItems(view);
   const project = useNavItems("portal");
-  const account = view === "account";
-  const items = account ? accountListItems(own, project) : own;
+  const items = view === "account" ? accountListItems(own, project) : own;
   // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
   const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();
@@ -231,19 +234,14 @@ function NavList({ view }: { view: NavView }) {
           {/* `/` is where a project lands, whichever screen that is. */}
           {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
           {view === "logs" && <LogViewPicker />}
-          {items.map(({ to, scope, nav: { icon: Icon, label: name } }) => (
+          {items.map(({ to, nav: { icon: Icon, label: name } }) => (
             <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
                 isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
-                <Link
-                  to={to}
-                  // An explicit `undefined` is what stops `_authed` retaining it.
-                  search={account && scope === "project" ? { project: undefined } : undefined}
-                  title={name}
-                >
+                <Link to={to} title={name}>
                   <Icon aria-hidden />
                   <span>{name}</span>
                 </Link>
@@ -331,8 +329,8 @@ function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      {/* Above every project the pill says so, and its list leads into one.
-          Logs is inside a project, like the project's own list. */}
+      {/* Above every project, with none selected, the pill says so, and its
+          list leads into one. */}
       <ContextSwitcher userId={userId} allProjects={view === "account" || view === "settings"} />
     </div>
   );

@@ -68,6 +68,7 @@ export function ResourceTitle({
   children,
   action,
   filter,
+  filterBelow = false,
 }: {
   children: ReactNode;
   action?: ReactNode;
@@ -80,6 +81,11 @@ export function ResourceTitle({
    * action off it.
    */
   filter?: ReactNode;
+  /**
+   * Keeps the filter on its own row under the title at every width, for one
+   * that wants the row's whole width (Logs' search, which fills with chips).
+   */
+  filterBelow?: boolean;
 }) {
   if (!filter) {
     return (
@@ -98,10 +104,25 @@ export function ResourceTitle({
       )}
     >
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 @3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end">
+      <div
+        className={cn(
+          "order-3 flex min-w-0 basis-full flex-wrap items-center gap-2",
+          filterBelow
+            ? // Out of the header's 8px inset, flush with the table under it.
+              "lg:-mx-2 lg:basis-[calc(100%+1rem)]"
+            : "@3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end",
+        )}
+      >
         {filter}
       </div>
-      <div className="order-2 ml-auto @3xl/title-row:order-3 @3xl/title-row:ml-0">{action}</div>
+      <div
+        className={cn(
+          "order-2 ml-auto",
+          !filterBelow && "@3xl/title-row:order-3 @3xl/title-row:ml-0",
+        )}
+      >
+        {action}
+      </div>
     </div>
   );
 }
@@ -148,6 +169,12 @@ export const RESOURCE_STICKY_BODY =
 
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";
+
+/**
+ * The row menu's body cell in a narrow menu column: inset 8px, not the cells'
+ * 24px, which would make the column 84px wide for one 36px button.
+ */
+export const RESOURCE_MENU_CELL_NARROW = "h-14 px-2 py-2";
 
 /** A body cell holding secondary text. */
 export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
@@ -229,9 +256,18 @@ export function ResourceHeadCell({
   );
 }
 
-/** The empty header cell over the row menus. */
-export function ResourceMenuHead({ className }: { className?: string }) {
-  return <TableHead className={cn("h-14 px-6", className)} />;
+/**
+ * The empty header cell over the row menus. `narrow` for a column that is the
+ * menu's button and no wider, with {@link RESOURCE_MENU_CELL_NARROW} beneath.
+ */
+export function ResourceMenuHead({
+  className,
+  narrow = false,
+}: {
+  className?: string;
+  narrow?: boolean;
+}) {
+  return <TableHead className={cn("h-14", narrow ? "px-2" : "px-6", className)} />;
 }
 
 /**

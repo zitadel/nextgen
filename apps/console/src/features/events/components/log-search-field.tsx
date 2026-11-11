@@ -41,7 +41,7 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
-export function EventSearch({ current, me }: { current: LogsSearch; me?: string }) {
+export function LogSearchField({ current, me }: { current: LogsSearch; me?: string }) {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);

@@ -47,9 +47,10 @@ import {
  * it opens on a search field, matched on the server across every project the
  * person can act on, above the selected project and the ones they opened
  * recently, and, while all their projects fit on one page, every other one by
- * name. Its footer opens Projects. Above every project (Projects, Settings)
- * the pill says so, `All projects`, rather than naming the one the selection
- * still holds, and its list is the way back into one (D27). The team switcher is a `Popover` over the
+ * name. Its footer opens Projects. The pill names the selected project on
+ * every screen, Projects and Settings too (D36); with none selected there it
+ * says `All projects`, and its list is the way into one (D27). The team
+ * switcher is a `Popover` over the
  * project's active teams; its footer adds a team, opening the Add team drawer
  * and then the new team.
  */
@@ -63,7 +64,7 @@ const NO_PROJECTS = "No projects";
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
 
-/** What it says above every project, and what its footer opens. */
+/** What it says above every project with none selected, and what its footer opens. */
 const ALL_PROJECTS = "All projects";
 
 /** The project list's search field, label and placeholder alike. */
@@ -96,7 +97,7 @@ export function ContextSwitcher({
   allProjects = false,
 }: {
   userId?: string;
-  /** The screen is above every project, so the pill names none. */
+  /** The screen is above every project: with none selected, the pill says so. */
   allProjects?: boolean;
 }) {
   // The pill shows the selected project (`?project=`, `src/features/projects/project-scope.ts`),
@@ -186,17 +187,19 @@ function ProjectSwitcher({
   }
 
   const label = current && (current.name ?? current.id);
+  // A selection outlives the way up to Projects and Settings (D36).
+  const unselected = allProjects && !selected;
 
   return (
     <Combobox open={open} onOpenChange={changeOpen}>
       <ComboboxAnchor asChild>
         <button type="button" aria-label="Switch project" className={TRIGGER}>
-          {selected && !allProjects ? (
+          {selected ? (
             <ProjectMark projectId={selected} className="size-4" />
           ) : (
             <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
           )}
-          {allProjects ? (
+          {unselected ? (
             <span className="min-w-0 truncate leading-5 text-foreground">{ALL_PROJECTS}</span>
           ) : mine === undefined ? (
             <Skeleton className="h-4 w-24" />

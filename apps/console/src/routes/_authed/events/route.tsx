@@ -7,8 +7,8 @@ import {
   useRouteContext,
   useRouter,
 } from "@tanstack/react-router";
-import { Download, ListFilter, Logs, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Logs, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
 import { FormError } from "@/components/form-error";
 import { IdText } from "@/components/id-text";
 import { Page } from "@/components/layout";
@@ -16,6 +16,7 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
   RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
@@ -29,36 +30,32 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useSidebar } from "@/components/ui/sidebar";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { listProjectEvents } from "@/features/events/api";
 import { EventSheet, LogRowsContext } from "@/features/events/components/event-panel";
-import { EventSearch } from "@/features/events/components/event-search";
+import { LogSearchField } from "@/features/events/components/log-search-field";
 import { EventSubject } from "@/features/events/components/event-subject";
-import { copyEvents, downloadEvents } from "@/features/events/export";
+import {
+  ExportMenu,
+  LiveDot,
+  LiveStatus,
+  SidebarFilters,
+} from "@/features/events/components/logs-toolbar";
 import {
   around,
   eventFilterValues,
-  filterCount,
   isFailure,
   isNarrowed,
   isNarrowedTo,
   type LogEvent,
   type LogsSearch,
   type LogView,
+  NO_AUDIT_EVENTS,
   narrowedBy,
   parseLogsSearch,
   rangeStart,
-  VIEW_LABEL,
 } from "@/features/events/model";
 import { useLiveEvents } from "@/features/events/use-live-events";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
@@ -81,7 +78,7 @@ import { cn } from "@/lib/utils";
  * its pages, and the drawer steps through them.
  *
  * Which events are listed is chosen in the sidebar, whose list Logs replaces
- * with its own (`LogViewRows`, `LogFilters`): the view (audit events, the
+ * with its own (`LogViewPicker`, `LogFilters`): the view (audit events, the
  * default; API requests; both), then the filters. They live in the URL, the
  * drawer's included: they are server-side, so they belong to the request the
  * loader makes. Any of them combine: the server bounds every read, and a
@@ -90,9 +87,9 @@ import { cn } from "@/lib/utils";
  * behind it. The list then says that not every event was read, and its
  * button reads **Keep looking**.
  *
- * The search above the table holds the filters set by a pasted value, as
+ * The search, on a row of its own under the title, holds the filters set by a pasted value, as
  * chips: an id, an event type, an operation, or a filter named before its
- * value (`EventSearch`). Its empty field offers **My activity**, the list
+ * value (`LogSearchField`). Its empty field offers **My activity**, the list
  * narrowed to what the signed-in person did. A row's menu narrows the list by
  * a value the row carries. While the sidebar is an icon rail, on a phone or
  * collapsed, a button beside the search names the view and opens it.
@@ -125,7 +122,7 @@ export const Route = createFileRoute("/_authed/events")({
 
 /** The empty table's sentence, by what was asked for. */
 const NOTHING: Record<LogView, string> = {
-  audit: "This project has no audit events.",
+  audit: NO_AUDIT_EVENTS,
   requests: "This project has no API requests.",
   all: "This project has no events.",
 };
@@ -188,10 +185,11 @@ function LogsScreen() {
     <LogRowsContext.Provider value={{ rows: events, search }}>
       <Page>
         <ResourceTitle
+          filterBelow
           filter={
             <>
               <SidebarFilters search={search} />
-              <EventSearch current={search} me={session.user_id || undefined} />
+              <LogSearchField current={search} me={session.user_id || undefined} />
             </>
           }
           action={
@@ -241,7 +239,7 @@ function LogsScreen() {
                 <ResourceHeadCell className="w-[27%]">Details</ResourceHeadCell>
                 <ResourceHeadCell className="w-[15%]">Actor</ResourceHeadCell>
                 <ResourceHeadCell className="w-[26%]">Time</ResourceHeadCell>
-                <ResourceMenuHead className="w-[6%] px-2" />
+                <ResourceMenuHead narrow className="w-[6%]" />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>
@@ -283,111 +281,6 @@ function LogsScreen() {
         <Outlet />
       </EventSheet>
     </LogRowsContext.Provider>
-  );
-}
-
-/**
- * The way to the views and filters while the sidebar is an icon rail, on a
- * phone or collapsed: the rail has no room for a field, and without its
- * labels it does not say which view is on. The button names the view and how
- * many filters narrow it, and opens the sidebar, where both are changed.
- * Beside an open sidebar it would repeat it, so it is not drawn.
- */
-function SidebarFilters({ search }: { search: LogsSearch }) {
-  const { isMobile, state, setOpen, setOpenMobile } = useSidebar();
-  if (!isMobile && state === "expanded") return null;
-  const count = filterCount(search);
-  const filters = count === 1 ? "1 filter" : `${count} filters`;
-
-  return (
-    <Button
-      variant="outline"
-      className="shrink-0 gap-1.5 px-2.5!"
-      aria-label={`Views and filters: ${VIEW_LABEL[search.view]}${count > 0 ? `, ${filters}` : ""}`}
-      onClick={() => (isMobile ? setOpenMobile(true) : setOpen(true))}
-    >
-      <ListFilter aria-hidden />
-      {VIEW_LABEL[search.view]}
-      {count > 0 && <Badge variant="secondary">{count}</Badge>}
-    </Button>
-  );
-}
-
-/**
- * Live's mark: a dot, grey while it is off, green and pulsing while it reads,
- * as a recording light is. The button's pressed state says the same to
- * assistive tech.
- */
-function LiveDot({ on }: { on: boolean }) {
-  return (
-    <span aria-hidden className="relative flex size-2">
-      {on && (
-        <span className="bg-success absolute inline-flex size-full animate-ping rounded-full opacity-75 motion-reduce:animate-none" />
-      )}
-      <span
-        className={cn(
-          "relative inline-flex size-2 rounded-full",
-          on ? "bg-success" : "bg-muted-foreground/60",
-        )}
-      />
-    </span>
-  );
-}
-
-/**
- * The line under the toolbar while Live is on: that new events appear at the
- * top, and how long ago it last read, counted every second, so a quiet log
- * still shows that it is being read.
- */
-function LiveStatus({ checkedAt }: { checkedAt: Date | undefined }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const seconds = checkedAt
-    ? Math.max(0, Math.round((now - checkedAt.getTime()) / 1000))
-    : undefined;
-
-  return (
-    <p role="status" className="text-muted-foreground mt-3 px-0 text-xs lg:px-2">
-      Live: new events appear at the top as they are recorded.{" "}
-      {seconds === undefined
-        ? "Reading…"
-        : seconds < 2
-          ? "Checked just now."
-          : `Checked ${seconds} s ago.`}
-    </p>
-  );
-}
-
-/**
- * The loaded rows copied or saved, as Vercel's Logs offers them: JSON as the
- * API returns each event, or CSV with the payload in one field. Only what the
- * list holds, Live's rows and the pages loaded included.
- */
-function ExportMenu({ events }: { events: LogEvent[] }) {
-  const empty = events.length === 0;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="icon" className="shrink-0" aria-label="Export">
-          <Download aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem disabled={empty} onSelect={() => void copyEvents(events)}>
-          Copy loaded events
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={empty} onSelect={() => downloadEvents(events, "json")}>
-          Download JSON
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={empty} onSelect={() => downloadEvents(events, "csv")}>
-          Download CSV
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -459,9 +352,7 @@ function EventRow({
       <TableCell className={cn(RESOURCE_CELL_MUTED, "tabular-nums")}>
         <time dateTime={event.occurred_at}>{formatLogTime(event.occurred_at)}</time>
       </TableCell>
-      {/* 8px inset, not the cells' 24px: the column is the menu's button and
-          no wider. */}
-      <TableCell className="h-14 px-2 py-2 text-right">
+      <TableCell className={`${RESOURCE_MENU_CELL_NARROW} text-right`}>
         <RowMenu name={`${event.event_type}, ${event.id}`} contentClassName="w-56">
           <DropdownMenuItem asChild>
             <Link to="/events/$eventId" params={params} search={search}>

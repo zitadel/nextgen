@@ -24,7 +24,7 @@ export type NavIcon = ComponentType<{
  *
  * `logs` is the list Logs opens, in place of the project's (D30). No route
  * belongs to it: its rows are the views and filters of one screen, which the
- * events feature draws (`LogViewRows`, `LogFilters`).
+ * events feature draws (`LogViewPicker`, `LogFilters`).
  */
 export type NavView = "portal" | "account" | "settings" | "logs";
 

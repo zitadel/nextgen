@@ -70,11 +70,11 @@ import {
 
 /**
  * The Logs list of the sidebar (D30): what the shell shows in place of the
- * project's screens on `/events` and on an event's page, as Vercel's Logs
+ * project's screens on `/events` and under an event's drawer, as Vercel's Logs
  * does. A picker chooses the list's view, and under it sit the filters chosen
  * from a list: the time, the category, the type or the status. Values that
  * are pasted, the ids and the operation, go in the search above the table
- * (`EventSearch`).
+ * (`LogSearchField`).
  *
  * Both read the filters from the URL and write them back to it, so the list's
  * loader is the only thing that asks the server. An event's drawer opens over
@@ -112,9 +112,11 @@ export function LogViewPicker() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
+            // The sidebar's outlined row, as search above it: one width, one
+            // radius, one height.
+            variant="outline"
             tooltip={`View: ${VIEW_LABEL[current.view]}`}
             aria-label={`View: ${VIEW_LABEL[current.view]}`}
-            className="border-sidebar-border h-10 border group-data-[collapsible=icon]:border-0"
           >
             <Icon aria-hidden />
             <span className="flex-1">{VIEW_LABEL[current.view]}</span>
@@ -168,8 +170,26 @@ export function LogFilters() {
       aria-label="Filters"
       className="pt-4 group-data-[collapsible=icon]:hidden"
     >
-      <SidebarGroupLabel>Filters</SidebarGroupLabel>
-      <SidebarGroupContent className="flex flex-col gap-3 px-2 pb-2">
+      {/* The group's name, a step above its fields' labels: at one size the
+          heading read as the first of them. Clearing is the group's action,
+          so it sits on the heading. */}
+      <div className="flex h-9 items-center justify-between pr-1 pl-2">
+        <SidebarGroupLabel className="text-sidebar-foreground h-auto px-0 text-sm">
+          Filters
+        </SidebarGroupLabel>
+        {isNarrowed(current) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Clear filters"
+            className="text-muted-foreground h-7 px-2 text-xs"
+            onClick={() => go({ view: current.view })}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      <SidebarGroupContent className="flex flex-col gap-4 px-2 pb-2">
         <TimeFilter current={current} go={go} />
 
         {/* The requests are one category themselves. */}
@@ -187,7 +207,7 @@ export function LogFilters() {
                   )
                 }
               >
-                <SelectTrigger size="sm" aria-labelledby={labelId} className={CONTROL}>
+                <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -209,17 +229,6 @@ export function LogFilters() {
           <StatusFilter current={current} go={go} />
         ) : (
           <TypeFilter current={current} go={go} />
-        )}
-
-        {isNarrowed(current) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-start px-2 text-xs"
-            onClick={() => go({ view: current.view })}
-          >
-            Clear filters
-          </Button>
         )}
       </SidebarGroupContent>
     </SidebarGroup>
@@ -254,7 +263,7 @@ function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSea
               go(withTimeRange(current, choice === ANY ? undefined : (choice as TimeRange)));
             }}
           >
-            <SelectTrigger size="sm" aria-labelledby={labelId} className={CONTROL}>
+            <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -342,7 +351,7 @@ function CustomRange({
         type="datetime-local"
         value={start}
         onChange={(event) => setStart(event.target.value)}
-        className="h-8 text-xs md:text-xs"
+        className={CONTROL}
       />
       <label htmlFor={toId} className={FIELD_LABEL}>
         To
@@ -352,7 +361,7 @@ function CustomRange({
         type="datetime-local"
         value={end}
         onChange={(event) => setEnd(event.target.value)}
-        className="h-8 text-xs md:text-xs"
+        className={CONTROL}
       />
       <Button type="submit" size="sm" variant="secondary" disabled={!valid} className="self-start">
         Apply range
@@ -371,78 +380,93 @@ const TYPE_GROUPS: ComboboxGroup[] = EVENT_TYPES.reduce<ComboboxGroup[]>((groups
   return groups;
 }, []);
 
+/** The list's first row, which is no type: it stands for all the failure types. */
+const FAILURES = "preset:failures";
+
+/**
+ * The shortcut heads the list it ticks, so what it chose shows beneath it. A
+ * chip in the failures' own tint over a rule, with no caption: under one it
+ * read as one more prefix of the types (`auth`, `user`).
+ */
+const TYPE_LIST: ComboboxGroup[] = [
+  {
+    ruled: true,
+    options: [
+      {
+        value: FAILURES,
+        label: "Only failures",
+        description: `${FAILURE_TYPES.length} types`,
+        chip: "destructive",
+      },
+    ],
+  },
+  ...TYPE_GROUPS,
+];
+
 /**
  * The event types the list is narrowed to, chosen from the types the server
  * writes rather than typed: several at once, each one range of the type
- * index, so any choice fills its pages. **Only failures** chooses the failure
- * types. Types read the All view with no category beside them.
+ * index, so any choice fills its pages. **Only failures**, the list's first
+ * row, ticks the failure types in the list under it, and unticks them again:
+ * a button outside the list set the same types without showing that it had.
+ * Types read the All view with no category beside them.
  */
 function TypeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
   const [open, setOpen] = useState(false);
   const chosen = current.type ?? [];
   const failuresOnly =
     chosen.length === FAILURE_TYPES.length && FAILURE_TYPES.every((type) => chosen.includes(type));
-  const toggle = (type: string) =>
+  const toggle = (type: string) => {
+    if (type === FAILURES) return go(withTypes(current, failuresOnly ? [] : FAILURE_TYPES));
     go(
       withTypes(
         current,
         chosen.includes(type) ? chosen.filter((known) => known !== type) : [...chosen, type],
       ),
     );
+  };
 
   return (
     <Field label="Type">
       {() => (
-        <div className="flex flex-col gap-1.5">
-          <Combobox open={open} onOpenChange={setOpen}>
-            <ComboboxAnchor asChild>
-              <ComboboxTrigger
-                label="Event types"
-                open={open}
-                onOpen={() => setOpen(true)}
-                className="h-8 w-full text-xs"
-              >
-                {chosen.length === 0 ? (
-                  <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
-                ) : (
-                  <ComboboxValue>
-                    {failuresOnly
-                      ? "Failures"
-                      : chosen.length === 1
-                        ? chosen[0]
-                        : `${chosen.length} types`}
-                  </ComboboxValue>
-                )}
-              </ComboboxTrigger>
-            </ComboboxAnchor>
-            <ComboboxContent
-              groups={TYPE_GROUPS}
-              selected={chosen}
-              searchPlaceholder="Find a type"
-              emptyLabel="No type matches."
+        <Combobox open={open} onOpenChange={setOpen}>
+          <ComboboxAnchor asChild>
+            <ComboboxTrigger
               label="Event types"
-              closeOnSelect={false}
-              onSelect={toggle}
-              onClose={() => setOpen(false)}
-              footer={
-                chosen.length > 0
-                  ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
-                  : undefined
-              }
-              className="w-64"
-            />
-          </Combobox>
-          {!failuresOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start px-2 text-xs"
-              onClick={() => go(withTypes(current, FAILURE_TYPES))}
+              open={open}
+              onOpen={() => setOpen(true)}
+              className={CONTROL}
             >
-              Only failures
-            </Button>
-          )}
-        </div>
+              {chosen.length === 0 ? (
+                <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
+              ) : (
+                <ComboboxValue>
+                  {failuresOnly
+                    ? "Only failures"
+                    : chosen.length === 1
+                      ? chosen[0]
+                      : `${chosen.length} types`}
+                </ComboboxValue>
+              )}
+            </ComboboxTrigger>
+          </ComboboxAnchor>
+          <ComboboxContent
+            groups={TYPE_LIST}
+            selected={failuresOnly ? [FAILURES, ...chosen] : chosen}
+            searchPlaceholder="Find a type"
+            emptyLabel="No type matches."
+            label="Event types"
+            closeOnSelect={false}
+            onSelect={toggle}
+            onClose={() => setOpen(false)}
+            footer={
+              chosen.length > 0
+                ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
+                : undefined
+            }
+            className="w-64"
+          />
+        </Combobox>
       )}
     </Field>
   );
@@ -456,16 +480,35 @@ const STATUS_MEANING: Record<StatusClass, string> = {
   "5xx": "Failed: the server's error",
 };
 
-const STATUS_OPTIONS = STATUS_CLASSES.map((status) => ({
-  value: status,
-  label: status,
-  description: STATUS_MEANING[status],
-}));
+/** The list's first row, which is no class: it stands for the failed ones. */
+const FAILED = "preset:failed";
+
+/** As the type list: the shortcut heads the classes it ticks. */
+const STATUS_LIST: ComboboxGroup[] = [
+  {
+    ruled: true,
+    options: [
+      {
+        value: FAILED,
+        label: "Only failed requests",
+        description: FAILED_STATUS.join(", "),
+        chip: "destructive",
+      },
+    ],
+  },
+  {
+    options: STATUS_CLASSES.map((status) => ({
+      value: status,
+      label: status,
+      description: STATUS_MEANING[status],
+    })),
+  },
+];
 
 /**
  * The API requests narrowed by the class of their response status, several
  * at once: one range of the status index each, so any choice fills its pages.
- * **Only failed requests** chooses 4xx and 5xx. Requests recorded before the
+ * **Only failed requests**, the list's first row, ticks 4xx and 5xx. Requests recorded before the
  * server indexed the status are not matched.
  */
 function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
@@ -475,6 +518,7 @@ function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsS
     chosen.length === FAILED_STATUS.length &&
     FAILED_STATUS.every((status) => chosen.includes(status));
   const toggle = (status: string) => {
+    if (status === FAILED) return go(withStatus(current, failedOnly ? [] : FAILED_STATUS));
     const known = STATUS_CLASSES.find((candidate) => candidate === status);
     if (!known) return;
     go(
@@ -488,63 +532,53 @@ function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsS
   return (
     <Field label="Status">
       {() => (
-        <div className="flex flex-col gap-1.5">
-          <Combobox open={open} onOpenChange={setOpen}>
-            <ComboboxAnchor asChild>
-              <ComboboxTrigger
-                label="Status classes"
-                open={open}
-                onOpen={() => setOpen(true)}
-                className="h-8 w-full text-xs"
-              >
-                {chosen.length === 0 ? (
-                  <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
-                ) : (
-                  <ComboboxValue>{chosen.join(", ")}</ComboboxValue>
-                )}
-              </ComboboxTrigger>
-            </ComboboxAnchor>
-            <ComboboxContent
-              options={STATUS_OPTIONS}
-              selected={chosen}
-              searchPlaceholder="Find a status"
-              emptyLabel="No status matches."
+        <Combobox open={open} onOpenChange={setOpen}>
+          <ComboboxAnchor asChild>
+            <ComboboxTrigger
               label="Status classes"
-              closeOnSelect={false}
-              onSelect={toggle}
-              onClose={() => setOpen(false)}
-              footer={
-                chosen.length > 0
-                  ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
-                  : undefined
-              }
-              className="w-64"
-            />
-          </Combobox>
-          {!failedOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start px-2 text-xs"
-              onClick={() => go(withStatus(current, FAILED_STATUS))}
+              open={open}
+              onOpen={() => setOpen(true)}
+              className={CONTROL}
             >
-              Only failed requests
-            </Button>
-          )}
-        </div>
+              {chosen.length === 0 ? (
+                <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
+              ) : (
+                <ComboboxValue>
+                  {failedOnly ? "Only failed requests" : chosen.join(", ")}
+                </ComboboxValue>
+              )}
+            </ComboboxTrigger>
+          </ComboboxAnchor>
+          <ComboboxContent
+            groups={STATUS_LIST}
+            selected={failedOnly ? [FAILED, ...chosen] : chosen}
+            searchPlaceholder="Find a status"
+            emptyLabel="No status matches."
+            label="Status classes"
+            closeOnSelect={false}
+            onSelect={toggle}
+            onClose={() => setOpen(false)}
+            footer={
+              chosen.length > 0
+                ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
+                : undefined
+            }
+            className="w-64"
+          />
+        </Combobox>
       )}
     </Field>
   );
 }
 
-/** A filter's control at the sidebar's width: 32px tall, 12px text. */
-const CONTROL = "w-full text-xs";
+/** A filter's control: the sidebar's width, and its rows' 36px and 14px. */
+const CONTROL = "h-9 w-full text-sm md:text-sm";
 
 /** One filter: its name over its control. The sidebar renders twice on a phone, so ids are per instance. */
 function Field({ label, children }: { label: string; children: (labelId: string) => ReactNode }) {
   const labelId = useId();
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <span id={labelId} className={FIELD_LABEL}>
         {label}
       </span>

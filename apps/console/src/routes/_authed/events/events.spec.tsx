@@ -737,7 +737,9 @@ describe("logs filters", () => {
       "2 types",
     );
 
-    await userEvent.click((await filters()).getByRole("button", { name: "Only failures" }));
+    // The shortcut is the list's first row, so the types it ticks show under it.
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^Only failures/ }));
 
     await waitFor(() =>
       expect(queries.at(-1)?.getAll("event_type")).toEqual([
@@ -748,7 +750,7 @@ describe("logs filters", () => {
       ]),
     );
     expect((await filters()).getByRole("combobox", { name: "Event types" })).toHaveTextContent(
-      "Failures",
+      "Only failures",
     );
   });
 
@@ -786,13 +788,14 @@ describe("logs filters", () => {
     expect(
       (await filters()).queryByRole("combobox", { name: "Event types" }),
     ).not.toBeInTheDocument();
-    await userEvent.click((await filters()).getByRole("button", { name: "Only failed requests" }));
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Status classes" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^Only failed requests/ }));
 
     await waitFor(() => expect(queries.at(-1)?.getAll("status_class")).toEqual(["4xx", "5xx"]));
     // One range of the status index each: no category beside them.
     expect(queries.at(-1)?.has("category")).toBe(false);
     expect((await filters()).getByRole("combobox", { name: "Status classes" })).toHaveTextContent(
-      "4xx, 5xx",
+      "Only failed requests",
     );
 
     await searchFor("createUser");
