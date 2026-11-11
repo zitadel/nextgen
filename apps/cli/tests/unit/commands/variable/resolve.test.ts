@@ -41,7 +41,7 @@ async function aProject(options: {
   earlier?: ReturnType<typeof aDeployment>[];
   origins?: { kind: string; pattern: string }[];
   variables?: Record<string, { value?: string; secret?: boolean }>;
-  frozen?: Record<string, Record<string, { value?: string; secret?: boolean }>>;
+  frozen?: Record<string, Record<string, string>>;
 }): Promise<string> {
   const cwd = await aProjectDirectory("zitadel-variable-resolve-", {
     id: "proj_1",
@@ -207,21 +207,21 @@ describe("variable resolve", () => {
       ],
       frozen: {
         dep_a: {
-          FROM_A: {
-            value: "a",
-          },
+          FROM_A: "a",
         },
         dep_b: {
-          FROM_B: {
-            value: "b",
-          },
+          FROM_B: "b",
         },
       },
     });
 
     const { exitCode, stdout } = await resolve(cwd, "dep_a");
     const envelope = parseJson(stdout) as {
-      data: { deployment_id: string; origins: string[]; items: { name: string }[] };
+      data: {
+        deployment_id: string;
+        origins: string[];
+        items: { name: string; value?: string }[];
+      };
     };
 
     expect(exitCode).toBe(0);
@@ -230,6 +230,7 @@ describe("variable resolve", () => {
     expect(envelope.data.items).toMatchObject([
       {
         name: "FROM_A",
+        value: "a",
       },
     ]);
   });
@@ -240,16 +241,18 @@ describe("variable resolve", () => {
       earlier: [aDeployment("dep_old", "https://app.acme.com")],
       frozen: {
         dep_old: {
-          OLD: {
-            value: "kept",
-          },
+          OLD: "kept",
         },
       },
     });
 
     const { exitCode, stdout } = await resolve(cwd, "dep_old");
     const envelope = parseJson(stdout) as {
-      data: { deployment_id: string; origins: string[]; items: { name: string }[] };
+      data: {
+        deployment_id: string;
+        origins: string[];
+        items: { name: string; value?: string }[];
+      };
     };
 
     expect(exitCode).toBe(0);
@@ -258,6 +261,7 @@ describe("variable resolve", () => {
     expect(envelope.data.items).toMatchObject([
       {
         name: "OLD",
+        value: "kept",
       },
     ]);
   });
