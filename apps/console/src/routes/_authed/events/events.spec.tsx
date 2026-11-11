@@ -686,14 +686,23 @@ describe("logs filters", () => {
     const group = await filters();
     fireEvent.change(group.getByLabelText("From"), { target: { value: "2026-11-10T08:00" } });
     fireEvent.change(group.getByLabelText("To"), { target: { value: "2026-11-10T09:30" } });
-    await userEvent.click(group.getByRole("button", { name: "Apply range" }));
 
-    // The viewer's local time, sent as the moments it names.
+    // Read as it is changed, after a pause: there is nothing to press. The
+    // viewer's local time, sent as the moments it names.
     const from = new Date("2026-11-10T08:00").toISOString();
     const to = new Date("2026-11-10T09:30").toISOString();
-    await waitFor(() => expect(queries.at(-1)?.get("created_before")).toBe(to));
+    await waitFor(() => expect(queries.at(-1)?.get("created_before")).toBe(to), {
+      timeout: 3000,
+    });
     expect(queries.at(-1)?.get("created_after")).toBe(from);
     expect(router.state.resolvedLocation?.search).toMatchObject({ from, to });
+    expect(group.queryByRole("button", { name: "Apply range" })).not.toBeInTheDocument();
+    // A start that is not before the end is said, and not read.
+    const reads = queries.length;
+    fireEvent.change(group.getByLabelText("From"), { target: { value: "2026-11-10T10:00" } });
+    expect(await group.findByRole("alert")).toHaveTextContent("The start must be before the end.");
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(queries.length).toBe(reads);
     expect(router.state.resolvedLocation?.search.since).toBeUndefined();
   });
 

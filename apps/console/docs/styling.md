@@ -266,7 +266,9 @@ Detail screens come in three compositions, and each has one shell:
 - **Resource detail** (Users, Teams, Project settings): a title row over body
   cards. Compose `Page` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
-  body card with a titled section is a `DetailSection`; a single name field with
+  body card with a titled section is a `DetailSection`, with an optional
+  `description` (a muted sentence about the whole section, between the title
+  and the rule); a single name field with
   its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
   card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
