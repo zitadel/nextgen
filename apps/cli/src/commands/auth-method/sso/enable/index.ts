@@ -48,7 +48,6 @@ import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
-import { BOX_STYLE, wrapForBox } from "@/lib/box";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -737,14 +736,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * Draw what the connection maps in a box: which claim fills each user
+   * Print what the connection maps: which claim fills each user
    * attribute and what verifies it, the scopes it asks for, the attributes no
    * claim fills, the schemas that sign in through it, and where to change it.
    *
    * @remarks
    * Every value read from a file is escaped on its own, newlines included, so a
-   * name cannot drive the terminal or forge a line of the box. The box has no
-   * heading: the first sentence names the provider.
+   * name cannot drive the terminal or forge a line of the notice.
    *
    * @param change - The change that adds the connection.
    */
@@ -808,16 +806,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     ].filter((section) => {
       return section.length > 0;
     });
-    consola.box({
-      message: wrapForBox(
-        sections
-          .flatMap((section, at) => {
-            return at === 0 ? section : ["", ...section];
-          })
-          .join("\n"),
-      ),
-      style: BOX_STYLE.info,
-    });
+    consola.info(
+      sections
+        .flatMap((section, at) => {
+          return at === 0 ? section : ["", ...section];
+        })
+        .join("\n"),
+    );
   }
 
   /**

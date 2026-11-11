@@ -842,7 +842,7 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
   run must pass all three and gets an error naming the missing ones. The text
-  output, `--dry-run` included, prints a box saying which claim fills each user
+  output, `--dry-run` included, prints a notice saying which claim fills each user
   attribute, which attributes no claim fills (marked required or optional) and
   which schemas sign in through the connection; `--json` carries the same in
   `data.connection` as `claim_mapping`, `verified_claims`, `scopes`, `unmapped`

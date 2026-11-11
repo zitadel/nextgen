@@ -849,7 +849,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a name that carries a control character", () => {
-    it("prints an attribute name as text in the summary box", async ({ dir }) => {
+    it("prints an attribute name as text in the summary", async ({ dir }) => {
       const cwd = await setUpProject(dir, {
         "default-human-user": aSchemaWith({ "nick\u001b[2Jname": { type: "string" } }),
       });
@@ -962,7 +962,7 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).toContain(line);
     });
 
-    it("draws its box after writing the file it describes", async ({ dir }) => {
+    it("prints its notice after writing the file it describes", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
       const result = await withStdin(ACME.secret, () => {
