@@ -277,6 +277,17 @@ the sidebar.
 > named Events, as the route, the API and the CLI are, and the list's
 > `NavView` is `"events"`.
 
+> **Amendment (2026-11-11, design decision D40):** a project's Settings row
+> opens a list of its own, as the root Settings row on Projects does (D29) and
+> as Vercel's project Settings does: both Settings rows carry the arrow and
+> swap the list. `/project` is a layout route (`routes/_authed/project/route.tsx`)
+> that reads the project and draws its header; its pages are routes beneath it
+> with `nav.view: "project-settings"` (General, Admins), and `/project/` only
+> carries the portal entry and forwards to General. `/project` with anything
+> beneath it shows that list under a heading row that leads back to the
+> project's landing, `/`. The root Settings are the platform project's and may
+> list other pages than a project's; only the way they open is shared.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;
