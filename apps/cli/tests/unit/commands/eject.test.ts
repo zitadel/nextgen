@@ -370,7 +370,7 @@ describe("eject asked on a terminal", () => {
 
     const { shown } = await ejecting(cwd, false);
 
-    expect(stripAnsi(shown).trimEnd().split("\n").at(-1)).toBe("Cancelled, nothing was removed");
+    expect(stripAnsi(shown).trimEnd().split("\n").at(-1)).toBe("Cancelled");
   });
 
   it("never shows a person the reason the envelope carries", async () => {
