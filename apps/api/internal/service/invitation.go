@@ -82,8 +82,12 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 	if s.platformProjectID == "" {
 		return nil, domain.ErrInvitationPlatformRequired()
 	}
-	if err := requireClaimedProject(ctx, s.db.Statements(), s.platformProjectID, input.ProjectID, domain.ErrInvitationProjectUnclaimed); err != nil {
+	claimed, err := projectIsClaimedOrExempt(ctx, s.db.Statements(), s.platformProjectID, input.ProjectID)
+	if err != nil {
 		return nil, err
+	}
+	if !claimed {
+		return nil, domain.ErrInvitationProjectUnclaimed()
 	}
 
 	// Minted before the transaction, so a retried callback reuses them.
