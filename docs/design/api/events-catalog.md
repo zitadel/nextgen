@@ -179,7 +179,7 @@ tracked below.
 | WebhookService update (enabling and disabling included) | `webhook.updated` | `admin` | `webhook` | delta: the fields the update named, of `url` (no query), `description`, `event_types`, `enabled` |
 | WebhookService delete | `webhook.deleted` | `admin` | `webhook` | _(empty)_ |
 | WebhookService rotate secret | `webhook.secret_rotated` | `admin` | `webhook` | _(empty; never a secret)_ |
-| Webhook delivery disabling a webhook whose deliveries failed for 3 days without a success, or whose endpoint answered `410` ([ADR 088 §4](../../adrs/088-project-webhooks.md)), in the transaction that disables it; actor type `system`. Disabling through the API is `webhook.updated` | `webhook.disabled` | `admin` | `webhook` | `reason` (`failing`, `gone`) |
+| Webhook delivery disabling a webhook whose deliveries failed for 3 days without a success, or whose endpoint answered `410` ([ADR 089 §4](../../adrs/089-project-webhooks.md)), in the transaction that disables it; actor type `system`. Disabling through the API is `webhook.updated` | `webhook.disabled` | `admin` | `webhook` | `reason` (`failing`, `gone`) |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |

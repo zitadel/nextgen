@@ -68,7 +68,7 @@ func (d webhookDelivery) signedWith(t *testing.T, secret string) bool {
 }
 
 // TestWebhookDelivery runs delivery on a real database, from a webhook
-// created over HTTP to the request its endpoint receives (ADR 088 §2 to §4):
+// created over HTTP to the request its endpoint receives (ADR 089 §2 to §4):
 // what only the parts together show. The secret the API handed out verifies
 // the signature the shipper makes with the stored one, a rotation is signed
 // with both, the pre-claim gate holds deliveries back, and a 410 disables the

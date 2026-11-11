@@ -1,5 +1,5 @@
 // Package webhook holds the read plumbing every dialect shares for a
-// project's webhooks (ADR 088).
+// project's webhooks (ADR 089).
 package webhook
 
 import (

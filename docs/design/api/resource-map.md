@@ -289,7 +289,7 @@ and session lifecycle events.
 
 ## Webhooks
 
-The URLs a project's events are sent to ([ADR 088](../../adrs/088-project-webhooks.md)).
+The URLs a project's events are sent to ([ADR 089](../../adrs/089-project-webhooks.md)).
 The paths are flat and every operation names the project in `project_id`. A
 webhook is not registered in `resource_scope_index`: the project decides
 access. The server stores webhooks and does not deliver to them yet.

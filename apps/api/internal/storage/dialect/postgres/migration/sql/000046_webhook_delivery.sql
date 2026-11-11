@@ -1,5 +1,5 @@
 -- +goose Up
--- What delivery keeps on a webhook (ADR 088 §4), beside the cursor.
+-- What delivery keeps on a webhook (ADR 089 §4), beside the cursor.
 -- next_attempt_at: from when the next attempt is due, the end of the backoff
 -- after a failure; NULL is due. failing_since: the first failure since the
 -- last delivery that succeeded. lease_holder and lease_expires_at: the server

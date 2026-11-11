@@ -1,6 +1,6 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- What delivery keeps on a webhook (ADR 088 §4); see the postgres migration.
+-- What delivery keeps on a webhook (ADR 089 §4); see the postgres migration.
 -- +goose StatementBegin
 ALTER TABLE webhooks ADD COLUMN next_attempt_at TIMESTAMP
 -- +goose StatementEnd

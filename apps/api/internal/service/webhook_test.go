@@ -71,7 +71,7 @@ func (f *webhookFixture) create(url string, eventTypes ...string) (*domain.Webho
 	})
 }
 
-// requireWebhookSecret checks the shape ADR 088 §3 gives a secret: whsec_ and
+// requireWebhookSecret checks the shape ADR 089 §3 gives a secret: whsec_ and
 // the base64 of 32 bytes.
 func requireWebhookSecret(t *testing.T, secret string) {
 	t.Helper()
