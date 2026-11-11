@@ -36,9 +36,9 @@ export const RENDERERS: Record<RendererId, RendererSpec> = {
  * its registry entry to reserve the id, but must never be offered as a usable
  * value.
  */
-export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter(
-  (id) => RENDERERS[id].status === "available",
-);
+export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => {
+  return RENDERERS[id].status === "available";
+});
 
 /**
  * Resolves a renderer id (an untrusted string from config) to its spec,

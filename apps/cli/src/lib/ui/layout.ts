@@ -3,6 +3,7 @@ import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
 
 import type { BoxAction } from "@/lib/box";
+
 import type { Section } from "./summary";
 
 /**

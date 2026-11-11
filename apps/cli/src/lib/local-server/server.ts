@@ -222,7 +222,9 @@ export class LocalServer {
    */
   static async nextFreePort(port: number): Promise<number | undefined> {
     const count = Math.max(0, Math.min(port + 20, 65535) - port);
-    for (const next of Array.from({ length: count }, (_, index) => port + 1 + index)) {
+    for (const next of Array.from({ length: count }, (_, index) => {
+      return port + 1 + index;
+    })) {
       if (await LocalServer.isPortFree(next)) {
         return next;
       }
@@ -235,8 +237,11 @@ export class LocalServer {
     const alive =
       runtime.backend === "binary"
         ? await BinaryLauncher.isRecordRunning(runtime)
-        : (await DockerLauncher.inspect(runtime.container_name).catch(() => undefined))?.running ===
-          true;
+        : (
+            await DockerLauncher.inspect(runtime.container_name).catch(() => {
+              return undefined;
+            })
+          )?.running === true;
     return alive && (await checkLocalServerHealth(runtime.server_url));
   }
 
@@ -259,7 +264,11 @@ export class LocalServer {
         stop_result: await BinaryLauncher.stopPid(processInfo.pid),
       });
     }
-    if (results.some((result) => result.stop_result.status === "failed")) {
+    if (
+      results.some((result) => {
+        return result.stop_result.status === "failed";
+      })
+    ) {
       throw new ZitadelError("E_VALIDATION", "Some managed local runtime processes did not stop", {
         hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
         details: { supported: true, results },
@@ -293,9 +302,9 @@ export class LocalServer {
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     // One start at a time per directory: two at once would pick the same port
     // and run two servers over one data directory. The second finds the first's.
-    return withStartLock(join(localRuntimePaths(this.cwd).runtimeDir, "start.lock"), () =>
-      this.startLocked(config, options),
-    );
+    return withStartLock(join(localRuntimePaths(this.cwd).runtimeDir, "start.lock"), () => {
+      return this.startLocked(config, options);
+    });
   }
 
   /**
@@ -357,7 +366,9 @@ export class LocalServer {
           {
             port: options.port,
             previousPort: other?.port,
-            reusable: (record) => version === undefined || record.server_version === version,
+            reusable: (record) => {
+              return version === undefined || record.server_version === version;
+            },
           },
         );
       }
@@ -381,7 +392,9 @@ export class LocalServer {
         {
           port: options.port,
           previousPort: other?.port,
-          reusable: (record) => record.image === image,
+          reusable: (record) => {
+            return record.image === image;
+          },
         },
       );
     } catch (error) {
@@ -401,8 +414,12 @@ export class LocalServer {
     const { container, dockerError } =
       runtime?.backend === "docker"
         ? await DockerLauncher.inspect(runtime.container_name).then(
-            (inspected) => ({ container: inspected, dockerError: undefined }),
-            (error: unknown) => ({ container: undefined, dockerError: errorMessage(error) }),
+            (inspected) => {
+              return { container: inspected, dockerError: undefined };
+            },
+            (error: unknown) => {
+              return { container: undefined, dockerError: errorMessage(error) };
+            },
           )
         : { container: undefined, dockerError: undefined };
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;

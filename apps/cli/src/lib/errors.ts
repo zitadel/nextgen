@@ -1,3 +1,5 @@
+import { stripVTControlCharacters as stripAnsi } from "node:util";
+
 import {
   BackendError,
   ConflictError,
@@ -7,12 +9,11 @@ import {
   UnavailableError,
   type UnavailableReason,
 } from "./backend";
-import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 import {
-  ConfigError,
   ConflictError as ConfigConflictError,
+  ConfigError,
   NotFoundError as ConfigNotFoundError,
 } from "./zitadel";
 

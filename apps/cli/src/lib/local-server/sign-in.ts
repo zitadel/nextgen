@@ -83,8 +83,14 @@ export async function adminSessionCookie(
   );
   const cookie = res.headers
     .getSetCookie()
-    .map((value) => value.split(";", 1)[0] ?? "")
-    .find((pair) => SESSION_COOKIES.some((name) => pair.startsWith(`${name}=`)));
+    .map((value) => {
+      return value.split(";", 1)[0] ?? "";
+    })
+    .find((pair) => {
+      return SESSION_COOKIES.some((name) => {
+        return pair.startsWith(`${name}=`);
+      });
+    });
   if (!res.ok || !cookie) {
     throw new ZitadelError(
       "E_AUTH",

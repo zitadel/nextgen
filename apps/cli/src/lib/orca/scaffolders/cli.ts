@@ -1,9 +1,10 @@
-import { execaSync } from "execa";
 import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { execaSync } from "execa";
 
 import { ZitadelError } from "@/lib/errors";
 import { reportWarning } from "@/lib/warnings";
+
 import {
   describeAcceptedNode,
   type NodeEngines,

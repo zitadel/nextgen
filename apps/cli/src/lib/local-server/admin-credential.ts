@@ -62,7 +62,9 @@ export async function findLocalAdminFor(
 ): Promise<LocalAdmin | undefined> {
   for (const dir of ancestors(cwd, homedir())) {
     if ((await findLocalAdminDir(dir)) !== dir) continue;
-    const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
+    const runtime = await readRuntimeMetadata(dir).catch(() => {
+      return undefined;
+    });
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }

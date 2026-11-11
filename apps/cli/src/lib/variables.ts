@@ -116,10 +116,12 @@ export function parseVariableValue(
   raw: string,
   type: VariableType,
 ): Parsed<string | number | boolean> {
-  const refuse = (problem: string, hint: string): Parsed<never> => ({
-    ok: false,
-    problem: `${problem} ${hint}`,
-  });
+  const refuse = (problem: string, hint: string): Parsed<never> => {
+    return {
+      ok: false,
+      problem: `${problem} ${hint}`,
+    };
+  };
   switch (type) {
     case "string":
       return { ok: true, value: raw };

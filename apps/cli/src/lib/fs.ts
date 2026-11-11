@@ -100,7 +100,9 @@ export async function pathExistsStrict(path: string): Promise<boolean> {
  * missing instead of aborting the rest.
  */
 export function readIfReadable(path: string): Promise<string | undefined> {
-  return readIfExists(path).catch(() => undefined);
+  return readIfExists(path).catch(() => {
+    return undefined;
+  });
 }
 
 /**
@@ -119,7 +121,11 @@ export function readIfReadable(path: string): Promise<string | undefined> {
  */
 export async function isFile(path: string): Promise<boolean> {
   return stat(path).then(
-    (info) => info.isFile(),
-    () => false,
+    (info) => {
+      return info.isFile();
+    },
+    () => {
+      return false;
+    },
   );
 }

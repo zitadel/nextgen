@@ -17,28 +17,42 @@ import { escapeControlCharacters } from "./terminal-text";
  */
 
 /** What a fragment carries: text, never an escape sequence. */
-const text = (s: string): string => escapeControlCharacters(s);
+const text = (s: string): string => {
+  return escapeControlCharacters(s);
+};
 
 /** Bold cyan, for commands the user should run. */
-export const command = (s: string): string => pc.bold(pc.cyan(text(s)));
+export const command = (s: string): string => {
+  return pc.bold(pc.cyan(text(s)));
+};
 /** Cyan, for filesystem paths the user can open. */
-export const path = (s: string): string => pc.cyan(text(s));
+export const path = (s: string): string => {
+  return pc.cyan(text(s));
+};
 /** Cyan, for a frame that says what to read or do, as against green for what succeeded. */
 export const notice = (s: string): string => {
   return pc.cyan(s);
 };
 /** Cyan, for URLs (browser-clickable in most terminals). */
-export const url = (s: string): string => pc.cyan(text(s));
+export const url = (s: string): string => {
+  return pc.cyan(text(s));
+};
 /**
  * Plain, for opaque ids: there is nothing to open, and yellow means a warning.
  * Still spelled out, because an id the server minted is interpolated into a
  * rendering printed as it came, whether or not this colours it.
  */
-export const id = (s: string): string => text(s);
+export const id = (s: string): string => {
+  return text(s);
+};
 /** Dim, for separators and secondary detail. */
-export const dim = (s: string): string => pc.dim(text(s));
+export const dim = (s: string): string => {
+  return pc.dim(text(s));
+};
 /** Bold, for titles and what needs attention. */
-export const strong = (s: string): string => pc.bold(text(s));
+export const strong = (s: string): string => {
+  return pc.bold(text(s));
+};
 
 /** The color of each outcome, for a mark in another shape, like doctor's `[✓]`. */
 export const statusColor = { pass: pc.green, warn: pc.yellow, fail: pc.red } as const;

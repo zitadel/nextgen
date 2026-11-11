@@ -1,9 +1,10 @@
-import type { Summary } from "@/lib/ui";
 import { Flags } from "@oclif/core";
 
-import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
-import { isObject } from "@/lib/json";
 import { Cmd } from "@/lib/cmd";
+import { isObject } from "@/lib/json";
+import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
+import type { Summary } from "@/lib/ui";
+
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
 import { painted, type Rendering, rows } from "./rendering";
@@ -176,7 +177,10 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
           );
         }),
         columns: columns.map((key) => {
-          return { key, name: key.split(".").at(-1) ?? key };
+          return {
+            key,
+            name: key.split(".").at(-1) ?? key,
+          };
         }),
         borderStyle: "headers-only-with-underline",
         maxWidth: "none",

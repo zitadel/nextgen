@@ -2,6 +2,7 @@ import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
+
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 

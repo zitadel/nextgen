@@ -1,12 +1,10 @@
-import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
-
 import {
   type Deployment,
   DeploymentService,
   type DeployToPrimaryResult,
   IdpService,
-  type Origins,
   OriginService,
+  type Origins,
   type Release,
   type ReleaseInput,
   ReleaseService,
@@ -15,10 +13,12 @@ import {
   VariableService,
   type ZitadelClient,
 } from "@/lib/backend";
+import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
 import { isCancellation, ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
+
 import { headSha, worktreeIsDirty } from "./git";
 import {
   type PipelineMode,

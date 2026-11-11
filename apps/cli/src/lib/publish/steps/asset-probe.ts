@@ -2,10 +2,9 @@ import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
 import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
-
-import { log } from "@/lib/log";
 import { Agent, type Dispatcher } from "undici";
 
+import { log } from "@/lib/log";
 import { userAgent } from "@/lib/user-agent";
 import type { JsonObject } from "@/lib/zitadel";
 

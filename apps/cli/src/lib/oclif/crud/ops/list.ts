@@ -1,12 +1,10 @@
-import { z } from "zod";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
+
 import { Paging } from "@/lib/backend/transport";
-
-import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
-
-import type { CommandResult } from "@/lib/oclif/types";
-import { plainFlag } from "@/lib/oclif/tabulatable";
-import { wireOf } from "@/lib/oclif/crud/wire";
+import { Cmd } from "@/lib/cmd";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
 import {
   type ParsedFilter,
   parseFilter,
@@ -15,10 +13,12 @@ import {
   type TypedSort,
 } from "@/lib/oclif/crud/query";
 import { parseOrThrow } from "@/lib/oclif/crud/shared";
-import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
-import { Cmd } from "@/lib/cmd";
-import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
 import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
+import { wireOf } from "@/lib/oclif/crud/wire";
+import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { plainFlag } from "@/lib/oclif/tabulatable";
+import type { CommandResult } from "@/lib/oclif/types";
+
 import {
   type OperationDefinition,
   type OperationInput,

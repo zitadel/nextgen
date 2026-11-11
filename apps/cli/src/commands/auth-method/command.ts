@@ -412,7 +412,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       }
       const retry = [...retryArgs, ...target.cwdArgs, "--force"];
       const question = `Disable ${error.disabling} anyway? Nobody will be able to sign in to ${error.schema}.`;
-      if (this.dryRun && this.meta.nonInteractive && !this.force) {
+      if (this.dryRun && this.nonInteractive && !this.force) {
         // The re-run stays a preview: --force with --dry-run writes nothing.
         refuseNoSignInLeft({
           target,

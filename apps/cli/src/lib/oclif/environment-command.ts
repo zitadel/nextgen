@@ -2,20 +2,21 @@ import { createZitadelClient } from "@/lib/backend";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
-import { Suggestible } from "./suggestible";
-import { byName } from "./names";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import {
   ENVIRONMENT_SELECTOR_OPTIONS,
   environmentFlags,
   environmentSelectorSuffix,
 } from "./environment-flags";
-import type { ConnectOptions, Connection, GlobalOptions } from "./types";
+import { byName } from "./names";
+import { Suggestible } from "./suggestible";
+import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
-import type { EnvironmentSelector, SuggestedCommand } from "@/lib/suggestion";
-import { optionArgs } from "@/lib/public-cli";
+
 import { Cmd } from "@/lib/cmd";
+import { optionArgs } from "@/lib/public-cli";
+import type { EnvironmentSelector, SuggestedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 
 /**
@@ -200,8 +201,8 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     // A dry run writes nothing, and an answer is persisted to a file, so it
     // never asks: a missing value fails it exactly as a scripted run.
     const ask = {
-      cwd: this.meta.cwd,
-      interactive: !this.meta.nonInteractive && !this.meta.dryRun && options.prompt !== false,
+      cwd: this.cwd,
+      interactive: !this.nonInteractive && !this.dryRun && options.prompt !== false,
       ask: this.ui.questions(),
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);

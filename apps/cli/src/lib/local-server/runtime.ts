@@ -305,14 +305,18 @@ export async function loopbackReach(
   cwd: string,
   serverUrl: string,
 ): Promise<"allowed" | "container" | "unknown"> {
-  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
+    return undefined;
+  });
   if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
     return "unknown";
   }
   if (nearest.runtime.backend === "docker") {
     return "container";
   }
-  return Object.keys(LOCAL_DEFAULTS).every((name) => nearest.runtime.env?.injected.includes(name))
+  return Object.keys(LOCAL_DEFAULTS).every((name) => {
+    return nearest.runtime.env?.injected.includes(name);
+  })
     ? "allowed"
     : "unknown";
 }
@@ -416,7 +420,9 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   const path = join(cwd, ".gitignore");
   const existing = (await readIfExists(path)) ?? "";
 
-  const lines = existing.split(/\r?\n/).map((line) => line.trim());
+  const lines = existing.split(/\r?\n/).map((line) => {
+    return line.trim();
+  });
   if (lines.includes(entry)) {
     return;
   }
@@ -587,7 +593,9 @@ export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   const resetArgs = ["reset", "--force", "--cwd", dir];
   const startArgs = ["start", "--cwd", dir];
   const suggestedArgs = [resetArgs, startArgs];
-  const portable = suggestedArgs.every((args) => args.every(isPortableShellWord));
+  const portable = suggestedArgs.every((args) => {
+    return args.every(isPortableShellWord);
+  });
   const reset = `zitadel ${resetArgs.join(" ")}`;
   const start = `zitadel ${startArgs.join(" ")}`;
   return new ZitadelError(error.code, error.message, {

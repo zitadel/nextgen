@@ -21,15 +21,23 @@ const PREVIEW_PLATFORMS: ReadonlyArray<{
 }> = [
   {
     variables: ["VERCEL_BRANCH_URL", "VERCEL_URL"],
-    urls: (env) =>
-      [env.VERCEL_BRANCH_URL, env.VERCEL_URL]
-        .filter((host): host is string => Boolean(host))
-        .map((host) => `https://${host}`),
+    urls: (env) => {
+      return [env.VERCEL_BRANCH_URL, env.VERCEL_URL]
+        .filter((host): host is string => {
+          return Boolean(host);
+        })
+        .map((host) => {
+          return `https://${host}`;
+        });
+    },
   },
   {
     variables: ["DEPLOY_PRIME_URL", "DEPLOY_URL"],
-    urls: (env) =>
-      [env.DEPLOY_PRIME_URL, env.DEPLOY_URL].filter((url): url is string => Boolean(url)),
+    urls: (env) => {
+      return [env.DEPLOY_PRIME_URL, env.DEPLOY_URL].filter((url): url is string => {
+        return Boolean(url);
+      });
+    },
   },
 ];
 

@@ -1,7 +1,8 @@
+import { Cmd } from "@/lib/cmd";
 import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
-import { Cmd } from "@/lib/cmd";
 import { inShell } from "@/lib/suggestion";
+
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
@@ -79,7 +80,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       message,
       ...gate
     }: DestructiveChange<Ready>): Promise<CommandResult> {
-      if (this.meta.dryRun) {
+      if (this.dryRun) {
         return preview();
       }
       const ready = prepare === undefined ? undefined : await prepare();
@@ -128,7 +129,10 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         return word.replace(CREDENTIALS, "$1");
       };
       const positional = (
-        gate.arguments ?? raw.flatMap((token) => (token.type === "arg" ? [token.input] : []))
+        gate.arguments ??
+        raw.flatMap((token) => {
+          return token.type === "arg" ? [token.input] : [];
+        })
       ).map(redact);
       const flags = raw.flatMap((token) => {
         if (token.type !== "flag" || ANSWERING.has(token.flag)) {
@@ -143,7 +147,9 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
 
         return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
       });
-      const delimited = positional.some((word) => word.startsWith("-"));
+      const delimited = positional.some((word) => {
+        return word.startsWith("-");
+      });
       const command = this.retryCommand([
         ...(this.id ?? "").split(":").filter((word) => {
           return word !== "";
@@ -153,9 +159,9 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         ...flags,
       ]);
       const session = {
-        interactive: !this.meta.nonInteractive,
-        force: this.meta.force,
-        dryRun: this.meta.dryRun,
+        interactive: !this.nonInteractive,
+        force: this.force,
+        dryRun: this.dryRun,
       };
 
       return Consent.request(

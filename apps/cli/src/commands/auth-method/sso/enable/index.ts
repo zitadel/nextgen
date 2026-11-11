@@ -832,15 +832,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       this.drawMapping(input.change);
     }
 
+    const title = this.title(name, unpublished);
+
     return this.emit({
       status: "ok",
       data: {
-        title: this.title(name, unpublished),
+        title,
         ...payload,
         next_args: followUps.args,
       },
       summary: {
-        title: escapeControlCharacters(this.title(name, unpublished)),
+        title: escapeControlCharacters(title),
         sections: [],
         lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
         next: [

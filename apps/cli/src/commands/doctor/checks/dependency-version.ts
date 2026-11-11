@@ -40,7 +40,9 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    const exact = await exactZitadelPins(ctx.cwd).catch(() => undefined);
+    const exact = await exactZitadelPins(ctx.cwd).catch(() => {
+      return undefined;
+    });
     if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.

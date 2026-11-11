@@ -1,14 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
-
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
-import { nonBlankString } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
-
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { resourceBody } from "@/lib/oclif/crud/resource-body";
-import type { CommandResult } from "@/lib/oclif/types";
 import {
   type BodyField,
   bodyFieldFlags,
@@ -17,6 +10,7 @@ import {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "@/lib/oclif/crud/fields";
+import { resourceBody } from "@/lib/oclif/crud/resource-body";
 import { article, dryRunResult, idArg, idName } from "@/lib/oclif/crud/shared";
 import type {
   CreateSpec,
@@ -28,9 +22,14 @@ import type {
   WriteShape,
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
+import { nonBlankString } from "@/lib/oclif/flags";
+import { named } from "@/lib/oclif/names";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json } from "@/lib/oclif/rendering";
-import type { Summary } from "@/lib/ui";
+import type { CommandResult } from "@/lib/oclif/types";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+import type { Summary } from "@/lib/ui";
+
 import {
   type OperationDefinition,
   type OperationInput,

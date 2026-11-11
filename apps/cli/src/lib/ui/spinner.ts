@@ -111,7 +111,10 @@ export class DrawnSpinner implements Spinner {
   private spin(): ReturnType<typeof spinner> {
     const events = ["SIGINT", "SIGTERM", "exit", "uncaughtExceptionMonitor", "unhandledRejection"];
     const before = events.map((event) => {
-      return { event, listeners: new Set(process.listeners(event as NodeJS.Signals)) };
+      return {
+        event,
+        listeners: new Set(process.listeners(event as NodeJS.Signals)),
+      };
     });
     const handle = spinner({ withGuide: this.guide });
     handle.start(this.text);

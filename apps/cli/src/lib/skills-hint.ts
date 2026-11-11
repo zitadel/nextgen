@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-
-import { log } from "@/lib/log";
 import * as rosie from "rosie-skills";
 
+import { log } from "@/lib/log";
+
 import type { BoxAction } from "./box";
-import { command } from "./style";
 import { publicCliCommand } from "./public-cli";
+import { command } from "./style";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {

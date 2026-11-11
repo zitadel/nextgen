@@ -4,6 +4,7 @@ import pc from "picocolors";
 import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
 import { asker } from "@/lib/input";
 import { log as logger } from "@/lib/log";
+
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";

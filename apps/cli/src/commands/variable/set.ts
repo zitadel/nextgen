@@ -241,6 +241,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             );
           }
         }
+
         return this.emit({
           status: "ok",
           data: {

@@ -137,7 +137,9 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
         server: readProjectServer(await readZitadelConfig(cwd)),
       };
     })
-    .catch(() => undefined);
+    .catch(() => {
+      return undefined;
+    });
   if (records === undefined) {
     // A missing or unparseable secret or config is the `secret` and `config`
     // checks' to report, with a repair path.

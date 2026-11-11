@@ -3,11 +3,11 @@ import {
   DEFAULT_SCOPES,
   type DisplayName,
   type Issuer,
+  type ProviderSelection,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseScopes,
-  type ProviderSelection,
   RESERVED_SLUGS,
 } from "@zitadel/config/idp";
 

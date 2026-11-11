@@ -100,7 +100,10 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
               next: { commands: [this.suggest("preview list")] },
             });
           }
-          return { client, projectId };
+          return {
+            client,
+            projectId,
+          };
         },
         apply: async (consent, { client, projectId }) => {
           const previewService = new PreviewService(consent.unlock(client), projectId);

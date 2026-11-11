@@ -11,9 +11,9 @@ import type { Connection, Credential } from "@/lib/zitadel";
 import {
   type CredentialNames,
   type GivenCredentials,
-  publishClientId,
   type PublishedCredentials,
   type PublishState,
+  publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishArgs,

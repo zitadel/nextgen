@@ -1,10 +1,11 @@
 import { isObject } from "@/lib/json";
-import { refusalError, type Refusal } from "@/lib/oclif/refusal";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
 import { mergeDocuments, setAt, valueAt } from "./document";
 import { type BodyField, bodyFromFlags } from "./fields";
-import { findCredential, refuseSecret, type References } from "./secrets";
+import { findCredential, type References, refuseSecret } from "./secrets";
 import { parseOrThrow } from "./shared";
 import type { Json, Schema } from "./types";
 import { objectOf, type ZodLike } from "./zod";
@@ -17,31 +18,35 @@ const argvParts = (
   fields: readonly BodyField[],
   fromFlags: Json | undefined,
   assignments: readonly Assignment[],
-): ArgvPart[] => [
-  ...(typeof flags.data === "string" && base
-    ? [
-        {
-          value: base,
-          source: "--data",
-        },
-      ]
-    : []),
-  ...fields.flatMap((field) => {
-    const value = valueAt(fromFlags, field.path);
-    return value === undefined || field.flag === undefined
-      ? []
-      : [
+): ArgvPart[] => {
+  return [
+    ...(typeof flags.data === "string" && base
+      ? [
           {
-            value: setAt({}, field.path, value),
-            source: `--${field.flag}`,
+            value: base,
+            source: "--data",
           },
-        ];
-  }),
-  ...assignments.map((assignment) => ({
-    value: fragmentOf(assignment),
-    source: "--set",
-  })),
-];
+        ]
+      : []),
+    ...fields.flatMap((field) => {
+      const value = valueAt(fromFlags, field.path);
+      return value === undefined || field.flag === undefined
+        ? []
+        : [
+            {
+              value: setAt({}, field.path, value),
+              source: `--${field.flag}`,
+            },
+          ];
+    }),
+    ...assignments.map((assignment) => {
+      return {
+        value: fragmentOf(assignment),
+        source: "--set",
+      };
+    }),
+  ];
+};
 
 const refuseArgvCredentials = (
   parts: readonly ArgvPart[],
@@ -72,13 +77,17 @@ const unwrapRoot = (raw: Json, root: string | undefined, document: ZodLike | und
   return isObject(inner) && !declared ? inner : raw;
 };
 
-const isMissing = (field: BodyField, document: unknown): boolean =>
-  valueAt(document, field.path) === undefined &&
-  (field.required ||
-    (field.requiredWith !== undefined && isObject(valueAt(document, field.requiredWith))));
+const isMissing = (field: BodyField, document: unknown): boolean => {
+  return (
+    valueAt(document, field.path) === undefined &&
+    (field.required ||
+      (field.requiredWith !== undefined && isObject(valueAt(document, field.requiredWith))))
+  );
+};
 
-const spelling = (field: BodyField): string =>
-  field.flag ? `--${field.flag}` : `--set ${field.name}=…`;
+const spelling = (field: BodyField): string => {
+  return field.flag ? `--${field.flag}` : `--set ${field.name}=…`;
+};
 
 /** What {@link resourceBody} builds a write's body from. */
 export type ResourceBodySource = Readonly<{
@@ -115,20 +124,24 @@ export const resourceBody = async (source: ResourceBodySource, flags: Json): Pro
     source.document,
     source.references,
   );
-  const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>(
-    (body, overlay) => (overlay === undefined ? body : mergeDocuments(body, overlay)),
-    base ?? {},
-  );
-  const missing = source.fields.filter((field) => isMissing(field, merged));
+  const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>((body, overlay) => {
+    return overlay === undefined ? body : mergeDocuments(body, overlay);
+  }, base ?? {});
+  const missing = source.fields.filter((field) => {
+    return isMissing(field, merged);
+  });
   if (missing.length > 0) {
+    const plural = new Intl.PluralRules("en").select(missing.length) === "one";
     const flagNames = missing.map(spelling);
     throw refusalError(MISSING_FIELDS_REFUSAL, {
       command: `${source.topic} ${source.verb}`,
-      noun: new Intl.PluralRules("en").select(missing.length) === "one" ? "field" : "fields",
-      pronoun: new Intl.PluralRules("en").select(missing.length) === "one" ? "it" : "them",
+      noun: plural ? "field" : "fields",
+      pronoun: plural ? "it" : "them",
       spellings: flagNames.join(", "),
       alternatives: new Intl.ListFormat("en", { type: "conjunction" }).format(flagNames),
-      names: missing.map((field) => field.name),
+      names: missing.map((field) => {
+        return field.name;
+      }),
     });
   }
   const wrapped = source.root === undefined ? merged : { [source.root]: merged };

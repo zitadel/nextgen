@@ -115,6 +115,7 @@ export default class Logs extends Suggestible(BaseCommand) {
       });
 
       const title = "Stopped following local Zitadel logs";
+
       return this.emit({
         status: "ok",
         data: { title },

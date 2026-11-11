@@ -1,13 +1,13 @@
+export { PublishedConfiguration } from "./configuration";
 export { abbreviate } from "./hash";
 export { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "./message";
-export { PublishedConfiguration } from "./configuration";
 export {
   type DeployOutcome,
   type DeployRequest,
-  type PrepareRequest,
   type PreparedRelease,
+  type PrepareRequest,
   type PreviewRequest,
-  type PublishOutcome,
   Publisher,
+  type PublishOutcome,
   type ReleaseRequest,
 } from "./publisher";

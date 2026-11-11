@@ -1219,7 +1219,9 @@ async function secretProjectId(cwd: string): Promise<string | undefined> {
         (secret) => {
           return secret.project_id;
         },
-        () => undefined,
+        () => {
+          return undefined;
+        },
       )
     : undefined;
 }

@@ -213,6 +213,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     }
     if (tests.length === 0) {
       const directory = CONFIG_DIRECTORIES.policies;
+
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",

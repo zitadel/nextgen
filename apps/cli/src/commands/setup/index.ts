@@ -2493,6 +2493,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     const title = moved
       ? `Moved the app to ${move.issuer}`
       : `The app is already on ${move.issuer}`;
+
     return this.emit({
       status: "ok",
       data: {

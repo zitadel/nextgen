@@ -35,7 +35,9 @@ export class ClaimCheck implements SanityCheck {
           server: readProjectServer(await readZitadelConfig(ctx.cwd)),
         });
       })
-      .catch(() => undefined);
+      .catch(() => {
+        return undefined;
+      });
     if (state === undefined) {
       // A missing or unparseable secret/config is already reported, loudly and
       // with a repair path, by the `secret` and `config` checks. Implementing

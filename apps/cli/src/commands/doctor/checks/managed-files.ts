@@ -265,16 +265,9 @@ export class ManagedFilesCheck implements SanityCheck {
     if (missingBefore.length === 0 && removed.length === 0 && conditionalWritten.size === 0) {
       return;
     }
-    // Reconcile the manifest with the current template set before rewriting
-    // it. Template migrations (Next 15's middleware.ts → Next 16's proxy.ts)
-    // retire paths the current plan no longer writes: repair restores the
-    // *new* boundary, so a retired entry whose file stays absent must be
-    // dropped — keeping it would fail doctor forever, since setup skips
-    // initialized projects. Paths the repair newly introduced are adopted
-    // with their class and on-disk hash, a conditional one only when this
-    // repair wrote it. A conditional path the repair did not bring back is one
-    // the current plan does not write for this app (Nuxt's retired plugins),
-    // so it is dropped the same way.
+    // A retired entry whose file stays absent is dropped, and a path the repair
+    // newly introduced is adopted with its class and on-disk hash, a conditional
+    // one only when this repair wrote it.
     const current = new Set(actions.markedFiles);
     const files: Record<string, ScaffoldFileEntry> = {};
     for (const [path, entry] of Object.entries(manifest.files)) {

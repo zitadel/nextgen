@@ -1,11 +1,10 @@
 import { join } from "node:path";
-
 import { execa } from "execa";
 
+import { Cmd } from "./cmd";
 import { pathExists } from "./fs";
 import { readPackageJson } from "./npm";
 import { optionArgs } from "./public-cli";
-import { Cmd } from "./cmd";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
@@ -151,7 +150,9 @@ function command(packageManager: PackageManager, args: string[]): PackageCommand
 }
 
 async function packageManagerFromManifest(cwd: string): Promise<PackageManager | undefined> {
-  const pkg = await readPackageJson(cwd).catch(() => undefined);
+  const pkg = await readPackageJson(cwd).catch(() => {
+    return undefined;
+  });
   return typeof pkg?.packageManager === "string"
     ? packageManagerFromString(pkg.packageManager)
     : undefined;

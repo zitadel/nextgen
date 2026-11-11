@@ -181,11 +181,8 @@ export default class Claim extends EnvironmentCommand {
         ? await this.connect()
         : undefined;
     const projectId = prompted?.projectId ?? requireValue(this.environment, "ZITADEL_PROJECT_ID");
-    // `.zitadel/secret` is only the place a completed claim is recorded, and
-    // only when it is this very project's record. An env file can supply a
-    // different project, so the legacy secret is neither required nor touched
-    // then — the durable record is the platform grant (ADR 046), and the local
-    // cache must not claim a project it does not describe.
+    // `.zitadel/secret` is a local cache of the claim, used only when it records
+    // this very project; the durable record is the platform grant (ADR 046).
     const localSecret = (await hasZitadelSecret(this.cwd))
       ? await readZitadelSecret(this.cwd)
       : undefined;

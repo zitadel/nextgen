@@ -37,9 +37,8 @@ export async function loadPatchContext(
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,
     scaffoldedFramework: scaffold?.scaffolded_framework,
-    // Restore the posture setup recorded rather than re-deriving it — a
-    // manifest-less legacy scaffold cannot answer the fresh-vs-pre-existing
-    // hinge, and every scaffold before the record was full-page (ADR 044).
+    // Restore the posture setup recorded: a manifest-less scaffold cannot answer
+    // the fresh-vs-pre-existing hinge, and it is always full-page (ADR 044).
     posture: scaffold?.posture ?? "page",
     preset: readPreset(config),
     useCase: readUseCase(config),
@@ -81,7 +80,9 @@ export async function configuredIssuer(cwd: string): Promise<string | undefined>
     ({ values }) => {
       return values.ZITADEL_ISSUER?.value;
     },
-    () => undefined,
+    () => {
+      return undefined;
+    },
   );
 }
 

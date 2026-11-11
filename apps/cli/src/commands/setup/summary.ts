@@ -104,7 +104,9 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
   // A missing or unreadable package.json leaves the version undefined; the
   // renderer skips that segment, which is the same as the user not having
   // declared the framework dep yet.
-  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const pj = await readPackageJson(cwd).catch(() => {
+    return undefined;
+  });
   const depPkg = depFromFramework(frameworkId);
   const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
   const version = range ? stripRange(range) : undefined;

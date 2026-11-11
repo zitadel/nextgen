@@ -1,9 +1,10 @@
 import { Args, Flags } from "@oclif/core";
-import { z, type ZodType } from "zod";
+import { type ZodType, z } from "zod";
+
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 
 import type { Placeholders } from "./refusal";
 import { type Refusal, refusalError } from "./refusal";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 
 /**
  * What a flag or argument is refused for, with the schema that decides it.

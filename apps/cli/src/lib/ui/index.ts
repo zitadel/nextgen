@@ -55,8 +55,8 @@ export type { Presentation } from "./presentation";
 export type { Report, Step } from "./progress";
 export type {
   Choice,
-  ConfirmQuestion,
   Confirmer,
+  ConfirmQuestion,
   MultiselectQuestion,
   Optional,
   Questions,

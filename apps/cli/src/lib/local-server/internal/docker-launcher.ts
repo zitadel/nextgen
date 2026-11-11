@@ -84,7 +84,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       env.values,
     ).catch(async (error: unknown) => {
       // A run that failed after the container was created leaves it behind.
-      await DockerLauncher.remove(spec.containerName).catch(() => false);
+      await DockerLauncher.remove(spec.containerName).catch(() => {
+        return false;
+      });
       throw error;
     });
     return launched(
@@ -151,7 +153,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       `${spec.dataDir}:${CONTAINER_DATA_DIR}`,
       // Project variables first: Docker takes the last value for a repeated
       // name, so the CLI's own settings below always win.
-      ...envNames.flatMap((name) => ["--env", name]),
+      ...envNames.flatMap((name) => {
+        return ["--env", name];
+      }),
       "--env",
       `NEXTGEN_SERVER_ADDRESS=:${CONTAINER_HTTP_PORT}`,
       "--env",

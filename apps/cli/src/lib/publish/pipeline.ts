@@ -1,6 +1,6 @@
 import type { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
-import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 
 /**
  * The publishes a step can run for. `preview` lands with the preview command.

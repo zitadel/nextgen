@@ -1,4 +1,5 @@
 import { isObject } from "@/lib/json";
+
 import type { Schema } from "./types";
 import { unwrap, type ZodLike } from "./zod";
 
@@ -37,10 +38,12 @@ const shapeOf = (schema: ZodLike | undefined): Record<string, ZodLike> | undefin
   if (!options) {
     return undefined;
   }
-  const merged = Object.assign({}, ...options.map((option) => shapeOf(option) ?? {})) as Record<
-    string,
-    ZodLike
-  >;
+  const merged = Object.assign(
+    {},
+    ...options.map((option) => {
+      return shapeOf(option) ?? {};
+    }),
+  ) as Record<string, ZodLike>;
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
@@ -72,12 +75,24 @@ export const fieldPaths = (schema: Schema | undefined, depth = 3): FieldPaths | 
 };
 
 /** Whether a path is legal for records of this shape. */
-export const allows = (paths: FieldPaths, path: string): boolean =>
-  paths.known.has(path) || paths.open.some((prefix) => path.startsWith(`${prefix}.`));
+export const allows = (paths: FieldPaths, path: string): boolean => {
+  return (
+    paths.known.has(path) ||
+    paths.open.some((prefix) => {
+      return path.startsWith(`${prefix}.`);
+    })
+  );
+};
 
 /** The paths worth showing a caller who named one that does not exist. */
-export const suggestable = (paths: FieldPaths): readonly string[] =>
-  [...paths.known, ...paths.open.map((prefix) => `${prefix}.<key>`)].sort();
+export const suggestable = (paths: FieldPaths): readonly string[] => {
+  return [
+    ...paths.known,
+    ...paths.open.map((prefix) => {
+      return `${prefix}.<key>`;
+    }),
+  ].sort();
+};
 
 /** Fallback when no schema is available: the paths these records actually carry. */
 export const observedPaths = (items: readonly unknown[]): FieldPaths => {

@@ -1,11 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { deletedData, mutatedData } from "@/lib/oclif/envelope";
-import type { CommandResult } from "@/lib/oclif/types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "@/lib/oclif/crud/shared";
 import type { DeleteSpec, Json } from "@/lib/oclif/crud/types";
+import { deletedData, mutatedData } from "@/lib/oclif/envelope";
 import { prose } from "@/lib/oclif/rendering";
+import type { CommandResult } from "@/lib/oclif/types";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+
 import {
   type OperationDefinition,
   type OperationInput,
@@ -67,7 +68,11 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
         return `${capitalize(verb)} ${resource.singular} ${id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
       },
       preview: () => {
-        return dryRunResult({ verb, topic, id });
+        return dryRunResult({
+          verb,
+          topic,
+          id,
+        });
       },
       prepare: () => {
         return this.context();

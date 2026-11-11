@@ -1,10 +1,11 @@
-import type { Tabulate } from "@/lib/oclif/tabulatable";
 import type { Interfaces } from "@oclif/core";
 import type { ZodType } from "zod";
 
 import type { Consent } from "@/lib/consent";
-import type { CommandGroup } from "@/lib/oclif/groups";
 import type { Connection } from "@/lib/oclif/environment-command";
+import type { CommandGroup } from "@/lib/oclif/groups";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
+
 import type { References } from "./secrets";
 
 /**

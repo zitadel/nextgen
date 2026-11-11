@@ -1,4 +1,5 @@
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
+
 import type { BaseCommand } from "./base";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
@@ -49,12 +50,12 @@ export function Suggestible<TBase extends CommandClass<BaseCommand>>(Base: TBase
           return projectCommand(
             args,
             takesSelector ? this.selector() : this.cwdSelector(),
-            this.meta.cliVersion,
+            this.cliVersion,
           );
         }
       }
 
-      return projectCommand(args, this.selector(), this.meta.cliVersion);
+      return projectCommand(args, this.selector(), this.cliVersion);
     }
   }
 

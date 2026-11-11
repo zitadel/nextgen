@@ -3,14 +3,14 @@ import {
   type CustomOidcInput,
   IDP_PROVIDERS,
   isLoopbackIssuer,
-  RESERVED_SLUGS,
+  type Parsed,
+  type ProviderSelection,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseProviderSelection,
   parseScopes,
-  type Parsed,
-  type ProviderSelection,
+  RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
 

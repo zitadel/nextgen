@@ -480,10 +480,12 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       }
     }
 
+    const title = `Added the ${args.name} environment, bound to ${projectId}`;
+
     return this.emit({
       status: "ok",
       data: {
-        title: `Bound ${args.name} to ${projectId}`,
+        title,
         environment: args.name,
         file: environment.file,
         server,
@@ -506,7 +508,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
               },
       },
       summary: {
-        title: escapeControlCharacters(`Added the ${args.name} environment, bound to ${projectId}`),
+        title: escapeControlCharacters(title),
         sections: [],
         lines: [
           `${environment.file} holds ${Object.keys(values).join(", ")}.`,

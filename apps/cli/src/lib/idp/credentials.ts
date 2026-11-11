@@ -1,4 +1,3 @@
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import type {
   ClientId,
   ClientIdVariable,
@@ -6,9 +5,10 @@ import type {
   ClientSecretVariable,
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
-import { log } from "@/lib/log";
 
+import { log } from "@/lib/log";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
 /**

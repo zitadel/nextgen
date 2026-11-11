@@ -1,4 +1,5 @@
 import type { Questions } from "@/lib/ui";
+
 import type { BaseCommand } from "./base";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */

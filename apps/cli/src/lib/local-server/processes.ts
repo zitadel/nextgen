@@ -50,23 +50,33 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   const listed = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
     .then(parsePsRows)
     .then(
-      (rows) => ({ rows }),
-      (error: unknown) => ({ error: errorMessage(error) }),
+      (rows) => {
+        return { rows };
+      },
+      (error: unknown) => {
+        return { error: errorMessage(error) };
+      },
     );
   if ("error" in listed) {
     return { supported: false, processes: [], error: listed.error };
   }
 
-  const candidates = listed.rows.filter((row) => isRuntimeCandidate(row.command));
+  const candidates = listed.rows.filter((row) => {
+    return isRuntimeCandidate(row.command);
+  });
   const hydrated = await Promise.all(
-    candidates.map(async (row) => ({
-      ...row,
-      command: await hydrateCommand(row.pid, row.command, opts?.timeoutMs ?? 1000),
-    })),
+    candidates.map(async (row) => {
+      return {
+        ...row,
+        command: await hydrateCommand(row.pid, row.command, opts?.timeoutMs ?? 1000),
+      };
+    }),
   );
   const processes = hydrated
     .map(toManagedRuntimeProcess)
-    .filter((candidate): candidate is ManagedRuntimeProcess => candidate !== undefined);
+    .filter((candidate): candidate is ManagedRuntimeProcess => {
+      return candidate !== undefined;
+    });
   return { supported: true, processes: uniqueByPid(processes) };
 }
 
@@ -141,7 +151,9 @@ function isServerBinary(command: string): boolean {
   }
   return (
     isCliLocalDataDir(extractDataDir(command)) &&
-    commandTokens(command).some((token) => basename(token) === "nextgen")
+    commandTokens(command).some((token) => {
+      return basename(token) === "nextgen";
+    })
   );
 }
 
@@ -166,7 +178,9 @@ function stripEnvironmentNoise(command: string): string {
 }
 
 function commandTokens(command: string): string[] {
-  return command.split(/\s+/).filter((token) => !/^[A-Z_][A-Z0-9_]*=/.test(token));
+  return command.split(/\s+/).filter((token) => {
+    return !/^[A-Z_][A-Z0-9_]*=/.test(token);
+  });
 }
 
 function uniqueByPid(
@@ -176,5 +190,7 @@ function uniqueByPid(
   for (const processInfo of processes) {
     byPid.set(processInfo.pid, processInfo);
   }
-  return [...byPid.values()].sort((a, b) => a.pid - b.pid);
+  return [...byPid.values()].sort((a, b) => {
+    return a.pid - b.pid;
+  });
 }

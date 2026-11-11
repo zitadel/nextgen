@@ -2,8 +2,8 @@ import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
-import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
+import { reportWarning } from "@/lib/warnings";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**

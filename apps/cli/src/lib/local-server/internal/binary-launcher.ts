@@ -95,7 +95,9 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     serverUrl: string;
   }): Promise<Launched<BinaryRuntimeMetadata>> {
     const { spec } = this;
-    const command = BinaryLauncher.available(() => BinaryLauncher.command());
+    const command = BinaryLauncher.available(() => {
+      return BinaryLauncher.command();
+    });
     const env = spec.env ?? EMPTY_ENV;
     await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
     const log = await open(spec.logPath, "a", 0o600);
@@ -421,13 +423,19 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
   // such as pnpm and moon export), and the server's long path is cut before its name.
-  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => undefined);
+  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => {
+    return undefined;
+  });
   if (listing === undefined) {
     return true;
   }
   const candidates = listing.split(/\r?\n/).flatMap((line) => {
     const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
-    const named = match !== null && programs.some((program) => (match[3] ?? "").includes(program));
+    const named =
+      match !== null &&
+      programs.some((program) => {
+        return (match[3] ?? "").includes(program);
+      });
     const ours =
       match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
     return named && ours ? [Number(match[1])] : [];
@@ -444,7 +452,9 @@ const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => undefined);
+  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => {
+    return undefined;
+  });
   if (command === undefined) {
     return true;
   }
@@ -481,7 +491,9 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
       );
     });
     // Anything it reports from here on, such as a failed signal, is not the start's to raise.
-    child.on("error", () => undefined);
+    child.on("error", () => {
+      return undefined;
+    });
     child.unref();
     return pid;
   } catch (error) {
@@ -567,10 +579,17 @@ function signalRuntime(
  * process's child, so there is no exit event to wait on.
  */
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const gone = () => !BinaryLauncher.isRunning(pid);
+  const gone = () => {
+    return !BinaryLauncher.isRunning(pid);
+  };
   await pWaitFor(gone, {
     interval: 200,
-    timeout: { milliseconds: timeoutMs, fallback: () => undefined },
+    timeout: {
+      milliseconds: timeoutMs,
+      fallback: () => {
+        return undefined;
+      },
+    },
   });
   return gone();
 }

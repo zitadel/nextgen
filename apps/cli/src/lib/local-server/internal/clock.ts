@@ -12,7 +12,9 @@ export interface Clock {
 }
 
 export const realClock: Clock = {
-  now: () => Date.now(),
+  now: () => {
+    return Date.now();
+  },
   wait: async (ms, signal) => {
     try {
       await sleep(ms, undefined, { signal });

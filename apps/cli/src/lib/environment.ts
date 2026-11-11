@@ -72,7 +72,12 @@ const PLATFORM_SIGNALS: ReadonlyArray<{
   platform?: string;
   name: (value: string) => string;
 }> = [
-  { variable: "VERCEL_ENV", name: (value) => value },
+  {
+    variable: "VERCEL_ENV",
+    name: (value) => {
+      return value;
+    },
+  },
   {
     variable: "CONTEXT",
     platform: "NETLIFY",
@@ -295,7 +300,11 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
     return resolved.value;
   }
   const name = environment.name.value;
-  const consulted = `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}.`;
+  const consulted = `Consulted, in order: ${environment.consulted
+    .map((entry) => {
+      return entry.source;
+    })
+    .join(", ")}.`;
   // The file to set the value in. An --env-file run reads that file; an
   // environment already bound by `env add` has its `.env.<name>.local`. Only an
   // environment with no project at all is pointed at `env add` (or `setup` for
@@ -304,7 +313,9 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   // process environment already names a project would pair that project with
   // another's credential.
   const boundFile = `.env.${name}.local`;
-  const bound = environment.consulted.some((entry) => entry.source === boundFile && entry.present);
+  const bound = environment.consulted.some((entry) => {
+    return entry.source === boundFile && entry.present;
+  });
   const file = environment.envFile ?? (bound ? boundFile : undefined);
   const unbound = file === undefined && environment.values.ZITADEL_PROJECT_ID === undefined;
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
@@ -327,7 +338,9 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
     details: {
       environment: name,
       variable: key,
-      consulted: environment.consulted.map((entry) => entry.source),
+      consulted: environment.consulted.map((entry) => {
+        return entry.source;
+      }),
     },
   });
 }
@@ -473,6 +486,8 @@ export async function deployInitialRelease(input: {
     releaseId: release.id,
     contentHash: release.content_hash,
     deploymentId: deployment.id,
-    origins: deployment.targets.map((target) => target.origin),
+    origins: deployment.targets.map((target) => {
+      return target.origin;
+    }),
   };
 }

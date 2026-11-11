@@ -109,6 +109,7 @@ export default class Start extends Suggestible(BaseCommand) {
       defaultLocalServerImageForCliVersion(this.cliVersion);
     if (this.dryRun) {
       const title = "Would start the local Zitadel server (dry run)";
+
       return this.emit({
         status: "ok",
         data: {

@@ -1,15 +1,15 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
+import { ZitadelError } from "@/lib/errors";
 import { nonBlankArg, taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/oclif/names";
-
-import { ZitadelError } from "@/lib/errors";
+import { prose } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
-import { prose } from "@/lib/oclif/rendering";
-import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 /** Helpers shared by more than one verb builder. */
 

@@ -1,6 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+
 import { ApiService } from "@/lib/backend/api-service";
+import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
 import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */

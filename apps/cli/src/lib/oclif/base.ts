@@ -411,7 +411,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected retryCommand(words: readonly string[]): SuggestedCommand {
     const line = Cmd.of(words).without(CWD_OPTIONS);
-    return unscopedCommand(`${line}${this.cwdSelector()}`, this.meta.cliVersion);
+    return unscopedCommand(`${line}${this.cwdSelector()}`, this.cliVersion);
   }
 
   /**
@@ -601,7 +601,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * computed `nonInteractive` from the flags.
    */
   private isInteractive(): boolean {
-    if (this.meta.nonInteractive || this.jsonEnabled()) {
+    if (this.nonInteractive || this.jsonEnabled()) {
       return false;
     }
     const argv = process.argv;
@@ -716,7 +716,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * that knows no project can still say where it ran.
    */
   private serverRanOn(): string | undefined {
-    if (this.meta.dryRun) {
+    if (this.dryRun) {
       return undefined;
     }
 

@@ -1,15 +1,14 @@
 import type { Writable } from "node:stream";
-
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
-
 import type { Parsed } from "@zitadel/config/idp";
 
 import { CANCELLED, confirmationHint, PromptCancelled, ZitadelError } from "./errors";
 import { flatOutput } from "./flat-output";
+import type { SuggestedCommand } from "./suggestion";
 import type {
   Choice,
-  ConfirmQuestion,
   Confirmer,
+  ConfirmQuestion,
   MultiselectQuestion,
   Optional,
   Questions,
@@ -18,7 +17,6 @@ import type {
   TextQuestion,
   YesNoQuestion,
 } from "./ui/questions";
-import type { SuggestedCommand } from "./suggestion";
 import { readStdin } from "./variables";
 
 /**

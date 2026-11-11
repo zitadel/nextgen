@@ -1,7 +1,7 @@
 import type { BoxAction } from "@/lib/box";
 import { command, dim, strong } from "@/lib/style";
-import { NEXT_LABEL } from "@/lib/ui/summary";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 
 /**
  * What a command suggests doing next, and the one place it is shown.

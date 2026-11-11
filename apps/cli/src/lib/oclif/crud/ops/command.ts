@@ -1,12 +1,12 @@
 import type { Command, Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import type { Admitted, BaseCommand } from "@/lib/oclif/base";
-import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "@/lib/oclif/crud/types";
 import { Destructive } from "@/lib/oclif/destructive";
+import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 
 /** Everything an operation needs to know about the resource it serves. */
 export type OperationDefinition<Ctx, Spec> = Readonly<{

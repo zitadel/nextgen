@@ -47,6 +47,7 @@ export default class Stop extends Suggestible(BaseCommand) {
       runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
     if (this.dryRun) {
       const title = "Would stop the local Zitadel server (dry run)";
+
       return this.emit({
         status: "ok",
         data: {
@@ -106,6 +107,7 @@ export default class Stop extends Suggestible(BaseCommand) {
     const sweep = await LocalServer.stopAll(this.localServers());
     if (!sweep.supported) {
       const title = "Managed local runtime process discovery is unavailable";
+
       return this.emit({
         status: "ok",
         data: {

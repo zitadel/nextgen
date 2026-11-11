@@ -2,20 +2,20 @@ import {
   type ClientId,
   type ClientSecretVariable,
   type ConnectionEndpoints,
+  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   providerOf,
-  type ProviderSelection,
   selectionName,
 } from "@zitadel/config/idp";
 
-import type { Questions } from "@/lib/ui";
 import {
   type EnvironmentSelector,
   inShell,
   projectCommand,
   type SuggestedCommand,
 } from "@/lib/suggestion";
+import type { Questions } from "@/lib/ui";
 
 import type { GivenCredentials } from "./credentials";
 import { askConnectionEndpoints } from "./endpoints";

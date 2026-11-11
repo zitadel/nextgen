@@ -118,6 +118,7 @@ export default class Status extends EnvironmentCommand {
     }
 
     const title = "Checked the status of the project";
+
     return this.emit({
       status: "ok",
       data: {
