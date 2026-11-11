@@ -13,17 +13,21 @@ import (
 const (
 	searchEntriesTable = "search_entries"
 
-	// searchEntriesQuery is one range of the primary key; see the postgres
-	// peer.
-	searchEntriesQuery = `SELECT resource_id, search_text, name_start, title, subtitle FROM ` + searchEntriesTable +
-		` WHERE project_id = `
+	// searchEntriesQuery reads one range of the primary key, its last column
+	// whether the caller may see the row; see the postgres peer.
+	searchEntriesQuery = `SELECT resource_id, search_text, name_start, title, subtitle, `
 
 	deleteSearchEntryStmt = `DELETE FROM ` + searchEntriesTable +
 		` WHERE project_id = ? AND resource_kind = ? AND resource_key = ?`
 
-	insertSearchEntryStmt = `INSERT INTO ` + searchEntriesTable +
+	// An upsert, as in the postgres peer: a write that finds the text already
+	// there takes it over.
+	upsertSearchEntryStmt = `INSERT INTO ` + searchEntriesTable +
 		` (project_id, resource_kind, search_text, resource_key, resource_id, name_start, title, subtitle)` +
-		` VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		` VALUES (?, ?, ?, ?, ?, ?, ?, ?)` +
+		` ON CONFLICT (project_id, resource_kind, search_text, resource_key) DO UPDATE SET` +
+		` resource_id = excluded.resource_id, name_start = excluded.name_start,` +
+		` title = excluded.title, subtitle = excluded.subtitle`
 )
 
 type searchEntryStatements struct{ statement }
@@ -33,14 +37,20 @@ func newSearchEntryStatements(client queryExecutor) searchEntryStatements {
 }
 
 // SearchEntries implements [service.SearchEntryStatements].
-func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, error) {
+func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, bool, error) {
 	if err := authz.RequireManagementListFilter(ctx); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	lower, upper, bounded := v2user.SearchBounds(prefix)
 
 	var compiler statementCompiler
 	compiler.WriteString(searchEntriesQuery)
+	if f, ok := service.AuthzListFilterFromContext(ctx); ok {
+		authz.WriteListAuthzExistsPredicate(&compiler, sqliteAuthzEnv(), searchEntriesTable+".resource_id", f)
+	} else {
+		compiler.WriteString("1")
+	}
+	compiler.WriteString(" FROM " + searchEntriesTable + " WHERE project_id = ")
 	compiler.WriteArg(projectID)
 	compiler.WriteString(" AND resource_kind = ")
 	compiler.WriteArg(kind.String())
@@ -50,25 +60,33 @@ func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.Re
 		compiler.WriteString(" AND search_text < ")
 		compiler.WriteArg(upper)
 	}
-	hasWhere := true
-	maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, searchEntriesTable, "resource_id")
 	compiler.WriteString(" ORDER BY search_text, resource_key")
 	compileLimit(&compiler, uint32(limit))
 
 	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, false, wrapError(err)
 	}
 	defer rows.Close()
-	matches, err := collectRows(rows, func(rows *sql.Rows) (domain.SearchEntryMatch, error) {
-		match := domain.SearchEntryMatch{ProjectID: projectID}
-		err := rows.Scan(&match.ResourceID, &match.MatchedText, &match.NameStart, &match.Title, &match.Subtitle)
-		return match, err
+	type row struct {
+		match   domain.SearchEntryMatch
+		visible bool
+	}
+	read, err := collectRows(rows, func(rows *sql.Rows) (row, error) {
+		out := row{match: domain.SearchEntryMatch{ProjectID: projectID}}
+		err := rows.Scan(&out.match.ResourceID, &out.match.MatchedText, &out.match.NameStart, &out.match.Title, &out.match.Subtitle, &out.visible)
+		return out, err
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, false, wrapError(err)
 	}
-	return matches, nil
+	matches := make([]domain.SearchEntryMatch, 0, len(read))
+	for _, r := range read {
+		if r.visible {
+			matches = append(matches, r.match)
+		}
+	}
+	return matches, limit > 0 && len(read) == limit, nil
 }
 
 // writeSearchEntry replaces the entry of its key with entry, inside the
@@ -78,7 +96,7 @@ func writeSearchEntry(ctx context.Context, tx queryExecutor, entry domain.Search
 		return err
 	}
 	for _, text := range entry.Texts() {
-		if _, err := tx.Exec(ctx, insertSearchEntryStmt,
+		if _, err := tx.Exec(ctx, upsertSearchEntryStmt,
 			entry.ProjectID, entry.Kind.String(), text.Text, entry.Key, entry.ResourceID, text.NameStart, entry.Title, entry.Subtitle,
 		); err != nil {
 			return wrapError(err)

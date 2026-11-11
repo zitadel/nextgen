@@ -6593,12 +6593,13 @@ func (c *MockAllStatementsScanEventsCall) DoAndReturn(f func(context.Context, *d
 }
 
 // SearchEntries mocks base method.
-func (m *MockAllStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, error) {
+func (m *MockAllStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SearchEntries", ctx, kind, projectID, prefix, limit)
 	ret0, _ := ret[0].([]domain.SearchEntryMatch)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // SearchEntries indicates an expected call of SearchEntries.
@@ -6614,19 +6615,19 @@ type MockAllStatementsSearchEntriesCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsSearchEntriesCall) Return(arg0 []domain.SearchEntryMatch, arg1 error) *MockAllStatementsSearchEntriesCall {
-	c.Call = c.Call.Return(arg0, arg1)
+func (c *MockAllStatementsSearchEntriesCall) Return(matches []domain.SearchEntryMatch, full bool, err error) *MockAllStatementsSearchEntriesCall {
+	c.Call = c.Call.Return(matches, full, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsSearchEntriesCall) Do(f func(context.Context, domain.ResourceKind, string, string, int) ([]domain.SearchEntryMatch, error)) *MockAllStatementsSearchEntriesCall {
+func (c *MockAllStatementsSearchEntriesCall) Do(f func(context.Context, domain.ResourceKind, string, string, int) ([]domain.SearchEntryMatch, bool, error)) *MockAllStatementsSearchEntriesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsSearchEntriesCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string, int) ([]domain.SearchEntryMatch, error)) *MockAllStatementsSearchEntriesCall {
+func (c *MockAllStatementsSearchEntriesCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string, int) ([]domain.SearchEntryMatch, bool, error)) *MockAllStatementsSearchEntriesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

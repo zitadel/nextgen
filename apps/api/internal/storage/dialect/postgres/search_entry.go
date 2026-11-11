@@ -14,17 +14,25 @@ import (
 const (
 	searchEntriesTable = "zitadel_nextgen.search_entries"
 
-	// searchEntriesQuery is one range of the primary key: the kind's texts in
-	// the project from the prefix on, read in key order so LIMIT stops it.
-	searchEntriesQuery = `SELECT resource_id, search_text, name_start, title, subtitle FROM ` + searchEntriesTable +
-		` WHERE project_id = `
+	// searchEntriesQuery reads one range of the primary key: the kind's texts in
+	// the project from the prefix on, in key order, so LIMIT stops it. Its last
+	// column says whether the caller may see the row. It is a column, not a
+	// condition, so a narrow grant drops rows from the page instead of making
+	// the read walk the range for rows it may see.
+	searchEntriesQuery = `SELECT resource_id, search_text, name_start, title, subtitle, `
 
 	deleteSearchEntryStmt = `DELETE FROM ` + searchEntriesTable +
 		` WHERE project_id = $1 AND resource_kind = $2 AND resource_key = $3`
 
-	insertSearchEntryStmt = `INSERT INTO ` + searchEntriesTable +
+	// Two transactions writing a newer revision of one key at once each delete
+	// what they can see and then write the same texts: the second to commit
+	// takes the rows over instead of failing its create.
+	upsertSearchEntryStmt = `INSERT INTO ` + searchEntriesTable +
 		` (project_id, resource_kind, search_text, resource_key, resource_id, name_start, title, subtitle)` +
-		` SELECT $1, $2, t.text, $3, $4, t.name_start, $5, $6 FROM unnest($7::text[], $8::boolean[]) AS t(text, name_start)`
+		` SELECT $1, $2, t.text, $3, $4, t.name_start, $5, $6 FROM unnest($7::text[], $8::boolean[]) AS t(text, name_start)` +
+		` ON CONFLICT (project_id, resource_kind, search_text, resource_key) DO UPDATE SET` +
+		` resource_id = EXCLUDED.resource_id, name_start = EXCLUDED.name_start,` +
+		` title = EXCLUDED.title, subtitle = EXCLUDED.subtitle`
 )
 
 type searchEntryStatements struct{ statement }
@@ -34,14 +42,20 @@ func newSearchEntryStatements(client queryExecutor) searchEntryStatements {
 }
 
 // SearchEntries implements [service.SearchEntryStatements].
-func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, error) {
+func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, bool, error) {
 	if err := authz.RequireManagementListFilter(ctx); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	lower, upper, bounded := v2user.SearchBounds(prefix)
 
 	var compiler statementCompiler
 	compiler.WriteString(searchEntriesQuery)
+	if f, ok := service.AuthzListFilterFromContext(ctx); ok {
+		authz.WriteListAuthzExistsPredicate(&compiler, postgresAuthzEnv(), searchEntriesTable+".resource_id", f)
+	} else {
+		compiler.WriteString("TRUE")
+	}
+	compiler.WriteString(" FROM " + searchEntriesTable + " WHERE project_id = ")
 	compiler.WriteArg(projectID)
 	compiler.WriteString(" AND resource_kind = ")
 	compiler.WriteArg(kind.String())
@@ -51,24 +65,32 @@ func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.Re
 		compiler.WriteString(" AND search_text < ")
 		compiler.WriteArg(upper)
 	}
-	hasWhere := true
-	maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, searchEntriesTable, "resource_id")
 	compiler.WriteString(" ORDER BY search_text, resource_key")
 	compileLimit(&compiler, uint32(limit))
 
 	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, false, wrapError(err)
 	}
-	matches, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.SearchEntryMatch, error) {
-		match := domain.SearchEntryMatch{ProjectID: projectID}
-		err := row.Scan(&match.ResourceID, &match.MatchedText, &match.NameStart, &match.Title, &match.Subtitle)
-		return match, err
+	type row struct {
+		match   domain.SearchEntryMatch
+		visible bool
+	}
+	read, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (row, error) {
+		out := row{match: domain.SearchEntryMatch{ProjectID: projectID}}
+		err := r.Scan(&out.match.ResourceID, &out.match.MatchedText, &out.match.NameStart, &out.match.Title, &out.match.Subtitle, &out.visible)
+		return out, err
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, false, wrapError(err)
 	}
-	return matches, nil
+	matches := make([]domain.SearchEntryMatch, 0, len(read))
+	for _, r := range read {
+		if r.visible {
+			matches = append(matches, r.match)
+		}
+	}
+	return matches, limit > 0 && len(read) == limit, nil
 }
 
 // writeSearchEntry replaces the entry of its key with entry. It runs inside
@@ -87,7 +109,7 @@ func writeSearchEntry(ctx context.Context, tx queryExecutor, entry domain.Search
 	for i, text := range texts {
 		values[i], nameStarts[i] = text.Text, text.NameStart
 	}
-	_, err := tx.Exec(ctx, insertSearchEntryStmt,
+	_, err := tx.Exec(ctx, upsertSearchEntryStmt,
 		entry.ProjectID, entry.Kind.String(), entry.Key, entry.ResourceID, entry.Title, entry.Subtitle, values, nameStarts)
 	return wrapError(err)
 }

@@ -15,9 +15,9 @@ type SearchEntriesInput struct {
 	Limit     int
 }
 
-// SearchEntriesOutput holds one match per resource, its best, in the order of
-// the read. More says the read stopped at its limit, so more resources may
-// match than it holds.
+// SearchEntriesOutput holds one match per resource the caller may see, its
+// best, in the order of the read. More says the read stopped at its limit, so
+// more resources may match than it holds.
 type SearchEntriesOutput struct {
 	Items []domain.SearchEntryMatch
 	More  bool
@@ -30,8 +30,9 @@ const searchEntryRowsPerResult = 4
 
 // SearchEntries reads the resources of in.Kind in in.ProjectID found by
 // in.Query from their search entries: one range of one index, at most
-// [domain.SearchReadLimit] rows, whatever the size of the project. ctx carries
-// the list gate of the kind, as for its list.
+// [domain.SearchReadLimit] rows, whatever the size of the project or the reach
+// of the caller's grant. ctx carries the list gate of the kind, as for its
+// list.
 func SearchEntries(ctx context.Context, stmts SearchEntryStatements, in SearchEntriesInput) (_ *SearchEntriesOutput, err error) {
 	ctx, end := startSpan(ctx, "Search.SearchEntries")
 	defer end(&err)
@@ -41,12 +42,14 @@ func SearchEntries(ctx context.Context, stmts SearchEntryStatements, in SearchEn
 		return &SearchEntriesOutput{}, nil
 	}
 	rows := min((max(in.Limit, 1)+1)*searchEntryRowsPerResult, domain.SearchReadLimit)
-	matches, err := stmts.SearchEntries(ctx, in.Kind, in.ProjectID, term, rows)
+	matches, full, err := stmts.SearchEntries(ctx, in.Kind, in.ProjectID, term, rows)
 	if err != nil {
 		return nil, mapListError(err, "failed to search the database")
 	}
 
-	out := &SearchEntriesOutput{More: len(matches) == rows}
+	// A full read may have more beyond it, whether or not the caller's grant
+	// let every row of it through.
+	out := &SearchEntriesOutput{More: full}
 	index := make(map[string]int, len(matches))
 	for _, match := range matches {
 		i, seen := index[match.ResourceID]

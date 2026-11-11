@@ -157,9 +157,9 @@ func TestSearch_Teams(t *testing.T) {
 					).Call
 				} else {
 					call = stmts.EXPECT().SearchEntries(gomock.Any(), domain.ResourceKindTeam, "proj_home", r.prefix, r.rows).DoAndReturn(
-						func(ctx context.Context, _ domain.ResourceKind, _, _ string, _ int) ([]domain.SearchEntryMatch, error) {
+						func(ctx context.Context, _ domain.ResourceKind, _, _ string, limit int) ([]domain.SearchEntryMatch, bool, error) {
 							assert.True(t, service.AuthzListSkipOncePending(ctx), "read behind the project's gate")
-							return r.matches, nil
+							return r.matches, len(r.matches) == limit, nil
 						},
 					).Call
 				}

@@ -4,7 +4,11 @@ package stmttest
 
 import (
 	"context"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +21,7 @@ import (
 // matched text, in the order of the read.
 func searchEntryIDs(t *testing.T, stmts service.AllStatements, kind domain.ResourceKind, projectID, prefix string) []string {
 	t.Helper()
-	matches, err := stmts.SearchEntries(unfilteredListCtx(t), kind, projectID, prefix, 20)
+	matches, _, err := stmts.SearchEntries(unfilteredListCtx(t), kind, projectID, prefix, 20)
 	require.NoError(t, err)
 	found := make([]string, 0, len(matches))
 	for _, match := range matches {
@@ -41,7 +45,7 @@ func TestSearchEntryStatements(t *testing.T) {
 			assert.Equal(t, []string{team.ID + " payments alpha"}, searchEntryIDs(t, d.stmts, domain.ResourceKindTeam, projectID, "pay"))
 			assert.Equal(t, []string{team.ID + " alpha", other.ID + " alpine"}, searchEntryIDs(t, d.stmts, domain.ResourceKindTeam, projectID, "alp"))
 
-			matches, err := d.stmts.SearchEntries(unfilteredListCtx(t), domain.ResourceKindTeam, projectID, "alp", 20)
+			matches, _, err := d.stmts.SearchEntries(unfilteredListCtx(t), domain.ResourceKindTeam, projectID, "alp", 20)
 			require.NoError(t, err)
 			require.Len(t, matches, 2)
 			assert.Equal(t, domain.SearchEntryMatch{
@@ -66,9 +70,10 @@ func TestSearchEntryStatements(t *testing.T) {
 			}
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), &domain.Team{ProjectID: otherProjectID, Name: "Ops Elsewhere"}))
 
-			matches, err := d.stmts.SearchEntries(unfilteredListCtx(t), domain.ResourceKindTeam, projectID, "ops", 2)
+			matches, full, err := d.stmts.SearchEntries(unfilteredListCtx(t), domain.ResourceKindTeam, projectID, "ops", 2)
 			require.NoError(t, err)
 			require.Len(t, matches, 2)
+			assert.True(t, full, "two rows of three read")
 			assert.Equal(t, []string{"ops one", "ops three"}, []string{matches[0].MatchedText, matches[1].MatchedText})
 
 			assert.Empty(t, searchEntryIDs(t, d.stmts, domain.ResourceKindFlowDefinition, projectID, "ops"))
@@ -129,7 +134,7 @@ func TestSearchEntryStatements(t *testing.T) {
 			connection.Document = []byte(`{"display_name":"Partner Gateway"}`)
 			require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), connection))
 			assert.Empty(t, searchEntryIDs(t, d.stmts, domain.ResourceKindIDPConnection, projectID, "portal"))
-			matches, err := d.stmts.SearchEntries(unfilteredListCtx(t), domain.ResourceKindIDPConnection, projectID, "gate", 20)
+			matches, _, err := d.stmts.SearchEntries(unfilteredListCtx(t), domain.ResourceKindIDPConnection, projectID, "gate", 20)
 			require.NoError(t, err)
 			require.Len(t, matches, 1)
 			assert.Equal(t, "Partner Gateway", matches[0].Title)
@@ -138,8 +143,101 @@ func TestSearchEntryStatements(t *testing.T) {
 
 		t.Run("a search without a list filter is refused", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			_, err := d.stmts.SearchEntries(t.Context(), domain.ResourceKindTeam, projectID, "a", 5)
+			_, _, err := d.stmts.SearchEntries(t.Context(), domain.ResourceKindTeam, projectID, "a", 5)
 			require.ErrorIs(t, err, service.ErrListFilterRequired)
 		})
+	})
+}
+
+// A caller whose grant reaches part of the project reads the same rows as one
+// who sees everything, and is shown the ones it may see: the grant drops rows
+// from the page, it never makes the read go further. full says the range had
+// more, so the search reports the type incomplete instead of reading on.
+func TestSearchEntryStatements_NarrowGrantReadsNoFurther(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		for i := range 5 {
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, Name: "Ops " + strconv.Itoa(i)}))
+		}
+		// The one team the grant reaches sorts after the others.
+		reached := &domain.Team{ProjectID: projectID, Name: "Ops 9"}
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), reached))
+
+		scoped := "usr-scoped-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, scoped, scoped+"@example.com", "Scoped")))
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+			newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, scoped, "project", "viewer", domain.NewTeamAssignmentScope(reached.ID))))
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: scoped,
+				ObjectType: "project", Relation: "viewer",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+
+		matches, full, err := d.stmts.SearchEntries(ctx, domain.ResourceKindTeam, projectID, "ops", 3)
+		require.NoError(t, err)
+		assert.Empty(t, matches, "the three rows read are all out of the grant")
+		assert.True(t, full)
+
+		matches, full, err = d.stmts.SearchEntries(ctx, domain.ResourceKindTeam, projectID, "ops", 20)
+		require.NoError(t, err)
+		require.Len(t, matches, 1)
+		assert.Equal(t, reached.ID, matches[0].ResourceID)
+		assert.False(t, full)
+	})
+}
+
+// Two revisions of one flow name written at once both commit, and the entry
+// names the one that committed last: the texts they share are upserted, not
+// inserted twice.
+func TestSearchEntryStatements_ConcurrentRevisionsOfOneKey(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		name := "Concurrent Sign In"
+		first := sampleFlowDefinition(projectID, "flowdef_"+uniqueSuffix(t), name)
+		second := sampleFlowDefinition(projectID, "flowdef_"+uniqueSuffix(t), name)
+		t.Cleanup(func() {
+			_ = d.stmts.DeleteFlowDefinitionByID(context.Background(), projectID, first.ID)
+			_ = d.stmts.DeleteFlowDefinitionByID(context.Background(), projectID, second.ID)
+		})
+
+		var once sync.Once
+		written := make(chan struct{})
+		commit := make(chan struct{})
+		release := sync.OnceFunc(func() { close(commit) })
+		t.Cleanup(release)
+		firstErr := make(chan error, 1)
+		go func() {
+			firstErr <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+				if err := tx.Statements().CreateFlowDefinition(ctx, first); err != nil {
+					return err
+				}
+				// Once per attempt: spanner replays aborted attempts.
+				once.Do(func() { close(written) })
+				<-commit
+				return nil
+			})
+		}()
+		select {
+		case <-written:
+		case err := <-firstErr:
+			t.Fatalf("the first create ended before it wrote its entry: %v", err)
+		}
+
+		// The second create runs while the first holds its rows, and waits on
+		// them where the dialect locks (on SQLite, on the first's transaction).
+		secondErr := make(chan error, 1)
+		go func() { secondErr <- d.stmts.CreateFlowDefinition(context.Background(), second) }()
+		time.Sleep(200 * time.Millisecond)
+		release()
+		require.NoError(t, <-firstErr)
+		require.NoError(t, <-secondErr)
+
+		assert.Equal(t, []string{second.ID + " " + strings.ToLower(name)},
+			searchEntryIDs(t, d.stmts, domain.ResourceKindFlowDefinition, projectID, "concurrent"))
 	})
 }

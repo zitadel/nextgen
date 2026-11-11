@@ -775,11 +775,14 @@ type ClaimStatements interface {
 type SearchEntryStatements interface {
 	Statements
 	// SearchEntries returns the entries of kind in projectID with a text that
-	// starts with prefix, a text as [domain.SearchText] folds it: at most limit
-	// rows of one index range, by matched text, then by key. An entry found by
-	// several of its texts appears once per text. Like a list, it reads behind
-	// the authz list filter on ctx and refuses a context without one.
-	SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, error)
+	// starts with prefix, a text as [domain.SearchText] folds it, by matched
+	// text, then by key. An entry found by several of its texts appears once
+	// per text. It reads exactly one range of the index to at most limit rows,
+	// whatever the caller may see: the authz list filter on ctx (which it
+	// refuses a context without, like a list) drops rows from those it read,
+	// never reads further. full says the range held limit rows, so more may
+	// match than were read.
+	SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) (matches []domain.SearchEntryMatch, full bool, err error)
 }
 
 type ResourceScopeStatements interface {
