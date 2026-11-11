@@ -23,7 +23,6 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
 // WebhookConfig controls delivery to the projects' webhooks (ADR 088 §4). It
@@ -132,9 +131,9 @@ type WebhookSource interface {
 // when the config names a trigger secret.
 //
 // It stands beside Shipper rather than inside it. The two share the event
-// listing and the wire body, and nothing else: a webhook is leased, filtered,
-// signed, backed off and given up on, its cursor is on its row, and its URL
-// is a customer's, so it goes through the hardened client.
+// listing and nothing else: a webhook gets its own body (webhookEvent), it is
+// leased, filtered, signed, backed off and given up on, its cursor is on its
+// row, and its URL is a customer's, so it goes through the hardened client.
 type WebhookShipper struct {
 	cfg    WebhookConfig
 	src    WebhookSource
@@ -437,7 +436,7 @@ func (s *WebhookShipper) send(ctx context.Context, hook *domain.Webhook, ev *dom
 		metrics.RecordWebhookDelivery(ctx, result)
 	}()
 
-	body, err := events.MarshalWire(ev)
+	body, err := marshalWebhookEvent(ev)
 	if err != nil {
 		failure.cause = err
 		return failure

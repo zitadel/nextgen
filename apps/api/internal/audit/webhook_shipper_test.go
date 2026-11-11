@@ -24,7 +24,6 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
 const (
@@ -432,8 +431,8 @@ func verifyStandardWebhook(secret string, d receivedDelivery) bool {
 	return false
 }
 
-// A delivery is the event as GET /events returns it, with the Standard
-// Webhooks headers; the timestamp is the attempt's, not the event's
+// A delivery is the event in the webhook body (webhookEvent), with the
+// Standard Webhooks headers; the timestamp is the attempt's, not the event's
 // (ADR 088 §2).
 func TestWebhookShipper_DeliversTheEventSigned(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
@@ -450,7 +449,7 @@ func TestWebhookShipper_DeliversTheEventSigned(t *testing.T) {
 
 	got := endpoint.deliveries()
 	require.Len(t, got, 1)
-	want, err := events.MarshalWire(evs[0])
+	want, err := marshalWebhookEvent(evs[0])
 	require.NoError(t, err)
 	assert.Equal(t, string(want), string(got[0].body))
 	assert.Equal(t, "application/json", got[0].header.Get("Content-Type"))

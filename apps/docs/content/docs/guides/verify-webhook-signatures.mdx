@@ -21,8 +21,10 @@ webhook-id: evt_01KWH3B7K2M9P4R6T8V0X2Z4C6
 webhook-timestamp: 1794391200
 webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 
-{"id":"evt_01KWH3B7K2M9P4R6T8V0X2Z4C6","event_type":"user.created","project_id":"proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A","payload":{}}
+{"id":"evt_01KWH3B7K2M9P4R6T8V0X2Z4C6","type":"user.created","created_at":"2026-11-11T10:00:00Z","project_id":"proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A","actor":{"type":"human","id":"user_01JD2Q7C4T9N6M8P0R2V5X7Z9B"},"entity":{"type":"user","id":"user_01KWH3B7JZ5N7Q9S1U3W5Y7A9C"},"data":{"schema_id":"sch_01JD2Q6W8K3M5P7R9T1V3X5Z7B","attribute_keys":["email","name"]}}
 ```
+
+The body always has these seven fields. `actor` and `entity` are `null` when the event has none. `data` is the event's payload, not the resource. To get more, read the resource by `entity.id`, or the whole event with `getEvent` (`GET /events/{id}`).
 
 | Header | Value |
 | --- | --- |
@@ -66,7 +68,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  console.log(event.event_type, event.id);
+  console.log(event.type, event.id);
   res.writeHead(204).end();
 }).listen(3000);
 ```

@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -126,15 +128,20 @@ func TestWebhookDelivery(t *testing.T) {
 		t.Helper()
 		types := make([]string, len(deliveries))
 		for i, d := range deliveries {
+			// The body holds these keys and no other, each one present.
+			var keys map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(d.body, &keys))
+			assert.ElementsMatch(t, []string{"id", "type", "created_at", "project_id", "actor", "entity", "data"},
+				slices.Collect(maps.Keys(keys)), string(d.body))
 			var ev struct {
 				ID        string `json:"id"`
-				EventType string `json:"event_type"`
+				Type      string `json:"type"`
 				ProjectID string `json:"project_id"`
 			}
 			require.NoError(t, json.Unmarshal(d.body, &ev))
 			assert.Equal(t, ev.ID, d.header.Get("webhook-id"), "webhook-id is the event's id")
 			assert.Equal(t, project.ID, ev.ProjectID)
-			types[i] = ev.EventType
+			types[i] = ev.Type
 		}
 		return types
 	}
@@ -169,12 +176,26 @@ func TestWebhookDelivery(t *testing.T) {
 		got := deliver(t)
 		require.NotEmpty(t, got)
 		types := eventTypes(t, got)
-		assert.Contains(t, types, "webhook.created", "the events since the webhook was created, its own included")
+		require.Contains(t, types, "webhook.created", "the events since the webhook was created, its own included")
 		assert.NotContains(t, types, "request.api", "* leaves request.api out")
 		for _, d := range got {
 			assert.True(t, d.signedWith(t, created.Secret), "signature %q", d.header.Get("webhook-signature"))
 			assert.Equal(t, "application/json", d.header.Get("Content-Type"))
 		}
+		// The body names the entity and carries the event's stored payload.
+		var ev struct {
+			Entity struct {
+				Type string `json:"type"`
+				ID   string `json:"id"`
+			} `json:"entity"`
+			Data struct {
+				URL string `json:"url"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(got[slices.Index(types, "webhook.created")].body, &ev))
+		assert.Equal(t, "webhook", ev.Entity.Type)
+		assert.Equal(t, string(created.ID), ev.Entity.ID)
+		assert.Equal(t, endpoint.URL+"/hooks/zitadel", ev.Data.URL)
 		row := stored(t)
 		assert.NotNil(t, row.LastDeliveredAt)
 		assert.Nil(t, row.FailingSince)
