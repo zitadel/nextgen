@@ -1295,6 +1295,41 @@ describe("search", () => {
     expect(router.state.resolvedLocation?.search).toMatchObject({ q: "example" });
   });
 
+  it("holds eight rows at most, the last opening Users when there are more", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        if (!body.types.includes("user")) {
+          return HttpResponse.json({ results: [], incomplete_types: [] });
+        }
+        return HttpResponse.json({
+          results: Array.from({ length: 8 }, (_, index) => ({
+            type: "user",
+            id: `user_${index}`,
+            project_id: "proj_1",
+            title: `Ann ${index}`,
+          })),
+          incomplete_types: ["user"],
+        });
+      }),
+    );
+    renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "ann",
+    );
+
+    // The row that opens Users takes the last place rather than a ninth.
+    await waitFor(() =>
+      expect(rows(dialog.getByRole("listbox"))).toEqual([
+        ...Array.from({ length: 7 }, (_, index) => `Ann ${index} · console-dev`),
+        "See all users matching “ann” · console-dev",
+      ]),
+    );
+  });
+
   it("lists the configuration the server found, each with its second line", async () => {
     server.use(
       http.post(SEARCH, async ({ request }) => {

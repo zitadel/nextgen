@@ -174,13 +174,59 @@ export function SearchDialog({
   /** Whose recent projects the palette opens on. */
   userId?: string;
 }) {
-  const [query, setQuery] = useState("");
   // The drawer an action opened. It outlives the palette, which closes first.
   const [adding, setAdding] = useState<"user" | "team" | null>(null);
   const navigate = useNavigate();
   const projectId = useProjectScope();
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent showCloseButton={false} className={PALETTE}>
+          <DialogTitle className="sr-only">Go to</DialogTitle>
+          <DialogDescription className="sr-only">
+            Search for a page, an action, a user, a team, configuration or a project.
+          </DialogDescription>
+          {/* Mounted only while the palette is open: each opening starts
+              empty, and closing it drops its pending searches and timers
+              instead of letting them land on a closed palette. */}
+          <SearchPalette onOpenChange={onOpenChange} onAdd={setAdding} userId={userId} />
+        </DialogContent>
+      </Dialog>
+      {projectId && (
+        <>
+          <AddUserSheet
+            open={adding === "user"}
+            onOpenChange={(next) => setAdding(next ? "user" : null)}
+            onCreated={(user) => navigate({ to: "/users/$userId", params: { userId: user.id } })}
+          />
+          <AddTeamSheet
+            open={adding === "team"}
+            onOpenChange={(next) => setAdding(next ? "team" : null)}
+            onCreated={(team) => navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/** The palette's field and its list, with the searches behind them. */
+function SearchPalette({
+  onOpenChange,
+  onAdd,
+  userId,
+}: {
+  onOpenChange: (open: boolean) => void;
+  /** Opens the drawer an action names, which outlives the palette. */
+  onAdd: (kind: "user" | "team") => void;
+  userId: string | undefined;
+}) {
+  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const projectId = useProjectScope();
   // One round of requests per pause in typing, not per keystroke.
-  const typed = useDebounced(open ? query.trim() : "", TYPING_PAUSE_MS);
+  const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
   // Users apart from the rest, so the quick types do not wait for them.
   const users = useAsync(
     typed.length >= USER_SEARCH_MIN_LENGTH && projectId
@@ -196,19 +242,15 @@ export function SearchDialog({
   );
   // The server's matches once something is typed; each answer stays until the
   // next lands, less what the typing has since ruled out.
-  const found = useProjectSearch(open ? query : "", PROJECT_RESULTS);
+  const found = useProjectSearch(query, PROJECT_RESULTS);
   // Before anything is typed: the selected and recent projects, then the rest
   // while one page holds them all (`openingList`), as the switcher opens.
   const mine = useMyProjects();
-  const recentProjects = useMemo(() => (open ? readRecentProjects(userId) : []), [open, userId]);
+  // Read as the palette opens, so it holds what was opened since it last did.
+  const recentProjects = useMemo(() => readRecentProjects(userId), [userId]);
   const pages = useNavItems();
   const account = useNavItems("account");
   const settings = useNavItems("settings");
-
-  // A fresh palette each time it opens.
-  useEffect(() => {
-    if (open) setQuery("");
-  }, [open]);
 
   const selected = useSelectedProject();
   const projectName = selected?.name;
@@ -262,7 +304,7 @@ export function SearchDialog({
             description: where(place),
             inProject: true,
             kind: KIND.action,
-            go: close(() => setAdding("user")),
+            go: close(() => onAdd("user")),
           },
           {
             id: "action:add-team",
@@ -271,7 +313,7 @@ export function SearchDialog({
             description: where(place),
             inProject: true,
             kind: KIND.action,
-            go: close(() => setAdding("team")),
+            go: close(() => onAdd("team")),
           },
           {
             id: "action:copy-project-id",
@@ -357,8 +399,7 @@ export function SearchDialog({
       return [
         {
           heading: "Recent",
-          results:
-            open && projectId ? recentHits(projectId).map((hit) => hitResult(hit, "recent")) : [],
+          results: projectId ? recentHits(projectId).map((hit) => hitResult(hit, "recent")) : [],
         },
         { heading: projectName ? `Pages in ${projectName}` : "Pages", results: pageResults },
         { heading: "Actions", results: actions },
@@ -378,7 +419,7 @@ export function SearchDialog({
     const projectResults = (found?.projects ?? [])
       .filter((project) => project.name.toLowerCase().includes(q))
       .map(projectResult);
-    const best = ranked(query, [
+    const all = ranked(query, [
       ...pageResults,
       ...actions,
       ...userResults,
@@ -388,13 +429,16 @@ export function SearchDialog({
       ...hitResults(others, "idp"),
       ...projectResults,
       ...accountResults,
-    ]).slice(0, MAX_RESULTS);
+    ]);
     // The palette shows the best few; the Users list searches the same text
-    // across every page, the users the list had no room for among them.
-    if (
+    // across every page, the users the list has no room for among them. Its
+    // row takes the list's last place, so the list never grows past the cap.
+    const shown = all.slice(0, MAX_RESULTS);
+    const seeAllUsers =
       hasMore(users ?? NO_ANSWER, query, "user") ||
-      userResults.some((result) => !best.includes(result))
-    ) {
+      userResults.some((result) => !shown.includes(result));
+    const best = seeAllUsers ? all.slice(0, MAX_RESULTS - 1) : shown;
+    if (seeAllUsers) {
       best.push({
         id: "users:all",
         icon: <Search aria-hidden />,
@@ -406,7 +450,6 @@ export function SearchDialog({
       });
     }
     return [{ results: best }];
-    // `open` is here for the recent hits and projects, read when the palette opens.
   }, [
     pages,
     account,
@@ -422,36 +465,59 @@ export function SearchDialog({
     place,
     q,
     query,
-    open,
     navigate,
     onOpenChange,
+    onAdd,
   ]);
 
+  const text = query.trim();
   return (
-    <>
-      <SearchPalette
-        open={open}
-        onOpenChange={onOpenChange}
-        query={query}
-        onQueryChange={setQuery}
-        groups={groups}
-        place={place}
-      />
-      {projectId && (
-        <>
-          <AddUserSheet
-            open={adding === "user"}
-            onOpenChange={(next) => setAdding(next ? "user" : null)}
-            onCreated={(user) => navigate({ to: "/users/$userId", params: { userId: user.id } })}
-          />
-          <AddTeamSheet
-            open={adding === "team"}
-            onOpenChange={(next) => setAdding(next ? "team" : null)}
-            onCreated={(team) => navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
-          />
-        </>
-      )}
-    </>
+    // Filtering is ours, not cmdk's: what the server found arrives already
+    // matched and ranked, and the pages match as a substring, any case.
+    <Command shouldFilter={false} className="bg-popover">
+      <div className="relative">
+        <CommandInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Go to a page, user, team or project, or run an action"
+          aria-label="Search"
+          className="h-12 pr-12 text-[15px]"
+        />
+        <Kbd className="absolute top-1/2 right-3 -translate-y-1/2">esc</Kbd>
+      </div>
+      <CommandList className="max-h-[440px] p-1.5">
+        {/* Says where it looked: users, teams and configuration are found in
+            the selected project only, and in none without one. */}
+        <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
+          <p className="tracking-wide uppercase">
+            {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
+          </p>
+          <p className="mt-1">
+            {place
+              ? "Users, teams and configuration are found in the selected project only."
+              : "Choose a project to search its users, teams and configuration."}
+          </p>
+        </CommandEmpty>
+        {groups.map((group) => (
+          <CommandGroup key={group.heading ?? "ranked"} heading={group.heading} className={GROUP}>
+            {group.results.map((result) => (
+              <CommandItem
+                key={result.id}
+                value={result.id}
+                onSelect={result.go}
+                className="gap-2.5 rounded-md px-2 py-2"
+              >
+                {result.icon}
+                <CommandItemText label={result.label} description={result.description} />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+      </CommandList>
+      <p className="border-t border-border px-3.5 py-2 text-xs text-muted-foreground">
+        ↑↓ to move · Enter to open · Searching inside a list stays in that list’s toolbar
+      </p>
+    </Command>
   );
 }
 
@@ -489,87 +555,6 @@ async function copyProjectId(projectId: string) {
   } catch {
     toast.error("Could not copy the project ID");
   }
-}
-
-/** The palette itself: the field and the groups it is given. */
-function SearchPalette({
-  open,
-  onOpenChange,
-  query,
-  onQueryChange,
-  groups,
-  place,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  query: string;
-  onQueryChange: (query: string) => void;
-  groups: ResultGroup[];
-  /** The selected project, which bounds what the server is asked: none without one. */
-  place: string | undefined;
-}) {
-  const text = query.trim();
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className={PALETTE}>
-        <DialogTitle className="sr-only">Go to</DialogTitle>
-        <DialogDescription className="sr-only">
-          Search for a page, an action, a user, a team, configuration or a project.
-        </DialogDescription>
-        {/* Filtering is ours, not cmdk's: what the server found arrives
-            already matched and ranked, and the pages match as a substring,
-            any case. */}
-        <Command shouldFilter={false} className="bg-popover">
-          <div className="relative">
-            <CommandInput
-              value={query}
-              onValueChange={onQueryChange}
-              placeholder="Go to a page, user, team or project, or run an action"
-              aria-label="Search"
-              className="h-12 pr-12 text-[15px]"
-            />
-            <Kbd className="absolute top-1/2 right-3 -translate-y-1/2">esc</Kbd>
-          </div>
-          <CommandList className="max-h-[440px] p-1.5">
-            {/* Says where it looked: users, teams and configuration are
-                found in the selected project only, and in none without one. */}
-            <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
-              <p className="tracking-wide uppercase">
-                {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
-              </p>
-              <p className="mt-1">
-                {place
-                  ? "Users, teams and configuration are found in the selected project only."
-                  : "Choose a project to search its users, teams and configuration."}
-              </p>
-            </CommandEmpty>
-            {groups.map((group) => (
-              <CommandGroup
-                key={group.heading ?? "ranked"}
-                heading={group.heading}
-                className={GROUP}
-              >
-                {group.results.map((result) => (
-                  <CommandItem
-                    key={result.id}
-                    value={result.id}
-                    onSelect={result.go}
-                    className="gap-2.5 rounded-md px-2 py-2"
-                  >
-                    {result.icon}
-                    <CommandItemText label={result.label} description={result.description} />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
-          <p className="border-t border-border px-3.5 py-2 text-xs text-muted-foreground">
-            ↑↓ to move · Enter to open · Searching inside a list stays in that list’s toolbar
-          </p>
-        </Command>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 /** How many of each kind the server is asked for: the best few, not a list. */
