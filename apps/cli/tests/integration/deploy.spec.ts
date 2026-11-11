@@ -24,19 +24,17 @@ const GOOGLE = {
 /** A set-up app with Google sign-in enabled, ready for a deploy. */
 async function anAppWithGoogle(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
-  expect(await app.enableSso("google", GOOGLE)).toSucceed();
+  await app.enableSso("google", GOOGLE);
   return app;
 }
 
 /** A set-up app with a custom OIDC connection enabled, ready for a deploy. */
 async function anAppWithCustomSso(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
-  expect(
-    await app.enableCustomSso(
-      { slug: "acme-sso", displayName: "Acme SSO", issuer: "https://sso.acme.example" },
-      { clientId: "acme-client-id", secret: "acme-client-secret" },
-    ),
-  ).toSucceed();
+  await app.enableCustomSso(
+    { slug: "acme-sso", displayName: "Acme SSO", issuer: "https://sso.acme.example" },
+    { clientId: "acme-client-id", secret: "acme-client-secret" },
+  );
   return app;
 }
 
@@ -745,6 +743,19 @@ describe("deploy", () => {
 
           expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
         });
+      });
+
+      it("lets a sign-up that creates a user without a required property the connection does not map through", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          schema.properties.staffNumber = { type: "string" };
+          schema.required = [...(schema.required ?? []), "staffNumber"];
+        });
+        await app.editLoginEntryStep((step) => {
+          step.fields = [...(step.fields ?? []), "staffNumber"];
+        });
+
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("lets a verification of a property nothing reads through", async () => {

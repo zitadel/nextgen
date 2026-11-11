@@ -449,9 +449,6 @@ export function customSettingsOf(flags: {
 /** Joins names as "a, b, and c" in the summary box. */
 const LIST = new Intl.ListFormat("en", { type: "conjunction" });
 
-/** Picks "one" or "other" for the counts the summary box words. */
-const PLURAL = new Intl.PluralRules("en");
-
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL: Refusal = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
@@ -1837,23 +1834,22 @@ export default class Setup extends Destructive(BaseCommand) {
                 mappings.length === 0
                   ? []
                   : [
-                      "Each user attribute is filled from a claim your provider returns:",
+                      "These user attributes are filled from a claim your provider returns:",
                       ...mappings.flatMap(({ property, claim }) => {
                         const how = verifiedBy.get(property);
                         return [
                           `- ${text(property)} comes from the ${text(claim)} claim.`,
-                          ...(how === true ? ["  It is always trusted."] : []),
-                          ...(typeof how === "string"
-                            ? [`  It is verified when ${text(how)} is true.`]
-                            : []),
+                          how === true
+                            ? "  It is always trusted."
+                            : typeof how === "string"
+                              ? `  It is verified when ${text(how)} is true.`
+                              : "  It is not verified.",
                         ];
                       }),
                     ],
                 scopes.length === 0
                   ? []
-                  : [
-                      `It asks your provider for the ${LIST.format(scopes.map(text))} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
-                    ],
+                  : [`Scopes requested from your provider: ${LIST.format(scopes.map(text))}.`],
                 unmapped.length === 0
                   ? []
                   : [
@@ -1870,17 +1866,17 @@ export default class Setup extends Destructive(BaseCommand) {
                 usedBy.length === 0
                   ? []
                   : [
-                      `${LIST.format(usedBy.map(text))} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
+                      `Users of ${LIST.format(usedBy.map(text))} sign in through this connection, so changes here affect them.`,
                     ],
+                [
+                  `Edit claim_mapping in ${text(connection.path)} if your provider returns other claims, then deploy.`,
+                ],
               ].filter((section) => {
                 return section.length > 0;
               });
-              if (sections.length === 0) {
-                return [];
-              }
               return [
                 "",
-                dim(`SIGN IN WITH ${connection.displayName.toUpperCase()}`),
+                dim(`SIGN IN WITH ${text(connection.displayName.toUpperCase())}`),
                 ...sections.flatMap((section, at) => {
                   return at === 0 ? section : ["", ...section];
                 }),
@@ -1945,24 +1941,25 @@ export default class Setup extends Destructive(BaseCommand) {
         sso: planned.connections.map((entry) => {
           const slug = providerOf(entry.chosen.selection).slug;
           const outcome = ssoOutcomes.get(slug);
+          const mapped = planned.change.after.connections.summarize(entry.connection);
           return {
             provider: selectionName(entry.chosen.selection),
             slug,
             client_id: entry.chosen.credentials.clientId ?? null,
             connection: entry.connection.path,
             claim_mapping: Object.fromEntries(
-              entry.connection.mappings.map(({ property, claim }) => {
+              mapped.mappings.map(({ property, claim }) => {
                 return [property, claim];
               }),
             ),
             verified_claims: Object.fromEntries(
-              entry.connection.verifications.map(({ property, claim }) => {
+              mapped.verifications.map(({ property, claim }) => {
                 return [property, claim];
               }),
             ),
-            scopes: entry.connection.scopes ?? [],
-            unmapped: planned.change.after.connections.summarize(entry.connection).unmapped,
-            used_by: planned.change.after.connections.summarize(entry.connection).usedBy,
+            scopes: mapped.scopes,
+            unmapped: mapped.unmapped,
+            used_by: mapped.usedBy,
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),

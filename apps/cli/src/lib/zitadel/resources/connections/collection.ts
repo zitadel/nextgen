@@ -333,9 +333,10 @@ export class Connections extends Collection<Connection> {
    * @remarks
    * Only a schema that lists the connection and has SSO enabled signs in
    * through it. An unmapped property is one such a schema defines at its top
-   * level and no claim fills. One the schema requires, at its own level or
-   * through a required object's members, is marked, as a sign-up through the
-   * connection then has to collect it in a step.
+   * level and no claim fills. One the server requires of a user a provider
+   * creates, at its own level or through a required object's members, is
+   * marked, as a sign-up through the connection then has to collect it in a
+   * step. The identifier a password asks for is not among them.
    *
    * @param connection - The connection.
    * @returns The summary.
@@ -346,7 +347,7 @@ export class Connections extends Collection<Connection> {
     });
     const required = new Set(
       schemas.flatMap((schema) => {
-        return schema.requiredPaths.map((path) => {
+        return schema.requiredByServer.map((path) => {
           return path.split(".")[0];
         });
       }),

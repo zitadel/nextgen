@@ -844,7 +844,7 @@ describe("auth-method sso enable", () => {
         expect(result).toPrintNoJson();
       });
 
-      it("ends with a box that summarises the connection", async () => {
+      it("draws a box that summarises the connection", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);

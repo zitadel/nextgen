@@ -802,6 +802,20 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).toContain("It is always trusted.");
     });
 
+    it("says a mapped attribute nothing verifies is not verified", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir);
+      await writeJson(cwd, ACME.file, {
+        ...(await readJson(cwd, ACME.file)),
+        verified_claims: {},
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).toContain("It is not verified.");
+    });
+
     it("draws no mapping lines for a connection that maps nothing", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
       await writeJson(cwd, ACME.file, {
@@ -814,7 +828,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).not.toContain("Each user attribute is filled");
+      expect(result.stdout).not.toContain("These user attributes are filled");
     });
 
     it("prints a claim name holding a newline on one line", async ({ dir }) => {
@@ -865,7 +879,27 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout).toContain("SIGN IN WITH EVIL\\X1B[2J SSO");
+      expect(result.stdout).toContain("SIGN IN WITH EVIL\\x1b[2J SSO");
+    });
+  });
+
+  describe("with --provider custom and --json --dry-run", () => {
+    it("reports what the connection would map", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodJson(cwd, ...CUSTOM, ...ACME_FLAGS, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          connection: {
+            claim_mapping: { email: "email" },
+            scopes: ["openid", "profile", "email"],
+            used_by: ["default-human-user"],
+          },
+        },
+      });
     });
   });
 
@@ -896,11 +930,12 @@ describe("auth-method sso enable", () => {
   describe("with --provider custom in a script", () => {
     it.for([
       "SIGN IN WITH ACME SSO",
-      "Each user attribute is filled from a claim your provider returns:",
+      "These user attributes are filled from a claim your provider returns:",
       "- email comes from the email claim.",
       "It is verified when email_verified is true.",
-      "It asks your provider for the openid, profile, and email scopes.",
-      "default-human-user signs in",
+      "Scopes requested from your provider: openid, profile, and email.",
+      "Users of default-human-user sign in",
+      "Edit claim_mapping in .zitadel/idps/acme-sso.json",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);
 

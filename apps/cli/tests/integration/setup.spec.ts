@@ -1062,7 +1062,23 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("default-human-user signs in");
+        expect(result).toPrint("Users of default-human-user sign in");
+      });
+
+      it("says which scopes it asks the provider for", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("Scopes requested from your provider: openid, profile, and email.");
+      });
+
+      it("says where to change the mapping", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("Edit claim_mapping in .zitadel/idps/acme-sso.json");
       });
     });
   });

@@ -182,6 +182,7 @@ export interface ProjectChanges {
 /** The user schema as committed, which the developer owns and edits. */
 export interface UserSchemaDocument {
   properties: Record<string, unknown>;
+  required?: string[];
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
@@ -215,6 +216,7 @@ interface PackageJson {
 /** The checks behind {@link UserSchemaDocument}, run before a spec edits one. */
 const UserSchemaDocumentSchema: z.ZodType<UserSchemaDocument> = z.object({
   properties: z.record(z.string(), z.unknown()),
+  required: z.array(z.string()).optional(),
   "x-auth-methods": z
     .record(
       z.string(),

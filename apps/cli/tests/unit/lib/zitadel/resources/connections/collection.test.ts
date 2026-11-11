@@ -414,25 +414,40 @@ describe("Connections.enable", () => {
 });
 
 describe("Connections.summarize", () => {
-  const enabled = () => {
-    const change = aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
-    return change.after.connections.summarize(change.document);
+  const enabledChange = () => {
+    return aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
   };
 
   it("lists each property the connection fills and its claim", () => {
-    expect(enabled().mappings).toEqual([{ property: "email", claim: "email" }]);
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.mappings).toEqual([{ property: "email", claim: "email" }]);
   });
 
   it("lists what verifies each property", () => {
-    expect(enabled().verifications).toEqual([{ property: "email", claim: "email_verified" }]);
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.verifications).toEqual([{ property: "email", claim: "email_verified" }]);
   });
 
   it("lists the scopes it asks for", () => {
-    expect(enabled().scopes).toEqual(["openid", "profile", "email"]);
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.scopes).toEqual(["openid", "profile", "email"]);
   });
 
   it("names the schemas that sign in through it", () => {
-    expect(enabled().usedBy).toEqual(["customers"]);
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.usedBy).toEqual(["customers"]);
   });
 
   it("names a property no claim fills, and whether the schema requires it", () => {
@@ -483,7 +498,7 @@ describe("Connections.summarize", () => {
     expect(summary.unmapped).toEqual([{ property: "address", required: true }]);
   });
 
-  it("marks the identifier a password signs in with as required", () => {
+  it("does not mark the identifier a password signs in with as required", () => {
     const body = aUserSchema({
       objectType: "customers",
       properties: { email: { type: "string" }, username: { type: "string" } },
@@ -495,7 +510,7 @@ describe("Connections.summarize", () => {
 
     const summary = change.after.connections.summarize(change.document);
 
-    expect(summary.unmapped).toEqual([{ property: "username", required: true }]);
+    expect(summary.unmapped).toEqual([{ property: "username", required: false }]);
   });
 
   it("names no schema that lists the connection with SSO switched off", () => {
@@ -512,7 +527,11 @@ describe("Connections.summarize", () => {
   });
 
   it("says a connection that creates users does", () => {
-    expect(enabled().createsUsers).toBe(true);
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.createsUsers).toBe(true);
   });
 
   it("says a connection whose creation is disabled creates none", () => {
