@@ -130,7 +130,7 @@ describe("variable resolve", () => {
     expect(parseJson(stdout)).toMatchObject({
       status: "error",
       code: "E_NOT_FOUND",
-      message: "Nothing is deployed to the project",
+      message: "Nothing is deployed to the project.",
     });
   });
 
@@ -149,7 +149,7 @@ describe("variable resolve", () => {
 
     expect(parseJson(stdout)).toMatchObject({
       status: "error",
-      message: "Nothing is deployed to https://app.acme.com",
+      message: "Nothing is deployed to https://app.acme.com.",
       hint: expect.stringContaining("Deploy to it first"),
     });
   });
@@ -182,7 +182,7 @@ describe("variable resolve", () => {
 
     expect(parseJson(stdout)).toMatchObject({
       status: "error",
-      message: "https://typo.acme.com is not an origin of the project",
+      message: "https://typo.acme.com is not an origin of the project.",
     });
   });
 });

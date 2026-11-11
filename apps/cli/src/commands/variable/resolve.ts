@@ -60,7 +60,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
         // origin, which a refusal template cannot list.
         throw new ZitadelError(
           "E_VALIDATION",
-          "More than one deployment is live; name which origin to resolve with --origin",
+          "More than one deployment is live; name which origin to resolve with --origin.",
           {
             hint: `Live origins: ${found.origins.join(", ")}.`,
             nextCommands: found.origins.map((entry) => {
@@ -72,26 +72,26 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       case "nothing-deployed": {
         switch (found.reason) {
           case "none": {
-            throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project", {
+            throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
               hint: "Deploy first, then resolve its variables.",
               nextCommands: [this.suggest(DEPLOY_ARGS)],
             });
           }
           case "primary": {
-            throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}`, {
+            throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}.`, {
               hint: "Deploy to it first, then resolve its variables.",
               nextCommands: [this.suggest(DEPLOY_ARGS)],
             });
           }
           case "preview": {
-            throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}`, {
+            throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}.`, {
               hint: "A preview URL is served by a pull-request build, not by a deploy from here; resolve its variables once that build has deployed it.",
             });
           }
           case "unknown-origin": {
             throw new ZitadelError(
               "E_NOT_FOUND",
-              `${flags.origin} is not an origin of the project`,
+              `${flags.origin} is not an origin of the project.`,
               {
                 hint: "Check the origin for a typo, or list the project's origins.",
                 nextCommands: [this.suggest("origin list")],
