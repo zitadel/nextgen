@@ -138,7 +138,6 @@ function ProjectDetail() {
         <TabsContent value="general" className={DETAIL_STACK}>
           <RenameCard
             id="project-name"
-            layout="inline"
             label="Project name"
             value={project.name}
             onSave={async (name) => {

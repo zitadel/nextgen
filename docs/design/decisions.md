@@ -16,6 +16,10 @@
 
 ## Decisions
 
+### D36 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
+Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks.
+→ Designs follow the shared layout.
+
 ### D35 · A project lands on its Overview — 2026-11-10
 Amends D20, whose landing (`/`) was Users. As in Vercel, where the team sidebar's Projects row is Overview inside a project, a project's sidebar now starts with Overview, the project's own page, and `/` opens it: after sign-in, from the logo of a project, from Logs' heading and when a project is chosen with no screen asked for. With no project chosen and several to choose from, `/` is still Projects itself, not "Continue to Overview" (D22). The page is the project's name, its site and its ID, then what its primary origins serve now (the live release, when and why it went live, the origins serving it, and Deployments), then its newest five audit events (each opening, and Logs). It holds no figures: the API has no counts or aggregates (D5), which is what dropped the earlier stat-card design. Each card reads on its own and says so when its read fails. The account list leaves Overview out: Projects stands in its slot (D34). Settings' first tab becomes General, as Vercel's is, so a project has one Overview.
 → Design review of the page: the header, the Production card and the activity rows, none of which has a frame.
@@ -146,8 +150,8 @@ Minimal (email) · Consumer (email, given name, family name) · Business (+ comp
 ### D0b · Schemas are read-only in the portal — 2026-07-23 · [standing]
 No editing; changes go through the CLI only. Version switching is view-only (skip between versions, no restore/apply).
 
-### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [standing]
-Users/teams/projects are resources; schemas are configuration, not resources — they should look different. MVP permissions: account creator = owner; invited users get admin; evolve later.
+### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [superseded in part by D36]
+Users/teams/projects are resources; schemas are configuration, not resources — they should look different (superseded by D36: the detail screens share one layout). MVP permissions: account creator = owner; invited users get admin; evolve later.
 
 ---
 

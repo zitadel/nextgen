@@ -70,7 +70,6 @@ function TeamDetail() {
           {/* The team's own `name`, the only field `PATCH /teams/{team_id}` accepts. */}
           <RenameCard
             id="team-detail-name"
-            layout="inline"
             label="Team name"
             value={team.name}
             onSave={async (name) => {

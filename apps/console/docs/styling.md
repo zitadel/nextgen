@@ -131,8 +131,7 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
   Field definitions, a login flow's User schema, Release content and the
   settings sections.
 - `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
-  inside a card body. The design draws an identity provider's Used by in the
-  section face instead, so that `h3` takes `SECTION_HEADING`.
+  inside a card body, such as an identity provider's Used by.
 - The overline is for meta labels, table heads and drill-down breadcrumbs,
   never a section title.
 
@@ -217,18 +216,15 @@ cards of labelled rows. Compose `Page` + `DetailHeader` from
 row and cards 16px apart (`DETAIL_STACK`).
 
 - A body card with a titled section is a `DetailSection`: the title, with an
-  optional `aside` beside it (a login flow's schema and its `RevisionLink`)
-  and `action` at the row's end, a rule, then the content. `asideOnRail`
-  starts the aside on the rail instead, as the user detail's schema card draws
-  it over its form. A single name field with its Save button is a
+  optional `aside` on the label rail (a login flow's or a user's schema and
+  its `RevisionLink`) and `action` at the row's end, a rule, then the
+  content. A single name field with its Save button is a
   `RenameCard` (`src/components/rename-card.tsx`).
 - A labelled value is a `DetailRow`, its value in `DETAIL_VALUE`, and a card's
   rows sit in `DetailRows`. Do not lay out a label and value by hand: every
-  card puts its values on the same 218px rail (`DETAIL_LABEL_RAIL`), and a
-  label beside a form control takes `FIELD_LABEL_RAIL` (or
-  `FIELD_GROUP_LABEL_RAIL` in a responsive `FieldGroup`) so the control starts
-  there too. A status list the design right-aligns (a schema's sign-in
-  methods) keeps its own row inside `DetailRows`.
+  card puts its values on the same 218px rail, and a label beside a form
+  control takes `FIELD_LABEL_RAIL` (or `FIELD_GROUP_LABEL_RAIL` in a
+  responsive `FieldGroup`) so the control starts there too.
 - User schemas head the same body with `DetailTitle` instead of
   `DetailHeader`: the title over one 12/16 line with the id, its copy button
   and the created date, no icon tile and no header card. The line stacks under

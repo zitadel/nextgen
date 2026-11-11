@@ -1,5 +1,5 @@
 import { DeploymentStatusBadge } from "./deployment-status-badge";
-import { DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
+import { DETAIL_VALUE_EMPTY, DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
 import { OriginLink } from "@/components/origin-link";
 import { formatDateTime } from "@/lib/date";
 import { type Deployment, KIND_LABEL } from "@/features/deployments/deployment";
@@ -15,7 +15,7 @@ export function ReleaseDeployments({ deployments }: { deployments: Deployment[] 
   return (
     <DetailSection title="Deployment of this release">
       {deployments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">This release has not been deployed.</p>
+        <p className={DETAIL_VALUE_EMPTY}>This release has not been deployed.</p>
       ) : (
         <DetailRows>
           {deployments.map((deployment) => (

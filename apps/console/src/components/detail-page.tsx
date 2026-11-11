@@ -62,8 +62,13 @@ export const DETAIL_CARD = "gap-0 py-0";
 /**
  * The label column of a card row from `sm`: 218px from the card's content
  * edge to the value, on every detail card.
+ *
+ * Tailwind reads class names whole, so the rail is spelled out wherever a
+ * variant needs it: here, the section aside's `@md/field-group:w-54.5`, and
+ * the container rows' `@md/detail-rows:w-54.5`. The two field rails below
+ * are this one less a field's gap. A change to one is a change to all five.
  */
-export const DETAIL_LABEL_RAIL = "sm:w-54.5";
+const DETAIL_LABEL_RAIL = "sm:w-54.5";
 
 /**
  * The same column for a label beside a form control: the rail less the 12px
@@ -81,19 +86,17 @@ export const FIELD_GROUP_LABEL_RAIL = "@md/field-group:flex-[0_0_206px]!";
 
 /**
  * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`),
- * then `aside` beside it (a value the title names, such as a login flow's
- * schema) and `action` at the row's end, a rule, then `children`. Inset 24px,
- * 20px top and bottom, 16px between parts. `asideOnRail` starts the aside on
- * the label rail, level with the controls of a form below it, as the user
- * detail's schema card draws it: like that form's fields, the title row lays
- * out on the card's width (`@md/field-group`), not the viewport's. Otherwise
- * the aside follows the title 16px after.
+ * then `aside` on the label rail (a value the title names, such as a login
+ * flow's or a user's schema) and `action` at the row's end, a rule, then
+ * `children`. Inset 24px, 20px top and bottom, 16px between parts. Like a
+ * form's fields, the title row lays out on the card's width
+ * (`@md/field-group`), not the viewport's, so the aside starts level with the
+ * values and controls below it.
  */
 export function DetailSection({
   title,
   titleId,
   aside,
-  asideOnRail = false,
   action,
   className,
   children,
@@ -103,7 +106,6 @@ export function DetailSection({
   /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
   aside?: ReactNode;
-  asideOnRail?: boolean;
   action?: ReactNode;
 }) {
   const heading = (
@@ -111,25 +113,20 @@ export function DetailSection({
       {title}
     </h2>
   );
-  const lead = !aside ? (
-    heading
-  ) : asideOnRail ? (
+  const lead = aside ? (
     <div className="flex min-w-0 flex-col gap-2 @md/field-group:flex-row @md/field-group:items-center @md/field-group:gap-0">
       <div className="shrink-0 @md/field-group:w-54.5">{heading}</div>
       {aside}
     </div>
   ) : (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-      {heading}
-      {aside}
-    </div>
+    heading
   );
   return (
     <Card className={cn(DETAIL_CARD, className)} {...props}>
       <CardContent className="flex flex-col gap-4 px-6 py-5">
-        {/* The container a railed aside lays out on: the full row's width,
-            the same as a form's `FieldGroup` below it. */}
-        <div className={asideOnRail ? "@container/field-group" : "contents"}>
+        {/* The container the aside lays out on: the full row's width, the
+            same as a form's `FieldGroup` below it. */}
+        <div className={aside ? "@container/field-group" : "contents"}>
           {action ? (
             // Wraps so a wide action drops under the title instead of widening
             // the card.
@@ -176,18 +173,14 @@ const ROW_CONTAINER = {
 };
 
 /**
- * A card row: the label (and a badge beside it) in the {@link DETAIL_LABEL_RAIL}
- * column, the value from its end, stacked under `sm` (or, inside
- * `<DetailRows container>`, below 448px of the list's own width). A 20px line
- * with 4px above and below. `divider` gives it 12px above and below and closes it with
- * its own rule, for rows that carry a menu (Origins); otherwise rows sit in
- * {@link DetailRows}.
+ * A card row: the label (and a badge beside it) in the label rail, the value
+ * from its end, stacked under `sm` (or, inside `<DetailRows container>`, below
+ * 448px of the list's own width). A 20px line with 4px above and below; rows
+ * sit in {@link DetailRows}, which rules between them.
  */
 export function DetailRow({
   label,
   align = "start",
-  divider = false,
-  as: Tag = "div",
   children,
 }: {
   label: ReactNode;
@@ -198,19 +191,11 @@ export function DetailRow({
    * its text.
    */
   align?: "start" | "center" | "control";
-  divider?: boolean;
-  as?: "div" | "li";
   children: ReactNode;
 }) {
   const layout = useContext(RowsOnContainer) ? ROW_CONTAINER : ROW_VIEWPORT;
   return (
-    <Tag
-      className={cn(
-        layout.row,
-        align === "center" ? layout.center : layout.start,
-        divider ? "border-b border-border py-3" : "py-1",
-      )}
-    >
+    <div className={cn(layout.row, align === "center" ? layout.center : layout.start, "py-1")}>
       <div
         className={cn(
           "flex shrink-0 items-center gap-2 text-sm leading-5 font-medium text-muted-foreground",
@@ -221,7 +206,7 @@ export function DetailRow({
         {label}
       </div>
       {children}
-    </Tag>
+    </div>
   );
 }
 

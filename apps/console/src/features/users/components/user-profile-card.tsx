@@ -109,7 +109,6 @@ export function UserProfileCard({
   return (
     <DetailSection
       title="User schema"
-      asideOnRail
       aside={
         schema &&
         schemaId && (
