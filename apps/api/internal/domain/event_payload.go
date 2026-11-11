@@ -511,3 +511,11 @@ func WebhookPayloadDelta(update WebhookUpdate, stored *Webhook) WebhookPayload {
 	}
 	return payload
 }
+
+// WebhookDisabledPayload is the payload of webhook.disabled: why the server
+// stopped delivering to the webhook (ADR 088 §4). A state flip with a reason
+// enum, so it holds nothing else: the failed delivery is on the webhook's
+// last_error_at and last_error_status.
+type WebhookDisabledPayload struct {
+	Reason WebhookDisabledReason `json:"reason"`
+}

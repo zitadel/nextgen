@@ -10,6 +10,7 @@
     "social-sign-in",
     "customize-design",
     "customize-copy",
+    "verify-webhook-signatures",
     "troubleshooting"
   ]
 }

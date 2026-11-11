@@ -99,7 +99,7 @@
     },
     {
       "name": "Webhooks",
-      "description": "Webhooks are the URLs a project's events are sent to. These operations\ncreate, list, read, update and delete a project's webhooks and rotate a\nwebhook's signing secret. The server does not deliver events to a\nproject's webhooks yet: it stores a webhook and delivers nothing to it.\n\nA webhook names the event types it receives, or `*` for all of them\nexcept `request.api`. The server POSTs each matching event to the\nwebhook's `url` as it stores it, one event per request and in the order\nthey were stored. The Event Webhooks section describes the request's\nbody and its delivery.\n\nEvery request to a project's webhook is signed, following\n[Standard Webhooks](https://www.standardwebhooks.com/). It carries three\nheaders:\n\n- `webhook-id`: the event's `id`. It is the same on every retry, so drop\n  duplicates by it.\n- `webhook-timestamp`: when this attempt was sent, in seconds since the\n  Unix epoch. Refuse a request whose timestamp is more than five minutes\n  from your clock.\n- `webhook-signature`: `v1,` followed by the base64 of the HMAC-SHA256\n  of `{webhook-id}.{webhook-timestamp}.{body}`, where `{body}` is the\n  request body byte for byte. The key is the webhook's secret: the\n  base64 after `whsec_`, decoded. For 24 hours after\n  `rotateWebhookSecret` the header holds two signatures separated by a\n  space, one per secret; accept the request when either matches.\n\nVerify the signature over the raw body before parsing it, and compare\nin constant time.\n"
+      "description": "Webhooks are the URLs a project's events are sent to. These operations\ncreate, list, read, update and delete a project's webhooks and rotate a\nwebhook's signing secret.\n\nA webhook names the event types it receives, or `*` for all of them\nexcept `request.api`. The server POSTs each matching event to the\nwebhook's `url` within seconds of storing it, one event per request and\nin the order they were stored. The Event Webhooks section describes the\nrequest's body. Any `2xx` status acknowledges the event. Delivery is at\nleast once.\n\nAny other answer, a redirect included, or none within 10 seconds is a\nfailure. The server then sends the same event again after 5 seconds,\nand after each further failure waits twice as long, up to an hour. The\nwebhook's later events wait behind it. A webhook that fails for 3 days\nwithout one success, or that answers `410`, is disabled: its `enabled`\nbecomes `false` and a `webhook.disabled` event records why.\n\nEvery request to a project's webhook is signed, following\n[Standard Webhooks](https://www.standardwebhooks.com/). It carries three\nheaders:\n\n- `webhook-id`: the event's `id`. It is the same on every retry, so drop\n  duplicates by it.\n- `webhook-timestamp`: when this attempt was sent, in seconds since the\n  Unix epoch. Refuse a request whose timestamp is more than five minutes\n  from your clock.\n- `webhook-signature`: `v1,` followed by the base64 of the HMAC-SHA256\n  of `{webhook-id}.{webhook-timestamp}.{body}`, where `{body}` is the\n  request body byte for byte. The key is the webhook's secret: the\n  base64 after `whsec_`, decoded. For 24 hours after\n  `rotateWebhookSecret` the header holds two signatures separated by a\n  space, one per secret; accept the request when either matches.\n\nVerify the signature over the raw body before parsing it, and compare\nin constant time.\n"
     },
     {
       "name": "Event Webhooks",
@@ -23546,6 +23546,49 @@
           }
         ]
       },
+      "webhook-disabled-payload": {
+        "title": "WebhookDisabledPayload",
+        "type": "object",
+        "description": "Payload for `webhook.disabled`. The webhook ID is the event's `entity_id`.\nThe failed delivery behind it is on the webhook: `last_error_at` and\n`last_error_status`.\n",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why the server disabled the webhook. `failing`: its deliveries failed\nfor 3 days without one success. `gone`: its endpoint answered `410`.\n",
+            "enum": [
+              "failing",
+              "gone"
+            ]
+          }
+        }
+      },
+      "webhook-disabled-event": {
+        "title": "WebhookDisabledEvent",
+        "description": "An event of type webhook.disabled, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "webhook.disabled"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/webhook-disabled-payload"
+              }
+            }
+          }
+        ]
+      },
       "webhook-secret_rotated-event": {
         "title": "WebhookSecretRotatedEvent",
         "description": "An event of type webhook.secret_rotated, with the shared event fields and its own payload.\n",
@@ -23750,6 +23793,9 @@
             "$ref": "#/components/schemas/webhook-deleted-event"
           },
           {
+            "$ref": "#/components/schemas/webhook-disabled-event"
+          },
+          {
             "$ref": "#/components/schemas/webhook-secret_rotated-event"
           },
           {
@@ -23809,6 +23855,7 @@
             "variable.set": "#/components/schemas/variable-set-event",
             "webhook.created": "#/components/schemas/webhook-created-event",
             "webhook.deleted": "#/components/schemas/webhook-deleted-event",
+            "webhook.disabled": "#/components/schemas/webhook-disabled-event",
             "webhook.secret_rotated": "#/components/schemas/webhook-secret_rotated-event",
             "webhook.updated": "#/components/schemas/webhook-updated-event"
           }
@@ -26359,6 +26406,31 @@
                   },
                   "data": {
                     "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "webhook.disabled",
+            "description": "The server disabled a webhook and stopped delivering to it. Its\ndeliveries failed for 3 days without one success, or its endpoint\nanswered `410`; the payload's `reason` says which. Enabling it with\n`updateWebhook` (`PATCH /webhooks/{id}`) starts delivery again from\nthat moment.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "webhook.disabled"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/webhook-disabled-payload"
                   }
                 }
               }
@@ -37568,7 +37640,7 @@
         }
       },
       "webhook-not-delivered": {
-        "description": "Not delivered: any other status, a failed connection, or no response\nwithin 10 seconds. The server sends the event again, and holds back the\nwebhook's later events until this one is delivered.\n"
+        "description": "Not delivered: any other status, a redirect included, a failed connection,\nor no response within 10 seconds. The server sends the event again, and\nholds back the webhook's later events until this one is delivered.\n"
       },
       "webhook-delivered": {
         "description": "Delivered. Any 2xx status acknowledges the event; the response body is ignored."

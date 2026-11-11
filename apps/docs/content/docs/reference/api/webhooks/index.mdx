@@ -8,27 +8,48 @@ A webhook is a URL the server sends a project's
 receives, and every request to it is signed with a secret only the webhook's
 owner holds.
 
-The server does not deliver events to a project's webhooks yet. You can
-create and manage webhooks now, and they receive nothing until delivery
-ships.
-
 ## What a webhook receives
 
-The server sends one `POST` per event, in the order the events were stored.
-The body is the same for every event type;
+The server sends one `POST` per event, within seconds of storing it and in
+the order the events were stored. The body is the same for every event type;
 [Event webhooks](/docs/reference/api/event-webhooks) describes it.
 
 - `event_types` lists the types the webhook receives. The single entry `*`
   stands for every type except `request.api`. To receive that type, name it.
-- Any `2xx` status acknowledges the event. After any other answer the server
-  sends the event again, and holds back the webhook's later events until
-  then.
+- A new webhook gets the events stored after it was created, and no history.
+- Any `2xx` status acknowledges the event. The response body is ignored.
 - Delivery is at least once, so an event can arrive twice. Drop duplicates by
   the `webhook-id` header.
-- A webhook is failing when its `last_error_at` is later than its
-  `last_delivered_at`. After 3 days of failures without a success, or a
-  `410` answer, the server sets `enabled` to `false` and stops sending.
+- A project nobody has [claimed](/docs/concepts/project-team-user#claim) yet
+  delivers nothing. Its webhooks get their pending events after the claim.
 - A project holds at most 10 webhooks.
+
+## When a delivery fails
+
+A delivery fails on any status outside `2xx`, on a failed connection, and
+when the endpoint doesn't answer within 10 seconds. The server follows no
+redirect: a `3xx` status is a failure too.
+
+- The server sends the same event again after 5 seconds. After each further
+  failure it waits twice as long, up to 1 hour. A success resets the wait.
+- The webhook's later events wait behind the failed one, so they still
+  arrive in order. Other webhooks are not held back.
+- `last_error_at` and `last_error_status` hold the last failure;
+  `last_error_status` is `null` when the endpoint gave no answer. A webhook
+  is failing while `last_error_at` is later than `last_delivered_at`.
+- After 3 days of failures without one success, or on a `410` answer, the
+  server sets `enabled` to `false`, stops sending and records a
+  `webhook.disabled` event whose `reason` is `failing` or `gone`.
+- To start again, fix the endpoint and set `enabled` to `true` with
+  `updateWebhook` (`PATCH /webhooks/{id}`). Delivery resumes with the events
+  stored from then on. The events from while it was disabled are not sent:
+  read them with `GET /events`.
+- Events are deleted by age, 30 days by default, whether they were delivered
+  or not.
+
+The server only sends to `https` URLs on public addresses. A webhook that
+names `localhost` or a private network address fails every delivery unless
+the server's operator allows that address.
 
 ## Verify the signature
 
@@ -41,18 +62,11 @@ Each request carries three headers, following
 | `webhook-timestamp` | When this attempt was sent, in seconds since the Unix epoch. |
 | `webhook-signature` | `v1,` followed by the signature in base64. |
 
-To verify a request:
-
-1. Read the body as raw bytes, before parsing it.
-2. Decode the secret: take the part after `whsec_` and decode it from base64.
-3. Compute the HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}` with
-   the decoded secret as the key, and encode the result in base64.
-4. Compare it with the value after `v1,` in constant time. Refuse the
-   request when they differ.
-5. Refuse a request whose `webhook-timestamp` is more than five minutes from
-   your clock.
-
-A Standard Webhooks library for your language does these steps.
+The signature is the HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}`,
+where `{body}` is the request body byte for byte. The key is the webhook's
+secret: the part after `whsec_`, decoded from base64.
+[Verify a webhook's signature](/docs/guides/verify-webhook-signatures) shows
+the check with a Standard Webhooks library and by hand.
 
 The secret appears only in the responses that create a webhook and rotate
 its secret. For 24 hours after a rotation the header holds two signatures

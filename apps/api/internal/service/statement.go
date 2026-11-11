@@ -1013,12 +1013,46 @@ type WebhookStatements interface {
 	ListWebhooks(ctx context.Context, projectID string, page database.Page[domain.WebhookField]) (*database.ListResult[*domain.Webhook], error)
 	// UpdateWebhook writes the fields update names and returns the webhook as
 	// stored. Enabling a disabled webhook also sets its cursor to now: what
-	// happened while it was disabled is not delivered. On Spanner the cursor
-	// it returns is then zero, as the commit decides it.
+	// happened while it was disabled is not delivered. It then starts clean:
+	// not failing, due at once and under nobody's lease, so a delivery still
+	// running from before it was disabled records nothing. On Spanner the
+	// cursor it returns is then zero, as the commit decides it.
 	UpdateWebhook(ctx context.Context, projectID, id string, update domain.WebhookUpdate) (*domain.Webhook, error)
 	DeleteWebhook(ctx context.Context, projectID, id string) error
 	// RotateWebhookSecret makes the stored secret the previous one, valid
 	// until previousExpiresAt, and stores secret in its place, and returns the
 	// webhook as stored.
 	RotateWebhookSecret(ctx context.Context, projectID, id, secret string, previousExpiresAt time.Time) (*domain.Webhook, error)
+
+	// LeaseDueWebhooks hands holder up to limit enabled webhooks, of any
+	// project, to deliver until leaseUntil: those whose next attempt is due
+	// by dueBy and that nobody holds a lease on that is still running at now,
+	// longest due first. No other caller gets one of them before leaseUntil,
+	// also when calls race, unless the holder gives it back first; a holder
+	// that crashed loses it at leaseUntil. The times are the caller's clock,
+	// so the servers of a deployment must agree on it to well within the
+	// length of a lease.
+	LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error)
+	// RecordWebhookProgress moves the cursor of a webhook holder has leased
+	// to the event (cursorCreatedAt, cursorEventID), keeping the lease. With
+	// deliveredAt the move includes a delivery that succeeded then: it
+	// becomes last_delivered_at and the webhook is no longer failing.
+	// Without, the filter skipped every event passed.
+	//
+	// It and the three methods below return *database.NoRowFoundError when
+	// holder no longer holds the webhook's lease: the webhook is gone, was
+	// enabled anew, or another server took it over after the lease ran out.
+	RecordWebhookProgress(ctx context.Context, projectID, id, holder string, cursorCreatedAt time.Time, cursorEventID string, deliveredAt *time.Time) error
+	// RecordWebhookFailure records a delivery that failed at at, with the
+	// HTTP status the endpoint answered or nil when it got no response,
+	// makes the next attempt due at nextAttemptAt and gives the lease back.
+	// The webhook is failing since at unless it already was.
+	RecordWebhookFailure(ctx context.Context, projectID, id, holder string, at time.Time, status *int32, nextAttemptAt time.Time) error
+	// DisableFailedWebhook disables a webhook after the failed delivery
+	// RecordWebhookFailure describes, and gives the lease back. A webhook
+	// that is already disabled returns *database.NoRowFoundError too.
+	DisableFailedWebhook(ctx context.Context, projectID, id, holder string, at time.Time, status *int32) error
+	// ReleaseWebhookLease gives the lease back with nothing to record, and
+	// makes the next attempt due at nextAttemptAt.
+	ReleaseWebhookLease(ctx context.Context, projectID, id, holder string, nextAttemptAt time.Time) error
 }

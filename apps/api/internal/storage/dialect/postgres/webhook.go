@@ -44,7 +44,11 @@ UPDATE zitadel_nextgen.webhooks SET
     event_types = COALESCE($5::text[], event_types),
     enabled = COALESCE($6::boolean, enabled),
     cursor_created_at = CASE WHEN $6::boolean AND NOT enabled THEN clock_timestamp() ELSE cursor_created_at END,
-    cursor_event_id = CASE WHEN $6::boolean AND NOT enabled THEN '' ELSE cursor_event_id END
+    cursor_event_id = CASE WHEN $6::boolean AND NOT enabled THEN '' ELSE cursor_event_id END,
+    next_attempt_at = CASE WHEN $6::boolean AND NOT enabled THEN NULL ELSE next_attempt_at END,
+    failing_since = CASE WHEN $6::boolean AND NOT enabled THEN NULL ELSE failing_since END,
+    lease_holder = CASE WHEN $6::boolean AND NOT enabled THEN NULL ELSE lease_holder END,
+    lease_expires_at = CASE WHEN $6::boolean AND NOT enabled THEN NULL ELSE lease_expires_at END
 WHERE project_id = $1 AND id = $2
 RETURNING ` + webhook.Columns
 
@@ -59,6 +63,60 @@ UPDATE zitadel_nextgen.webhooks SET
     previous_secret_expires_at = $4
 WHERE project_id = $1 AND id = $2
 RETURNING ` + webhook.Columns
+
+	// SKIP LOCKED passes over a row another server is leasing in a statement
+	// that has not committed yet. One that committed is seen: a row lock at
+	// READ COMMITTED re-checks the conditions against the row as it is now,
+	// which holds the other server's lease. The CTE is materialized so the
+	// limit is applied once.
+	leaseDueWebhooksStmt = `
+WITH due AS MATERIALIZED (
+    SELECT project_id, id FROM zitadel_nextgen.webhooks
+    WHERE enabled
+      AND (next_attempt_at IS NULL OR next_attempt_at <= $2)
+      AND (lease_expires_at IS NULL OR lease_expires_at <= $3)
+    ORDER BY next_attempt_at NULLS FIRST, project_id, id
+    LIMIT $5
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE zitadel_nextgen.webhooks SET lease_holder = $1, lease_expires_at = $4
+WHERE (project_id, id) IN (SELECT project_id, id FROM due)
+RETURNING ` + webhook.Columns
+
+	recordWebhookProgressStmt = `
+UPDATE zitadel_nextgen.webhooks SET
+    cursor_created_at = $4,
+    cursor_event_id = $5,
+    last_delivered_at = COALESCE($6::timestamptz, last_delivered_at),
+    failing_since = CASE WHEN $6::timestamptz IS NULL THEN failing_since END
+WHERE project_id = $1 AND id = $2 AND lease_holder = $3`
+
+	recordWebhookFailureStmt = `
+UPDATE zitadel_nextgen.webhooks SET
+    last_error_at = $4,
+    last_error_status = $5,
+    next_attempt_at = $6,
+    failing_since = COALESCE(failing_since, $4),
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = $1 AND id = $2 AND lease_holder = $3`
+
+	disableFailedWebhookStmt = `
+UPDATE zitadel_nextgen.webhooks SET
+    enabled = FALSE,
+    last_error_at = $4,
+    last_error_status = $5,
+    failing_since = COALESCE(failing_since, $4),
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = $1 AND id = $2 AND lease_holder = $3 AND enabled`
+
+	releaseWebhookLeaseStmt = `
+UPDATE zitadel_nextgen.webhooks SET
+    next_attempt_at = $4,
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = $1 AND id = $2 AND lease_holder = $3`
 )
 
 type webhookStatements struct{ statement }
@@ -161,6 +219,52 @@ func (s webhookStatements) RotateWebhookSecret(ctx context.Context, projectID, i
 	return s.queryOne(ctx, s.client, rotateWebhookSecretStmt, projectID, id, secret, previousExpiresAt.UTC())
 }
 
+// LeaseDueWebhooks implements [service.WebhookStatements].
+func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+	rows, err := s.client.Query(ctx, leaseDueWebhooksStmt, holder, dueBy.UTC(), now.UTC(), leaseUntil.UTC(), limit)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	items, err := pgx.CollectRows(rows, scanWebhook)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
+}
+
+// RecordWebhookProgress implements [service.WebhookStatements].
+func (s webhookStatements) RecordWebhookProgress(ctx context.Context, projectID, id, holder string, cursorCreatedAt time.Time, cursorEventID string, deliveredAt *time.Time) error {
+	return s.execLeased(ctx, recordWebhookProgressStmt, projectID, id, holder, cursorCreatedAt.UTC(), cursorEventID, deliveredAt)
+}
+
+// RecordWebhookFailure implements [service.WebhookStatements].
+func (s webhookStatements) RecordWebhookFailure(ctx context.Context, projectID, id, holder string, at time.Time, status *int32, nextAttemptAt time.Time) error {
+	return s.execLeased(ctx, recordWebhookFailureStmt, projectID, id, holder, at.UTC(), status, nextAttemptAt.UTC())
+}
+
+// DisableFailedWebhook implements [service.WebhookStatements].
+func (s webhookStatements) DisableFailedWebhook(ctx context.Context, projectID, id, holder string, at time.Time, status *int32) error {
+	return s.execLeased(ctx, disableFailedWebhookStmt, projectID, id, holder, at.UTC(), status)
+}
+
+// ReleaseWebhookLease implements [service.WebhookStatements].
+func (s webhookStatements) ReleaseWebhookLease(ctx context.Context, projectID, id, holder string, nextAttemptAt time.Time) error {
+	return s.execLeased(ctx, releaseWebhookLeaseStmt, projectID, id, holder, nextAttemptAt.UTC())
+}
+
+// execLeased runs a write on a webhook its holder has leased, or none when
+// the holder no longer holds it: a *database.NoRowFoundError.
+func (s webhookStatements) execLeased(ctx context.Context, stmt string, args ...any) error {
+	tag, err := s.client.Exec(ctx, stmt, args...)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
 // queryOne runs a statement that returns one webhook, or none when the
 // project has no webhook of that id: a *database.NoRowFoundError.
 func (s webhookStatements) queryOne(ctx context.Context, client queryExecutor, stmt string, args ...any) (*domain.Webhook, error) {
@@ -193,12 +297,19 @@ func scanWebhook(row pgx.CollectableRow) (*domain.Webhook, error) {
 		&entity.CursorCreatedAt,
 		&entity.CursorEventID,
 		&entity.CreatedAt,
+		&entity.NextAttemptAt,
+		&entity.FailingSince,
+		&entity.LeaseHolder,
+		&entity.LeaseExpiresAt,
 	); err != nil {
 		return nil, err
 	}
 	// pgx scans timestamptz in Local; reads normalize to UTC.
 	entity.CreatedAt, entity.CursorCreatedAt = entity.CreatedAt.UTC(), entity.CursorCreatedAt.UTC()
-	for _, at := range []*time.Time{entity.PreviousSecretExpiresAt, entity.LastDeliveredAt, entity.LastErrorAt} {
+	for _, at := range []*time.Time{
+		entity.PreviousSecretExpiresAt, entity.LastDeliveredAt, entity.LastErrorAt,
+		entity.NextAttemptAt, entity.FailingSince, entity.LeaseExpiresAt,
+	} {
 		if at != nil {
 			*at = at.UTC()
 		}

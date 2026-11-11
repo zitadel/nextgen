@@ -451,6 +451,21 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	// A webhook's URL is a customer's: deliveries go through the hardened
+	// egress client (ADR 061), built apart from the schema one because it
+	// follows no redirect and has the delivery's deadline (ADR 088 §4).
+	webhookClient, err := audit.WebhookClientConfig(cfg.HTTPClient).NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to build webhook http client: %w", err)
+	}
+	webhookShipper := audit.NewWebhookShipper(service.WebhookDeliveryAdapter{
+		Pool:              serviceDBPool,
+		Keys:              keyService,
+		PlatformProjectID: cfg.Platform.ResolvedProjectID(),
+	}, webhookClient, cfg.Events.Webhooks)
+	webhookShipper.Start()
+	defer webhookShipper.Close()
+
 	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
 		Version:    build.Version(),
 		Commit:     build.Commit(),
@@ -499,7 +514,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
-		retentionJob.Trigger())
+		map[string]http.Handler{
+			audit.RetentionTriggerPath: retentionJob.Trigger(),
+			audit.WebhookTriggerPath:   webhookShipper.Trigger(),
+		})
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -785,6 +803,11 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.trigger_secret", "")
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
+	// On: a project that created a webhook expects its events delivered.
+	v.SetDefault("events.webhooks.enabled", true)
+	v.SetDefault("events.webhooks.interval", 5*time.Second)
+	// Empty: the server delivers on its own timer, not when a scheduler calls.
+	v.SetDefault("events.webhooks.trigger_secret", "")
 	v.SetDefault("service_ping.enabled", false)
 	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
 	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
@@ -957,7 +980,7 @@ func idleTimeout(configured time.Duration) time.Duration {
 	return configured
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, triggers map[string]http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -1011,7 +1034,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// Request ID, access log and panic recovery — shared by mounts that sit
-	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
+	// outside the API's auth/CSRF chain (the cron triggers, CSP reports, the
 	// embedded OpenAPI document).
 	observe := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
@@ -1022,12 +1045,16 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 			api.WithRecover,
 		)
 	}
-	// The event retention trigger, when a scheduler outside the process runs
-	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
-	// not the API's, so it takes the request ID and the request line but none
-	// of the middleware a client's request passes.
-	if retentionTrigger != nil {
-		mux.Handle(audit.RetentionTriggerPath, observe(retentionTrigger))
+	// The triggers by path, each present when a scheduler outside the process
+	// runs its job: the event retention purge
+	// (events.retention.trigger_secret, ADR 049) and delivery to the
+	// projects' webhooks (events.webhooks.trigger_secret, ADR 088). They are
+	// the operator's, not the API's, so they take the request ID and the
+	// request line but none of the middleware a client's request passes.
+	for path, trigger := range triggers {
+		if trigger != nil {
+			mux.Handle(path, observe(trigger))
+		}
 	}
 	// Where browsers post the violations of the console's and the error
 	// page's policies, and on the hosted cloud those of every service's

@@ -47,11 +47,13 @@ type OriginsConfig struct {
 	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
 
-// EventsConfig configures audit event retention and deployment export sinks.
+// EventsConfig configures audit event retention, the deployment's export
+// sinks and delivery to the projects' webhooks.
 type EventsConfig struct {
 	Request   audit.RequestConfig   `mapstructure:"request"`
 	Retention audit.RetentionConfig `mapstructure:"retention"`
 	Export    audit.ExportConfig    `mapstructure:"export"`
+	Webhooks  audit.WebhookConfig   `mapstructure:"webhooks"`
 }
 
 // PlatformConfig configures the deployment's default project resolution
@@ -140,6 +142,7 @@ func (c Config) Validate() error {
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
 		c.Events.Retention.Validate,
+		c.Events.Webhooks.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err

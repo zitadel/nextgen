@@ -31,6 +31,22 @@ const WebhookSecretPrefix = "whsec_"
 // except request.api (ADR 088 §1).
 const WebhookAllEventTypes = "*"
 
+// WebhookDisableAfter is how long a webhook may fail without one success
+// before the server disables it (ADR 088 §4).
+const WebhookDisableAfter = 3 * 24 * time.Hour
+
+// WebhookDisabledReason says why the server disabled a webhook: the payload
+// of webhook.disabled.
+type WebhookDisabledReason string
+
+const (
+	// WebhookDisabledReasonFailing: every delivery failed for
+	// WebhookDisableAfter.
+	WebhookDisabledReasonFailing WebhookDisabledReason = "failing"
+	// WebhookDisabledReasonGone: the endpoint answered 410 Gone.
+	WebhookDisabledReasonGone WebhookDisabledReason = "gone"
+)
+
 // NewWebhookSecret generates a signing secret: 32 random bytes, shown as
 // whsec_ and their base64 (ADR 088 §3).
 func NewWebhookSecret() (string, error) {
@@ -87,7 +103,19 @@ type Webhook struct {
 	// wire.
 	CursorCreatedAt time.Time
 	CursorEventID   string
-	CreatedAt       time.Time
+	// NextAttemptAt is from when the next delivery attempt is due: after a
+	// failure the end of the backoff, otherwise when delivery last looked.
+	// Nil, it is due. FailingSince is the first failure since the last
+	// delivery that succeeded, nil while the webhook is not failing. Neither
+	// is on the wire.
+	NextAttemptAt *time.Time
+	FailingSince  *time.Time
+	// LeaseHolder is the server delivering the webhook until LeaseExpiresAt,
+	// so that replicas do not each send every event (ADR 088 §4). Both are
+	// nil when nobody is.
+	LeaseHolder    *string
+	LeaseExpiresAt *time.Time
+	CreatedAt      time.Time
 }
 
 // WebhookUpdate is a partial update of a webhook: a nil field keeps the
@@ -120,4 +148,8 @@ const (
 	WebhookFieldCursorCreatedAt
 	WebhookFieldCursorEventID
 	WebhookFieldCreatedAt
+	WebhookFieldNextAttemptAt
+	WebhookFieldFailingSince
+	WebhookFieldLeaseHolder
+	WebhookFieldLeaseExpiresAt
 )

@@ -179,6 +179,7 @@ tracked below.
 | WebhookService update (enabling and disabling included) | `webhook.updated` | `admin` | `webhook` | delta: the fields the update named, of `url` (no query), `description`, `event_types`, `enabled` |
 | WebhookService delete | `webhook.deleted` | `admin` | `webhook` | _(empty)_ |
 | WebhookService rotate secret | `webhook.secret_rotated` | `admin` | `webhook` | _(empty; never a secret)_ |
+| Webhook delivery disabling a webhook whose deliveries failed for 3 days without a success, or whose endpoint answered `410` ([ADR 088 §4](../../adrs/088-project-webhooks.md)), in the transaction that disables it; actor type `system`. Disabling through the API is `webhook.updated` | `webhook.disabled` | `admin` | `webhook` | `reason` (`failing`, `gone`) |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
@@ -239,5 +240,4 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
-| `webhook.disabled` | [ADR 088 §4](../../adrs/088-project-webhooks.md): the shipper disabling a webhook that failed for 3 days or answered `410`; lands with delivery |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

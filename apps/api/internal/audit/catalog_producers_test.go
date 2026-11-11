@@ -63,6 +63,7 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeWebhookUpdated:             "internal/service",
 	domain.EventTypeWebhookDeleted:             "internal/service",
 	domain.EventTypeWebhookSecretRotated:       "internal/service",
+	domain.EventTypeWebhookDisabled:            "internal/service",
 	domain.EventTypeRequestAPI:                 "internal/audit",
 }
 

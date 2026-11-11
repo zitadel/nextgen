@@ -33,6 +33,7 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 	metrics.RecordFlowTransition(ctx, metrics.FlowSubmit, metrics.FlowStep)
 	metrics.RecordAuditInsert(ctx, metrics.AuditEvent, time.Millisecond)
 	metrics.RecordAuditEvents(ctx, "auth.token.revoked", 1)
+	metrics.RecordWebhookDelivery(ctx, metrics.WebhookDelivered)
 	unregister := metrics.RegisterPool(metrics.PoolSQLite, func() metrics.PoolStats {
 		return metrics.PoolStats{Used: 1, Idle: 2, Max: 3}
 	})
