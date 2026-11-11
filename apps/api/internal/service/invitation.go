@@ -130,7 +130,7 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 		entity.CreatedByType = actor.ActorType
 
 		if input.ReplacesInvitationID != "" {
-			original, err := s.releaseReplaced(ctx, stmts, input.ProjectID, input.ReplacesInvitationID, now)
+			original, err := s.releaseReplaced(ctx, stmts, input.ProjectID, input.ReplacesInvitationID)
 			if err != nil {
 				return err
 			}
@@ -158,7 +158,7 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 		}
 		// TODO(#2850): emit invitation.created for entity, with
 		// replaces_invitation_id, and invitation.cancelled (reason replaced,
-		// replaced_by entity.ID) for a deleted pending original.
+		// replaced_by entity.ID) for the deleted original.
 		created = entity
 		return nil
 	})
@@ -171,27 +171,18 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 	}, nil
 }
 
-// releaseReplaced deletes a pending original, clears an expired one's moved
-// metadata, and refuses an accepted one.
-func (s *InvitationService) releaseReplaced(ctx context.Context, stmts AllStatements, projectID, id string, now time.Time) (*domain.Invitation, error) {
+// releaseReplaced deletes the original a replace names, unless it was accepted.
+func (s *InvitationService) releaseReplaced(ctx context.Context, stmts AllStatements, projectID, id string) (*domain.Invitation, error) {
 	original, err := stmts.GetInvitationByID(ctx, projectID, id)
 	if err != nil {
 		return nil, err
 	}
-	switch original.StatusAt(now) {
-	case domain.InvitationStatusPending:
-		// A miss here means it was accepted or declined after the read.
-		if err := stmts.DeletePendingInvitation(ctx, projectID, id, now); err != nil {
-			return nil, notPendingOnMiss(err)
-		}
-	case domain.InvitationStatusExpired:
-		if original.EncryptedMetadata != nil {
-			if err := stmts.ClearInvitationMetadata(ctx, projectID, id, now); err != nil {
-				return nil, err
-			}
-		}
-	case domain.InvitationStatusAccepted:
+	if original.Status == domain.InvitationStatusAccepted {
 		return nil, domain.ErrInvitationNotPending()
+	}
+	// A miss here means it was accepted after the read.
+	if err := stmts.DeleteUnacceptedInvitation(ctx, projectID, id); err != nil {
+		return nil, notPendingOnMiss(err)
 	}
 	return original, nil
 }

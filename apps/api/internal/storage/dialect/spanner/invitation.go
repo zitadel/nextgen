@@ -24,8 +24,8 @@ const (
 	changeInvitationStatusStmt   = `UPDATE invitations SET status = @p3, accepted_by = @p4, accepted_at = @p5, metadata = NULL` +
 		` WHERE project_id = @p1 AND id = @p2 AND status = 'pending' AND expires_at > @p6` +
 		` THEN RETURN ` + invitationColumnList
-	clearInvitationMetadataStmt = `UPDATE invitations SET metadata = NULL` +
-		` WHERE project_id = @p1 AND id = @p2 AND (status <> 'pending' OR expires_at <= @p3)`
+	deleteUnacceptedInvitationStmt = `DELETE FROM invitations` +
+		` WHERE project_id = @p1 AND id = @p2 AND status <> 'accepted'`
 	deletePendingInvitationStmt = `DELETE FROM invitations` +
 		` WHERE project_id = @p1 AND id = @p2 AND status = 'pending' AND expires_at > @p3`
 	countPendingInvitationsStmt = `SELECT COUNT(*) FROM invitations` +
@@ -139,9 +139,9 @@ func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projec
 	return entity, nil
 }
 
-// ClearInvitationMetadata implements [service.InvitationStatements].
-func (s invitationStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.updateOne(ctx, buildStatement(clearInvitationMetadataStmt, projectID, id, now).statement())
+// DeleteUnacceptedInvitation implements [service.InvitationStatements].
+func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error {
+	return s.updateOne(ctx, buildStatement(deleteUnacceptedInvitationStmt, projectID, id).statement())
 }
 
 // DeletePendingInvitation implements [service.InvitationStatements].

@@ -458,8 +458,8 @@ func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest
 // and `role`, and answers `501` `not_implemented` until team invitations
 // ship. Optional `metadata.name` labels who the link is for. Optional
 // `replaces_invitation_id` replaces that invitation: the new row keeps the
-// original's `journey_id`, and a pending original is deleted in the same
-// transaction.
+// original's `journey_id`, and the original is deleted in the same
+// transaction unless it was accepted.
 // The `link` appears only in this response. Share it out of band; whoever
 // opens it and is signed in can redeem the role. It expires in 72 hours.
 // Refused for an unclaimed project, on a server without a platform project,

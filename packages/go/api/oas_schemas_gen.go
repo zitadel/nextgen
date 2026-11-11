@@ -18229,9 +18229,11 @@ type CreateInvitationProjectMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original is deleted in the
-	// same transaction. Use the `id` that `createInvitation`
-	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	// the original's `journey_id` and, without `metadata` of its own, the
+	// original's metadata. The original is deleted in the same transaction. An
+	// accepted invitation cannot be replaced. Use the `id` that
+	// `createInvitation` (`POST /invitations`) or `listInvitations`
+	// (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                          `json:"replaces_invitation_id"`
 	Type                 CreateInvitationProjectMemberRequestType `json:"type"`
 	ProjectMember        InvitationProjectMemberPayload           `json:"project_member"`
@@ -18317,7 +18319,7 @@ type CreateInvitationProjectMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18721,9 +18723,11 @@ type CreateInvitationTeamMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original is deleted in the
-	// same transaction. Use the `id` that `createInvitation`
-	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	// the original's `journey_id` and, without `metadata` of its own, the
+	// original's metadata. The original is deleted in the same transaction. An
+	// accepted invitation cannot be replaced. Use the `id` that
+	// `createInvitation` (`POST /invitations`) or `listInvitations`
+	// (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                       `json:"replaces_invitation_id"`
 	Type                 CreateInvitationTeamMemberRequestType `json:"type"`
 	TeamMember           InvitationTeamMemberPayload           `json:"team_member"`
@@ -18809,7 +18813,7 @@ type CreateInvitationTeamMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -48988,8 +48992,8 @@ func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) erro
 
 // What the administrator entered at creation, so other administrators know who
 // the link is for. It is only displayed, never matched. Null once the
-// invitation is accepted or declined. Cancel and replace of a pending
-// invitation delete the row, so the metadata goes with it.
+// invitation is accepted or declined. Cancel deletes the row with it; replace
+// moves it to the new invitation unless that sends its own.
 // Ref: #
 type InvitationMetadata struct {
 	// A display name for who the invitation is intended for.
@@ -49012,7 +49016,7 @@ type InvitationProjectMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -49796,8 +49800,8 @@ func (s *InvitationRejectedPayload) SetUserID(val string) {
 }
 
 // Lifecycle status of the invitation. `expired` is derived on read from
-// `expires_at`; `accepted` and `rejected` are final. Cancel and replace of a
-// pending invitation delete the row rather than leaving a cancelled status.
+// `expires_at`; `accepted` and `rejected` are final. Cancel and replace delete
+// the row rather than leaving a cancelled status.
 // Ref: #
 type InvitationStatus string
 
@@ -49860,7 +49864,7 @@ type InvitationTeamMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
