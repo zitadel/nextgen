@@ -566,6 +566,27 @@ func prepareServer(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
+	// An OTLP endpoint on the environment turns telemetry export on. The OTLP
+	// SDK reads it and OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
+	// itself, so the exporters' own endpoint stays unset; an environment
+	// without it exports nothing rather than retry localhost:4318. The batch
+	// durations are the SDK's defaults, named so the cloud's export cadence is
+	// read here rather than inherited.
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		for key, value := range map[string]string{
+			"NEXTGEN_INSTRUMENTATION_SERVICE_NAME":                   "nextgen-cloud",
+			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":            "http",
+			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION":  "5s",
+			"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE":           "http",
+			"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "60s",
+			"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE":              "http",
+			"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_BATCH_DURATION":    "1s",
+		} {
+			if err := setDefault(key, value); err != nil {
+				return nil, err
+			}
+		}
+	}
 	// Added to, not defaulted: a deployment names its custom domains there, and
 	// the URLs Vercel serves it at must stay console origins beside them.
 	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(env, os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
