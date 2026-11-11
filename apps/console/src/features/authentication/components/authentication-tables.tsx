@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Braces, Shield } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
@@ -35,7 +36,7 @@ import type { SchemaEntry } from "@/features/schemas/model";
  * platform project (D41). The screen that draws the tables names it, so a row
  * never opens a project's page at the root.
  */
-export type IdpDetailRoute = "/authentication/idps/$idpId" | "/settings/authentication/idps/$idpId";
+export type IdpDetailRoute = "/authentication/idps/$idpId" | "/platform/authentication/idps/$idpId";
 
 /** The first and last columns; the user schema column takes the rest. */
 const COLUMN = "w-1/4";
@@ -48,9 +49,12 @@ const COLUMN = "w-1/4";
 export function SignInMethods({
   loaded,
   detail,
+  empty,
 }: {
   loaded: AuthenticationData;
   detail: IdpDetailRoute;
+  /** What an empty table says, where it is not a project's (the root's, D41). */
+  empty?: ReactNode;
 }) {
   const rows = signInMethodRows(loaded.schemas, loaded.idps);
 
@@ -67,7 +71,7 @@ export function SignInMethods({
         <TableBody>
           {rows.length === 0 ? (
             <ResourceEmptyRow colSpan={3}>
-              No user schema in this project enables a sign-in method.
+              {empty ?? "No user schema in this project enables a sign-in method."}
             </ResourceEmptyRow>
           ) : (
             rows.map((row) => <MethodRow key={row.key} row={row} detail={detail} />)
@@ -134,10 +138,16 @@ export function IdentityProviders({
   idps,
   schemas,
   detail,
+  empty,
 }: {
   idps: IdpConnection[];
   schemas: SchemaEntry[];
   detail: IdpDetailRoute;
+  /**
+   * What an empty table says, where it is not a project's (the root's, D41):
+   * the CLI hint is a project's, whose connections its own deploys carry.
+   */
+  empty?: ReactNode;
 }) {
   const users = schemasBySsoProvider(schemas);
 
@@ -155,8 +165,12 @@ export function IdentityProviders({
         <TableBody>
           {idps.length === 0 ? (
             <ResourceEmptyRow colSpan={4}>
-              This project has no identity providers. Add one with{" "}
-              <InlineCode>zitadel auth-method sso enable</InlineCode>.
+              {empty ?? (
+                <>
+                  This project has no identity providers. Add one with{" "}
+                  <InlineCode>zitadel auth-method sso enable</InlineCode>.
+                </>
+              )}
             </ResourceEmptyRow>
           ) : (
             idps.map((idp) => (

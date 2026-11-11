@@ -30,7 +30,7 @@ export type EventLink = Pick<LinkProps, "to" | "params" | "search">;
 
 /**
  * Where an events list's links lead, which the route that draws it knows: the
- * project's Events (`/events`) or the root's Audit log (`/settings/audit-log`,
+ * project's Events (`/events`) or the root's Audit log (`/platform/audit-log`,
  * D41). The list and the drawer over it link only through these, so each
  * stays on its own route.
  */

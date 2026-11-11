@@ -53,8 +53,8 @@ export interface ConsoleRuntime {
    * The reserved platform project (ADR 0004 §3 amendment, D41): present, and
    * equal to `console_project_id`, only when the console signs in to the
    * project bootstrap provisioned. The console draws that project at its root
-   * (the root Settings' People, Authentication, Login flows, Branding and Audit
-   * log) and never offers it as a project. Absent for the pinned or
+   * (the root sidebar's People, Authentication, Login flows, Branding and
+   * Audit log) and never offers it as a project. Absent for the pinned or
    * first-created fallback, whose project is an ordinary one.
    */
   platform_project_id?: string;

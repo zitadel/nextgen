@@ -72,7 +72,7 @@ test("a platform operator reaches every management screen without an error", asy
 
   // The platform project the console signs in to is the root, not a project
   // (D41): the server marks it, Projects never lists it, and this operator,
-  // who holds no grant on it, finds none of its pages in Settings.
+  // who holds no grant on it, finds none of its pages in the root's sidebar.
   const runtime = (await (await page.request.get("/console/runtime.json")).json()) as {
     console_project_id?: string;
     platform_project_id?: string;
@@ -89,17 +89,14 @@ test("a platform operator reaches every management screen without an error", asy
   // Bootstrap names the platform project "Platform" (internal/bootstrap/platform).
   await expect(page.getByRole("table").getByRole("link", { name: "Platform" })).toHaveCount(0);
   // Its pages refuse this operator outright: the server answers the platform
-  // project's read with a refusal, so a link to one lands on an empty Settings.
-  await page.goto("/ui/console/settings/people");
-  await expect(page).toHaveURL(/\/settings(\?|$)/);
-  await expect(page.getByText("Nothing here is yours to set.")).toBeVisible();
-  // With nothing in its list, the account sidebar has no Settings row. The
-  // read above has answered by now, so the row is absent, not on its way.
-  await page.goto("/ui/console/projects");
+  // project's read with a refusal, so a link to one lands on Projects, whose
+  // sidebar lists none of them. The embedded console has no add-on either, so
+  // Projects is the root's only row.
+  await page.goto("/ui/console/platform/people");
+  await expect(page).toHaveURL(/\/projects(\?|$)/);
   await expect(projectLink).toBeVisible();
-  const account = page.getByRole("navigation", { name: "Account" });
-  await expect(account.getByRole("link", { name: "Projects" })).toBeVisible();
-  await expect(account.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  const root = page.getByRole("navigation", { name: "Account" });
+  await expect(root.getByRole("link")).toHaveText(["Projects"]);
   await projectLink.click();
   await expect(page).toHaveURL(new RegExp(`/console/?\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByRole("region", { name: "Production" })).toBeVisible();

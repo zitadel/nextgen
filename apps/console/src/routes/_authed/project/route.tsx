@@ -13,8 +13,8 @@ import { projectScopeDeps, requireProjectScope } from "@/features/projects/proje
  * root Settings above every project is (D29) and as Vercel's project Settings
  * is (D40). The project's row opens it, and its pages are the routes beneath
  * this one: General (name, origins, variables, policies) and Admins (who has
- * access and how, #1238, #1462). The root Settings are the platform project's
- * and list other pages; both open the same way.
+ * access and how, #1238, #1462). The root's Settings list other pages, the
+ * hosted cloud's; both open the same way.
  *
  * This layout reads the project and draws its header on every page, so moving
  * between them keeps the header and reads only the page's own data. It is

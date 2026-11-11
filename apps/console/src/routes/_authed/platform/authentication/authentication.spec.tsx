@@ -133,7 +133,7 @@ async function renderAt(path: string) {
 describe("root authentication", () => {
   it("reads the platform project's sign-in methods, and a provider opens the root's page", async () => {
     const reads = serve();
-    const router = await renderAt("/settings/authentication");
+    const router = await renderAt("/platform/authentication");
 
     const google = await screen.findByRole("link", { name: "Google" });
     // The platform project's, not the selection's.
@@ -145,14 +145,14 @@ describe("root authentication", () => {
     );
     expect(reads.every((entry) => entry.project === PLATFORM)).toBe(true);
     expect(google.getAttribute("href")).toMatch(
-      /^\/settings\/authentication\/idps\/idp_google(\?|$)/,
+      /^\/platform\/authentication\/idps\/idp_google(\?|$)/,
     );
     expect(google.getAttribute("href")).not.toContain(PLATFORM);
 
     await userEvent.click(google);
     await waitFor(() =>
       expect(router.state.resolvedLocation?.pathname).toBe(
-        "/settings/authentication/idps/idp_google",
+        "/platform/authentication/idps/idp_google",
       ),
     );
     // The selection is kept, never replaced by the platform project.
@@ -166,13 +166,13 @@ describe("root authentication", () => {
     expect(screen.getByText("Operators")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Operators" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Default login" }).getAttribute("href")).toMatch(
-      /^\/settings\/login-flows\/flow_login(\?|$)/,
+      /^\/platform\/login-flows\/flow_login(\?|$)/,
     );
   });
 
   it("keeps the open tab in the URL, and a connection opens the root's page", async () => {
     serve();
-    const router = await renderAt("/settings/authentication");
+    const router = await renderAt("/platform/authentication");
 
     await userEvent.click(await screen.findByRole("tab", { name: "Identity providers" }));
     await waitFor(() =>
@@ -181,14 +181,14 @@ describe("root authentication", () => {
         project: TEST_PROJECT_ID,
       }),
     );
-    expect(router.state.resolvedLocation?.pathname).toBe("/settings/authentication");
+    expect(router.state.resolvedLocation?.pathname).toBe("/platform/authentication");
     expect((await screen.findByRole("link", { name: "GitHub" })).getAttribute("href")).toMatch(
-      /^\/settings\/authentication\/idps\/idp_github(\?|$)/,
+      /^\/platform\/authentication\/idps\/idp_github(\?|$)/,
     );
   });
 
-  it.each(["/settings/authentication", "/settings/authentication/idps/idp_google"])(
-    "sends someone who may not act on the platform project from %s to Settings",
+  it.each(["/platform/authentication", "/platform/authentication/idps/idp_google"])(
+    "sends someone who may not act on the platform project from %s to Projects",
     async (path) => {
       server.use(
         http.get(PLATFORM_PROJECT, () =>
@@ -197,10 +197,9 @@ describe("root authentication", () => {
       );
       const router = await renderAt(path);
 
-      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
-      // Settings, settled: with no page of the platform project's to list, and
-      // no add-on, it has nothing to forward to.
-      expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+      // The root's home, whose sidebar lists no page of the platform project.
+      expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Authentication" })).not.toBeInTheDocument();
     },
   );

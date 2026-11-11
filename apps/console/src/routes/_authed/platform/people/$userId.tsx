@@ -12,7 +12,7 @@ import { PEOPLE_USER_LINKS } from "@/features/users/links";
  * since the root shows no schemas; a linked provider opens the root's
  * Authentication, and deleting them returns to People.
  */
-export const Route = createFileRoute("/_authed/settings/people/$userId")({
+export const Route = createFileRoute("/_authed/platform/people/$userId")({
   staticData: { platformRoot: true, resource: "user" },
   beforeLoad: requirePlatformRoot,
   loader: ({ params, context }) => fetchUserDetail(params.userId, context.platformProjectId),

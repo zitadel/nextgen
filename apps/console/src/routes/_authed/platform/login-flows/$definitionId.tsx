@@ -6,11 +6,11 @@ import { requirePlatformRoot } from "@/features/platform/access";
 import { ManagedProject } from "@/features/projects/project-scope";
 
 /**
- * One of the reserved platform project's flow definitions, opened from root
- * Settings → Login flows (D41). Its schema is named in that project and not
+ * One of the reserved platform project's flow definitions, opened from the
+ * root's Login flows (D41). Its schema is named in that project and not
  * linked, as the root shows no schemas.
  */
-export const Route = createFileRoute("/_authed/settings/login-flows/$definitionId")({
+export const Route = createFileRoute("/_authed/platform/login-flows/$definitionId")({
   staticData: { platformRoot: true, resource: "login flow" },
   beforeLoad: requirePlatformRoot,
   loader: ({ params, context }) =>

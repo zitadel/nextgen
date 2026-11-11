@@ -18,7 +18,7 @@ const lastAnswer = sessionKept((): { value: string | null | undefined } => ({ va
  * console's root (D41, Console ADR 0004 §5 amendment).
  *
  * Its pages (People, Authentication, Login flows, Branding, Audit log) are
- * listed in the root Settings only for someone who can, which a platform
+ * rows of the root sidebar only for someone who can, which a platform
  * operator always can (root ADR 075) and a cloud customer, holding no grant
  * there, never can. Signing in to the project, or being homed in it, is not
  * that: the server answers it, from the person's grants, by reading the
@@ -46,20 +46,11 @@ export const readPlatformAccess = sessionCached(async (): Promise<string | undef
 
 /**
  * The reserved platform project's id when the person may act on it, for the
- * chrome (the Settings list, search): `undefined` while the first read is in
+ * chrome (the root sidebar, search): `undefined` while the first read is in
  * flight, where the deployment has none, and when it is refused or fails, so
  * the root pages are simply not listed.
  */
 export function usePlatformAccess(): string | undefined {
-  return usePlatformAccessRead() ?? undefined;
-}
-
-/**
- * {@link usePlatformAccess}, telling the first read in flight (`undefined`)
- * from an answer of none (`null`): for a screen that must not settle on
- * "nothing here" before the answer lands.
- */
-export function usePlatformAccessRead(): string | null | undefined {
   const platform = getPlatformProjectId();
   const [read, setRead] = useState<string | null | undefined>(() =>
     platform ? lastAnswer().value : null,
@@ -79,18 +70,18 @@ export function usePlatformAccessRead(): string | null | undefined {
       cancelled = true;
     };
   }, [platform]);
-  return read;
+  return read ?? undefined;
 }
 
 /**
  * `beforeLoad` of a root page of the platform project (D41): the project's id
  * in the route's context, for its loader and its `ManagedProject`. Someone
  * who may not act on it (or a deployment without one, or a failed read) goes
- * to Settings instead, as the page is not in their list.
+ * to Projects instead, the root's home, as the page is not in their list.
  */
 export async function requirePlatformRoot(): Promise<{ platformProjectId: string }> {
   const id = await readPlatformAccess().catch(() => undefined);
-  if (!id) throw redirect({ to: "/settings", replace: true });
+  if (!id) throw redirect({ to: "/projects", replace: true });
   return { platformProjectId: id };
 }
 

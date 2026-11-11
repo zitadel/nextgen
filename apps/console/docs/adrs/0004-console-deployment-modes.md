@@ -357,8 +357,8 @@ authorization. Each API operation performs its own target-scoped check.
 
 > **Amendment (2026-11-11, D41):** the reserved platform project's
 > surfaces (its people, how they sign in, its audit log) are root surfaces,
-> listed in the root Settings, and the same rule governs them, with the
-> reserved project as the target. They are listed when the signed-in person
+> rows of the root's sidebar beside Projects, and the same rule governs them,
+> with the reserved project as the target. They are listed when the signed-in person
 > can act on that project, which the Console learns by reading it
 > (`GET /projects/{platform_project_id}`) until effective permissions are
 > exposed. Each page's own reads then decide what it shows. Being signed in

@@ -53,30 +53,18 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 }
 
 /**
- * The account list as the sidebar draws it (D34): its first row, Projects,
- * then the project's screens, then the account's other rows (Settings). Above
- * every project the account's rows alone left the sidebar nearly empty; with
- * the project's screens it shows what the console holds. Choosing one opens it
- * in the selected project (D36), and asks for a project first when none is
- * (D31).
+ * The root's list as the sidebar draws it (D41): Projects, the spine, then
+ * the reserved platform project's own pages for someone who may act on it
+ * (People, Authentication, Login flows, Branding, Audit log, which
+ * `useNavItems` already leaves out for anyone else), then Settings. The root
+ * is the platform, so its sidebar holds the root's screens and no project's:
+ * a project's are reached by choosing the project.
  *
- * Two of the project's rows are left out, as in Vercel. Its landing, `/`
- * (Overview, D35), is the row Projects stands in for up here. A screen named
- * like an account row (the project's own Settings) would name two places
- * alike: up here Settings is the account's.
+ * Settings opens a list (D29): with nothing in it (no add-on) the row would
+ * open nothing, so it is left out.
  */
-export function accountListItems(
-  account: NavItem[],
-  project: NavItem[],
-  settings: NavItem[],
-): NavItem[] {
-  // Settings opens a list (D29): with nothing in it (no add-on, no access to
-  // the platform project, D41) the row would open nothing, so it is left out.
-  const [home, ...others] = account;
-  const rest = settings.length > 0 ? others : others.filter((item) => item.to !== SETTINGS_PATH);
-  const taken = new Set(account.map((item) => item.nav.label));
-  const screens = project.filter((item) => item.to !== "/" && !taken.has(item.nav.label));
-  return home ? [home, ...screens, ...rest] : screens;
+export function accountListItems(account: NavItem[], settings: NavItem[]): NavItem[] {
+  return settings.length > 0 ? account : account.filter((item) => item.to !== SETTINGS_PATH);
 }
 
 /**

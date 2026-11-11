@@ -1,4 +1,4 @@
-import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
+import { Link, useMatch, useMatchRoute, useMatches } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -22,12 +22,7 @@ import { EventFilters, EventViewPicker } from "@/features/events/components/even
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import {
-  PROJECT_SETTINGS_PATH,
-  accountListItems,
-  useNavItems,
-  useRequestedNavItem,
-} from "./use-nav-items";
+import { PROJECT_SETTINGS_PATH, accountListItems, useNavItems } from "./use-nav-items";
 import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
@@ -100,8 +95,8 @@ const EVENTS_PATH = "/events";
 
 /**
  * Which of the sidebar's lists is showing, and the **route** decides:
- * Projects is above every project, so it lists the account's screens, and
- * so does the person's profile (`/account`, D41);
+ * Projects is above every project, so it lists the root's screens, and so do
+ * the person's profile (`/account`) and the platform project's pages (D41);
  * `/settings` with anything beneath it lists Settings' pages (D29); `/project`
  * with anything beneath it lists the selected project's Settings pages (D40);
  * `/events` with anything beneath it lists Events' views and filters (D30);
@@ -115,10 +110,24 @@ function useShellView(): NavView {
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
   // The person's profile is above every project too (D41), with no row of its own.
   const atAccount = !!useMatch({ from: ACCOUNT_ROUTE, shouldThrow: false });
+  // So are the platform project's pages, which are the root's own rows.
+  const atPlatform = usePlatformRootPage();
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
   if (matchRoute({ to: PROJECT_SETTINGS_PATH, fuzzy: true })) return "project-settings";
   if (matchRoute({ to: EVENTS_PATH, fuzzy: true })) return "events";
-  return atHome || atAccount ? "account" : "portal";
+  return atHome || atAccount || atPlatform ? "account" : "portal";
+}
+
+/**
+ * Whether the screen is a root page of the reserved platform project (D41):
+ * People, Authentication, Login flows, Branding, Audit log, and what opens
+ * beneath one. The route says so (`staticData.platformRoot`), on the page or
+ * on its layout.
+ */
+function usePlatformRootPage(): boolean {
+  return useMatches({
+    select: (matches) => matches.some((match) => match.staticData.platformRoot === true),
+  });
 }
 
 /**
@@ -216,14 +225,13 @@ const NAV_LABEL: Record<NavView, string> = {
 
 /**
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
- * Console ADR 0001). Portal is the project's screens. Account is what sits
- * above every project: Projects, the home, then the project's screens, then
- * what an add-on lists, then Settings (D34). A project's screen chosen from it
- * opens in the selected project (D36); with none selected it asks for one
- * (D31), marking its row while it asks (D22).
- * Settings is that row's own list, under a heading that leads back:
- * the person's profile, alone while accounts are not surfaced (Console ADR
- * 0005 §3), then what an add-on lists. A row stays marked on the screens
+ * Console ADR 0001). Portal is the project's screens. Account is the root's
+ * list, what sits above every project: Projects, the home, then the reserved
+ * platform project's own pages for someone who may act on it, then Settings
+ * (D41). It lists no project's screen: one opened without a project asks for
+ * it on Projects (D31).
+ * Settings is that row's own list, under a heading that leads back: what an
+ * add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked. The project's
  * Settings row opens a list the same way, under a heading that leads back to
  * the project: its General and Admins pages (D40).
@@ -238,11 +246,8 @@ const NAV_LABEL: Record<NavView, string> = {
  */
 function NavList({ view }: { view: NavView }) {
   const own = useNavItems(view);
-  const project = useNavItems("portal");
   const settings = useNavItems("settings");
-  const items = view === "account" ? accountListItems(own, project, settings) : own;
-  // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
-  const requested = useRequestedNavItem(project);
+  const items = view === "account" ? accountListItems(own, settings) : own;
   const matchRoute = useMatchRoute();
   const entrance = useListEntrance(view);
 
@@ -261,7 +266,7 @@ function NavList({ view }: { view: NavView }) {
             <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
-                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
+                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
                 <Link to={to} title={name}>
@@ -388,12 +393,20 @@ function ListHeading({
  * so the bar carries none of them.
  */
 function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
+  // A page of the platform project manages the root, whichever project stays
+  // selected in the URL (D36): the pill says the root there, so the bar never
+  // names a customer's project above the console's own people or sign-in.
+  const root = usePlatformRootPage();
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
       {/* Above every project, with none selected, the pill says so, and its
           list leads into one. */}
-      <ContextSwitcher userId={userId} allProjects={view === "account" || view === "settings"} />
+      <ContextSwitcher
+        userId={userId}
+        allProjects={view === "account" || view === "settings"}
+        root={root}
+      />
     </div>
   );
 }

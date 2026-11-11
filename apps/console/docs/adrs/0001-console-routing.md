@@ -237,6 +237,15 @@ the sidebar.
 > the selected project, and the pill names it. With none selected the pill
 > says `All projects` and a project's row asks for one (D22, D31).
 
+> **Amendment (2026-11-11, design decision D41):** the account list is the
+> root's: Projects, then the reserved platform project's pages for someone
+> who may act on it, then Settings. It draws no portal entry, which replaces
+> D34's amendment above. The platform's pages are routes under `/platform`
+> with `staticData.platformRoot` and `view: "account"`; the shell shows the
+> account list on them and on `/account`, and their pill says `All projects`
+> whichever project the URL keeps selected. `/settings` lists what an add-on
+> adds, and its row is left out while that is nothing.
+
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
 > project's Overview, declaring `scope: "project"` and the portal list's first
 > entry. The `_authed` guard sends it to Projects without `?next=` when no

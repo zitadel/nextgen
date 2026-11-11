@@ -78,12 +78,12 @@ describe("root login flows", () => {
         return HttpResponse.json({ schemas: [SCHEMA_EMBED], next_page_token: null });
       }),
     );
-    const router = await renderAt("/settings/login-flows");
+    const router = await renderAt("/platform/login-flows");
 
     const row = await screen.findByRole("link", { name: "Default login" });
     // The platform project's, not the selection's, which stays as it is (D36).
     expect(lists.map((params) => params.get("project_id"))).toEqual([PLATFORM]);
-    expect(row.getAttribute("href")).toMatch(/^\/settings\/login-flows\/flow_1(\?|$)/);
+    expect(row.getAttribute("href")).toMatch(/^\/platform\/login-flows\/flow_1(\?|$)/);
     expect(row.getAttribute("href")).not.toContain(PLATFORM);
     // The root shows no schemas, so the cell names it without linking it.
     expect(screen.getByText("Minimal")).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe("root login flows", () => {
 
     await userEvent.click(row);
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/settings/login-flows/flow_1"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/login-flows/flow_1"),
     );
     expect(await screen.findByRole("heading", { name: "Default login" })).toBeInTheDocument();
     // The badge names the schema in the platform project, and links nowhere.
@@ -100,8 +100,8 @@ describe("root login flows", () => {
     expect(screen.queryByRole("link", { name: "Minimal" })).not.toBeInTheDocument();
   });
 
-  it.each(["/settings/login-flows", "/settings/login-flows/flow_1"])(
-    "sends someone who may not act on the platform project from %s to Settings",
+  it.each(["/platform/login-flows", "/platform/login-flows/flow_1"])(
+    "sends someone who may not act on the platform project from %s to Projects",
     async (path) => {
       server.use(
         http.get(PLATFORM_URL, () =>
@@ -110,10 +110,9 @@ describe("root login flows", () => {
       );
       const router = await renderAt(path);
 
-      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
-      // Settings, settled: with no page of the platform project's to list, and
-      // no add-on, it has nothing to forward to.
-      expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+      // The root's home, whose sidebar lists no page of the platform project.
+      expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Login flows" })).not.toBeInTheDocument();
     },
   );

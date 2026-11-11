@@ -10,7 +10,7 @@ import { ManagedProject } from "@/features/projects/project-scope";
  * root's Authentication (D41). Its login flows open the root's Login flows;
  * its user schemas read as text, since the root shows no schemas (D41).
  */
-export const Route = createFileRoute("/_authed/settings/authentication/idps/$idpId")({
+export const Route = createFileRoute("/_authed/platform/authentication/idps/$idpId")({
   staticData: { platformRoot: true, resource: "identity provider" },
   beforeLoad: requirePlatformRoot,
   loader: ({ params, context }) => loadIdpDetail(context.platformProjectId, params.idpId),
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authed/settings/authentication/idps/$idp
       <ManagedProject id={platformProjectId}>
         <IdpDetailScreen
           {...Route.useLoaderData()}
-          flowDetail="/settings/login-flows/$definitionId"
+          flowDetail="/platform/login-flows/$definitionId"
         />
       </ManagedProject>
     );

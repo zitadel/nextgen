@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,9 +57,9 @@ async function renderAt(path: string) {
 }
 
 /**
- * Root Settings → Branding (D41): the console's own sign-in, the reserved
- * platform project's branding, drawn by the project screen's components while
- * the selected project stays selected.
+ * Branding at the root (D41): the console's own sign-in, the reserved
+ * platform project's branding, drawn by the project screen's components. The
+ * selected project stays in the URL, and the pill says the root.
  */
 describe("root branding", () => {
   it("reads and previews the platform project, keeping the selection", async () => {
@@ -75,25 +75,37 @@ describe("root branding", () => {
         return HttpResponse.json([]);
       }),
     );
-    const router = await renderAt("/settings/branding");
+    const router = await renderAt("/platform/branding");
 
     expect(await screen.findByTestId("preview")).toHaveTextContent("proj_platform");
     expect(asked).toEqual(["proj_platform", "proj_platform"]);
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_test" });
-    expect(
-      screen.getByRole("navigation", { name: "Settings" }).querySelector('[aria-current="page"]'),
-    ).toHaveTextContent("Branding");
+    // A row of the root's sidebar, which holds the root's pages and no
+    // project's, under a pill that names the root rather than the selection.
+    const root = screen.getByRole("navigation", { name: "Account" });
+    await waitFor(() =>
+      expect(
+        within(root)
+          .getAllByRole("link")
+          .map((link) => link.textContent?.trim()),
+      ).toEqual(["Projects", "People", "Authentication", "Login flows", "Branding", "Audit log"]),
+    );
+    expect(root.querySelector('[aria-current="page"]')).toHaveTextContent("Branding");
+    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
+      "All projects",
+    );
   });
 
-  it("sends someone who may not act on the platform project to Settings", async () => {
+  it("sends someone who may not act on the platform project to Projects", async () => {
     server.use(
       http.get(PLATFORM_URL, () =>
         HttpResponse.json({ code: "proj.not_found", message: "Not found" }, { status: 404 }),
       ),
     );
-    const router = await renderAt("/settings/branding");
+    const router = await renderAt("/platform/branding");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
-    expect(await screen.findByText("Nothing here is yours to set.")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Branding" })).not.toBeInTheDocument();
   });
 });

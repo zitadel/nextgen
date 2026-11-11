@@ -8,11 +8,11 @@
  */
 export interface UserLinks {
   /** The list a user is listed in, where a deleted user's detail returns to. */
-  list: "/users" | "/settings/people";
+  list: "/users" | "/platform/people";
   /** A user's detail, beside that list. */
-  detail: "/users/$userId" | "/settings/people/$userId";
+  detail: "/users/$userId" | "/platform/people/$userId";
   /** An identity provider a user signs in with. */
-  idp: "/authentication/idps/$idpId" | "/settings/authentication/idps/$idpId";
+  idp: "/authentication/idps/$idpId" | "/platform/authentication/idps/$idpId";
   /** A schema revision's page; absent, the revision reads as text. */
   schema?: "/schemas/$schemaId";
   /** A team's page; absent, a membership reads as text. */
@@ -30,7 +30,7 @@ export const PROJECT_USER_LINKS: UserLinks = {
 
 /** The root's People (D41): the platform project's users, and its Authentication. */
 export const PEOPLE_USER_LINKS: UserLinks = {
-  list: "/settings/people",
-  detail: "/settings/people/$userId",
-  idp: "/settings/authentication/idps/$idpId",
+  list: "/platform/people",
+  detail: "/platform/people/$userId",
+  idp: "/platform/authentication/idps/$idpId",
 };

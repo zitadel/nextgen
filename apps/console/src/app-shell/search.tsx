@@ -346,7 +346,7 @@ function SearchPalette({
 
     // The project's pages. With none selected, opening one asks for one (D22).
     // Its Settings row is a list (D40): the list's pages stand in for it,
-    // marked Settings as the root Settings' are, then the project.
+    // marked Settings as the root's Settings pages are, then the project.
     const inProject = {
       description: where(place ?? CHOOSE_A_PROJECT),
       inProject: projectId !== undefined,
@@ -429,15 +429,15 @@ function SearchPalette({
     const openRootHit = (hit: SearchHit) => {
       switch (hit.type) {
         case "user":
-          return navigate({ to: "/settings/people/$userId", params: { userId: hit.id } });
+          return navigate({ to: "/platform/people/$userId", params: { userId: hit.id } });
         case "flow_definition":
           return navigate({
-            to: "/settings/login-flows/$definitionId",
+            to: "/platform/login-flows/$definitionId",
             params: { definitionId: hit.id },
           });
         case "idp":
           return navigate({
-            to: "/settings/authentication/idps/$idpId",
+            to: "/platform/authentication/idps/$idpId",
             params: { idpId: hit.id },
           });
         default:
@@ -457,9 +457,9 @@ function SearchPalette({
     const hitResult = (hit: SearchHit, group: string): RankedResult => {
       const Icon = iconOf(hit.type);
       const root = hit.projectId === platformProjectId;
-      // A root hit reads as the root page it opens (D41), as Settings' pages do,
-      // never as a project named for the platform.
-      const placed = root ? `Settings · ${ROOT_PAGE[hit.type]}` : placeOf(hit.projectId);
+      // A root hit reads as the root page it opens (D41), never as a project
+      // named for the platform.
+      const placed = root ? ROOT_PAGE[hit.type] : placeOf(hit.projectId);
       return {
         id: `${group}:${hit.type}:${hit.projectId}:${hit.id}`,
         icon: <Icon aria-hidden />,
@@ -719,10 +719,10 @@ const ACCOUNT = "Account";
 const PROFILE = "Profile";
 
 /**
- * The root page a hit in the reserved platform project opens, by kind (D41):
- * its users are People, its login flows and identity providers how people
- * sign in. Kinds the root has no page for are absent, and such hits are left
- * out.
+ * The root page a hit in the reserved platform project opens, by kind (D41),
+ * a row of the root sidebar: its users are People, its login flows and
+ * identity providers how people sign in. Kinds the root has no page for are
+ * absent, and such hits are left out.
  */
 const ROOT_PAGE: Partial<Record<SearchResultType, string>> = {
   user: "People",

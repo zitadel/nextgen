@@ -95,10 +95,16 @@ interface SwitcherOption {
 export function ContextSwitcher({
   userId,
   allProjects = false,
+  root = false,
 }: {
   userId?: string;
   /** The screen is above every project: with none selected, the pill says so. */
   allProjects?: boolean;
+  /**
+   * The screen manages the root itself, a page of the platform project (D41):
+   * the pill says so whichever project is selected, and marks none.
+   */
+  root?: boolean;
 }) {
   // The pill shows the selected project (`?project=`, `src/features/projects/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
@@ -115,7 +121,7 @@ export function ContextSwitcher({
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      <ProjectSwitcher userId={userId} current={current} allProjects={allProjects} />
+      <ProjectSwitcher userId={userId} current={current} allProjects={allProjects} root={root} />
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
@@ -141,11 +147,13 @@ function ProjectSwitcher({
   userId,
   current,
   allProjects,
+  root,
 }: {
   userId: string | undefined;
   /** The selected project, named once it is read. */
   current: SelectedProject | undefined;
   allProjects: boolean;
+  root: boolean;
 }) {
   // The first page says whether there are more projects than it shows, and so
   // whether the list can open on all of them.
@@ -187,15 +195,18 @@ function ProjectSwitcher({
   }
 
   const label = current && (current.name ?? current.id);
-  // A selection outlives the way up to Projects and Settings (D36).
-  const unselected = allProjects && !selected;
+  // A selection outlives the way up to Projects and Settings (D36). On a page
+  // of the platform project it stays in the URL for the way back, but the
+  // pill names the root: that page is not the selected project's (D41).
+  const shown = root ? undefined : selected;
+  const unselected = root || (allProjects && !selected);
 
   return (
     <Combobox open={open} onOpenChange={changeOpen}>
       <ComboboxAnchor asChild>
         <button type="button" aria-label="Switch project" className={TRIGGER}>
-          {selected ? (
-            <ProjectMark projectId={selected} className="size-4" />
+          {shown ? (
+            <ProjectMark projectId={shown} className="size-4" />
           ) : (
             <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
           )}
@@ -215,7 +226,7 @@ function ProjectSwitcher({
       </ComboboxAnchor>
       <ComboboxContent
         groups={groups}
-        selected={selected ? [selected] : []}
+        selected={shown ? [shown] : []}
         searchPlaceholder={FIND_PROJECT}
         emptyLabel={emptyLabel}
         search={{ query, onQueryChange: setQuery }}

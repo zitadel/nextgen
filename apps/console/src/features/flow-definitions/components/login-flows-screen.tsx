@@ -35,7 +35,7 @@ import { formatDate } from "@/lib/date";
 /** Where the screen's links lead, which differs between the project and the root. */
 export interface LoginFlowsLinks {
   /** The route a row opens: the project's flow detail, or the root's (D41). */
-  detailTo: "/flow-definitions/$definitionId" | "/settings/login-flows/$definitionId";
+  detailTo: "/flow-definitions/$definitionId" | "/platform/login-flows/$definitionId";
   /**
    * The route the user-schema cell links to. Left out at the root, which
    * shows no schemas (D41): the cell then names the schema as text.
@@ -48,6 +48,8 @@ export interface LoginFlowsLinks {
    * own would not outlast.
    */
   hint?: ReactNode;
+  /** What an empty list says, where it is not a project's (the root's, D41). */
+  empty?: string;
 }
 
 /**
@@ -55,7 +57,12 @@ export interface LoginFlowsLinks {
  * for the selected project, and at the root for the reserved platform project
  * (D41), where its flows are how people sign in to the console.
  */
-export function LoginFlowsScreen({ flows, hint, ...links }: LoginFlowsData & LoginFlowsLinks) {
+export function LoginFlowsScreen({
+  flows,
+  hint,
+  empty = "This project has no login flows.",
+  ...links
+}: LoginFlowsData & LoginFlowsLinks) {
   return (
     <Page>
       <ResourceTitle>Login flows</ResourceTitle>
@@ -78,7 +85,7 @@ export function LoginFlowsScreen({ flows, hint, ...links }: LoginFlowsData & Log
           </TableHeader>
           <TableBody>
             {flows.length === 0 ? (
-              <ResourceEmptyRow colSpan={6}>This project has no login flows.</ResourceEmptyRow>
+              <ResourceEmptyRow colSpan={6}>{empty}</ResourceEmptyRow>
             ) : (
               flows.map((flow) => <FlowRowItem key={flow.id} {...flow} {...links} />)
             )}

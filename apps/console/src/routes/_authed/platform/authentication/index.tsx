@@ -12,16 +12,16 @@ import { requirePlatformRoot } from "@/features/platform/access";
 import { ManagedProject } from "@/features/projects/project-scope";
 
 /**
- * Root Settings → Authentication: how people sign in to the console, the
+ * Authentication at the root: how people sign in to the console, the
  * reserved platform project's sign-in methods and identity providers (D41),
  * drawn by the project screen's components. Listed for someone who may act on
  * that project; the selected project stays selected (D36), and a connection
  * opens the root's page for it, never the project's.
  */
-export const Route = createFileRoute("/_authed/settings/authentication/")({
+export const Route = createFileRoute("/_authed/platform/authentication/")({
   staticData: {
     platformRoot: true,
-    nav: { label: "Authentication", view: "settings", order: 11, icon: Shield },
+    nav: { label: "Authentication", view: "account", order: 3, icon: Shield },
   },
   validateSearch: validateAuthenticationSearch,
   beforeLoad: requirePlatformRoot,
@@ -40,7 +40,11 @@ export const Route = createFileRoute("/_authed/settings/authentication/")({
           loaded={Route.useLoaderData()}
           tab={Route.useSearch().tab}
           onTabChange={onTabChange}
-          detail="/settings/authentication/idps/$idpId"
+          detail="/platform/authentication/idps/$idpId"
+          empty={{
+            signInMethods: "The console's user schema enables no sign-in method.",
+            identityProviders: "The console has no identity providers.",
+          }}
         />
       </ManagedProject>
     );

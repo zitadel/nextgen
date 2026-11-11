@@ -11,20 +11,20 @@ import { loadUsers } from "@/features/users/load";
 import { searchTerm } from "@/lib/search-params";
 
 /**
- * Root Settings → People: the reserved platform project's users, the people
+ * People at the root: the reserved platform project's users, the people
  * who sign in to the console (on the hosted cloud, every customer account),
  * drawn by the Users list's components (D41). Its rows open the root's own
  * detail; their schemas and teams read as text, as the root shows neither.
  * Listed for someone who may act on that project; the selected project stays
  * selected (D36), and Add user creates in the platform project.
  */
-export const Route = createFileRoute("/_authed/settings/people/")({
-  // Order 10: the first of the platform's own pages, before Authentication,
-  // Login flows (12) and Branding (13), as D41 lists them. The Users list's
-  // glyph, since these are its rows.
+export const Route = createFileRoute("/_authed/platform/people/")({
+  // Order 2: the first of the platform's own pages, right after Projects (1)
+  // and before Authentication, Login flows and Branding, as D41 lists them.
+  // The Users list's glyph, since these are its rows.
   staticData: {
     platformRoot: true,
-    nav: { label: "People", view: "settings", order: 10, icon: User },
+    nav: { label: "People", view: "account", order: 2, icon: User },
   },
   validateSearch: validateUsersSearch,
   beforeLoad: requirePlatformRoot,

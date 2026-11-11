@@ -14,7 +14,7 @@ import { loadEvent } from "@/features/events/load";
  * Its request's steps open in the same drawer; nothing in it leads into a
  * project's Events.
  */
-export const Route = createFileRoute("/_authed/settings/audit-log/$eventId")({
+export const Route = createFileRoute("/_authed/platform/audit-log/$eventId")({
   staticData: { resource: "event" },
   loader: ({ params, context }) => loadEvent(context.platformProjectId, params.eventId),
   pendingComponent: EventPanelPending,

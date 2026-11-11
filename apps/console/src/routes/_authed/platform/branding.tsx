@@ -7,15 +7,15 @@ import { requirePlatformRoot } from "@/features/platform/access";
 import { ManagedProject } from "@/features/projects/project-scope";
 
 /**
- * Root Settings → Branding: how the console's own sign-in looks, the reserved
+ * Branding at the root: how the console's own sign-in looks, the reserved
  * platform project's branding (D41), drawn by the project screen's components.
- * Listed for someone who may act on that project; the selected project stays
- * selected (D36).
+ * A row of the root sidebar for someone who may act on that project; the
+ * selected project stays in the URL (D36), and the pill says the root.
  */
-export const Route = createFileRoute("/_authed/settings/branding")({
+export const Route = createFileRoute("/_authed/platform/branding")({
   staticData: {
     platformRoot: true,
-    nav: { label: "Branding", view: "settings", order: 13, icon: Paintbrush },
+    nav: { label: "Branding", view: "account", order: 5, icon: Paintbrush },
   },
   beforeLoad: requirePlatformRoot,
   loader: ({ context }) => loadBranding(context.platformProjectId),

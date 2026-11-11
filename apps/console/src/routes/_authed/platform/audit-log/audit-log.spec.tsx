@@ -150,11 +150,11 @@ async function drawer() {
 }
 
 describe("root audit log", () => {
-  it("lists the platform project's audit events, newest first, under the Settings list", async () => {
+  it("lists the platform project's audit events, newest first, in the root's sidebar", async () => {
     const queries = serveEvents([
       { data: [event("evt_2", { event_type: "user.created" }), event("evt_1")] },
     ]);
-    renderAt("/settings/audit-log");
+    renderAt("/platform/audit-log");
 
     expect(await screen.findByRole("heading", { name: "Audit log" })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
@@ -164,20 +164,17 @@ describe("root audit log", () => {
     expect(queries[0]?.getAll("category")).toEqual(AUDIT);
     expect(queries[0]?.get("limit")).toBe(String(PAGE_SIZE));
     expect(queries[0]?.has("created_after")).toBe(false);
-    // The sidebar is Settings' list, with the page marked; Events' views and
+    // The sidebar is the root's list, with the page marked; Events' views and
     // filters, and the search that sets them, are the project's.
-    const settings = within(await screen.findByRole("navigation", { name: "Settings" }));
-    expect(settings.getByRole("link", { name: "Audit log" })).toHaveAttribute(
-      "data-active",
-      "true",
-    );
+    const root = within(await screen.findByRole("navigation", { name: "Account" }));
+    expect(root.getByRole("link", { name: "Audit log" })).toHaveAttribute("data-active", "true");
     expect(screen.queryByRole("navigation", { name: "Events" })).not.toBeInTheDocument();
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
   it("says so when nothing has been recorded", async () => {
     serveEvents([{ data: [] }]);
-    renderAt("/settings/audit-log");
+    renderAt("/platform/audit-log");
 
     expect(await screen.findByText("There are no audit events yet.")).toBeInTheDocument();
   });
@@ -187,16 +184,16 @@ describe("root audit log", () => {
       { data: [event("evt_2", { event_type: "user.created" }), event("evt_1")] },
     ]);
     const reads = serveEvent(event("evt_1"));
-    const router = renderAt("/settings/audit-log");
+    const router = renderAt("/platform/audit-log");
 
     const link = await screen.findByRole("link", { name: "user.deleted" });
     // The root's own drawer; the selected project rides along, unnamed.
-    expect(link).toHaveAttribute("href", scopedPath("/settings/audit-log/evt_1"));
+    expect(link).toHaveAttribute("href", scopedPath("/platform/audit-log/evt_1"));
     await userEvent.click(link);
 
     expect(await (await drawer()).findByRole("heading", { name: "user.deleted" })).toBeVisible();
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/settings/audit-log/evt_1"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/audit-log/evt_1"),
     );
     expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
     // The event is read within the platform project.
@@ -210,7 +207,7 @@ describe("root audit log", () => {
     const call = request("evt_0");
     serveEvents([{ data: [change] }], [call, change]);
     serveEvent(change, call);
-    const router = renderAt("/settings/audit-log");
+    const router = renderAt("/platform/audit-log");
 
     const row = (await screen.findByRole("link", { name: "user.deleted" })).closest(
       "tr",
@@ -232,7 +229,7 @@ describe("root audit log", () => {
     );
     await userEvent.click(steps.getByRole("link"));
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/settings/audit-log/evt_0"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/audit-log/evt_0"),
     );
     expect(await panel.findByRole("heading", { name: "request.api" })).toBeVisible();
     // Nothing on the page leads into a project's Events.
@@ -244,12 +241,12 @@ describe("root audit log", () => {
   it("closes the drawer back to the Audit log", async () => {
     const queries = serveEvents([{ data: [event("evt_1")] }]);
     serveEvent(event("evt_1"));
-    const router = renderAt("/settings/audit-log/evt_1");
+    const router = renderAt("/platform/audit-log/evt_1");
 
     await userEvent.click((await drawer()).getByRole("button", { name: "Close" }));
 
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/settings/audit-log"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/audit-log"),
     );
     expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -263,7 +260,7 @@ describe("root audit log", () => {
       { data: [event("evt_b", { event_type: "user.created" })], next_page_token: "page-3" },
       { data: [event("evt_c", { event_type: "auth.check.succeeded", category: "auth" })] },
     ]);
-    renderAt("/settings/audit-log");
+    renderAt("/platform/audit-log");
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
     expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
@@ -291,7 +288,7 @@ describe("root audit log", () => {
     try {
       serveEvents([{ data: [] }]);
       serveEvent();
-      renderAt("/settings/audit-log/evt_gone");
+      renderAt("/platform/audit-log/evt_gone");
 
       const panel = await drawer();
       expect(await panel.findByRole("heading", { name: "Event not found" })).toBeInTheDocument();
@@ -309,9 +306,9 @@ describe("root audit log", () => {
         HttpResponse.json({ code: "proj.not_found", message: "not found" }, { status: 404 }),
       ),
     );
-    const router = renderAt("/settings/audit-log");
+    const router = renderAt("/platform/audit-log");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(screen.queryByRole("heading", { name: "Audit log" })).not.toBeInTheDocument();
     expect(queries).toHaveLength(0);
   });

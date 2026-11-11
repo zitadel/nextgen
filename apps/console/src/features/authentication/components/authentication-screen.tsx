@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import { Page } from "@/components/layout";
 import { ResourceTitle } from "@/components/resource-list";
@@ -28,12 +28,15 @@ export function AuthenticationScreen({
   tab: requested,
   onTabChange,
   detail,
+  empty,
 }: {
   loaded: AuthenticationData;
   tab: Tab;
   /** Puts `tab` in the URL; `replace` for a correction rather than a choice. */
   onTabChange: (tab: Tab, replace?: boolean) => void;
   detail: IdpDetailRoute;
+  /** What each empty table says at the root, in place of the project's words (D41). */
+  empty?: { signInMethods: ReactNode; identityProviders: ReactNode };
 }) {
   // Without `idp.read` the tab does not exist, so a link to it opens Sign-in
   // methods rather than an empty strip, and the URL drops the tab it cannot
@@ -70,12 +73,17 @@ export function AuthenticationScreen({
         </TabsList>
 
         <TabsContent value="sign-in">
-          <SignInMethods loaded={loaded} detail={detail} />
+          <SignInMethods loaded={loaded} detail={detail} empty={empty?.signInMethods} />
         </TabsContent>
 
         {loaded.idps && (
           <TabsContent value="identity-providers">
-            <IdentityProviders idps={loaded.idps} schemas={loaded.schemas} detail={detail} />
+            <IdentityProviders
+              idps={loaded.idps}
+              schemas={loaded.schemas}
+              detail={detail}
+              empty={empty?.identityProviders}
+            />
           </TabsContent>
         )}
       </Tabs>

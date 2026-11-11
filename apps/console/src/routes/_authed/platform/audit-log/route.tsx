@@ -8,20 +8,22 @@ import { requirePlatformRoot } from "@/features/platform/access";
 import { ManagedProject } from "@/features/projects/project-scope";
 
 /**
- * Root Settings → Audit log: the deployment's audit trail, the reserved
+ * Audit log at the root: the deployment's audit trail, the reserved
  * platform project's Audit events (D41, the default view of D30), newest
  * first: the sign-ins and changes to the console's accounts and
  * configuration. Drawn by the project's Events list with the platform
- * project's id; listed for someone who may act on that project, and the
- * selected project stays selected (D36).
+ * project's id; a row of the root sidebar for someone who may act on that
+ * project, and the selected project stays in the URL (D36).
  *
- * The sidebar stays the Settings list, so there is no view picker and no
+ * The sidebar stays the root's list, so there is no view picker and no
  * filter here: the table and its pages alone, `Load more` or, for a page cut
  * short, `Keep looking`. An event opens in the drawer over the list
  * (`$eventId`, this route's child), which never reads the list again, and
  * nothing on the page leads into a project's Events.
  */
-export const Route = createFileRoute("/_authed/settings/audit-log")({
+export const Route = createFileRoute("/_authed/platform/audit-log")({
+  // On the layout, so the list and an event's drawer are both root pages.
+  staticData: { platformRoot: true },
   beforeLoad: requirePlatformRoot,
   loader: ({ context }) => loadEvents(context.platformProjectId, AUDIT_LOG),
   component: PlatformAuditLog,
@@ -36,8 +38,8 @@ const AUDIT_LOG: EventsSearch = { view: "audit" };
  * project (`_authed` keeps the selection).
  */
 const LINKS: EventLinks = {
-  event: (eventId) => ({ to: "/settings/audit-log/$eventId", params: { eventId } }),
-  list: { to: "/settings/audit-log" },
+  event: (eventId) => ({ to: "/platform/audit-log/$eventId", params: { eventId } }),
+  list: { to: "/platform/audit-log" },
 };
 
 function PlatformAuditLog() {

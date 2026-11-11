@@ -77,7 +77,7 @@ describe("root people", () => {
       http.get(`${USERS_URL}/user_1/password`, () => HttpResponse.json({})),
     );
     // Opened from a project, which stays selected (D36).
-    const router = await renderAt(`${scopedPath("/settings/people")}&status=active`);
+    const router = await renderAt(`${scopedPath("/platform/people")}&status=active`);
 
     const table = within(await screen.findByRole("table"));
     // Titled for the root, not the project's Users (D41).
@@ -88,7 +88,7 @@ describe("root people", () => {
     expect(queries[0]?.body.filter).toEqual([
       { field: "status", operation: "equals", value: "active" },
     ]);
-    expect(row.getAttribute("href")).toMatch(/^\/settings\/people\/user_1(\?|$)/);
+    expect(row.getAttribute("href")).toMatch(/^\/platform\/people\/user_1(\?|$)/);
     expect(row.getAttribute("href")).not.toContain(PLATFORM);
     // The root shows no schemas or teams, so their cells name them as text.
     expect(table.getByText("sch_people")).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe("root people", () => {
 
     await userEvent.click(row);
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/settings/people/user_1"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/people/user_1"),
     );
     expect(router.state.resolvedLocation?.search).toEqual({ project: TEST_PROJECT_ID });
     expect(await screen.findByRole("heading", { name: "maya@acme.com" })).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe("root people", () => {
       }),
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     );
-    const router = await renderAt("/settings/people/user_1");
+    const router = await renderAt("/platform/people/user_1");
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete user" }));
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
@@ -137,11 +137,11 @@ describe("root people", () => {
     );
 
     await waitFor(() => expect(deleted).toBe(true));
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/people"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/platform/people"));
   });
 
-  it.each(["/settings/people", "/settings/people/user_1"])(
-    "sends someone who may not act on the platform project from %s to Settings",
+  it.each(["/platform/people", "/platform/people/user_1"])(
+    "sends someone who may not act on the platform project from %s to Projects",
     async (path) => {
       server.use(
         http.get(PLATFORM_URL, () =>
@@ -150,8 +150,8 @@ describe("root people", () => {
       );
       const router = await renderAt(path);
 
-      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
-      expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+      expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "People" })).not.toBeInTheDocument();
     },
   );

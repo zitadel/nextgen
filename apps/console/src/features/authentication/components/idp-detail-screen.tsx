@@ -19,7 +19,7 @@ import { formatDate } from "@/lib/date";
  */
 export type FlowDetailRoute =
   | "/flow-definitions/$definitionId"
-  | "/settings/login-flows/$definitionId";
+  | "/platform/login-flows/$definitionId";
 
 /** The classes of a "Used by" name that opens its page. */
 const REFERENCE_LINK = "underline-offset-2 hover:underline";
