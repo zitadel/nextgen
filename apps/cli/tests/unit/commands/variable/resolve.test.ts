@@ -38,7 +38,6 @@ function aDeployment(id: string, origin: string) {
  */
 async function aProject(options: {
   deployments: ReturnType<typeof aDeployment>[];
-  earlier?: ReturnType<typeof aDeployment>[];
   origins?: { kind: string; pattern: string }[];
   variables?: Record<string, { value?: string; secret?: boolean }>;
   frozen?: Record<string, Record<string, string>>;
@@ -60,14 +59,6 @@ async function aProject(options: {
         id: "proj_1",
         origins: options.origins ?? [],
       });
-    }),
-    http.get(`${SERVER}/api/v1/deployments/:id`, ({ params }) => {
-      const found = [...options.deployments, ...(options.earlier ?? [])].find((deployment) => {
-        return deployment.id === params.id;
-      });
-      return found === undefined
-        ? HttpResponse.json({ code: "not_found", message: "no such deployment" }, { status: 404 })
-        : HttpResponse.json(found);
     }),
     http.get(`${SERVER}/api/v1/deployments/:id/variables`, ({ params }) => {
       if (options.frozen === undefined) {
@@ -223,16 +214,11 @@ describe("variable resolve", () => {
 
     const { exitCode, stdout } = await resolve(cwd, "dep_a");
     const envelope = parseJson(stdout) as {
-      data: {
-        deployment_id: string;
-        origins: string[];
-        items: { name: string; value?: string }[];
-      };
+      data: { deployment_id: string; items: { name: string; value?: string }[] };
     };
 
     expect(exitCode).toBe(0);
     expect(envelope.data.deployment_id).toBe("dep_a");
-    expect(envelope.data.origins).toEqual(["https://a.acme.com"]);
     expect(envelope.data.items).toMatchObject([
       {
         name: "FROM_A",
@@ -241,10 +227,9 @@ describe("variable resolve", () => {
     ]);
   });
 
-  it("reads a deployment that is no longer live, with the origins it was deployed to", async () => {
+  it("reads a deployment that is not live", async () => {
     const cwd = await aProject({
       deployments: [aDeployment("dep_new", "https://app.acme.com")],
-      earlier: [aDeployment("dep_old", "https://app.acme.com")],
       frozen: {
         dep_old: {
           OLD: "kept",
@@ -254,16 +239,11 @@ describe("variable resolve", () => {
 
     const { exitCode, stdout } = await resolve(cwd, "dep_old");
     const envelope = parseJson(stdout) as {
-      data: {
-        deployment_id: string;
-        origins: string[];
-        items: { name: string; value?: string }[];
-      };
+      data: { deployment_id: string; items: { name: string; value?: string }[] };
     };
 
     expect(exitCode).toBe(0);
     expect(envelope.data.deployment_id).toBe("dep_old");
-    expect(envelope.data.origins).toEqual(["https://app.acme.com"]);
     expect(envelope.data.items).toMatchObject([
       {
         name: "OLD",
@@ -272,10 +252,9 @@ describe("variable resolve", () => {
     ]);
   });
 
-  it("names no origin in the empty line for a deployment with no targets", async () => {
+  it("says in the empty line that the deployment froze no variables", async () => {
     const cwd = await aProject({
       deployments: [],
-      earlier: [{ ...aDeployment("dep_old", "https://app.acme.com"), targets: [] }],
       frozen: {
         dep_old: {},
       },
@@ -292,6 +271,7 @@ describe("variable resolve", () => {
   it("says a deployment the project does not have is not found", async () => {
     const cwd = await aProject({
       deployments: [],
+      frozen: {},
     });
 
     const { exitCode, stdout } = await resolve(cwd, "dep_missing");

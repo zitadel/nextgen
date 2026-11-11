@@ -382,9 +382,7 @@ Each invocation prints one JSON object:
 - `variable resolve` reads the variables a deployment froze: the one live on the
   project (narrowed with `--origin` when several are live), or any deployment
   named by `variable resolve <deployment_id>`. A deployment id together with
-  `--origin` is refused, since the id already says which deployment. For a
-  named deployment the envelope's `data.origins` are the origins of its
-  targets, as `deployment get` lists them.
+  `--origin` is refused, since the id already says which deployment.
 - `variable set` stores the value on the project, but a sign-in keeps using the
   variables the last `deploy` froze, so the change applies after the next
   `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
