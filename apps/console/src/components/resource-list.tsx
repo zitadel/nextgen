@@ -58,6 +58,15 @@ export const RESOURCE_TABLE_FIXED = "min-w-[36rem] table-fixed text-xs";
 /** A screen's title: the 24/24 display face, shared with the detail shell. */
 export const RESOURCE_TITLE = PAGE_TITLE;
 
+/** Controls on a row of the title's own: 8px apart, wrapping among themselves. */
+const TITLE_ROW_CONTROLS = "flex min-w-0 basis-full flex-wrap items-center gap-2";
+
+/**
+ * A row under the title at every width (`filterBelow`, `below`): out of the
+ * header's 8px inset, flush with the table under it.
+ */
+const TITLE_ROW_BELOW = `${TITLE_ROW_CONTROLS} lg:-mx-2 lg:basis-[calc(100%+1rem)]`;
+
 /**
  * The title row of a list screen: the heading with, where the screen has one,
  * its primary action beside it at every width (D19), and any filter beside
@@ -95,12 +104,7 @@ export function ResourceTitle({
    */
   below?: ReactNode;
 }) {
-  const belowRow = below && (
-    // Out of the header's 8px inset, as `filterBelow` is.
-    <div className="order-4 flex min-w-0 basis-full flex-wrap items-center gap-2 lg:-mx-2 lg:basis-[calc(100%+1rem)]">
-      {below}
-    </div>
-  );
+  const belowRow = below && <div className={cn(TITLE_ROW_BELOW, "order-4")}>{below}</div>;
   if (!filter) {
     return (
       <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
@@ -121,11 +125,10 @@ export function ResourceTitle({
       <h1 className={RESOURCE_TITLE}>{children}</h1>
       <div
         className={cn(
-          "order-3 flex min-w-0 basis-full flex-wrap items-center gap-2",
+          "order-3",
           filterBelow
-            ? // Out of the header's 8px inset, flush with the table under it.
-              "lg:-mx-2 lg:basis-[calc(100%+1rem)]"
-            : "@3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end",
+            ? TITLE_ROW_BELOW
+            : `${TITLE_ROW_CONTROLS} @3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end`,
         )}
       >
         {filter}

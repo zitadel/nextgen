@@ -77,7 +77,11 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-/** A status in words, as the pill shows it: `pending_purge` → `Pending Purge`. */
+/**
+ * A status in words as the pill draws it, `pending_purge` → `Pending Purge`,
+ * for where there is no pill to capitalise it. The pill keeps the API's own
+ * value as its text, which the screens' specs read.
+ */
 function statusLabel(status: string): string {
   return status.replace(/_/g, " ").replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }

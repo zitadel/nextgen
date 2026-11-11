@@ -1382,7 +1382,7 @@ describe("users screen", () => {
         ],
       }),
     );
-    expect(screen.getByRole("button", { name: "Filter by revision" })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent(
       "Revisionsch_business",
     );
 
@@ -1404,7 +1404,7 @@ describe("users screen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Clear the schema filter" }));
     await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
-    expect(screen.queryByRole("button", { name: "Filter by schema" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^User schema/ })).toBeNull();
     expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
   });
 
@@ -1447,7 +1447,7 @@ describe("users screen", () => {
       schema: "business",
       revision: "older",
     });
-    expect(screen.getByRole("button", { name: "Filter by revision" })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent(
       "RevisionOlder revisions",
     );
   });
@@ -1868,9 +1868,7 @@ describe("users screen", () => {
         filter: [{ field: "status", operation: "equals", value: "suspended" }],
       }),
     );
-    expect(screen.getByRole("button", { name: "Filter by status" })).toHaveTextContent(
-      "StatusSuspended",
-    );
+    expect(screen.getByRole("button", { name: /^Status/ })).toHaveTextContent("StatusSuspended");
 
     // A date is a range that ends now.
     const before = Date.now();
@@ -1915,7 +1913,7 @@ describe("users screen", () => {
     await renderUsers(`${scopedPath("/users")}&schema=ghost`);
 
     await screen.findByRole("table");
-    expect(screen.getByRole("button", { name: "Filter by schema" })).toHaveTextContent("ghost");
+    expect(screen.getByRole("button", { name: /^User schema/ })).toHaveTextContent("ghost");
     expect(screen.getByText("No users match this filter.")).toBeInTheDocument();
   });
 
@@ -1938,9 +1936,7 @@ describe("users screen", () => {
         { field: "schema", operation: "equals", value: "sch_business" },
       ],
     });
-    expect(screen.getByRole("button", { name: "Filter by schema" })).toHaveTextContent("business");
-    expect(screen.getByRole("button", { name: "Filter by revision" })).toHaveTextContent(
-      "sch_business",
-    );
+    expect(screen.getByRole("button", { name: /^User schema/ })).toHaveTextContent("business");
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent("sch_business");
   });
 });

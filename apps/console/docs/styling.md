@@ -187,9 +187,10 @@ Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
 composes `Page`, `ResourceTitle` (with the Add button as its `action`,
 beside the title at every width, D19, labelled with what it adds as the sheet
-it opens is titled: `Add user`, `New project`, never a bare `Add`, and any list filter as its `filter`,
+it opens is titled: `Add user`, `New project`, never a bare `Add`, the list's search as its `filter`,
 beside the action on one 36px row and on its own row under the title on a
-phone; `filterBelow` keeps it on that row at every width, as Logs' search is),
+phone, where `filterBelow` keeps it at every width, as Logs' search is, and
+the list's `ResourceFilter` as its `below` row, by "List filters" below),
 then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside

@@ -31,8 +31,8 @@ import { cn } from "@/lib/utils";
  * the properties the resource can be narrowed by, and choosing one swaps the
  * menu for that property's values, drawn by its type (`FilterDefinition`): a
  * searchable list for a set of options, ranges and a day for a date. Each
- * filter that is set is a chip beside the button: its body reopens the values,
- * its cross clears it.
+ * filter that is set is a chip beside the button: its body, named by the label
+ * and value it shows, reopens the values, and its cross clears it.
  *
  * The component knows no resource. A screen describes its properties as
  * definitions (`src/features/users/filters.tsx` is the example to copy), keeps
@@ -54,6 +54,9 @@ export function ResourceFilter({
 }) {
   const add = useRef<HTMLButtonElement>(null);
   const set = (filter: FilterDefinition, value: string | undefined) => {
+    // Picking the value it already has changes nothing, so nothing that
+    // depends on it is cleared: a schema picked again keeps its revision.
+    if (value !== undefined && value === values[filter.key]) return;
     const patch: Record<string, string | undefined> = {};
     for (const key of filter.clears ?? []) patch[key] = undefined;
     patch[filter.key] = value;
@@ -96,13 +99,15 @@ export function ResourceFilter({
               <X aria-hidden className="size-4" />
             </button>
             <FilterMenu filters={filters} values={values} onPick={set} only={filter.key}>
-              <button
-                type="button"
-                aria-label={`Filter by ${name}`}
-                className={cn(CHIP_PART, "h-7 min-w-0 gap-1.5 px-1.5")}
-              >
-                <span className="text-muted-foreground">{filter.label}</span>
-                <FilterValue filter={filter} value={value} />
+              {/* Named by what it shows, the label and the value. The label
+                  keeps its line; the value gives way, cut inside the chip. */}
+              <button type="button" className={cn(CHIP_PART, "h-7 min-w-0 gap-1.5 px-1.5")}>
+                <span className="text-muted-foreground shrink-0 whitespace-nowrap">
+                  {filter.label}
+                </span>
+                <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                  <FilterValue filter={filter} value={value} />
+                </span>
               </button>
             </FilterMenu>
           </div>
@@ -165,6 +170,8 @@ function FilterMenu({
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         align="start"
+        // The dialog's name: the step it is on.
+        aria-label={current ? current.label : "Filter by"}
         className={cn(MENU, current?.type === "options" && current.menuClassName)}
       >
         {!current ? (

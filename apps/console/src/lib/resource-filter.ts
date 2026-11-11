@@ -17,7 +17,7 @@ interface FilterBase {
   key: string;
   /** The property's name as the menu and the chip show it: `User schema`. */
   label: string;
-  /** The property in the controls' accessible names (`Filter by schema`); the label in lower case by default. */
+  /** The property in the clear button's accessible name (`Clear the schema filter`); the label in lower case by default. */
   name?: string;
   /**
    * Why the property cannot be chosen right now, in a few words: it is listed,

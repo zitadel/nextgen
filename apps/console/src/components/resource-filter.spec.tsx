@@ -66,9 +66,7 @@ describe("ResourceFilter", () => {
     // A new kind clears the size that belonged to the last one.
     expect(onChange).toHaveBeenLastCalledWith({ size: undefined, kind: "veg" });
     expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByRole("button", { name: "Filter by kind" })).toHaveTextContent(
-      "KindVegetable",
-    );
+    expect(screen.getByRole("button", { name: /^Kind/ })).toHaveTextContent("KindVegetable");
   });
 
   it("finds a property and a value by typing, and steps back to the properties", async () => {
@@ -90,7 +88,7 @@ describe("ResourceFilter", () => {
 
   it("reopens a set filter on its values alone, and clears it from its cross", async () => {
     const onChange = renderFilter({ kind: "fruit" });
-    await userEvent.click(screen.getByRole("button", { name: "Filter by kind" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Kind/ }));
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Fruit",
       "Vegetable",
@@ -104,9 +102,27 @@ describe("ResourceFilter", () => {
     expect(screen.getByRole("button", { name: "Add filter" })).toHaveFocus();
   });
 
+  it("changes nothing when the value a filter already has is picked again", async () => {
+    // Nothing that depends on it is cleared either: the size stays.
+    const onChange = renderFilter({ kind: "fruit", size: "l" });
+    await userEvent.click(screen.getByRole("button", { name: /^Kind/ }));
+    await userEvent.click(screen.getByRole("option", { name: "Fruit" }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Size/ })).toHaveTextContent("SizeLarge");
+  });
+
+  it("names the menu by the step it is on", async () => {
+    renderFilter();
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    expect(screen.getByRole("dialog", { name: "Filter by" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("option", { name: "Kind" }));
+    expect(screen.getByRole("dialog", { name: "Kind" })).toBeInTheDocument();
+  });
+
   it("shows a value no option matches, so it can be cleared", () => {
     renderFilter({ kind: "ghost" });
-    expect(screen.getByRole("button", { name: "Filter by kind" })).toHaveTextContent("Kindghost");
+    expect(screen.getByRole("button", { name: /^Kind/ })).toHaveTextContent("Kindghost");
     expect(screen.getByRole("button", { name: "Clear the kind filter" })).toBeInTheDocument();
   });
 
@@ -122,12 +138,10 @@ describe("ResourceFilter", () => {
     ]);
     await userEvent.click(screen.getByRole("option", { name: "Last 30 days" }));
     expect(onChange).toHaveBeenLastCalledWith({ picked: "30d" });
-    expect(screen.getByRole("button", { name: "Filter by picked" })).toHaveTextContent(
-      "PickedLast 30 days",
-    );
+    expect(screen.getByRole("button", { name: /^Picked/ })).toHaveTextContent("PickedLast 30 days");
 
     // From the chip, a day replaces the range. A day yet to come cannot be applied.
-    await userEvent.click(screen.getByRole("button", { name: "Filter by picked" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Picked/ }));
     const day = screen.getByLabelText("Since a day");
     const apply = screen.getByRole("button", { name: "Apply" });
     expect(apply).toBeDisabled();
