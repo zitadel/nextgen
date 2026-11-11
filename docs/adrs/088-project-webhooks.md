@@ -106,11 +106,29 @@ webhook-id: evt_01HZY…
 webhook-timestamp: 1794391200
 webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 
-{ "id": "evt_01HZY…", "event_type": "user.created", "project_id": "…", "payload": { … } }
+{
+  "id": "evt_01HZY…",
+  "type": "user.created",
+  "created_at": "2026-11-11T10:00:00Z",
+  "project_id": "proj_abc",
+  "actor":  { "type": "human", "id": "user_xyz" },
+  "entity": { "type": "user",  "id": "user_123" },
+  "data": { "schema_id": "sch_…", "attribute_keys": ["email", "name"] }
+}
 ```
 
-- The body is the event as `GET /events` returns it, unwrapped. The
-  per-type webhook pages in the spec stay the contract.
+- The body is one envelope for every event type, every field always
+  present: the event's `id`, its `type`, `created_at` and `project_id`, who
+  caused it (`actor`) and what it is about (`entity`), each `null` when the
+  event has none, and `data`.
+- `data` is the event's payload as stored, already redacted
+  ([ADR 048](048-wide-events-internal-audit-primitive.md)), `{}` when empty.
+  It is not the resource. A receiver that needs more reads the resource by
+  `entity.id`, or the whole event with `GET /events/{id}`.
+- The spec describes the envelope once and types `data` per event type from
+  the payload schemas `GET /events` uses.
+- The operator's sinks are not this: they keep receiving the event as
+  `GET /events` returns it, unsigned (ADR 049).
 - The headers and the signature follow
   [Standard Webhooks](https://www.standardwebhooks.com/): HMAC-SHA256 over
   `{webhook-id}.{webhook-timestamp}.{body}`, base64, with the bytes sent as
@@ -288,8 +306,13 @@ disable it and rotate its secret.
   ADR 049 sketched. It needs the unique key on a sink's URL taken apart, a
   second way to delete cursors and, on SQLite, both tables rebuilt, to save
   one table.
-- **An envelope around the event.** The event already carries its id, type
-  and time, and the spec already documents it as the body.
+- **The event as `GET /events` returns it, as the body.** Its optional
+  columns come and go, so no two types have the same keys, and a receiver
+  written for one cannot rely on the next. It also sends every correlation
+  column to an endpoint that mostly wants to know what happened to what.
+- **The whole resource in `data`**, as Stripe's `data.object` is. It would
+  send what the audit rules keep out of events, and cost a read per
+  delivery.
 - **Webhooks as release configuration.** The URL differs per environment, and
   a rollback would redirect events.
 
