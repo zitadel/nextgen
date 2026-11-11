@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -63,10 +64,11 @@ func TestInvitationLifecycle(t *testing.T) {
 		assert.NotEmpty(t, created.JourneyID)
 		// A project secret names no user.
 		assert.True(t, created.CreatedBy.IsNull())
-		// The client decodes a uri with url.ParseRequestURI, which keeps the
-		// fragment in Path.
-		assert.True(t, strings.HasPrefix(created.Link.Path, "/ui/console/invitations/accept#token="), created.Link.Path)
-		assert.Empty(t, created.Link.RawQuery)
+		link, err := url.Parse(created.Link)
+		require.NoError(t, err)
+		assert.Equal(t, "/ui/console/invitations/accept", link.Path)
+		assert.Empty(t, link.RawQuery)
+		assert.True(t, strings.HasPrefix(link.Fragment, "token="), link.Fragment)
 
 		got, ok := get(t, created.ID).(*api.Invitation)
 		require.True(t, ok)
@@ -115,7 +117,7 @@ func TestInvitationLifecycle(t *testing.T) {
 		assert.NotEqual(t, original.ID, replacement.ID)
 		assert.Equal(t, original.JourneyID, replacement.JourneyID)
 		assert.Equal(t, "Jane Doe", replacement.Metadata.Value.Name)
-		assert.NotEqual(t, original.Link.Path, replacement.Link.Path)
+		assert.NotEqual(t, original.Link, replacement.Link)
 		require.IsType(t, &api.GetInvitationNotFound{}, get(t, original.ID))
 
 		events := invitationEvents(t, client, projectID, original.ID)

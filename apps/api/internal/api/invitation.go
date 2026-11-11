@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
@@ -45,10 +44,6 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 	if err != nil {
 		return nil, err
 	}
-	link, err := url.Parse(created.Link)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to build invitation link")
-	}
 	inv := invitationProjectMemberResponse(&created.Invitation, time.Now())
 	resp := api.NewCreateInvitationProjectMemberResponseCreateInvitationResponse(api.CreateInvitationProjectMemberResponse{
 		ID:            inv.ID,
@@ -63,7 +58,7 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 		AcceptedAt:    inv.AcceptedAt,
 		Type:          api.CreateInvitationProjectMemberResponseTypeProjectMember,
 		ProjectMember: inv.ProjectMember,
-		Link:          *link,
+		Link:          created.Link,
 	})
 	if v, ok := inv.CreatedByType.Get(); ok {
 		resp.CreateInvitationProjectMemberResponse.CreatedByType.SetTo(api.CreateInvitationProjectMemberResponseCreatedByType(v))

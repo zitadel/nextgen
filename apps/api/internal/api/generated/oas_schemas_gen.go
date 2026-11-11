@@ -18397,7 +18397,7 @@ type CreateInvitationProjectMemberResponse struct {
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
 	// Only this create or replace response returns it.
-	Link url.URL `json:"link"`
+	Link string `json:"link"`
 }
 
 // GetID returns the value of ID.
@@ -18466,7 +18466,7 @@ func (s *CreateInvitationProjectMemberResponse) GetProjectMember() InvitationPro
 }
 
 // GetLink returns the value of Link.
-func (s *CreateInvitationProjectMemberResponse) GetLink() url.URL {
+func (s *CreateInvitationProjectMemberResponse) GetLink() string {
 	return s.Link
 }
 
@@ -18536,7 +18536,7 @@ func (s *CreateInvitationProjectMemberResponse) SetProjectMember(val InvitationP
 }
 
 // SetLink sets the value of Link.
-func (s *CreateInvitationProjectMemberResponse) SetLink(val url.URL) {
+func (s *CreateInvitationProjectMemberResponse) SetLink(val string) {
 	s.Link = val
 }
 
@@ -18891,7 +18891,7 @@ type CreateInvitationTeamMemberResponse struct {
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
 	// Only this create or replace response returns it.
-	Link url.URL `json:"link"`
+	Link string `json:"link"`
 }
 
 // GetID returns the value of ID.
@@ -18960,7 +18960,7 @@ func (s *CreateInvitationTeamMemberResponse) GetTeamMember() InvitationTeamMembe
 }
 
 // GetLink returns the value of Link.
-func (s *CreateInvitationTeamMemberResponse) GetLink() url.URL {
+func (s *CreateInvitationTeamMemberResponse) GetLink() string {
 	return s.Link
 }
 
@@ -19030,7 +19030,7 @@ func (s *CreateInvitationTeamMemberResponse) SetTeamMember(val InvitationTeamMem
 }
 
 // SetLink sets the value of Link.
-func (s *CreateInvitationTeamMemberResponse) SetLink(val url.URL) {
+func (s *CreateInvitationTeamMemberResponse) SetLink(val string) {
 	s.Link = val
 }
 

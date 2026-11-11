@@ -21735,7 +21735,6 @@
             "properties": {
               "link": {
                 "type": "string",
-                "format": "uri",
                 "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n",
                 "example": "https://console.example.com/invitations/accept#token=dGhpc2lzYXRva2Vu"
               }
@@ -21758,7 +21757,6 @@
             "properties": {
               "link": {
                 "type": "string",
-                "format": "uri",
                 "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n"
               }
             }

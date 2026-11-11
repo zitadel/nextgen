@@ -27956,7 +27956,7 @@ func (s *CreateInvitationProjectMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("link")
-		json.EncodeURI(e, s.Link)
+		e.Str(s.Link)
 	}
 }
 
@@ -28125,8 +28125,8 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 		case "link":
 			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Link = v
+				v, err := d.Str()
+				s.Link = string(v)
 				if err != nil {
 					return err
 				}
@@ -28473,7 +28473,7 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("link")
-				json.EncodeURI(e, s.Link)
+				e.Str(s.Link)
 			}
 		}
 	case CreateInvitationTeamMemberResponseCreateInvitationResponse:
@@ -28541,7 +28541,7 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("link")
-				json.EncodeURI(e, s.Link)
+				e.Str(s.Link)
 			}
 		}
 	}
@@ -28871,7 +28871,7 @@ func (s *CreateInvitationTeamMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("link")
-		json.EncodeURI(e, s.Link)
+		e.Str(s.Link)
 	}
 }
 
@@ -29040,8 +29040,8 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 		case "link":
 			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Link = v
+				v, err := d.Str()
+				s.Link = string(v)
 				if err != nil {
 					return err
 				}
