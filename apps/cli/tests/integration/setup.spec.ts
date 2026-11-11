@@ -815,15 +815,6 @@ describe("setup", () => {
           expect(data.sso[0]?.verified_claims).toEqual({ email: "email_verified" });
         });
 
-        it("reports that the connection reached the server", async () => {
-          const app = await anApp();
-
-          const result = await provider.setUp(app);
-
-          const { data } = app.envelopeOf<{ sso: { state: string }[] }>(result);
-          expect(data.sso[0]?.state).toBe("applied");
-        });
-
         it("publishes the client id as a readable project variable", async () => {
           const app = await anApp();
 

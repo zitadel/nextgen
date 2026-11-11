@@ -694,12 +694,10 @@ describe("auth-method sso enable", () => {
 
   describe("with --provider custom in a script", () => {
     it.for([
-      "Acme SSO is set up",
-      "Connection file   .zitadel/idps/acme-sso.json",
+      "SIGN IN WITH ACME SSO",
+      "Each user attribute is filled from a claim your provider returns:",
       "email comes from the email claim",
-      "Saved in your project. Not applied, not tested.",
-      "Still to do:",
-      "Sign in once with Acme SSO: until then the mapping is untested.",
+      "default-human-user signs in",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);
 
@@ -743,7 +741,7 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout.indexOf("Acme SSO is set up")).toBeGreaterThan(
+      expect(result.stdout.indexOf("SIGN IN WITH ACME SSO")).toBeGreaterThan(
         result.stdout.indexOf(`Wrote ${ACME.file}`),
       );
     });

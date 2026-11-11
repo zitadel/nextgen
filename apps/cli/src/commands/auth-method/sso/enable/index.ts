@@ -48,6 +48,7 @@ import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
+import { BOX_STYLE, wrapForBox } from "@/lib/box";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { type Change, Connection, type DocumentChange, type UserSchema } from "@/lib/zitadel";
@@ -230,7 +231,7 @@ type Outcome = {
  */
 type ResultInput = {
   readonly summary: Summary;
-  readonly change: Change;
+  readonly change: DocumentChange<Connection>;
   readonly written: readonly string[];
   readonly published: PublishedCredentials;
   readonly delivery: CredentialDelivery;
@@ -241,7 +242,7 @@ type ResultInput = {
  */
 type PayloadInput = {
   readonly summary: Summary;
-  readonly change: Change;
+  readonly change: DocumentChange<Connection>;
   readonly published: PublishedCredentials;
   readonly names: CredentialNames;
 };
@@ -265,6 +266,9 @@ type Payload = {
     readonly action: "reuse" | "create";
     readonly slug: string;
     readonly file: string;
+    readonly claim_mapping: Readonly<Record<string, string>>;
+    readonly verified_claims: Readonly<Record<string, string | boolean>>;
+    readonly scopes: readonly string[];
   };
   readonly callback_uri: string;
   readonly changed: readonly string[];
@@ -272,6 +276,16 @@ type Payload = {
   readonly client_id: PublishedVariable | null;
   readonly secret: PublishedVariable | null;
 };
+
+/**
+ * Joins names as "a, b, and c" in the summary box.
+ */
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * Picks "one" or "other" for the counts the summary box words.
+ */
+const PLURAL = new Intl.PluralRules("en");
 
 /**
  * Nothing sent to the project, as a dry run reports it.
@@ -699,6 +713,62 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       ? { actions, commands: followUps.commands }
       : { commands: followUps.commands };
 
+    if (!this.isJson) {
+      const connection = input.change.document;
+      const { mappings, verifications, scopes, unmapped, usedBy } =
+        input.change.after.connections.summarize(connection);
+      const verifiedBy = new Map(
+        verifications.map(({ property, claim }) => {
+          return [property, claim];
+        }),
+      );
+      const lines = [
+        ...(mappings.length === 0
+          ? [
+              `No attribute is filled from a claim yet. Add pairs to claim_mapping in ${connection.path}.`,
+            ]
+          : [
+              "Each user attribute is filled from a claim your provider returns:",
+              ...mappings.map(({ property, claim }) => {
+                const how = verifiedBy.get(property);
+                const trust =
+                  how === true
+                    ? ", and is always trusted"
+                    : typeof how === "string"
+                      ? `, verified when ${how} is true`
+                      : "";
+                return `- ${property} comes from the ${claim} claim${trust}.`;
+              }),
+            ]),
+        ...(scopes.length === 0
+          ? []
+          : [
+              "",
+              `It asks your provider for the ${LIST.format(scopes)} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
+            ]),
+        ...(unmapped.length === 0
+          ? []
+          : [
+              "",
+              "Some attributes have no claim yet:",
+              ...unmapped.map(({ property, required }) => {
+                return required
+                  ? `- ${property} (required) - not filled by this connection, so sign-up has to collect it.`
+                  : `- ${property} (optional) - fine to leave empty.`;
+              }),
+            ]),
+        "",
+        usedBy.length === 0
+          ? "No user schema signs in through this connection yet, so changing it affects nothing today."
+          : `${LIST.format(usedBy)} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
+      ];
+      consola.box({
+        title: `SIGN IN WITH ${name.toUpperCase()}`,
+        message: wrapForBox(escapeControlCharacters(lines.join("\n"))),
+        style: BOX_STYLE.info,
+      });
+    }
+
     return this.emit({
       status: "ok",
       data: {
@@ -739,6 +809,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   private payload(input: PayloadInput): Payload {
     const summary = input.summary;
     const action = summary.reused ? "reuse" : "create";
+    const mapped = input.change.after.connections.summarize(input.change.document);
     return {
       project_id: summary.projectId,
       provider: summary.provider,
@@ -747,6 +818,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action,
         slug: summary.connection.slug,
         file: summary.connection.path,
+        claim_mapping: Object.fromEntries(
+          mapped.mappings.map(({ property, claim }) => {
+            return [property, claim];
+          }),
+        ),
+        verified_claims: Object.fromEntries(
+          mapped.verifications.map(({ property, claim }) => {
+            return [property, claim];
+          }),
+        ),
+        scopes: mapped.scopes,
       },
       callback_uri: summary.callbackUri,
       changed: [...input.change.changedPaths],

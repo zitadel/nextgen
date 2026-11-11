@@ -160,7 +160,7 @@ import {
   type Section,
 } from "./summary";
 import { Cmd } from "@/lib/cmd";
-import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
+import { dim, id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import { showSkillsHint } from "@/lib/skills-hint";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -445,6 +445,12 @@ export function customSettingsOf(flags: {
     scopes: flags.ssoScopes,
   };
 }
+
+/** Joins names as "a, b, and c" in the summary box. */
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
+/** Picks "one" or "other" for the counts the summary box words. */
+const PLURAL = new Intl.PluralRules("en");
 
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL: Refusal = {
@@ -1815,6 +1821,61 @@ export default class Setup extends Destructive(BaseCommand) {
         message: wrapForBox(
           [
             renderSummary(sections),
+            ...planned.connections.flatMap((entry) => {
+              const connection = entry.connection;
+              const { mappings, verifications, scopes, unmapped, usedBy } =
+                planned.change.after.connections.summarize(connection);
+              const verifiedBy = new Map(
+                verifications.map(({ property, claim }) => {
+                  return [property, claim];
+                }),
+              );
+              const lines = [
+                ...(mappings.length === 0
+                  ? [
+                      `No attribute is filled from a claim yet. Add pairs to claim_mapping in ${connection.path}.`,
+                    ]
+                  : [
+                      "Each user attribute is filled from a claim your provider returns:",
+                      ...mappings.map(({ property, claim }) => {
+                        const how = verifiedBy.get(property);
+                        const trust =
+                          how === true
+                            ? ", and is always trusted"
+                            : typeof how === "string"
+                              ? `, verified when ${how} is true`
+                              : "";
+                        return `- ${property} comes from the ${claim} claim${trust}.`;
+                      }),
+                    ]),
+                ...(scopes.length === 0
+                  ? []
+                  : [
+                      "",
+                      `It asks your provider for the ${LIST.format(scopes)} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
+                    ]),
+                ...(unmapped.length === 0
+                  ? []
+                  : [
+                      "",
+                      "Some attributes have no claim yet:",
+                      ...unmapped.map(({ property, required }) => {
+                        return required
+                          ? `- ${property} (required) - not filled by this connection, so sign-up has to collect it.`
+                          : `- ${property} (optional) - fine to leave empty.`;
+                      }),
+                    ]),
+                "",
+                usedBy.length === 0
+                  ? "No user schema signs in through this connection yet, so changing it affects nothing today."
+                  : `${LIST.format(usedBy)} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
+              ];
+              return [
+                "",
+                dim(`SIGN IN WITH ${connection.displayName.toUpperCase()}`),
+                escapeControlCharacters(lines.join("\n")),
+              ];
+            }),
             "",
             renderBoxActions([
               ...deployStep.boxActions,
@@ -1879,6 +1940,17 @@ export default class Setup extends Destructive(BaseCommand) {
             slug,
             client_id: entry.chosen.credentials.clientId ?? null,
             connection: entry.connection.path,
+            claim_mapping: Object.fromEntries(
+              entry.connection.mappings.map(({ property, claim }) => {
+                return [property, claim];
+              }),
+            ),
+            verified_claims: Object.fromEntries(
+              entry.connection.verifications.map(({ property, claim }) => {
+                return [property, claim];
+              }),
+            ),
+            scopes: entry.connection.scopes ?? [],
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),

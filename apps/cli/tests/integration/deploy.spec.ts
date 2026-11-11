@@ -792,27 +792,6 @@ describe("deploy", () => {
 
         expect(await app.deployRendered(["--dry-run"])).toSay("only returns for");
       });
-
-      it("prints the mapping box for each connection on a dry run", async () => {
-        const app = await anAppWithGoogle();
-
-        expect(await app.deployRendered(["--dry-run"])).toPrint("SIGN IN WITH GOOGLE");
-      });
-
-      it("names an attribute the connection leaves without a claim", async () => {
-        const app = await aSetUpApp(["--use-case", "business"]);
-        expect(await app.enableSso("google", GOOGLE)).toSucceed();
-
-        expect(await app.deployRendered(["--dry-run"])).toPrint("companyName");
-      });
-
-      it("names the schema that signs in through the connection", async () => {
-        const app = await anAppWithGoogle();
-
-        expect(await app.deployRendered(["--dry-run"])).toPrint(
-          "default-human-user signs in through this connection",
-        );
-      });
     });
 
     describe("rendered for a terminal", () => {

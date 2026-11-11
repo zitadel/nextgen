@@ -378,25 +378,6 @@ describe("auth-method sso enable", () => {
           expect(data.connection.verified_claims).toEqual({ email: "email_verified" });
         });
 
-        it("reports that the connection is saved and not yet applied", async () => {
-          const app = await aSetUpApp();
-
-          const result = await app.enableSsoWith(provider.flags, provider.credentials.secret);
-
-          const { data } = app.envelopeOf<{ connection: { state: string } }>(result);
-          expect(data.connection.state).toBe("saved");
-        });
-
-        it("reports that a connection already in the project is present", async () => {
-          const app = await aSetUpApp();
-          await app.enableSsoWith(provider.flags, provider.credentials.secret);
-
-          const result = await app.enableSsoWith(provider.flags, provider.credentials.secret);
-
-          const { data } = app.envelopeOf<{ connection: { state: string } }>(result);
-          expect(data.connection.state).toBe("present");
-        });
-
         it("reports the variable the secret was stored as", async () => {
           const app = await aSetUpApp();
 
@@ -847,20 +828,12 @@ describe("auth-method sso enable", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says the provider is saved locally and not yet live", async () => {
+      it("says the provider is configured locally and not yet live", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Saved in your project. Not applied, not tested.");
-      });
-
-      it("prints nothing after its box to repeat what the box says", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
-
-        expect(result).not.toPrint("Next:");
+        expect(result).toPrint("Google sign-in is configured locally.");
       });
 
       it("renders text rather than a json envelope", async () => {
@@ -876,7 +849,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Google is set up");
+        expect(result).toPrint("SIGN IN WITH GOOGLE");
       });
 
       it("prints no mapping on a dry run, which writes no connection", async () => {

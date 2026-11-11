@@ -702,10 +702,8 @@ them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 provider or an older CLI version does not work.
 
 The same results carry the connection's `claim_mapping` (user attribute to
-claim), `verified_claims` (what makes an attribute verified), `scopes` and
-`state` (`saved`, `applied` or `present`: only `applied` has reached the server,
-and none is tested until a sign-in) in `data.sso[]` from `setup` and
-`data.connection` from `sso enable`. To map another
+claim), `verified_claims` (what makes an attribute verified) and `scopes` in
+`data.sso[]` from `setup` and `data.connection` from `sso enable`. To map another
 claim, edit `claim_mapping` in the connection file named there, then run
 `deploy`; the connection is not tested until a real sign-in.
 `deploy` refuses a mapping that cannot work and names the file, the
