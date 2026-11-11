@@ -1,5 +1,5 @@
 import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import {
@@ -171,8 +171,6 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Documentation is parked: it needs a published URL for the docs
-              site to point at, and a row that does nothing reads as broken. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
@@ -248,7 +246,19 @@ function NavList({ view }: { view: NavView }) {
               >
                 <Link to={to} title={name}>
                   <Icon aria-hidden />
-                  <span>{name}</span>
+                  {/* Cut short itself: with the arrow after it, it is no
+                      longer the button's last child, which is what the
+                      button truncates. */}
+                  <span className="truncate">{name}</span>
+                  {opensList(view, to) && (
+                    // The account row's arrow in the footer, which opens a menu
+                    // as this row opens a list. Not drawn in the rail.
+                    <ChevronRight
+                      aria-hidden
+                      data-opens-list
+                      className="text-sidebar-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                    />
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -265,6 +275,26 @@ function NavList({ view }: { view: NavView }) {
  * starts; Settings' and Logs' open from a row of one (D29, D30).
  */
 const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, logs: 1 };
+
+/** The list a row's screen shows, where it is not the project's or the account's. */
+function listOf(to: string): NavView | undefined {
+  const under = (path: string) => to === path || to.startsWith(`${path}/`);
+  if (under(SETTINGS_PATH)) return "settings";
+  if (under(LOGS_PATH)) return "logs";
+  return undefined;
+}
+
+/**
+ * Whether a row of the list `view` names swaps the sidebar for a list one
+ * level down (Logs in a project's list, Settings in the account's), rather
+ * than opening a screen beside it. Such a row carries an arrow, so the swap
+ * is no surprise. A row of the list it is already in (Settings' Profile) does
+ * not: the rule is the depth, so a new list needs no change here.
+ */
+function opensList(view: NavView, to: string): boolean {
+  const target = listOf(to);
+  return target !== undefined && LIST_DEPTH[target] > LIST_DEPTH[view];
+}
 
 /** A short fade and slide, with the design's motion tokens; none for reduced motion. */
 const LIST_MOTION =

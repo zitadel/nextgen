@@ -41,6 +41,7 @@ type statements struct {
 	variableStatements
 	variableSetStatements
 	claimStatements
+	invitationStatements
 	resourceScopeStatements
 	searchEntryStatements
 	authzAssignmentStatements
@@ -85,6 +86,7 @@ func newStatements(client queryExecutor) statements {
 		variableStatements:            newVariableStatements(client),
 		variableSetStatements:         newVariableSetStatements(client),
 		claimStatements:               newClaimStatements(client),
+		invitationStatements:          newInvitationStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
 		searchEntryStatements:         newSearchEntryStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),

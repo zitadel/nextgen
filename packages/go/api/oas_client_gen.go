@@ -1525,9 +1525,10 @@ type Invoker interface {
 	// it refuses it with `rel.revoked`, including a build that pins its digest.
 	// A release that any origin still serves cannot be revoked. An origin serves
 	// the release of the newest deployment to it, so the call answers `409` with
-	// `rel.in_use`, naming each such origin and that deployment. Deploy another
-	// release there or roll back first, then revoke. Revoking therefore never
-	// takes an origin down. Deployments that named the release earlier stay in
+	// `rel.in_use`, naming each such origin, that deployment and whether the
+	// origin is primary or a preview. Deploy another release to a primary origin
+	// or roll it back, and remove a preview, then revoke. Revoking therefore
+	// never takes an origin down. Deployments that named the release earlier stay in
 	// the history.
 	// The call is idempotent: revoking a release that is already revoked answers
 	// `200` with the release unchanged, and `revoked_at` still names the first
@@ -17790,9 +17791,10 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 // it refuses it with `rel.revoked`, including a build that pins its digest.
 // A release that any origin still serves cannot be revoked. An origin serves
 // the release of the newest deployment to it, so the call answers `409` with
-// `rel.in_use`, naming each such origin and that deployment. Deploy another
-// release there or roll back first, then revoke. Revoking therefore never
-// takes an origin down. Deployments that named the release earlier stay in
+// `rel.in_use`, naming each such origin, that deployment and whether the
+// origin is primary or a preview. Deploy another release to a primary origin
+// or roll it back, and remove a preview, then revoke. Revoking therefore
+// never takes an origin down. Deployments that named the release earlier stay in
 // the history.
 // The call is idempotent: revoking a release that is already revoked answers
 // `200` with the release unchanged, and `revoked_at` still names the first
