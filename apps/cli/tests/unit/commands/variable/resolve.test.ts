@@ -1,12 +1,15 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
+import ResolveCommand from "@/commands/variable/resolve";
+import { parseArg } from "@tests/helpers/inputs";
 import {
   aProjectDirectory,
   PLATFORM_URL,
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { onTerminalReadingAFile } from "@tests/helpers/terminal";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -35,8 +38,10 @@ function aDeployment(id: string, origin: string) {
  */
 async function aProject(options: {
   deployments: ReturnType<typeof aDeployment>[];
+  earlier?: ReturnType<typeof aDeployment>[];
   origins?: { kind: string; pattern: string }[];
   variables?: Record<string, { value?: string; secret?: boolean }>;
+  frozen?: Record<string, Record<string, { value?: string; secret?: boolean }>>;
 }): Promise<string> {
   const cwd = await aProjectDirectory("zitadel-variable-resolve-", {
     id: "proj_1",
@@ -57,15 +62,15 @@ async function aProject(options: {
       });
     }),
     http.get(`${SERVER}/api/v1/deployments/:id`, ({ params }) => {
-      const found = options.deployments.find((deployment) => {
+      const found = [...options.deployments, ...(options.earlier ?? [])].find((deployment) => {
         return deployment.id === params.id;
       });
       return found === undefined
         ? HttpResponse.json({ code: "not_found", message: "no such deployment" }, { status: 404 })
         : HttpResponse.json(found);
     }),
-    http.get(`${SERVER}/api/v1/deployments/:id/variables`, () => {
-      return HttpResponse.json(options.variables ?? {});
+    http.get(`${SERVER}/api/v1/deployments/:id/variables`, ({ params }) => {
+      return HttpResponse.json(options.frozen?.[String(params.id)] ?? options.variables ?? {});
     }),
   );
   return cwd;
@@ -194,15 +199,22 @@ describe("variable resolve", () => {
     });
   });
 
-  it("reads the variables of the deployment it is given", async () => {
+  it("reads the variables of the deployment it is given, not another one's", async () => {
     const cwd = await aProject({
       deployments: [
         aDeployment("dep_b", "https://b.acme.com"),
         aDeployment("dep_a", "https://a.acme.com"),
       ],
-      variables: {
-        API_URL: {
-          value: "https://api.acme.com",
+      frozen: {
+        dep_a: {
+          FROM_A: {
+            value: "a",
+          },
+        },
+        dep_b: {
+          FROM_B: {
+            value: "b",
+          },
         },
       },
     });
@@ -217,9 +229,54 @@ describe("variable resolve", () => {
     expect(envelope.data.origins).toEqual(["https://a.acme.com"]);
     expect(envelope.data.items).toMatchObject([
       {
-        name: "API_URL",
+        name: "FROM_A",
       },
     ]);
+  });
+
+  it("reads a deployment that is no longer live, which serves no origin", async () => {
+    const cwd = await aProject({
+      deployments: [aDeployment("dep_new", "https://app.acme.com")],
+      earlier: [aDeployment("dep_old", "https://app.acme.com")],
+      frozen: {
+        dep_old: {
+          OLD: {
+            value: "kept",
+          },
+        },
+      },
+    });
+
+    const { exitCode, stdout } = await resolve(cwd, "dep_old");
+    const envelope = parseJson(stdout) as {
+      data: { deployment_id: string; origins: string[]; items: { name: string }[] };
+    };
+
+    expect(exitCode).toBe(0);
+    expect(envelope.data.deployment_id).toBe("dep_old");
+    expect(envelope.data.origins).toEqual([]);
+    expect(envelope.data.items).toMatchObject([
+      {
+        name: "OLD",
+      },
+    ]);
+  });
+
+  it("names no origin in the empty line for a deployment that serves none", async () => {
+    const cwd = await aProject({
+      deployments: [],
+      earlier: [aDeployment("dep_old", "https://app.acme.com")],
+      frozen: {
+        dep_old: {},
+      },
+    });
+
+    const { exitCode, stdout } = await onTerminalReadingAFile(() => {
+      return runCliForTest(["variable", "resolve", "dep_old", "--cwd", cwd, "--server", SERVER]);
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("dep_old froze no variables.");
   });
 
   it("says a deployment the project does not have is not found", async () => {
@@ -250,18 +307,29 @@ describe("variable resolve", () => {
       message: "Name a deployment or an origin, not both.",
     });
   });
+});
 
-  it("refuses a value that is not a deployment id", async () => {
-    const cwd = await aProject({
-      deployments: [],
-    });
+const DEPLOYMENT = "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6";
 
-    const { exitCode, stdout } = await resolve(cwd, "not a deployment!");
+describe("deployment_id", () => {
+  it("takes a deployment id, trimmed", async () => {
+    await expect(
+      parseArg(ResolveCommand.args.deployment_id, ` ${DEPLOYMENT}\n`, "deployment_id"),
+    ).resolves.toBe(DEPLOYMENT);
+  });
 
-    expect(exitCode).toBe(3);
-    expect(parseJson(stdout)).toMatchObject({
-      status: "error",
+  it.each([
+    ["a release id", "rel_01M6KPFXAE68N6G2X1HN5XD29R"],
+    ["a blank", "   "],
+    ["a prefix alone", "dep_"],
+    ["a space inside", "dep_has space"],
+  ])("refuses %s, saying what a deployment id is and where to list them", async (_, value) => {
+    await expect(
+      parseArg(ResolveCommand.args.deployment_id, value, "deployment_id"),
+    ).rejects.toMatchObject({
       code: "E_VALIDATION",
+      message: expect.stringContaining("must be a deployment ID"),
+      hint: "Find one with `zitadel deployment list`, or omit it to read the live deployment.",
     });
   });
 });

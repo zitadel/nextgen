@@ -1,7 +1,7 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
-import { DeploymentService } from "@/lib/backend";
+import { DeploymentService, type Variable } from "@/lib/backend";
 import { GetDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { Cmd } from "@/lib/cmd";
 import { ZitadelError } from "@/lib/errors";
@@ -51,10 +51,13 @@ const COLUMNS = ["name", "value"] as const;
  *
  * Not the store's current values but the map frozen onto a deployment: what a
  * later `variable set` has not reached. A deployment id names one, live or not,
- * as `deployment get` does; without it, the one live on the target is read.
- * `--origin`
- * names one of the project's origins. Without it, resolving is unambiguous only
- * when a single deployment is live across the project; when several are — a
+ * as `deployment get` does, and `--origin` cannot accompany it. The origins
+ * shown are those the deployment serves now: none for one that is no longer
+ * live.
+ *
+ * Without an id, the deployment live on the target is read. `--origin` names
+ * one of the project's origins. Without it, resolving is unambiguous only when
+ * a single deployment is live across the project; when several are — a
  * different release or frozen map on each origin — the live origins are named
  * and `--origin` is required rather than resolving from an arbitrary one
  * (#1617). A target with nothing deployed is a miss that says how to reach it:
@@ -94,11 +97,17 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
     if (args.deploymentId !== undefined) {
-      const [deployment, items] = await Promise.all([
-        deploymentService.get(args.deploymentId),
-        deploymentService.variables(args.deploymentId),
+      // Read first, so an id the project does not have is a miss of its own
+      // rather than whichever of the later reads fails first.
+      const deployment = await deploymentService.get(args.deploymentId);
+      const [items, live] = await Promise.all([
+        deploymentService.variables(deployment.id),
+        deploymentService.live(),
       ]);
-      return this.render(flags, deployment.id, [...deployment.origins].sort(), items);
+      const serving = live.find((entry) => {
+        return entry.id === deployment.id;
+      });
+      return this.render(flags, deployment.id, [...(serving?.origins ?? [])].sort(), items);
     }
     const found = await deploymentService.liveOn(flags.origin);
     switch (found.outcome) {
@@ -173,7 +182,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     flags: Admitted<typeof VariableResolve>["flags"],
     deploymentId: string,
     origins: string[],
-    items: Awaited<ReturnType<DeploymentService["variables"]>>,
+    items: readonly Variable[],
   ): Promise<JsonEnvelope> {
     const where = origins.length === 0 ? "" : ` for ${origins.join(", ")}`;
     this.recordTelemetry({
