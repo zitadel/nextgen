@@ -135,6 +135,9 @@ type CreateAuthAttemptInput struct {
 	// RuntimeResolutionFromContext when the caller leaves them empty.
 	DeploymentID string
 	ReleaseID    string
+	// FlowID is the login flow creating the attempt. Never settable through
+	// the REST surface.
+	FlowID string
 }
 
 // BeginPasskeyEnrollmentInput starts a management-plane enrollment ceremony
@@ -392,6 +395,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 	attempt.Internal = input.Internal
 	attempt.DeploymentID = input.DeploymentID
 	attempt.ReleaseID = input.ReleaseID
+	attempt.FlowID = input.FlowID
 	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
 		if attempt.DeploymentID == "" && resolution.Deployment != nil {
 			attempt.DeploymentID = resolution.Deployment.ID
