@@ -29,7 +29,16 @@ type ListEventsRequest struct {
 	Order         string
 	Limit         int
 	PageToken     string
+	// PlatformOperator says whether the caller is a platform operator, who
+	// reads a project nobody has claimed yet; nil, the caller is not one.
+	PlatformOperator PlatformOperatorCheck
 }
+
+// PlatformOperatorCheck answers whether the caller is a platform operator
+// (ADR 075), who reads every project's events, claimed or not (ADR 049 §4).
+// The events gate asks it only of a project that exists and is unclaimed, so
+// it may read; a failure is the request's, never a "no".
+type PlatformOperatorCheck func(context.Context) (bool, error)
 
 // ListEventsResponse is a cursor page of events.
 type ListEventsResponse struct {
@@ -45,16 +54,21 @@ const eventScanBudget = 1000
 
 // EventService lists and loads audit events (ADR 049).
 type EventService struct {
-	v2Pool     *DB
-	scanBudget uint32
+	v2Pool            *DB
+	platformProjectID string
+	scanBudget        uint32
 }
 
-func NewEventService(v2Pool *DB) *EventService {
-	return &EventService{v2Pool: v2Pool, scanBudget: eventScanBudget}
+// NewEventService builds the events service. platformProjectID is the
+// deployment's platform project, whose events are visible without a claim
+// (ADR 049 §4); empty, every project needs one.
+func NewEventService(v2Pool *DB, platformProjectID string) *EventService {
+	return &EventService{v2Pool: v2Pool, platformProjectID: platformProjectID, scanBudget: eventScanBudget}
 }
 
-// List returns events for a claimed project with optional filters and keyset
-// pagination on (created_at, id). Pre-claim projects yield an empty page.
+// List returns events for a claimed project, the platform project, or, to a
+// platform operator, any project, with optional filters and keyset pagination
+// on (created_at, id). Any other project yields an empty page.
 //
 // Every list is read as ranges of an index, each no further than the page or
 // than eventScanBudget (planEventRead). So a list whose filter no index holds
@@ -68,7 +82,7 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *List
 		return nil, domain.ErrEventInvalid("project_id is required", nil)
 	}
 
-	visible, err := s.projectEventsVisible(ctx, req.ProjectID)
+	visible, err := s.projectEventsVisible(ctx, req.ProjectID, req.PlatformOperator)
 	if err != nil {
 		return nil, err
 	}
@@ -114,9 +128,10 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *List
 	}, nil
 }
 
-// Get loads one event by (project_id, id). Pre-claim projects and misses
-// return not found (no existence leak).
-func (s *EventService) Get(ctx context.Context, projectID, id string) (_ *domain.Event, err error) {
+// Get loads one event by (project_id, id). A miss, and any event of a project
+// whose events List does not show (projectEventsVisible), is not found (no
+// existence leak).
+func (s *EventService) Get(ctx context.Context, projectID, id string, operator PlatformOperatorCheck) (_ *domain.Event, err error) {
 	ctx, end := startSpan(ctx, "EventService.Get")
 	defer end(&err)
 
@@ -127,7 +142,7 @@ func (s *EventService) Get(ctx context.Context, projectID, id string) (_ *domain
 		return nil, domain.ErrEventInvalid("id is required", nil)
 	}
 
-	visible, err := s.projectEventsVisible(ctx, projectID)
+	visible, err := s.projectEventsVisible(ctx, projectID, operator)
 	if err != nil {
 		return nil, err
 	}
@@ -145,12 +160,24 @@ func (s *EventService) Get(ctx context.Context, projectID, id string) (_ *domain
 	return event, nil
 }
 
-// projectEventsVisible implements the ADR 049 pre-claim gate. Claim is a
-// project→team grant (ADR 046), denormalized onto resource_scope_index.team_id
-// for the project row when claim completes. Until that team stamp exists the
-// project is treated as pre-claim: list returns empty, get returns not found.
-func (s *EventService) projectEventsVisible(ctx context.Context, projectID string) (bool, error) {
-	return projectIsClaimed(ctx, s.v2Pool.Statements(), projectID)
+// projectEventsVisible implements the ADR 049 §4 pre-claim gate: a project's
+// events are visible once it holds an active owning-team grant (ADR 046). The
+// platform project never does, but has its admins from the start, so its
+// events are always visible. A platform operator sees every project's, and is
+// asked only about a project that exists and is unclaimed, so no other read
+// pays for the question. A project that is gone shows nothing to anyone.
+func (s *EventService) projectEventsVisible(ctx context.Context, projectID string, operator PlatformOperatorCheck) (bool, error) {
+	if s.platformProjectID != "" && projectID == s.platformProjectID {
+		return true, nil
+	}
+	claim, err := loadProjectClaim(ctx, s.v2Pool.Statements(), projectID)
+	if err != nil {
+		return false, err
+	}
+	if claim != projectUnclaimed || operator == nil {
+		return claim == projectClaimed, nil
+	}
+	return operator(ctx)
 }
 
 // fetchEvents loads a page's events by id, once a bounded scan has said which

@@ -1,6 +1,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useMatch, useRouter, useSearch } from "@tanstack/react-router";
 
+import type { RouteScope } from "@/features/projects/project-scope";
 import { withoutTrailingSlash } from "@/lib/base-path";
 import type { NavMeta, NavView } from "@/nav";
 
@@ -8,6 +9,8 @@ export interface NavItem {
   /** Route path. */
   to: string;
   nav: NavMeta;
+  /** `"project"` for a screen that acts on the selected project. */
+  scope?: RouteScope;
 }
 
 /**
@@ -34,10 +37,29 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
       // which declare one, keep their place.
       if (!nav || (nav.view ?? "portal") !== view) return undefined;
       const to = withoutTrailingSlash(route.fullPath);
-      return { to, nav };
+      return { to, nav, scope: route.options.staticData?.scope };
     })
     .filter((item): item is NavItem => item !== undefined)
     .sort((a, b) => a.nav.order - b.nav.order);
+}
+
+/**
+ * The account list as the sidebar draws it (D34): its first row, Projects,
+ * then the project's screens, then the account's other rows (Settings). Above
+ * every project the account's rows alone left the sidebar nearly empty; with
+ * the project's screens it shows what the console holds, and choosing one asks
+ * for a project first (D31).
+ *
+ * Two of the project's rows are left out, as in Vercel. Its landing, `/`
+ * (Overview, D35), is the row Projects stands in for up here. A screen named
+ * like an account row (the project's own Settings) would name two places
+ * alike: up here Settings is the account's.
+ */
+export function accountListItems(account: NavItem[], project: NavItem[]): NavItem[] {
+  const [home, ...rest] = account;
+  const taken = new Set(account.map((item) => item.nav.label));
+  const screens = project.filter((item) => item.to !== "/" && !taken.has(item.nav.label));
+  return home ? [home, ...screens, ...rest] : screens;
 }
 
 /**

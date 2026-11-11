@@ -364,7 +364,7 @@ Quick lookup for which project a given use case targets.
 
 | Area | Status |
 |---|---|
-| **Search** | **LOCKED.** Ship `?q=` (server-defined fuzzy match on common fields) plus typed filters for MVP. Defer the Stripe-style query DSL to post-MVP `POST /search` endpoints. |
+| **Search** | Typed filters on each resource's query endpoint ([ADR 031](../../adrs/031-openapi-querying.md)), and `search` (`POST /search`) for text across resource types in one project ([ADR 087](../../adrs/087-search.md)). A Stripe-style query DSL stays deferred. |
 | **Bulk** | **LOCKED.** No generic `/batch`. Async `POST /imports` for migration; resource-specific bulk endpoints only when demand is real. |
 | **Cross-project aggregation** | **LOCKED.** Drop at MVP. Aggregated endpoints are console-internal only until there's a clear customer-facing need. |
 

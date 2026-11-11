@@ -18,7 +18,8 @@ export type NavIcon = ComponentType<{
  * Which sidebar list an entry belongs to. The shell renders one list at a
  * time from the same route tree, so an entry has to say which: `portal` is
  * the selected project's screens, `account` what sits above every project
- * (Projects, and Settings), `settings` the pages Settings opens (the person's
+ * (Projects, and Settings; the sidebar lists the project's among them,
+ * `accountListItems`), `settings` the pages Settings opens (the person's
  * profile, what an add-on adds beside it).
  *
  * `logs` is the list Logs opens, in place of the project's (D30). No route

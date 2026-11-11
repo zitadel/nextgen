@@ -27,9 +27,9 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { listProjectEvents } from "@/features/events/api";
 import { EventSearch } from "@/features/events/components/event-search";
+import { EventSubject } from "@/features/events/components/event-subject";
 import {
   eventFilterValues,
-  eventSubject,
   filterCount,
   isNarrowed,
   type LogEvent,
@@ -252,7 +252,7 @@ function EventRow({ event, search }: { event: LogEvent; search: LogsSearch }) {
         </Link>
       </TableCell>
       <TableCell className={RESOURCE_CELL}>
-        <Subject event={event} />
+        <EventSubject event={event} />
       </TableCell>
       <TableCell className={RESOURCE_CELL}>
         {actor ? (
@@ -284,45 +284,5 @@ function EventRow({ event, search }: { event: LogEvent; search: LogsSearch }) {
         </RowMenu>
       </TableCell>
     </ResourceRow>
-  );
-}
-
-/**
- * What the event was about: an API request as its method, operation and
- * status, any other event as the record it touched.
- */
-function Subject({ event }: { event: LogEvent }) {
-  const subject = eventSubject(event);
-  if (!subject) return <span className="text-muted-foreground">—</span>;
-
-  if (subject.kind === "request") {
-    return (
-      <span className="flex min-w-0 items-center gap-2 text-sm">
-        <span className="text-foreground truncate">
-          {subject.method} {subject.route}
-        </span>
-        {/* The number says it; the colour only draws the eye to a failure. */}
-        <span
-          className={cn(
-            "shrink-0",
-            subject.status >= 500
-              ? "text-destructive"
-              : subject.status >= 400
-                ? "text-warning"
-                : "text-muted-foreground",
-          )}
-        >
-          {subject.status}
-        </span>
-      </span>
-    );
-  }
-
-  return (
-    <span className="flex min-w-0 items-center gap-2 text-sm">
-      {/* The API's own value, its underscores read as spaces. */}
-      <span className="text-muted-foreground shrink-0">{subject.type.replace(/_/g, " ")}</span>
-      {subject.id && <IdText id={subject.id} title={subject.id} className="text-foreground" />}
-    </span>
   );
 }

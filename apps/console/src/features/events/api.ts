@@ -14,8 +14,8 @@ export interface EventPage {
  * page token continues the filters it was issued under, so `Load more` sends
  * the same ones, `createdAfter` included: the start of the time range, which
  * the list computed once when it loaded. A project that is not claimed yet
- * answers an empty page: its events are stored but stay hidden until the
- * claim.
+ * answers an empty page, except to a platform operator: its events are stored
+ * but stay hidden until the claim.
  *
  * A page can hold fewer events than asked for, or none, and still carry a
  * token: the server reads a bounded number of events a request, and filters
@@ -39,4 +39,18 @@ export async function listProjectEvents(
 /** One event of the project. An id the project does not hold is a 404. */
 export function getProjectEvent(projectId: string, eventId: string): Promise<LogEvent> {
   return api.getEvent(eventId, { project_id: projectId });
+}
+
+/**
+ * The project's newest audit events, at most `limit`: the sign-ins and changes,
+ * as Logs' default view lists them. The audit view is one range of an index,
+ * so the page fills up to `limit` whenever the project has that many.
+ */
+export async function listRecentEvents(projectId: string, limit: number): Promise<LogEvent[]> {
+  const answer = await api.listEvents({
+    project_id: projectId,
+    ...eventsQuery({ view: "audit" }),
+    limit,
+  });
+  return answer.data;
 }

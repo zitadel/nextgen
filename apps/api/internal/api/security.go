@@ -186,6 +186,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.QueryGrantsOperation:         true,
 	api.QueryUsersOperation:          true,
 	api.QueryTeamsOperation:          true,
+	api.SearchOperation:              true,
 	api.GetTeamOperation:             true,
 	api.ListMyProjectsOperation:      true,
 	api.GetMyUserSchemaOperation:     true,
