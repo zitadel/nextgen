@@ -143,8 +143,22 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 
 ### 4. Delivery
 
+![An API request writes an event to the events table; a wake-up starts the delivery engine, which reads the webhooks table and sends signed events to the endpoint; a failed delivery asks for a delayed wake-up.](assets/088-webhook-system.svg)
+
 The shipper delivers, with the cursor and the settled-events bound of
-ADR 049. What changes for a project's webhook:
+ADR 049. The events table and each webhook's cursor decide what is sent. A
+wake-up only says that a project has something new:
+
+- A server that runs until it is stopped wakes its own shipper when a
+  request has written an event, and checks on a timer besides.
+- A server that runs only while it serves a request, as the hosted cloud's
+  does, publishes a message to a queue, which calls the server's delivery
+  path. A retry is a delayed message.
+- A lost wake-up loses no event: the next one in the project delivers
+  everything after the cursor. A scheduler may call the delivery path as
+  well, so a quiet project does not wait for its next event.
+
+What changes for a project's webhook:
 
 - **Start.** The cursor is set when the webhook is created, so a new webhook
   gets no history. Changing `url` keeps the cursor.
@@ -227,11 +241,12 @@ disable it and rotate its secret.
 
 ## Open questions
 
-- **The hosted cloud.** A function runs only while it serves a request, so
-  the shipper's timer does not run there, as the retention purge's did not
-  (ADR 049, amendment 2026-10-27). A `/cron/events-export` trigger is the same
-  fix and delivers at best once a minute; a queue in `apps/cloud-functions`
-  delivers sooner and is new infrastructure.
+- **The hosted cloud's queue.** Vercel Queues is in beta, publishing needs
+  the platform's OIDC token from a Go function, and
+  [ADR 084](084-hosted-cloud-business-systems.md) decided against a queue of
+  our own for usage. Here it is one message per project with something new,
+  not one per event. Whether the scheduler's check runs beside it is the
+  cloud's choice.
 - **A lost rotate response.** Rotating again drops the secret the endpoint
   still uses, so its deliveries fail until it has the newest one. An
   `Idempotency-Key` would let the caller repeat the request and get the same
