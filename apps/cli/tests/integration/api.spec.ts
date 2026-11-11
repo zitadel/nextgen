@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
+import { anApp, aSetUpApp, MOCK_SERVER_URL, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -124,6 +124,33 @@ describe("api", () => {
 
         expect(total).toBeGreaterThan(1);
         expect(app.envelopeOf<{ schemas: unknown[] }>(result).data.schemas).toHaveLength(total);
+      });
+
+      it("calls the server the project's environment names", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.runWithoutServer([
+          "api",
+          "getVariables",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).source).toBe(MOCK_SERVER_URL);
+      });
+
+      it("refuses a call that needs the project secret where no server is named", async () => {
+        const app = await anApp();
+        await app.writeLocalSecret("proj_local");
+
+        const result = await app.runWithoutServer([
+          "api",
+          "getVariables",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("fails as the server refuses", async () => {

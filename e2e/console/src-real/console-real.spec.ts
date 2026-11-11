@@ -156,7 +156,7 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
 
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
-  await expect(row.getByText("active", { exact: true })).toBeVisible();
+  await expect(row.getByText("Active", { exact: true })).toBeVisible();
 });
 
 test("gives a colleague admin access to the project, and takes it away", async ({

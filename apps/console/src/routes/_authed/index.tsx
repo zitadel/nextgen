@@ -15,7 +15,7 @@ import { formatDate } from "@/lib/date";
  * Projects stands above every project (D35). As Vercel's project Overview, it
  * says what the project is and what it is doing, and hands each part over to
  * the screen it summarizes: what the primary origins serve now (Deployments)
- * and the newest audit events (Logs).
+ * and the newest audit events (Events).
  *
  * It holds no figures. An earlier overview design was stat cards (totals and
  * their trends), and nothing can compute them: the API's lists return pages,

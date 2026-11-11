@@ -1,5 +1,21 @@
 # @zitadel/api
 
+## 0.6.0
+
+### Minor Changes
+
+- [#2903](https://github.com/zitadel/nextgen/pull/2903) [`c52126e`](https://github.com/zitadel/nextgen/commit/c52126ed0bad6656dc97d582628479075a476bb1) - The console's Projects list now reads newest first, so a project you just created heads the list instead of waiting behind `Load more`. `GET /users/me/projects` takes `order` (`desc` or `asc`, by `created_at`), and `listMyProjects()` in `@zitadel/api` accepts it; without it the list stays ordered by project ID. Send the same `order` with every `page_token`: a token used under another order is refused with `400`.
+
+- [#2933](https://github.com/zitadel/nextgen/pull/2933) [`b665fe5`](https://github.com/zitadel/nextgen/commit/b665fe5229180cbc604b6e57085b73236160df94) - `POST /releases/{id}/revoke` now says, for each origin in a `rel.in_use` refusal, whether it serves the release as a primary origin or a preview (`details.origins[].kind`), so a client can tell a deploy or rollback from removing the preview as the step that frees it.
+
+- [#2936](https://github.com/zitadel/nextgen/pull/2936) [`81df24d`](https://github.com/zitadel/nextgen/commit/81df24d34accdf7a135d2930103a7812899b3401) - Find the users, teams and configuration of a project with one request. `POST /search` takes the text someone typed and the types to look for, and answers with references (`type`, `id`, `project_id`, `title`, `subtitle`), best match first. A user matches on the start of the value they carry as `identifier` or of a part of their display name, a team on part of its name, a user schema on its title or object type, a flow definition on its name, an identity provider on its slug or display name, and any of them by its `id`. `search()` in `@zitadel/api` calls it. The Console's search (⌘K) uses it: it now finds users, user schemas, login flows and identity providers of the selected project beside teams, and opens the Users list when there are more users than it shows. It also runs actions in the selected project (Add user, Add team, Copy project ID) and opens on what you last opened from it.
+
+- [#2688](https://github.com/zitadel/nextgen/pull/2688) [`d4e7203`](https://github.com/zitadel/nextgen/commit/d4e720361e3428eb0454aafff9c0d37e89ad2824) - Find a user by the start of the value they carry as `identifier`: `POST /users/query` and `zitadel users list --filter` accept `identifier` with the new `starts_with` operation, and the Console's Users list has a search field that uses it across every page. The match ignores case, is answered from an index, and returns the users ordered by identifier. A filter value containing a NUL byte or invalid UTF-8 now answers 400 on any text filter.
+
+### Patch Changes
+
+- [#2905](https://github.com/zitadel/nextgen/pull/2905) [`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e) - A value the API spec refuses by pattern (an ID, a slug, a URL, a colour or a font stack) is now refused in plain words that say what a valid value looks like, in place of a raw regex.
+
 ## 0.5.0
 
 ### Minor Changes

@@ -9,6 +9,13 @@ get:
     (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
     `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
 
+    For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
+    creates its user on submit, or one carrying a passkey registration that
+    creates its user.
+    Reuses challenges with more than a minute remaining; otherwise issues a
+    new one. If this render resolves parked SSO state, it first returns the
+    updated cookie; fetch the step again to obtain its puzzle.
+
     Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
     re-resolve from `Origin`. If that release was revoked since the attempt
     started, the response is `409` with `rel.revoked`.

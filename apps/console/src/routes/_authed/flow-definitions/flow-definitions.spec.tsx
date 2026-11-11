@@ -119,8 +119,8 @@ describe("login flows list", () => {
     // Only the draft is marked: the engine picks the newest *active*
     // definition, so an all-active list stays exactly as the design draws it.
     await screen.findByRole("link", { name: "Default login" });
-    expect(screen.getByText("draft")).toBeInTheDocument();
-    expect(screen.queryByText("active")).not.toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
   it("asks for the embedded user schema", async () => {

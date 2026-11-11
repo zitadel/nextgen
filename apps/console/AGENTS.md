@@ -55,6 +55,10 @@ between files are the sign the component is missing.
   screen `src/components/detail-page.tsx` ("Resource list layout" and
   "Resource detail layout" in `docs/styling.md`). Follow the shipped screens
   under `src/routes/_authed/`: loader-fetched data, `$param` detail routes.
+- Narrow a list through `ResourceFilter` by the "List filters" recipe in
+  `docs/styling.md`, never a select of the screen's own.
+- Keep a filter's value in the URL and send it to the server; never filter the
+  rows already loaded.
 - A screen that acts on one project declares `staticData.scope: "project"`
   and reads the selected project (`?project=`) through
   `src/features/projects/project-scope.ts`: `projectScopeDeps` +
@@ -72,13 +76,13 @@ between files are the sign the component is missing.
   figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
-- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): a view
+- `/events` swaps the project's list for Events' (`NavView` `"events"`, D30): a view
   picker and the filters chosen from a list; a pasted value belongs in the search.
-- An event opens in a drawer over Logs' list: `/events/$eventId` is the list
+- An event opens in a drawer over Events' list: `/events/$eventId` is the list
   route's child, so it never reads the list again (D30).
-- Send any combination of Logs' filters: the server bounds every read (root
+- Send any combination of Events' filters: the server bounds every read (root
   ADR 048). One that must fill its pages needs an index and a read plan there.
-- A short Logs page with a token is not the end: say so and offer
+- A short Events page with a token is not the end: say so and offer
   `Keep looking` (D30), and never follow a token without a click.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.

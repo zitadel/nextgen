@@ -62,3 +62,66 @@ export function hitsFor(answer: SearchAnswer, query: string, type: SearchResultT
 export function hasMore(answer: SearchAnswer, query: string, type: SearchResultType): boolean {
   return answer.term === query.trim() && answer.incomplete.includes(type);
 }
+
+/**
+ * How closely `label` matches the typed text, lower being closer: the whole
+ * label, its start, the start of one of its words, somewhere inside it, or
+ * not at all. The last is a row the server matched on what the row does not
+ * name it by: an id, or a user's identifier under their name.
+ */
+export function closeness(query: string, label: string): number {
+  const text = query.trim().toLowerCase();
+  const folded = label.toLowerCase();
+  if (folded === text) return 0;
+  if (folded.startsWith(text)) return 1;
+  if (folded.split(WORD_BREAK).some((word) => word.startsWith(text))) return 2;
+  if (folded.includes(text)) return 3;
+  return NO_MATCH;
+}
+
+/** `closeness` of a label the text is not in. */
+const NO_MATCH = 4;
+
+/** What starts a word inside a label: `test-branding`, `Grace Hopper`, `my_shop`. */
+const WORD_BREAK = /[\s\-_./@]+/;
+
+/** What `ranked` needs to know of a row. */
+export interface Rankable {
+  /** The name the row shows, which the typing is matched against. */
+  label: string;
+  /**
+   * A second name the server matches the row on and the row shows beneath
+   * (a user's identifier): the typing is matched against it too.
+   */
+  alias?: string;
+  /** Whether it is in the selected project rather than above every project. */
+  inProject: boolean;
+  /** Its kind, as the caller orders kinds: lower first. */
+  kind: number;
+}
+
+/**
+ * Rows of every kind as one list, closest match first (`closeness`, by the
+ * label or the alias, whichever is closer). Among rows as close as each other, the selected project's come before what is
+ * above every project, then by kind, then in the order they came, which keeps
+ * the server's own ranking within a kind.
+ */
+export function ranked<T extends Rankable>(query: string, rows: readonly T[]): T[] {
+  return rows
+    .map((row, index) => ({
+      row,
+      index,
+      close: Math.min(
+        closeness(query, row.label),
+        row.alias ? closeness(query, row.alias) : NO_MATCH,
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        a.close - b.close ||
+        Number(b.row.inProject) - Number(a.row.inProject) ||
+        a.row.kind - b.row.kind ||
+        a.index - b.index,
+    )
+    .map(({ row }) => row);
+}

@@ -20,6 +20,7 @@ import { UserAuthentication } from "@/features/users/components/user-authenticat
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { field } from "@/lib/record";
 import {
+  hasNoSignInMethod,
   userAttributes,
   userIdentity,
   userIdentitySecondary,
@@ -141,7 +142,13 @@ function UserDetail() {
         </TabsContent>
 
         <TabsContent value="authentication">
-          <DetailSection title="Authentication">
+          <DetailSection
+            title="Authentication"
+            description={
+              hasNoSignInMethod({ passwordSetAt, passkeys, identityLinks }) &&
+              "This user cannot sign in because no sign-in method is configured."
+            }
+          >
             <UserAuthentication
               passwordSetAt={passwordSetAt}
               passkeys={passkeys}

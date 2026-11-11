@@ -130,7 +130,7 @@ describe("project overview", () => {
       "href",
       scopedPath("/releases/rel_1"),
     );
-    expect(card.getByText("live")).toBeInTheDocument();
+    expect(card.getByText("Live")).toBeInTheDocument();
     expect(card.getByText("Add phone_number")).toBeInTheDocument();
     expect(card.getByRole("link", { name: "https://app.acme.com" })).toHaveAttribute(
       "href",
@@ -143,7 +143,7 @@ describe("project overview", () => {
     );
   });
 
-  it("lists the newest audit events, each opening, and hands over to Logs", async () => {
+  it("lists the newest audit events, each opening, and hands over to Events", async () => {
     serveProject();
     serveLive([]);
     const queries = serveEvents([
@@ -160,11 +160,11 @@ describe("project overview", () => {
       scopedPath("/events/evt_2?view=audit"),
     );
     expect(card.getByText("user_new")).toBeInTheDocument();
-    // Logs' default view, the audit events, and only a handful of them.
+    // Events' default view, the audit events, and only a handful of them.
     expect(queries).toHaveLength(1);
     expect(queries[0]?.get("limit")).toBe("5");
     expect(queries[0]?.getAll("category")).not.toContain("request");
-    expect(card.getByRole("link", { name: "Logs" }).getAttribute("href")).toMatch(/^\/events\?/);
+    expect(card.getByRole("link", { name: "Events" }).getAttribute("href")).toMatch(/^\/events\?/);
   });
 
   it("says when nothing is live and nothing has happened", async () => {

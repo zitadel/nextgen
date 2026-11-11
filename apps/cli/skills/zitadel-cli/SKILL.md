@@ -207,7 +207,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
   (a user attribute, a project's own password hash) without asking first.
   `users create` and `users update` refuse an attribute that fails its schema's `format` (`email`, `uri`, `uuid`, `date`, `date-time` and the other standard names). `users update` validates the whole merged user, so a stored value that fails must be corrected in the same request.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
-  any operation of the API with the resolved server and `.zitadel/secret`. One
+  any operation of the API with the server, project and project secret every
+  project command resolves (`--server`, `--env`, `--env-file`, the `.env`
+  files, `.zitadel/secret`). One that needs the secret fails with
+  `E_VALIDATION` when no `ZITADEL_URL` resolves; one that needs none runs
+  against the cloud where nothing names a server. One
   that deletes, revokes or rolls back asks first and needs `--force` when
   non-interactive, as the command that covers it does. An update is not
   asked about, even one whose `null` removes what it names.
@@ -696,7 +700,13 @@ no app: where it would scaffold one, it previews the project, and
 (`.zitadel/policies/auth.factor.password.set.json`), with a minimum length of
 15, NIST's minimum for password-only sign-in and the wizard's default. Pass
 `--password-min-length <n>` only when the user asks for another value (`0` sets
-none), and give test users passwords at least that long.
+none), and give test users passwords at least that long. It writes the
+sign-up policy (`.zitadel/policies/user.create.json`) too, which that deploy
+publishes: the default, the built-in proof of work every password or passkey
+sign-up solves with or without the file; sign-in provider sign-ups are not
+challenged. A server too old to take it gets a warning and no file; a file
+`--force` kept stays, and every `deploy` fails until the server is upgraded or
+the file moves out of `.zitadel/policies/`.
 When setup fails after scaffolding a new app, before its default schema and
 flow files are written, it removes the app again and puts back what the
 directory held, so rerunning the same `setup` starts over. Setup writes

@@ -8,7 +8,7 @@ import {
   useContext,
 } from "react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { IdText } from "@/components/id-text";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
@@ -93,17 +93,18 @@ export const FIELD_GROUP_LABEL_RAIL = "@md/field-group:flex-[0_0_206px]!";
 /**
  * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`),
  * then `aside` on the label rail (a value the title names, such as a login
- * flow's or a user's schema) and `action` at the row's end, a rule, then
- * `children`. Inset 24px, 20px top and bottom, 16px between parts. Like a
- * form's fields, the title row lays out on the card's width
- * (`@md/field-group`), not the viewport's, so the aside starts level with the
- * values and controls below it.
+ * flow's or a user's schema) and `action` at the row's end, an optional
+ * `description` under them, a rule, then `children`. Inset 24px, 20px top
+ * and bottom, 16px between parts. Like a form's fields, the title row lays out
+ * on the card's width (`@md/field-group`), not the viewport's, so the aside
+ * starts level with the values and controls below it.
  */
 export function DetailSection({
   title,
   titleId,
   aside,
   action,
+  description,
   className,
   children,
   ...props
@@ -113,6 +114,8 @@ export function DetailSection({
   titleId?: string;
   aside?: ReactNode;
   action?: ReactNode;
+  /** A sentence about the whole section, muted, between the title and the rule. */
+  description?: ReactNode;
 }) {
   const heading = (
     <h2 id={titleId} className={SECTION_HEADING}>
@@ -144,6 +147,7 @@ export function DetailSection({
             lead
           )}
         </div>
+        {description && <CardDescription>{description}</CardDescription>}
         <Separator />
         {children}
       </CardContent>
@@ -227,7 +231,7 @@ const ROW_RULE = "-mt-px";
 /**
  * A card's list of rows ({@link DetailRow}, or a row of its own shape): 16px,
  * a rule, 16px between each, and no rule after the last. `as="ul"` makes it a
- * list: each row is wrapped in its `li`, and the rules are presentational.
+ * list: each row is wrapped in its `li`, the rule above it inside that item.
  * `container` lays its rows out on the list's own width, for rows nested
  * inside another row's value (a policy's settings in a release).
  */
@@ -241,25 +245,27 @@ export function DetailRows({
   children: ReactNode;
 }) {
   const rows = Children.toArray(children);
-  const rule = (key: number) =>
-    as === "ul" ? (
-      <li key={`rule-${key}`} role="none">
-        <Separator className={ROW_RULE} />
-      </li>
-    ) : (
-      <Separator key={`rule-${key}`} className={ROW_RULE} />
-    );
   const Tag = as;
   return (
     <RowsOnContainer.Provider value={container}>
       <Tag className={cn("flex flex-col gap-4", container && "@container/detail-rows")}>
-        {rows.map((row, index) => (
+        {rows.map((row, index) => {
           // `Children.toArray` has keyed every element row.
-          <Fragment key={isValidElement(row) && row.key !== null ? row.key : index}>
-            {index > 0 && rule(index)}
-            {as === "ul" ? <li>{row}</li> : row}
-          </Fragment>
-        ))}
+          const key = isValidElement(row) && row.key !== null ? row.key : index;
+          // In a list the rule opens the row's own item, 16px above it, so the
+          // list holds nothing but its items.
+          return as === "ul" ? (
+            <li key={key} className="flex flex-col gap-4">
+              {index > 0 && <Separator className={ROW_RULE} />}
+              {row}
+            </li>
+          ) : (
+            <Fragment key={key}>
+              {index > 0 && <Separator className={ROW_RULE} />}
+              {row}
+            </Fragment>
+          );
+        })}
       </Tag>
     </RowsOnContainer.Provider>
   );

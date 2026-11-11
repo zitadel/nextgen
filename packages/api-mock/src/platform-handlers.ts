@@ -132,7 +132,7 @@ import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
 import { schemaFileIssues } from "@zitadel/config/meta-schemas";
-import { policyConfigSchema } from "@zitadel/config/schemas";
+import { passwordSetPolicyFileSchema, userCreatePolicyFileSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
 
@@ -759,16 +759,49 @@ function publishPolicyRevision(
 }
 
 /**
+ * The publish body as the server decodes it: one branch per operation, each
+ * with its own closed config, while an extra top-level key (the file's
+ * `$schema`) is ignored.
+ */
+const PublishPolicyLooseBody = z.discriminatedUnion("operation", [
+  passwordSetPolicyFileSchema.loose(),
+  userCreatePolicyFileSchema.loose(),
+]);
+
+const [passwordSetEvaluateBody, userCreateEvaluateBody] = EvaluatePolicyBody.options;
+
+/**
  * The evaluate body as the server decodes it. The generated schema is not
  * strict (orval's `strict.body: false`), so it would drop an unknown key the
  * server refuses with `req.invalid`: `config`, `input` and `facts` are closed
- * here, while an extra top-level key is ignored, as on publish.
+ * here, per operation, while an extra top-level key is ignored, as on publish.
  */
-const EvaluatePolicyStrictBody = EvaluatePolicyBody.extend({
-  config: policyConfigSchema.shape.config,
-  input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
-  facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
-});
+const EvaluatePolicyStrictBody = z.discriminatedUnion("operation", [
+  passwordSetEvaluateBody.extend({
+    config: passwordSetPolicyFileSchema.shape.config,
+    input: z.strictObject(passwordSetEvaluateBody.shape.input.shape),
+    facts: z.strictObject(passwordSetEvaluateBody.shape.facts.unwrap().shape).optional(),
+  }),
+  userCreateEvaluateBody.extend({
+    config: userCreatePolicyFileSchema.shape.config,
+    input: z.strictObject(userCreateEvaluateBody.shape.input.shape),
+  }),
+]);
+
+/**
+ * What `POST /policies/evaluate` answers for a sign-up: the server's
+ * `UserCreatePolicy.CheckSolved` (internal/service/user_create_policy.go). A
+ * challenge the policy names must be the one solved; without one, any is.
+ */
+function evaluateUserCreate(
+  config: { challenge?: string },
+  solved: string,
+): { allowed: boolean; code?: string } {
+  if (config.challenge !== undefined && config.challenge !== solved) {
+    return { allowed: false, code: "flow.proof_invalid" };
+  }
+  return { allowed: true };
+}
 
 /** The server's length cap on a password (`domain.MaxPasswordLength`). */
 const MAX_PASSWORD_LENGTH = 64;
@@ -3056,7 +3089,7 @@ export function setupPlatformHandlers() {
       }
       // Like the server's decoder: unknown settings are refused, while an
       // extra top-level key (the file's `$schema`) is ignored.
-      const body = parse(policyConfigSchema.loose(), raw, "req.invalid");
+      const body = parse(PublishPolicyLooseBody, raw, "req.invalid");
       if (!body.ok) {
         return body.response;
       }
@@ -3105,10 +3138,13 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const decision = evaluatePasswordSet(body.data.config, body.data.input.password, {
-        self_service: body.data.facts?.self_service ?? true,
-        history_matches: body.data.facts?.history_matches ?? [],
-      });
+      const decision =
+        body.data.operation === "user.create"
+          ? evaluateUserCreate(body.data.config, body.data.input.solved_challenge)
+          : evaluatePasswordSet(body.data.config, body.data.input.password, {
+              self_service: body.data.facts?.self_service ?? true,
+              history_matches: body.data.facts?.history_matches ?? [],
+            });
       const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
