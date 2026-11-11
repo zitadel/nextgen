@@ -59,7 +59,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   applications: "registered applications are written through the API, not the CLI (#2788)",
   // OpenAPI contract lands first (#2849); CLI commands follow in #2858.
   invitations: "not yet exposed — `zitadel invitation` lands with #2858",
-  // The OpenAPI contract lands first (ADR 088); the CLI commands follow.
+  // The OpenAPI contract lands first (ADR 089); the CLI commands follow.
   webhooks: "not yet exposed — `zitadel webhook` lands with the webhooks CLI surface",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
 };
