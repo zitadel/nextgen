@@ -49,6 +49,41 @@ rules:
       notPattern: /[a-z][A-Z]/
     severity: error
 
+  # An operationId is public: `zitadel api <operationId>`, the Go and TS client
+  # method names. camelCase, opening with a verb from this list (the ones the
+  # spec uses; add one only with an operation that needs it), and no `By…`
+  # suffix, since the path carries the ID. Only operations under `paths`:
+  # webhook operationIds name the event, noun first (gen_event_schemas).
+  rule/operation-id-verb-camel-case:
+    subject:
+      type: Operation
+      property: operationId
+    where:
+      - subject:
+          type: Paths
+        assertions:
+          defined: true
+    assertions:
+      pattern: /^(accept|add|build|cancel|complete|create|deactivate|delete|evaluate|exchange|get|list|lookup|publish|query|reject|remove|revoke|rollback|search|set|submit|update|verify)([A-Z][a-z0-9]*)*$/
+      notPattern: /By[A-Z][A-Za-z0-9]*$/
+    severity: error
+
+  # A path parameter names its resource (`{user_id}`, `{schema_id}`), so the
+  # generated clients' arguments say which ID they take.
+  rule/path-parameter-not-id:
+    subject:
+      type: Parameter
+      property: name
+    where:
+      - subject:
+          type: Parameter
+          property: in
+        assertions:
+          const: path
+    assertions:
+      notPattern: /^id$/
+    severity: error
+
   # The first sentence of an operation's or a webhook's description is its API
   # reference page's description (apps/api/api/openapi/AGENTS.md), so the description
   # opens with a sentence: not a heading, a quote, a list, a table, a code

@@ -27,6 +27,16 @@ silently at runtime: an unknown property is dropped, not rejected.
   (`scripts/openapi-casing-rules.test.mjs`) that fail when a rule silently
   stops matching. Keep the fixtures in step with the rules.
 
+## Operation IDs and path parameters
+
+An `operationId` is public: `zitadel api <operationId>`, the Go and TS client
+method names, the API reference page URLs.
+
+- Name an operation `<verb><Resource>` in camelCase, with a verb the spec
+  already uses and no `By…` suffix; `rule/operation-id-verb-camel-case` gates it.
+- Name a path parameter after its resource (`{schema_id}`), never `{id}`;
+  `rule/path-parameter-not-id` gates it.
+
 ## Patterns say what a valid value looks like
 
 - Give every `pattern` in the OpenAPI spec an `x-zitadel-pattern-message` beside it: the sentence

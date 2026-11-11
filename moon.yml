@@ -200,6 +200,8 @@ tasks:
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
       - "/.redocly.lint-ignore.yaml"
+      # The verb allow-list test reads the spec's operationIds.
+      - "/apps/api/api/openapi/endpoints/**/methods.yaml"
       - "vitest.config.ts"
       - "packages/vitest-config/vitest.shared.mjs"
       - "packages/vitest-config/vitest.shared.d.mts"
