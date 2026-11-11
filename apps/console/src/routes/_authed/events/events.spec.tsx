@@ -686,14 +686,23 @@ describe("logs filters", () => {
     const group = await filters();
     fireEvent.change(group.getByLabelText("From"), { target: { value: "2026-11-10T08:00" } });
     fireEvent.change(group.getByLabelText("To"), { target: { value: "2026-11-10T09:30" } });
-    await userEvent.click(group.getByRole("button", { name: "Apply range" }));
 
-    // The viewer's local time, sent as the moments it names.
+    // Read as it is changed, after a pause: there is nothing to press. The
+    // viewer's local time, sent as the moments it names.
     const from = new Date("2026-11-10T08:00").toISOString();
     const to = new Date("2026-11-10T09:30").toISOString();
-    await waitFor(() => expect(queries.at(-1)?.get("created_before")).toBe(to));
+    await waitFor(() => expect(queries.at(-1)?.get("created_before")).toBe(to), {
+      timeout: 3000,
+    });
     expect(queries.at(-1)?.get("created_after")).toBe(from);
     expect(router.state.resolvedLocation?.search).toMatchObject({ from, to });
+    expect(group.queryByRole("button", { name: "Apply range" })).not.toBeInTheDocument();
+    // A start that is not before the end is said, and not read.
+    const reads = queries.length;
+    fireEvent.change(group.getByLabelText("From"), { target: { value: "2026-11-10T10:00" } });
+    expect(await group.findByRole("alert")).toHaveTextContent("The start must be before the end.");
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(queries.length).toBe(reads);
     expect(router.state.resolvedLocation?.search.since).toBeUndefined();
   });
 
@@ -737,7 +746,9 @@ describe("logs filters", () => {
       "2 types",
     );
 
-    await userEvent.click((await filters()).getByRole("button", { name: "Only failures" }));
+    // The shortcut is the list's first row, so the types it ticks show under it.
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^Only failures/ }));
 
     await waitFor(() =>
       expect(queries.at(-1)?.getAll("event_type")).toEqual([
@@ -748,7 +759,7 @@ describe("logs filters", () => {
       ]),
     );
     expect((await filters()).getByRole("combobox", { name: "Event types" })).toHaveTextContent(
-      "Failures",
+      "Only failures",
     );
   });
 
@@ -786,13 +797,14 @@ describe("logs filters", () => {
     expect(
       (await filters()).queryByRole("combobox", { name: "Event types" }),
     ).not.toBeInTheDocument();
-    await userEvent.click((await filters()).getByRole("button", { name: "Only failed requests" }));
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Status classes" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^Only failed requests/ }));
 
     await waitFor(() => expect(queries.at(-1)?.getAll("status_class")).toEqual(["4xx", "5xx"]));
     // One range of the status index each: no category beside them.
     expect(queries.at(-1)?.has("category")).toBe(false);
     expect((await filters()).getByRole("combobox", { name: "Status classes" })).toHaveTextContent(
-      "4xx, 5xx",
+      "Only failed requests",
     );
 
     await searchFor("createUser");

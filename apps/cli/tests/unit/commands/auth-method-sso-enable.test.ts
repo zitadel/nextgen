@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { describe, expect, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { JsonObject } from "@/lib/zitadel";
 import {
@@ -80,6 +80,26 @@ const CONNECTION_FILE = ".zitadel/idps/google.json";
  * The URI the developer registers with Google for the connection.
  */
 const CALLBACK_URI = "http://localhost:3000/__nextgen/idp/google/callback";
+
+/**
+ * The primary origin a deploy lands the app on.
+ */
+const DEPLOYED_ORIGIN = "https://app.acme.com";
+
+/**
+ * The URI the developer registers for the primary origin.
+ */
+const DEPLOYED_CALLBACK_URI = `${DEPLOYED_ORIGIN}/__nextgen/idp/google/callback`;
+
+/**
+ * The preview pattern a pull-request build of the app is served from.
+ */
+const PREVIEW_PATTERN = "https://app-*.vercel.app";
+
+/**
+ * The URI the developer registers for the preview pattern.
+ */
+const PREVIEW_CALLBACK_URI = `${PREVIEW_PATTERN}/__nextgen/idp/google/callback`;
 
 /**
  * The project the linked Project publishes to.
@@ -769,6 +789,190 @@ describe("auth-method sso enable", () => {
         });
       },
     );
+  });
+
+  describe("when the Project serves a primary origin and a preview pattern", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [
+              { pattern: DEPLOYED_ORIGIN, kind: "primary" },
+              { pattern: PREVIEW_PATTERN, kind: "preview" },
+            ],
+          });
+        }),
+      );
+    });
+
+    it("prints the callback URI on the primary origin", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain(DEPLOYED_CALLBACK_URI);
+    });
+
+    it("says each preview URL needs its own callback URI", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain("Each preview URL needs its own callback URI");
+    });
+
+    it("lists the preview callback URI pattern", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain(PREVIEW_CALLBACK_URI);
+    });
+  });
+
+  describe("when the Project holds the development issuer as a preview origin", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the development callback URI once", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout.split(CALLBACK_URI)).toHaveLength(2);
+    });
+  });
+
+  describe("when the Project holds the development issuer as a primary origin", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the development callback URI once", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout.split(CALLBACK_URI)).toHaveLength(2);
+    });
+  });
+
+  describe("when the Project holds no preview origin", () => {
+    it("prints no preview block", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).not.toContain("Each preview URL needs its own callback URI");
+    });
+  });
+
+  describe("when the Project holds one primary origin under two spellings", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [
+              { pattern: DEPLOYED_ORIGIN, kind: "primary" },
+              { pattern: `${DEPLOYED_ORIGIN}/`, kind: "primary" },
+            ],
+          });
+        }),
+      );
+    });
+
+    it("prints the deployed callback URI once", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout.split(DEPLOYED_CALLBACK_URI)).toHaveLength(2);
+    });
+  });
+
+  describe("when Ctrl-C is pressed during the origin read", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", () => {
+          process.emit("SIGINT", "SIGINT");
+          return HttpResponse.json({ id: PROJECT_ID, name: "app", lifecycle: "active" });
+        }),
+      );
+    });
+
+    it("writes no connection file", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
+  describe("when a primary origin holds an escape sequence", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "https://app.acme.com\u001b[2J", kind: "primary" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the escape sequence as text, not as a control character", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain("https://app.acme.com\\x1b[2J/__nextgen/idp/google/callback");
+    });
   });
 
   describe("with --dry-run", () => {

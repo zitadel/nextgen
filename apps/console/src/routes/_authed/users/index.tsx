@@ -1,13 +1,13 @@
-import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { Plus, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormError } from "@/components/form-error";
-import { describeError } from "@/lib/api-error";
 import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_END,
   RESOURCE_STICKY_START,
@@ -35,25 +35,21 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
-import { fetchAllSchemas, fetchLatestSchemaId, fetchSchemaRevisions } from "@/features/schemas/api";
-import type { UserSchema } from "@/features/schemas/model";
+import { useRequiredProjectScope } from "@/features/projects/project-scope";
 import { columnsForUsers, fetchUsers } from "@/features/users/api";
 import {
   type ColumnGroup,
-  type SchemaOption,
   type UsersSearch,
-  OLDER_REVISIONS,
   attributeSummary,
   columnsBeyondIdentity,
   pinnedColumns,
-  schemaOptions,
   toUserRow,
-  userFilter,
 } from "@/features/users/list";
 import { Page } from "@/components/layout";
+import { searchTerm } from "@/lib/search-params";
 import { cn } from "@/lib/utils";
 import { useColumnPins } from "@/features/users/column-pins";
+import { latestDocuments, loadUsers, useUserSearch } from "@/features/users/load";
 import {
   ColumnsContextMenu,
   keepLinkMenu,
@@ -64,16 +60,6 @@ import { UserRowActions } from "@/features/users/components/user-row-actions";
 
 /** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
 const LEGACY_LATEST = "latest";
-
-/**
- * What the URL's `q` searches for: nothing unless it is text with more than
- * spaces in it. The router reads a hand-typed `?q=12345` as a number, which is
- * still what someone is looking for: a phone number, a numeric username.
- */
-function searchTerm(q: unknown): string | undefined {
-  const text = typeof q === "number" ? String(q) : q;
-  return (typeof text === "string" && text.trim()) || undefined;
-}
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -110,73 +96,6 @@ export const Route = createFileRoute("/_authed/users/")({
   component: UsersScreen,
 });
 
-/** The first page of a search, and what the screen draws around it. */
-async function loadUsers(search: UsersSearch & { project?: string }) {
-  const projectId = requireProjectScope(search.project);
-  // The filter's options are the project's schemas at their latest revision;
-  // the chosen schema's revisions, with whether each is in use, are read for
-  // it alone. Both are chrome: unreadable, the list still renders, narrowed
-  // by what the URL carries.
-  const readingRevisions = search.schema
-    ? fetchSchemaRevisions(projectId, search.schema, { inUse: true }).catch(() => [])
-    : Promise.resolve([]);
-  // `older` compares with the newest revision, so its users wait for it.
-  // It is read as the latest of the type, not taken from the history,
-  // which leaves out a revision the viewer may not read. Unreadable, the
-  // URL would claim a filter the list cannot apply, so it drops back to the
-  // schema alone.
-  const older = search.revision === OLDER_REVISIONS ? search.schema : undefined;
-  const latestId = older
-    ? await fetchLatestSchemaId(projectId, older).catch(() => undefined)
-    : undefined;
-  if (older && !latestId) {
-    throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
-  }
-  const filter = userFilter(search, latestId);
-  const [page, options, revisions] = await Promise.all([
-    fetchUsers(projectId, undefined, true, filter),
-    fetchAllSchemas(projectId).then(schemaOptions, () => []),
-    readingRevisions,
-  ]);
-  return {
-    users: page.users,
-    teamsExpanded: page.teamsExpanded,
-    nextPageToken: page.next_page_token ?? undefined,
-    columns: await columnsForUsers(projectId, page.users, latestDocuments(options)),
-    options,
-    revisions,
-    filter,
-    q: search.q,
-    latestId,
-  };
-}
-
-/**
- * A later term's first page. Only the rows depend on the term: the filter's
- * options, the revisions and the newest revision stay as the load read them.
- */
-async function searchUsers(search: UsersSearch & { project?: string }, base: LoadedUsers) {
-  const projectId = requireProjectScope(search.project);
-  const filter = userFilter(search, base.latestId);
-  const page = await fetchUsers(projectId, undefined, true, filter);
-  return {
-    ...base,
-    users: page.users,
-    teamsExpanded: page.teamsExpanded,
-    nextPageToken: page.next_page_token ?? undefined,
-    columns: await columnsForUsers(projectId, page.users, latestDocuments(base.options)),
-    filter,
-    q: search.q,
-  };
-}
-
-type LoadedUsers = Awaited<ReturnType<typeof loadUsers>>;
-
-/** The latest revisions' documents, keyed by id: what `columnsForUsers` need not read again. */
-function latestDocuments(options: SchemaOption[]): Map<string, UserSchema> {
-  return new Map(options.map((option) => [option.latestId, option.schema]));
-}
-
 /** One fetched page, with the list state it carries besides its rows. */
 interface UsersPage {
   items: Record<string, unknown>[];
@@ -192,35 +111,7 @@ function UsersScreen() {
   const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
 
-  // The answer to a term the load did not read, for as long as that load stands.
-  // Only the latest term's answer is kept, whichever comes back last.
-  const [found, setFound] = useState<{ base: LoadedUsers; page: LoadedUsers }>();
-  // A failed search is said beside the list it could not replace, as a failed
-  // Load more is: thrown, it would take the screen and the field being typed in
-  // with it.
-  const [searchError, setSearchError] = useState<string>();
-  useEffect(() => {
-    setSearchError(undefined);
-    if (search.q === fromRoute.q) {
-      setFound(undefined);
-      return;
-    }
-    let latest = true;
-    searchUsers(search, fromRoute).then(
-      (page) => {
-        if (latest) setFound({ base: fromRoute, page });
-      },
-      (cause) => {
-        if (latest) setSearchError(describeError(cause, "Could not search the users."));
-      },
-    );
-    return () => {
-      latest = false;
-    };
-  }, [search, fromRoute]);
-  const loaded = found?.base === fromRoute ? found.page : fromRoute;
-  // The rows of the last search stand until the next one answers.
-  const searching = loaded.q !== search.q && !searchError;
+  const { loaded, searching, searchError } = useUserSearch(search, fromRoute);
   const searchField = useRef<HTMLInputElement>(null);
   const onSearch = useCallback(
     (q: string) =>
@@ -392,10 +283,7 @@ function UsersScreen() {
                     cell's hover card (D23). */}
                 {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
                 <ResourceHeadCell>ID</ResourceHeadCell>
-                {/* 52px: the 36px menu button and 8px either side. The cell
-                  inset the other columns take would make this pinned column
-                  84px wide for one icon. */}
-                <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
+                <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>
@@ -483,8 +371,7 @@ function UsersScreen() {
                     <UserIdCell user={user} />
                     <TableCell
                       className={cn(
-                        RESOURCE_CELL,
-                        "px-2",
+                        RESOURCE_MENU_CELL_NARROW,
                         RESOURCE_STICKY_END,
                         RESOURCE_STICKY_BODY,
                       )}

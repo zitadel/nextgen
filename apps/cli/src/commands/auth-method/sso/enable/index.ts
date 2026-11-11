@@ -24,7 +24,14 @@ import { log } from "@/lib/log";
 import { z } from "zod";
 
 import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
-import { VariableService, VariableWrite, type ZitadelClient } from "@/lib/backend";
+import {
+  isCancelled,
+  OriginService,
+  Origins,
+  VariableService,
+  VariableWrite,
+  type ZitadelClient,
+} from "@/lib/backend";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { resolveEnvironment } from "@/lib/environment";
 import {
@@ -206,9 +213,22 @@ type Summary = {
   readonly reused: boolean;
 
   /**
-   * The redirect URI to register with the provider.
+   * The redirect URI to register with the provider, on the Project's
+   * development issuer.
    */
   readonly callbackUri: string;
+
+  /**
+   * The redirect URI on each primary origin, where a deploy lands the app.
+   */
+  readonly deployedCallbackUris: readonly string[];
+
+  /**
+   * The redirect URI pattern for each preview origin. A preview URL is one
+   * pull-request build of the same app, so each needs its own entry at the
+   * provider, and a wildcard pattern cannot be registered as one.
+   */
+  readonly previewCallbackUris: readonly string[];
 };
 
 /**
@@ -220,6 +240,7 @@ type SummaryInput = {
   readonly target: SchemaTarget;
   readonly preview: DocumentChange<Connection>;
   readonly issuer: string;
+  readonly origins: Origins;
 };
 
 /**
@@ -387,6 +408,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
     const remote = await this.connect();
+    // Read only to name more callback URIs: a platform that cannot answer still
+    // gets the local one, and the run goes on. A cancelled run stops instead,
+    // as OriginService.remove does.
+    const origins = await new OriginService(remote.client, remote.projectId)
+      .list()
+      .catch((cause: unknown) => {
+        if (isCancelled(remote.client)) {
+          throw cause;
+        }
+        return Origins.wrap([]);
+      });
     const selection = await choice.resolve(target, this.ask);
     const provider = providerOf(selection);
     const options = {
@@ -408,6 +440,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       target,
       preview,
       issuer,
+      origins,
     });
     this.introduce(summary, target.schema, provider);
     if (this.dryRun) {
@@ -512,6 +545,27 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    */
   private summarize(input: SummaryInput): Summary {
     const connection = input.preview.document;
+    const callbackUri = callbackUriFor(input.issuer, connection.slug);
+    // A Set first: two spellings of one origin, such as with and without a
+    // trailing slash, name the same redirect URI, which is listed once.
+    const deployedCallbackUris = [
+      ...new Set(
+        input.origins.primary.map((origin) => {
+          return callbackUriFor(origin, connection.slug);
+        }),
+      ),
+    ].filter((uri) => {
+      return uri !== callbackUri;
+    });
+    const previewCallbackUris = [
+      ...new Set(
+        input.origins.preview.map((pattern) => {
+          return callbackUriFor(pattern, connection.slug);
+        }),
+      ),
+    ].filter((uri) => {
+      return uri !== callbackUri && !deployedCallbackUris.includes(uri);
+    });
     return {
       projectId: input.projectId,
       provider: selectionName(input.selection),
@@ -519,7 +573,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       schema: input.target.schema.name,
       connection,
       reused: !input.preview.created,
-      callbackUri: callbackUriFor(input.issuer, connection.slug),
+      callbackUri,
+      deployedCallbackUris,
+      previewCallbackUris,
     };
   }
 
@@ -548,6 +604,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       );
     }
     log.info(`Callback URI   ${summary.callbackUri}`);
+    for (const uri of summary.deployedCallbackUris) {
+      log.info(`Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`);
+    }
+    if (summary.previewCallbackUris.length > 0) {
+      log.info(
+        "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
+      );
+      for (const uri of summary.previewCallbackUris) {
+        log.info(`  ${escapeControlCharacters(uri, { keepLayout: false })}`);
+      }
+    }
     // A custom provider has no console to send the developer to: it is
     // theirs, and the issuer they gave is the only address known.
     if (!summary.reused && provider.consoleUrl === undefined) {
