@@ -77,6 +77,37 @@ func TestEventStatements_InsertAndGet(t *testing.T) {
 		require.NotNil(t, got.ActorID)
 		assert.Equal(t, *entity.ActorID, *got.ActorID)
 		assert.JSONEq(t, string(entity.Payload), string(got.Payload))
+		assert.Nil(t, got.OperationID, "only a request event names an operation")
+		assert.Nil(t, got.StatusClass)
+	})
+}
+
+// A request event's operation and status class are columns of their own,
+// read back as written.
+func TestEventStatements_InsertAndGet_RequestColumns(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, eventID := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		recorded := domain.RequestAPIPayload{OperationID: "createUser", Method: "POST", RouteTemplate: "createUser", Status: 409}
+		payload, err := json.Marshal(recorded)
+		require.NoError(t, err)
+		entity := &domain.Event{
+			ProjectID: projectID,
+			ID:        eventID,
+			EventType: domain.EventTypeRequestAPI,
+			Category:  domain.EventCategoryRequest,
+			Payload:   payload,
+		}
+		entity.OperationID, entity.StatusClass = recorded.Indexed()
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), entity))
+
+		got, err := d.stmts.GetEventByID(t.Context(), projectID, eventID)
+		require.NoError(t, err)
+		require.NotNil(t, got.OperationID)
+		assert.Equal(t, "createUser", *got.OperationID)
+		require.NotNil(t, got.StatusClass)
+		assert.Equal(t, domain.HTTPStatusClassClientError, *got.StatusClass)
 	})
 }
 
@@ -169,8 +200,9 @@ func TestEventStatements_ListKeyset_Desc(t *testing.T) {
 	})
 }
 
-// The reads the events indexes serve (migrations events_filter_indexes and
-// events_value_indexes): by category, type, actor and resource, and the events
+// The reads the events indexes serve (migrations events_filter_indexes,
+// events_value_indexes and events_request_indexes): by category, type, actor,
+// resource and resource type, by operation and status class, and the events
 // of one request, session or login flow. Each returns exactly its rows.
 func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -179,26 +211,37 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 
 		request, session, flow := "req_1", "sess_1", "flow_1"
 		alice, service, resource := "user_alice", "svc_backend", "user_bob"
+		createUser, getMyUser := "createUser", "getMyUser"
+		ok, failed := domain.HTTPStatusClassSuccessful, domain.HTTPStatusClassClientError
 		for _, seed := range []struct {
-			id        string
-			eventType domain.EventType
-			category  domain.EventCategory
-			actor     *string
-			entity    *string
-			request   *string
-			session   *string
-			flow      *string
+			id          string
+			eventType   domain.EventType
+			category    domain.EventCategory
+			actor       *string
+			entity      *string
+			request     *string
+			session     *string
+			flow        *string
+			operation   *string
+			statusClass *domain.HTTPStatusClass
 		}{
-			{id: "evt-001", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &alice, request: &request, session: &session},
+			{id: "evt-001", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &alice, request: &request, session: &session, operation: &createUser, statusClass: &ok},
 			{id: "evt-002", eventType: domain.EventTypeUserCreated, category: domain.EventCategoryEntity, actor: &alice, entity: &resource, request: &request},
 			{id: "evt-003", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, session: &session, flow: &flow},
 			{id: "evt-004", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, actor: &service},
 			{id: "evt-005", eventType: domain.EventTypeUserDeleted, category: domain.EventCategoryEntity, actor: &service, entity: &resource},
+			{id: "evt-006", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &service, operation: &createUser, statusClass: &failed},
+			{id: "evt-007", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &service, operation: &getMyUser, statusClass: &failed},
+			{id: "evt-008", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, statusClass: &failed},
 		} {
 			event := sampleEvent(projectID, seed.id)
 			event.EventType, event.Category = seed.eventType, seed.category
 			event.ActorID, event.EntityID = seed.actor, seed.entity
+			if seed.category == domain.EventCategoryRequest {
+				event.EntityType = nil
+			}
 			event.RequestID, event.SessionID, event.FlowID = seed.request, seed.session, seed.flow
+			event.OperationID, event.StatusClass = seed.operation, seed.statusClass
 			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
 		}
 
@@ -219,6 +262,15 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 				filter: database.And(equal(domain.EventFieldActorID, alice), equal(domain.EventFieldCategory, string(domain.EventCategoryEntity))),
 				want:   []string{"evt-002"},
 			},
+			"resource type in one category": {
+				filter: database.And(equal(domain.EventFieldEntityType, "user"), equal(domain.EventFieldCategory, string(domain.EventCategoryAuth))),
+				want:   []string{"evt-004", "evt-003"},
+			},
+			"operation in one status class": {
+				filter: equal(domain.EventFieldOperationStatus, events.OperationStatus(createUser, failed)),
+				want:   []string{"evt-006"},
+			},
+			"status class": {filter: equal(domain.EventFieldStatusClass, string(failed)), want: []string{"evt-008", "evt-007", "evt-006"}},
 		} {
 			t.Run(name, func(t *testing.T) {
 				opts := events.ListOptions(projectID, 10)
@@ -244,6 +296,18 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldCategory, categories)
 			require.NoError(t, err)
 			assert.Equal(t, []string{"evt-002", "evt-001"}, eventIDs(page.Items))
+		})
+		// One operation across every status class: a read per class, merged.
+		t.Run("operation across status classes", func(t *testing.T) {
+			opts := events.ListOptions(projectID, 10)
+			opts.Pagination.OrderBy = events.CreatedAtDesc()
+			keys := make([]string, 0, len(domain.HTTPStatusClasses()))
+			for _, class := range domain.HTTPStatusClasses() {
+				keys = append(keys, events.OperationStatus(createUser, class))
+			}
+			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldOperationStatus, keys)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"evt-006", "evt-001"}, eventIDs(page.Items))
 		})
 		t.Run("several types", func(t *testing.T) {
 			opts := events.ListOptions(projectID, 2)

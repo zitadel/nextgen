@@ -1769,6 +1769,12 @@ describe("other resources", () => {
       "category=auth",
       "--filter",
       "created_at=greater_than_or_equal:2026-01-01T00:00:00Z",
+      "--filter",
+      "operation_id=createUser",
+      "--filter",
+      "status_class=4xx",
+      "--filter",
+      "status_class=5xx",
       "--limit",
       "5",
     ]);
@@ -1776,6 +1782,8 @@ describe("other resources", () => {
     const params = new URL(urls.at(-1) ?? "").searchParams;
     expect(params.get("project_id")).toBe("proj_test");
     expect(params.getAll("category")).toEqual(["entity", "auth"]);
+    expect(params.getAll("operation_id")).toEqual(["createUser"]);
+    expect(params.getAll("status_class")).toEqual(["4xx", "5xx"]);
     expect(params.get("created_after")).toBe("2026-01-01T00:00:00Z");
     expect(params.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };

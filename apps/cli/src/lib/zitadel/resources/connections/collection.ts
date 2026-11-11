@@ -8,6 +8,7 @@ import type { Connection } from "@/lib/zitadel/resources/connections/connection"
 import type {
   ConnectionPath,
   ConnectionSetting,
+  ConnectionSummary,
   CredentialVariable,
   LookupOptions,
   SsoOptions,
@@ -326,6 +327,59 @@ export class Connections extends Collection<Connection> {
   }
 
   /**
+   * Summarise what a connection fills a user with, and which schemas sign in
+   * through it.
+   *
+   * @remarks
+   * Only a schema that lists the connection and has SSO enabled signs in
+   * through it. An unmapped property is one such a schema defines at its top
+   * level and no claim fills. One the server requires of a user a provider
+   * creates, at its own level or through a required object's members, is
+   * marked, as a sign-up through the connection then has to collect it in a
+   * step. The identifier a password asks for is not among them.
+   *
+   * @param connection - The connection.
+   * @returns The summary.
+   */
+  summarize(connection: Connection): ConnectionSummary {
+    const schemas = this.config.schemas.all.filter((schema) => {
+      return schema.isSsoEnabled && schema.lists(connection.slug);
+    });
+    const required = new Set(
+      schemas.flatMap((schema) => {
+        return schema.requiredByServer.map((path) => {
+          return path.split(".")[0];
+        });
+      }),
+    );
+    const properties = [
+      ...new Set(
+        schemas.flatMap((schema) => {
+          return schema.propertyNames;
+        }),
+      ),
+    ];
+    const unmapped = properties
+      .filter((property) => {
+        return !connection.maps(property);
+      })
+      .sort()
+      .map((property) => {
+        return { property, required: required.has(String(property)) };
+      });
+    return {
+      mappings: connection.mappings,
+      verifications: connection.verifications,
+      scopes: connection.scopes ?? [],
+      createsUsers: connection.createsUsers,
+      unmapped,
+      usedBy: schemas.map((schema) => {
+        return schema.name;
+      }),
+    };
+  }
+
+  /**
    * Whether the server is known to have a connection already.
    *
    * @param slug - The connection's slug.
@@ -338,7 +392,7 @@ export class Connections extends Collection<Connection> {
   /**
    * Describe the connection a provider is enabled with: a second connection
    * to one issuer, settings an existing file does not have, and a new
-   * connection's claim mapping.
+   * connection that fills nothing.
    *
    * @param schema - The schema.
    * @param candidate - The connection that would be written.
@@ -378,42 +432,7 @@ export class Connections extends Collection<Connection> {
             },
           ]
         : [];
-    const summary: readonly Notice[] =
-      candidate.template === undefined && candidate.mappings.length > 0
-        ? [{ severity: "info", message: this.summarizeMappings(candidate) }]
-        : [];
-    return [...secondButton, ...fillsNothing, ...summary];
-  }
-
-  /**
-   * Summarise the claim mappings a new connection was written with: which
-   * side of each line is the schema's and which the claim the provider must
-   * return, then what verifies a value, which a mapping alone does not.
-   *
-   * @param candidate - The new connection.
-   * @returns The summary, one line per row.
-   */
-  private summarizeMappings(candidate: Connection): string {
-    const provider = candidate.displayName;
-    const mappings = candidate.mappings.map((row) => {
-      return `  ${row.property} ← ${row.claim}`;
-    });
-    const verifications = candidate.verifications.map((row) => {
-      if (row.claim === true) {
-        return `  ${row.property} is treated as verified.`;
-      }
-      return `  ${row.property} is treated as verified only when ${provider} says so in the ${String(row.claim)} claim.`;
-    });
-    const verification =
-      verifications.length === 0
-        ? ["Nothing is treated as verified."]
-        : ["Verification, which a mapping alone does not give:", ...verifications];
-    return [
-      `Claim mappings in ${candidate.path}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
-      ...mappings,
-      ...verification,
-      "Edit the mappings in that file if your provider returns other claims.",
-    ].join("\n");
+    return [...secondButton, ...fillsNothing];
   }
 
   /**

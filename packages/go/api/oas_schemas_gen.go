@@ -48768,6 +48768,68 @@ func (s *ListEventsResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*ListEventsResponse) listEventsRes() {}
 
+type ListEventsStatusClassItem string
+
+const (
+	ListEventsStatusClassItem1xx ListEventsStatusClassItem = "1xx"
+	ListEventsStatusClassItem2xx ListEventsStatusClassItem = "2xx"
+	ListEventsStatusClassItem3xx ListEventsStatusClassItem = "3xx"
+	ListEventsStatusClassItem4xx ListEventsStatusClassItem = "4xx"
+	ListEventsStatusClassItem5xx ListEventsStatusClassItem = "5xx"
+)
+
+// AllValues returns all ListEventsStatusClassItem values.
+func (ListEventsStatusClassItem) AllValues() []ListEventsStatusClassItem {
+	return []ListEventsStatusClassItem{
+		ListEventsStatusClassItem1xx,
+		ListEventsStatusClassItem2xx,
+		ListEventsStatusClassItem3xx,
+		ListEventsStatusClassItem4xx,
+		ListEventsStatusClassItem5xx,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListEventsStatusClassItem) MarshalText() ([]byte, error) {
+	switch s {
+	case ListEventsStatusClassItem1xx:
+		return []byte(s), nil
+	case ListEventsStatusClassItem2xx:
+		return []byte(s), nil
+	case ListEventsStatusClassItem3xx:
+		return []byte(s), nil
+	case ListEventsStatusClassItem4xx:
+		return []byte(s), nil
+	case ListEventsStatusClassItem5xx:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListEventsStatusClassItem) UnmarshalText(data []byte) error {
+	switch ListEventsStatusClassItem(data) {
+	case ListEventsStatusClassItem1xx:
+		*s = ListEventsStatusClassItem1xx
+		return nil
+	case ListEventsStatusClassItem2xx:
+		*s = ListEventsStatusClassItem2xx
+		return nil
+	case ListEventsStatusClassItem3xx:
+		*s = ListEventsStatusClassItem3xx
+		return nil
+	case ListEventsStatusClassItem4xx:
+		*s = ListEventsStatusClassItem4xx
+		return nil
+	case ListEventsStatusClassItem5xx:
+		*s = ListEventsStatusClassItem5xx
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type ListEventsUnauthorized ErrorDetails
 
 func (*ListEventsUnauthorized) listEventsRes() {}

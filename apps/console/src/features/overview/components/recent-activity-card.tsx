@@ -51,6 +51,8 @@ function ActivityRow({ event }: { event: LogEvent }) {
       <Link
         to="/events/$eventId"
         params={{ eventId: event.id }}
+        // Opened over the audit view, which this card heads.
+        search={{ view: "audit" }}
         className="min-w-0 truncate text-sm font-medium text-foreground hover:underline sm:w-64 sm:shrink-0"
         title={event.event_type}
       >

@@ -249,6 +249,24 @@ the sidebar.
 > a list only when its views and filters are navigation the way Logs' are;
 > every other entry stays a route with `staticData.nav`.
 
+> **Amendment (2026-11-10, D30):** the Logs list is the layout route
+> `/events` (`routes/_authed/events/route.tsx`), which owns the filters
+> (`validateSearch`) and the list's loader; `/events/` only carries the
+> sidebar entry. An event, `/events/$eventId`, is its child and opens in a
+> drawer over the list, as Vercel's Logs opens a request: the list's match
+> stays, so opening or stepping through events never reads the list again, and
+> the drawer's URL carries the list's filters. A loader that must not rerun
+> when a child changes belongs to the layout route, keyed on the search it
+> reads.
+
+> **Amendment (2026-11-11, D30):** Logs' list chooses the view from a picker
+> (each view's glyph, name and what it holds), as Vercel's Logs chooses its
+> kind of log, rather than one row per view, and keeps only the filters chosen
+> from a list (time, category, type or status). The values a person pastes
+> (the ids, the operation, the resource type, My activity) are set in the
+> search above the table and shown there as chips. The URL keeps every filter
+> as before.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;

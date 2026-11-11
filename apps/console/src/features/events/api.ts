@@ -36,6 +36,56 @@ export async function listProjectEvents(
   return { items: answer.data, nextPageToken: answer.next_page_token ?? undefined };
 }
 
+/**
+ * The events recorded after a moment under the list's filters, oldest first:
+ * what Live adds on top of the list. `createdAfter` is inclusive, so the
+ * newest event the list holds comes back too, and the caller drops what it
+ * has. A token continues the same read; a page without one has read up to
+ * now.
+ */
+export async function listNewerEvents(
+  projectId: string,
+  search: LogsSearch,
+  page: { createdAfter: string; pageToken?: string },
+): Promise<EventPage> {
+  const query = eventsQuery(search);
+  const answer = await api.listEvents({
+    project_id: projectId,
+    ...query,
+    // The later of the two starts: the list's own range may begin after the
+    // newest event it holds, when it holds none.
+    created_after:
+      query.created_after && query.created_after > page.createdAfter
+        ? query.created_after
+        : page.createdAfter,
+    order: "asc",
+    limit: LIST_PAGE_SIZE,
+    page_token: page.pageToken,
+  });
+  return { items: answer.data, nextPageToken: answer.next_page_token ?? undefined };
+}
+
+/** How many of one request's events its panel lists. */
+export const REQUEST_EVENTS_LIMIT = 50;
+
+/**
+ * One request's events in the order they happened, at most
+ * {@link REQUEST_EVENTS_LIMIT}: the API call and the changes and sign-ins it
+ * made. One range of the request index; `more` says the request holds others.
+ */
+export async function listRequestEvents(
+  projectId: string,
+  requestId: string,
+): Promise<{ items: LogEvent[]; more: boolean }> {
+  const answer = await api.listEvents({
+    project_id: projectId,
+    request_id: requestId,
+    order: "asc",
+    limit: REQUEST_EVENTS_LIMIT,
+  });
+  return { items: answer.data, more: Boolean(answer.next_page_token) };
+}
+
 /** One event of the project. An id the project does not hold is a 404. */
 export function getProjectEvent(projectId: string, eventId: string): Promise<LogEvent> {
   return api.getEvent(eventId, { project_id: projectId });
