@@ -455,10 +455,12 @@ describe("claim", () => {
     const res = await claim(cwd, ["--dry-run"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; reason: string; data: unknown };
-    expect(json.status).toBe("skipped");
-    expect(json.reason).toBe("dry-run");
-    expect(json.data).toMatchObject({ project_id: expect.stringMatching(/^proj-/) });
+    const json = parseJson(res.stdout) as { status: string; data: unknown };
+    expect(json.status).toBe("ok");
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      project_id: expect.stringMatching(/^proj-/),
+    });
 
     // The whole point: no challenge was minted, so a developer who wandered
     // into the browser could not have claimed the project behind this run's
@@ -629,12 +631,11 @@ describe("claim", () => {
 
       const json = parseJson(res.stdout) as {
         status: string;
-        data: { would: string };
-        next_commands: string[];
+        data: { would: string; next_commands: string[] };
       };
-      expect(json.status).toBe("skipped");
+      expect(json.status).toBe("ok");
       expect(json.data.would).toBe("Create a link to claim this project.");
-      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+      expect(json.data.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
     });
   });
 

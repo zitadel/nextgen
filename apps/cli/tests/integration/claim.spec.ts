@@ -141,7 +141,7 @@ describe("claim", () => {
 
       const result = await app.run([...WITHOUT_A_BROWSER, "--dry-run"]);
 
-      expect(result).toBeSkipped();
+      expect(result).toSucceed();
     });
 
     describe("rendered for a terminal", () => {

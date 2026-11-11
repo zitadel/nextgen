@@ -772,14 +772,14 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run", () => {
-    it("reports the run as skipped", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
       });
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
     it("writes no connection", async ({ dir }) => {

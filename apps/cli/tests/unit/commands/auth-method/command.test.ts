@@ -421,8 +421,8 @@ describe("AuthMethodCommand", () => {
       });
 
       expect(result).toMatchObject({
-        status: "skipped",
-        reason: "dry-run",
+        status: "ok",
+        data: { dry_run: true },
         warnings: [WOULD_HAVE_NO_WAY_TO_SIGN_IN],
       });
     });
@@ -517,7 +517,7 @@ describe("AuthMethodCommand", () => {
 
       const printed = await scripted(cwd, "--dry-run", "--force");
 
-      expect(printed).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(printed).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
   });
 

@@ -187,7 +187,7 @@ describe("env add", () => {
 
         const result = await app.run([...ADD, "--dry-run"]);
 
-        expect(result).toBeSkipped();
+        expect(result).toSucceed();
         expect(await boundEnvironments(app)).toEqual(["development"]);
       });
 

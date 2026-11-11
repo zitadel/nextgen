@@ -858,12 +858,12 @@ describe("auth-method password and passkey", () => {
       expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
     });
 
-    it("reports a skipped preview", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
       const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
     it("writes nothing", async ({ dir }) => {
@@ -926,8 +926,8 @@ describe("auth-method password and passkey", () => {
         );
 
         expect(parseJson(result.stdout)).toMatchObject({
-          status: "skipped",
-          reason: "dry-run",
+          status: "ok",
+          data: { dry_run: true },
           warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
         });
       });

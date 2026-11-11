@@ -566,12 +566,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const said = [...writes, ...stores];
     const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
     return this.emit({
-      status: "skipped",
-      reason: "dry-run",
-      data: { ...payload, would_store: toStore },
+      status: "ok",
+      data: { ...payload, would_store: toStore, dry_run: true },
       // The ending closes on the first line and lists the others under it.
       summary: {
-        title: escapeControlCharacters(said[0] ?? ""),
+        title: escapeControlCharacters(said[0] === undefined ? "" : `${said[0]} (dry run)`),
         sections: [],
         lines: said.slice(1).map((line) => escapeControlCharacters(line)),
       },

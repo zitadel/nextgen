@@ -222,9 +222,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     if (dryRun) {
       return this.emit({
-        status: "skipped",
-        reason: "dry-run",
+        status: "ok",
         data: {
+          dry_run: true,
           environment: args.name,
           file: environment.file,
           server,

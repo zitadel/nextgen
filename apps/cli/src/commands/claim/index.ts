@@ -226,9 +226,9 @@ export default class Claim extends EnvironmentCommand {
           : `${action}.`;
 
       return this.emit({
-        status: "skipped",
-        reason: "dry-run",
+        status: "ok",
         data: {
+          dry_run: true,
           title: "Nothing was claimed (dry run)",
           project_id: projectId,
           would,

@@ -317,14 +317,14 @@ describe("auth-method sso disable", () => {
   });
 
   describe("with --dry-run", () => {
-    it("reports a skipped preview", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       await writeProject(dir, GOOGLE_OFFERED);
 
       const result = await runCliForTest(
         authMethodJson(dir, "sso", "disable", "--provider", "google", "--dry-run"),
       );
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
     it.for(GOOGLE_OFFERED_IN)(
@@ -618,8 +618,9 @@ describe("auth-method sso disable", () => {
       );
 
       expect(parseJson(result.stdout)).toMatchObject({
-        status: "skipped",
+        status: "ok",
         data: {
+          dry_run: true,
           notices: expect.arrayContaining([expect.objectContaining({ message: CONNECTION_KEPT })]),
         },
       });
@@ -969,8 +970,8 @@ describe("auth-method sso disable", () => {
         );
 
         expect(parseJson(result.stdout)).toMatchObject({
-          status: "skipped",
-          reason: "dry-run",
+          status: "ok",
+          data: { dry_run: true },
           warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
         });
       });

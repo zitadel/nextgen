@@ -122,11 +122,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.report(change);
-      const preview = change.changed ? `Would remove ${provider} from ${where}` : unchanged;
+      const preview = change.changed
+        ? `Would remove ${provider} from ${where} (dry run)`
+        : unchanged;
       return this.emit({
-        status: "skipped",
-        reason: "dry-run",
-        data,
+        status: "ok",
+        data: { ...data, dry_run: true },
         summary: { title: escapeControlCharacters(preview), sections: [] },
       });
     }

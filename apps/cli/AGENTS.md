@@ -65,6 +65,8 @@
 - One text per message: the envelope's `message` and `data.title` are the very
   strings the terminal draws. Never capitalise, trim or add a full stop for one
   rendering; write the sentence once, without a trailing full stop.
+- A dry run answers `ok` with `data.dry_run: true` and a headline ending in
+  `(dry run)`; it is never `skipped`, which means a person said no.
 - Read [`docs/styling.md`](docs/styling.md) before changing human output. Style
   it with `src/lib/style.ts`, not `picocolors`; a unit test fails on another import.
 - Read a command top-down: its description, group and flags, then what it
