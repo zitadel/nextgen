@@ -2038,7 +2038,7 @@ describe("setup", () => {
       expect(parseJson(res.stdout)).toMatchObject({
         warnings: [
           expect.stringContaining(
-            "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run `zitadel deploy`",
+            "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ",
           ),
         ],
       });
@@ -2062,7 +2062,7 @@ describe("setup", () => {
       expect(parseJson(res.stdout)).toMatchObject({
         warnings: [
           expect.stringContaining(
-            "every `zitadel deploy` fails while .zitadel/policies/user.create.json is there",
+            "every deploy fails while .zitadel/policies/user.create.json is there",
           ),
         ],
       });

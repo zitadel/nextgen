@@ -2303,8 +2303,8 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     if (!signupPolicy) {
       reportWarning(
         scaffold.signupPolicy === undefined
-          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run \`zitadel deploy\`.`
-          : `The server does not take a sign-up policy yet, so every \`zitadel deploy\` fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
+          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${this.suggest(DEPLOY_ARGS)}.`
+          : `The server does not take a sign-up policy yet, so every deploy fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
       );
     }
     const store = new DiskStore(this.cwd);
