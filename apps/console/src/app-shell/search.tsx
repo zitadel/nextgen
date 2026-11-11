@@ -65,8 +65,9 @@ import { SETTINGS_PATH } from "./user-menu";
  * (D37): those pages and actions; what `POST /search` finds (root ADR 087),
  * which is users, teams and configuration (user schemas, login flows,
  * identity providers), each matched on the server, an id pasted into the
- * field included, in the selected project or, at All projects, in the
- * projects the person can act on (D38); projects, matched on the server
+ * field included, in the selected project or, above every project (All
+ * projects, Projects, Settings), in the projects the person can act on
+ * (D38); projects, matched on the server
  * across every project the person can act on; and the account's pages. They
  * are ranked together (`ranked`), the selected project's first among equally
  * good matches, and each row says beneath its name where it is, so a page of
@@ -174,11 +175,17 @@ export function SearchDialog({
   open,
   onOpenChange,
   userId,
+  allProjects = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Whose recent projects the palette opens on. */
   userId?: string;
+  /**
+   * The person is above every project (Projects, Settings), so the server
+   * searches all their projects even while one stays selected (D38).
+   */
+  allProjects?: boolean;
 }) {
   // The drawer an action opened. It outlives the palette, which closes first.
   const [adding, setAdding] = useState<"user" | "team" | null>(null);
@@ -209,6 +216,7 @@ export function SearchDialog({
             onOpenChange={onOpenChange}
             onAdd={setAdding}
             userId={userId}
+            allProjects={allProjects}
           />
         </DialogContent>
       </Dialog>
@@ -235,33 +243,39 @@ function SearchPalette({
   onOpenChange,
   onAdd,
   userId,
+  allProjects,
 }: {
   onOpenChange: (open: boolean) => void;
   /** Opens the drawer an action names, which outlives the palette. */
   onAdd: (kind: "user" | "team") => void;
   userId: string | undefined;
+  allProjects: boolean;
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const projectId = useProjectScope();
+  // The project the server searches: the selected one inside a project,
+  // none above every project or with none selected, which searches the
+  // person's projects (D38). The selected one's hits still rank first.
+  const scope = allProjects ? undefined : projectId;
   // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
   // Users apart from the rest, so the quick types do not wait for them. With
-  // no project selected, the server searches the person's projects. A search
+  // no project to search, the server searches the person's projects. A search
   // that is not sent, or fails, answers its text with nothing, so the palette
   // can tell an answer from one still on its way.
   const nothing = { ...NO_ANSWER, term: typed };
   const users = useAsync(
     typed.length >= USER_SEARCH_MIN_LENGTH
-      ? () => search(projectId, typed, USER_TYPES, HITS_PER_TYPE)
+      ? () => search(scope, typed, USER_TYPES, HITS_PER_TYPE)
       : null,
     nothing,
-    [typed, projectId],
+    [typed, scope],
   );
   const others = useAsync(
-    typed ? () => search(projectId, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
+    typed ? () => search(scope, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
     nothing,
-    [typed, projectId],
+    [typed, scope],
   );
   // The server's matches once something is typed; each answer stays until the
   // next lands, less what the typing has since ruled out.
@@ -354,8 +368,8 @@ function SearchPalette({
     // A hit wears the glyph of the sidebar page that lists its kind.
     const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
-    // A hit opens in its own project, which a hit found at All projects
-    // selects (`?project=`, D38).
+    // A hit opens in its own project, which opening it selects (`?project=`,
+    // D38).
     const openHit = (hit: SearchHit) => {
       const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
@@ -484,7 +498,7 @@ function SearchPalette({
     // That list is one project's, so the row needs one selected.
     const shown = all.slice(0, MAX_RESULTS);
     const seeAllUsers =
-      projectId !== undefined &&
+      scope !== undefined &&
       (hasMore(users ?? NO_ANSWER, query, "user") ||
         userResults.some((result) => !shown.includes(result)));
     const best = seeAllUsers ? all.slice(0, MAX_RESULTS - 1) : shown;
@@ -511,6 +525,7 @@ function SearchPalette({
     recentProjects,
     selected,
     projectId,
+    scope,
     projectName,
     place,
     q,
@@ -524,8 +539,11 @@ function SearchPalette({
   // Every search has answered the text in the field: until then an empty
   // list is not "nothing matches".
   const answered = users?.term === text && others?.term === text && (!text || found?.term === text);
-  // At All projects the server read the first of the person's projects only.
-  const moreProjects = !projectId && (users?.moreProjects || others?.moreProjects);
+  // Searched across projects, the server read the newest of them only.
+  const moreProjects = !scope && (users?.moreProjects || others?.moreProjects);
+  // Users are matched from three characters, so a shorter text did not ask
+  // for them.
+  const usersSearched = text.length >= USER_SEARCH_MIN_LENGTH;
   return (
     // Filtering is ours, not cmdk's: what the server found arrives already
     // matched and ranked, and the pages match as a substring, any case.
@@ -542,20 +560,20 @@ function SearchPalette({
       </div>
       <CommandList className="max-h-[440px] p-1.5">
         {/* Says where it looked: users, teams and configuration are found in
-            the selected project only, or at All projects in the person's
-            projects, the first ten of them when there are more. */}
+            the project searched, or across the person's projects, the newest
+            ten of them when there are more. */}
         <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
           {answered ? (
             <>
               <p className="tracking-wide uppercase">
-                {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
+                {scope && place
+                  ? `Nothing in ${place} matches “${text}”`
+                  : `Nothing matches “${text}”`}
               </p>
               <p className="mt-1">
-                {place
+                {scope
                   ? "Users, teams and configuration are found in the selected project only."
-                  : moreProjects
-                    ? "Searched the first ten of your projects. Choose a project to search it."
-                    : "Searched every project you can act on."}
+                  : searchedAcross(usersSearched, Boolean(moreProjects))}
               </p>
             </>
           ) : (
@@ -578,6 +596,12 @@ function SearchPalette({
           </CommandGroup>
         ))}
       </CommandList>
+      {/* With matches too, the list says it is from some of the projects. */}
+      {text && answered && moreProjects && groups.some((group) => group.results.length > 0) && (
+        <p className="px-3.5 pb-2 text-xs text-muted-foreground">
+          {searchedAcross(usersSearched, true)}
+        </p>
+      )}
       <p className="border-t border-border px-3.5 py-2 text-xs text-muted-foreground">
         ↑↓ to move · Enter to open · Searching inside a list stays in that list’s toolbar
       </p>
@@ -615,6 +639,22 @@ const LIST_PATH: Record<SearchResultType, string> = {
  * missing clipboard on an insecure origin, says that instead of claiming a
  * copy.
  */
+/**
+ * What a search across the person's projects read: users only from three
+ * characters, and the newest ten projects when there are more.
+ */
+function searchedAcross(usersSearched: boolean, moreProjects: boolean): string {
+  const kinds = usersSearched ? "users, teams and configuration" : "teams and configuration";
+  const where = moreProjects ? "the newest ten of your projects" : "every project you can act on";
+  return [
+    `Searched ${kinds} in ${where}.`,
+    usersSearched ? "" : "Users are found from three characters.",
+    moreProjects ? "Choose a project to search the others." : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 async function copyProjectId(projectId: string) {
   if (await copyText(projectId)) toast.success("Project ID copied");
   else toast.error("Could not copy the project ID");

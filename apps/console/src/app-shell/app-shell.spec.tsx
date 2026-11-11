@@ -1858,13 +1858,15 @@ describe("search", () => {
     await userEvent.clear(field);
     await userEvent.type(field, "admin");
     expect(await dialog.findByText("Nothing matches “admin”")).toBeInTheDocument();
-    expect(dialog.getByText("Searched every project you can act on.")).toBeInTheDocument();
+    expect(
+      dialog.getByText("Searched users, teams and configuration in every project you can act on."),
+    ).toBeInTheDocument();
     // No project named: the server reads the person's projects (D38).
     await waitFor(() => expect(asked.length).toBeGreaterThan(0));
     expect(asked.every((projectId) => projectId === null)).toBe(true);
   });
 
-  it("at All projects says it read the first ten of many projects", async () => {
+  it("at All projects says it read the newest ten of many projects", async () => {
     server.use(
       http.get(MY_PROJECTS, () =>
         HttpResponse.json({
@@ -1890,9 +1892,143 @@ describe("search", () => {
 
     expect(
       await dialog.findByText(
-        "Searched the first ten of your projects. Choose a project to search it.",
+        "Searched users, teams and configuration in the newest ten of your projects. Choose a project to search the others.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("at All projects does not claim users were searched for text too short for them", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+      http.post(SEARCH, () =>
+        HttpResponse.json({ results: [], incomplete_types: [], more_projects: false }),
+      ),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "qq",
+    );
+
+    expect(
+      await dialog.findByText(
+        "Searched teams and configuration in every project you can act on. Users are found from three characters.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says beneath its matches that it read the newest ten of many projects", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+          next_page_token: "page-2",
+        }),
+      ),
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        return HttpResponse.json({
+          results: body.types.includes("team")
+            ? [{ type: "team", id: "team_d", project_id: "proj_2", title: "Support" }]
+            : [],
+          incomplete_types: ["team"],
+          more_projects: true,
+        });
+      }),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "supp",
+    );
+
+    expect(await dialog.findByRole("option", { name: /Delta/ })).toBeInTheDocument();
+    expect(
+      await dialog.findByText(
+        "Searched users, teams and configuration in the newest ten of your projects. Choose a project to search the others.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("above every project searches all of them, the selected one's matches first", async () => {
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "console-dev" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+      http.post(SEARCH, async ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get("project_id"));
+        const body = (await request.json()) as SearchBody;
+        return HttpResponse.json({
+          results: body.types.includes("team")
+            ? [
+                { type: "team", id: "team_d", project_id: "proj_2", title: "Support" },
+                { type: "team", id: "team_c", project_id: "proj_1", title: "Support" },
+              ]
+            : [],
+          incomplete_types: [],
+          more_projects: false,
+        });
+      }),
+    );
+    // Projects, with console-dev still selected (D36).
+    renderShell(scopedPath("/projects", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "supp",
+    );
+
+    await waitFor(() =>
+      expect(rows(dialog.getByRole("listbox"))).toEqual([
+        "Support · console-dev",
+        "Support · Delta",
+      ]),
+    );
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.every((projectId) => projectId === null)).toBe(true);
+  });
+
+  it("inside a project searches that project alone", async () => {
+    const asked: (string | null)[] = [];
+    server.use(
+      http.post(SEARCH, ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ results: [], incomplete_types: [], more_projects: false });
+      }),
+    );
+    renderShell(scopedPath("/teams", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "supp",
+    );
+
+    await waitFor(() => expect(asked.length).toBeGreaterThan(0));
+    expect(asked.every((projectId) => projectId === "proj_1")).toBe(true);
   });
 
   it("at All projects finds a team in a project and opens it there", async () => {
