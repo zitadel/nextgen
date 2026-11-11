@@ -47,6 +47,7 @@ export const POINTER_KINDS: readonly {
   { kind: "branding", label: "Branding", noun: "branding" },
   { kind: "idp", label: "Identity providers", noun: "connection" },
   { kind: "policy", label: "Policies", noun: "policy" },
+  { kind: "oauth", label: "OAuth settings", noun: "settings" },
 ];
 
 /** A pointer with the revision it names read, or not. */
@@ -70,8 +71,8 @@ export interface ResolvedPointer {
  * still says which resource the pointer pins.
  *
  * Schema, identity provider and policy ids are unique per project only, so
- * those reads name the selected project; the flow and branding reads take the
- * revision id alone.
+ * those reads name the selected project; the flow, branding and OAuth settings
+ * reads take the revision id alone.
  */
 export async function resolvePointer(
   pointer: ReleasePointer,
@@ -97,6 +98,10 @@ export async function resolvePointer(
         const body = await api.getBrandingById(pointer.revision_id);
         return { ...base, name: handleName(pointer), document: body.branding };
       }
+      case "oauth": {
+        const body = await api.getOAuthSettingsById(pointer.revision_id);
+        return { ...base, name: handleName(pointer), document: body.oauth };
+      }
       case "idp": {
         const body = await api.getIdpRevisionById(pointer.revision_id, { project_id: projectId });
         return { ...base, name: handleName(pointer), document: body.definition };
@@ -120,8 +125,8 @@ export async function resolvePointer(
 }
 
 /**
- * The name a pointer takes from its handle. Branding, identity providers and
- * policies are always named this way, so their rows read the same whether or
+ * The name a pointer takes from its handle. Branding, identity providers,
+ * policies and OAuth settings are always named this way, so their rows read the same whether or
  * not the revision could be read; schemas and flows fall back to it.
  */
 function handleName(pointer: ReleasePointer): string {
