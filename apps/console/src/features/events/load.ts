@@ -1,4 +1,11 @@
-import { type EventPage, getProjectEvent, listProjectEvents, listRequestEvents } from "./api";
+import {
+  type EventPage,
+  type EventTimeline,
+  getProjectEvent,
+  listFlowEvents,
+  listProjectEvents,
+  listRequestEvents,
+} from "./api";
 import { type EventsSearch, type ProjectEvent, rangeStart } from "./model";
 
 /**
@@ -22,18 +29,27 @@ export async function loadEvents(projectId: string, search: EventsSearch): Promi
   return { ...page, search, createdAfter };
 }
 
-/** What the drawer over a list shows: the event, and its request's events when one made it. */
+/**
+ * What the drawer over a list shows: the event, and the events of its login
+ * flow when it is part of one, else of its request when one made it.
+ */
 export interface EventLoad {
   event: ProjectEvent;
-  request?: { items: ProjectEvent[]; more: boolean };
+  request?: EventTimeline;
+  flow?: EventTimeline;
 }
 
 /**
  * Reads one event of a project for the drawer, then the other events of its
- * request, oldest first. An id the project does not hold is a 404.
+ * login flow, or else of its request, oldest first. A flow's events hold its
+ * requests', so the drawer draws one or the other. An id the project does not
+ * hold is a 404.
  */
 export async function loadEvent(projectId: string, eventId: string): Promise<EventLoad> {
   const event = await getProjectEvent(projectId, eventId);
+  if (event.flow_id) {
+    return { event, flow: await listFlowEvents(projectId, event.flow_id) };
+  }
   const request = event.request_id
     ? await listRequestEvents(projectId, event.request_id)
     : undefined;
