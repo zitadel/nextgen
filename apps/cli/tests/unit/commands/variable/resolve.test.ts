@@ -100,11 +100,12 @@ describe("variable resolve", () => {
 
     const { exitCode, stdout } = await resolve(cwd);
     const envelope = parseJson(stdout) as {
-      data: { deployment_id: string; items: { name: string }[] };
+      data: { deployment_id: string; origins: string[]; items: { name: string }[] };
     };
 
     expect(exitCode).toBe(0);
     expect(envelope.data.deployment_id).toBe("dep_1");
+    expect(envelope.data.origins).toEqual(["https://app.acme.com"]);
     expect(envelope.data.items).toMatchObject([
       {
         name: "API_URL",
@@ -219,6 +220,7 @@ describe("variable resolve", () => {
 
     expect(exitCode).toBe(0);
     expect(envelope.data.deployment_id).toBe("dep_a");
+    expect(envelope.data).not.toHaveProperty("origins");
     expect(envelope.data.items).toMatchObject([
       {
         name: "FROM_A",
