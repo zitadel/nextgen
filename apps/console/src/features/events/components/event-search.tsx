@@ -15,8 +15,8 @@ const READING: Partial<Record<string, string>> = {
 };
 
 /**
- * The search above the Logs table. It takes one id or one event type and
- * turns it into the filter it names, or opens the event it names
+ * The search above the Logs table. It takes one id, one event type or one API
+ * operation and turns it into the filter it names, or opens the event it names
  * (`searchMeanings`): the server matches whole values on indexed fields and
  * has no text search, so nothing here searches as you type.
  *
@@ -102,8 +102,8 @@ export function EventSearch({ current }: { current: LogsSearch }) {
       >
         {meanings.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1.5 text-xs">
-            Logs are found by one exact ID or event type, such as <code>req_…</code> or{" "}
-            <code>user.created</code>. There is no text search.
+            Logs are found by one exact ID, event type or operation, such as <code>req_…</code>,{" "}
+            <code>user.created</code> or <code>createUser</code>. There is no text search.
           </p>
         ) : (
           <>

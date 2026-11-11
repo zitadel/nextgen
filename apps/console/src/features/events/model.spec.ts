@@ -10,6 +10,7 @@ import {
   eventSubject,
   eventsCsv,
   eventsQuery,
+  FAILED_STATUS,
   FAILURE_TYPES,
   filterCount,
   isFailure,
@@ -28,6 +29,7 @@ import {
   VALUE_FILTERS,
   withCategory,
   withCustomRange,
+  withStatus,
   withTimeRange,
   withTypes,
   withView,
@@ -135,10 +137,12 @@ describe("parseLogsSearch", () => {
       resource: undefined,
       resource_type: undefined,
       client: undefined,
+      operation: undefined,
       request: undefined,
       session: undefined,
       flow: undefined,
       device: undefined,
+      status: undefined,
     });
   });
 
@@ -228,10 +232,12 @@ describe("parseLogsSearch", () => {
       resource: "user_2",
       resource_type: "user",
       client: "app_1",
+      operation: undefined,
       request: "req_1",
       session: "sess_1",
       flow: "flow_1",
       device: "fp_1",
+      status: undefined,
     });
   });
 
@@ -362,6 +368,8 @@ describe("eventsQuery", () => {
       session_id: "sess_1",
       flow_id: "flow_1",
       fingerprint: "fp_1",
+      operation_id: undefined,
+      status_class: undefined,
       created_after: "2026-11-10T08:00:00.000Z",
       created_before: "2026-11-10T09:00:00.000Z",
     });
@@ -638,8 +646,10 @@ describe("what gives way, on every way into a list", () => {
       "event_type",
       "fingerprint",
       "flow_id",
+      "operation_id",
       "request_id",
       "session_id",
+      "status_class",
     ]);
   }
 
@@ -737,6 +747,13 @@ describe("searchMeanings", () => {
     expect(meanings("app_1")).toEqual(["client app_1"]);
   });
 
+  it("reads one camel-cased word as an API operation", () => {
+    expect(meanings("createUser")).toEqual(["operation createUser"]);
+    expect(meanings("deleteUserByID")).toEqual(["operation deleteUserByID"]);
+    // A lowercase word or an ID is not one.
+    expect(meanings("admin")).toEqual(["actor admin", "resource admin"]);
+  });
+
   it("reads 32 hex digits as a request: its trace ID", () => {
     expect(meanings("0af7651916cd43dd8448eb211c80319c")).toEqual([
       "request 0af7651916cd43dd8448eb211c80319c",
@@ -811,5 +828,91 @@ describe("eventsCsv", () => {
       'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
     );
     expect(end).toBe("");
+  });
+});
+
+describe("the API requests by operation and status", () => {
+  it("reads them in the requests view, with no category or type beside them", () => {
+    const parsed = parseLogsSearch({
+      view: "audit",
+      category: "auth",
+      type: "user.created",
+      operation: "createUser",
+      status: ["5xx", "4xx", "4xx", "6xx"],
+      actor: "user_1",
+    });
+    expect(parsed).toMatchObject({
+      view: "requests",
+      category: undefined,
+      type: undefined,
+      operation: "createUser",
+      status: ["4xx", "5xx"],
+      actor: "user_1",
+    });
+    // One range of the request indexes: no category is sent beside them.
+    expect(eventsQuery(parsed)).toMatchObject({
+      category: undefined,
+      event_type: undefined,
+      operation_id: ["createUser"],
+      status_class: ["4xx", "5xx"],
+      actor_id: "user_1",
+    });
+  });
+
+  it("are dropped for a view that is not the requests', or for a type", () => {
+    const current = parseLogsSearch({ operation: "createUser", status: "5xx" });
+    for (const view of ["audit", "all"] as const) {
+      expect(withView(current, view)).toMatchObject({
+        view,
+        operation: undefined,
+        status: undefined,
+      });
+    }
+    expect(withView(current, "requests")).toMatchObject({
+      operation: "createUser",
+      status: ["5xx"],
+    });
+    expect(withTypes(current, ["user.created"])).toMatchObject({
+      view: "all",
+      type: ["user.created"],
+      operation: undefined,
+      status: undefined,
+    });
+  });
+
+  it("narrows to status classes in their order, or the failed requests, and back to any", () => {
+    const current = parseLogsSearch({ view: "requests", since: "1h" });
+    const failed = withStatus(current, [...FAILED_STATUS].reverse());
+    expect(failed).toMatchObject({ view: "requests", status: ["4xx", "5xx"], since: "1h" });
+    expect(eventsQuery(failed).status_class).toEqual(["4xx", "5xx"]);
+    expect(withStatus(failed, [])).toMatchObject({ view: "requests", status: undefined });
+    expect(filterCount(failed)).toBe(2);
+  });
+
+  it("narrows by a request's operation from the request, and leads on to its other calls", () => {
+    const call = event({
+      event_type: "request.api",
+      category: "request",
+      entity_type: null,
+      entity_id: null,
+      payload: {
+        operation_id: "createUser",
+        method: "POST",
+        route_template: "createUser",
+        status: 201,
+      },
+    });
+    expect(eventFilterValues(call).map(({ filter, value }) => [filter.key, value])).toContainEqual([
+      "operation",
+      "createUser",
+    ]);
+    expect(narrowedBy(parseLogsSearch({ view: "all" }), "operation", "createUser")).toMatchObject({
+      view: "requests",
+      operation: "createUser",
+    });
+    expect(sharing("operation", "createUser")).toEqual({
+      view: "requests",
+      operation: "createUser",
+    });
   });
 });

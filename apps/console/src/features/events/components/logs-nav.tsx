@@ -32,9 +32,12 @@ import {
   AUDIT_CATEGORIES,
   type AuditCategory,
   EVENT_TYPES,
+  FAILED_STATUS,
   FAILURE_TYPES,
   hasCustomRange,
   isNarrowed,
+  STATUS_CLASSES,
+  type StatusClass,
   LOG_VIEWS,
   type LogsSearch,
   type LogView,
@@ -48,6 +51,7 @@ import {
   VIEW_LABEL,
   withCategory,
   withCustomRange,
+  withStatus,
   withTimeRange,
   withTypes,
   withView,
@@ -160,10 +164,17 @@ export function LogFilters() {
           </Field>
         )}
 
-        <TypeFilter current={current} go={go} />
+        {/* A request is one type: the requests narrow by status instead. */}
+        {current.view === "requests" ? (
+          <StatusFilter current={current} go={go} />
+        ) : (
+          <TypeFilter current={current} go={go} />
+        )}
 
         {VALUE_FILTERS.map((filter) =>
-          filter.key === "type" ? null : (
+          // The operation is a request's: its field is the requests view's.
+          filter.key === "type" ||
+          (filter.key === "operation" && current.view !== "requests") ? null : (
             <ValueField
               key={filter.key}
               filter={filter}
@@ -402,6 +413,95 @@ function TypeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSea
               onClick={() => go(withTypes(current, FAILURE_TYPES))}
             >
               Only failures
+            </Button>
+          )}
+        </div>
+      )}
+    </Field>
+  );
+}
+
+/** What a status class means, beside it in the list. */
+const STATUS_MEANING: Record<StatusClass, string> = {
+  "2xx": "Succeeded",
+  "3xx": "Redirected",
+  "4xx": "Refused: the caller's mistake",
+  "5xx": "Failed: the server's error",
+};
+
+const STATUS_OPTIONS = STATUS_CLASSES.map((status) => ({
+  value: status,
+  label: status,
+  description: STATUS_MEANING[status],
+}));
+
+/**
+ * The API requests narrowed by the class of their response status, several
+ * at once: one range of the status index each, so any choice fills its pages.
+ * **Only failed requests** chooses 4xx and 5xx. Requests recorded before the
+ * server indexed the status are not matched.
+ */
+function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+  const [open, setOpen] = useState(false);
+  const chosen = current.status ?? [];
+  const failedOnly =
+    chosen.length === FAILED_STATUS.length &&
+    FAILED_STATUS.every((status) => chosen.includes(status));
+  const toggle = (status: string) => {
+    const known = STATUS_CLASSES.find((candidate) => candidate === status);
+    if (!known) return;
+    go(
+      withStatus(
+        current,
+        chosen.includes(known) ? chosen.filter((other) => other !== known) : [...chosen, known],
+      ),
+    );
+  };
+
+  return (
+    <Field label="Status">
+      {() => (
+        <div className="flex flex-col gap-1.5">
+          <Combobox open={open} onOpenChange={setOpen}>
+            <ComboboxAnchor asChild>
+              <ComboboxTrigger
+                label="Status classes"
+                open={open}
+                onOpen={() => setOpen(true)}
+                className="h-8 w-full text-xs"
+              >
+                {chosen.length === 0 ? (
+                  <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
+                ) : (
+                  <ComboboxValue>{chosen.join(", ")}</ComboboxValue>
+                )}
+              </ComboboxTrigger>
+            </ComboboxAnchor>
+            <ComboboxContent
+              options={STATUS_OPTIONS}
+              selected={chosen}
+              searchPlaceholder="Find a status"
+              emptyLabel="No status matches."
+              label="Status classes"
+              closeOnSelect={false}
+              onSelect={toggle}
+              onClose={() => setOpen(false)}
+              footer={
+                chosen.length > 0
+                  ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
+                  : undefined
+              }
+              className="w-64"
+            />
+          </Combobox>
+          {!failedOnly && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start px-2 text-xs"
+              onClick={() => go(withStatus(current, FAILED_STATUS))}
+            >
+              Only failed requests
             </Button>
           )}
         </div>

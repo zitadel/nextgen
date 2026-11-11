@@ -247,6 +247,7 @@ export const VALUE_FILTERS = [
     placeholder: "user, team",
   },
   { key: "client", label: "Application", name: "application", placeholder: "app_…" },
+  { key: "operation", label: "Operation", name: "operation", placeholder: "createUser" },
   { key: "request", label: "Request", name: "request", placeholder: "req_…" },
   { key: "session", label: "Session", name: "session", placeholder: "sess_…" },
   { key: "flow", label: "Login flow", name: "login flow", placeholder: "flow_…" },
@@ -268,6 +269,8 @@ const EVENT_VALUE: Record<ValueFilterKey, (event: LogEvent) => string | null | u
   resource: (event) => event.entity_id,
   resource_type: (event) => event.entity_type,
   client: (event) => event.client_id,
+  operation: (event) =>
+    event.event_type === "request.api" ? event.payload.operation_id || undefined : undefined,
   request: (event) => event.request_id,
   session: (event) => event.session_id,
   flow: (event) => event.flow_id,
@@ -297,7 +300,24 @@ export type LogsSearch = {
   from?: string;
   to?: string;
   type?: string[];
+  status?: StatusClass[];
 } & Partial<Record<IdFilterKey, string>>;
+
+/**
+ * The classes of an API request's response status the requests can be
+ * narrowed to, as the API names them (`status_class`). `1xx` is the API's too,
+ * but the server answers no request with one.
+ */
+export const STATUS_CLASSES = ["2xx", "3xx", "4xx", "5xx"] as const;
+export type StatusClass = (typeof STATUS_CLASSES)[number];
+
+/** The failed requests: the caller's mistakes and the server's. */
+export const FAILED_STATUS: readonly StatusClass[] = ["4xx", "5xx"];
+
+/** Whether the list is narrowed by what only an API request carries: its operation or its status. */
+function byRequest(search: LogsSearch): boolean {
+  return Boolean(search.operation || search.status?.length);
+}
 
 /**
  * Filters brought to a combination that means something. The server bounds
@@ -306,6 +326,8 @@ export type LogsSearch = {
  * So the list refuses no combination, and only these give way, on every way
  * into a list (the URL, a click, the request itself):
  *
+ * - An operation and a status class are an API request's, so they read the
+ *   API requests view, with no category or type beside them.
  * - A type names its own category, so it reads the All view and takes no
  *   category beside it. That also keeps types on their own one range of
  *   their index each, which always fills its pages.
@@ -317,6 +339,7 @@ export type LogsSearch = {
  */
 export function servedSearch(search: LogsSearch): LogsSearch {
   const time = search.from || search.to ? { ...search, since: undefined } : search;
+  if (byRequest(time)) return { ...time, view: "requests", category: undefined, type: undefined };
   if (time.type?.length) return { ...time, view: "all", category: undefined };
   if (time.view === "requests") return { ...time, category: undefined };
   return time;
@@ -346,6 +369,13 @@ function eventTypes(value: unknown): string[] | undefined {
   return types.length > 0 ? [...new Set(types)] : undefined;
 }
 
+/** The status classes a URL names, once each, in their order; any other value is dropped. */
+function statusClasses(value: unknown): StatusClass[] | undefined {
+  const values = Array.isArray(value) ? value : [value];
+  const classes = STATUS_CLASSES.filter((known) => values.includes(known));
+  return classes.length > 0 ? classes : undefined;
+}
+
 /**
  * The filters a URL may carry. Anything else is dropped rather than sent: an
  * unknown view is the default one, a range whose start is not before its end
@@ -367,6 +397,7 @@ export function parseLogsSearch(search: Record<string, unknown>): LogsSearch {
     from,
     to,
     type: eventTypes(search.type),
+    status: statusClasses(search.status),
   };
   for (const { key } of VALUE_FILTERS) {
     if (key === "type") continue;
@@ -386,6 +417,7 @@ export function filterCount(search: LogsSearch): number {
   return (
     Number(Boolean(search.category)) +
     Number(Boolean(search.since) || hasCustomRange(search)) +
+    Number(Boolean(search.status?.length)) +
     VALUE_FILTERS.filter(({ key }) => (key === "type" ? search.type?.length : search[key])).length
   );
 }
@@ -421,12 +453,17 @@ export function eventsQuery(
   | "session_id"
   | "flow_id"
   | "fingerprint"
+  | "operation_id"
+  | "status_class"
   | "created_after"
   | "created_before"
 > {
   const served = servedSearch(search);
-  const category: ListEventsParams["category"] =
-    served.view === "requests"
+  // An operation or a status class matches API requests alone: one range of
+  // their own index, with no category to send beside it.
+  const category: ListEventsParams["category"] = byRequest(served)
+    ? undefined
+    : served.view === "requests"
       ? ["request"]
       : served.category
         ? [served.category]
@@ -444,14 +481,22 @@ export function eventsQuery(
     session_id: served.session,
     flow_id: served.flow,
     fingerprint: served.device,
+    operation_id: served.operation ? [served.operation] : undefined,
+    status_class: served.status,
     created_after: createdAfter ?? served.from,
     created_before: served.to,
   };
 }
 
-/** The list in another view. Only the All view holds types. */
+/** The list in another view. Only the All view holds types, and only the requests' an operation or a status. */
 export function withView(current: LogsSearch, view: LogView): LogsSearch {
-  return servedSearch({ ...current, view, type: view === "all" ? current.type : undefined });
+  return servedSearch({
+    ...current,
+    view,
+    type: view === "all" ? current.type : undefined,
+    operation: view === "requests" ? current.operation : undefined,
+    status: view === "requests" ? current.status : undefined,
+  });
 }
 
 /** The list narrowed to one category, or to none. A category takes no type beside it. */
@@ -480,7 +525,24 @@ export function withCustomRange(
  */
 export function withTypes(current: LogsSearch, types: readonly string[]): LogsSearch {
   if (types.length === 0) return { ...current, type: undefined };
-  return servedSearch({ ...current, type: [...new Set(types)] });
+  return servedSearch({
+    ...current,
+    type: [...new Set(types)],
+    operation: undefined,
+    status: undefined,
+  });
+}
+
+/**
+ * The API requests narrowed to these status classes, or to none. Clearing
+ * them keeps the requests view the list is in.
+ */
+export function withStatus(current: LogsSearch, classes: readonly StatusClass[]): LogsSearch {
+  if (classes.length === 0) return { ...current, status: undefined };
+  return servedSearch({
+    ...current,
+    status: STATUS_CLASSES.filter((known) => classes.includes(known)),
+  });
 }
 
 /**
@@ -507,6 +569,7 @@ export function narrowedBy(
   if (key === "request" || key === "session" || key === "flow") {
     return servedSearch({ ...current, view: "all", [key]: value });
   }
+  // An operation reads the requests view ({@link servedSearch}).
   return servedSearch({ ...current, [key]: value });
 }
 
@@ -516,6 +579,7 @@ export function narrowedBy(
  */
 export function sharing(key: ValueFilterKey, value: string): LogsSearch {
   if (key === "type") return { view: "all", type: [value] };
+  if (key === "operation") return { view: "requests", operation: value };
   return { view: "all", [key]: value };
 }
 
@@ -526,6 +590,8 @@ export type SearchMeaning =
 
 /** A request id as a W3C trace id: 32 hex digits. */
 const TRACE_ID = /^[0-9a-f]{32}$/i;
+/** An API operation: one camel-cased word, as `createUser`. IDs carry an underscore. */
+const OPERATION = /^[a-z]+(?:[A-Z][a-z0-9]*)+$/;
 
 /**
  * What a term in the search above the table means: the filters it could set,
@@ -535,7 +601,8 @@ const TRACE_ID = /^[0-9a-f]{32}$/i;
  * - `evt_…` is an event, and opens it.
  * - `req_…` (or a 32-digit trace id), `sess_…`, `flow_…` and `app_…` are a
  *   request, a session, a login flow and an application.
- * - Words joined by dots are an event type.
+ * - Words joined by dots are an event type, and one camel-cased word, as
+ *   `createUser`, is an API operation.
  * - Any other id may be who did something or what it was done to, so it
  *   means both an actor and a resource, and the person says which.
  *
@@ -555,6 +622,7 @@ export function searchMeanings(term: string): SearchMeaning[] {
   if (value.startsWith("flow_")) return [filter("flow")];
   if (value.startsWith("app_")) return [filter("client")];
   if (EVENT_TYPE.test(value)) return [filter("type")];
+  if (OPERATION.test(value)) return [filter("operation")];
   return [filter("actor"), filter("resource")];
 }
 

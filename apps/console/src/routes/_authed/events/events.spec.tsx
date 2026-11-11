@@ -741,6 +741,44 @@ describe("logs filters", () => {
     expect(queries.at(-1)?.get("client_id")).toBe("app_1");
   });
 
+  it("narrows the API requests by status, or to the failed ones, and by operation", async () => {
+    const queries = serveEvents({ data: [request("evt_2")] });
+    const router = await renderAt("/events?view=requests");
+    await screen.findByRole("link", { name: "request.api" });
+
+    // A request is one type: the requests narrow by status instead, and only
+    // they have an operation.
+    expect(
+      (await filters()).queryByRole("combobox", { name: "Event types" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click((await filters()).getByRole("button", { name: "Only failed requests" }));
+
+    await waitFor(() => expect(queries.at(-1)?.getAll("status_class")).toEqual(["4xx", "5xx"]));
+    // One range of the status index each: no category beside them.
+    expect(queries.at(-1)?.has("category")).toBe(false);
+    expect((await filters()).getByRole("combobox", { name: "Status classes" })).toHaveTextContent(
+      "4xx, 5xx",
+    );
+
+    await userEvent.type(
+      (await filters()).getByRole("textbox", { name: "Operation" }),
+      "createUser{Enter}",
+    );
+
+    await waitFor(() => expect(queries.at(-1)?.getAll("operation_id")).toEqual(["createUser"]));
+    expect(queries.at(-1)?.getAll("status_class")).toEqual(["4xx", "5xx"]);
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "requests",
+      operation: "createUser",
+      status: ["4xx", "5xx"],
+    });
+
+    // Another view is not the requests': both give way.
+    await userEvent.click((await logsNav()).getByRole("link", { name: "All" }));
+    await waitFor(() => expect(queries.at(-1)?.has("operation_id")).toBe(false));
+    expect(queries.at(-1)?.has("status_class")).toBe(false);
+  });
+
   it("narrows by a value typed into its field, and clears it there", async () => {
     const queries = serveEvents({ data: [event("evt_1")] });
     const router = await renderAt("/events?category=entity");
@@ -1048,6 +1086,20 @@ describe("logs search", () => {
     expect((await filters()).getByRole("combobox", { name: "Event types" })).toHaveTextContent(
       "auth.check.failed",
     );
+  });
+
+  it("narrows to an API operation from its name", async () => {
+    const queries = serveEvents({ data: [event("evt_1")] });
+    const router = await renderAt("/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+
+    await userEvent.type(await find(), "createUser{Enter}");
+
+    await waitFor(() => expect(queries.at(-1)?.getAll("operation_id")).toEqual(["createUser"]));
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "requests",
+      operation: "createUser",
+    });
   });
 
   it("opens the event an event ID names", async () => {
