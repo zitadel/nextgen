@@ -17,7 +17,8 @@ import (
 
 // Search decides the project's list gate once, then reads a type behind it:
 // a team by its id through the teams list, a team by name from the search
-// entries. The mock refuses any statement a case does not expect, so a case
+// entries, which a project the gate allows every row of reads in the one
+// statement for every project and kind (here one of each). The mock refuses any statement a case does not expect, so a case
 // that names its reads also proves nothing else was read: no user is listed
 // for a search that asks for teams.
 func TestSearch_Teams(t *testing.T) {
@@ -40,12 +41,14 @@ func TestSearch_Teams(t *testing.T) {
 		}
 		return out
 	}
-	// A read is either a team list by id or a search of the entries.
+	// A read is a team list by id, a search of the entries of this project
+	// (after an id finds nothing), or one across the allowed projects.
 	type read struct {
 		id      string
 		teams   []*domain.Team
 		prefix  string
 		rows    int
+		single  bool
 		matches []domain.SearchEntryMatch
 	}
 
@@ -88,7 +91,7 @@ func TestSearch_Teams(t *testing.T) {
 			query: "team_blue",
 			reads: []read{
 				{id: "team_blue"},
-				{prefix: "team_blue", rows: 24, matches: []domain.SearchEntryMatch{match("team_9", "team_blue crew", "team_blue crew", true)}},
+				{prefix: "team_blue", rows: 24, single: true, matches: []domain.SearchEntryMatch{match("team_9", "team_blue crew", "team_blue crew", true)}},
 			},
 			wantIDs: []string{"team_9"},
 		},
@@ -155,11 +158,23 @@ func TestSearch_Teams(t *testing.T) {
 							return &database.ListResult[*domain.Team]{Items: r.teams}, nil
 						},
 					).Call
-				} else {
+				} else if r.single {
 					call = stmts.EXPECT().SearchEntries(gomock.Any(), domain.ResourceKindTeam, "proj_home", r.prefix, r.rows).DoAndReturn(
 						func(ctx context.Context, _ domain.ResourceKind, _, _ string, limit int) ([]domain.SearchEntryMatch, bool, error) {
 							assert.True(t, service.AuthzListSkipOncePending(ctx), "read behind the project's gate")
 							return r.matches, len(r.matches) == limit, nil
+						},
+					).Call
+				} else {
+					call = stmts.EXPECT().SearchEntriesInProjects(gomock.Any(), []string{"proj_home"}, []domain.ResourceKind{domain.ResourceKindTeam}, r.prefix, r.rows).DoAndReturn(
+						func(ctx context.Context, _ []string, _ []domain.ResourceKind, _ string, limit int) ([]domain.SearchEntryRange, error) {
+							assert.True(t, service.AuthzListSkipOncePending(ctx), "read behind the projects' gates")
+							return []domain.SearchEntryRange{{
+								ProjectID: "proj_home",
+								Kind:      domain.ResourceKindTeam,
+								Matches:   r.matches,
+								Full:      len(r.matches) == limit,
+							}}, nil
 						},
 					).Call
 				}

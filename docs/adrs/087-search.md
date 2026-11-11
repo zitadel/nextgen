@@ -182,8 +182,15 @@ amends §1 and §4.
   a project searches that one.
 - Each project costs one access check, and its decision gates every type read
   in it, as that type's own list would gate it. A listed project the person
-  cannot read is left out. Projects are checked and read side by side, at most
-  4 at a time, each read with a context of its own.
+  cannot read is left out. The projects are checked in one statement, and
+  those whose gate allows every row are read together: one statement for the
+  search entries of every kind, and for users one each for the projects' user
+  schemas, the search index and the users found. A project behind a narrower
+  grant, and text shaped like an id, is read project by project. The reads run
+  one after another, so a search holds one database connection at a time.
+- The console asks once per pause in typing across projects, for every type,
+  so the projects are listed and checked once; inside a project it asks for
+  users apart, so the other types do not wait for them.
 - `limit_per_type` counts the matches of all projects together, and every
   result carries its `project_id`.
 - A project secret, and any request naming `project_id`, searches one project
@@ -228,27 +235,34 @@ whole name, then the start of a name, then the start of a later word.
 ### Read plan
 
 A session's search without `project_id`, for every type, at the default
-`limit_per_type` of 5, reads in each of at most 10 projects:
+`limit_per_type` of 5, over up to 10 projects whose gate allows every row:
 
 | Read | Statements | Rows |
 | --- | --- | --- |
-| Access check | 2: the active catalog, the check | the person's grants on the project |
-| `user` | 1 per designated property, plus the schema read and the user refs of ADR 058 | per property at most 6 × the properties one schema designates (18 for three) index entries, then those users |
-| `team`, `schema`, `flow_definition`, `idp` | 1 each | at most 24 rows of `search_entries` each |
-| An id | 1 by primary key | 1 |
+| The session's user, the projects and their origins, the operator question | 5 | the person's grants; for an operator the newest 11 from `idx_projects_created_at` |
+| Access check | 2: the active catalog, one check of every project | the person's grants on each project |
+| `team`, `schema`, `flow_definition`, `idp` | 1 for all of them | per project and kind at most 24 rows of `search_entries` |
+| `user` | 3: the projects' user schemas, the search index, the users found; then their attributes, 1 per project holding one of them | per project and designated property at most 6 × the properties one schema designates (18 for three) index entries; at most 5 users |
+| An id | 1 by primary key per project | 1 |
 
-Before them, two reads: the session's user, by primary key, and the projects,
-from the person's grants or, for an operator, the newest 11 from
-`idx_projects_created_at`. Nothing grows with the number of users, teams or
-configuration rows a project holds, or with how narrow the caller's grant is
-for those four types. Measured on Postgres with 10 projects and every type,
-one search is 107 statements. Read 4 projects at a time, the longest chain
-of them run one after another is about 40, where reading every project in
-turn ran all 107 in a row (locally a median of 3.3 ms against 5.8 ms).
+Nothing grows with the number of users, teams or configuration rows a project
+holds, or with how narrow the caller's grant is for those four types, and only
+the users' attributes grow with the projects, up to `limit_per_type`. Measured
+on Postgres with 10 projects and every type, one pause in typing was 134
+statements in two requests (each reading 4 projects at a time) and is now 17
+in one, holding one connection where it held up to 8. With 1 ms added to every
+statement, standing in for the network to a hosted database, a pause took a
+median of 33 ms and now 27 ms; with 2 ms, 46 ms.
 
-Two costs stay. The user read lists every user schema revision of the project
-to learn which properties are searched. And its index ranges keep a narrow
-grant's filter in their condition, as the users list does
-([ADR 058](058-user-identity-designation-and-references.md)), so a caller
-whose grant covers part of a project reads past the users it may not see.
+Three costs stay. The user read lists every user schema revision of the
+projects to learn which properties are searched. The users' attributes are
+read per project holding one of the users found. And in a project behind a
+narrower grant the users' index ranges keep that grant's filter in their
+condition, as the users list does
+([ADR 058](058-user-identity-designation-and-references.md)): a caller whose
+grant covers part of a project reads past the users it may not see, in the
+worst case every user whose identifier or name starts with the text. Across
+projects it is rare, since a grant narrower than a project lists no project;
+it is mostly a project secret, or a session naming a project, with a grant on
+one team.
 

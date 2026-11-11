@@ -573,6 +573,14 @@ const DefaultUserTeamsLimit = 10
 
 type UserStatements interface {
 	Statements
+	// SearchUserIndex reads, in one statement, one range of the user search
+	// index per range of ranges: the users of that project whose value of that
+	// property starts with prefix, by text then user, each to limit rows, from
+	// the index alone. The result is ranges with Hits and Full set. It is for
+	// projects whose list gate allows the caller every user, decided before
+	// the read: it needs a one-shot skip or an unrestricted context, and
+	// refuses one that carries a list filter.
+	SearchUserIndex(ctx context.Context, ranges []domain.UserSearchRange, prefix string, limit int) ([]domain.UserSearchRange, error)
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
 	// PatchUser reconciles the stored user to the given post-merge state:
 	// header (schema_url, updated_at), and attribute rows with their unique
@@ -816,6 +824,13 @@ type SearchEntryStatements interface {
 	// never reads further. full says the range held limit rows, so more may
 	// match than were read.
 	SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) (matches []domain.SearchEntryMatch, full bool, err error)
+	// SearchEntriesInProjects reads, in one statement, the range SearchEntries
+	// reads for every pair of projectIDs and kinds, each to limit rows; the
+	// results follow projectIDs, then kinds. It is for projects whose list gate
+	// allows the caller every row, decided before the read: it needs a
+	// one-shot skip or an unrestricted context, and refuses one that carries a
+	// list filter, which it could not apply to one project alone.
+	SearchEntriesInProjects(ctx context.Context, projectIDs []string, kinds []domain.ResourceKind, prefix string, limit int) ([]domain.SearchEntryRange, error)
 }
 
 type ResourceScopeStatements interface {
@@ -973,6 +988,9 @@ type AuthzResolverStatements interface {
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
+	// CheckAuthzProjects is CheckAuthz for each of projectIDs in one round
+	// trip, params.ProjectID ignored; the results follow projectIDs' order.
+	CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error)
 	CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

@@ -442,6 +442,45 @@ func (c *MockAllStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, do
 	return c
 }
 
+// CheckAuthzProjects mocks base method.
+func (m *MockAllStatements) CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckAuthzProjects", ctx, params, projectIDs)
+	ret0, _ := ret[0].([]domain.AuthzCheckResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CheckAuthzProjects indicates an expected call of CheckAuthzProjects.
+func (mr *MockAllStatementsMockRecorder) CheckAuthzProjects(ctx, params, projectIDs any) *MockAllStatementsCheckAuthzProjectsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckAuthzProjects", reflect.TypeOf((*MockAllStatements)(nil).CheckAuthzProjects), ctx, params, projectIDs)
+	return &MockAllStatementsCheckAuthzProjectsCall{Call: call}
+}
+
+// MockAllStatementsCheckAuthzProjectsCall wrap *gomock.Call
+type MockAllStatementsCheckAuthzProjectsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCheckAuthzProjectsCall) Return(arg0 []domain.AuthzCheckResult, arg1 error) *MockAllStatementsCheckAuthzProjectsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCheckAuthzProjectsCall) Do(f func(context.Context, domain.AuthzCheckParams, []string) ([]domain.AuthzCheckResult, error)) *MockAllStatementsCheckAuthzProjectsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCheckAuthzProjectsCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams, []string) ([]domain.AuthzCheckResult, error)) *MockAllStatementsCheckAuthzProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CheckPlatformOperator mocks base method.
 func (m *MockAllStatements) CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
 	m.ctrl.T.Helper()
@@ -6941,6 +6980,84 @@ func (c *MockAllStatementsSearchEntriesCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// SearchEntriesInProjects mocks base method.
+func (m *MockAllStatements) SearchEntriesInProjects(ctx context.Context, projectIDs []string, kinds []domain.ResourceKind, prefix string, limit int) ([]domain.SearchEntryRange, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchEntriesInProjects", ctx, projectIDs, kinds, prefix, limit)
+	ret0, _ := ret[0].([]domain.SearchEntryRange)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchEntriesInProjects indicates an expected call of SearchEntriesInProjects.
+func (mr *MockAllStatementsMockRecorder) SearchEntriesInProjects(ctx, projectIDs, kinds, prefix, limit any) *MockAllStatementsSearchEntriesInProjectsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchEntriesInProjects", reflect.TypeOf((*MockAllStatements)(nil).SearchEntriesInProjects), ctx, projectIDs, kinds, prefix, limit)
+	return &MockAllStatementsSearchEntriesInProjectsCall{Call: call}
+}
+
+// MockAllStatementsSearchEntriesInProjectsCall wrap *gomock.Call
+type MockAllStatementsSearchEntriesInProjectsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsSearchEntriesInProjectsCall) Return(arg0 []domain.SearchEntryRange, arg1 error) *MockAllStatementsSearchEntriesInProjectsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsSearchEntriesInProjectsCall) Do(f func(context.Context, []string, []domain.ResourceKind, string, int) ([]domain.SearchEntryRange, error)) *MockAllStatementsSearchEntriesInProjectsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsSearchEntriesInProjectsCall) DoAndReturn(f func(context.Context, []string, []domain.ResourceKind, string, int) ([]domain.SearchEntryRange, error)) *MockAllStatementsSearchEntriesInProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// SearchUserIndex mocks base method.
+func (m *MockAllStatements) SearchUserIndex(ctx context.Context, ranges []domain.UserSearchRange, prefix string, limit int) ([]domain.UserSearchRange, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchUserIndex", ctx, ranges, prefix, limit)
+	ret0, _ := ret[0].([]domain.UserSearchRange)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchUserIndex indicates an expected call of SearchUserIndex.
+func (mr *MockAllStatementsMockRecorder) SearchUserIndex(ctx, ranges, prefix, limit any) *MockAllStatementsSearchUserIndexCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUserIndex", reflect.TypeOf((*MockAllStatements)(nil).SearchUserIndex), ctx, ranges, prefix, limit)
+	return &MockAllStatementsSearchUserIndexCall{Call: call}
+}
+
+// MockAllStatementsSearchUserIndexCall wrap *gomock.Call
+type MockAllStatementsSearchUserIndexCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsSearchUserIndexCall) Return(arg0 []domain.UserSearchRange, arg1 error) *MockAllStatementsSearchUserIndexCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsSearchUserIndexCall) Do(f func(context.Context, []domain.UserSearchRange, string, int) ([]domain.UserSearchRange, error)) *MockAllStatementsSearchUserIndexCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsSearchUserIndexCall) DoAndReturn(f func(context.Context, []domain.UserSearchRange, string, int) ([]domain.UserSearchRange, error)) *MockAllStatementsSearchUserIndexCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetAuthAttemptChallenge mocks base method.
 func (m *MockAllStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
@@ -11037,6 +11154,45 @@ func (c *MockUserStatementsPatchUserCall) DoAndReturn(f func(context.Context, *d
 	return c
 }
 
+// SearchUserIndex mocks base method.
+func (m *MockUserStatements) SearchUserIndex(ctx context.Context, ranges []domain.UserSearchRange, prefix string, limit int) ([]domain.UserSearchRange, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchUserIndex", ctx, ranges, prefix, limit)
+	ret0, _ := ret[0].([]domain.UserSearchRange)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchUserIndex indicates an expected call of SearchUserIndex.
+func (mr *MockUserStatementsMockRecorder) SearchUserIndex(ctx, ranges, prefix, limit any) *MockUserStatementsSearchUserIndexCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUserIndex", reflect.TypeOf((*MockUserStatements)(nil).SearchUserIndex), ctx, ranges, prefix, limit)
+	return &MockUserStatementsSearchUserIndexCall{Call: call}
+}
+
+// MockUserStatementsSearchUserIndexCall wrap *gomock.Call
+type MockUserStatementsSearchUserIndexCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsSearchUserIndexCall) Return(arg0 []domain.UserSearchRange, arg1 error) *MockUserStatementsSearchUserIndexCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsSearchUserIndexCall) Do(f func(context.Context, []domain.UserSearchRange, string, int) ([]domain.UserSearchRange, error)) *MockUserStatementsSearchUserIndexCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsSearchUserIndexCall) DoAndReturn(f func(context.Context, []domain.UserSearchRange, string, int) ([]domain.UserSearchRange, error)) *MockUserStatementsSearchUserIndexCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // UserExists mocks base method.
 func (m *MockUserStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
 	m.ctrl.T.Helper()
@@ -14093,6 +14249,45 @@ func (c *MockAuthzResolverStatementsCheckAuthzCall) Do(f func(context.Context, d
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzResolverStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams) (bool, bool, error)) *MockAuthzResolverStatementsCheckAuthzCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// CheckAuthzProjects mocks base method.
+func (m *MockAuthzResolverStatements) CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckAuthzProjects", ctx, params, projectIDs)
+	ret0, _ := ret[0].([]domain.AuthzCheckResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CheckAuthzProjects indicates an expected call of CheckAuthzProjects.
+func (mr *MockAuthzResolverStatementsMockRecorder) CheckAuthzProjects(ctx, params, projectIDs any) *MockAuthzResolverStatementsCheckAuthzProjectsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckAuthzProjects", reflect.TypeOf((*MockAuthzResolverStatements)(nil).CheckAuthzProjects), ctx, params, projectIDs)
+	return &MockAuthzResolverStatementsCheckAuthzProjectsCall{Call: call}
+}
+
+// MockAuthzResolverStatementsCheckAuthzProjectsCall wrap *gomock.Call
+type MockAuthzResolverStatementsCheckAuthzProjectsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzResolverStatementsCheckAuthzProjectsCall) Return(arg0 []domain.AuthzCheckResult, arg1 error) *MockAuthzResolverStatementsCheckAuthzProjectsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzResolverStatementsCheckAuthzProjectsCall) Do(f func(context.Context, domain.AuthzCheckParams, []string) ([]domain.AuthzCheckResult, error)) *MockAuthzResolverStatementsCheckAuthzProjectsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzResolverStatementsCheckAuthzProjectsCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams, []string) ([]domain.AuthzCheckResult, error)) *MockAuthzResolverStatementsCheckAuthzProjectsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

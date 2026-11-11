@@ -177,6 +177,16 @@ type SearchEntryMatch struct {
 	NameStart   bool
 }
 
+// SearchEntryRange is what one read of a batch found in one project for one
+// kind: its matches the caller may see, and whether the range held as many
+// rows as the read took, so more may match.
+type SearchEntryRange struct {
+	ProjectID string
+	Kind      ResourceKind
+	Matches   []SearchEntryMatch
+	Full      bool
+}
+
 // Rank is how well the match answers term, the text as [SearchText] folds it:
 // a whole name, then the start of a name, then the start of a later word.
 func (m SearchEntryMatch) Rank(term string) SearchRank {

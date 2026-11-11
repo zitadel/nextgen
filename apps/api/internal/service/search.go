@@ -49,18 +49,67 @@ func SearchEntries(ctx context.Context, stmts SearchEntryStatements, in SearchEn
 
 	// A full read may have more beyond it, whether or not the caller's grant
 	// let every row of it through.
-	out := &SearchEntriesOutput{More: full}
+	return &SearchEntriesOutput{Items: bestEntryMatches(matches, term), More: full}, nil
+}
+
+// SearchEntriesInProjectsInput asks for the resources of several kinds in
+// several projects that a text starts a name of.
+type SearchEntriesInProjectsInput struct {
+	ProjectIDs []string
+	Kinds      []domain.ResourceKind
+	Query      string
+	// Limit is the most results a kind may return from all the projects.
+	Limit int
+}
+
+// SearchEntriesInProjects is SearchEntries for every kind in every project of
+// in, in one statement: each project's range of each kind read to the same
+// number of rows as SearchEntries reads. It is for projects whose list gate
+// allows the caller every row, decided before the call (ctx carries the
+// one-shot skip). The output holds one match per resource per kind, its best;
+// More says a project's range of that kind held as many rows as were read.
+func SearchEntriesInProjects(ctx context.Context, stmts SearchEntryStatements, in SearchEntriesInProjectsInput) (_ map[domain.ResourceKind]*SearchEntriesOutput, err error) {
+	ctx, end := startSpan(ctx, "Search.SearchEntriesInProjects")
+	defer end(&err)
+
+	out := make(map[domain.ResourceKind]*SearchEntriesOutput, len(in.Kinds))
+	for _, kind := range in.Kinds {
+		out[kind] = &SearchEntriesOutput{}
+	}
+	term, ok := domain.SearchText(in.Query)
+	if !ok || len(in.ProjectIDs) == 0 || len(in.Kinds) == 0 {
+		return out, nil
+	}
+	rows := min((max(in.Limit, 1)+1)*searchEntryRowsPerResult, domain.SearchReadLimit)
+	ranges, err := stmts.SearchEntriesInProjects(ctx, in.ProjectIDs, in.Kinds, term, rows)
+	if err != nil {
+		return nil, mapListError(err, "failed to search the database")
+	}
+	for _, r := range ranges {
+		kind := out[r.Kind]
+		if kind == nil {
+			continue
+		}
+		kind.More = kind.More || r.Full
+		kind.Items = append(kind.Items, bestEntryMatches(r.Matches, term)...)
+	}
+	return out, nil
+}
+
+// bestEntryMatches keeps each resource's best match, in the order of the read.
+func bestEntryMatches(matches []domain.SearchEntryMatch, term string) []domain.SearchEntryMatch {
+	var best []domain.SearchEntryMatch
 	index := make(map[string]int, len(matches))
 	for _, match := range matches {
 		i, seen := index[match.ResourceID]
 		if !seen {
-			index[match.ResourceID] = len(out.Items)
-			out.Items = append(out.Items, match)
+			index[match.ResourceID] = len(best)
+			best = append(best, match)
 			continue
 		}
-		if match.Rank(term) < out.Items[i].Rank(term) {
-			out.Items[i] = match
+		if match.Rank(term) < best[i].Rank(term) {
+			best[i] = match
 		}
 	}
-	return out, nil
+	return best
 }

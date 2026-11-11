@@ -475,6 +475,12 @@ func markPlatformOperator(ctx context.Context, scope ScopeContext) {
 // can read every project (ADR 075 §3): the question listMyProjects asks without
 // a target project.
 func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
+	return h.platformOperatorWith(ctx, resolver.New(), scope)
+}
+
+// platformOperatorWith is platformOperator asking through r, so a caller that
+// checks projects next reads the active catalog once.
+func (h *Handler) platformOperatorWith(ctx context.Context, r *resolver.Resolver, scope ScopeContext) (bool, error) {
 	req := resolver.Request{
 		PrincipalType:     scope.PrincipalType,
 		PrincipalID:       scope.PrincipalID,
@@ -490,7 +496,7 @@ func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (boo
 	if h == nil || h.pool == nil {
 		return false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), req)
+	ok, err := r.PlatformOperator(ctx, h.pool.Statements(), req)
 	if err != nil {
 		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}

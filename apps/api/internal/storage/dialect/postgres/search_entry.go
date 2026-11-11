@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/searchentry"
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
@@ -20,6 +21,11 @@ const (
 	// condition, so a narrow grant drops rows from the page instead of making
 	// the read walk the range for rows it may see.
 	searchEntriesQuery = `SELECT resource_id, search_text, name_start, title, subtitle, `
+
+	// searchEntriesBatchArm opens one range of a read across projects, which
+	// carries the project and kind its rows answer for.
+	searchEntriesBatchArm = `(SELECT project_id, resource_kind, resource_id, search_text, name_start, title, subtitle FROM ` + searchEntriesTable +
+		` WHERE project_id = `
 
 	deleteSearchEntryStmt = `DELETE FROM ` + searchEntriesTable +
 		` WHERE project_id = $1 AND resource_kind = $2 AND resource_key = $3`
@@ -91,6 +97,60 @@ func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.Re
 		}
 	}
 	return matches, limit > 0 && len(read) == limit, nil
+}
+
+// SearchEntriesInProjects implements [service.SearchEntryStatements]: one
+// UNION ALL of the ranges SearchEntries reads, each in parentheses with its own
+// ORDER BY and LIMIT, so each is still one range of the key read to the limit.
+func (s searchEntryStatements) SearchEntriesInProjects(ctx context.Context, projectIDs []string, kinds []domain.ResourceKind, prefix string, limit int) ([]domain.SearchEntryRange, error) {
+	if err := authz.RequireUnfilteredBatch(ctx); err != nil {
+		return nil, err
+	}
+	ranges := searchentry.Ranges(projectIDs, kinds)
+	if len(ranges) == 0 {
+		return ranges, nil
+	}
+	lower, upper, bounded := v2user.SearchBounds(prefix)
+	var compiler statementCompiler
+	for i, r := range ranges {
+		if i > 0 {
+			compiler.WriteString(" UNION ALL ")
+		}
+		compiler.WriteString(searchEntriesBatchArm)
+		compiler.WriteArg(r.ProjectID)
+		compiler.WriteString(" AND resource_kind = ")
+		compiler.WriteArg(r.Kind.String())
+		compiler.WriteString(" AND search_text >= ")
+		compiler.WriteArg(lower)
+		if bounded {
+			compiler.WriteString(" AND search_text < ")
+			compiler.WriteArg(upper)
+		}
+		compiler.WriteString(" ORDER BY search_text, resource_key")
+		compileLimit(&compiler, uint32(limit))
+		compiler.WriteString(")")
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	arms := searchentry.Arms(ranges)
+	read := make([]int, len(ranges))
+	for rows.Next() {
+		var kind string
+		var match domain.SearchEntryMatch
+		if err := rows.Scan(&match.ProjectID, &kind, &match.ResourceID, &match.MatchedText, &match.NameStart, &match.Title, &match.Subtitle); err != nil {
+			return nil, wrapError(err)
+		}
+		arm := arms[searchentry.ArmKey{ProjectID: match.ProjectID, Kind: domain.ResourceKind(kind)}]
+		ranges[arm].Matches = append(ranges[arm].Matches, match)
+		read[arm]++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return searchentry.MarkFull(ranges, read, limit), nil
 }
 
 // writeSearchEntry replaces the entry of its key with entry. It runs inside

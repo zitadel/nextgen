@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/searchentry"
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
@@ -18,6 +19,11 @@ const (
 	// whether the caller may see the row; see the postgres peer. The key is the
 	// table's own, so the read needs no index hint.
 	searchEntriesQuery = `SELECT resource_id, search_text, name_start, title, subtitle, `
+
+	// searchEntriesBatchArm opens one range of a read across projects, which
+	// carries the project and kind its rows answer for.
+	searchEntriesBatchArm = `(SELECT project_id, resource_kind, resource_id, search_text, name_start, title, subtitle FROM ` + searchEntriesTable +
+		` WHERE project_id = `
 
 	deleteSearchEntryStmt = `DELETE FROM ` + searchEntriesTable +
 		` WHERE project_id = @p1 AND resource_kind = @p2 AND resource_key = @p3`
@@ -85,6 +91,58 @@ func (s searchEntryStatements) SearchEntries(ctx context.Context, kind domain.Re
 		}
 	}
 	return matches, limit > 0 && len(read) == limit, nil
+}
+
+// SearchEntriesInProjects implements [service.SearchEntryStatements]: one
+// UNION ALL of the ranges SearchEntries reads, each in parentheses with its own
+// ORDER BY and LIMIT; see the postgres peer.
+func (s searchEntryStatements) SearchEntriesInProjects(ctx context.Context, projectIDs []string, kinds []domain.ResourceKind, prefix string, limit int) ([]domain.SearchEntryRange, error) {
+	if err := authz.RequireUnfilteredBatch(ctx); err != nil {
+		return nil, err
+	}
+	ranges := searchentry.Ranges(projectIDs, kinds)
+	if len(ranges) == 0 {
+		return ranges, nil
+	}
+	lower, upper, bounded := v2user.SearchBounds(prefix)
+	var compiler statementCompiler
+	for i, r := range ranges {
+		if i > 0 {
+			compiler.WriteString(" UNION ALL ")
+		}
+		compiler.WriteString(searchEntriesBatchArm)
+		compiler.WriteArg(r.ProjectID)
+		compiler.WriteString(" AND resource_kind = ")
+		compiler.WriteArg(r.Kind.String())
+		compiler.WriteString(" AND search_text >= ")
+		compiler.WriteArg(lower)
+		if bounded {
+			compiler.WriteString(" AND search_text < ")
+			compiler.WriteArg(upper)
+		}
+		compiler.WriteString(" ORDER BY search_text, resource_key")
+		compileLimit(&compiler, uint32(limit))
+		compiler.WriteString(")")
+	}
+	arms := searchentry.Arms(ranges)
+	read := make([]int, len(ranges))
+	err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		return iter.Do(func(row *spanner.Row) error {
+			var kind string
+			var match domain.SearchEntryMatch
+			if err := row.Columns(&match.ProjectID, &kind, &match.ResourceID, &match.MatchedText, &match.NameStart, &match.Title, &match.Subtitle); err != nil {
+				return err
+			}
+			arm := arms[searchentry.ArmKey{ProjectID: match.ProjectID, Kind: domain.ResourceKind(kind)}]
+			ranges[arm].Matches = append(ranges[arm].Matches, match)
+			read[arm]++
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return searchentry.MarkFull(ranges, read, limit), nil
 }
 
 // writeSearchEntry replaces the entry of its key with entry, inside the
