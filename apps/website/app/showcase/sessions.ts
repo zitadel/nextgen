@@ -134,7 +134,8 @@ export const sessions: Session[] = [
         },
         {
           command: deployCommand,
-          output: "Deployed 3 resources\nRelease sha256:a2807ed6… is now live on http://localhost:3000.",
+          output:
+            "Deployed 3 resources\nRelease sha256:a2807ed6… is now live on http://localhost:3000.",
         },
       ],
     },
@@ -180,7 +181,8 @@ export const sessions: Session[] = [
         },
         {
           command: deployCommand,
-          output: "Deployed 3 resources\nRelease sha256:7166cbe0… is now live on http://localhost:3000.",
+          output:
+            "Deployed 3 resources\nRelease sha256:7166cbe0… is now live on http://localhost:3000.",
         },
       ],
     },
