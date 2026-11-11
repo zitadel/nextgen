@@ -1,0 +1,15 @@
+language js
+
+// A flag is declared by its CLI spelling and read as code reads it: oclif's
+// parsed object is keyed that way (apps/cli/src/lib/oclif/names.ts), so
+// `flags["client-id"]` is always undefined where `flags.clientId` holds the
+// value. Nothing fails at compile time, so the flag silently does nothing.
+`$source[$key]` as $read where {
+  $filename <: r".*/apps/cli/src/.*",
+  $source <: or {
+    `flags`,
+    `args`
+  },
+  $key <: r"\"[a-z0-9]+[-_].*\"",
+  register_diagnostic(span=$read, message="Read a flag or argument as code reads it (flags.clientId), not by its CLI spelling.", severity="error")
+}

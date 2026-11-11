@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Next.js compiles the route handlers itself (SWC); tsc only type-checks.
+    "jsx": "preserve",
+    "noEmit": true,
+    "types": ["node"],
+    "paths": { "@/*": ["./src/*"] },
+    "plugins": [{ "name": "next" }]
+  },
+  // Next reads this file and expects its generated route types listed here;
+  // no route handler reads them, so typecheck runs without `next typegen`.
+  "include": ["next-env.d.ts", "*.config.ts", "app/**/*.ts", "src/**/*.ts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

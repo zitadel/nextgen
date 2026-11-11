@@ -22,10 +22,65 @@ export function formatDateTime(value: string): string {
   return format(value, { ...DATE, hour: "2-digit", minute: "2-digit" });
 }
 
+/** A moment the server stamped finer than the second, as `…T15:32:07.123Z`. */
+const FRACTION = /T\d{2}:\d{2}:\d{2}[.,]\d/;
+
+/** The milliseconds, for a moment that has them: a whole second shows none rather than `.000`. */
+function fraction(value: string): Intl.DateTimeFormatOptions {
+  return FRACTION.test(value) ? { fractionalSecondDigits: 3 } : {};
+}
+
+/**
+ * `2026-04-28T15:32:07.123Z` → `28 Apr 2026, 15:32:07.123` in the viewer's
+ * locale and time zone: {@link formatDateTime} to the millisecond, for a log,
+ * where the events of one request fall within the same second. A moment the
+ * server stamped to the whole second shows no milliseconds. The same fallback.
+ */
+export function formatLogTime(value: string): string {
+  return format(value, {
+    ...DATE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    ...fraction(value),
+  });
+}
+
+/** `2026-04-28T15:32:07.123Z` → `15:32:07.123`: {@link formatLogTime} without the date. */
+export function formatClockTime(value: string): string {
+  return format(value, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    ...fraction(value),
+  });
+}
+
 const DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
 function format(value: string, options: Intl.DateTimeFormatOptions): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString(undefined, options);
+}
+
+/** A day: the window in which a moment reads as "how long ago". */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A moment within the last day as `6h ago` or `12m ago`, and anything older
+ * as {@link formatDateTime}: a deployment made today is read against now, one
+ * made last week against the calendar. The short units are the design's own
+ * rather than the locale's (`6 hr. ago`); the calendar form stays localised.
+ * `now` is a parameter so a test can pin it. A moment up to a minute ahead
+ * is `just now`: the server stamps it, and the browser's clock may trail.
+ */
+export function formatRecent(value: string, now: Date = new Date()): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const elapsed = now.getTime() - parsed.getTime();
+  if (elapsed < -60_000 || elapsed >= DAY_MS) return formatDateTime(value);
+  const minutes = Math.floor(Math.max(elapsed, 0) / 60_000);
+  if (minutes < 1) return "just now";
+  return minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
 }

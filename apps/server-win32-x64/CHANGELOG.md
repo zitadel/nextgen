@@ -1,5 +1,25 @@
 # @zitadel/server-win32-x64
 
+## 0.5.0
+
+No changes in this release.
+
+## 0.4.0
+
+No changes in this release.
+
+## 0.3.0
+
+No changes in this release.
+
+## 0.2.0
+
+No changes in this release.
+
+## 0.1.0
+
+No changes in this release.
+
 ## 1.0.0-alpha.28
 
 ## 1.0.0-alpha.27

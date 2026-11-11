@@ -1,20 +1,35 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // Test-only OIDC provider for the journey runner; nested Go module, no root import.
+  // Test-only OIDC provider for the journey runner: the Go module turbo finds
+  // through go.work as the package `oidc-mock`. No other module of ours is a
+  // dependency. The tasks are moon's (moon.yml) as commands; turbo's
+  // built-in `lint` (go vet, which `vet` runs) and `dev` are dropped.
   "tasks": {
     // Tracked Go files only, as the server project checks them.
-    "format": {},
+    "format": {
+      "cache": false,
+      "command": ["node", "../../scripts/go-format-check.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
+    },
     "vet": {
+      "cache": false,
+      "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
+    "lint": { "extends": false },
+    "dev": { "extends": false },
     "build": {
-      "dependsOn": ["vet"],
+      "cache": false,
+      "command": ["go", "build", "-o", "dist/oidc-mock", "."],
+      "inputs": ["$TURBO_EXTENDS$", "!**/*_test.go", "!**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/oidc-mock"]
     },
     "test": {
+      "cache": false,
       "dependsOn": ["format", "vet"],
+      "command": ["go", "test", "-timeout", "2m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     }
   }

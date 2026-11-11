@@ -1,13 +1,15 @@
-import { publicCliCommand } from "../public-cli";
+import { publicCliCommand } from "@/lib/public-cli";
+import { shellCommand, type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { errorMessage } from "@/lib/errors";
 
 export type DockerRuntimeGuidance = {
   hint: string;
   nextActions: string[];
-  nextCommands: string[];
+  nextCommands: SuggestedCommand[];
 };
 
 export function dockerUnavailableMessage(error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Docker is not reachable${suffix}; managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.`;
 }
@@ -23,6 +25,6 @@ export function dockerRuntimeGuidance(
       `Run \`docker version\`, then rerun \`${publicCliCommand(retryCommand, cliVersion)}\`.`,
       "If you are not using the managed local runtime, run setup with `--server <url>` instead.",
     ],
-    nextCommands: ["docker version", publicCliCommand(retryCommand, cliVersion)],
+    nextCommands: [shellCommand("docker version"), unscopedCommand(retryCommand, cliVersion)],
   };
 }

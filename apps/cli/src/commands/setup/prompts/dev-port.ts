@@ -1,40 +1,39 @@
-import type { Parsed } from "@zitadel/config/idp";
-
+import { LocalServer } from "@/lib/local-server/server";
+import { readPort } from "@/commands/setup/index";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
- * "Where will your app run during development?" — defaults to the detected
- * port. It takes a port or the address it is served at; the validated answer
- * becomes the issuer URL (`http://localhost:<port>`) via `issuerFromPort`.
+ * "Port 3000 is in use. Which port should your app run on?" — asked only when
+ * something already holds the detected port. A free one is nearly always the
+ * answer, and a question whose answer is Enter is one more step for nothing:
+ * the summary shows the port, and `setup --dev-port` moves a set-up app later.
+ * A taken one is worth the question, because setup pins the dev script to the
+ * port and the dev server then fails to start on it.
+ *
+ * The suggestion is the next free port, so Enter, which the developer has
+ * pressed at every question before this one, gives a port the dev server can
+ * start on. If what holds the detected port is this app's own dev server, the
+ * next one works as well, and the detected one can still be typed back. The
+ * validated answer becomes the issuer URL (`http://localhost:<port>`) via
+ * `issuerFromPort`.
  */
-const ADDRESS_PROBLEM = "Enter a port such as 3000, or an address such as http://localhost:3000.";
-
-/** A port, or a `http://localhost:<port>` address, as the port it names. */
-export function parseDevAddress(value: string): Parsed<number> {
-  const text = value.trim();
-  const port = /^\d+$/.test(text)
-    ? Number.parseInt(text, 10)
-    : Number.parseInt(/^http:\/\/(?:localhost|127\.0\.0\.1):(\d+)\/?$/.exec(text)?.[1] ?? "", 10);
-  return Number.isFinite(port) && port > 0 && port < 65536
-    ? { ok: true, value: port }
-    : { ok: false, problem: ADDRESS_PROBLEM };
-}
-
 export class DevPortPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     // `--dev-port <n>` is authoritative: skip the prompt so an interactive
     // answer can't override the explicit flag (the base command already folded
     // it into answers.devPort).
-    if (ctx.devPortFromFlag) {
+    if (ctx.devPortFromFlag || (await LocalServer.isPortFree(answers.devPort))) {
       return answers;
     }
+    // With the next ones all taken too, the detected port is still the best guess.
+    const suggested = String((await LocalServer.nextFreePort(answers.devPort)) ?? answers.devPort);
     const devPort = await ctx.input({
       kind: "text",
       name: "dev server port",
-      message: "Where will your app run during development?",
-      placeholder: `http://localhost:${answers.devPort}`,
-      initialValue: `http://localhost:${answers.devPort}`,
-      parse: parseDevAddress,
+      message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
+      placeholder: suggested,
+      initialValue: suggested,
+      parse: readPort,
     });
     return { ...answers, devPort };
   }

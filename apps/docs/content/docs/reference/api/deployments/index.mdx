@@ -1,13 +1,23 @@
 ---
 title: Deployments
-description: OpenAPI operations for deployments.
+description: Make a release live on primary origins or preview URLs, list what ran where, and roll back.
 ---
 
-A deployment will record which release goes live on which targets, and when.
-These operations are specified but answer `501 Not Implemented` today. Until
-they ship, the server serves the newest revision of each schema, branding, and
-identity provider connection, and picks flows as
-[Edit the login flow and schema](/docs/guides/plan-apply#walkthrough-a-second-flow-selected-by-name)
-describes.
+A [release](/docs/reference/api/releases) is a snapshot of the project's
+configuration. A deployment makes a release live on origins and freezes the
+project's variable values with it. [Deploy](/docs/guides/deploy) walks through
+the CLI flow.
+
+Name the release by `release_id`. Naming it by `content_hash` answers
+`501 Not Implemented` for now.
+
+## Roll back to the previous deployment
+
+1. Call `listDeployments` (`GET /deployments`). It lists the newest deployment first. Note the `id`
+   of the newest one with `kind: primary` and `status: live`.
+2. Pick the deployment to return to: the next `kind: primary` entry below it.
+3. Call `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) with that deployment's `id` in the path and
+   `expected_deployment_id` set to the live one in the request body. It creates
+   a new deployment of the older release.
 
 <Operations />

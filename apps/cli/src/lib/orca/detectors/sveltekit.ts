@@ -12,12 +12,14 @@ import { enforceVersionFloor } from "./version-floor";
  * Runs before the Svelte detector (which excludes SvelteKit) since SvelteKit
  * ships Svelte — so a SvelteKit project is never mistaken for a bare Svelte SPA.
  * Routes/managed files live under `src` (`src/routes`, `src/hooks.server.ts`).
+ * SvelteKit 3 is the floor: the hook reads its settings from `$app/env/private`,
+ * which SvelteKit 2 does not have.
  */
 export class SvelteKitDetector implements Detector {
   readonly framework = "sveltekit";
   readonly displayName = "SvelteKit";
   readonly versionPackage = "@sveltejs/kit";
-  readonly versionFloor = "2";
+  readonly versionFloor = "3";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

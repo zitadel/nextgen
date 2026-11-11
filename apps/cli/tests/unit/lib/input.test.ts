@@ -17,11 +17,12 @@ vi.mock("@clack/prompts", () => ({
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 import { type Parsed, parseClientId } from "@zitadel/config/idp";
 
-import type { ZitadelError } from "../../../src/lib/errors";
+import type { ZitadelError } from "@/lib/errors";
 
-import { clackInputImports } from "../../helpers/clack-imports";
-import { sourceFiles } from "../../helpers/source-files";
-import { input } from "../../../src/lib/input";
+import { clackInputImports } from "@tests/helpers/clack-imports";
+import { sourceFiles } from "@tests/helpers/source-files";
+import { input } from "@/lib/input";
+import { unscopedCommand } from "@/lib/suggestion";
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -219,7 +220,7 @@ describe("input", () => {
           name: "client secret",
           message: "Secret",
           stdin: true,
-          retry: "zitadel x",
+          retry: unscopedCommand("x"),
           parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
         },
         { ...scripted, stdin: piped("hunter2") },
@@ -275,7 +276,10 @@ describe("input", () => {
 
     it("offers the command to run again as the next command", async () => {
       await expect(
-        input({ ...typed(), retry: "zitadel auth-method sso enable --client-id <id>" }, scripted),
+        input(
+          { ...typed(), retry: unscopedCommand("auth-method sso enable --client-id <id>") },
+          scripted,
+        ),
       ).rejects.toMatchObject({
         nextCommands: ["zitadel auth-method sso enable --client-id <id>"],
       });
@@ -283,7 +287,10 @@ describe("input", () => {
 
     it("quotes the command to run again in the hint as an example", async () => {
       await expect(
-        input({ ...typed(), retry: "zitadel auth-method sso enable --client-id <id>" }, scripted),
+        input(
+          { ...typed(), retry: unscopedCommand("auth-method sso enable --client-id <id>") },
+          scripted,
+        ),
       ).rejects.toMatchObject({
         hint: "For example: zitadel auth-method sso enable --client-id <id>",
       });
@@ -294,7 +301,7 @@ describe("input", () => {
       ["a multiselect", { kind: "multiselect" as const, options: [{ value: "a", label: "A" }] }],
     ])("offers the command to run again for %s too", async (_kind, extra) => {
       await expect(
-        input({ name: "x", message: "X", retry: "zitadel x --y", ...extra }, scripted),
+        input({ name: "x", message: "X", retry: unscopedCommand("x --y"), ...extra }, scripted),
       ).rejects.toMatchObject({ nextCommands: ["zitadel x --y"] });
     });
 
@@ -463,12 +470,49 @@ describe("input", () => {
 
     it("requires --force when nobody is there to ask", async () => {
       await expect(
-        input({ ...question, retry: "zitadel x --force" }, scripted),
+        input({ ...question, retry: unscopedCommand("x --force") }, scripted),
       ).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot delete the thing without --force in non-interactive mode",
-        hint: "Pass --force to delete the thing.",
+        hint: "Ask a person first: Delete? Pass --force only once they agree.",
         nextCommands: ["zitadel x --force"],
+        details: { question: "Delete?" },
+      });
+    });
+  });
+
+  describe("yes-no", () => {
+    const question = {
+      kind: "yes-no" as const,
+      name: "deploy it now",
+      message: "Deploy it now?",
+      initialValue: true,
+    };
+
+    it.each([true, false])("returns %s as answered", async (answer) => {
+      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
+
+      expect(await input(question, ask)).toBe(answer);
+    });
+
+    it("is never answered by force", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+      expect(await input(question, { interactive: true, force: true })).toBe(false);
+    });
+
+    it("offers its initial value", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+      await input(question, ask);
+
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ initialValue: true });
+    });
+
+    it("refuses when nobody is there to ask, even with force", async () => {
+      await expect(input(question, { interactive: false, force: true })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "No deploy it now supplied",
       });
     });
   });
@@ -499,12 +543,15 @@ describe("input", () => {
       ],
     ];
 
-    it.each(prompts)("throws E_VALIDATION from %s", async (_kind, prompt, question) => {
+    it.each(prompts)("throws E_CANCELLED from %s", async (_kind, prompt, question) => {
+      // A cancel is the person's decision, not a value that failed to parse,
+      // so it exits 130 like Ctrl-C anywhere else.
       vi.mocked(isCancel).mockReturnValue(true);
       (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
       await expect(input(question, ask)).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CANCELLED",
+        exitCode: 130,
         message: "Cancelled by user",
       });
     });

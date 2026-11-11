@@ -5,11 +5,32 @@ import {
   parseIssuer,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "../input";
+import type { Asker } from "@/lib/input";
+
+/**
+ * What {@link askConnectionEndpoints} needs to know about the run.
+ */
+export type EndpointsQuestion = {
+  /**
+   * The catalog provider the connection is for.
+   */
+  readonly provider: CatalogProviderId;
+
+  /**
+   * Whether this is a development build, the only one that asks.
+   */
+  readonly developmentBuild: boolean;
+
+  /**
+   * How the question is asked: the running command's `input`.
+   */
+  readonly ask: Asker;
+};
 
 /**
  * Ask where a provider lives, on a development run only.
  *
+ * @remarks
  * Someone working on the CLI runs it against a local stand-in constantly, and
  * before this the connection document had to be hand-edited afterwards and
  * re-applied. Someone who installed the CLI is configuring the real vendor and
@@ -17,18 +38,17 @@ import type { Asker } from "../input";
  * (`isDevelopmentBuild()`, the explicit `ZITADEL_CLI_DEV` opt-in). A published
  * CLI never sets it, so the question stays out of its `--help` and prompts.
  *
- * Returns `undefined` for a normal run and for a scripted run, and the
- * catalog's own issuer is dropped when written, so an ordinary run produces
- * the document it would if none of this existed.
+ * The catalog's own issuer is dropped when written, so an ordinary run
+ * produces the document it would if none of this existed.
+ *
+ * @param question - The provider, whether this is a development build, and
+ *   how to ask.
+ * @returns The endpoints, or `undefined` for a normal run and a scripted one.
  */
-export async function askConnectionEndpoints(options: {
-  readonly provider: CatalogProviderId;
-  readonly developmentBuild: boolean;
-  /** How the question is asked: the running command's `input`. */
-  readonly ask: Asker;
-}): Promise<ConnectionEndpoints | undefined> {
-  const { provider, developmentBuild, ask } = options;
-  if (!developmentBuild) {
+export async function askConnectionEndpoints(
+  question: EndpointsQuestion,
+): Promise<ConnectionEndpoints | undefined> {
+  if (!question.developmentBuild) {
     return undefined;
   }
   // Only the issuer is asked for, and only the issuer is written. The engine
@@ -42,13 +62,12 @@ export async function askConnectionEndpoints(options: {
   // URL` accepts `http://idp.internal:9100` and `file:///tmp/idp`, which would
   // be written to a connection that then fails on apply. Refusing at the prompt
   // puts the complaint where the value was typed.
-  return {
-    issuer: await ask({
-      kind: "text",
-      name: "issuer",
-      message: "Issuer",
-      parse: parseIssuer,
-      initialValue: idpProvider(provider).issuer,
-    }),
-  };
+  const issuer = await question.ask({
+    kind: "text",
+    name: "issuer",
+    message: "What is the issuer URL of the provider?",
+    parse: parseIssuer,
+    initialValue: idpProvider(question.provider).issuer,
+  });
+  return { issuer };
 }

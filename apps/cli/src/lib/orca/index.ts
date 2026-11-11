@@ -1,8 +1,9 @@
-import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { ZitadelError } from "../errors";
-import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
+import { isErrno, ZitadelError } from "@/lib/errors";
+import { pathExists, readDirIfExists } from "@/lib/fs";
+import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
@@ -152,11 +153,10 @@ export class Orca {
    * Describes the new `framework` app {@link scaffold} would create in `cwd`,
    * without touching the directory, so a caller can ask its questions first and
    * create the app only once it has every answer. Refuses up front what would
-   * stop the app later: a directory name npm does not accept, or a framework
-   * no scaffolder can create or no patcher can integrate.
+   * stop the app later: a framework no scaffolder can create or no patcher can
+   * integrate.
    */
   async planScaffold(cwd: string, framework: string): Promise<PlannedApp> {
-    assertNpmSafeScaffoldDirectoryName(cwd);
     this.scaffolderFor(framework);
     this.patcherFor(framework);
     return { framework, devPort: await detectDevPort(cwd, {}) };
@@ -190,23 +190,30 @@ export class Orca {
         details: { entries: target.entries },
       });
     }
-    assertNpmSafeScaffoldDirectoryName(cwd);
+    // A directory that does not exist yet is created only now, so a refusal or
+    // a dry run leaves no trace of it, and an undo removes it again with any
+    // parent it took to create it.
+    const created = await mkdir(cwd, { recursive: true });
     const before = await listEntries(cwd);
     // The underlying scaffolders require an empty directory. When it holds the
     // local runtime `start` left, or --force lets us scaffold into a non-empty
     // one, move the existing entries aside, scaffold, then restore anything the
     // scaffold did not create itself.
     const stash = await stashScaffoldDir(cwd, target.entries);
-    const undo = () => undoScaffold(cwd, before, stash);
-    let facts: FrameworkFacts;
-    try {
-      await this.scaffolderFor(framework).scaffold(cwd, framework);
-      await restoreBesideScaffold(cwd, stash);
-      facts = await this.detect(cwd, framework);
-    } catch (error) {
-      await undo();
-      throw error;
-    }
+    const undo = () =>
+      created === undefined
+        ? undoScaffold(cwd, before, stash)
+        : rm(created, { recursive: true, force: true });
+    // Starting from a resolved promise puts the scaffolder lookup, which throws
+    // for an unknown framework, under the same undo as the scaffold itself.
+    const facts = await Promise.resolve()
+      .then(() => this.scaffolderFor(framework).scaffold(cwd, framework))
+      .then(() => restoreBesideScaffold(cwd, stash))
+      .then(() => this.detect(cwd, framework))
+      .catch(async (error: unknown) => {
+        await undo();
+        throw error;
+      });
     return { facts, undo, keep: () => dropStash(stash) };
   }
 
@@ -252,10 +259,14 @@ export class Orca {
     return this.detectors.map((detector) => detector.framework);
   }
 
+  /** A framework's name as people write it ("Next.js" for `next`), or its id when it has none. */
+  displayName(id: string): string {
+    return this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+  }
+
   /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
   private frameworkMismatch(requested: string, detected: string): ZitadelError {
-    const name = (id: string) =>
-      this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+    const name = (id: string) => this.displayName(id);
     return new ZitadelError(
       "E_CONFLICT",
       `Setup detects ${name(detected)} here, not ${name(requested)}`,
@@ -268,53 +279,6 @@ export class Orca {
       },
     );
   }
-}
-
-function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
-  const name = basename(cwd);
-  const errors = npmPackageNameErrors(name);
-  if (errors.length === 0) {
-    return;
-  }
-
-  throw new ZitadelError(
-    "E_VALIDATION",
-    `Fresh app directory name "${name}" is not npm-package-safe`,
-    {
-      hint: "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
-      details: { cwd, name, validation_errors: errors },
-    },
-  );
-}
-
-function npmPackageNameErrors(name: string): string[] {
-  // This local preflight catches common package-name failures before the
-  // scaffolder mutates disk; framework generators still own stricter checks.
-  const errors: string[] = [];
-  if (name.length === 0) {
-    errors.push("name is empty");
-  }
-  if (name.length > 214) {
-    errors.push("name is longer than 214 characters");
-  }
-  if (name !== name.trim()) {
-    errors.push("name contains leading or trailing whitespace");
-  }
-  if (/[A-Z]/.test(name)) {
-    errors.push("name can no longer contain capital letters");
-  }
-  if (name.startsWith(".") || name.startsWith("_")) {
-    errors.push("name cannot start with a period or underscore");
-  }
-  if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
-    errors.push(
-      "name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens",
-    );
-  }
-  if (name === "node_modules" || name === "favicon.ico") {
-    errors.push(`name "${name}" is reserved`);
-  }
-  return [...new Set(errors)];
 }
 
 /** {@link Orca} wired with the default detector, scaffolder, and patcher registries. */
@@ -332,7 +296,10 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
   // and then `setup` work in a new directory: the local runtime, and the
   // `.gitignore` line that keeps it out of git. `scaffold()` moves both aside
   // while the generator runs and merges the `.gitignore` back.
-  const names = [...(await readdir(cwd))].sort();
+  // A scaffold target that does not exist yet has no entries: the scaffold
+  // creates it, as a framework's own generator creates `my-app`, so a `--cwd`
+  // naming the new app's directory works before that directory does.
+  const names = [...(await readDirIfExists(cwd))].sort();
   const others: string[] = [];
   for (const name of names) {
     if (!(await isLocalRuntimeEntry(cwd, name))) {
@@ -347,6 +314,25 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
     reason: `Directory is not empty (contains ${others.join(", ")}).`,
     entries: names,
   };
+}
+
+/**
+ * Whether a project directory is a directory, or does not exist yet, which a
+ * scaffold creates. One that is a file, or lies under one, is not.
+ */
+export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
+  return stat(cwd).then(
+    (stats) => stats.isDirectory(),
+    (error: unknown) => {
+      if (isErrno(error, "ENOENT")) {
+        return true;
+      }
+      if (isErrno(error, "ENOTDIR")) {
+        return false;
+      }
+      throw error;
+    },
+  );
 }
 
 /**
@@ -381,7 +367,7 @@ async function stashScaffoldDir(
 
   const root = join(
     dirname(cwd),
-    `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+    `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
   );
   await mkdir(root, { mode: 0o700 });
   const moved: string[] = [];
@@ -492,13 +478,4 @@ async function mergeGitignore(stashed: string, dest: string): Promise<void> {
     return;
   }
   await writeFile(dest, `${into}${into.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }

@@ -19,7 +19,9 @@ is on Vercel.
   reads modules from a `go.work`, and a module at the repository root (ours)
   is rejected: "Root modules cannot be go.work members; move the module into
   a subdirectory." Without it, the server's inputs are listed by hand, which
-  is what moon's `serverInputs` file group does today.
+  is what moon's `serverInputs` file group does today. (Since the module moved
+  to `apps/api`, turbo reads the committed `go.work`:
+  [turborepo.md](turborepo.md).)
 - **Speed:** the same. Building the three deployed apps from scratch (13
   tasks) took 11–12 s with either tool, under 1 s from the local cache.
 - **Vercel:** turbo uses Vercel's remote cache without any setup (measured

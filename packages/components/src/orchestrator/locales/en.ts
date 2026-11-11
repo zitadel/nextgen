@@ -51,9 +51,9 @@ export const en: Record<string, string> = {
   "collect-credentials.field.email": "Email",
   "collect-credentials.field.email.placeholder": "you@example.com",
   "collect-credentials.field.password": "Password",
-  // No static password rule hint: the only enforced rule is the schema's
-  // minLength, and "symbol + number" was never enforced. The client will build
-  // this hint dynamically from the API's per-field validation rules (#251).
+  // No static password rule hint: the template builds it from the field's own
+  // `validation.min_length` (`fieldRuleHint`, "hint.field_min_length"), which
+  // the server sets from the project's password policy.
   "collect-credentials.action.submit": "Sign up",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -209,6 +209,8 @@ export const en: Record<string, string> = {
   "error.flow_restart_required": "Your sign-in could not be continued. Please start again.",
   "error.passkey_registration_invalid":
     "The new passkey could not be verified. Please try registering it again.",
+  "error.sso_user_schema_mismatch":
+    "This account can't sign in with this provider. Please try another way to sign in, or contact your administrator.",
   "error.sso_unavailable":
     "This sign-in provider is not available right now. Please try another way to sign in.",
   "error.sso_verified_unique_value_changed":
@@ -221,6 +223,13 @@ export const en: Record<string, string> = {
   "error.sso_user_not_found": "There is no account for this sign-in yet.",
   "error.outcome_unhandled": "This step could not continue. Please try again.",
   "error.sign_in_first": "Please sign in to your account first.",
+
+  // --- Notices: why the flow moved between sign-in and sign-up by itself ---
+  "notice.user_not_found":
+    "We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.",
+  "notice.user_already_exists": "That email already has an account. Sign in to continue.",
+  "notice.sso_user_not_found":
+    "There's no account for this sign-in yet, so you can create one now.",
 
   // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
@@ -239,7 +248,14 @@ export const en: Record<string, string> = {
   "error.field_format": "Please enter a valid {0}.",
   "error.field_min_length": "{0} is too short.",
   "error.field_max_length": "{0} is too long.",
+  "error.field_min_length_value": "{0} must be at least {1} characters.",
+  "error.field_max_length_value": "{0} must be at most {1} characters.",
   "error.field_invalid": "Please check {0}.",
+
+  // --- Field hints from validation rules ({0} = the rule's bound) ---
+  // Shown under a field before anything is typed, by `fieldRuleHint`
+  // (liquid.ts), when the field has no `.help` text of its own.
+  "hint.field_min_length": "At least {0} characters.",
 
   // --- Sign-in form-level alert ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",

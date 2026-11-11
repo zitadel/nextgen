@@ -1,11 +1,11 @@
 ---
 title: Overview
-description: Start here for the current Zitadel preview docs, shipped boundaries, and navigation.
+description: Where to begin with the Zitadel preview, what ships today, and how to read these docs as an agent.
 ---
 
 import { Card, Cards } from "fumadocs-ui/components/card";
 
-Zitadel's next-generation preview is the successor track for the platform, built around local-first setup, repo-owned configuration, and auth flows that are easy for humans and coding agents to prove end to end.
+The Zitadel preview is a pre-release version of the identity platform. You set it up locally with the CLI, keep its configuration as files in your repository, and prove sign-in in a browser, by hand or with a coding agent.
 
 Zitadel v4 remains maintained while this preview evolves. The preview is pre-release: APIs, CLI flags, packages, and docs can change before this becomes a future major version. The public product name may also change.
 
@@ -20,15 +20,18 @@ Zitadel v4 remains maintained while this preview evolves. The preview is pre-rel
 
 ## What ships today
 
-The shipped path is local auth setup through the `@zitadel/cli` alpha package. `zitadel start` runs the released `@zitadel/server` npm binary, with no Docker, Go, Moon, or source checkout ([Run Zitadel locally](/docs/guides/local-runtime)), and `zitadel setup` scaffolds auth into a new app or adds it to yours. The claim flow is shipped end to end, though a local project needs none ([Claim](/docs/concepts/project-team-user#claim)).
+The shipped path is local sign-in setup through the `@zitadel/cli` package:
+- `zitadel start` runs the released `@zitadel/server` npm binary, with no Docker, Go or source checkout ([Run Zitadel locally](/docs/guides/local-runtime)).
+- `zitadel setup` scaffolds sign-in into a new app or adds it to yours.
+- Claiming a project, which attaches it to your team, is shipped end to end. A local project needs none ([Claim](/docs/concepts/project-team-user#claim)).
 
-## LLM support
+## Read the docs as an agent
 
-This docs app exposes:
+The docs site exposes these for agents and LLM tools:
 
 - `/docs/llms.txt` for a compact index, each page by its Markdown URL.
 - `/docs/llms-full.txt` for the full text of every page except the API operations.
 - `/docs/<page>.md` (the overview is `/docs/index.md`) for a page's Markdown, or the page URL with `Accept: text/markdown`.
 - `/docs/api/search?query=…` for search.
 - `/docs/api/mcp` for MCP clients, with the tools `search`, `list_pages`, and `get_page`.
-- `/docs/openapi.json` for the server's whole OpenAPI document.
+- `/docs/openapi.json` for the server's whole OpenAPI document. A running server also serves the contract it was built from at `/api/v1/openapi.json`.

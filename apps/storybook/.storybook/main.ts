@@ -9,6 +9,7 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // (the package ships only `dist/`), so it is imported by source path here —
 // mirroring how the package's own `vitest.config.ts` imports it — rather than
 // through a package export that would resolve to an unpublished `.ts` file.
+// @boundaries-ignore build tooling @zitadel/components does not publish, imported by path as said above
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
 import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.ts";
@@ -67,9 +68,9 @@ const config: StorybookConfig = {
   staticDirs: [{ from: apiMockPublicDir, to: "/" }],
   // Inject the workspace-source reload poller into the preview iframe — but only
   // in `storybook dev`. Its `__zitadel_reload_token` endpoint is served by the
-  // dev server's `configureServer` hook alone, so in a static build (e.g. the
-  // Vercel preview) the poller would fetch a nonexistent path every 500ms
-  // forever. `storybook build` runs with `NODE_ENV=production`, so gate on that.
+  // dev server's `configureServer` hook alone, so in a static build the poller
+  // would fetch a nonexistent path every 500ms forever. `storybook build` runs
+  // with `NODE_ENV=production`, so gate on that.
   previewHead: (head) =>
     process.env.NODE_ENV === "production" ? head : `${head}${reloadPollerScript}`,
   async viteFinal(viteConfig) {
@@ -85,8 +86,8 @@ const config: StorybookConfig = {
     viteConfig.resolve.conditions = ["@zitadel/source", ...(viteConfig.resolve.conditions ?? [])];
     // `@zitadel/components` intentionally does NOT publish a `@zitadel/source`
     // condition: its source imports raw `*.css?inline` and `*.liquid` assets, and
-    // exposing it repo-wide would force every TS consumer (the SDKs, `login-ui`)
-    // to typecheck those un-declared modules and conflict with their composite
+    // exposing it repo-wide would force every TS consumer (the SDKs) to
+    // typecheck those un-declared modules and conflict with their composite
     // `dist` project references. Alias it to source here instead — a Storybook-
     // bundler-only override that keeps the Lit shadow CSS (`?inline`) and atom
     // logic hot, without changing how the rest of the workspace resolves it.

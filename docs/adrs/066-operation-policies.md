@@ -27,8 +27,8 @@ Some work was planned as part of ([zitadel#11596](https://github.com/zitadel/zit
 ### Nextgen
 
 No defined settings / policy model. Some configuration is hard-coded, for example:
-- Password minimum length: [`MinLength: 8`](../../internal/domain/flow_field_resolver_schema.go)
-- Passkey user verification is a fixed [`"preferred"`](../../internal/domain/flow_state_machine.go)
+- Password minimum length: [`MinLength: 8`](../../apps/api/internal/domain/flow_field_resolver_schema.go)
+- Passkey user verification is a fixed [`"preferred"`](../../apps/api/internal/domain/flow_state_machine.go)
 - Failed authentication attempts are recorded "for rate-limiting purposes" with no threshold reading them.
 
 The first priority is to introduce proper password policies ([#898](https://github.com/zitadel/nextgen/issues/898)):
@@ -75,10 +75,12 @@ password length, for one) is a guard in the domain, not a policy.
 
 Decided on 2026-10-15, revising #898's "defaults to 15 characters".
 
-- The product does not teach a project what is best for it. Requirements
-  legitimately differ between projects, so Zitadel enforces what a project
-  configures and does not grade it: no recommended values, no warnings below
-  a threshold, no product floor beyond what the server technically needs.
+- The product does not grade a project's choice. Requirements legitimately
+  differ between projects, so Zitadel enforces what a project configures:
+  no warnings below a threshold, no product floor beyond what the server
+  technically needs. Informing, hinting and recommending while a value is
+  chosen is fine; text that appears or changes tone only for some chosen
+  values grades it.
 - Nothing opinionated is hidden in the server. A value Zitadel chose on the
   project's behalf would be enforced without appearing anywhere the project
   can read or review.
@@ -88,14 +90,19 @@ Decided on 2026-10-15, revising #898's "defaults to 15 characters".
 - Overrides stay simple. A later audience or hierarchy model resolves
   between instances that exist, not between instances and a hidden default.
 
-Projects still start from a sensible policy. `zitadel setup` scaffolds a
-starter instance for `auth.factor.password.set` with `min_length: 15`, the
-NIST SP 800-63B minimum for a password used as a single factor
-([#1450](https://github.com/zitadel/nextgen/issues/1450)). #898's default
-therefore lives on as the starter's value, not as server behaviour. A project
-that skips the starter, or later removes the file or its `min_length`, has no
+The CLI may recommend, since what it writes lands in the project's own file.
+`zitadel setup` writes and publishes the `auth.factor.password.set` instance
+with the minimum length the developer picks: the wizard preselects and
+recommends 15 characters, and a run with nobody to ask writes 15 unless
+`--password-min-length` says otherwise
+([#2371](https://github.com/zitadel/nextgen/pull/2371)). 15 is NIST SP
+800-63B-4's minimum for a password that is the only factor; a password only
+ever used with a second factor needs 8, which the wizard offers too and
+becomes the fitting choice once a project can require multi-factor sign-in. The value is
+visible and reviewable in `.zitadel/policies/`, so it is the project's
+configuration, not a hidden default. A project without a `min_length` has no
 length policy; the domain guards (non-empty, at most 64 code points) still
-apply. NIST alignment holds for projects that keep the starter.
+apply.
 
 ### Terminology
 
@@ -158,14 +165,14 @@ resource has, and is not answered here.
 #### Instance
 
 Each instance guards one operation and carries its own configuration under `config`.
-The envelope (`kind`, `operation`) is the same for every operation;
+The envelope (`operation`, and the editor's optional `$schema`) is the same for every operation;
 `config` is what the operation's template defines, and `operation` is the
 discriminator that says which template that is.
 
 ```json
 // .zitadel/policies/auth.factor.password.set.json
 {
-  "kind": "policy",
+  "$schema": "../meta/policy.json",
   "operation": "auth.factor.password.set",
   "config": {
     "min_length": 12,
@@ -229,7 +236,7 @@ cannot add an operation to it. Templates ship with the server; today's list:
 #### Where the catalog lives and how an operation is added
 
 The catalog is the set of template files embedded in the server binary,
-[`internal/policy/templates/*.json`](../../internal/policy/templates/), plus
+[`internal/policy/templates/*.json`](../../apps/api/internal/policy/templates/), plus
 the index that names each operation's evaluation point,
 [`docs/design/policies/catalog.md`](../design/policies/catalog.md). The two
 must agree; the index is what a reviewer reads, the files are what the
@@ -261,17 +268,24 @@ from the context, so the other paths, which have no history to compare with
 or must not learn it, pass it without a hash being verified. The write checks
 that the password it replaces is still the one the history was compared
 with, and fails with `user.conflict` when another change landed in between.
-Instances are resolved through `service.PolicyResolver`. Until instances can be stored
-(the policy resource), it resolves none, so no project has a policy and the
-gate applies only the server's own length cap; registration and SSO sign-up
-also keep the flow field's own minimum of 8 until the field reads the policy
-([#1449](https://github.com/zitadel/nextgen/issues/1449)). Once they can, it returns the newest
-stored revision of the project's instance for the operation; that in turn is
-a stand-in: ADR 035 says an environment sees only what its active release
-pins, so resolution moves to the release's pinned policy revision once
-release-pinned reads exist (scope table in
-[`docs/design/policies/`](../design/policies/README.md)). The
-[catalog index](../design/policies/catalog.md) names the functions.
+Instances are published with `POST /policies`, or by a release build that
+carries them, and resolved through `service.PolicyResolver`, which
+`service.PolicyService.ResolvePolicy` implements. A request whose release pins
+a flow (ADR 035, [#536](https://github.com/zitadel/nextgen/issues/536)) gets
+the policy revision that release pins for the operation, as it gets the user
+schema, branding and identity providers the release pins. There is no
+fallback: a release that pins a flow and no policy for the operation means no
+policy, never the newest stored revision, so deleting a policy file and
+deploying switches the policy off, with the confirmation `deploy` asks for
+every removal. A request that resolves no release, or one that pins no flow,
+gets the newest stored revision, as for every other kind, until it resolves a
+release ([#1616](https://github.com/zitadel/nextgen/issues/1616)); runtime
+resolution then serves only what releases pin
+([#2331](https://github.com/zitadel/nextgen/issues/2331)). Without a policy
+the gate applies only the server's own length cap. A flow step where the user
+chooses a password shows and checks the same length bounds before the gate
+runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)).
+The [catalog index](../design/policies/catalog.md) names the functions.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -389,8 +403,7 @@ needs a misbehaving policy out of the way publishes a revision with an empty
 ### End to end: a user enters their password during sign-up (via flow-engine)
 
 The flow for an instance that sets `min_length: 12`; the step's constraints
-come from the policy once the flow field reads them
-([#1449](https://github.com/zitadel/nextgen/issues/1449)). A new user has no
+come from the policy. A new user has no
 password history and sign-up is not a self-service change, so the gate sends
 `self_service: false` and the `history_depth` rule passes without a hash
 being verified, even when the instance sets it. The constraints projection
@@ -424,13 +437,30 @@ sequenceDiagram
     end
 ```
 
-1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection ([#1449](https://github.com/zitadel/nextgen/issues/1449)). The client can perform frontend validation.
+1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection, through `domain.FlowPasswordPolicy`, on steps where the user chooses a password. The client can perform frontend validation and name the bound in its message ("at least 12 characters").
 2. Submit. The client posts the new password as the reserved field `x-auth-methods#password`.
 3. Validation. Flow-engine backend payload validation re-checks constraints.
 4. Domain operation. The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
 5. Prepare context. Per-operation Go code derives the context (see [Evaluation](../design/policies/2-evaluation.md)).
 6. Evaluate. Every active rule runs over config plus context.
-7. Return the error, or proceed with the operation. In a flow the violated rules come back as field errors on the step that creates the user (`error.x-auth-methods#password_min_length`), here the step with the password field.
+7. Return the error, or proceed with the operation. In a flow the violated rules come back as field errors on the step that creates the user (`error.x-auth-methods#password_min_length`), here the step with the password field. A length violation never gets this far in a flow that collects the password on its own step: step 3 refuses it there.
+
+#### What a step discloses
+
+A step where the user chooses a password carries the policy's `min_length`
+and `max_length` in the field's `validation`, and a sign-up step is served
+before anyone is authenticated. That disclosure is deliberate: a user cannot
+choose a valid password without the length bounds, and they say nothing about
+any account. `history_depth` is never sent with a step; a history violation
+names only the rule. Which settings of future operations a step or the
+constraints endpoint may disclose is not decided here.
+
+A step where the user enters a password they have (signing in) carries no
+length rules: a stored password that predates a stricter policy must still
+sign in. The purpose the flow runs under decides between the two: its
+`chooses` field in `passwordPurposes`. The `new-password` or
+`current-password` autocomplete token beside it is what the form tells a
+password manager, and does not decide the bounds.
 
 ### The rule language: CEL
 
@@ -481,13 +511,24 @@ no `name`. When scoped instances land, with an audience model such as the
 one proposed in [#1264](https://github.com/zitadel/nextgen/pull/1264), the
 handle grows the audience key next to the operation, still derived from the document, so a
 project default and a team override of the same operation are two resources
-without a naming field to keep in step with the audience. The resource slice
-copies branding (create-only, versioned, project-owned), not the user schema
-(URL identity and `$ref` handling a policy does not need). Templates are not
-release content: they ship with the server, and a release records the catalog
-version it was validated against. Release validation runs the same check as
-publishing (`policy.Engine.ValidateInstance`: known operation and settings,
-types, bounds, config rules) and rejects two instances for the same
+without a naming field to keep in step with the audience. The resource follows
+ADR 063 like identity provider connections: a `policies` row per operation per
+project carries the fixed `id` (`pol_`), a `policy_revisions` row per publish
+carries the `revision_id` (`polrev_`) and the config, and the newest revision
+is the one with the greatest `created_at`. It has no URL identity or `$ref`
+handling, which a policy does not need. The API publishes
+(`POST /policies`) and has the ADR 063 reads: the list (`GET /policies`),
+the read by `id`, the revisions of one policy and one revision
+(`GET /policies/revisions/{revision_id}`). A release build
+(`POST /releases/build`) carries instances under `policies`, each the body
+`POST /policies` takes, and publishes them inside the release's transaction:
+an unchanged config reuses the operation's newest revision, a changed one
+appends a revision, and the release pins it under the `policy` kind with the
+operation as its handle. Building one needs `policy.write`, like publishing.
+Templates are not release content: they ship with the server, and a release
+records the catalog version it was validated against. Release validation runs
+the same check as publishing (`policy.Engine.Bind`: known operation and
+settings, types, bounds, config rules) and rejects two instances for the same
 operation.
 
 ### Applicability
@@ -502,7 +543,7 @@ configuration proposal ([#1264](https://github.com/zitadel/nextgen/pull/1264),
 closed without a decision) gave release content a required `audience` (an
 explicit project default or a set of scope parameters such as `team_ids`),
 release-time validation, and most-specific-wins resolution; whichever model
-is decided, policies take its envelope field next to `kind` and `operation`.
+is decided, policies take its envelope field next to `operation`.
 The model needs no change to take it: the engine evaluates one resolved
 instance, and the resolver is the only piece that grows a request hint. That
 a scoped instance must not weaken the project's policy is decided with it
@@ -662,3 +703,13 @@ than the link.
 - The policy itself as a JSON Schema, enforced by validating the context. The most internally consistent option, and it cannot take a bound from another value in the document, so `history_depth` bakes into the schema's shape and a configuration change becomes a schema change.
 - A remote policy server queried per decision. A release cannot determine behaviour if the deciding logic lives somewhere we do not version.
 - Rules inline in the user schema. Re-revisions every schema on a security change.
+
+## Amendment (2026-10-30): a policy comes only from a release
+
+A request gets the policy revision its release pins, and no policy when it pins
+none, whether or not that release pins a flow. Nothing falls back to the newest
+stored revision. A request with no release answers `rel.not_deployed`. A
+password set through the API follows the release
+[ADR 085](085-which-release-serves-a-request.md#amendment-2026-11-05-setuserpassword-follows-its-callers-origin)
+picks for its caller. A release build still reuses only an operation's newest
+revision, so a policy reads back as the config the last build carried.

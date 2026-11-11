@@ -1,0 +1,5 @@
+title: PolicyOperation
+type: string
+description: An operation a policy can guard; the policy catalog lists them.
+enum:
+  - auth.factor.password.set

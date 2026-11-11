@@ -1,0 +1,59 @@
+get:
+  operationId: getVariable
+  x-zitadel-cli: variable get
+  summary: Get a variable by name
+  description: |
+    Returns one variable by name, with its value for each kind. A variable
+    holds a value per kind: `primary` for primary origins and `preview` for
+    preview URLs.
+
+    Pass the name of a variable the project holds, as `getVariables` (`GET /variables`) lists
+    it. A name with no value for the requested kind answers `var.not_found`;
+    set it with `updateVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
+  tags:
+    - Variables
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/variable-name.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
+  security:
+    - oauth2:
+        - variable.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: The variable, with its value for each kind.
+      content:
+        application/json:
+          schema:
+            $ref: ../variable-by-kind.yaml
+    default:
+      $ref: getVariable-error-response.yaml
+
+delete:
+  operationId: deleteVariable
+  x-zitadel-cli: variable rm
+  summary: Delete a variable by name
+  description: |
+    Deletes a variable for the requested kind, or for both kinds without
+    `kind`. Existing deployments keep the values they froze. Each kind removed
+    records a `variable.removed` event.
+
+    A name with no value for that kind answers `var.not_found`: there is
+    nothing to delete. `getVariables` (`GET /variables`) lists the names the project holds. To
+    remove several names in one request, or to remove a name that may already
+    be absent, send `null` for each name to `updateVariables` (`PATCH /variables`).
+  tags:
+    - Variables
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/variable-name.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
+  security:
+    - oauth2:
+        - variable.write
+  responses:
+    '204':
+      description: The variable was deleted.
+    default:
+      $ref: deleteVariable-error-response.yaml

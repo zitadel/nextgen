@@ -1,0 +1,27 @@
+title: ReleaseCreatedPayload
+type: object
+description: |
+  Payload for `release.created`. The release ID is the event's `entity_id`.
+  The payload repeats the pinned set, the revisions the
+  [release](/docs/concepts/repo-config) freezes, so the event stream shows
+  what a release contained without reading the release itself.
+properties:
+  content_hash:
+    type: string
+  message:
+    type: string
+  git_sha:
+    type: string
+  git_dirty:
+    type: boolean
+  pointers:
+    type: array
+    items:
+      type: object
+      properties:
+        kind:
+          type: string
+        handle:
+          type: string
+        revision_id:
+          type: string

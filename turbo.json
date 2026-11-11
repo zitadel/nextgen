@@ -4,30 +4,58 @@
   // turborepo-migration.md). Every moon task has a turbo task: the shared ones
   // here, the rest in each package's turbo.json ("extends": ["//"]), which
   // mirrors that package's moon.yml edge for edge. Both runners run the same
-  // package.json scripts. Moon stays the runner of record (CI, local docs)
-  // until the cutover; the hosted cloud (vercel.json, apps/cloud/build.sh)
+  // package.json scripts, except in the Go modules, which have none: their
+  // turbo.json gives each task a `command`. Moon stays the runner of record (CI, local docs)
+  // until the cutover; the hosted cloud (vercel.json, apps/cloud)
   // builds with turbo since the pilot.
   //
   // Without this, turbo writes its own block into the root AGENTS.md whenever
   // it detects an AI agent running it.
   "agentGuidance": false,
+  // `--affected` and `turbo query affected` match changed files against each
+  // task's `inputs` and follow task edges, the artifact edges included (the
+  // server embeds the console): the same answer as the cache key gives
+  // (docs/design/build/turborepo-graph.md). `turbo watch` reruns by the same
+  // inputs; matched by package instead, it ignored every Go edit, because no
+  // package held the server's Go code.
+  //
+  // The two experimental flags make the modules in go.work packages (named
+  // after the module path's last element, a major-version suffix keeping the
+  // element before it: `nextgen`, `zitadel/v5`, `bench`, `oidc-mock`,
+  // `defaults`, `design-tokens`) and let a task run a `command` instead of a
+  // script. Each module's `go-sources` depends on its module dependencies'
+  // (`^go-sources`), so a task that reads one module
+  // sees the sources of every module it compiles. Turbo gives each module
+  // built-in `build`, `test`, `lint` (go vet), `format` (go fmt, which
+  // rewrites) and `dev` tasks; the modules' turbo.json replace or drop them.
+  "futureFlags": {
+    "affectedUsingTaskInputs": true,
+    "experimentalGoWorkspaces": true,
+    "experimentalTaskCommand": true,
+    "watchUsingTaskInputs": true
+  },
   // Tasks see only the variables listed on them, turbo's built-in list (PATH,
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
   // adds (VITE_* for Vite packages, NEXT_* for Next.js, ...).
   "envMode": "strict",
   // Vite inference would hash the VITE_VERCEL_* variables Vercel sets in a
   // build. Turbo leaves them out in the Vite service's build, where Vercel
-  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the storybook's
-  // and the server's, so the same packages got other keys there than in the
-  // console's build and were built twice per deployment. No build here reads
+  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the server's, so
+  // the same packages got other keys there than in the console's build and
+  // were built twice per deployment. No build here reads
   // them. A negation here also applies to framework inference.
   "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
-    // are keyed by Go itself. GOFLAGS and the target platform change outputs,
-    // so the Go tasks list those as hashed `env` instead.
+    // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
+    // runners set (`depot gocache`), which authenticates with the job's
+    // DEPOT_CACHE_TOKEN. Native Go commands are not runner-cached: Go hashes
+    // the effective compiler and target defaults itself. The Go tasks list
+    // GOFLAGS and explicit target variables as `env` so strict mode passes them.
     "GOPATH",
     "GOCACHE",
+    "GOCACHEPROG",
+    "DEPOT_CACHE_TOKEN",
     "GOMODCACHE",
     "GOTMPDIR",
     "GOTOOLCHAIN",
@@ -54,9 +82,10 @@
     // listed here (it checks the file); the cloud's builds run its `pnpm`.
     "COREPACK_HOME"
   ],
-  // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change
-  // to any of them re-runs every task. Turbo hashes each package's slice of
-  // pnpm-lock.yaml on its own, so the lockfile is not listed.
+  // The files moon's .moon/tasks/*.yml list as implicitInputs: a change to
+  // any of them re-runs every task. Turbo hashes each package's slice of
+  // pnpm-lock.yaml on its own, so the lockfile is not listed. Shared test
+  // configuration belongs to test and typecheck inputs, not every build.
   "globalDependencies": [
     ".nvmrc",
     ".npmrc",
@@ -65,9 +94,7 @@
     "devbox.json",
     "devbox.lock",
     "tsconfig.base.json",
-    "biome.json",
-    "vitest.shared.mjs",
-    "vitest.shared.d.mts"
+    "biome.json"
   ],
   "tasks": {
     // ---- The standard tasks of every TypeScript package (.moon/tasks/
@@ -75,12 +102,67 @@
     // not used: it follows devDependencies too, and the console's
     // @zitadel/testing (dev-real only) would pull the CLI and the server
     // build into every console build (pilot finding 2).
-    "lint": {},
-    "typecheck": {},
+    //
+    // Inputs by file class (docs/design/build/turborepo-graph.md): no task
+    // below reads a package's docs, and no build reads its tests. A negation
+    // wins over any inclusion, so a task that reads one of these files
+    // replaces `inputs` instead of extending them (cli#test). Every package
+    // lint is `biome check .`, which processes no Markdown.
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
+    },
+    "typecheck": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!skills/**/*.md"
+      ]
+    },
     "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!skills/**/*.md",
+        "!**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/__tests__/**",
+        "!**/__snapshots__/**",
+        "!tests/**",
+        "!test/**",
+        "!**/vitest.config.*",
+        "!**/vitest.*.config.*"
+      ],
       "outputs": ["dist/**"]
     },
-    "test": {},
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!skills/**/*.md"
+      ]
+    },
 
     // ---- Task shapes several packages share. Release builds clean and
     // rewrite dist in one script (scripts/release-clean.mjs), never cached.
@@ -89,12 +171,58 @@
       "outputs": ["dist/**"]
     },
     // Chromium for the browser-mode Vitest projects; the `test` task of those
-    // packages depends on it so the test gate provisions it in CI.
+    // packages depends on it so the test gate provisions it in CI. Never
+    // cached, so its inputs only decide when it counts as affected: the
+    // Playwright version, which the manifest and the lockfile pin. With the
+    // whole package as input, a README edit made every browser test affected.
     "install-browsers": {
-      "cache": false
+      "cache": false,
+      "inputs": ["package.json"]
     },
+    // Generation feeds the builds, so it leaves out what they leave out:
+    // without that, a spec edit re-ran api#generate and every build after it.
     "generate": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!skills/**/*.md",
+        "!**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/__tests__/**",
+        "!**/__snapshots__/**",
+        "!tests/**",
+        "!test/**",
+        "!**/vitest.config.*",
+        "!**/vitest.*.config.*"
+      ],
       "outputs": ["src/generated/**"]
+    },
+    // A Go module's production sources, which no command reads directly:
+    // the Go tasks depend on it. `^go-sources` follows the module's requires,
+    // so the task covers every module it compiles. Tests and testdata are
+    // left out, so a test-only change does not select a production build,
+    // and so are the docs the builds leave out. @zitadel/server and the
+    // design tokens list their own inputs.
+    "go-sources": {
+      "dependsOn": ["^go-sources"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        // Native Go inputs must not hash the toolchain/cache Vercel puts
+        // inside the service root, even on a checkout without Git metadata.
+        "!**/.vercel/**",
+        "!**/*_test.go",
+        "!**/testdata/**",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md"
+      ]
     },
     "dev": {
       "cache": false,
@@ -126,18 +254,88 @@
     // orchestration. The root package's default inputs are the whole
     // repository, so every root task lists its inputs: the cached ones as
     // moon.yml does, the uncached ones so that only a change to their own
-    // scripts marks them affected (scripts/ci-mode.mjs).
+    // scripts marks them affected (`--affected`).
     //
     // The root lint checks the whole repository, so its inputs are every file
     // Biome checks (moon's workspace:lint has no inputs and is never selected
     // by affectedness, which is a gap rather than a behaviour to copy).
+    // An explicit glob also matches ignored files, so it names the ignored
+    // trees it would otherwise hash: node_modules alone held 101,000 matches,
+    // and in the main checkout .claude/ holds every worktree.
     "//#lint": {
-      "inputs": ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}", "biome.json"]
+      "inputs": [
+        "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+        "biome.json",
+        "biome-plugins/*.grit",
+        "!**/node_modules/**",
+        "!**/generated/**",
+        "!**/dist/**",
+        "!**/out-tsc/**",
+        "!**/coverage/**",
+        "!**/.next/**",
+        "!**/.nuxt/**",
+        "!**/.nuxt-typecheck/**",
+        "!**/.output/**",
+        "!**/.svelte-kit/**",
+        "!**/.turbo/**",
+        "!**/.vercel/**",
+        "!**/test-results/**",
+        "!**/playwright-report/**",
+        "!**/.vitest/**",
+        "!**/next-env.d.ts",
+        "!**/*.timestamp*",
+        "!apps/docs/.source/**",
+        "!apps/docs/.generated/**",
+        "!apps/cloud-functions/app/.well-known/workflow/**",
+        "!.claude/**",
+        "!.codex/**",
+        "!.cursor/**",
+        "!.agents/**",
+        "!.opencode/**",
+        "!.moon/**",
+        "!tmp/**",
+        "!.tmp/**"
+      ]
     },
     "//#test": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
+        "scripts/cloud-setup.test.mjs",
+        "scripts/deployment-suite.test.mjs",
+        "apps/cloud/setup-secrets.sh",
+        "apps/cloud/admin-document.mjs",
+        "packages/config/bootstrap-user.mjs",
+        ".github/workflows/deployment-suite.yml",
+        "scripts/go-generate.mjs",
+        "scripts/go-generate.test.mjs",
+        "scripts/task-graph.test.mjs",
+        "scripts/cloud-build.test.mjs",
+        "vercel.json",
+        "apps/cloud/build-launcher.sh",
+        "apps/cloud/deploy.sh",
+        "apps/api/internal/build/info.go",
+        "go.work",
+        "moon.yml",
+        "turbo.json",
+        "apps/*/moon.yml",
+        "apps/*/turbo.json",
+        "apps/*/package.json",
+        "packages/*/moon.yml",
+        "packages/*/turbo.json",
+        "packages/*/package.json",
+        "tools/*/moon.yml",
+        "tools/*/turbo.json",
+        "tools/*/package.json",
+        "e2e/moon.yml",
+        "e2e/turbo.json",
+        "e2e/package.json",
+        ".moon/**/*.yml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/ci-turbo.yml",
+        ".gitignore",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
         "scripts/shims/pnpm",
@@ -147,15 +345,21 @@
         "scripts/release-github.mjs",
         "scripts/release-github.test.mjs",
         "scripts/release-manifest.mjs",
+        "scripts/server-build.mjs",
         "scripts/render-builtin-schemas.mjs",
         "scripts/render-builtin-schemas.test.mjs",
-        "api/openapi/endpoints/schemas/*.json",
+        "apps/api/api/openapi/endpoints/schemas/*.json",
+        // The built-in schemas' renderer matches the server's default
+        // namespace.
+        "packages/config/src/builtin-schema-base.ts",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]
     },
     "//#check-typecheck": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/check-typecheck-programs.mjs",
         "scripts/check-typecheck-programs.test.mjs",
         "scripts/assert-file.mjs",
@@ -173,6 +377,8 @@
     },
     "//#check-openapi-rules": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/openapi-casing-rules.test.mjs",
         "scripts/assert-file.mjs",
         "scripts/testdata/openapi-casing/**",
@@ -201,29 +407,65 @@
     "//#check-adrs": {
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
     },
+    // Every module in go.work compiles with what its own go.mod selects
+    // (scripts/check-go-work.mjs). Not cached, as no native Go result is.
+    "//#check-go-work": {
+      "cache": false,
+      "env": ["GOFLAGS"],
+      "inputs": [
+        "scripts/check-go-work.mjs",
+        "scripts/check-go-work.test.mjs",
+        "scripts/assert-file.mjs",
+        "scripts/dev-process.mjs",
+        "go.work",
+        "go.work.sum",
+        "apps/*/go.{mod,sum}",
+        "packages/*/go.{mod,sum}",
+        "packages/config/defaults/go.{mod,sum}",
+        "tools/*/go.{mod,sum}"
+      ]
+    },
+    // Two Go modules cannot have a turbo.json of their own: the design
+    // tokens' shares its directory with @zitadel/design-tokens, and the config
+    // defaults' directory ships to npm (and every *.json in it is a default
+    // the server's tests load). They keep turbo's built-in build, test and
+    // lint (go build, go test, go vet), uncached like every native Go result
+    // (.moon/AGENTS.md), and their `format` (go fmt, which rewrites) is
+    // replaced here, by name, with the other modules' check.
+    "design-tokens#format": {
+      "cache": false,
+      "command": ["node", "../../scripts/go-format-check.mjs"]
+    },
+    "design-tokens#build": { "cache": false },
+    "design-tokens#lint": { "cache": false },
+    "design-tokens#test": { "cache": false },
+    "defaults#format": {
+      "cache": false,
+      "command": ["node", "../../../scripts/go-format-check.mjs"]
+    },
+    "defaults#build": { "cache": false },
+    "defaults#lint": { "cache": false },
+    "defaults#test": { "cache": false },
     "//#doctor": {
       "cache": false,
-      "inputs": ["scripts/doctor.mjs", "scripts/dev-process.mjs"]
+      "inputs": ["scripts/doctor.mjs", "scripts/server-build.mjs", "scripts/dev-process.mjs"]
     },
     // `workspace:cli` is not a turbo task: it is interactive, which turbo only
     // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    // Under `turbo watch server` a Go or console edit restarts the server
+    // (`interruptible`): its edges reach both.
     "//#server": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "interruptible": true,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/server#go-sources"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
-    },
-    "//#cloud": {
-      "cache": false,
-      "persistent": true,
-      "inputs": ["scripts/run-cloud.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
-      "passThroughEnv": ["CLOUD_DEV_PORT", "CLOUD_DEV_DEBUG", "NEXTGEN_*", "GOFLAGS"]
     },
     "//#server-debug": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["@zitadel/console#build"],
       "inputs": [
         "scripts/run-server-debug.mjs",
         "scripts/server-build.mjs",
@@ -232,12 +474,19 @@
       ],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
-    // The local runtime image: the server cross-compiled for linux with both
-    // UI dists embedded. Needs Docker, so it stays out of CI.
+    // The local runtime image: the server cross-compiled for linux with the
+    // console's dist embedded. Needs Docker, so it stays out of CI.
     "//#build-local-image": {
       "cache": false,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
-      "inputs": ["scripts/build-local-runtime-image.mjs", "scripts/dev-process.mjs", "Dockerfile"],
+      "dependsOn": ["@zitadel/console#build"],
+      "inputs": [
+        "scripts/build-local-runtime-image.mjs",
+        "scripts/release-artifacts.mjs",
+        "scripts/release-manifest.mjs",
+        "scripts/server-build.mjs",
+        "scripts/dev-process.mjs",
+        "Dockerfile"
+      ],
       "passThroughEnv": ["ZITADEL_*", "DOCKER_*", "GOFLAGS"]
     },
     "//#smoke-container": {

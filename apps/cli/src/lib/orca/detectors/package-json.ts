@@ -1,29 +1,13 @@
 import { readFile, realpath } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import semver from "semver";
 
-/**
- * Minimal shape of the `package.json` fields detectors read. Intentionally
- * partial: only the keys detection logic depends on are modeled, all optional
- * since a project may omit any of them.
- */
-export type PackageJson = {
-  name?: string;
-  scripts?: Record<string, string>;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
+import { ancestors } from "@/lib/paths";
+import { type PackageJson, readPackageJson } from "@/lib/npm";
 
-/**
- * Reads and parses the `package.json` at `cwd`. Rejects if the file is absent
- * or malformed; callers that treat those as "not a project" are expected to
- * catch and fall back rather than have detection swallow the error here.
- */
-export async function readPackageJson(cwd: string): Promise<PackageJson> {
-  const contents = await readFile(join(cwd, "package.json"), "utf8");
-  return JSON.parse(contents) as PackageJson;
-}
+export { type PackageJson, readPackageJson } from "@/lib/npm";
 
 /**
  * Reports whether `name` appears in either `dependencies` or `devDependencies`.
@@ -156,14 +140,8 @@ async function isWorkspaceRoot(dir: string): Promise<boolean> {
   ) {
     return true;
   }
-  try {
-    const { workspaces } = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
-      workspaces?: unknown;
-    };
-    return workspaces !== undefined && workspaces !== null;
-  } catch {
-    return false;
-  }
+  const pkg = await readPackageJson(dir).catch(() => undefined);
+  return pkg?.workspaces !== undefined && pkg.workspaces !== null;
 }
 
 /**
@@ -179,20 +157,19 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  let dir = await realpath(resolve(cwd)).catch(() => resolve(cwd));
-  for (;;) {
+  const start = await realpath(resolve(cwd)).catch(() => resolve(cwd));
+  for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
     const contents = await readFile(path, "utf8").catch(() => undefined);
     if (contents !== undefined) {
       const version = versionIn(contents);
       return version === undefined ? undefined : { version, path };
     }
-    const parent = dirname(dir);
-    if (parent === dir || (await isWorkspaceRoot(dir))) {
+    if (await isWorkspaceRoot(dir)) {
       return undefined;
     }
-    dir = parent;
   }
+  return undefined;
 }
 
 /** The version of `name` installed for the app at `cwd`; see {@link installedPackage}. */
@@ -202,12 +179,9 @@ export async function installedVersion(cwd: string, name: string): Promise<strin
 
 /** The valid semver `version` a `package.json` declares, if any. */
 function versionIn(contents: string): string | undefined {
-  try {
-    const { version } = JSON.parse(contents) as { version?: unknown };
-    return typeof version === "string" ? (semver.valid(version) ?? undefined) : undefined;
-  } catch {
-    return undefined;
-  }
+  const parsed = parseJsonOrUndefined(contents);
+  const version = isObject(parsed) ? parsed.version : undefined;
+  return typeof version === "string" ? (semver.valid(version) ?? undefined) : undefined;
 }
 
 /**

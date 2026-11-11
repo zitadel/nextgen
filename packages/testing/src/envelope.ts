@@ -43,7 +43,6 @@ export interface StartEnvelopeData {
   urls: {
     api: string;
     console: string;
-    login: string;
   };
 }
 

@@ -5,7 +5,7 @@ Svelte 5 components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-svelte@alpha
+pnpm add @zitadel/sdk-svelte@latest
 ```
 
 ## Requirements

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{.Title}} · Zitadel</title>
+<link rel="icon" href="/favicons/light/favicon.ico" type="image/x-icon" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/favicons/dark/favicon.ico" type="image/x-icon" media="(prefers-color-scheme: dark)">
+<script>if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";</script>
+<style>{{.CSS}}</style>
+</head>
+<body>
+<main class="error">
+<p class="error-status">Error {{.Status}}</p>
+<h1 class="error-title">{{.Title}}</h1>
+<p class="error-description">{{.Description}}</p>
+{{- with .Action}}
+<a class="error-action" href="{{.Href}}">{{.Label}}</a>
+{{- end}}
+{{- with .RequestID}}
+<p class="error-reference">Request ID <code>{{.}}</code></p>
+{{- end}}
+</main>
+</body>
+</html>

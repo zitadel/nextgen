@@ -1,0 +1,100 @@
+/* The anatomy every error page shares (ADR 076): the status, a title, one
+   sentence, a way on and a reference to quote. Colours, faces, spacing and
+   radii are the --zl-* tokens inlined before this file. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  display: grid;
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--zl-spacing-10) var(--zl-spacing-6);
+  place-items: center;
+  background:
+    radial-gradient(60% 40% at 50% 0%, color-mix(in srgb, var(--zl-foreground) 7%, transparent), transparent),
+    var(--zl-background);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.error {
+  display: flex;
+  max-width: 32rem;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--zl-spacing-3);
+  text-align: center;
+}
+
+.error-status {
+  margin: 0;
+  color: var(--zl-muted-foreground);
+  font-family: var(--zl-font-family-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* APK Futural has one weight: a heading in it is never bold. */
+.error-title {
+  margin: 0;
+  font-family: var(--zl-font-family-heading);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.error-description {
+  margin: 0;
+  color: var(--zl-muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.error-action {
+  display: inline-flex;
+  height: 2.5rem;
+  margin-top: var(--zl-spacing-3);
+  padding: 0 var(--zl-spacing-5);
+  align-items: center;
+  border-radius: var(--zl-radius-md);
+  background: var(--zl-primary);
+  color: var(--zl-primary-foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.error-action:hover {
+  background: color-mix(in srgb, var(--zl-primary) 88%, var(--zl-background));
+}
+
+.error-action:focus-visible {
+  outline: 2px solid var(--zl-ring);
+  outline-offset: 2px;
+}
+
+.error-reference {
+  margin: var(--zl-spacing-6) 0 0;
+  color: var(--zl-muted-foreground);
+  font-size: 0.75rem;
+}
+
+.error-reference code {
+  font-family: var(--zl-font-family-mono);
+}

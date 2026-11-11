@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { _setRuntimeForTesting } from "../runtime/runtime";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -16,7 +17,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 async function renderAt(path: string) {
-  const { createAppRouter } = await import("../router");
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
   return router;
@@ -32,40 +32,51 @@ function project(id: string, name: string) {
   };
 }
 
+/** What a project's Overview reads (D35), recording which project it read. */
+function overviewReads(projectReads: string[]) {
+  return [
+    http.get("http://localhost/api/v1/projects/:projectId", ({ params }) => {
+      const id = String(params.projectId);
+      projectReads.push(id);
+      return HttpResponse.json({ ...project(id, "Acme"), origins: [], owning_team_id: null });
+    }),
+    http.get("http://localhost/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
+    http.get("http://localhost/api/v1/events", () => HttpResponse.json({ data: [] })),
+  ];
+}
+
 /**
- * Neither `/` nor `/settings` has a screen of its own; each lands on the first
- * one behind it.
+ * `/` is a project's Overview, and Projects itself when no project is chosen;
+ * `/settings` has no screen of its own and lands on the first one behind it.
  *
  * Worth its own spec because these are the two paths nobody navigates to
  * deliberately: `/` is where sign-in, the logo and the claim flow's "Open the
- * console" all arrive, and `/settings` is where the account dropdown goes.
+ * console" all arrive, and `/settings` is where the sidebar's Settings row goes.
  */
 describe("landing routes", () => {
-  // `/` lands on Users, a project-scoped screen, so with no `?project=` the
-  // `_authed` guard picks one (`resolveDefaultProjectScope`). Users, because
-  // whoever just signed up through the developer's app is listed there.
-  it("lands on Users in the only project the person can act on", async () => {
-    const userQueries: string[] = [];
+  // `/` is the project's Overview (D35), a project-scoped screen, so with no
+  // `?project=` the `_authed` guard picks one (`resolveDefaultProjectScope`).
+  it("lands on the Overview of the only project the person can act on", async () => {
+    const projectReads: string[] = [];
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/users/query", ({ request }) => {
-        userQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
-        return HttpResponse.json({ users: [] });
-      }),
+      ...overviewReads(projectReads),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
-    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-    expect(userQueries).toEqual(["proj_1"]);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/");
+    expect(await screen.findByRole("heading", { name: "Acme", level: 1 })).toBeInTheDocument();
+    expect(projectReads).toEqual(["proj_1"]);
   });
 
   it("lands on Projects when there are several to choose from", async () => {
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
       ),
     );
@@ -73,27 +84,31 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    // Projects itself rather than the way to Overview: arriving at the console
+    // asked for no screen (D22).
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
   });
 
   it("keeps a scoped deep link's target while the person picks a project", async () => {
     // A link shared before the selection was part of the URL: several projects
     // to choose from, so the guard asks, and choosing one ends on the link.
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
       ),
       // The link's own screen, once it is reached.
-      http.get("http://localhost/api/users/usr_1", () =>
+      http.get("http://localhost/api/v1/users/usr_1", () =>
         HttpResponse.json({ id: "usr_1", schema: "sch_1", attributes: {}, metadata: {} }),
       ),
-      http.get("http://localhost/api/users/usr_1/passkeys", () =>
+      http.get("http://localhost/api/v1/users/usr_1/passkeys", () =>
         HttpResponse.json({ passkeys: [] }),
       ),
-      http.get("http://localhost/api/users/usr_1/identity_links", () =>
+      http.get("http://localhost/api/v1/users/usr_1/identity_links", () =>
         HttpResponse.json({ identity_links: [] }),
       ),
-      http.get("http://localhost/api/users/usr_1/password", () => HttpResponse.json({})),
-      http.get("http://localhost/api/schemas/sch_1", () =>
+      http.get("http://localhost/api/v1/users/usr_1/password", () => HttpResponse.json({})),
+      http.get("http://localhost/api/v1/schemas/sch_1", () =>
         HttpResponse.json({ id: "sch_1", schema: { properties: {} }, metadata: {} }),
       ),
     );
@@ -110,7 +125,7 @@ describe("landing routes", () => {
   it("selects the only project on an unscoped screen too", async () => {
     // `/projects` opened directly agrees with `/`: one project, so it is selected.
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
     );
@@ -124,19 +139,19 @@ describe("landing routes", () => {
 
   it("asks for the person's projects once for the guard and the switcher", async () => {
     // The Projects screen pages the list itself (`limit`); the guard and the
-    // switcher share one unpaged read.
+    // switcher share one unpaged read. System is a screen with both.
     let unpaged = 0;
     server.use(
-      http.get("http://localhost/api/users/me/projects", ({ request }) => {
+      http.get("http://localhost/api/v1/users/me/projects", ({ request }) => {
         if (!new URL(request.url).searchParams.has("limit")) unpaged += 1;
         return HttpResponse.json({
           projects: [project("proj_1", "Acme"), project("proj_2", "Globex")],
         });
       }),
     );
-    const router = await renderAt("/");
+    server.use(http.get("*/api/v1/readyz", () => HttpResponse.text("ok")));
+    await renderAt("/system");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
     expect(unpaged).toBe(1);
@@ -147,21 +162,25 @@ describe("landing routes", () => {
     // project, which the developer who just claimed a project cannot manage:
     // their project is the default.
     _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+    const projectReads: string[] = [];
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/users/query", () => HttpResponse.json({ users: [] })),
+      ...overviewReads(projectReads),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/");
+    await waitFor(() => expect(projectReads).toEqual(["proj_1"]));
   });
 
   it("does not take one listed project as the only one while more pages follow", async () => {
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")], next_page_token: "page_2" }),
       ),
     );
@@ -176,18 +195,22 @@ describe("landing routes", () => {
     // platform project, and every screen in it would refuse this person.
     _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
     server.use(
-      http.get("http://localhost/api/users/me/projects", () => HttpResponse.json({ projects: [] })),
+      http.get("http://localhost/api/v1/users/me/projects", () =>
+        HttpResponse.json({ projects: [] }),
+      ),
     );
     const router = await renderAt("/");
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
-    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Create your first project" }),
+    ).toBeInTheDocument();
   });
 
   it("selects nothing when the person's projects cannot be read", async () => {
     server.use(
-      http.get("http://localhost/api/users/me/projects", ({ request }) =>
+      http.get("http://localhost/api/v1/users/me/projects", ({ request }) =>
         new URL(request.url).searchParams.has("limit")
           ? HttpResponse.json({ projects: [] })
           : HttpResponse.json({ code: "internal" }, { status: 500 }),
@@ -199,11 +222,11 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on Profile from settings", async () => {
-    // Settings has no landing page of its own; the account dropdown's target
-    // forwards to the first settings screen.
+  it("lands on the profile from settings", async () => {
+    // Settings has no landing page of its own: the sidebar's row forwards to
+    // the profile, its list's first page.
     server.use(
-      http.get("http://localhost/api/users/me", () =>
+      http.get("http://localhost/api/v1/users/me", () =>
         HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
       ),
     );
@@ -211,9 +234,7 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
-    // No screen claims WORKSPACE, so the heading is absent and no Admins row
-    // survives from when that screen lived here.
-    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
+    // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
 });

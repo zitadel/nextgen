@@ -1,15 +1,13 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import semver from "semver";
 
-import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
+import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
+import { exactZitadelPins } from "@/lib/zitadel-pins";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
  * Verifies that exactly-pinned `@zitadel/*` dependencies match this CLI's own
  * version. The packages publish as one lockstep train, and the scaffold pins
- * the SDK at the CLI's version — but the CLI floats (`npx @zitadel/cli@alpha`)
+ * the SDK at the CLI's version — but the CLI floats (`npx @zitadel/cli@latest`)
  * while the app's pin stays put, so a newer CLI can restore files or write
  * guidance that references SDK entry points the older pinned SDK does not
  * ship (e.g. a subpath export added a train later). A mismatch therefore
@@ -38,20 +36,13 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-    try {
-      pkg = JSON.parse(await readFile(join(ctx.cwd, "package.json"), "utf8")) as typeof pkg;
-    } catch {
+    const exact = await exactZitadelPins(ctx.cwd).catch(() => undefined);
+    if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
       return { ...base, status: "pass", message: "no package.json to compare pins against" };
     }
-    const declared = Object.entries({
-      ...(pkg.dependencies ?? {}),
-      ...(pkg.devDependencies ?? {}),
-    }).filter(([name]) => name.startsWith("@zitadel/"));
-    const exact = declared.filter(([, version]) => semver.valid(version.trim()) !== null);
-    const mismatched = exact.filter(([, version]) => !semver.eq(version.trim(), ctx.cliVersion));
+    const mismatched = exact.filter(([, version]) => !semver.eq(version, ctx.cliVersion));
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project
@@ -66,7 +57,7 @@ export class DependencyVersionCheck implements SanityCheck {
         message:
           `${mismatched.map(([name, version]) => `${name}@${version}`).join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
-          `guidance target the CLI's train — update with \`${remedy}\``,
+          `guidance target the CLI's train`,
         details: {
           mismatched: mismatched.map(([name, version]) => ({
             name,
@@ -91,8 +82,8 @@ export class DependencyVersionCheck implements SanityCheck {
    * No auto-fix: repair's dependency op is deliberately additive-only (it
    * never rewrites a version the user declared), so the repair ships as the
    * package-manager-aware install command in `details.remedy_command` — the
-   * doctor command surfaces it in the envelope's `next_commands` — with the
-   * same command quoted in the warn message for human readers.
+   * doctor command surfaces it in the envelope's `next_commands` and under the
+   * category in its report.
    */
   async fix(_ctx: CheckContext): Promise<void> {
     return;

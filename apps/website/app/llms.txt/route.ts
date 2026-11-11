@@ -1,4 +1,4 @@
-import { applyCommand, commands, folderCommand, planCommand, skillsCommand } from "../commands";
+import { commands, deployCommand, dryRunCommand, folderCommand, skillsCommand } from "../commands";
 import { sessions } from "../showcase/sessions";
 
 // The host's llms.txt (llmstxt.org): what the preview is, the commands, what
@@ -22,11 +22,11 @@ Run it locally with the published CLI (Node.js 24 or newer), in a new folder for
 ${[folderCommand, ...commands].join("\n")}
 \`\`\`
 
-\`start\` runs Zitadel on the machine and signs in to its console; users, passwords and sessions live there, not in the app. \`setup\` writes these files into the app, and \`npm run dev\` serves the login:
+\`start\` runs Zitadel on the machine; users, passwords and sessions live there, not in the app. \`setup\` writes these files into the app, and \`npm run dev\` serves the login:
 
 ${files}
 
-To change the user model or the login flow, edit those files, then publish the change: \`${planCommand}\` shows what changes, \`${applyCommand}\` makes it live. To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet.
+To change the user model or the login flow, edit those files and commit \`.zitadel/\` (a release records the commit it was built from, and the commit's subject is its message), then publish the change: \`${dryRunCommand}\` shows what changes, \`${deployCommand}\` makes it live. To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet, and restyle its card, fields and buttons with \`::part()\`.
 
 Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
@@ -42,15 +42,17 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 - [Quickstart](/docs/get-started/quickstart.md): from an empty folder to working local auth
 - [Agent setup](/docs/get-started/agents.md): the CLI's JSON contract and the browser proof
 - [Flows and schemas](/docs/concepts/flows-and-schemas.md): how login flows, user schemas and the generated UI relate
-- [Edit the login flow and schema](/docs/guides/plan-apply.md): edit the local configuration and sync it
+- [Edit the login flow](/docs/guides/edit-login-flow.md): change what the login asks for and which flow an app runs
+- [Deploy](/docs/guides/deploy.md): edit the local configuration, preview it and deploy it as a release
 - [Add social sign-in](/docs/guides/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
-- [Customize the login design](/docs/guides/customize-design.md): a starter design, your branding, published as a revision
+- [Customize the login design](/docs/guides/customize-design.md): the stable tokens and CSS parts, or a starter design with your branding, published as a revision
 - [Docs MCP server](/docs/api/mcp): the tools search, list_pages and get_page
 
 ## Optional
 
 - [Run Zitadel locally](/docs/guides/local-runtime.md): how the CLI starts and stores local Zitadel state
 - [Configuration as code](/docs/concepts/repo-config.md): how the app's auth configuration stays reviewable
+- [Choose a version](/choose-version): what the next version has next to Zitadel v4, and which to pick
 - [Source](https://github.com/zitadel/nextgen): the repository on GitHub
 - [Vision](https://github.com/zitadel/nextgen/blob/main/VISION.md): the four pillars and where each stands
 - [Zitadel v4](https://zitadel.com): the current release, for production

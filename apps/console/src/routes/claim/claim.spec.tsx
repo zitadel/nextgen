@@ -5,10 +5,10 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "@/test/session.fixture";
-import { listMyProjectsCached } from "../../lib/project-scope";
+import { listMyProjectsCached } from "../../features/projects/my-projects";
 import { _setRuntimeForTesting } from "../../runtime/runtime";
 import { createAppRouter } from "../../router";
-import { _resetClaimAttemptsForTesting } from "../../lib/claim";
+import { _resetClaimAttemptsForTesting } from "@/features/claim/api";
 import { server } from "@/test/msw";
 
 /**
@@ -55,8 +55,8 @@ const PROJECT_ID = "proj_claimme";
 const CHALLENGE_ID = "chal_1";
 const CLAIM_PATH = `/claim?challenge_id=${CHALLENGE_ID}&project_id=${PROJECT_ID}`;
 
-const COMPLETE_PATTERN = `*/api/projects/${PROJECT_ID}/claim/complete`;
-const WINDOW_PATTERN = `*/api/projects/${PROJECT_ID}/claim/window`;
+const COMPLETE_PATTERN = `*/api/v1/projects/${PROJECT_ID}/claim/complete`;
+const WINDOW_PATTERN = `*/api/v1/projects/${PROJECT_ID}/claim/window`;
 
 beforeEach(() => {
   fetchSession.mockReset();
@@ -146,12 +146,24 @@ describe("claim page", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     let claimed = false;
     server.use(
-      http.get("*/api/users/me/projects", () =>
+      http.get("*/api/v1/users/me/projects", () =>
         HttpResponse.json({
           projects: claimed ? [{ id: PROJECT_ID, name: "Claimed" }] : [],
         }),
       ),
-      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
+      // The claimed project's Overview, where the console opens (D35).
+      http.get(`*/api/v1/projects/${PROJECT_ID}`, () =>
+        HttpResponse.json({
+          id: PROJECT_ID,
+          name: "Claimed",
+          origins: [],
+          created_at: "2026-08-24T10:00:00Z",
+          updated_at: "2026-08-24T10:00:00Z",
+          owning_team_id: "team_personal",
+        }),
+      ),
+      http.get("*/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
+      http.get("*/api/v1/events", () => HttpResponse.json({ data: [] })),
     );
     stubComplete(() => {
       claimed = true;
@@ -167,8 +179,10 @@ describe("claim page", () => {
     const { router } = await renderAt(CLAIM_PATH);
     await userEvent.click(await screen.findByRole("link", { name: "Open the console" }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/");
   });
 
   // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.

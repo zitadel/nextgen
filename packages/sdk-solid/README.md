@@ -5,7 +5,7 @@ Solid components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-solid@alpha
+pnpm add @zitadel/sdk-solid@latest
 ```
 
 ## Requirements

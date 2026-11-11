@@ -22,17 +22,27 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
  */
 export function describeError(cause: unknown, fallback: string): string {
   if (cause instanceof ApiError) {
-    const body = cause.body;
-    if (body && typeof body === "object") {
-      const message = (body as Record<string, unknown>).message;
-      if (typeof message === "string" && message.trim() !== "") {
-        const fields = namedFields(body as Record<string, unknown>);
-        return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
-      }
+    const body = errorBody(cause);
+    const message = body?.message;
+    if (body && typeof message === "string" && message.trim() !== "") {
+      const fields = namedFields(body);
+      return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
     }
     return fallback;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+/** The fields a failed request names, as {@link describeError} lists them. */
+export function errorFieldNames(cause: unknown): string[] {
+  const body = cause instanceof ApiError ? errorBody(cause) : undefined;
+  return body ? namedFields(body) : [];
+}
+
+/** The error payload of a failed request, when it carried one. */
+function errorBody(cause: ApiError): Record<string, unknown> | undefined {
+  const body = cause.body;
+  return body && typeof body === "object" ? (body as Record<string, unknown>) : undefined;
 }
 
 /** The fields an error payload names, from its producer's `details`. */
@@ -46,4 +56,28 @@ function namedFields(body: Record<string, unknown>): string[] {
   return fields
     .filter((field): field is string => typeof field === "string" && field !== "")
     .map((field) => field.replace(/^attributes\./, ""));
+}
+
+/**
+ * The read's answer, or `null` when it is refused (403): for a read that is
+ * chrome on its screen, where a refusal costs that part rather than the page.
+ * Any other failure still throws.
+ */
+export async function nullOnForbidden<T>(read: Promise<T>): Promise<T | null> {
+  try {
+    return await read;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 403) return null;
+    throw cause;
+  }
+}
+
+/**
+ * The API's error code of a failed request (ADR 030 `code`), or nothing when
+ * the failure carried no payload. For the one case a screen answers
+ * differently by code, such as a refusal with its own dialog.
+ */
+export function errorCode(cause: unknown): string | undefined {
+  const code = cause instanceof ApiError ? errorBody(cause)?.code : undefined;
+  return typeof code === "string" ? code : undefined;
 }

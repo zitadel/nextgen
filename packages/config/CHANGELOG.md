@@ -1,5 +1,102 @@
 # @zitadel/config
 
+## 0.5.0
+
+### Minor Changes
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+- [#2493](https://github.com/zitadel/nextgen/pull/2493) [`bbc6bc5`](https://github.com/zitadel/nextgen/commit/bbc6bc54255991e59d949553c95fe8ded17a7bd4) - Add the Node-only `@zitadel/config/bootstrap-user` export so setup tools can generate bootstrap user documents using the same password hashing and document format as `zitadel start`.
+
+### Patch Changes
+
+- [#2752](https://github.com/zitadel/nextgen/pull/2752) [`6777ed8`](https://github.com/zitadel/nextgen/commit/6777ed8c876124123732efc9f7887c2e5a056c63) - `zitadel auth-method password|passkey|sso disable --dry-run` now refuses to remove a schema's last way to sign in without `--force`, as the real run does, and `zitadel deploy` warns when a login flow can finish without verifying a password, passkey or SSO sign-in.
+
+- [#2757](https://github.com/zitadel/nextgen/pull/2757) [`2e14564`](https://github.com/zitadel/nextgen/commit/2e145640554b0a4ec4de20a7a02f47c01c1d1d90) - `zitadel deploy --dry-run` and `zitadel doctor` now refuse a user schema whose `x-auth-methods` holds a key that is not an authentication method, such as a misspelt `pasword`, and suggest the method it was likely meant to be. An unknown key inside a method and an empty `x-auth-methods` are refused too. Before, the dry run passed and the deploy failed with a generic request error.
+
+- [#2675](https://github.com/zitadel/nextgen/pull/2675) [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560) - `<zitadel-login>`'s error for an unknown `flow-name`, the `@zitadel/components` and `@zitadel/config` READMEs and the branding API reference now name `zitadel deploy` instead of the removed `zitadel apply` and `zitadel plan`.
+
+- [#2597](https://github.com/zitadel/nextgen/pull/2597) [`9b687fe`](https://github.com/zitadel/nextgen/commit/9b687fe88342b80349bea5fecfdce94044fa1799) - `zitadel deploy` now prints which schema or flow the server rejected and why, instead of only `release: invalid`. A schema that fails the meta-schema names the failing property path and keyword. The `warn/password-without-identifier` warning no longer fires for a password step reached through an SSO email collision, so the scaffolded flow deploys without a false `sso-conflict` warning.
+
+- [#2682](https://github.com/zitadel/nextgen/pull/2682) [`14d27d8`](https://github.com/zitadel/nextgen/commit/14d27d8ede0f092b9a7f2c09b374637cbcbb33e7) - The `.zitadel/flows/README.md` that `zitadel setup` writes now lists its edits by goal, each with the JSON to change, and says that a required schema property must be collected by a step. The docs add [Edit the login flow](https://preview.zitadel.com/docs/guides/edit-login-flow).
+
+- [#2824](https://github.com/zitadel/nextgen/pull/2824) [`db8ecc2`](https://github.com/zitadel/nextgen/commit/db8ecc2e5192d43e5042590462eeb7bbde544e31) - `zitadel policies test --help` now says that test cases go in `<operation>.test.json` beside the policy, not on the command line, and that the server evaluates them; the policies README that `setup` writes says that a policy applies once a deployed release carries it, for passwords set through the API too, that a pull request's `preview` applies it only on that pull request's preview URLs, and that a history case needs `history_depth` 2 or more.
+
+- [#2693](https://github.com/zitadel/nextgen/pull/2693) [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede) - Update dependencies that have published security advisories. `@zitadel/cli` now
+  requires `undici` 7.30.1 or later, which fixes TLS certificate validation being
+  skipped, cache poisoning across redirects and several denial-of-service bugs.
+  `@zitadel/cli`, `@zitadel/api` and `@zitadel/config` require `zod` 4.6.6 or
+  later, which stops oversized collections from exhausting memory during
+  validation. The console embedded in the server picks up the `seroval` and `zod`
+  fixes.
+
+- [#2756](https://github.com/zitadel/nextgen/pull/2756) [`aa65acf`](https://github.com/zitadel/nextgen/commit/aa65acf7a7f7e8ab7f5d319592d20479e1adb0e7) - The `.zitadel/schemas/README.md` and `.zitadel/flows/README.md` that `zitadel setup` writes now name the `zitadel auth-method password|passkey` commands and show how a flow step offers each method. The docs add [Turn password and passkey sign-in on and off](https://preview.zitadel.com/docs/guides/sign-in-methods).
+- Updated dependencies [[`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c), [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0), [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b), [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6), [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99), [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede)]:
+  - @zitadel/api@0.5.0
+
+## 0.4.0
+
+### Minor Changes
+
+- [#2527](https://github.com/zitadel/nextgen/pull/2527) [`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924) - Every paged list method of the [`@zitadel/api` client](https://preview.zitadel.com/docs/sdks/api-client) now has `items()`, `pages()` and `all()`, which follow the cursor for you, and `createZitadelClient` takes `onResponse` and `onError` hooks; `@zitadel/api/client` exports `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page. The CLI no longer stops `--all`, the resource list commands or `zitadel api --paginate` when a server sends the same page cursor twice: that is a server bug, and the client trusts the paging contract. `deploy`, `preview`, `release create` and `setup`'s first deploy check the release body against the API's own schema before sending it, and name each field it refuses. `@zitadel/testing` no longer re-checks the ids the server answers its bootstrap and seeding with, and types `BootstrappedProject.previewSecret` as always present, as the server always issues one. `@zitadel/config`'s `getDefaultHumanUserSchema` is typed as the user schema document it returns, `$id` included, and exports that type as `UserSchemaDocument`; `getDefaultHumanUserSchemaBody` returns it without `$id`, as an inline schema in a release bundle must be.
+
+### Patch Changes
+
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924), [`79d8dd0`](https://github.com/zitadel/nextgen/commit/79d8dd01660b5bb7a2d936aa330c3d591a8d3954), [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da)]:
+  - @zitadel/api@0.4.0
+
+## 0.3.0
+
+### Minor Changes
+
+- [#2353](https://github.com/zitadel/nextgen/pull/2353) [`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894) - `zitadel policies test` runs the cases in `.zitadel/policies/<operation>.test.json` against your policy. Each case gives the operation's input (for the password policy, the password itself), optionally the facts the operation would look up (`self_service`, `history_matches`), and the decision it expects: `allowed`, and optionally the error `code` and exactly the `violations`. Zitadel evaluates every case as a real password set would, so a case also covers how the password is counted. By default the cases run against the policy file beside them; `--release <id>` runs them against the policy a built release pins, before you deploy it. A failing case fails the command with `E_VALIDATION` and lists what was expected and what Zitadel decided. `deploy` never carries test files, editors validate them against the new `.zitadel/meta/policy-test.json`, and the policies README that `setup` writes shows an example.
+
+### Patch Changes
+
+- [#2417](https://github.com/zitadel/nextgen/pull/2417) [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15) - `<zitadel-login>` now shows the project's minimum password length under the password field while someone chooses a password, instead of only after a too-short submit. The designs `zitadel branding eject` copies show it too; a template you ejected earlier gets it by adding `| fieldRuleHint: f` to its `field_help` line. A field's clear button no longer appears while the field is empty.
+- Updated dependencies [[`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3)]:
+  - @zitadel/api@0.3.0
+
+## 0.2.0
+
+### Minor Changes
+
+- [#2270](https://github.com/zitadel/nextgen/pull/2270) [`08a369b`](https://github.com/zitadel/nextgen/commit/08a369b1b6e2218f284df5950bf65e5249091ea0) - `zitadel deploy` now carries operation policies from `.zitadel/policies/`, one file per operation, checked against the new `.zitadel/meta/policy.json` schema before anything is sent; `zitadel policies list` and `policies get` read them back ([docs](https://preview.zitadel.com/docs/reference/cli/policies/list)). Sign-ins and sign-ups use the policy the deployed release carries, so deploying without a file switches that policy off.
+
+- [#1803](https://github.com/zitadel/nextgen/pull/1803) [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171) - Rework the console navigation: logo and collapse toggle in the sidebar, project and team switchers and a ⌘K search in the top bar, an account menu with theme and sign-out, and one title line per screen. Settings is your profile, with your passkeys and linked accounts, and teams gain Overview and Members tabs. `@zitadel/config/server` exports `DEFAULT_SERVER`, the CLI's default server.
+
+- [#2231](https://github.com/zitadel/nextgen/pull/2231) [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5) - The password step of `<zitadel-login>` shows the account as a full-width chip that goes back to use another account, with an avatar generated from the typed identifier, so it never confirms an account exists; the console shows the same avatar. Custom templates get the chip as `<zl-account>`, and `<zl-avatar>` and `@zitadel/components/avatar` export the avatar for your own pages.
+
+- [#2279](https://github.com/zitadel/nextgen/pull/2279) [`65e1b78`](https://github.com/zitadel/nextgen/commit/65e1b7834326cfdd82e366df33df026769bf07af) - `zitadel setup` now writes and publishes a password policy for every new project, `.zitadel/policies/auth.factor.password.set.json`, with a minimum of 15 characters, NIST's minimum without a second factor, and a README on its settings. The wizard offers 15, 8 or none; `--password-min-length <n>` sets another, `0` none. Change it in the file and publish it with `zitadel deploy`.
+  
+  **Breaking:** a scripted `zitadel setup` now publishes a 15-character minimum. If your scripts or tests register users with passwords shorter than 15 characters, use longer ones, or pass `--password-min-length` with the length you need.
+
+### Patch Changes
+
+- [#2368](https://github.com/zitadel/nextgen/pull/2368) [`76dc3be`](https://github.com/zitadel/nextgen/commit/76dc3be0e6475dc0efa37e7b4b4d47fad16fc9a9) - `zitadel setup --use-case consumer` and `--use-case business` now make a user's given and family name their display name (`x-display`), so a signed-in session reads "Ada Lovelace" instead of only the email, in `getSession()` and `<zitadel-session>`.
+  
+  **Upgrading a project set up earlier:** add `"x-display": ["givenName", "familyName"]` to its user schema and run `zitadel deploy`; users who sign up after that show their name.
+
+- [#2373](https://github.com/zitadel/nextgen/pull/2373) [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19) - `<zitadel-login>` now says why it switched between sign-in and sign-up by itself: an email without an account becomes a sign-up, with a note to fix a typo in the email field, and one with an account a sign-in; an identity provider sign-in without an account gets the same note. Flow API steps carry `purpose` and, after a switch, `notice`.
+  
+  **Upgrading a page or design from an earlier release:** a page that shows its own heading in place of the widget's should follow `step.purpose` from the `zitadel-flow-step` event, not step names, and a design ejected earlier shows the notice once its template renders `messages`, as the designs `zitadel branding eject` copies now do.
+
+- [#2328](https://github.com/zitadel/nextgen/pull/2328) [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1) - The packages no longer ship `.d.ts.map` files. They pointed at `src` files the packages do not publish, so an editor's go-to-definition already landed on the `.d.ts`; it still does.
+- Updated dependencies [[`2d78353`](https://github.com/zitadel/nextgen/commit/2d78353e4191d576d8d163d312ae78be0e6c4341), [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19), [`2ecde76`](https://github.com/zitadel/nextgen/commit/2ecde76e573c125fd86b7cf7b918619426b624bd), [`89a3471`](https://github.com/zitadel/nextgen/commit/89a34712236d2edc2deb6f482b56a636726956e3), [`33918fa`](https://github.com/zitadel/nextgen/commit/33918faa4ac9300e53d43bf99b55191ba2daa07f), [`5ea7fe4`](https://github.com/zitadel/nextgen/commit/5ea7fe4f9bcaa323c67d2cd347e53e9ba9048d02), [`c21caeb`](https://github.com/zitadel/nextgen/commit/c21caeb5e6c797d092a970129eb2238884d9c9f3)]:
+  - @zitadel/api@0.2.0
+
+## 0.1.0
+
+### Patch Changes
+
+- [#2155](https://github.com/zitadel/nextgen/pull/2155) [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1) Thanks [@fforootd](https://github.com/fforootd)! - The password step of `<zitadel-login>` now shows the account it signs in to, with a "Use another account" link that goes back to the step where the email was typed. Templates ejected with `zitadel branding eject` before this release keep their markup; eject again to get the account row.
+
+- [#2155](https://github.com/zitadel/nextgen/pull/2155) [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-login>` shows a spinner only on the button that was used: following the "Sign up" or "Sign in" link no longer spins the "Continue" button, and a secondary button such as "Use a passkey" now shows its own progress.
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030)]:
+  - @zitadel/api@0.1.0
+
 ## 1.0.0-alpha.28
 
 ### Patch Changes

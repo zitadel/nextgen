@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ciFlag } from "../../../../../src/lib/telemetry/dimensions/ci-flag";
+import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
 
 describe("ciFlag", () => {
   it("detects an automated CI environment", () => {

@@ -160,7 +160,7 @@ describe("Wizard", () => {
       });
 
       await wizard.ask({
-        kind: "confirm",
+        kind: "yes-no",
         name: "go on",
         message: "Go on?",
       });

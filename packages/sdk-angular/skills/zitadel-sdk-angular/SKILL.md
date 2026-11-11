@@ -19,7 +19,7 @@ You are adding Zitadel login, registration, logout, or session handling to an
 Angular app and wiring the auth UI in by hand.
 
 The `zitadel` CLI scaffolds a *fresh* Angular app
-(`npx @zitadel/cli@alpha setup --framework angular`) with this SDK already wired in. In an
+(`npx @zitadel/cli@latest setup --framework angular`) with this SDK already wired in. In an
 **existing** Angular app it writes the root component to `src/app/app.ts`, and
 stops with `E_CONFLICT` when the app has one there, or when `src/main.ts`
 bootstraps a root from another file (Angular 17–19's
@@ -29,7 +29,7 @@ package and wire the components in manually.
 ## Install
 
 ```sh
-npm install @zitadel/sdk-angular@alpha
+npm install @zitadel/sdk-angular@latest
 ```
 
 Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).

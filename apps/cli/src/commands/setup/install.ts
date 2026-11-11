@@ -1,17 +1,23 @@
 import { consola } from "consola";
 
-import type { BoxAction } from "../../lib/box";
-import { ZitadelError } from "../../lib/errors";
-import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
+import type { BoxAction } from "@/lib/box";
+import { ZitadelError } from "@/lib/errors";
+import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
 import {
   detectPackageManager,
   devCommandFor,
+  inDirectory,
   installCommandFor,
   runPackageCommand,
   type PackageCommand,
   type PackageManager,
-} from "../../lib/package-manager";
-import { publicCliCommand } from "../../lib/public-cli";
+} from "@/lib/package-manager";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  shellCommand,
+  type SuggestedCommand,
+} from "@/lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -35,28 +41,52 @@ export type SetupInstallOutcome = {
   boxActions: BoxAction[];
   /** Complete journey for the JSON envelope — agents consume all of it. */
   nextActions: string[];
-  nextCommands: string[];
+  nextCommands: SuggestedCommand[];
 };
 
 export type SetupInstallInput = {
   cliVersion: string;
   cwd: string;
+  /**
+   * `--cwd` as typed. The suggested install and dev commands then name the
+   * directory, as every other follow-up carries `--cwd`; run from the shell's
+   * own directory they would act on whatever project is there.
+   */
+  cwdFlag?: string;
   depsAdded: ReadonlyArray<string>;
   dryRun: boolean;
   env: NodeJS.ProcessEnv;
   issuer: string;
   json: boolean;
+  /**
+   * The selector pinning the project setup just created, for the follow-ups
+   * below. Without it a bare `status`/`deploy` resolves the environment as the
+   * next shell does, where the process environment outranks the `.env` files:
+   * in a shell holding production values the follow-up would read — or publish
+   * to — another project.
+   */
+  selector: EnvironmentSelector;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
   run?: typeof runPackageCommand;
 };
 
+/**
+ * Installs what setup added, with the package manager the project already
+ * uses, and reports what a reader runs next. A run that scaffolded nothing and
+ * added no dependency installs nothing, and `--skip-install` leaves the
+ * install to the reader while still naming the command.
+ */
 export async function installDependenciesForSetup(
   input: SetupInstallInput,
 ): Promise<SetupInstallOutcome> {
   const packageManager = await detectPackageManager(input.cwd);
   const installCommand = installCommandFor(packageManager);
   const devCommand = devCommandFor(packageManager);
+  // What the reader runs, from the shell's directory; setup itself runs the
+  // plain commands in `cwd`.
+  const shownInstall = inDirectory(installCommand, input.cwdFlag, input.cwd).display;
+  const shownDev = inDirectory(devCommand, input.cwdFlag, input.cwd).display;
   const needsInstall = input.scaffoldedFramework || input.depsAdded.length > 0;
 
   if (!needsInstall) {
@@ -67,9 +97,11 @@ export async function installDependenciesForSetup(
         command: installCommand.display,
         reason: "no-dependency-changes",
       },
-      devCommand: devCommand.display,
+      devCommand: shownDev,
+      installCommand: shownInstall,
       cliVersion: input.cliVersion,
       issuer: input.issuer,
+      selector: input.selector,
       includeInstallCommand: false,
     });
   }
@@ -82,9 +114,11 @@ export async function installDependenciesForSetup(
         command: installCommand.display,
         reason: input.dryRun ? "dry-run" : "skip-install",
       },
-      devCommand: devCommand.display,
+      devCommand: shownDev,
+      installCommand: shownInstall,
       cliVersion: input.cliVersion,
       issuer: input.issuer,
+      selector: input.selector,
       includeInstallCommand: true,
     });
   }
@@ -97,7 +131,7 @@ export async function installDependenciesForSetup(
       redirectStdoutToStderr: input.json,
     });
   } catch (error) {
-    throw installFailed(error, installCommand, devCommand, input.cwd);
+    throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
   }
   consola.success("Installed dependencies");
 
@@ -107,9 +141,11 @@ export async function installDependenciesForSetup(
       package_manager: packageManager,
       command: installCommand.display,
     },
-    devCommand: devCommand.display,
+    devCommand: shownDev,
+    installCommand: shownInstall,
     cliVersion: input.cliVersion,
     issuer: input.issuer,
+    selector: input.selector,
     includeInstallCommand: false,
   });
 }
@@ -117,22 +153,25 @@ export async function installDependenciesForSetup(
 function outcome(input: {
   install: SetupInstall;
   devCommand: string;
+  /** {@link SetupInstall.command} as the reader runs it. */
+  installCommand: string;
   cliVersion: string;
   issuer: string;
+  selector: EnvironmentSelector;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = publicCliCommand("plan", input.cliVersion);
-  const statusCommand = publicCliCommand("status", input.cliVersion);
+  const planCommand = projectCommand("deploy --dry-run", input.selector, input.cliVersion);
+  const statusCommand = projectCommand("status", input.selector, input.cliVersion);
   const verifyActions = [
-    ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
-    `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
+    ...(input.includeInstallCommand ? [`Install dependencies: ${input.installCommand}`] : []),
+    `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,
     verifyLoginAction(),
   ];
   const boxActions: BoxAction[] = [
     ...(input.includeInstallCommand
-      ? [{ text: "Install dependencies:", command: input.install.command }]
+      ? [{ text: "Install dependencies:", command: input.installCommand }]
       : []),
-    { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
+    { text: `Start your project (then open ${input.issuer}/register):`, command: input.devCommand },
     { text: verifyLoginAction() },
     // The dev server holds the terminal it starts in, and every later command
     // reads `.zitadel/` from this directory.
@@ -148,10 +187,13 @@ function outcome(input: {
     install: input.install,
     devCommand: input.devCommand,
     boxActions,
-    nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
+    nextActions: [
+      ...verifyActions,
+      ...customizeAndPublishActions(input.cliVersion, input.selector),
+    ],
     nextCommands: input.includeInstallCommand
-      ? [input.install.command, input.devCommand, planCommand]
-      : [input.devCommand, planCommand],
+      ? [shellCommand(input.installCommand), shellCommand(input.devCommand), planCommand]
+      : [shellCommand(input.devCommand), planCommand],
   };
 }
 
@@ -159,11 +201,12 @@ function installFailed(
   error: unknown,
   installCommand: PackageCommand,
   devCommand: PackageCommand,
+  shownInstall: string,
   cwd: string,
 ): ZitadelError {
   return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
     hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
-    nextCommands: [installCommand.display],
+    nextCommands: [shellCommand(shownInstall)],
     details: { command: installCommand.display, cwd, original: errorShape(error) },
   });
 }

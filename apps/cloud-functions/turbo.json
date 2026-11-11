@@ -1,0 +1,40 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The hosted cloud's functions under /cloud/ (Next.js, route handlers
+  // only; root ADR 084). Mirrors apps/cloud-functions/moon.yml; `test` and
+  // `dev` are the root's after @zitadel/api's build.
+  //
+  // The build (withWorkflow, next.config.ts) writes the Workflow routes into
+  // app/.well-known/workflow/, which its own `.gitignore` ignores. Turbo
+  // hashes that `.gitignore` all the same, which a fresh checkout lacks, so
+  // the cached tasks leave the folder out.
+  "tasks": {
+    "lint": {
+      "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**"]
+    },
+    // Waits for the build, for apps/website/turbo.json's reason.
+    "typecheck": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**"]
+    },
+    // The specs import @zitadel/api's dist/, as Next does.
+    "test": {
+      "dependsOn": ["@zitadel/api#build"],
+      "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**"]
+    },
+    // `next dev` resolves @zitadel/api to its dist/, as the build does.
+    "dev": {
+      "dependsOn": ["@zitadel/api#build"]
+    },
+    // The cloud's service builds through this task, keyed by the
+    // deployment's ID as the website's is: on Vercel it never hits.
+    "build": {
+      // Next resolves @zitadel/api to its dist/.
+      "dependsOn": ["@zitadel/api#build"],
+      "env": ["VERCEL_DEPLOYMENT_ID"],
+      "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    }
+  }
+}

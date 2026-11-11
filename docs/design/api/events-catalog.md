@@ -21,6 +21,15 @@ deprecated), and a test keeps the generator's statuses in step with them.
 **Naming:** dot-separated segments (`auth.factor.password.set`). Per-resource
 types — no generic admin.config.pushed bucket.
 
+**`user.*` versus `auth.*`:** `user.*` is the user as a record (created,
+updated, deleted). A user's credentials and sign-ins are not: they live under
+`auth.*` and `session.*`. Setting a password is `auth.factor.password.set`,
+not a `user.*` event, and enrolling a passkey is
+`auth.factor.passkey.enrolled`. A consumer syncing user records filters on
+`user.*` without receiving sign-in or credential traffic; a security consumer
+gets every credential change from `auth.factor.*`. A credential event names
+its user in the payload's `user_id`.
+
 **Compound transactions:** emit one Path B event per semantic mutation in the
 same TX (shared `request_id`).
 
@@ -59,6 +68,7 @@ same TX (shared `request_id`).
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
+| **Policy** | `operation`, `revision_id`, `config` (the instance's settings) | — |
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
 | **IdP identity link** | `connection_id`, `user_id` | Provider subject, claims, tokens |
@@ -102,7 +112,15 @@ Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
 (actor/token empty). Path B copies `request_id` from the HTTP request even
 without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
-Path A `request.api`. Probes (`healthz` / `readyz` / `livez`) do not.
+Path A `request.api`. Probes (`livez` / `readyz`) do not.
+
+The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
+`status_class` column, and its `operation_id` with that class to
+`operation_status` (`createUser 4xx`), which the `GET /events` filters
+`status_class` and `operation_id` read from an index
+(`RequestAPIPayload.Indexed`). A request refused before an operation ran has a
+class and no operation. Every other event leaves both empty, and so do the
+requests stored before the columns existed.
 
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.
@@ -119,6 +137,7 @@ tracked below.
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `AddOrigin` | `origin.added` | `entity` | `origin` | `pattern`, `kind` |
 | `RemoveOrigin` | `origin.removed` | `entity` | `origin` | `pattern`, `kind` |
+| `RemovePreview` (when a row was deleted) | `preview.removed` | `entity` | `preview` | _(empty)_ |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |
@@ -142,7 +161,10 @@ tracked below.
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
+| PolicyService publish (first revision of an operation's policy) | `policy.created` | `admin` | `policy` | `operation`, `revision_id`, `config` |
+| PolicyService publish (later revision) | `policy.updated` | `admin` | `policy` | `operation`, `revision_id`, `config` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
+| ReleaseService revoke | `release.revoked` | `admin` | `release` | `content_hash` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
@@ -152,13 +174,17 @@ tracked below.
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| `DeleteUserByID` revoking the user's assignments (`RevokeAuthzAssignmentsByPrincipal`; one event per assignment, on its own project) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
-`IssueSSOState`), which mints the `check_id` the outcome event then carries.
+`IssueSSOState`), which mints the `check_id` the outcome event then carries;
+storing the rehash of an outdated password hash on sign-in, which rewrites the
+existing password row in place.
 
 ## Retired
 
@@ -178,11 +204,7 @@ every supported deployment; that removal is its own breaking change.
 Types whose API contract is published before their producer lands. Each has
 a `domain.EventType` constant and an events API schema, so clients can be
 built against it, but nothing emits it yet. A type moves to Path B with its
-producer.
-
-| `event_type` | Payload | Producer |
-|--------------|---------|----------|
-| `release.revoked` | `content_hash` | ReleaseService revoke ([#1574](https://github.com/zitadel/nextgen/issues/1574)) |
+producer. None today.
 
 ## Deferred
 
@@ -194,5 +216,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
+| `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

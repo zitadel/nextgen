@@ -1,18 +1,20 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, isCancel, select } from "@clack/prompts";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
-import BrandingEject from "../../../src/commands/branding/eject";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
+import BrandingEject from "@/commands/branding/eject";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 
@@ -83,6 +85,48 @@ describe("branding eject", () => {
     expect(meta).not.toMatch(/`zitadel /);
   });
 
+  it("writes the dialect meta-schema byte for byte as setup does", async () => {
+    const cwd = await makeProject();
+
+    await eject(cwd);
+
+    const expected = projectMetaSchemas(cliVersion.version).find(
+      (file) => file.path === ".zitadel/meta/branding.json",
+    );
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toBe(expected?.contents);
+  });
+
+  it("replaces an outdated dialect meta-schema with this version's", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/meta/branding.json"), '{"title": "an older dialect"}\n');
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    const expected = projectMetaSchemas(cliVersion.version).find(
+      (file) => file.path === ".zitadel/meta/branding.json",
+    );
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toBe(expected?.contents);
+  });
+
+  it("writes nothing through a dialect meta-schema that is a symlink", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
+    await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+    await symlink("../secret", join(cwd, ".zitadel/meta/branding.json"));
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
+      '{"project_secret": "sk_proj_test"}\n',
+    );
+    expect((await lstat(join(cwd, ".zitadel/meta/branding.json"))).isSymbolicLink()).toBe(true);
+  });
+
   it("--design minimal writes the card-less template on the centered layout", async () => {
     const cwd = await makeProject();
 
@@ -106,13 +150,30 @@ describe("branding eject", () => {
       const cwd = await makeProject();
       const res = await eject(cwd, "--design", design);
       expect(res.exitCode, design).toBe(3);
-      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        hint: string;
+        next_commands: string[];
+      };
       expect(json.code, design).toBe("E_VALIDATION");
       expect(json.message, design).toContain(`The ${design} design was retired`);
       expect(json.hint, design).toContain("<zitadel-login>");
       expect(json.hint, design).toContain("centered, minimal");
+      expect(json.next_commands, design).toEqual([
+        expect.stringContaining("branding eject --design centered"),
+      ]);
       await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
     }
+  });
+
+  it("quotes an unknown design as JSON, so an escape sequence in it cannot drive the terminal", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--design", "x\u001b[31m");
+
+    const json = parseJson(res.stdout) as { message: string };
+    expect(json.message).toBe('Unknown design "x\\u001b[31m"');
   });
 
   it("rejects an unknown design and lists the catalog", async () => {
@@ -132,6 +193,16 @@ describe("branding eject", () => {
     const res = await eject(cwd);
     expect(res.exitCode).not.toBe(0);
     expect(res.stdout + res.stderr).toContain("E_CONFLICT");
+  });
+
+  it("writes no descriptor when the template is already there", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/branding"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/branding/login.liquid"), "mine");
+
+    await eject(cwd);
+
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 
   it("--force replaces the scaffolded files with the chosen design", async () => {
@@ -175,6 +246,23 @@ describe("branding eject asked on a terminal", () => {
     expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
       getDefaultBrandingConfig("minimal").template,
     );
+  });
+
+  it("refuses a file that is already there, naming --force", async () => {
+    const cwd = await makeProject();
+    const args = ["--cwd", cwd, "--design", "minimal", "--json"];
+    await asTerminal(() => BrandingEject.run(args, cliPackageRoot));
+    const printed: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+      printed.push(String(line));
+    });
+
+    await asTerminal(() => BrandingEject.run(args, cliPackageRoot)).catch(() => undefined);
+
+    expect(parseJson(printed.join("\n"))).toMatchObject({
+      code: "E_CONFLICT",
+      hint: "Rerun with --force to replace it, or edit the existing file directly.",
+    });
   });
 
   it("fails, scaffolding nothing, on Ctrl-C", async () => {

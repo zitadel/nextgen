@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { sessionCookieName } from "@zitadel/testing/playwright";
+import { type ProfileEntry, sessionCookieName } from "@zitadel/testing/playwright";
 
 import { frameworkForId } from "../scripts/frameworks.mjs";
+import { isLoggedOutUrl } from "../scripts/navigation.mjs";
 
 /**
  * A variable the journey runner sets for the suites (JOURNEY_OUTPUT_DIR,
@@ -68,9 +69,37 @@ export async function runCli(
   args: string[],
   stdin?: string,
 ): Promise<unknown> {
+  const { stdout } = await execCli(metadata, args, stdin);
+  return JSON.parse(stdout) as unknown;
+}
+
+/**
+ * Runs a command that must fail and returns its `--json` error envelope, which
+ * the CLI prints on stdout with a non-zero exit.
+ */
+export async function runCliFailing(
+  metadata: JourneyMetadata,
+  args: string[],
+): Promise<{ status: string; code: string; details?: unknown }> {
+  const stdout = await execCli(metadata, args).then(
+    () => {
+      throw new Error(`zitadel ${args.join(" ")} succeeded; it should have failed`);
+    },
+    (error: { stdout?: string }) => error.stdout ?? "",
+  );
+  const envelope = JSON.parse(stdout) as { status: string; code: string; details?: unknown };
+  expect(envelope.status).toBe("error");
+  return envelope;
+}
+
+function execCli(
+  metadata: JourneyMetadata,
+  args: string[],
+  stdin?: string,
+): Promise<{ stdout: string }> {
   const run = promisify(execFile)(
     "npx",
-    ["--yes", `${metadata.cliPackage}@alpha`, ...args, "--cwd", metadata.appDir],
+    ["--yes", `${metadata.cliPackage}@latest`, ...args, "--cwd", metadata.appDir],
     {
       cwd: metadata.appDir,
       env: {
@@ -87,9 +116,16 @@ export async function runCli(
   // Closed even with nothing to pipe: the CLI reads stdin whenever it is not
   // a TTY, and would wait on an open pipe.
   run.child.stdin?.end(stdin);
-  const { stdout } = await run;
-  return JSON.parse(stdout) as unknown;
+  return run;
 }
+
+// Fields some presets require at registration; the kit fills them only when
+// the flow renders them.
+export const registrationProfile: ProfileEntry[] = [
+  { field: "givenName", value: "Ada", label: /given.?name/i },
+  { field: "familyName", value: "Lovelace", label: /family.?name/i },
+  { field: "dateOfBirth", value: "1990-01-15", label: /date.?of.?birth/i },
+];
 
 // Frameworks whose server SDK guards /profile (the registry's flag) must
 // redirect a signed-out visit to /login; the SPA families have no server.
@@ -140,25 +176,25 @@ export async function logout(page: Page): Promise<void> {
     await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
   await logout.click();
-  const loggedOutUrl = expectsProtectedRouteRedirect ? loginUrl : /\/(?:login)?(?:[/?#]|$)/;
-  await expect(page).toHaveURL(loggedOutUrl);
+  await expect(page).toHaveURL((url) => isLoggedOutUrl(url, expectsProtectedRouteRedirect));
   await expectSessionCleared(page);
 }
 
 /**
- * The cookie the app keeps its session in: every scaffold's proxy, a server
- * SDK's or the dev proxy setup writes for an SPA, keeps it under the app's
- * project's name (ADR 073). setup records the project in `.zitadel/secret`.
+ * The cookie the app at `url` keeps its session in: every scaffold's proxy, a
+ * server SDK's or the dev proxy setup writes for an SPA, keeps it under the
+ * app's project's name (ADR 073), without the `__Host-` prefix on loopback
+ * http (ADR 083). setup records the project in `.zitadel/secret`.
  */
-export async function appSessionCookieName(): Promise<string> {
+export async function appSessionCookieName(url: string): Promise<string> {
   const secret = JSON.parse(
     await readFile(join(requiredEnv("JOURNEY_APP_DIR"), ".zitadel/secret"), "utf8"),
   ) as { project_id: string };
-  return sessionCookieName(secret.project_id);
+  return sessionCookieName(secret.project_id, url);
 }
 
 async function expectSessionCleared(page: Page): Promise<void> {
-  const name = await appSessionCookieName();
+  const name = await appSessionCookieName(page.url());
   await expect
     .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === name), {
       timeout: 5000,

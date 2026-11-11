@@ -1,0 +1,32 @@
+type: object
+additionalProperties: false
+required: [kind, provider]
+description: |
+  A gate is a security check, such as a captcha, that must be satisfied
+  before this step's submission is accepted. The server may also inject gates
+  at runtime based on policy or risk evaluation.
+properties:
+  kind:
+    type: string
+    enum: [captcha]
+    example: captcha
+    description: |
+      The gate category. Only `captcha` is defined today. Authenticator
+      ceremonies, such as passkey, are not gates: they are modeled as
+      credential authentication attempts (`auth_attempts`) with `x-credential`
+      on a field.
+  provider:
+    type: string
+    description: |
+      The provider within the gate kind, for example `altcha`, `turnstile` or
+      `hcaptcha`. The server looks up an implementation in its provider
+      registry.
+    example: altcha
+  config:
+    type: object
+    description: |
+      Provider-specific configuration consumed by the implementation when
+      issuing the per-render challenge. Opaque to the server.
+    additionalProperties: true
+    example:
+      site_key: "0x4AAAAAAA-example-site-key"

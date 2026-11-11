@@ -1,10 +1,10 @@
-import type { PatchedFile } from "../../types";
+import type { PatchedFile } from "@/lib/orca/patchers/types";
 
 /**
  * A single filesystem mutation in a rule-based patcher's plan. Rule patchers
  * emit these as a declarative description of intended changes so the
- * {@link import("./index").scaffold} file-writer can apply, skip, or dry-run
- * them uniformly. Each variant maps to one handler in the file-writer; the
+ * {@link import("./index").FileWriter} can apply, skip, or dry-run
+ * them uniformly. Each variant maps to one class in `./ops`; the
  * `kind` discriminant is exhaustively switched on. This vocabulary is internal
  * to the rule patcher family — other patcher families need not produce it.
  */
@@ -27,10 +27,24 @@ export type FileOp =
       readonly path: string;
       readonly entries: Readonly<Record<string, string>>;
       /**
+       * Permission bits for this op's target. On create they set the file's
+       * mode; on an existing file a set `mode` is re-asserted (chmod), because
+       * a secret-bearing `.env.*.local` must not be left at a looser mode it
+       * drifted to — `writeFile`'s mode applies only on creation and is masked
+       * by the umask.
+       */
+      readonly mode?: number;
+      /**
        * Lines written as `# ` comments above the entries the first time any of
        * them is added; a file that already carries the first line keeps it.
        */
       readonly comment?: ReadonlyArray<string>;
+      /**
+       * Replace the value of an entry the file already holds, rather than keep
+       * it. For a file the CLI owns, where a value saved earlier must not
+       * outrank the one this run just learned.
+       */
+      readonly overwrite?: boolean;
     }
   | {
       readonly kind: "merge-json";
@@ -83,15 +97,21 @@ export type FileOp =
        * Reads the wiring's state for the doctor, for a transform whose output
        * cannot tell "applied" from "cannot be applied here": one that leaves a
        * file it does not recognize as it is, so that the run does not fail.
-       * Returns `applied`, `detached`, or why the file cannot be checked
-       * (reported as `unknown`, a warning). Without it, the doctor runs the
-       * transform and reads an unchanged file as applied.
+       * Returns `applied`, `detached`, why the file cannot be checked
+       * (reported as `unknown`, a warning), or why what it holds is outdated
+       * (reported as `outdated`, a failure whatever the wiring's class).
+       * Without it, the doctor runs the transform and reads an unchanged file
+       * as applied.
        */
       readonly verify?: (source: string) => WiringVerdict;
     };
 
 /** A wiring's state as an edit's own {@link FileOp} `verify` reads it. */
-export type WiringVerdict = "applied" | "detached" | { readonly unknown: string };
+export type WiringVerdict =
+  | "applied"
+  | "detached"
+  | { readonly unknown: string }
+  | { readonly outdated: string };
 
 /**
  * A rule-based patcher's plan: the ordered file operations to apply plus a

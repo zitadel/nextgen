@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../src/lib/json";
+import { deepMerge, parseJsonObject, setTopLevelJsonKey, stableStringify } from "@/lib/json";
 
 describe("setTopLevelJsonKey", () => {
   it("splices one value and leaves every other byte untouched", () => {
@@ -58,6 +58,12 @@ describe("setTopLevelJsonKey", () => {
   it("keeps a compact document compact", () => {
     const out = setTopLevelJsonKey('{"name":"demo"}', "package.json", "extra", 1);
     expect(out).toBe('{"name":"demo","extra":1}');
+  });
+
+  it("keeps a compact document compact when the new key needs escaping", () => {
+    const next = setTopLevelJsonKey('{"name":"demo"}', "package.json", 'say "hi"', 1);
+
+    expect(next).toBe('{"name":"demo","say \\"hi\\"":1}');
   });
 
   it("does not invent a trailing newline", () => {
@@ -137,5 +143,33 @@ describe("parseJsonObject", () => {
 
   it("propagates the JSON.parse SyntaxError for invalid JSON", () => {
     expect(() => parseJsonObject("{ not json", "config.json")).toThrow(SyntaxError);
+  });
+});
+
+describe("deepMerge", () => {
+  it("merges objects found at the same key", () => {
+    expect(deepMerge({ a: { b: 1, c: 2 } }, { a: { c: 3, d: 4 } })).toEqual({
+      a: { b: 1, c: 3, d: 4 },
+    });
+  });
+
+  it("replaces everything that is not an object on both sides, arrays included", () => {
+    expect(deepMerge({ list: [1, 2], n: 1 }, { list: [9], n: { x: 1 } })).toEqual({
+      list: [9],
+      n: { x: 1 },
+    });
+  });
+
+  it("keeps the keys the patch does not name, and adds the ones it brings", () => {
+    expect(deepMerge({ keep: true }, { added: 1 })).toEqual({ keep: true, added: 1 });
+  });
+
+  it("changes neither argument", () => {
+    const target = { a: { b: 1 } };
+    const patch = { a: { c: 2 } };
+
+    deepMerge(target, patch);
+
+    expect([target, patch]).toEqual([{ a: { b: 1 } }, { a: { c: 2 } }]);
   });
 });

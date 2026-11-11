@@ -24,15 +24,15 @@ and release workflows. Agent-facing workspace rules live in
 
 ### I am adding Zitadel to my app
 
-| I want to...                                         | Run                                           |
-| ---------------------------------------------------- | --------------------------------------------- |
-| Check local runtime prerequisites                    | `npx @zitadel/cli@alpha doctor`               |
-| Start local Zitadel                                  | `npx @zitadel/cli@alpha start`                |
-| Add auth to my app                                   | `npx @zitadel/cli@alpha setup --server local` |
-| Open the local console, signed in as the local admin | `npx @zitadel/cli@alpha console`              |
-| Check generated app files                            | `npx @zitadel/cli@alpha doctor`               |
-| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@alpha stop`                 |
-| Delete local Zitadel data                            | `npx @zitadel/cli@alpha reset --force`        |
+| I want to...                                         | Run                                            |
+| ---------------------------------------------------- | ---------------------------------------------- |
+| Check local runtime prerequisites                    | `npx @zitadel/cli@latest doctor`               |
+| Start local Zitadel                                  | `npx @zitadel/cli@latest start`                |
+| Add auth to my app                                   | `npx @zitadel/cli@latest setup --server local` |
+| Open the local console, signed in as the local admin | `npx @zitadel/cli@latest console`              |
+| Check generated app files                            | `npx @zitadel/cli@latest doctor`               |
+| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@latest stop`                 |
+| Delete local Zitadel data                            | `npx @zitadel/cli@latest reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
 the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
@@ -48,25 +48,34 @@ integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
 contributing to this repository. The documentation site publishes LLM-friendly
 text at `/docs/llms.txt`, `/docs/llms-full.txt`, and page-level `.md` URLs.
 
-Install the skill into any skills-compatible agent (Claude Code, Cursor,
-Copilot, Codex, and more) straight from this repo:
+The CLI ships the Zitadel skills — the `zitadel` router skill, the CLI skill,
+and the per-framework SDK and component skills — and adds the ones of its
+version to your project, for any skills-compatible agent (Claude Code, Cursor,
+Copilot, Codex, and more):
 
 ```sh
-npx skills add zitadel/nextgen --full-depth
+npx @zitadel/cli@latest skills add
 ```
 
-`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
-skill, and the per-framework SDK and component skills. Without it, only the
-top-level router skill is installed. The CLI skill also ships inside the
-`@zitadel/cli` package.
+They land in `.agents/skills/`, and in `.claude/skills/` for Claude Code. Run it
+again after updating the CLI to keep them in step. To install them from this
+repo's `main` instead, run `npx skills add zitadel/nextgen --full-depth`;
+without `--full-depth`, only the router skill is installed.
+
+After a successful interactive `setup`, the CLI suggests `skills add` once if it
+finds a coding agent on your machine. "Once" is per machine, not per project: the
+CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
+see it.
 
 ## Customer quick start
 
 ```sh
 mkdir myapp
 cd myapp
-npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@latest doctor
 ```
+
+`doctor`, `setup` and `console` use the local server started in the current folder or in the nearest parent folder that has one, and `doctor` says which folder that is. A new, empty folder inside a folder where `start` ran therefore uses that server. To give the new folder a server of its own, run `npx @zitadel/cli@latest start` in it. `reset --force` deletes the local data of the folder it names, so check the folder `doctor` printed first.
 
 Pick a server before running `setup`. It cannot be changed on this app
 afterwards. Use `--server local` for local development, or point at a hosted
@@ -75,14 +84,15 @@ Zitadel Cloud instance if you want the project to belong to your team there.
 ### Local
 
 ```sh
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 npm run dev
 ```
 
 `start` boots the local Zitadel runtime and creates a local admin,
-`admin@zitadel.localhost`. It ends by printing a sign-in link for the
-management console. That link works once.
+`admin@zitadel.localhost`. It ends by telling you to run `setup`. Once `setup`
+has created your project it offers `zitadel console`; before that the console has
+nothing to show.
 
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
@@ -91,10 +101,10 @@ reports it as already owned. If that attempt fails, setup prints a warning and
 bootstrap off, the server has no local admin and no claiming at all, so the
 project simply has no owning team.
 
-Any time you need the console again, print a fresh link:
+Once your project exists, print a sign-in link for the console. The link works once:
 
 ```sh
-npx @zitadel/cli@alpha console
+npx @zitadel/cli@latest console
 ```
 
 The console shows your project and lets you add colleagues as project admins
@@ -102,7 +112,7 @@ by their email address. Pass `--no-open` to print the link instead of opening
 a browser. For the admin credential file, how its password is handled, and
 how to turn the local admin off, see [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md).
 
-Open http://localhost:3000/login and register your first user. That user is
+Open http://localhost:3000/register and register your first user. That user is
 an end user of your app, a different identity from the console admin above.
 `setup` walks through the scaffold choices (such as which framework and use
 case) and writes the app into the current directory; pass `--skip-install` if
@@ -110,10 +120,20 @@ you want to install dependencies yourself. The managed Zitadel runtime stores
 its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 `reset --force` deletes it.
 
+Once you have signed in to your app, run the CLI with no subcommand to see every
+command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. `zitadel <command> --help` lists a command's
+options, and the help of a command or a family of commands points back to this list.
+
 ### Zitadel Cloud
 
 ```sh
-npx @zitadel/cli@alpha setup --server https://preview.zitadel.com
+npx @zitadel/cli@latest setup --server https://preview.zitadel.com
 npm run dev
 ```
 
@@ -122,7 +142,7 @@ and `console` do not apply there. Once the app is up, attach the project to
 your team:
 
 ```sh
-npx @zitadel/cli@alpha claim
+npx @zitadel/cli@latest claim
 ```
 
 This opens a browser so you can sign in with your own Zitadel account (not
@@ -146,8 +166,8 @@ docker compose up -d
 | Surface            | URL                               |
 | ------------------ | --------------------------------- |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell      | http://localhost:8080/ui/login/   |
-| Health             | http://localhost:8080/healthz     |
+| Liveness probe     | http://localhost:8080/livez       |
+| Readiness probe    | http://localhost:8080/readyz      |
 
 A fresh Compose server has no project and no user yet, so this console shows
 its setup prompt until you seed one (see
@@ -174,8 +194,10 @@ search, and publishes LLM-friendly text at `/docs/llms.txt`,
 ## Current status
 
 This repository is pre-release. The Go `server` command serves the OpenAPI
-surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
-CI produces installable snapshots for review, not official releases.
+surface and embeds the console at `/ui/console/`; the login lives in your app.
+Releases are `0.x` previews on npm's `latest` tag, and until 1.0.0 a minor
+release can carry a breaking change
+([ADR 074](docs/adrs/074-preview-releases-on-0x.md)).
 
 For product direction and the four pillars, see [VISION.md](VISION.md).
 
@@ -192,7 +214,7 @@ step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 Moon builds the artifacts (Go binaries, containers, archives) and the draft
 GitHub Release; Changesets owns versions, npm publishing, and release notes,
-with the public packages on one fixed alpha train. Build a local snapshot with
+with the public packages on one fixed release train. Build a local snapshot with
 `moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To
 cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md); for when to add a

@@ -1,40 +1,45 @@
+import { log, note } from "@clack/prompts";
+
 import {
+  credentialVariables,
   CUSTOM_PROVIDER,
+  type ClientId,
+  type ConnectionEndpoints,
+  type CustomOidcInput,
+  DEFAULT_SCOPES,
   idpProvider,
   IDP_PROVIDERS,
   RESERVED_SLUGS,
+  type IdpProvider,
+  type Issuer,
   parseClientId,
   parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  type Parsed,
   type ProviderName,
   type ProviderSelection,
   providerOf,
   selectionName,
+  slugFromDisplayName,
   validated,
 } from "@zitadel/config/idp";
 
 import {
-  applyRequest,
-  asksForClaims,
-  askClaims,
-  claimsOrRefuse,
   askConnectionEndpoints,
   callbackUriFor,
   type CustomFlagValues,
-  askScopes,
-  CONNECTION_SCHEMA_REF,
   loopbackIssuerWarning,
-  registrationLines,
-  seedMapping,
-} from "../../../lib/idp";
-import { defaultSchemaAttributes } from "../../../lib/setup-resources";
-import { reportWarning } from "../../../lib/warnings";
-import type { Asker } from "../../../lib/input";
-import { issuerFromPort } from "../../../lib/orca";
-import { Wizard } from "../../../lib/wizard";
+  ssoEnableArgs,
+} from "@/lib/idp";
+import { askClaims, asksForClaims, attributesOf, type ClaimRequest, seedMapping } from "@/lib/idp";
+import { Wizard } from "@/lib/wizard";
+import { Connection, ZitadelConfig } from "@/lib/zitadel";
+import { reportWarning } from "@/lib/warnings";
+import type { Asker } from "@/lib/input";
+import { issuerFromPort } from "@/lib/orca";
 
 import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types";
 
@@ -49,41 +54,50 @@ import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types
  */
 export async function askCustomSettings(
   given: CustomFlagValues,
-  wizard: Wizard,
+  ask: Asker,
 ): Promise<Required<CustomFlagValues>> {
-  const slug = await wizard.ask({
-    kind: "text",
-    name: "connection name",
-    message: "What should this connection be called?",
-    placeholder: "acme-sso",
-    parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
-    given: given.slug,
-  });
-  const displayName = await wizard.ask({
+  // The display name comes first so the slug can be suggested from it: "Acme
+  // SSO" offers "acme-sso", which the developer accepts or edits.
+  const displayName = await ask({
     kind: "text",
     name: "display name",
-    message: "What should the sign-in button say?",
-    placeholder: "Acme SSO",
+    message: "What name should the sign-in button show? For example Acme SSO.",
     parse: parseDisplayName,
     given: given.displayName,
   });
-  const issuer = await wizard.ask({
+  const slug = await ask({
+    kind: "text",
+    name: "connection name",
+    message:
+      "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
+    parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+    given: given.slug,
+    initialValue: slugFromDisplayName(displayName, RESERVED_SLUGS),
+  });
+  const issuer = await ask({
     kind: "text",
     name: "issuer",
-    message: "What is the provider's issuer URL?",
-    placeholder: "https://sso.acme.example",
+    message: "What is the issuer URL of the provider?",
     parse: parseIssuer,
     given: given.issuer,
   });
+  const scopes = await ask({
+    kind: "text",
+    name: "scopes",
+    message: "Which scopes should we request? Separate them with spaces.",
+    parse: parseScopes,
+    given: given.scopes,
+    initialValue: DEFAULT_SCOPES.join(" "),
+  });
   // The settings carry the scopes as the one string a flag does.
-  const scopes = await askScopes(wizard, displayName, given.scopes);
-  return { slug, displayName, issuer, scopes };
+  return { slug, displayName, issuer, scopes: scopes.join(" ") };
 }
 
 /**
- * "Add sign-in with another service?" — the one onboarding question that needs
- * something from outside the terminal, so it asks last of the configuration
- * questions and takes "not now" as a first-class answer (#1081).
+ * "Which external sign-in providers would you like to add?" — the one
+ * onboarding question that needs something from outside the terminal, so it
+ * asks last of the configuration questions and takes "not now" as a
+ * first-class answer (#1081).
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before
@@ -91,19 +105,22 @@ export async function askCustomSettings(
  * performs exactly this journey on an existing Project, which is why this
  * prompt collects answers rather than doing any work — the scaffolding step
  * writes the connection, the schema and the flow in one place for both paths.
+ * "Not now" stays an answer after a provider is ticked, too: the redirect URI
+ * only shows once it is, and a developer who then finds they have no OAuth
+ * application yet leaves the client id empty to drop that provider, rather
+ * than cancelling setup and losing every answer.
  *
  * `--sso` skips only the parts it answers. A flagged run that could not
  * supply the secret — it is never a flag, and only a scripted run pipes it in
  * — is still asked for it here, the way `--preset` skips its own question and
- * no other.
+ * no other. A flagged provider cannot be dropped: the command line asked for it.
  */
 export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    const wizard = ctx.wizard ?? new Wizard({ ask: ctx.input, output: ctx.wizardOutput });
     // `--sso` names the set; the wizard asks for it only when no flag did.
     const chosen = ctx.ssoFromFlag
       ? answers.sso.map((draft) => selectionName(draft.selection))
-      : await this.chooseProviders(wizard.ask);
+      : await this.chooseProviders(ctx.input);
     if (chosen.length === 0) {
       return { ...answers, sso: [] };
     }
@@ -111,136 +128,96 @@ export class SocialSignInPrompt implements SetupPrompt {
     // Asked per provider rather than once: each registers its own OAuth
     // application, so each has its own console, its own client id and its own
     // secret. A flagged run still gets asked for whatever the flags left out.
-    // Each provider is a branch of the wizard, so its questions read together.
     const collected: SsoDraft[] = [];
     for (const name of chosen) {
       const flagged = answers.sso.find((draft) => selectionName(draft.selection) === name);
-      const title =
-        name === CUSTOM_PROVIDER ? "Configuring the new provider" : idpProvider(name).displayName;
-      collected.push(
-        await wizard.branch(title, () => this.askProvider(wizard, name, flagged, answers, ctx)),
-      );
+      // A custom connection is described before anything else about it can be
+      // said: the announcement names its issuer, and its slug names the secret.
+      const selection: ProviderSelection =
+        flagged?.selection ??
+        (name === CUSTOM_PROVIDER
+          ? { kind: "custom", connection: await this.askCustom(ctx.input) }
+          : { kind: "catalog", id: name });
+      // A custom connection typed in here has not been through the flag checks.
+      const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
+      if (loopback !== undefined) {
+        reportWarning(loopback);
+      }
+      const entry = providerOf(selection);
+      // Before the announcement, which names the vendor's console: on a
+      // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at
+      // all. Not asked of a custom connection, whose issuer was just given.
+      const endpoints =
+        selection.kind === "custom"
+          ? undefined
+          : (flagged?.endpoints ??
+            (await askConnectionEndpoints({
+              provider: selection.id,
+              developmentBuild: ctx.developmentBuild === true,
+              ask: ctx.input,
+            })));
+      this.announce(entry, answers.devPort, endpoints?.issuer);
+
+      const clientId = await ctx.input({
+        kind: "text",
+        name: "client id",
+        // "To skip", not "to add it later": the line after it names the command
+        // that adds it, and the shorter question fits an 80-column terminal.
+        message:
+          flagged === undefined
+            ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to skip.`
+            : `What is the client ID of your ${entry.displayName} OAuth app?`,
+        parse: flagged === undefined ? clientIdOrSkip : parseClientId,
+        given: flagged?.credentials.clientId,
+      });
+      if (clientId === undefined) {
+        log.info(
+          [
+            `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
+            ctx.suggest(ssoEnableArgs(selection)),
+          ].join("\n"),
+        );
+        continue;
+      }
+      const secret = await ctx.input({
+        kind: "secret",
+        name: "client secret",
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
+        parse: parseClientSecret,
+        given: flagged?.credentials.secret,
+      });
+      // `--sso-claim` is the whole answer when given, as `--preset` is for its
+      // question; otherwise the person is walked through what is mapped.
+      const claimRequest =
+        flagged?.claimRequest !== undefined && asksForClaims(flagged.claimRequest)
+          ? flagged.claimRequest
+          : await this.askClaimMapping(selection, endpoints, answers, ctx);
+      collected.push({ selection, credentials: { clientId, secret }, endpoints, claimRequest });
     }
     return { ...answers, sso: collected };
   }
 
   /**
-   * One provider's questions, in the order a person can answer them: what the
-   * connection is, where it points, the credentials, and the claims it fills.
+   * Walk through what the connection maps, against the default schema the
+   * answers so far will scaffold.
+   *
+   * @param selection - The provider.
+   * @param endpoints - Where the provider answers, on a development run.
+   * @param answers - What was answered so far, which decides the schema.
+   * @param ctx - How a question is asked.
+   * @returns What the person asked for beyond the provider's defaults.
    */
-  private async askProvider(
-    wizard: Wizard,
-    name: ProviderName,
-    flagged: SsoDraft | undefined,
+  private async askClaimMapping(
+    selection: ProviderSelection,
+    endpoints: ConnectionEndpoints | undefined,
     answers: SetupAnswers,
     ctx: PromptContext,
-  ): Promise<SsoDraft> {
-    const attributes = defaultSchemaAttributes(answers.preset, answers.useCase);
-    const given = flagged?.claims;
-
-    // A custom connection is described before anything else about it can be
-    // said: the registration message names its issuer, and its slug names the
-    // secret.
-    let selection: ProviderSelection;
-    if (flagged?.selection !== undefined) {
-      selection = flagged.selection;
-    } else if (name === CUSTOM_PROVIDER) {
-      const values = await askCustomSettings({}, wizard);
-      selection = {
-        kind: "custom",
-        connection: {
-          slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
-          displayName: validated(parseDisplayName(values.displayName)),
-          issuer: validated(parseIssuer(values.issuer)),
-          scopes: validated(parseScopes(values.scopes)),
-        },
-      };
-    } else {
-      selection = { kind: "catalog", id: name };
-    }
+  ): Promise<ClaimRequest> {
     const entry = providerOf(selection);
-
-    // Flags are held to the schema before anything else is typed: a mistake in
-    // the command line should not cost the person their credentials. Where the
-    // connection points makes no difference to which properties it fills.
-    if (given !== undefined && asksForClaims(given)) {
-      claimsOrRefuse(
-        applyRequest(
-          seedMapping(
-            entry.connection({
-              schemaProperties: attributes.map((one) => one.name),
-              schemaRef: CONNECTION_SCHEMA_REF,
-            }),
-            attributes,
-          ),
-          given,
-        ),
-        "",
-      );
-    }
-
-    // Before the registration message, which names the vendor's console: on a
-    // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at
-    // all. Not asked of a custom connection, whose issuer was just given.
-    const endpoints =
-      selection.kind === "custom"
-        ? undefined
-        : (flagged?.endpoints ??
-          (await askConnectionEndpoints({
-            provider: selection.id,
-            developmentBuild: ctx.developmentBuild === true,
-            ask: wizard.ask,
-          })));
-
-    // Said where the person needs it: just before they are asked for what
-    // registering the application gives them. The redirect URI is settled by
-    // now, and the vendor matches it literally.
-    wizard.say(
-      registrationLines(
-        entry,
-        callbackUriFor(issuerFromPort(answers.devPort), entry.slug),
-        endpoints?.issuer,
-      ),
-    );
-    const clientId = await wizard.ask({
-      kind: "text",
-      name: "client id",
-      message: "What is the OAuth client ID?",
-      parse: parseClientId,
-      given: flagged?.credentials.clientId,
-    });
-    const secret = await wizard.ask({
-      kind: "secret",
-      name: "client secret",
-      message: "What is the OAuth client secret?",
-      parse: parseClientSecret,
-      given: flagged?.credentials.secret,
-    });
-
-    // `--sso-claim` is the whole answer when given.
-    const claims =
-      given !== undefined && asksForClaims(given)
-        ? given
-        : await askClaims(
-            seedMapping(
-              entry.connection({
-                schemaProperties: attributes.map((one) => one.name),
-                schemaRef: CONNECTION_SCHEMA_REF,
-                endpoints,
-              }),
-              attributes,
-            ),
-            wizard,
-            entry.displayName,
-          );
-
-    // A custom connection typed in here has not been through the flag checks.
-    const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
-    if (loopback !== undefined) {
-      reportWarning(loopback);
-    }
-    wizard.say(`"${entry.displayName}" is set up.`, "success");
-    return { selection, credentials: { clientId, secret }, endpoints, claims };
+    const template = ZitadelConfig.defaultSchema(answers.preset, answers.useCase);
+    const connection = Connection.forProvider(entry, template, endpoints);
+    const state = seedMapping(connection.body, attributesOf(template.body));
+    return askClaims(state, new Wizard({ ask: ctx.input }), entry.displayName);
   }
 
   /**
@@ -248,30 +225,92 @@ export class SocialSignInPrompt implements SetupPrompt {
    *
    * A multi-select rather than one choice: a project may offer several at
    * once, and the schema and flow already carry `sso_providers` as a list.
-   * `required: false` is what makes "none" an answer -- an explicit "not now"
-   * option cannot coexist with ticking a provider beside it.
+   * Space ticks a provider and Enter continues, so Enter on an empty list is
+   * not a silent skip: it asks whether to go on without SSO, where No goes back
+   * to the list, and only a Yes returns none.
    */
   private async chooseProviders(ask: Asker): Promise<readonly ProviderName[]> {
-    return ask({
-      kind: "multiselect",
-      name: "social sign-in providers",
-      message: "Add sign-in with another service?",
+    for (;;) {
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
-      required: false,
-      options: [
-        ...IDP_PROVIDERS.map((provider) => ({
-          value: provider as ProviderName,
-          label: idpProvider(provider).displayName,
-          hint: "needs an OAuth application you create there",
-        })),
-        {
-          value: CUSTOM_PROVIDER as ProviderName,
-          label: "Another OpenID Connect provider",
-          hint: "you give its issuer",
-        },
-      ],
-    });
+      const chosen: readonly ProviderName[] = await ask({
+        kind: "multiselect",
+        name: "external sign-in providers",
+        message:
+          "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
+        required: false,
+        options: [
+          ...IDP_PROVIDERS.map((provider) => ({
+            value: provider as ProviderName,
+            label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
+          })),
+          {
+            value: CUSTOM_PROVIDER as ProviderName,
+            label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
+          },
+        ],
+      });
+      if (chosen.length > 0) {
+        return chosen;
+      }
+      const continueWithout = await ask({
+        kind: "yes-no",
+        name: "continue without SSO",
+        message: "Would you like to continue without setting up SSO?",
+        initialValue: false,
+      });
+      if (continueWithout) {
+        return [];
+      }
+    }
   }
+
+  /**
+   * Say what to register and where. The redirect URI is settled by now — the
+   * port question runs before this one and the issuer derives from it — so it
+   * can be shown rather than left for the developer to work out, which
+   * matters because the vendor matches it literally.
+   */
+  private announce(entry: IdpProvider, devPort: number, issuer?: Issuer): void {
+    note(
+      [
+        // Where to register depends on who is actually answering: pointing a
+        // developer at the vendor's console when the connection runs against
+        // their own stand-in would be worse than saying nothing.
+        ...(issuer === undefined
+          ? [
+              entry.consoleUrl === undefined
+                ? `Register a client at ${entry.issuer}, as an OAuth application:`
+                : "Register an OAuth application at:",
+              ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
+            ]
+          : ["Register a client with the provider at:", issuer]),
+        "",
+        "Redirect URI:",
+        callbackUriFor(issuerFromPort(devPort), entry.slug),
+      ].join("\n"),
+      `${entry.displayName} sign-in`,
+    );
+  }
+
+  /** Describe a custom connection from scratch: nothing was given on the command line. */
+  private async askCustom(ask: Asker): Promise<CustomOidcInput> {
+    const values = await askCustomSettings({}, ask);
+    return {
+      slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
+      displayName: validated(parseDisplayName(values.displayName)),
+      issuer: validated(parseIssuer(values.issuer)),
+      scopes: validated(parseScopes(values.scopes)),
+    };
+  }
+}
+
+/**
+ * A client id typed into the wizard, or `undefined` for an empty answer, which
+ * drops the provider. A blank id is never a credential: the provider is
+ * either configured with both values or not at all.
+ */
+function clientIdOrSkip(value: string): Parsed<ClientId | undefined> {
+  return value.trim() === "" ? { ok: true, value: undefined } : parseClientId(value);
 }

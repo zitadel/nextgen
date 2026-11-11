@@ -210,7 +210,9 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         text_key: "register-password.field.password",
         autocomplete: "new-password",
         required: true,
-        validation: { min_length: 8 },
+        // A project without a password policy: no minimum, the server's cap
+        // as the maximum (ADR 066).
+        validation: { max_length: 64 },
       },
     ],
     identifier: collectedIdentifier(input),
@@ -457,7 +459,6 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
         text_key: "sso-conflict.field.password",
         autocomplete: "current-password",
         required: true,
-        validation: { min_length: 8 },
       },
     ],
     actions: [

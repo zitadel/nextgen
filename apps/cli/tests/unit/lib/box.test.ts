@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { command, renderBoxActions, wrapForBox } from "../../../src/lib/box";
-import { stripAnsi } from "../../helpers/run-cli";
+import { renderBoxActions, wrapForBox } from "@/lib/box";
+import { command } from "@/lib/style";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 describe("wrapForBox", () => {
   it("wraps prose so no line exceeds the terminal minus the frame", () => {

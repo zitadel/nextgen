@@ -5,10 +5,10 @@ Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
-> **Status: alpha.** Published to npm on the shared release train — the kit
+> **Status: preview.** Published to npm on the shared release train — the kit
 > carries the same version as `@zitadel/cli` and the SDKs, the train publishes
-> under the `alpha` dist-tag (install with `@alpha`), and APIs can still move
-> between alphas. macOS/Linux (see [Known limitations](#known-limitations)).
+> to npm's `latest` tag, and until 1.0.0 a minor version can change its API
+> (its release note marks it **Breaking:**). macOS/Linux (see [Known limitations](#known-limitations)).
 
 ## Why
 
@@ -21,7 +21,7 @@ through the registration UI, serialized per suite. This kit fills the middle:
 ## Quick start (Playwright)
 
 ```sh
-npm i -D @zitadel/testing@alpha @playwright/test
+npm i -D @zitadel/testing@latest @playwright/test
 ```
 
 The kit drives the `zitadel` CLI, which resolves the published
@@ -71,8 +71,8 @@ The fixtures find the instance through `ZITADEL_TESTING_HANDSHAKE`, which
 `withZitadel()` points at its handshake file.
 
 `app` is optional. Omit it when the instance itself serves the app — the
-Zitadel binary embeds the console and hosted sign-in at `/ui/console/` and
-`/ui/login/`, so a suite testing those surfaces has no second server to boot.
+Zitadel binary embeds the console at `/ui/console/`, so a suite testing it
+has no second server to boot.
 Only the instance entry is generated, and `appOrigin` must then be the
 instance's own local origin:
 
@@ -96,10 +96,14 @@ and injects the resulting session cookie into a dedicated browser context. It
 injects it under both names a session cookie can have on an app's origin, so it
 works for any app. Behind a server SDK (Next.js, Nuxt, SvelteKit, SolidStart,
 TanStack Start, Qwik Router), and behind the dev proxy `zitadel setup` writes for
-an SPA, the session is in `sessionCookieName(projectId)`,
-`__nextgen_session_<projectId>`, so that the apps and the Console on one host
-each keep their own. Behind a proxy that passes the server's cookie through, it
-is the server's `SESSION_COOKIE_NAME`:
+an SPA, the session is in `sessionCookieName(projectId, url)`,
+`__Host-zitadel_session_<projectId>`, so that the apps and the Console on one
+host each keep their own. Behind a proxy that passes the server's cookie
+through, it is the server's, `browserSessionCookieName(url)`:
+`__Host-zitadel_session`. Over plain http to a loopback host, such as
+`http://localhost:3000`, both drop the `__Host-` prefix and `Secure`, as the
+server does there for Safari: `zitadel_session_<projectId>` and
+`zitadel_session`. The fixture names them for its `baseURL`:
 
 ```ts
 test("member sees the dashboard", async ({ authenticatedPage }) => {
@@ -110,9 +114,9 @@ test("member sees the dashboard", async ({ authenticatedPage }) => {
 
 Underneath sits `seed.session()`, whose `sessionToken` also drives session
 APIs without any browser — backend tests call the instance directly with the
-cookie header (`cookie: __nextgen_session=<sessionToken>`, the SDK
-middleware's own headless pattern; `SESSION_COOKIE_NAME` holds the name, which
-is the server's).
+cookie header (`cookie: __Host-zitadel_session=<sessionToken>`, the SDK
+middleware's own headless pattern; `SESSION_COOKIE_NAME` holds the name, the
+server's canonical one, which it reads over any transport).
 Scope: password flows (the shipped `password-first` presets). A flow step
 demanding anything beyond the user's email and password — a challenge,
 another factor — fails with the step name; log in through the UI for those.
@@ -202,14 +206,15 @@ import {
   connectZitadel,    // attach to an existing instance via its handle
   writeHandshake, readHandshakeSync, waitForHandshake,
   identity,          // unused { email, password }, no instance needed
-  SESSION_COOKIE_NAME, // "__nextgen_session", the server's name
-  sessionCookieName,   // (projectId) => "__nextgen_session_<projectId>", an app's
+  SESSION_COOKIE_NAME,      // "__Host-zitadel_session", the server's canonical name
+  browserSessionCookieName, // (url?) => the server's name as a browser at url holds it
+  sessionCookieName,        // (projectId, url?) => an app's, "__Host-zitadel_session_<projectId>"
 } from "@zitadel/testing";
 
 const z = await startLocalZitadel({
   port,          // default: free port
   dir,           // default: temp dir, removed on stop (caller dirs are kept)
-  appOrigins,    // registered as the project's origins
+  appOrigins,    // exact URLs, registered as the project's primary origins; default http://localhost:3000
   useCase,       // "minimal" (default) | "consumer" | "business"
   preset,        // "password-first" (default)
   serverBinary,  // ZITADEL_SERVER_BINARY override (path to a built server binary)
@@ -238,8 +243,10 @@ per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 `withZitadel(options)` returning `{ webServer }` for the config,
 `enableVirtualPasskey(page)` for non-fixture pages, and
 `nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
-above. `identity()`, `SESSION_COOKIE_NAME` and `sessionCookieName` are on
-both entry points, so a Playwright spec imports everything from this one.
+above. `identity()`, `SESSION_COOKIE_NAME`, `browserSessionCookieName` and
+`sessionCookieName` are on both entry points, so a Playwright spec imports
+everything from this one. Without a URL, the two functions name the cookies of
+a loopback http dev server.
 
 ## How it works
 
@@ -333,11 +340,10 @@ platform packages; the in-repo workspace carries no such binary, so the repo's
 own suites run `moon run server:build` and point the kit at the result via
 `ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
 `serverBinaryHint` exists for this). Most in-repo moon tasks set
-`NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
-because they drive the app-embedded login, not the server-hosted `/ui/*`; the
-exception is `e2e:console-embedded`, which keeps both surfaces on and
-omits `app` — the binary-served `/ui/*` pages are its subject. Customer
-installs need none of this.
+`NEXTGEN_SERVER_CONSOLE_ENABLED=false` because they drive the app-embedded
+login, not the server-hosted console; the exception is `e2e:console-embedded`,
+which keeps the console on and omits `app` — the binary-served console is its
+subject. Customer installs need none of this.
 
 ## Known limitations
 
@@ -383,7 +389,7 @@ on top, in intended order:
   customer would in CI, and the kit ships on the release train (release
   manifest + changeset `fixed` group), versioned in lockstep with
   `@zitadel/cli`. Remaining: the Windows decision for the local binary
-  runtime and the stability commitment when the train leaves alpha.
+  runtime and the stability commitment when the train reaches 1.0.0.
 
 Parked until server support exists: passkey *seeding* (pre-registered WebAuthn
 credentials) — UI-driven passkey ceremonies are covered today by

@@ -2,7 +2,9 @@ import { Ellipsis, type LucideIcon } from "lucide-react";
 import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { FormError } from "@/components/form-error";
+import { IdText } from "@/components/id-text";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +14,7 @@ import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import type { LoadMoreState } from "@/hooks/use-load-more";
 import { cn } from "@/lib/utils";
 
-import { PAGE_TITLE } from "./typography";
+import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
 
 /**
  * Shared geometry for the console's resource list screens (Users, Teams,
@@ -22,28 +24,20 @@ import { PAGE_TITLE } from "./typography";
  *
  * | Region        | Value                                              |
  * | ------------- | -------------------------------------------------- |
- * | Page gutter   | 16px — the table's own inset                        |
- * | Page top      | 20px at `lg`, 16px below — the page-header block    |
+ * | Page          | `Page` (`layout.tsx`) — 16px gutter, 20px top at `lg` |
  * | Header gutter | 24px at `lg` — the page gutter plus 8px; 16px below  |
- * | Title row     | 24px, or 36px with the Add button beside the title  |
+ * | Title row     | 36px with or without the Add button (`PAGE_TITLE_ROW`) |
  * | Table top     | 20px under the title row at `lg`, 16px below        |
  * | Table head    | 56px tall, 24px leading / 16px trailing inset       |
  * | Table cell    | 56px tall, 24px inset, 8px block padding            |
  * | Head label    | display face, 12/16, 0.72px tracking, `foreground`  |
  * | Row icon      | 16px, stroke 1.5, `muted-foreground`, 10px to label |
  *
- * Column widths stay with each screen: Teams is a fixed 248px grid, Projects
- * thirds, and the Users table is schema-driven (its ID column takes the slack),
- * so it has no fixed grid to share.
+ * Column widths stay with each screen: Teams is a fixed 248px grid, while the
+ * Users and Projects tables let their ID column take the slack
+ * (`ResourceIdCell`); Users takes the properties a viewer pins, so it has no
+ * fixed grid to share.
  */
-
-/** Page gutters. `ResourcePage` adds the page-header block's top padding. */
-export const RESOURCE_PAGE = "px-4 pb-8";
-
-/** Page wrapper for a list screen: 20px under the navbar at `lg`, 16px below. */
-export function ResourcePage({ children }: { children: ReactNode }) {
-  return <div className={cn(RESOURCE_PAGE, "pt-4 lg:pt-5")}>{children}</div>;
-}
 
 /**
  * Title row. The page header block insets 24px at `lg` (the page gutter plus
@@ -66,14 +60,69 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 
 /**
  * The title row of a list screen: the heading with, where the screen has one,
- * its primary action beside it at every width (D19). 24px tall on its own,
- * 36px with the button.
+ * its primary action beside it at every width (D19), and any filter beside
+ * that. 36px tall (`PAGE_TITLE_ROW`), except where the row is too narrow for a
+ * filter, which then takes a row of its own under the title.
  */
-export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function ResourceTitle({
+  children,
+  action,
+  filter,
+  filterBelow = false,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  /**
+   * Controls that narrow the list, beside the action and 8px from it. By the
+   * width of the row, not the viewport, since the sidebar takes part of it: too
+   * narrow, they drop to their own row under the title while the action keeps
+   * the title row (D19). Wide enough, a basis of 0 keeps them on the title row
+   * whatever they hold, and they wrap among themselves rather than push the
+   * action off it.
+   */
+  filter?: ReactNode;
+  /**
+   * Keeps the filter on its own row under the title at every width, for one
+   * that wants the row's whole width (Logs' search, which fills with chips).
+   */
+  filterBelow?: boolean;
+}) {
+  if (!filter) {
+    return (
+      <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
+        <h1 className={RESOURCE_TITLE}>{children}</h1>
+        <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+      </div>
+    );
+  }
   return (
-    <div className={cn(RESOURCE_HEADER, "flex min-h-6 items-center justify-between gap-3")}>
+    <div
+      className={cn(
+        RESOURCE_HEADER,
+        PAGE_TITLE_ROW,
+        "@container/title-row flex-wrap gap-x-2 gap-y-4",
+      )}
+    >
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {action}
+      <div
+        className={cn(
+          "order-3 flex min-w-0 basis-full flex-wrap items-center gap-2",
+          filterBelow
+            ? // Out of the header's 8px inset, flush with the table under it.
+              "lg:-mx-2 lg:basis-[calc(100%+1rem)]"
+            : "@3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end",
+        )}
+      >
+        {filter}
+      </div>
+      <div
+        className={cn(
+          "order-2 ml-auto",
+          !filterBelow && "@3xl/title-row:order-3 @3xl/title-row:ml-0",
+        )}
+      >
+        {action}
+      </div>
     </div>
   );
 }
@@ -82,11 +131,97 @@ export function ResourceTitle({ children, action }: { children: ReactNode; actio
 export const RESOURCE_TABLE_WRAP =
   "border-sidebar-border bg-card overflow-x-auto rounded-md border";
 
-/** One body cell: 56px tall, inset 24px. */
-export const RESOURCE_CELL = "h-14 px-6 py-2";
+/**
+ * The card of a table whose leading and trailing columns stay put while the
+ * rest scrolls under them. It is the `scroll` group the sticky cells read
+ * `data-scroll-start` / `data-scroll-end` from (`useScrollEdges`).
+ */
+export const RESOURCE_TABLE_SCROLL = "group/scroll";
+
+/**
+ * The leading column, pinned to the card's left edge from 640px. Its 1px
+ * divider shows only while a column is scrolled under it.
+ *
+ * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
+ * and a pinned identity column (up to 280px) beside the pinned menu would
+ * leave no room for any column between them.
+ */
+export const RESOURCE_STICKY_START =
+  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+
+/**
+ * The trailing column (the row menu), pinned to the card's right edge so the
+ * menu is reachable at any width. Its divider shows while columns run on
+ * under it.
+ */
+export const RESOURCE_STICKY_END =
+  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+
+/**
+ * A body cell of a sticky column. It must be opaque, or the scrolled cells
+ * show through it, so the row's translucent hover and open-menu fills
+ * (`ResourceRow`, `TableRow`) are mixed onto the card colour here rather than
+ * layered over it. The row needs the `group` class. It fades with the row's
+ * own `transition-colors`, or it would snap while the rest of the row fades.
+ */
+export const RESOURCE_STICKY_BODY =
+  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
+
+/**
+ * How tall a table's rows are, set once on its card (`RESOURCE_TABLE_WRAP`)
+ * and read by every head and body cell beneath it, so a screen chooses what
+ * fits its rows and never restates a height per cell.
+ *
+ * `comfortable`, the default, is the design's 56px with 8px block padding: a
+ * row with a second line under its name, or a mark beside it. `compact` is
+ * 40px with 4px: one line a row, where the list is read by the screenful
+ * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * a narrow menu column sizes itself for.
+ */
+export const RESOURCE_DENSITY = {
+  comfortable: "",
+  compact: "[--resource-row:2.5rem] [--resource-row-pad:0.25rem] [--resource-menu:1.5rem]",
+} as const;
+
+export type ResourceDensity = keyof typeof RESOURCE_DENSITY;
+
+/** One body cell: as tall as the table's density (56px by default), inset 24px. */
+export const RESOURCE_CELL =
+  "h-[var(--resource-row,3.5rem)] px-6 py-[var(--resource-row-pad,0.5rem)]";
+
+/**
+ * The row menu's body cell in a narrow menu column: inset 8px, not the cells'
+ * 24px, which would make the column 84px wide for one 36px button.
+ */
+export const RESOURCE_MENU_CELL_NARROW =
+  "h-[var(--resource-row,3.5rem)] px-2 py-[var(--resource-row-pad,0.5rem)]";
 
 /** A body cell holding secondary text. */
-export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+export const RESOURCE_CELL_MUTED =
+  "text-muted-foreground h-[var(--resource-row,3.5rem)] truncate px-6 py-[var(--resource-row-pad,0.5rem)] text-sm";
+
+// The row's copy button rests hidden and shows on the row's hover or its own
+// focus, so a keyboard reaches it; where there is no hover it always shows.
+// The row needs the `group` class for the hover.
+const ROW_COPY =
+  "shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
+
+/**
+ * A row's ID cell. It takes whatever width the other columns leave
+ * (`w-full max-w-0`) and is cut in the middle inside it (`IdText`), so a
+ * table of a few short columns fits a 1024px window without scrolling. The tooltip keeps the whole
+ * id, and the copy button copies it however much of it shows.
+ */
+export function ResourceIdCell({ id, name }: { id: string; name: string }) {
+  return (
+    <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
+      <span className="flex items-center gap-1">
+        <IdText id={id} title={id} className="text-foreground text-sm" />
+        <CopyButton value={id} label={`Copy the ID of ${name}`} className={ROW_COPY} />
+      </span>
+    </TableCell>
+  );
+}
 
 /** A row's leading glyph — the design draws Lucide at stroke 1.5, not the default 2. */
 export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";
@@ -133,7 +268,7 @@ export function ResourceHeadCell({
   return (
     <TableHead
       className={cn(
-        "text-foreground h-14 py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
+        "text-foreground h-[var(--resource-row,3.5rem)] py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
         className,
       )}
     >
@@ -142,9 +277,27 @@ export function ResourceHeadCell({
   );
 }
 
-/** The empty header cell over the row menus. */
-export function ResourceMenuHead({ className }: { className?: string }) {
-  return <TableHead className={cn("h-14 px-6", className)} />;
+/**
+ * The empty header cell over the row menus. `narrow` for a column that is the
+ * menu's button and no wider, with {@link RESOURCE_MENU_CELL_NARROW} beneath.
+ */
+export function ResourceMenuHead({
+  className,
+  narrow = false,
+}: {
+  className?: string;
+  narrow?: boolean;
+}) {
+  return (
+    <TableHead
+      className={cn(
+        "h-[var(--resource-row,3.5rem)]",
+        // Narrow: the menu's button (36px, or the density's) and 8px either side.
+        narrow ? "w-[calc(var(--resource-menu,2.25rem)+1rem)] px-2" : "px-6",
+        className,
+      )}
+    />
+  );
 }
 
 /**
@@ -185,6 +338,7 @@ export function ResourceEmptyRow({ colSpan, children }: { colSpan: number; child
 export function RowMenu({
   name,
   icon: Icon = Ellipsis,
+  size = "icon",
   className,
   contentClassName = "w-40",
   children,
@@ -192,6 +346,8 @@ export function RowMenu({
   /** The row's name, for the trigger's accessible name. */
   name: string;
   icon?: LucideIcon;
+  /** `icon-xs`: the 24px trigger a detail card's rows draw. */
+  size?: "icon" | "icon-xs";
   className?: string;
   contentClassName?: string;
   children: ReactNode;
@@ -201,7 +357,7 @@ export function RowMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           aria-label={`Actions for ${name}`}
           className={className}
         >
@@ -219,20 +375,34 @@ export function RowMenu({
  * `Load more` under a cursor-paginated list (decisions log D5: a button, not
  * pagination controls). Its presence means there is more; its absence means the
  * list is complete.
+ *
+ * A list whose server may stop reading before a page is full names the button
+ * for that (`label`) and says so in a line above it (`note`).
  */
-export function LoadMore({ paging }: { paging: LoadMoreState }) {
+export function LoadMore({
+  paging,
+  label = "Load more",
+  note,
+}: {
+  paging: LoadMoreState;
+  label?: string;
+  note?: ReactNode;
+}) {
   return (
     <>
       <FormError message={paging.error} className="mt-3" />
       {paging.hasMore && (
-        <Button
-          variant="secondary"
-          className="mt-6 h-9 w-full gap-1.5 px-2.5"
-          onClick={() => void paging.loadMore()}
-          loading={paging.loading}
-        >
-          Load more
-        </Button>
+        <>
+          {note && <p className="text-muted-foreground mt-6 text-center text-sm">{note}</p>}
+          <Button
+            variant="secondary"
+            className={cn("h-9 w-full gap-1.5 px-2.5", note ? "mt-3" : "mt-6")}
+            onClick={() => void paging.loadMore()}
+            loading={paging.loading}
+          >
+            {label}
+          </Button>
+        </>
       )}
     </>
   );

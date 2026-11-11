@@ -1,8 +1,29 @@
 # ADR 031: OpenAPI querying
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-24 (originally Proposed 2026-06-30)
 > **Date:** 2026-06-30
 > **Context:** Flexible query language for querying lists
+>
+> **Amendment (2026-10-24):** `POST /<resource>/query` with `limit`,
+> `page_token`, `sorting` and `filter` is the shipped list contract (first on
+> users, #981). Three points differ from the text below:
+>
+> - A resource with a query endpoint need not keep a plain `GET`: `GET /users`
+>   was removed in favour of `POST /users/query` (#982), and a `GET` may take
+>   simple filters such as `GET /schemas?kind=` (#932).
+> - The shared `filter-operation` enum ships without `in`, `not_in`,
+>   `is_empty` and `is_not_empty`; they are added when a resource needs them.
+> - Sorting names its fields in a per-resource sort-field enum, not the
+>   filter-field enum (#1328).
+>
+> **Amendment (2026-11-10):** `starts_with` joins the shared
+> `filter-operation` enum: a case-insensitive match on the start of a text
+> value. Only a field that names it accepts it, and a field names it only when
+> an index answers it; the first is `identifier` on users
+> ([ADR 058](058-user-identity-designation-and-references.md)). Such a filter
+> returns its matches ordered by the matched field, the order of that index,
+> and refuses `sorting`: any other order would make the database collect every
+> match before it could return the first page.
 
 ## Context
 

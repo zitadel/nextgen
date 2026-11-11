@@ -297,3 +297,55 @@ no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
   decide is withdrawn.
 
 Design: [origins](https://github.com/zitadel/nextgen/pull/1427) in the spike behind #1389.
+
+## Amendment (2026-10-23): the server's own origin may open a flow
+
+The console previews a project's login with the project's own flow, opened
+by `createFlow` from the server's own origin, which a project's origins do
+not list. Where a project's origins refuse it, `createFlow` therefore
+admits the origin of `server.public_base` all the same, without a pattern;
+a project that lists that origin keeps its own rules there, deployments and
+previews included. Only opening a flow takes this exemption: every later
+step is held to the project's origins without it, so a page on the server's
+own origin can show a project's first step but cannot sign anyone in to it.
+
+## Amendment (2026-10-29): the console may be reached at more than one origin
+
+A deployment can be reached at more than one hostname, and its console with
+it: the hosted cloud serves a deployment at its own URL beside its branch
+alias or production domain, and a preview is reviewed on either. The
+exemption above therefore covers the origin of `server.public_base` and each
+origin in `server.console_origins`. The hosted cloud's launcher adds the URLs
+Vercel serves the deployment at to that list; the server reads no hosting
+provider's environment itself.
+
+## Amendment (2026-10-30): the console signs in only at the public base
+
+The exemption for the console's origins opens a flow and nothing more. The
+platform project, which the console signs operators in to, lists the origin of
+`server.public_base` as its one primary origin. So the console signs in there
+and on a loopback origin; at any other console origin a sign-in opens and its
+first submit is refused, while previewing a project's login keeps working.
+
+## Amendment (2026-10-31): callers with no origin
+
+A request with no `Origin` is served the project's newest primary deployment when
+there is one. So is a request from a console origin the project does not list,
+such as `https://console.example.com` or a console on `http://localhost:8080`. So
+a console origin the platform project does not list still opens a flow.
+
+## Amendment (2026-10-31): an empty allowlist admits nothing
+
+A project with no origin pattern no longer admits every origin. A loopback
+origin is still always admitted. Nothing falls back to the newest revisions: a
+request with no `Origin`, and one from a console origin the project does not
+list, needs a primary deployment, and without one answers `409` with
+`rel.no_default`. A listed origin, a loopback origin, or a live preview with
+nothing deployed answers `409` with `rel.not_deployed`.
+
+## Amendment (2026-10-31): a deployment freezes its origins
+
+A deployment to `primary` freezes the project's primary origins, and a rollback
+restores the ones it names. A primary origin serves the newest primary
+deployment only when that deployment names it and the project still lists it.
+So an added origin waits for a deploy, and removing one takes effect at once.

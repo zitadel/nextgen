@@ -1,0 +1,119 @@
+# Shared wide-event envelope (ADR 048 / ADR 049). Concrete events are `allOf`
+# this schema plus a `const` `event_type` and a typed `payload`.
+type: object
+description: |
+  The fields every event carries. Each event type adds its own `event_type`
+  and a typed `payload`.
+required:
+  - id
+  - project_id
+  - event_type
+  - category
+  - occurred_at
+  - created_at
+  - client_id
+properties:
+  id:
+    type: string
+    description: The event ID, in the form `evt_<opaque>`.
+    example: evt_01HZYABCDEFGHJKMNPQRSTVWXY
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  team_id:
+    description: The team the actor operated under when the event was emitted, if any.
+    oneOf:
+      - type: string
+      - type: 'null'
+  event_type:
+    type: string
+    # The event types are catalogued in docs/design/api/events-catalog.md.
+    description: |
+      The event type, dot-separated, for example `user.created`. It says which
+      `payload` the event carries.
+  category:
+    type: string
+    description: The category of the event.
+    enum:
+      - request
+      - auth
+      - session
+      - admin
+      - entity
+      - signal
+    example: entity
+  occurred_at:
+    type: string
+    format: date-time
+    # The timestamp comes from the server or storage clock, which the dialect owns.
+    description: When the action happened, on the server's clock.
+  created_at:
+    type: string
+    format: date-time
+    # The timestamp comes from the server or storage clock, which the dialect owns.
+    description: When the event was stored, on the server's clock.
+  actor_id:
+    description: The ID of the actor that triggered the event.
+    oneOf:
+      - type: string
+      - type: 'null'
+  actor_type:
+    description: The kind of actor that triggered the event.
+    oneOf:
+      - type: string
+        enum:
+          - human
+          - service
+          - system
+          - agent
+      - type: 'null'
+  entity_type:
+    description: The type of resource the event affected.
+    oneOf:
+      - type: string
+      - type: 'null'
+  entity_id:
+    description: The ID of the resource the event affected.
+    oneOf:
+      - type: string
+      - type: 'null'
+  client_id:
+    type: string
+    description: The application or agent that produced the event.
+  token_id:
+    type: string
+    description: The ID of the token in use when the event was emitted, when there was one.
+  delegation_type:
+    type: string
+    description: The kind of delegation. Absent when unset.
+    enum:
+      - direct
+      - delegated
+      - pat_shared
+      - exchanged
+  delegation_id:
+    type: string
+  grantor:
+    type: string
+  fingerprint:
+    type: string
+    description: A device fingerprint ID that correlates events from the same device.
+  request_id:
+    description: |
+      The ID of the HTTP request that caused the event. Events of one request
+      share it. Only the `request.api` event of a request carries
+      `metadata.client`.
+    oneOf:
+      - type: string
+      - type: 'null'
+  session_id:
+    description: The ID of the session the event belongs to.
+    oneOf:
+      - type: string
+      - type: 'null'
+  flow_id:
+    description: An ID that correlates the events of one login flow.
+    oneOf:
+      - type: string
+      - type: 'null'
+  metadata:
+    $ref: ../../components/schemas/event-metadata.yaml

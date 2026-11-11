@@ -5,22 +5,17 @@ import {
   applyRequest,
   asksForClaims,
   attributesOf,
-  claimedConnection,
   claimNotes,
   claimFlagText,
   claimRequestFromFlags,
-  describeMapping,
   fieldLabelFor,
   ENABLE_CLAIM_FLAGS,
   type MappingState,
-  NO_CLAIM_REQUEST,
   parseClaimEntry,
   parseScopeList,
   parseVerifiedEntry,
   SETUP_CLAIM_FLAGS,
   seedMapping,
-  summariseClaims,
-  withClaims,
 } from "../../../../src/lib/idp";
 import {
   fillable,
@@ -544,8 +539,8 @@ describe("mapClaim with create", () => {
     ).toContain("email already fills email");
   });
 
-  it("is reported by claimedConnection so the commands can write the attribute", () => {
-    const parsed = claimedConnection(document(), attributes, {
+  it("is reported in the state so the commands can write the attribute", () => {
+    const parsed = applyRequest(seeded(), {
       entries: [{ attribute: "employeeNumber", claim: "employee_id", create: true }],
       verified: [],
       scopes: [],
@@ -645,97 +640,6 @@ describe("applyRequest", () => {
         scopes: [],
       }).ok,
     ).toBe(true);
-  });
-});
-
-describe("withClaims", () => {
-  it("writes the mapping, the verification and the scopes into the document", () => {
-    const next = value(
-      applyRequest(seeded(), {
-        entries: [{ attribute: "staffNumber", claim: "employee_id", type: "integer" }],
-        verified: [],
-        scopes: ["employee"],
-      }),
-    );
-
-    const doc = withClaims(document(), next);
-
-    expect(doc.claim_mapping).toMatchObject({ staffNumber: "employee_id", email: "email" });
-    expect(doc.verified_claims).toEqual({ email: "email_verified" });
-    expect(doc.oidc).toEqual({
-      issuer: "https://sso.acme.example",
-      scopes: ["openid", "profile", "email", "employee"],
-    });
-  });
-
-  it("removes the blocks a provider scaffolded when the state ends with none", () => {
-    const replaced = value(mapClaim(seeded(), { attribute: "email", claim: "mail" }));
-    const only = { ...replaced, mapping: { email: "mail" }, verified: {} };
-
-    const doc = withClaims(document({ verified_claims: { email: "email_verified" } }), only);
-
-    expect(doc).not.toHaveProperty("verified_claims");
-    expect(doc.claim_mapping).toEqual({ email: "mail" });
-  });
-
-  it("leaves the keys out when there is nothing to write", () => {
-    const empty = seedMapping({ oidc: { scopes: ["openid"] } }, []);
-
-    const doc = withClaims({ slug: "x", oidc: { scopes: ["openid"] } }, empty);
-
-    expect(doc).not.toHaveProperty("claim_mapping");
-    expect(doc).not.toHaveProperty("verified_claims");
-  });
-});
-
-describe("claimedConnection", () => {
-  it("returns the document with the defaults and the request applied", () => {
-    const parsed = claimedConnection(document(), attributes, {
-      entries: [{ attribute: "staffNumber", claim: "employee_id", type: "integer" }],
-      verified: [],
-      scopes: [],
-    });
-
-    expect(value(parsed).document.claim_mapping).toMatchObject({ staffNumber: "employee_id" });
-  });
-
-  it("returns the refusal for a request the schema cannot take", () => {
-    expect(
-      problem(
-        claimedConnection(document(), attributes, {
-          entries: [{ attribute: "staffNumber", claim: "employee_id" }],
-          verified: [],
-          scopes: [],
-        }),
-      ),
-    ).toContain("would not hold it");
-  });
-
-  it("changes nothing for an empty request beyond the standard defaults", () => {
-    expect(
-      value(claimedConnection(document(), attributes, NO_CLAIM_REQUEST)).document.claim_mapping,
-    ).toMatchObject({
-      email: "email",
-    });
-  });
-});
-
-describe("describeMapping", () => {
-  it("writes one line per mapping, property first", () => {
-    expect(describeMapping(seeded())).toContain("givenName ← given_name");
-  });
-
-  it("says how a mapped property is verified", () => {
-    expect(describeMapping(seeded())).toContain("email ← email (verified by email_verified)");
-    expect(
-      describeMapping(value(verifyAttribute(seeded(), { attribute: "email", source: true }))),
-    ).toContain("email ← email (the provider is trusted)");
-  });
-});
-
-describe("summariseClaims", () => {
-  it("ends with the scopes the connection asks for", () => {
-    expect(summariseClaims(seeded()).at(-1)).toBe("scopes: openid profile email");
   });
 });
 

@@ -8,8 +8,10 @@ import type { Json, QueryParts, WireConventions } from "./types";
  *
  * These live behind {@link WireConventions} rather than inline in the list
  * operation so the factory stays honest about what it assumes: a platform
- * whose cursor is `next_cursor`, or whose filters are a map rather than a
- * list, overrides the vocabulary instead of forking the factory.
+ * that sends its cursor as `cursor`, reports it as `next_cursor`, or takes its
+ * filters as a map rather than a list, overrides the vocabulary instead of
+ * forking the factory. A response is never read by these names: each list
+ * reads its items and cursor through its own typed `items` and `next`.
  */
 export const DEFAULT_WIRE: WireConventions = {
   limit: "limit",

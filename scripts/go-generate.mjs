@@ -28,9 +28,9 @@
  * Within a package `go generate` keeps directives in file order, which is what
  * keeps api's own chain (error schemas -> openapi errors -> ogen) intact.
  *
- * That chain closes a cycle on a pruned tree — the analysis needs the client
+ * That chain closes a cycle on a pruned tree — the analysis needs the stubs
  * ogen writes at the end of it — which `api/cmd/gen_openapi_errors` breaks from
- * the inside, by generating a bootstrap client for itself. Nothing about it is
+ * the inside, by generating a bootstrap pass of them for itself. Nothing about it is
  * this runner's business; bare `go generate ./...` gets the same treatment.
  *
  * Today the mockgen race would be benign — enumer writes via a same-directory
@@ -40,13 +40,16 @@
  * costs ~0.3s and removes the class.
  */
 import { availableParallelism } from "node:os";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isDirectRun, mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
+import { isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
+import { serverModuleRoot } from "./server-build.mjs";
 
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
+// The Go module; every directive the server generates lives below it.
+const ROOT = serverModuleRoot(fileURLToPath(new URL("..", import.meta.url)));
 
 // Never hold Go sources, and walking them dwarfs the rest of discovery.
 // `.claude` holds agent worktrees, `.go` a local module cache and `vendor` a
@@ -57,12 +60,20 @@ const SKIP_DIRS = new Set([
   ".git",
   ".moon",
   ".claude",
+  ".codex",
+  ".cursor",
+  ".agents",
+  ".opencode",
+  ".vercel",
   ".go",
   "vendor",
   "dist",
   "target",
   ".next",
   ".turbo",
+  "testdata",
+  "tmp",
+  ".tmp",
 ]);
 
 // Runs alone, between the enumer and mockgen phases — see the module comment.
@@ -161,54 +172,60 @@ function assertEveryDirectiveHasAPhase(packages) {
 
 async function runPhase(dirs, phase, log) {
   const limit = Math.max(1, Math.min(availableParallelism(), dirs.length));
-  await mapWithConcurrency(dirs, limit, async (dir) => {
-    // Buffered per package so concurrent generators never interleave. On
-    // failure runCapture folds both streams into the thrown error's message.
-    const { stdout, stderr } = await runCapture("go", ["generate", "-run", phase.filter, "."], {
-      cwd: join(ROOT, dir),
-    });
-    const output = `${stdout}${stderr}`.trim();
-    // Most packages have nothing to do in a given phase; only say so when
-    // something actually ran.
-    if (output) {
-      log(`--- ${dir} (${phase.name})\n${output}`);
-    }
-  });
+  await mapAll(
+    dirs,
+    async (dir) => {
+      // Buffered per package so concurrent generators never interleave. On
+      // failure runCapture folds both streams into the thrown error's message.
+      const { stdout, stderr } = await runCapture("go", ["generate", "-run", phase.filter, "."], {
+        cwd: join(ROOT, dir),
+      });
+      const output = `${stdout}${stderr}`.trim();
+      // Most packages have nothing to do in a given phase; only say so when
+      // something actually ran.
+      if (output) {
+        log(`--- ${dir} (${phase.name})\n${output}`);
+      }
+    },
+    limit,
+  );
 }
 
 /**
- * Every directory holding a `//go:generate` directive, repo-relative, mapped to
- * the directives it holds.
+ * Every directory holding a `//go:generate` directive, module-relative, mapped
+ * to the directives it holds.
  *
  * Each is generated with `go generate .` rather than `./...`, so a directory
  * whose subdirectories also hold directives (`internal/instrumentation` over
  * `zotel` and `zlog`) does not run them a second time — which would otherwise
  * put two processes on the same output file concurrently.
  */
-function findGeneratePackages() {
+export function findGeneratePackages(root = ROOT) {
   const found = new Map();
 
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) {
+        // A nested module owns its generation; test fixtures are not packages
+        // whose directives the root build should execute.
+        if (!SKIP_DIRS.has(entry.name) && !existsSync(join(dir, entry.name, "go.mod"))) {
           walk(join(dir, entry.name));
         }
         continue;
       }
-      if (!entry.name.endsWith(".go")) {
+      if (!entry.name.endsWith(".go") || entry.name.endsWith("_test.go")) {
         continue;
       }
       const directives = readFileSync(join(dir, entry.name), "utf8").match(DIRECTIVE);
       if (!directives) {
         continue;
       }
-      const pkg = relative(ROOT, dir);
+      const pkg = relative(root, dir);
       found.set(pkg, [...(found.get(pkg) ?? []), ...directives]);
     }
   };
 
-  walk(ROOT);
+  walk(root);
   return new Map([...found].sort(([a], [b]) => a.localeCompare(b)));
 }
 

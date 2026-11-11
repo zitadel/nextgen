@@ -38,17 +38,23 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 
 - **Projects** (`/projects`): the one entry outside a project, and the only one
   until a project is selected.
-- **Teams** (`/teams`, `/teams/$teamId`).
-- **Users** (`/users`, `/users/$userId`), with **User schemas** (`/schemas`,
-  `/schemas/$schemaId`) nested under it.
-- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`), with
-  **Branding** (`/branding`) nested under it.
+- **Teams** (`/teams`, `/teams/$teamId`, with Overview and Members tabs).
+- **Users** (`/users`, `/users/$userId`).
+- **User schemas** (`/schemas`, `/schemas/$schemaId`).
+- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`).
+- **Branding** (`/branding`).
+- **Authentication** (`/authentication`).
+- **Logs** (`/events`, `/events/$eventId`): the project's events.
 - **Project settings** (`/project`).
-- **Profile** (`/settings/profile`), in the Settings view.
+- **Profile** (`/settings/profile`), your profile, under Settings in the
+  account sidebar.
+
+The sidebar is one level, in the order and with the icons of the design's
+"01 / Nav Level 1".
 
 **Not in the sidebar:**
 
-- `/` redirects to Users, `/settings` to Profile, and `/projects/$projectId` to
+- `/` redirects to Users, `/settings` to the profile, and `/projects/$projectId` to
   `/project` with that project selected.
 - `/system` shows server health.
 - `/login` and `/claim` render outside the app shell.
@@ -63,14 +69,17 @@ empty). Attaching `staticData.nav` to a new route lists it.
 - Desktop expanded = 256px sidebar
 - Desktop collapsed / mobile = icon rail (48px), with a Sheet
   overlay available for the expanded label view
-- Context bar: project `Popover` switcher + theme toggle
+- Context bar: the project switcher (not on Projects), the team switcher on a
+  team's page, and search (⌘K / Ctrl K). The theme lives in the account menu.
 
 ## API access and auth
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
-same-origin API base (`/api` under the dev server, the origin root when
-embedded). Management requests carry no bearer: the `__nextgen_session` cookie
-authorizes them. Sign-in requests send the runtime publishable key (below).
+same-origin API under `/api/v1` (through the Vite proxy under the dev server,
+straight to the Go server when embedded). Management requests carry no bearer:
+the session cookie (`__Host-zitadel_session`, `zitadel_session` on
+`http://localhost`) authorizes them. Sign-in requests send the runtime
+publishable key (below).
 The dev proxy injects no credential. See the Vite proxy config and environment
 variables below.
 
@@ -78,7 +87,7 @@ variables below.
 
 Console users sign in through the embedded `<zitadel-login>` widget on
 `/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
-widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+widget's handoff token for the HttpOnly session cookie; the
 pathless `_authed` layout guards every screen by confirming that cookie
 against `GET /sessions/me` and redirects unauthenticated visitors to
 `/login?next=…`. Sign-out lives in the sidebar user menu
@@ -139,8 +148,8 @@ production build.
 The runtime document also carries the default project's **publishable key**
 (root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
 on flow calls and the handoff exchange. Sign-in therefore needs no server-side
-credential either. The server serves the document only while one of its UI
-surfaces (console or hosted login) is enabled.
+credential either. The server serves the document whether or not it embeds the
+console.
 
 ## Local development
 
@@ -205,7 +214,7 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.ts`) |
 | `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
-| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api` under the dev server, the origin root in a build) |
+| `VITE_CONSOLE_API_BASE` | Client | A path or origin the SDK puts in front of the API's `/api/v1` (default: none, the page's own origin) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands

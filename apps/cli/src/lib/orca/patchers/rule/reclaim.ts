@@ -1,8 +1,8 @@
-import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { isObject } from "../../../json";
-import { MANAGED_MARKER } from "../../../paths";
+import { pathExists } from "@/lib/fs";
+import { readPackageJson } from "@/lib/npm";
+import { MANAGED_MARKER } from "@/lib/paths";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
 /**
@@ -15,18 +15,25 @@ import type { FileOp, ScaffoldPlan } from "./file-writer/types";
  * the transform returning the source unchanged), so replaying one restores a
  * removed managed block without clobbering the user's own edits. Deliberately
  * excludes the unmarked `.zitadel/` resource writes and `zitadel.json` — those
- * are user-editable and synced by `apply`, so `--fix` must not clobber them.
+ * are user-editable and published by `deploy`, so `--fix` must not clobber them.
  *
  * Pure: filters a freshly-allocated list; the input plan is not mutated.
  */
 export function reclaimableOps(plan: ScaffoldPlan): FileOp[] {
-  return plan.ops.filter(
-    (op) =>
-      op.kind === "merge-env" ||
-      op.kind === "append-gitignore" ||
-      op.kind === "add-dep" ||
-      op.kind === "edit" ||
-      (op.kind === "write" && op.contents.includes(MANAGED_MARKER)),
+  return (
+    plan.ops
+      .filter(
+        (op) =>
+          op.kind === "merge-env" ||
+          op.kind === "append-gitignore" ||
+          op.kind === "add-dep" ||
+          op.kind === "edit" ||
+          (op.kind === "write" && op.contents.includes(MANAGED_MARKER)),
+      )
+      // A repair only adds what is missing: setup may replace its own stale
+      // values, but a value the developer changed since (`env add --force`, a
+      // prompt's answer) is theirs, so a replayed merge never overwrites.
+      .map((op) => (op.kind === "merge-env" && op.overwrite ? { ...op, overwrite: false } : op))
   );
 }
 
@@ -51,7 +58,7 @@ export async function withoutExistingTargets(
   const kept: FileOp[] = [];
   for (const op of ops) {
     if (op.kind === "write") {
-      if (!(await exists(join(cwd, op.path)))) {
+      if (!(await pathExists(join(cwd, op.path)))) {
         kept.push(op);
       }
       continue;
@@ -59,7 +66,7 @@ export async function withoutExistingTargets(
     if (op.kind === "edit" && op.overwrites) {
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
       const present = await Promise.all(
-        candidates.map((candidate) => exists(join(cwd, candidate))),
+        candidates.map((candidate) => pathExists(join(cwd, candidate))),
       );
       if (!present.includes(true)) {
         kept.push(op);
@@ -84,29 +91,6 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  let contents: string;
-  try {
-    contents = await readFile(join(cwd, "package.json"), "utf8");
-  } catch {
-    return false;
-  }
-  try {
-    const pkg = JSON.parse(contents) as unknown;
-    if (!isObject(pkg)) {
-      return false;
-    }
-    const declared = (key: string): boolean => isObject(pkg[key]) && name in (pkg[key] as object);
-    return declared("dependencies") || declared("devDependencies");
-  } catch {
-    return false;
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
+  const pkg = await readPackageJson(cwd).catch(() => undefined);
+  return pkg?.dependencies?.[name] !== undefined || pkg?.devDependencies?.[name] !== undefined;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "1.0.0-alpha.28",
+  "version": "0.5.0",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -13,6 +13,8 @@
     "directory": "packages/config"
   },
   "files": [
+    "bootstrap-user.mjs",
+    "bootstrap-user.d.mts",
     "dist",
     "defaults/*.json",
     "defaults/*.md",
@@ -42,6 +44,11 @@
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
+    },
+    "./server": {
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
     },
     "./branding-url": {
       "@zitadel/source": "./src/branding-url.ts",
@@ -81,7 +88,11 @@
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./defaults/branding/*": "./defaults/branding/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./bootstrap-user": {
+      "types": "./bootstrap-user.d.mts",
+      "import": "./bootstrap-user.mjs"
+    }
   },
   "publishConfig": {
     "access": "public"
@@ -89,7 +100,7 @@
   "scripts": {
     "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
     "prebuild": "node --run sync-schemas",
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only",
     "pretypecheck": "node --run sync-schemas",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "node --run sync-schemas",
@@ -100,15 +111,18 @@
     "prepack": "publint --strict"
   },
   "dependencies": {
+    "@sindresorhus/slugify": "catalog:",
     "@zitadel/api": "workspace:*",
+    "ajv": "catalog:",
     "culori": "catalog:",
+    "fastest-levenshtein": "catalog:",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/culori": "catalog:",
     "@types/node": "catalog:",
-    "ajv": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "typescript": "catalog:",

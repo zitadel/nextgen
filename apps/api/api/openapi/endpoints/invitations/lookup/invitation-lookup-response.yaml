@@ -1,0 +1,12 @@
+title: LookupInvitationResponse
+description: |
+  Lean invitation view for the signed-in accept page. Discriminate on `type`.
+  Unknown and finished tokens answer the same opaque `404`.
+oneOf:
+  - $ref: invitation-lookup-project-member-response.yaml
+  - $ref: invitation-lookup-team-member-response.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: invitation-lookup-project-member-response.yaml
+    team_member: invitation-lookup-team-member-response.yaml

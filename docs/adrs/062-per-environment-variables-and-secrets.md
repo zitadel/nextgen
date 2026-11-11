@@ -1,7 +1,15 @@
-# ADR 062: Per-Environment Variables and Secrets
+# ADR 062: Per-Project Variables and Secrets
 
 > **Status:** Proposed
 > **Date:** 2026-09-04
+>
+> **Note (2026-10-24):** retitled from "Per-Environment Variables and Secrets".
+> There are no environments since [ADR 068](068-project-is-the-data-boundary.md);
+> a variable is scoped to a project and a target kind
+> ([ADR 069](069-variables-per-kind-frozen-per-deployment.md)). The context
+> below keeps the original wording. Storage, the per-kind API and the CLI
+> `variables` commands have shipped (#1145, #1850); freezing a deployment's
+> values and refusing a deploy that names a missing variable have not (#1781).
 > **Context:** How a configuration value that must differ per environment
 > reaches a running release, and how the sensitive half of those values is
 > protected.

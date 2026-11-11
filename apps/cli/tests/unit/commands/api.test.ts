@@ -1,13 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { select, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
-import Api from "../../../src/commands/api/index";
-import { makeProject } from "../../helpers/local-project";
-import { cliPackageRoot } from "../../helpers/oclif-build";
+import Api from "@/commands/api/index";
+import { it } from "@tests/helpers/fixtures";
+import { makeProject } from "@tests/helpers/local-project";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
@@ -35,14 +36,17 @@ beforeEach(() => {
 afterEach(() => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
+  vi.restoreAllMocks();
   vi.mocked(select).mockReset();
   vi.mocked(text).mockReset();
-  vi.restoreAllMocks();
 });
 
-/** Run `zitadel api` from source with its output kept out of the test log. */
-async function api(...argv: string[]) {
-  return apiIn(await makeProject({ linked: true }), ...argv);
+/**
+ * Run `zitadel api` from source in a linked Project written to `dir`, with its
+ * output kept out of the test log.
+ */
+async function api(dir: string, ...argv: string[]) {
+  return apiIn(await makeProject(dir, { linked: true }), ...argv);
 }
 
 /** Run `zitadel api` from source in `cwd`. */
@@ -57,26 +61,47 @@ async function apiIn(cwd: string, ...argv: string[]) {
   );
 }
 
+describe("zitadel api help", () => {
+  it("is no operation, in any case and whatever follows", async ({ dir }) => {
+    const envelope = await api(dir, "Help", "getVariable");
+
+    expect(envelope).toMatchObject({ status: "ok", data: {} });
+  });
+
+  it("opens no telemetry and resolves no server", async ({ dir }) => {
+    const toMeta = vi.spyOn(Api.prototype as unknown as { toMeta: () => unknown }, "toMeta");
+
+    await api(dir, "help");
+
+    expect(toMeta).not.toHaveBeenCalled();
+  });
+});
+
 describe("zitadel api without an operation, at a terminal", () => {
-  it("asks for the part of the API, the operation and its path parameters", async () => {
+  it("asks for the part of the API, the operation and its path parameters", async ({ dir }) => {
     vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
     vi.mocked(select).mockResolvedValueOnce("revokeSession" as never);
     vi.mocked(text).mockResolvedValueOnce("sess_1" as never);
 
-    const envelope = await api("--dry-run");
+    const envelope = await api(dir, "--dry-run");
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
+      data: { operation: "revokeSession", url: "http://localhost:8080/api/v1/sessions/sess_1" },
     });
+    expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
+      "Which part of the API would you like to use?",
+      "Which operation would you like to run?",
+    ]);
+    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe("What is the value of session_id?");
   });
 
-  it("offers only what the CLI can call", async () => {
+  it("offers only what the CLI can call", async ({ dir }) => {
     vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
     vi.mocked(select).mockResolvedValueOnce("getSession" as never);
     vi.mocked(text).mockResolvedValueOnce("sess_1" as never);
 
-    await api("--dry-run");
+    await api(dir, "--dry-run");
 
     const offered = vi.mocked(select).mock.calls[1]?.[0].options.map((option) => option.value);
     expect(offered).toContain("getSession");
@@ -85,12 +110,12 @@ describe("zitadel api without an operation, at a terminal", () => {
 });
 
 describe("zitadel api for an operation that needs no credential", () => {
-  it("runs where no project was set up", async () => {
-    const envelope = await apiIn(await makeProject(), "getHealth", "--dry-run");
+  it("runs where no project was set up", async ({ dir }) => {
+    const envelope = await apiIn(await makeProject(dir), "getLive", "--dry-run");
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/healthz" },
+      data: { url: "http://localhost:8080/api/v1/livez" },
     });
   });
 });

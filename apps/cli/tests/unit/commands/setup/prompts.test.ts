@@ -1,566 +1,1052 @@
-import { PassThrough } from "node:stream";
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock @clack/prompts so each prompt's clack calls return canned values. Tests
-// then drive return values via vi.mocked(...).mockResolvedValueOnce(...).
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  multiselect: vi.fn(),
-  select: vi.fn(),
-  text: vi.fn(),
-  password: vi.fn(),
-  note: vi.fn(),
-  intro: vi.fn(),
-  outro: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-  // `spinner()` returns a tiny stateful handle — the tests don't assert on
-  // its frames, just that calling it doesn't break the prompt flow.
-  spinner: vi.fn(() => ({
-    start: vi.fn(),
-    stop: vi.fn(),
-    message: vi.fn(),
-  })),
-}));
+vi.mock("@clack/prompts", async () => {
+  return (await import("@tests/helpers/clack")).clackDouble();
+});
 
-// Stub local-server detection so ServerPrompt tests stay focused on the
-// choice wiring, not the runtime-metadata/health probing (which has its own
-// tests under tests/unit/lib/local-server/). Spread the original module so
-// unrelated exports (used transitively via lib/server) stay intact.
-vi.mock("../../../../src/lib/local-server/server", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  LocalServer: { detectUrl: vi.fn() },
-}));
+vi.mock("@/lib/local-server/server", async (importOriginal) => {
+  return {
+    ...(await importOriginal<object>()),
+    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
+  };
+});
 
-import { confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
-import { IDP_PROVIDERS, type ProviderSelection } from "@zitadel/config/idp";
-
-import {
-  acmeSelection,
-  clientId,
-  clientSecret,
-  googleSelection,
-} from "../../../helpers/idp-values";
-
-import { parseDevAddress } from "../../../../src/commands/setup/prompts/dev-port";
-import { type Asker, input } from "../../../../src/lib/input";
-import { Wizard } from "../../../../src/lib/wizard";
-import { takeReportedWarnings } from "../../../../src/lib/warnings";
-import { LocalServer } from "../../../../src/lib/local-server/server";
+import { confirm, isCancel, log, multiselect, note, password, select, text } from "@clack/prompts";
+import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import {
   askCustomSettings,
   DevPortPrompt,
   FrameworkConfirmPrompt,
+  PasswordPolicyPrompt,
   PickFrameworkPrompt,
+  type PromptContext,
   ServerPrompt,
-  SignInPresetPrompt,
   SETUP_PROMPTS,
+  type SetupAnswers,
+  SignInPresetPrompt,
   SocialSignInPrompt,
   UseCasePrompt,
-  type PromptContext,
-  type SetupAnswers,
-} from "../../../../src/commands/setup/prompts";
+} from "@/commands/setup/prompts";
+import { ZitadelError } from "@/lib/errors";
+import { type Asker, input } from "@/lib/input";
+import { LocalServer } from "@/lib/local-server/server";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { projectCommand } from "@/lib/suggestion";
+import { takeReportedWarnings } from "@/lib/warnings";
+import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const FRAMEWORK = {
-  id: "next",
-  appDir: "app" as const,
-  devPort: 3000,
-  url: "http://localhost:3000",
+/**
+ * The framework setup detected.
+ */
+const FRAMEWORK = { id: "next", displayName: "Next.js" };
+
+/**
+ * The hosted cloud, the server a run falls back to.
+ */
+const CLOUD = "https://preview.zitadel.com";
+
+/**
+ * A local Zitadel server `zitadel start` ran.
+ */
+const LOCAL = "http://localhost:8080";
+
+/**
+ * The server choice that asks for a URL.
+ */
+const CUSTOM_SERVER = "__custom__";
+
+/**
+ * The app directory setup runs in.
+ */
+const APP_DIR = "/tmp/app";
+
+/**
+ * What a cancelled prompt answers.
+ */
+const CANCEL = Symbol("cancel");
+
+/**
+ * The redirect URI a Google provider registers when the app runs on port 4321.
+ */
+const GOOGLE_CALLBACK = "http://localhost:4321/__nextgen/idp/google/callback";
+
+/**
+ * The redirect URI the Acme connection registers when the app runs on port 4321.
+ */
+const ACME_CALLBACK = "http://localhost:4321/__nextgen/idp/acme-sso/callback";
+
+/**
+ * The Acme connection's issuer.
+ */
+const ACME_ISSUER = "https://sso.acme.example";
+
+/**
+ * The order the custom connection's questions are asked in.
+ */
+const QUESTION = { displayName: 0, slug: 1, issuer: 2, scopes: 3 } as const;
+
+/**
+ * A custom connection's settings, every one of them given.
+ */
+const EVERYTHING = {
+  slug: "acme-sso",
+  displayName: "Acme SSO",
+  issuer: ACME_ISSUER,
+  scopes: "openid",
 };
 
-function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
+/**
+ * How each custom connection setting's question begins.
+ */
+const QUESTIONS = {
+  slug: "What would you like to call this connection?",
+  displayName: "What name should the sign-in button show?",
+  issuer: "What is the issuer URL of the provider?",
+  scopes: "Which scopes should we request?",
+};
+
+/**
+ * How the wizard asks: interactively, without `--force`.
+ *
+ * @param question - The question.
+ * @returns The answer.
+ */
+const ask: Asker = (question) => {
+  return input(question, { interactive: true, force: false });
+};
+
+/**
+ * What every prompt is given, as setup builds it: its suggestions are aimed
+ * at the project setup creates.
+ */
+const CONTEXT: PromptContext = {
+  input: ask,
+  framework: FRAMEWORK,
+  cwd: APP_DIR,
+  suggest: (args) => {
+    return projectCommand(
+      args,
+      environmentSelectorSuffix({ envFile: ".env.development.local" }),
+      "1.2.3",
+    );
+  },
+};
+
+/**
+ * The answers setup has gathered for a passkey-first, minimal app on the
+ * cloud, on port 3000, with no provider.
+ *
+ * @param overrides - What the answers differ in from the default.
+ * @returns The answers.
+ */
+function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   return {
-    server: "https://preview.zitadel.com",
+    server: CLOUD,
     devPort: 3000,
     preset: "passkey-first",
     useCase: "minimal",
     sso: [],
-    ...over,
+    ...overrides,
   };
 }
 
-const ask: Asker = (question) => input(question, { interactive: true, force: false });
+/**
+ * Answers the Acme connection's four questions, then its client id.
+ *
+ * @param overrides - The issuer or client id to answer instead.
+ * @returns Nothing; the text prompt is primed.
+ */
+function describesAcme(overrides: { issuer?: string; clientId?: string } = {}): void {
+  vi.mocked(text)
+    .mockResolvedValueOnce(" Acme SSO ")
+    .mockResolvedValueOnce(" acme-sso ")
+    .mockResolvedValueOnce(overrides.issuer ?? ` ${ACME_ISSUER} `)
+    .mockResolvedValueOnce("openid profile email groups")
+    .mockResolvedValueOnce(overrides.clientId ?? "acme-client-id");
+}
 
-let drawn = "";
-const sink = new PassThrough();
-sink.on("data", (chunk) => {
-  drawn += chunk.toString();
-});
+/**
+ * The check a question applies to each answer.
+ *
+ * @param question - The question, as clack was given it.
+ * @returns The check: why an answer is refused, or `undefined`.
+ */
+function validatorOf(
+  question: { validate?: Parameters<typeof text>[0]["validate"] } | undefined,
+): (value: string) => string | Error | undefined {
+  const validate = question?.validate;
+  if (typeof validate !== "function") {
+    throw new Error("the question has no validator");
+  }
+  return validate;
+}
 
-const ctx: PromptContext = {
-  input: ask,
-  framework: FRAMEWORK,
-  cwd: "/tmp/app",
-  wizardOutput: sink,
-};
+/**
+ * Answers each custom connection setting's question with its value from
+ * {@link EVERYTHING}.
+ *
+ * @param message - The question asked.
+ * @returns The answer.
+ */
+async function answerFromEverything({ message }: { message: string }): Promise<string> {
+  const key = Object.entries(QUESTIONS).find(([, question]) => {
+    return message.startsWith(question);
+  })?.[0];
+  return (
+    Object.entries(EVERYTHING).find(([name]) => {
+      return name === key;
+    })?.[1] ?? ""
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // clearAllMocks keeps answers queued by a test that did not use them, which
-  // would then answer the next test's questions.
-  for (const prompt of [confirm, multiselect, password, select, text]) {
-    vi.mocked(prompt).mockReset();
-  }
-  drawn = "";
   vi.mocked(isCancel).mockReturnValue(false);
-  // Default: no local Zitadel server running. Each ServerPrompt test that
-  // exercises the detection path overrides via mockResolvedValueOnce.
   vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
+  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
-/**
- * Reads the `options` array off the first `select(...)` call so we can assert
- * what choices `ServerPrompt` presented. Throws if `select` was never called
- * (rather than returning a misleading empty list).
- */
-function selectOptionsFromFirstCall(): ReadonlyArray<{ value: string }> {
-  const [firstCall] = vi.mocked(select).mock.calls;
-  if (!firstCall) {
-    throw new Error("expected `select` to have been called");
-  }
-  return (firstCall[0] as { options: ReadonlyArray<{ value: string }> }).options;
-}
-
 describe("FrameworkConfirmPrompt", () => {
-  it("returns answers unchanged when the user confirms", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true);
+  describe("when the developer confirms", () => {
+    it("returns the answers unchanged", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    const out = await new FrameworkConfirmPrompt().ask(baseAnswers(), ctx);
+      const answers = await new FrameworkConfirmPrompt().ask(setupAnswers(), CONTEXT);
 
-    expect(out).toEqual(baseAnswers());
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining("Next.js") }),
-    );
-  });
-
-  it("does not ask when the developer already chose the framework", async () => {
-    // Picked from the scaffold list a moment earlier, or passed --framework:
-    // detection only read their own answer back.
-    const out = await new FrameworkConfirmPrompt().ask(baseAnswers(), {
-      ...ctx,
-      frameworkChosen: true,
+      expect(answers).toEqual(setupAnswers());
     });
 
-    expect(out).toEqual(baseAnswers());
-    expect(confirm).not.toHaveBeenCalled();
-  });
+    it("asks whether to set up Zitadel in the detected app", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
-  it("throws E_UNSUPPORTED_PROJECT_SHAPE when the user declines", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false);
+      await new FrameworkConfirmPrompt().ask(setupAnswers(), CONTEXT);
 
-    await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+        message: "Would you like to set up Zitadel in this Next.js app?",
+      });
     });
   });
 
-  it("says it stopped because the framework was declined, not that anything was cancelled", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false);
+  describe("when the developer already chose the framework", () => {
+    it("returns the answers unchanged", async () => {
+      const answers = await new FrameworkConfirmPrompt().ask(setupAnswers(), {
+        ...CONTEXT,
+        frameworkChosen: true,
+      });
 
-    await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
-      message: "Setup stopped — the detected framework was declined",
-      hint: "Re-run with --framework next when ready.",
+      expect(answers).toEqual(setupAnswers());
+    });
+
+    it("does not ask", async () => {
+      await new FrameworkConfirmPrompt().ask(setupAnswers(), { ...CONTEXT, frameworkChosen: true });
+
+      expect(confirm).not.toHaveBeenCalled();
     });
   });
 
-  it("throws E_VALIDATION on Ctrl-C", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+  describe("when the developer declines", () => {
+    it("refuses with E_UNSUPPORTED_PROJECT_SHAPE", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(false);
+
+      const error = await rejectionOf(() => {
+        return new FrameworkConfirmPrompt().ask(setupAnswers(), CONTEXT);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_UNSUPPORTED_PROJECT_SHAPE" });
+    });
+
+    it("says nothing changed and points at the app's own directory, not --framework", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(false);
+
+      const error = await rejectionOf(() => {
+        return new FrameworkConfirmPrompt().ask(setupAnswers(), CONTEXT);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        message: "Setup stopped before changing this Next.js app",
+        hint: "To set up another app, run setup in its directory, or pass --cwd with that directory.",
+      });
+    });
+  });
+
+  it("refuses with E_CANCELLED on Ctrl-C", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(CANCEL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
-      code: "E_VALIDATION",
+    const error = await rejectionOf(() => {
+      return new FrameworkConfirmPrompt().ask(setupAnswers(), CONTEXT);
     });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({ code: "E_CANCELLED" });
   });
 });
 
 describe("ServerPrompt", () => {
-  it("writes the cloud choice without asking for a URL", async () => {
-    vi.mocked(select).mockResolvedValueOnce("https://preview.zitadel.com" as never);
+  describe("when the cloud is chosen", () => {
+    it("writes the cloud", async () => {
+      vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-    const out = await new ServerPrompt().ask(baseAnswers(), ctx);
+      const answers = await new ServerPrompt().ask(setupAnswers(), CONTEXT);
 
-    expect(out.server).toBe("https://preview.zitadel.com");
-    expect(text).not.toHaveBeenCalled();
-  });
-
-  it("follows up with the URL prompt when 'custom' is chosen", async () => {
-    vi.mocked(select).mockResolvedValueOnce("__custom__" as never);
-    vi.mocked(text).mockResolvedValueOnce("https://zitadel.internal" as never);
-
-    const out = await new ServerPrompt().ask(baseAnswers(), ctx);
-
-    expect(out.server).toBe("https://zitadel.internal");
-    expect(text).toHaveBeenCalledOnce();
-  });
-
-  it("offers and preselects the detected local Zitadel server", async () => {
-    // `zitadel start` ran here: runtime metadata + /healthz say localhost:8080.
-    vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce("http://localhost:8080");
-    vi.mocked(select).mockResolvedValueOnce("http://localhost:8080" as never);
-
-    const out = await new ServerPrompt().ask(baseAnswers(), ctx);
-
-    expect(LocalServer.detectUrl).toHaveBeenCalledWith(ctx.cwd);
-    expect(out.server).toBe("http://localhost:8080");
-    // The text prompt must not fire when the user picks the detected server.
-    expect(text).not.toHaveBeenCalled();
-
-    // The detected URL sits between the Cloud row and the "Custom URL"
-    // sentinel, and is the preselected answer — the user just ran
-    // `zitadel start`, so local is almost certainly what they want.
-    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
-      initialValue: "http://localhost:8080",
+      expect(answers.server).toBe(CLOUD);
     });
-    const values = selectOptionsFromFirstCall().map((option) => option.value);
-    expect(values).toEqual(["https://preview.zitadel.com", "http://localhost:8080", "__custom__"]);
-  });
 
-  it("offers only Cloud and Custom when no local server is detected", async () => {
-    // Default mock (LocalServer.detectUrl → undefined) already simulates
-    // this; assert explicitly that no detected URL leaks into the options.
-    vi.mocked(select).mockResolvedValueOnce("https://preview.zitadel.com" as never);
+    it("does not ask for a URL", async () => {
+      vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-    await new ServerPrompt().ask(baseAnswers(), ctx);
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
 
-    const values = selectOptionsFromFirstCall().map((option) => option.value);
-    expect(values).toEqual(["https://preview.zitadel.com", "__custom__"]);
-    expect(selectOptionsFromFirstCall()[0]).toMatchObject({
-      label: "Zitadel Cloud (preview.zitadel.com)",
-    });
-    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
-      initialValue: "https://preview.zitadel.com",
+      expect(text).not.toHaveBeenCalled();
     });
   });
 
-  it("skips entirely when --server pinned the answer", async () => {
-    const answers = baseAnswers({ server: "http://localhost:8080" });
+  describe("when a custom URL is chosen", () => {
+    it("writes the URL entered", async () => {
+      vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
+      vi.mocked(text).mockResolvedValueOnce("https://zitadel.internal");
 
-    const out = await new ServerPrompt().ask(answers, {
-      ...ctx,
-      serverFlag: "local",
+      const answers = await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.server).toBe("https://zitadel.internal");
     });
 
-    expect(out).toEqual(answers);
-    expect(LocalServer.detectUrl).not.toHaveBeenCalled();
-    expect(select).not.toHaveBeenCalled();
+    it("asks for the URL once", async () => {
+      vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
+      vi.mocked(text).mockResolvedValueOnce("https://zitadel.internal");
+
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(text).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when a local server is detected", () => {
+    beforeEach(() => {
+      vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce(LOCAL);
+      vi.mocked(select).mockResolvedValueOnce(LOCAL);
+    });
+
+    it("looks for it in the app directory", async () => {
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(LocalServer.detectUrl).toHaveBeenCalledWith(APP_DIR);
+    });
+
+    it("writes it when it is picked", async () => {
+      const answers = await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.server).toBe(LOCAL);
+    });
+
+    it("does not ask for a URL when it is picked", async () => {
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(text).not.toHaveBeenCalled();
+    });
+
+    it("preselects it", async () => {
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: LOCAL });
+    });
+
+    it("lists it between the cloud and a custom URL", async () => {
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(
+        vi.mocked(select).mock.calls[0]?.[0].options.map((option) => {
+          return option.value;
+        }),
+      ).toEqual([CLOUD, LOCAL, CUSTOM_SERVER]);
+    });
+
+    it("labels it with its URL", async () => {
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0].options[1]).toMatchObject({
+        label: "Local server (http://localhost:8080)",
+      });
+    });
+  });
+
+  describe("when no local server is detected", () => {
+    it("lists the local server as unavailable, saying how to start it", async () => {
+      vi.mocked(select).mockResolvedValueOnce(CLOUD);
+
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0].options).toEqual([
+        { value: CLOUD, label: "Zitadel Cloud (preview.zitadel.com)" },
+        {
+          value: "__local_not_running__",
+          label: "Local server",
+          hint: "not running — run zitadel start first",
+          disabled: true,
+        },
+        { value: CUSTOM_SERVER, label: "Custom URL (self-hosted)" },
+      ]);
+    });
+
+    it("preselects the cloud", async () => {
+      vi.mocked(select).mockResolvedValueOnce(CLOUD);
+
+      await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: CLOUD });
+    });
+  });
+
+  it("asks which server the app uses, not which one a file points to", async () => {
+    vi.mocked(select).mockResolvedValueOnce(CLOUD);
+
+    await new ServerPrompt().ask(setupAnswers(), CONTEXT);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
+      "Which Zitadel server should your app use?",
+    );
+  });
+
+  describe("with --server", () => {
+    it("keeps the pinned server", async () => {
+      const answers = await new ServerPrompt().ask(setupAnswers({ server: LOCAL }), {
+        ...CONTEXT,
+        serverFlag: "local",
+      });
+
+      expect(answers).toEqual(setupAnswers({ server: LOCAL }));
+    });
+
+    it("does not look for a local server", async () => {
+      await new ServerPrompt().ask(setupAnswers({ server: LOCAL }), {
+        ...CONTEXT,
+        serverFlag: "local",
+      });
+
+      expect(LocalServer.detectUrl).not.toHaveBeenCalled();
+    });
+
+    it("does not ask", async () => {
+      await new ServerPrompt().ask(setupAnswers({ server: LOCAL }), {
+        ...CONTEXT,
+        serverFlag: "local",
+      });
+
+      expect(select).not.toHaveBeenCalled();
+    });
   });
 });
 
 describe("DevPortPrompt", () => {
-  it("parses the entered text into a number", async () => {
-    vi.mocked(text).mockResolvedValueOnce("4000" as never);
+  describe("when the detected port is free", () => {
+    it("checks the detected port", async () => {
+      await new DevPortPrompt().ask(setupAnswers({ devPort: 3000 }), CONTEXT);
 
-    const out = await new DevPortPrompt().ask(baseAnswers(), ctx);
-
-    expect(out.devPort).toBe(4000);
-  });
-
-  it.each([
-    ["3000", 3000],
-    [" 4321 ", 4321],
-    ["http://localhost:3000", 3000],
-    ["http://127.0.0.1:5173/", 5173],
-  ])("reads %j as port %i", (typed, port) => {
-    expect(parseDevAddress(typed)).toEqual({ ok: true, value: port });
-  });
-
-  it.each(["", "0", "70000", "localhost", "https://example.com:3000", "http://localhost"])(
-    "says how to write the address when given %j",
-    (typed) => {
-      expect(parseDevAddress(typed)).toEqual({
-        ok: false,
-        problem: "Enter a port such as 3000, or an address such as http://localhost:3000.",
-      });
-    },
-  );
-
-  it("skips and keeps the flagged port when --dev-port was passed", async () => {
-    const out = await new DevPortPrompt().ask(baseAnswers({ devPort: 5000 }), {
-      ...ctx,
-      devPortFromFlag: true,
+      expect(LocalServer.isPortFree).toHaveBeenCalledWith(3000);
     });
 
-    expect(out.devPort).toBe(5000);
-    expect(vi.mocked(text)).not.toHaveBeenCalled();
+    it("keeps the detected port", async () => {
+      const answers = await new DevPortPrompt().ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+
+      expect(answers.devPort).toBe(3000);
+    });
+
+    it("does not ask", async () => {
+      await new DevPortPrompt().ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+
+      expect(text).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the detected port is taken", () => {
+    beforeEach(() => {
+      vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
+      vi.mocked(LocalServer.nextFreePort).mockImplementation((port) => {
+        return Promise.resolve(port + 1);
+      });
+    });
+
+    it("parses the entered text into a number", async () => {
+      vi.mocked(text).mockResolvedValueOnce("4000");
+
+      const answers = await new DevPortPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.devPort).toBe(4000);
+    });
+
+    it("looks for the next free port after it", async () => {
+      vi.mocked(text).mockResolvedValueOnce("5174");
+
+      await new DevPortPrompt().ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+
+      expect(LocalServer.nextFreePort).toHaveBeenCalledWith(5173);
+    });
+
+    it("says the port is in use and suggests the next free one", async () => {
+      vi.mocked(text).mockResolvedValueOnce("5174");
+
+      await new DevPortPrompt().ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+
+      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
+        message: "Port 5173 is in use. Which port should your app run on?",
+        initialValue: "5174",
+      });
+    });
+
+    it("suggests the taken port when the next ones are taken too", async () => {
+      vi.mocked(LocalServer.nextFreePort).mockResolvedValue(undefined);
+      vi.mocked(text).mockResolvedValueOnce("5173");
+
+      await new DevPortPrompt().ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+
+      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ initialValue: "5173" });
+    });
+  });
+
+  describe("with --dev-port", () => {
+    it("keeps the flagged port", async () => {
+      vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
+
+      const answers = await new DevPortPrompt().ask(setupAnswers({ devPort: 5000 }), {
+        ...CONTEXT,
+        devPortFromFlag: true,
+      });
+
+      expect(answers.devPort).toBe(5000);
+    });
+
+    it("does not ask", async () => {
+      vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
+
+      await new DevPortPrompt().ask(setupAnswers({ devPort: 5000 }), {
+        ...CONTEXT,
+        devPortFromFlag: true,
+      });
+
+      expect(text).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("PasswordPolicyPrompt", () => {
+  it("records the chosen minimum", async () => {
+    vi.mocked(select).mockResolvedValueOnce(15);
+
+    const answers = await new PasswordPolicyPrompt().ask(setupAnswers(), CONTEXT);
+
+    expect(answers.passwordMinLength).toBe(15);
+  });
+
+  it("offers 15, 8 or none, with 15 preselected as the recommendation", async () => {
+    vi.mocked(select).mockResolvedValueOnce(15);
+
+    await new PasswordPolicyPrompt().ask(setupAnswers(), CONTEXT);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+      message: "Which minimum length should passwords have? You can change it later.",
+      initialValue: 15,
+      options: [
+        { value: 15, label: "15 characters — recommended" },
+        { value: 8, label: "8 characters" },
+        { value: null, label: "No minimum" },
+      ],
+    });
+  });
+
+  it("records no minimum as none", async () => {
+    vi.mocked(select).mockResolvedValueOnce(null);
+
+    const answers = await new PasswordPolicyPrompt().ask(setupAnswers(), CONTEXT);
+
+    expect(answers.passwordMinLength).toBeNull();
+  });
+
+  describe("with --password-min-length", () => {
+    it("keeps the flagged minimum", async () => {
+      const answers = await new PasswordPolicyPrompt().ask(
+        setupAnswers({ passwordMinLength: 10 }),
+        { ...CONTEXT, passwordMinLengthFromFlag: true },
+      );
+
+      expect(answers.passwordMinLength).toBe(10);
+    });
+
+    it("does not ask", async () => {
+      await new PasswordPolicyPrompt().ask(setupAnswers({ passwordMinLength: 10 }), {
+        ...CONTEXT,
+        passwordMinLengthFromFlag: true,
+      });
+
+      expect(select).not.toHaveBeenCalled();
+    });
   });
 });
 
 describe("PickFrameworkPrompt", () => {
   it("returns the selected framework id", async () => {
-    vi.mocked(select).mockResolvedValueOnce("next" as never);
+    vi.mocked(select).mockResolvedValueOnce("next");
 
-    const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask);
+    const id = await new PickFrameworkPrompt().ask([FRAMEWORK], ask);
 
     expect(id).toBe("next");
   });
 
-  it("throws E_VALIDATION on Ctrl-C", async () => {
-    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+  it("asks which framework to scaffold", async () => {
+    vi.mocked(select).mockResolvedValueOnce("next");
+
+    await new PickFrameworkPrompt().ask([FRAMEWORK], ask);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
+      "Which framework would you like to scaffold?",
+    );
+  });
+
+  it("refuses with E_CANCELLED on Ctrl-C", async () => {
+    vi.mocked(select).mockResolvedValueOnce(CANCEL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await expect(
-      new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    const error = await rejectionOf(() => {
+      return new PickFrameworkPrompt().ask([FRAMEWORK], ask);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({ code: "E_CANCELLED" });
   });
 });
 
 describe("UseCasePrompt", () => {
   it("writes the selected use case into the answers", async () => {
-    vi.mocked(select).mockResolvedValueOnce("business" as never);
+    vi.mocked(select).mockResolvedValueOnce("business");
 
-    const answers = await new UseCasePrompt().ask(baseAnswers({ useCase: "minimal" }), ctx);
+    const answers = await new UseCasePrompt().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
 
     expect(answers.useCase).toBe("business");
+  });
+
+  it("preselects the use case already answered", async () => {
+    vi.mocked(select).mockResolvedValueOnce("business");
+
+    await new UseCasePrompt().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "minimal" });
   });
 
-  it("skips and keeps the flagged use case when --use-case was passed", async () => {
-    const answers = await new UseCasePrompt().ask(baseAnswers({ useCase: "consumer" }), {
-      ...ctx,
-      useCaseFromFlag: true,
-    });
+  it("asks which registration fields to collect, with every field set in its label", async () => {
+    vi.mocked(select).mockResolvedValueOnce("minimal");
 
-    expect(answers.useCase).toBe("consumer");
-    expect(select).not.toHaveBeenCalled();
+    await new UseCasePrompt().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+      message: "Which fields should registration collect? You can change them later.",
+      options: [
+        { value: "minimal", label: "Email only" },
+        { value: "consumer", label: "Email, first name and last name" },
+        { value: "business", label: "Email, first name, last name and company name" },
+      ],
+    });
   });
 
-  it("throws E_VALIDATION on Ctrl-C", async () => {
-    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+  describe("with --use-case", () => {
+    it("keeps the flagged use case", async () => {
+      const answers = await new UseCasePrompt().ask(setupAnswers({ useCase: "consumer" }), {
+        ...CONTEXT,
+        useCaseFromFlag: true,
+      });
+
+      expect(answers.useCase).toBe("consumer");
+    });
+
+    it("does not ask", async () => {
+      await new UseCasePrompt().ask(setupAnswers({ useCase: "consumer" }), {
+        ...CONTEXT,
+        useCaseFromFlag: true,
+      });
+
+      expect(select).not.toHaveBeenCalled();
+    });
+  });
+
+  it("refuses with E_CANCELLED on Ctrl-C", async () => {
+    vi.mocked(select).mockResolvedValueOnce(CANCEL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await expect(
-      new UseCasePrompt().ask(baseAnswers({ useCase: "minimal" }), ctx),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    const error = await rejectionOf(() => {
+      return new UseCasePrompt().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({ code: "E_CANCELLED" });
   });
 });
 
 describe("SignInPresetPrompt", () => {
   it("writes the selected preset into the answers", async () => {
-    vi.mocked(select).mockResolvedValueOnce("passkey-first" as never);
+    vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
     const answers = await new SignInPresetPrompt().ask(
-      baseAnswers({ preset: "password-first" }),
-      ctx,
+      setupAnswers({ preset: "password-first" }),
+      CONTEXT,
     );
 
     expect(answers.preset).toBe("passkey-first");
+  });
+
+  it("preselects the preset already answered", async () => {
+    vi.mocked(select).mockResolvedValueOnce("passkey-first");
+
+    await new SignInPresetPrompt().ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "password-first" });
+  });
+
+  it("says what users see first and what is secondary, which both presets enable", async () => {
+    vi.mocked(select).mockResolvedValueOnce("password-first");
+
+    await new SignInPresetPrompt().ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
-      initialValue: "password-first",
+      message: "Which sign-in method would you like your users to see first?",
+      options: [
+        {
+          value: "password-first",
+          label: "Email and password, with passkeys enabled but not shown at sign-in",
+        },
+        {
+          value: "passkey-first",
+          label: "Passkey, with email and password shown as the alternative",
+        },
+      ],
     });
   });
 
-  it("skips and keeps the flagged preset when --preset was passed", async () => {
-    const answers = await new SignInPresetPrompt().ask(baseAnswers({ preset: "passkey-first" }), {
-      ...ctx,
-      presetFromFlag: true,
+  describe("with --preset", () => {
+    it("keeps the flagged preset", async () => {
+      const answers = await new SignInPresetPrompt().ask(
+        setupAnswers({ preset: "passkey-first" }),
+        { ...CONTEXT, presetFromFlag: true },
+      );
+
+      expect(answers.preset).toBe("passkey-first");
     });
 
-    expect(answers.preset).toBe("passkey-first");
-    expect(select).not.toHaveBeenCalled();
+    it("does not ask", async () => {
+      await new SignInPresetPrompt().ask(setupAnswers({ preset: "passkey-first" }), {
+        ...CONTEXT,
+        presetFromFlag: true,
+      });
+
+      expect(select).not.toHaveBeenCalled();
+    });
   });
 
-  it("throws E_VALIDATION on Ctrl-C", async () => {
-    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+  it("refuses with E_CANCELLED on Ctrl-C", async () => {
+    vi.mocked(select).mockResolvedValueOnce(CANCEL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await expect(
-      new SignInPresetPrompt().ask(baseAnswers({ preset: "password-first" }), ctx),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    const error = await rejectionOf(() => {
+      return new SignInPresetPrompt().ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({ code: "E_CANCELLED" });
   });
 });
 
 describe("SETUP_PROMPTS", () => {
+  /**
+   * Setup only gets authentication working; taking ownership of the login
+   * template is the opt-in `branding eject`, never a wizard step. Social
+   * sign-in configures a way in, which is what setup is for, and it asks last
+   * because its answer is the only one that comes from outside the terminal.
+   */
   it("asks no login-design question (#1039)", () => {
-    // Setup only gets authentication working; taking ownership of the login
-    // template is the opt-in `branding eject`, never a wizard step. Social
-    // sign-in is not the same kind of question: it configures a way in, which
-    // is what setup is for, and it asks last because it is the only one whose
-    // answer comes from outside the terminal.
-    expect(SETUP_PROMPTS.map((prompt) => prompt.constructor.name)).toEqual([
+    const names = SETUP_PROMPTS.map((prompt) => {
+      return prompt.constructor.name;
+    });
+
+    expect(names).toEqual([
       "FrameworkConfirmPrompt",
       "ServerPrompt",
       "DevPortPrompt",
       "UseCasePrompt",
       "SignInPresetPrompt",
+      "PasswordPolicyPrompt",
       "SocialSignInPrompt",
     ]);
   });
 });
 
 describe("SocialSignInPrompt", () => {
-  it("leaves the answers alone when no provider is wanted", async () => {
-    vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+  describe("when no provider is wanted", () => {
+    it("leaves the answers alone", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-    expect(answers.sso).toEqual([]);
-    // Nothing is asked for once the developer has declined.
-    expect(text).not.toHaveBeenCalled();
-    expect(password).not.toHaveBeenCalled();
+      expect(answers.sso).toEqual([]);
+    });
+
+    it("asks before going on without SSO, where No goes back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+        message: "Would you like to continue without setting up SSO?",
+        initialValue: false,
+      });
+    });
+
+    it("asks for the providers again when Go back is chosen", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(multiselect)).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ["text", text],
+      ["password", password],
+    ])("asks no %s question", async (_kind, prompt) => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(prompt).not.toHaveBeenCalled();
+    });
   });
 
   it("offers every catalog provider and a custom one, with no option meaning none", async () => {
-    vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+    vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+    await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-    const options = vi.mocked(multiselect).mock.calls[0]?.[0]?.options ?? [];
-    // No declining option: an empty selection is the decline, which is what
-    // `required: false` on the multiselect allows.
-    expect(options.map((option) => option.value)).toEqual([...IDP_PROVIDERS, "custom"]);
+    expect(
+      vi.mocked(multiselect).mock.calls[0]?.[0].options.map((option) => {
+        return option.value;
+      }),
+    ).toEqual([...IDP_PROVIDERS, "custom"]);
   });
 
-  it("captures the credentials and shows the redirect URI to register", async () => {
-    vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-    vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  " as never);
-    vi.mocked(password).mockResolvedValueOnce("  s3cret  " as never);
+  it("says that Space selects a provider and Enter continues", async () => {
+    vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    const answers = await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
+    await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-    expect(answers.sso).toEqual([
-      {
-        selection: googleSelection,
-        credentials: {
-          clientId: "1234-abc.apps.googleusercontent.com",
-          secret: "s3cret",
-        },
-        endpoints: undefined,
-        claims: { entries: [], verified: [], scopes: [] },
-      },
+    expect(vi.mocked(multiselect).mock.calls[0]?.[0].message).toBe(
+      "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
+    );
+  });
+
+  it("says what each provider requires", async () => {
+    vi.mocked(multiselect).mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
+
+    await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+    expect(
+      vi.mocked(multiselect).mock.calls[0]?.[0].options.map((option) => {
+        return option.label;
+      }),
+    ).toEqual([
+      "Google — requires a Google OAuth app",
+      "Another OpenID Connect (OIDC) provider — requires provider configuration",
     ]);
-    // The URI has to be exact — the vendor matches it literally — and the
-    // port answered a moment earlier is what decides it.
-    expect(drawn).toContain("http://localhost:4321/__nextgen/idp/google/callback");
   });
 
-  describe("claim questions", () => {
-    it("offers to replace a default even when the schema has no empty property", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-      vi.mocked(select).mockResolvedValueOnce(false as never);
-      vi.mocked(text).mockResolvedValueOnce("a-client-id" as never);
-      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
+  describe("when Google is chosen", () => {
+    it("captures the credentials, trimmed", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+      vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  ");
+      vi.mocked(password).mockResolvedValueOnce("  s3cret  ");
 
-      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      expect(select).toHaveBeenCalledTimes(1);
-    });
-
-    it("refuses a claim given as a flag that the schema cannot take, before the credentials", async () => {
-      const flagged = {
-        selection: googleSelection,
-        credentials: {},
-        claims: {
-          entries: [{ attribute: "shoeSize", claim: "shoe" }],
-          verified: [],
-          scopes: [],
+      expect(answers.sso).toEqual([
+        {
+          selection: googleSelection,
+          credentials: { clientId: "1234-abc.apps.googleusercontent.com", secret: "s3cret" },
+          endpoints: undefined,
+          claimRequest: { entries: [], scopes: [], verified: [] },
         },
-      };
-
-      await expect(
-        new SocialSignInPrompt().ask(baseAnswers({ sso: [flagged] }), {
-          ...ctx,
-          ssoFromFlag: true,
-        }),
-      ).rejects.toMatchObject({ code: "E_VALIDATION" });
-      expect(text).not.toHaveBeenCalled();
-      expect(password).not.toHaveBeenCalled();
-    });
-
-    it("offers to map more claims once the credentials are in", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-      vi.mocked(select).mockResolvedValueOnce(false as never);
-      vi.mocked(text).mockResolvedValueOnce("a-client-id" as never);
-      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
-
-      await new SocialSignInPrompt().ask(baseAnswers({ useCase: "business" }), ctx);
-
-      expect(vi.mocked(select).mock.invocationCallOrder[0]).toBeGreaterThan(
-        vi.mocked(password).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-      );
-    });
-
-    it("carries the claims the person maps into the draft", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-      vi.mocked(select)
-        .mockResolvedValueOnce(true as never)
-        .mockResolvedValueOnce("string" as never)
-        .mockResolvedValueOnce("companyName" as never)
-        .mockResolvedValueOnce(false as never);
-      vi.mocked(text)
-        .mockResolvedValueOnce("a-client-id" as never)
-        .mockResolvedValueOnce("organization" as never)
-        .mockResolvedValueOnce("" as never);
-      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
-
-      const answers = await new SocialSignInPrompt().ask(baseAnswers({ useCase: "business" }), ctx);
-
-      expect(answers.sso[0]?.claims?.entries).toEqual([
-        { attribute: "companyName", claim: "organization" },
       ]);
     });
 
-    it("skips the questions when claims were given as flags", async () => {
-      vi.mocked(text).mockResolvedValueOnce("a-client-id" as never);
-      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
-      const flagged = {
-        selection: googleSelection,
-        credentials: {},
-        claims: {
-          entries: [{ attribute: "companyName", claim: "organization" }],
-          verified: [],
-          scopes: [],
+    it("keeps a provider ticked after Go back", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce(["google"]);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
+      vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
+      vi.mocked(password).mockResolvedValueOnce("s3cret");
+
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.sso).toEqual([
+        {
+          selection: googleSelection,
+          credentials: { clientId: "1234-abc.apps.googleusercontent.com", secret: "s3cret" },
+          endpoints: undefined,
+          claimRequest: { entries: [], scopes: [], verified: [] },
         },
-      };
+      ]);
+    });
 
-      const answers = await new SocialSignInPrompt().ask(
-        baseAnswers({ useCase: "business", sso: [flagged] }),
-        { ...ctx, ssoFromFlag: true },
+    it("shows the exact redirect URI to register, on the port answered earlier", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+      vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
+      vi.mocked(password).mockResolvedValueOnce("s3cret");
+
+      await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+
+      expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(GOOGLE_CALLBACK);
+    });
+
+    it("names the project variable the client secret is saved as", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+      vi.mocked(text).mockResolvedValueOnce("client-id");
+      vi.mocked(password).mockResolvedValueOnce("the-secret");
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(password).mock.calls[0]?.[0].message).toBe(
+        "What is the client secret of your Google OAuth app? It will be stored on the project as GOOGLE_CLIENT_SECRET.",
       );
+    });
 
-      expect(select).not.toHaveBeenCalled();
-      expect(answers.sso[0]?.claims).toEqual(flagged.claims);
+    it.each(["", "   "])(
+      "will not take the empty secret %j, because a provider without one cannot work",
+      async (secret) => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+        vi.mocked(text).mockResolvedValueOnce("client-id");
+        vi.mocked(password).mockResolvedValueOnce("the-secret");
+
+        await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+        expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])(secret)).toBeTruthy();
+      },
+    );
+
+    it("takes a secret", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+      vi.mocked(text).mockResolvedValueOnce("client-id");
+      vi.mocked(password).mockResolvedValueOnce("the-secret");
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])("a-secret")).toBeUndefined();
+    });
+
+    it("asks where the provider lives on a development build", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+      vi.mocked(text)
+        .mockResolvedValueOnce("http://localhost:9100")
+        .mockResolvedValueOnce("client-id");
+      vi.mocked(password).mockResolvedValueOnce("the-secret");
+
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), {
+        ...CONTEXT,
+        developmentBuild: true,
+      });
+
+      expect(answers.sso[0]?.endpoints).toEqual({ issuer: "http://localhost:9100" });
+    });
+
+    describe("on a released build", () => {
+      it("leaves the provider at its own issuer", async () => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+        vi.mocked(text).mockResolvedValueOnce("client-id");
+        vi.mocked(password).mockResolvedValueOnce("the-secret");
+
+        const answers = await new SocialSignInPrompt().ask(setupAnswers(), {
+          ...CONTEXT,
+          developmentBuild: false,
+        });
+
+        expect(answers.sso[0]?.endpoints).toBeUndefined();
+      });
+
+      it("asks only for the client id", async () => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+        vi.mocked(text).mockResolvedValueOnce("client-id");
+        vi.mocked(password).mockResolvedValueOnce("the-secret");
+
+        await new SocialSignInPrompt().ask(setupAnswers(), {
+          ...CONTEXT,
+          developmentBuild: false,
+        });
+
+        expect(text).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
-  describe("a custom provider", () => {
-    /** The four questions describing the connection, then the client id. */
-    function describeAcme(overrides: { slug?: string; scopes?: string } = {}): void {
-      const extra = (overrides.scopes ?? "openid profile email groups")
-        .split(" ")
-        .filter((scope) => !["openid", "profile", "email"].includes(scope));
-      for (const _scope of extra) {
-        vi.mocked(select).mockResolvedValueOnce(true as never);
-      }
-      vi.mocked(select).mockResolvedValueOnce(false as never);
-      vi.mocked(text)
-        .mockResolvedValueOnce((overrides.slug ?? " acme-sso ") as never)
-        .mockResolvedValueOnce(" Acme SSO " as never)
-        .mockResolvedValueOnce(" https://sso.acme.example " as never);
-      for (const scope of extra) {
-        vi.mocked(text).mockResolvedValueOnce(scope as never);
-      }
-      vi.mocked(text).mockResolvedValueOnce("acme-client-id" as never);
-    }
+  describe("when Google's client id is left empty", () => {
+    beforeEach(() => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"]);
+      vi.mocked(text).mockResolvedValueOnce("   ");
+    });
 
+    it("drops the provider", async () => {
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(answers.sso).toEqual([]);
+    });
+
+    it("does not ask for its secret", async () => {
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(password).not.toHaveBeenCalled();
+    });
+
+    it("says the client id may be left empty to skip", async () => {
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
+        "What is the client ID of your Google OAuth app? Leave it empty to skip.",
+      );
+    });
+
+    it("says how to add it later", async () => {
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(log.info).toHaveBeenCalledWith(
+        [
+          "Skipped Google. Once its OAuth application exists, add it with:",
+          "npx @zitadel/cli@1.2.3 auth-method sso enable --provider google --env-file .env.development.local",
+        ].join("\n"),
+      );
+    });
+  });
+
+  describe("with a custom provider", () => {
     it("is offered beside the catalog, saying what it will ask for", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      const options = vi.mocked(multiselect).mock.calls[0]?.[0]?.options ?? [];
-      expect(options.at(-1)).toMatchObject({
+      expect(vi.mocked(multiselect).mock.calls[0]?.[0].options.at(-1)).toMatchObject({
         value: "custom",
-        label: "Another OpenID Connect provider",
+        label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
       });
     });
 
     it("asks what the connection is, then for its credentials", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      describeAcme();
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(answers.sso).toEqual([
         {
@@ -569,241 +1055,371 @@ describe("SocialSignInPrompt", () => {
             connection: {
               slug: "acme-sso",
               displayName: "Acme SSO",
-              issuer: "https://sso.acme.example",
+              issuer: ACME_ISSUER,
               scopes: ["openid", "profile", "email", "groups"],
             },
           },
           credentials: { clientId: "acme-client-id", secret: "acme-secret" },
           endpoints: undefined,
-          claims: { entries: [], verified: [], scopes: [] },
+          claimRequest: { entries: [], scopes: [], verified: [] },
         },
       ]);
     });
 
     it("warns about an issuer on this machine that was typed in, naming the allow list", async () => {
       takeReportedWarnings();
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      vi.mocked(text)
-        .mockResolvedValueOnce("acme-sso" as never)
-        .mockResolvedValueOnce("Acme SSO" as never)
-        .mockResolvedValueOnce("http://localhost:9100" as never)
-        .mockResolvedValueOnce("acme-client-id" as never);
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme({ issuer: "http://localhost:9100" });
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(takeReportedWarnings().join(" ")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
     });
 
     it("says nothing about an issuer elsewhere", async () => {
       takeReportedWarnings();
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      describeAcme();
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
       expect(takeReportedWarnings()).toEqual([]);
     });
 
-    it("shows the redirect URI to register at the developer's own provider", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      describeAcme();
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+    it("names the secret's variable after the connection, not after 'custom'", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      expect(drawn).toContain("http://localhost:4321/__nextgen/idp/acme-sso/callback");
-      expect(drawn).toContain("https://sso.acme.example");
-      expect(drawn).not.toContain("undefined");
+      expect(vi.mocked(password).mock.calls.at(-1)?.[0].message).toContain(
+        "ACME_SSO_CLIENT_SECRET",
+      );
     });
 
-    it("never asks where the provider lives, even on a development build", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      describeAcme();
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+    it.each([ACME_CALLBACK, ACME_ISSUER])("shows %s in the note", async (shown) => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
-        ...ctx,
-        developmentBuild: true,
+      await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+
+      expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(shown);
+    });
+
+    it("leaves nothing undefined in the note", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
+
+      await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+
+      expect(vi.mocked(note).mock.calls[0]?.[0]).not.toContain("undefined");
+    });
+
+    it("titles the note after the connection", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
+
+      await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+
+      expect(vi.mocked(note).mock.calls[0]?.[1]).toBe("Acme SSO sign-in");
+    });
+
+    describe("on a development build", () => {
+      it("asks only for the slug, display name, issuer, scopes and client id", async () => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+        describesAcme();
+        vi.mocked(password).mockResolvedValueOnce("acme-secret");
+
+        await new SocialSignInPrompt().ask(setupAnswers(), { ...CONTEXT, developmentBuild: true });
+
+        expect(text).toHaveBeenCalledTimes(5);
       });
 
-      // Slug, display name, issuer, scopes and client id, and nothing more.
-      expect(vi.mocked(text)).toHaveBeenCalledTimes(5);
-      expect(answers.sso[0]?.endpoints).toBeUndefined();
+      it("never asks where the provider lives", async () => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+        describesAcme();
+        vi.mocked(password).mockResolvedValueOnce("acme-secret");
+
+        const answers = await new SocialSignInPrompt().ask(setupAnswers(), {
+          ...CONTEXT,
+          developmentBuild: true,
+        });
+
+        expect(answers.sso[0]?.endpoints).toBeUndefined();
+      });
     });
 
-    it("checks each answer against what the server would refuse", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      describeAcme();
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+    it.each([
+      ["slug", "Acme", "Use lowercase letters"],
+      ["slug", "google", "built-in provider"],
+      ["displayName", "  ", "Enter the name shown on the sign-in button"],
+      ["issuer", "http://sso.acme.example", "Use an https:// URL"],
+      ["scopes", "profile email", "openid"],
+    ] as const)("refuses the %s %j as the server would", async (question, value, says) => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      const validate = (call: number): ((value: string) => string | undefined) => {
-        const options = vi.mocked(text).mock.calls[call]?.[0] as
-          | { validate?: (value: string) => string | undefined }
-          | undefined;
-        return options?.validate ?? (() => "no validator");
-      };
-      expect(validate(0)("Acme")).toBeTruthy();
-      expect(validate(0)("google")).toContain("built-in provider");
-      expect(validate(0)("acme-sso")).toBeUndefined();
-      expect(validate(1)("  ")).toBeTruthy();
-      expect(validate(2)("http://sso.acme.example")).toBeTruthy();
-      expect(validate(2)("https://sso.acme.example")).toBeUndefined();
-      expect(validate(3)("")).toBeTruthy();
-      expect(validate(3)("acme-client-id")).toBeUndefined();
+      expect(validatorOf(vi.mocked(text).mock.calls[QUESTION[question]]?.[0])(value)).toContain(
+        says,
+      );
     });
 
-    it("will not take an empty client id or client secret, so the connection cannot be left without one", async () => {
-      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
-      describeAcme();
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+    it.each([
+      ["slug", "acme-sso"],
+      ["issuer", ACME_ISSUER],
+      ["scopes", "openid email"],
+    ] as const)("takes the %s %j", async (question, value) => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      type Validate = (value: string) => string | undefined;
-      const validatorOf = (call: unknown[] | undefined): Validate => {
-        const [options] = call ?? [];
-        return (options as { validate: Validate }).validate;
-      };
-      const clientIdValidate = validatorOf(vi.mocked(text).mock.calls[4]);
-      const secretValidate = validatorOf(vi.mocked(password).mock.calls.at(-1));
-      for (const validate of [clientIdValidate, secretValidate]) {
-        expect(validate("")).toBeTruthy();
-        expect(validate("   ")).toBeTruthy();
-        expect(validate("something")).toBeUndefined();
-      }
+      expect(
+        validatorOf(vi.mocked(text).mock.calls[QUESTION[question]]?.[0])(value),
+      ).toBeUndefined();
     });
 
-    it("uses the description from --sso-* flags rather than asking again", async () => {
-      vi.mocked(text).mockResolvedValueOnce("acme-client-id" as never);
-      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
-      const selection = {
-        ...acmeSelection,
-        connection: { ...acmeSelection.connection, scopes: ["openid"] },
-      } as ProviderSelection;
+    it.each(["", "   "])(
+      "will not take the empty client secret %j, so the connection cannot be left without one",
+      async (secret) => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+        describesAcme();
+        vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      const answers = await new SocialSignInPrompt().ask(
-        baseAnswers({ sso: [{ selection, credentials: {} }] }),
-        { ...ctx, ssoFromFlag: true },
+        await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+        expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])(secret)).toBeTruthy();
+      },
+    );
+
+    it("takes a client secret", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+      describesAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret");
+
+      await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+      expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])("something")).toBeUndefined();
+    });
+
+    describe("when its client id is left empty", () => {
+      beforeEach(() => {
+        vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
+        describesAcme({ clientId: "" });
+      });
+
+      it("drops the connection", async () => {
+        const answers = await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+        expect(answers.sso).toEqual([]);
+      });
+
+      it("does not ask for its secret", async () => {
+        await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+        expect(password).not.toHaveBeenCalled();
+      });
+
+      it("names the command that adds the connection as described later", async () => {
+        await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
+
+        expect(vi.mocked(log.info).mock.calls[0]?.[0]).toContain(
+          "npx @zitadel/cli@1.2.3 auth-method sso enable --provider custom --slug acme-sso",
+        );
+      });
+    });
+
+    describe("described by --sso-* flags", () => {
+      beforeEach(() => {
+        vi.mocked(text).mockResolvedValueOnce("acme-client-id");
+        vi.mocked(password).mockResolvedValueOnce("acme-secret");
+      });
+
+      it("asks only for the client id", async () => {
+        await new SocialSignInPrompt().ask(
+          setupAnswers({ sso: [{ selection: acmeSelection, credentials: {} }] }),
+          { ...CONTEXT, ssoFromFlag: true },
+        );
+
+        expect(text).toHaveBeenCalledTimes(1);
+      });
+
+      it("uses the description from the flags", async () => {
+        const answers = await new SocialSignInPrompt().ask(
+          setupAnswers({ sso: [{ selection: acmeSelection, credentials: {} }] }),
+          { ...CONTEXT, ssoFromFlag: true },
+        );
+
+        expect(answers.sso[0]?.selection).toEqual(acmeSelection);
+      });
+    });
+  });
+
+  describe("with --sso naming a provider and its client id", () => {
+    beforeEach(() => {
+      vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag");
+    });
+
+    it("does not ask which provider", async () => {
+      await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
       );
 
-      expect(vi.mocked(text)).toHaveBeenCalledTimes(1);
-      expect(answers.sso[0]?.selection).toEqual(selection);
+      expect(multiselect).not.toHaveBeenCalled();
+    });
+
+    it("does not ask for the client id", async () => {
+      await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
+
+      expect(text).not.toHaveBeenCalled();
+    });
+
+    it("keeps the provider", async () => {
+      const answers = await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
+
+      expect(answers.sso[0]?.selection).toEqual(googleSelection);
+    });
+
+    it("keeps the client id", async () => {
+      const answers = await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
+
+      expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");
+    });
+
+    it("still asks once for the secret, which is never a flag", async () => {
+      await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
+
+      expect(password).toHaveBeenCalledOnce();
+    });
+
+    it("keeps the secret typed after the flag", async () => {
+      const answers = await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
+
+      expect(answers.sso[0]?.credentials.secret).toBe("typed-after-the-flag");
     });
   });
 
-  it("asks where the provider lives on a development build", async () => {
-    // Someone working on the CLI runs it against a local stand-in constantly.
-    // Before this the connection had to be hand-edited afterwards.
-    vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-    vi.mocked(text)
-      .mockResolvedValueOnce("http://localhost:9100" as never)
-      .mockResolvedValueOnce("client-id" as never);
-    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
-
-    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
-      ...ctx,
-      developmentBuild: true,
+  describe("with --sso naming a provider without its client id", () => {
+    beforeEach(() => {
+      vi.mocked(text).mockResolvedValueOnce("client-id");
+      vi.mocked(password).mockResolvedValueOnce("a-secret");
     });
 
-    // Only the issuer: naming a subset of the endpoints the engine needs is
-    // rejected as `idp.endpoints_partial`, so discovery supplies them.
-    expect(answers.sso[0]?.endpoints).toEqual({ issuer: "http://localhost:9100" });
-  });
+    it("asks for the client id without offering to skip", async () => {
+      await new SocialSignInPrompt().ask(
+        setupAnswers({ sso: [{ selection: googleSelection, credentials: {} }] }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
 
-  it("never asks on a released build", async () => {
-    // Gated on the ZITADEL_CLI_DEV opt-in, which a published CLI never sets:
-    // someone who installed it is configuring the real vendor and must not
-    // meet this question.
-    vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-    vi.mocked(text).mockResolvedValueOnce("client-id" as never);
-    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
-
-    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
-      ...ctx,
-      developmentBuild: false,
+      expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
+        "What is the client ID of your Google OAuth app?",
+      );
     });
 
-    expect(answers.sso[0]?.endpoints).toBeUndefined();
-    // Only the client id was asked for, so no URL question was rendered.
-    expect(vi.mocked(text)).toHaveBeenCalledTimes(1);
+    it("does not let the provider be dropped with an empty client id", async () => {
+      await new SocialSignInPrompt().ask(
+        setupAnswers({ sso: [{ selection: googleSelection, credentials: {} }] }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
+
+      expect(validatorOf(vi.mocked(text).mock.calls[0]?.[0])("")).toBeTruthy();
+    });
   });
 
-  it("will not take an empty secret, because a provider without one cannot work", async () => {
-    // The prompt re-asks rather than accepting nothing: the connection
-    // references the secret as `${{ NAME }}` and the engine resolves it from
-    // the project's variables, so scaffolding without a value writes a
-    // sign-in button that fails at the provider with invalid_client. "Not
-    // now" is answered by declining the provider, not by skipping this.
-    vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
-    vi.mocked(text).mockResolvedValueOnce("client-id" as never);
-    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+  describe("with a secret already piped in", () => {
+    it("does not ask again", async () => {
+      await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            {
+              selection: googleSelection,
+              credentials: { clientId: clientId("from-the-flag"), secret: clientSecret("piped") },
+            },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
 
-    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
-
-    const { validate } = vi.mocked(password).mock.calls.at(-1)![0] as {
-      validate?: (value: string) => string | undefined;
-    };
-    expect(validate?.("")).toBeTruthy();
-    expect(validate?.("   ")).toBeTruthy();
-    expect(validate?.("a-secret")).toBeUndefined();
-  });
-
-  it("does not ask which provider when --sso named one", async () => {
-    vi.mocked(password).mockResolvedValueOnce("a-secret" as never);
-    vi.mocked(select).mockResolvedValueOnce(false as never);
-    const seeded = baseAnswers({
-      sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
+      expect(password).not.toHaveBeenCalled();
     });
 
-    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+    it("keeps it", async () => {
+      const answers = await new SocialSignInPrompt().ask(
+        setupAnswers({
+          sso: [
+            {
+              selection: googleSelection,
+              credentials: { clientId: clientId("from-the-flag"), secret: clientSecret("piped") },
+            },
+          ],
+        }),
+        { ...CONTEXT, ssoFromFlag: true },
+      );
 
-    expect(multiselect).not.toHaveBeenCalled();
-    expect(text).not.toHaveBeenCalled();
-    expect(answers.sso[0]?.selection).toEqual(googleSelection);
-    expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");
-  });
-
-  it("still asks for the secret a flagged run could not supply", async () => {
-    // The secret is never a flag, and only a scripted run pipes it in — so an
-    // interactive run with --sso arrives here without one.
-    vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
-    const seeded = baseAnswers({
-      sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
+      expect(answers.sso[0]?.credentials.secret).toBe("piped");
     });
-
-    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
-
-    expect(password).toHaveBeenCalledOnce();
-    expect(answers.sso[0]?.credentials.secret).toBe("typed-after-the-flag");
   });
 
-  it("keeps a secret that was already piped in rather than asking again", async () => {
-    const seeded = baseAnswers({
-      sso: [
-        {
-          selection: googleSelection,
-          credentials: { clientId: clientId("from-the-flag"), secret: clientSecret("piped") },
-        },
-      ],
-    });
-
-    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
-
-    expect(password).not.toHaveBeenCalled();
-    expect(answers.sso[0]?.credentials.secret).toBe("piped");
-  });
-
-  it("throws E_VALIDATION on Ctrl-C at the provider question", async () => {
-    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+  it("refuses with E_CANCELLED on Ctrl-C at the provider question", async () => {
+    vi.mocked(multiselect).mockResolvedValueOnce(CANCEL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await expect(new SocialSignInPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
-      code: "E_VALIDATION",
+    const error = await rejectionOf(() => {
+      return new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
     });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({ code: "E_CANCELLED" });
   });
 });
 
@@ -812,97 +1428,130 @@ describe("askCustomSettings", () => {
     vi.mocked(text).mockReset();
   });
 
-  it("asks for nothing when every setting was given", async () => {
-    const given = {
-      slug: "acme-sso",
-      displayName: "Acme SSO",
-      issuer: "https://sso.acme.example",
-      scopes: "openid",
-    };
+  describe("when every setting was given", () => {
+    it("returns them", async () => {
+      const values = await askCustomSettings(EVERYTHING, ask);
 
-    expect(await askCustomSettings(given, new Wizard({ ask, output: sink }))).toEqual(given);
-    expect(text).not.toHaveBeenCalled();
+      expect(values).toEqual(EVERYTHING);
+    });
+
+    it("asks for nothing", async () => {
+      await askCustomSettings(EVERYTHING, ask);
+
+      expect(text).not.toHaveBeenCalled();
+    });
   });
 
-  const EVERYTHING = {
-    slug: "acme-sso",
-    displayName: "Acme SSO",
-    issuer: "https://sso.acme.example",
-    scopes: "openid",
-  };
-  const QUESTIONS = {
-    slug: "What should this connection be called?",
-    displayName: "What should the sign-in button say?",
-    issuer: "What is the provider's issuer URL?",
-  };
-
   it.each([
-    [["slug"], ["displayName", "issuer"], true],
-    [["displayName", "scopes"], ["slug", "issuer"], false],
-    [["slug", "displayName", "issuer"], [], true],
-    [[], ["slug", "displayName", "issuer"], true],
-  ] as const)(
-    "given %j asks the text of %j, in that order, and the scopes only when not given",
-    async (givenKeys, askedKeys, asksScopes) => {
-      const given = Object.fromEntries(givenKeys.map((key) => [key, EVERYTHING[key]]));
-      vi.mocked(select).mockResolvedValue(false as never);
-      vi.mocked(text).mockImplementation(
-        (async ({ message }: { message: string }) =>
-          Object.values(EVERYTHING)[
-            Object.values(QUESTIONS).findIndex((question) => message.startsWith(question))
-          ]) as never,
-      );
+    [["slug"], ["displayName", "issuer", "scopes"]],
+    [
+      ["displayName", "scopes"],
+      ["slug", "issuer"],
+    ],
+    [["slug", "displayName", "issuer"], ["scopes"]],
+    [[], ["displayName", "slug", "issuer", "scopes"]],
+  ] as const)("given %j asks only for %j, in that order", async (givenKeys, askedKeys) => {
+    const given = Object.fromEntries(
+      givenKeys.map((key) => {
+        return [key, EVERYTHING[key]];
+      }),
+    );
+    vi.mocked(text).mockImplementation(answerFromEverything);
 
-      await askCustomSettings(given, new Wizard({ ask, output: sink }));
+    await askCustomSettings(given, ask);
 
-      expect(vi.mocked(text).mock.calls.map(([options]) => options.message)).toEqual(
-        askedKeys.map((key) => expect.stringContaining(QUESTIONS[key])),
-      );
-      expect(vi.mocked(select).mock.calls.length > 0).toBe(asksScopes);
+    expect(
+      vi.mocked(text).mock.calls.map(([options]) => {
+        return options.message;
+      }),
+    ).toEqual(
+      askedKeys.map((key) => {
+        return expect.stringContaining(QUESTIONS[key]);
+      }),
+    );
+  });
+
+  describe("with a given setting that does not parse", () => {
+    it.each([
+      ["slug", "Not A Slug"],
+      ["issuer", "not a url"],
+    ] as const)("refuses the %s", async (key, value) => {
+      const error = await rejectionOf(() => {
+        return askCustomSettings({ ...EVERYTHING, [key]: value }, ask);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+    });
+
+    it.each([
+      ["slug", "Not A Slug"],
+      ["issuer", "not a url"],
+    ] as const)("does not ask, given the %s", async (key, value) => {
+      await rejectionOf(() => {
+        return askCustomSettings({ ...EVERYTHING, [key]: value }, ask);
+      });
+
+      expect(text).not.toHaveBeenCalled();
+    });
+  });
+
+  it("suggests the slug from the display name it was asked first", async () => {
+    vi.mocked(text).mockResolvedValueOnce("Zitadel Cloud").mockResolvedValueOnce("zitadel-cloud");
+
+    await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+    expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({
+      message: expect.stringContaining("What would you like to call this connection?"),
+      initialValue: "zitadel-cloud",
+    });
+  });
+
+  it.each(["Google", "Custom"])(
+    "suggests no slug for the built-in provider name %j",
+    async (displayName) => {
+      vi.mocked(text).mockResolvedValueOnce(displayName).mockResolvedValueOnce("acme-sso");
+
+      await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+      expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({ initialValue: "" });
     },
   );
 
-  it.each([
-    ["slug", "Not A Slug"],
-    ["issuer", "not a url"],
-  ] as const)("refuses a given %s that does not parse, without asking", async (key, value) => {
-    await expect(
-      askCustomSettings({ ...EVERYTHING, [key]: value }, new Wizard({ ask, output: sink })),
-    ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-    });
-    expect(text).not.toHaveBeenCalled();
+  it("suggests no slug when the display name has nothing a slug can keep", async () => {
+    vi.mocked(text).mockResolvedValueOnce("!!!").mockResolvedValueOnce("slug");
+
+    await askCustomSettings({ issuer: ACME_ISSUER, scopes: "openid" }, ask);
+
+    expect(vi.mocked(text).mock.calls[1]?.[0]).toMatchObject({ initialValue: "" });
   });
 
   it("returns the scopes that were given as one string", async () => {
-    const values = await askCustomSettings(
-      { ...EVERYTHING, scopes: "openid  email" },
-      new Wizard({ ask, output: sink }),
-    );
+    const values = await askCustomSettings({ ...EVERYTHING, scopes: "openid  email" }, ask);
 
     expect(values.scopes).toBe("openid email");
   });
 
-  it("asks only for the settings that were left out", async () => {
-    vi.mocked(text).mockResolvedValueOnce("Acme SSO" as never);
-    vi.mocked(select).mockResolvedValueOnce(true as never);
-    vi.mocked(text).mockResolvedValueOnce("groups" as never);
-    vi.mocked(select).mockResolvedValueOnce(false as never);
+  describe("when some settings were left out", () => {
+    beforeEach(() => {
+      vi.mocked(text).mockResolvedValueOnce("Acme SSO").mockResolvedValueOnce("openid groups");
+    });
 
-    const values = await askCustomSettings(
-      {
+    it("asks only for those", async () => {
+      await askCustomSettings({ slug: "acme-sso", issuer: ACME_ISSUER }, ask);
+
+      expect(text).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns the given and the answered settings together", async () => {
+      const values = await askCustomSettings({ slug: "acme-sso", issuer: ACME_ISSUER }, ask);
+
+      expect(values).toEqual({
         slug: "acme-sso",
-        issuer: "https://sso.acme.example",
-      },
-      new Wizard({ ask, output: sink }),
-    );
-
-    expect(vi.mocked(text)).toHaveBeenCalledTimes(2);
-    expect(values).toEqual({
-      slug: "acme-sso",
-      displayName: "Acme SSO",
-      issuer: "https://sso.acme.example",
-      scopes: "openid profile email groups",
+        displayName: "Acme SSO",
+        issuer: ACME_ISSUER,
+        scopes: "openid groups",
+      });
     });
   });
 });
