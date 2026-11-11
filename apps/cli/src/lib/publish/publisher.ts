@@ -449,7 +449,7 @@ export class Publisher {
     });
     throw new ZitadelError(
       "E_VALIDATION",
-      `The release body does not match what the API takes, so nothing was sent (${issues.length} ${new Intl.PluralRules("en").select(issues.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
+      `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
       {
         details: {
           issues,

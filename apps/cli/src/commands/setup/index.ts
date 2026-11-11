@@ -1323,7 +1323,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     let ssoDimension = "multiple";
     if (answers.sso.length === 0) {
       ssoDimension = "none";
-    } else if (new Intl.PluralRules("en").select(answers.sso.length) === "one") {
+    } else if (answers.sso.length === 1) {
       ssoDimension = answers.sso[0] ? selectionName(answers.sso[0].selection) : "none";
     }
     this.recordTelemetry({
