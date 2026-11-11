@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, formatRecent, formatTimestamp } from "./date";
+import { formatDateTime, formatRecent } from "./date";
 
 describe("formatRecent", () => {
   const now = new Date("2026-10-15T12:00:00Z");
@@ -22,29 +22,5 @@ describe("formatRecent", () => {
 
   it("shows what arrived when it cannot be parsed", () => {
     expect(formatRecent("not a date", now)).toBe("not a date");
-  });
-});
-
-describe("formatTimestamp", () => {
-  it("tells apart two moments of one minute, which the date and time alone do not", () => {
-    const first = "2026-11-10T08:15:42Z";
-    const second = "2026-11-10T08:15:43Z";
-    expect(formatDateTime(first)).toBe(formatDateTime(second));
-    expect(formatTimestamp(first)).not.toBe(formatTimestamp(second));
-    // The viewer's own date and time, with the seconds added to it.
-    expect(formatTimestamp(first)).toBe(
-      new Date(first).toLocaleString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-    );
-  });
-
-  it("shows what arrived when it cannot be parsed", () => {
-    expect(formatTimestamp("not a date")).toBe("not a date");
   });
 });

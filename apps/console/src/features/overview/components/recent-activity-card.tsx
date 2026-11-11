@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
 import { Button } from "@/components/ui/button";
 import { EventSubject } from "@/features/events/components/event-subject";
-import type { LogEvent } from "@/features/events/model";
+import { type LogEvent, NO_AUDIT_EVENTS } from "@/features/events/model";
 import type { CardRead } from "@/features/overview/api";
 import { formatRecent } from "@/lib/date";
 
@@ -33,7 +33,7 @@ export function RecentActivityCard({ activity }: { activity: CardRead<LogEvent[]
         <p className="text-sm leading-5 text-muted-foreground">{activity.error}</p>
       ) : activity.value.length === 0 ? (
         // Logs' own sentence for its empty audit view, which this card heads.
-        <p className="text-sm leading-5 text-muted-foreground">This project has no audit events.</p>
+        <p className="text-sm leading-5 text-muted-foreground">{NO_AUDIT_EVENTS}</p>
       ) : (
         <ul className="-my-1 flex flex-col divide-y divide-border">
           {activity.value.map((event) => (

@@ -8,6 +8,9 @@ import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/gener
  */
 export type LogEvent = ListEvents200DataItem;
 
+/** What Logs' audit view, and Overview's card of it, say of a project with none. */
+export const NO_AUDIT_EVENTS = "This project has no audit events.";
+
 /**
  * What an event is about, for the one line a list row has: the request an
  * API call made, or the record a change touched. `undefined` when the event
@@ -30,7 +33,7 @@ export function eventSubject(event: LogEvent): EventSubject | undefined {
 }
 
 /** One labelled value of an event's envelope. */
-export interface EventField {
+interface EventField {
   label: string;
   value: string;
   /** An identifier: drawn in the code face, with a copy button. */
@@ -256,9 +259,9 @@ export const VALUE_FILTERS = [
   { key: "device", label: "Device", name: "device", prefix: "device" },
 ] as const;
 export type ValueFilter = (typeof VALUE_FILTERS)[number];
-export type ValueFilterKey = ValueFilter["key"];
+type ValueFilterKey = ValueFilter["key"];
 /** The filters that hold one value each: all but the type. */
-export type IdFilterKey = Exclude<ValueFilterKey, "type">;
+type IdFilterKey = Exclude<ValueFilterKey, "type">;
 
 const FILTER_BY_KEY = Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.key, filter])) as {
   [K in ValueFilterKey]: Extract<ValueFilter, { key: K }>;

@@ -6,7 +6,7 @@ import { listNewerEvents } from "./api";
 import type { LogEvent, LogsSearch } from "./model";
 
 /** How often Live asks for newer events. */
-export const LIVE_INTERVAL_MS = 3000;
+const LIVE_INTERVAL_MS = 3000;
 
 /**
  * Whether Live was left on. A new filter reads the list again under a new

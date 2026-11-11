@@ -1,7 +1,7 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { _setRuntimeForTesting } from "@/runtime/runtime";
 import { server } from "@/test/msw";
@@ -154,7 +154,7 @@ describe("projects screen", () => {
     expect(table.getAllByRole("button", { name: "Copy the ID of maxtest1" })).toHaveLength(2);
   });
 
-  it("names no project up here, in the bar or in the list", async () => {
+  it("keeps the selected project in the bar, and singles out no row", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({ projects: [listed("proj_1", "River"), listed("proj_2", "Delta")] }),
@@ -164,11 +164,11 @@ describe("projects screen", () => {
 
     const table = within(await screen.findByRole("table"));
     await table.findByRole("link", { name: "Delta" });
-    // The selection rides along in the URL, but this page is above every
-    // project (D27): the pill says so, and no row is singled out.
-    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
-      "All projects",
-    );
+    // The selection outlives the way up here (D36): the pill still names it.
+    // The list is every project's, so no row is singled out.
+    const pill = screen.getByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("Delta"));
+    expect(pill).not.toHaveTextContent("All projects");
     expect(table.queryByText("Current")).not.toBeInTheDocument();
   });
 
@@ -462,6 +462,39 @@ describe("projects screen", () => {
     // field as it was typed.
     await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "zep" }));
     expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+  });
+
+  it("keeps the search field mounted and focused through a slow search", async () => {
+    server.use(
+      http.get(PROJECTS_URL, async ({ request }) => {
+        if (!new URL(request.url).searchParams.has("name_contains")) {
+          return HttpResponse.json({ projects: [listed("proj_1", "River")] });
+        }
+        // Past the router's pending delay, which a fast response never reaches.
+        await delay(1600);
+        return HttpResponse.json({ projects: [listed("proj_9", "Zephyr")] });
+      }),
+    );
+    await renderProjects();
+    const field = await screen.findByRole("searchbox", { name: "Search projects" });
+
+    await userEvent.type(field, "zep");
+    // The rows of the last list stand, marked busy, until the search answers.
+    await waitFor(() =>
+      expect(screen.getByRole("table").closest("[aria-busy]")).toHaveAttribute("aria-busy", "true"),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+
+    // The same element, still focused: the screen was not swapped for a pending one.
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toBe(field);
+    expect(field).toHaveFocus();
+    expect(screen.getByRole("link", { name: "River" })).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole("link", { name: "Zephyr" }, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toBe(field);
+    expect(field).toHaveFocus();
   });
 
   it("keeps the field while a cleared search reloads the list", async () => {

@@ -15,14 +15,14 @@ import { describeError } from "@/lib/api-error";
  */
 
 /** How many events the activity card lists before it hands over to Logs. */
-export const RECENT_EVENTS = 5;
+const RECENT_EVENTS = 5;
 
 /** A card's read: what it shows, or why it shows nothing. */
 export type CardRead<T> = { value: T; error?: undefined } | { value?: undefined; error: string };
 
-export type OverviewProject = Awaited<ReturnType<typeof api.getProject>>;
+type OverviewProject = Awaited<ReturnType<typeof api.getProject>>;
 
-export interface ProjectOverview {
+interface ProjectOverview {
   project: OverviewProject;
   /** The deployment the primary origins serve, `undefined` while none does. */
   live: CardRead<Deployment | undefined>;

@@ -3,6 +3,8 @@ import { Boxes, Copy, type LucideIcon, Plus, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { copyText } from "@/lib/clipboard";
+
 import {
   Command,
   CommandEmpty,
@@ -356,12 +358,8 @@ const LIST_PATH: Record<SearchResultType, string> = {
  * copy.
  */
 async function copyProjectId(projectId: string) {
-  try {
-    await navigator.clipboard.writeText(projectId);
-    toast.success("Project ID copied");
-  } catch {
-    toast.error("Could not copy the project ID");
-  }
+  if (await copyText(projectId)) toast.success("Project ID copied");
+  else toast.error("Could not copy the project ID");
 }
 
 /** The palette itself: the field and the groups it is given. */

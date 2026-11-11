@@ -68,6 +68,7 @@ export function ResourceTitle({
   children,
   action,
   filter,
+  filterBelow = false,
 }: {
   children: ReactNode;
   action?: ReactNode;
@@ -80,6 +81,11 @@ export function ResourceTitle({
    * action off it.
    */
   filter?: ReactNode;
+  /**
+   * Keeps the filter on its own row under the title at every width, for one
+   * that wants the row's whole width (Logs' search, which fills with chips).
+   */
+  filterBelow?: boolean;
 }) {
   if (!filter) {
     return (
@@ -98,10 +104,25 @@ export function ResourceTitle({
       )}
     >
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 @3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end">
+      <div
+        className={cn(
+          "order-3 flex min-w-0 basis-full flex-wrap items-center gap-2",
+          filterBelow
+            ? // Out of the header's 8px inset, flush with the table under it.
+              "lg:-mx-2 lg:basis-[calc(100%+1rem)]"
+            : "@3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end",
+        )}
+      >
         {filter}
       </div>
-      <div className="order-2 ml-auto @3xl/title-row:order-3 @3xl/title-row:ml-0">{action}</div>
+      <div
+        className={cn(
+          "order-2 ml-auto",
+          !filterBelow && "@3xl/title-row:order-3 @3xl/title-row:ml-0",
+        )}
+      >
+        {action}
+      </div>
     </div>
   );
 }
@@ -146,11 +167,38 @@ export const RESOURCE_STICKY_END =
 export const RESOURCE_STICKY_BODY =
   "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
-/** One body cell: 56px tall, inset 24px. */
-export const RESOURCE_CELL = "h-14 px-6 py-2";
+/**
+ * How tall a table's rows are, set once on its card (`RESOURCE_TABLE_WRAP`)
+ * and read by every head and body cell beneath it, so a screen chooses what
+ * fits its rows and never restates a height per cell.
+ *
+ * `comfortable`, the default, is the design's 56px with 8px block padding: a
+ * row with a second line under its name, or a mark beside it. `compact` is
+ * 40px with 4px: one line a row, where the list is read by the screenful
+ * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * a narrow menu column sizes itself for.
+ */
+export const RESOURCE_DENSITY = {
+  comfortable: "",
+  compact: "[--resource-row:2.5rem] [--resource-row-pad:0.25rem] [--resource-menu:1.5rem]",
+} as const;
+
+export type ResourceDensity = keyof typeof RESOURCE_DENSITY;
+
+/** One body cell: as tall as the table's density (56px by default), inset 24px. */
+export const RESOURCE_CELL =
+  "h-[var(--resource-row,3.5rem)] px-6 py-[var(--resource-row-pad,0.5rem)]";
+
+/**
+ * The row menu's body cell in a narrow menu column: inset 8px, not the cells'
+ * 24px, which would make the column 84px wide for one 36px button.
+ */
+export const RESOURCE_MENU_CELL_NARROW =
+  "h-[var(--resource-row,3.5rem)] px-2 py-[var(--resource-row-pad,0.5rem)]";
 
 /** A body cell holding secondary text. */
-export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+export const RESOURCE_CELL_MUTED =
+  "text-muted-foreground h-[var(--resource-row,3.5rem)] truncate px-6 py-[var(--resource-row-pad,0.5rem)] text-sm";
 
 // The row's copy button rests hidden and shows on the row's hover or its own
 // focus, so a keyboard reaches it; where there is no hover it always shows.
@@ -220,7 +268,7 @@ export function ResourceHeadCell({
   return (
     <TableHead
       className={cn(
-        "text-foreground h-14 py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
+        "text-foreground h-[var(--resource-row,3.5rem)] py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
         className,
       )}
     >
@@ -229,9 +277,27 @@ export function ResourceHeadCell({
   );
 }
 
-/** The empty header cell over the row menus. */
-export function ResourceMenuHead({ className }: { className?: string }) {
-  return <TableHead className={cn("h-14 px-6", className)} />;
+/**
+ * The empty header cell over the row menus. `narrow` for a column that is the
+ * menu's button and no wider, with {@link RESOURCE_MENU_CELL_NARROW} beneath.
+ */
+export function ResourceMenuHead({
+  className,
+  narrow = false,
+}: {
+  className?: string;
+  narrow?: boolean;
+}) {
+  return (
+    <TableHead
+      className={cn(
+        "h-[var(--resource-row,3.5rem)]",
+        // Narrow: the menu's button (36px, or the density's) and 8px either side.
+        narrow ? "w-[calc(var(--resource-menu,2.25rem)+1rem)] px-2" : "px-6",
+        className,
+      )}
+    />
+  );
 }
 
 /**

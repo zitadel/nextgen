@@ -4,7 +4,7 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { eventsQuery, type LogEvent, type LogsSearch } from "./model";
 
 /** One page of a project's events, newest first. */
-export interface EventPage {
+interface EventPage {
   items: LogEvent[];
   nextPageToken?: string;
 }
@@ -66,7 +66,7 @@ export async function listNewerEvents(
 }
 
 /** How many of one request's events its panel lists. */
-export const REQUEST_EVENTS_LIMIT = 50;
+const REQUEST_EVENTS_LIMIT = 50;
 
 /**
  * One request's events in the order they happened, at most
