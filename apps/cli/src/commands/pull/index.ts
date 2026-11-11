@@ -404,7 +404,7 @@ export default class Pull extends EnvironmentCommand {
       case "latest": {
         const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
-          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
+          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
             hint: `Deploy first with ${this.suggest(DEPLOY_ARGS)}, then pull.`,
           });
         }

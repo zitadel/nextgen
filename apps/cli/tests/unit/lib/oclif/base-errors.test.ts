@@ -97,7 +97,7 @@ describe("BaseCommand errors", () => {
 
     expect(cmd.stderr.join("\n")).not.toContain("\u001b");
     expect(cmd.stderr).toEqual([
-      "Error: More than one deployment is live (E_VALIDATION)\nLive origins: https://a.example\\x1b[2Jwiped.",
+      "Error: More than one deployment is live. (E_VALIDATION)\nLive origins: https://a.example\\x1b[2Jwiped.",
     ]);
   });
 
