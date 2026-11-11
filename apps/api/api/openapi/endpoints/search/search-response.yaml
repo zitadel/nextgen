@@ -3,6 +3,7 @@ description: The best matches of each requested type.
 required:
   - results
   - incomplete_types
+  - more_projects
 properties:
   results:
     type: array
@@ -17,7 +18,14 @@ properties:
     description: |
       The requested types whose matches are not all in `results`: there were
       more than `limit_per_type`, the text was too short to search that type,
-      or the project holds more of that type than one search reads. Empty when
-      every requested type is complete.
+      a project holds more matches of that type than one search reads, or
+      `more_projects` is true. Empty when every requested type is complete.
     items:
       $ref: search-result-type.yaml
+  more_projects:
+    type: boolean
+    description: |
+      True when a session searched without `project_id` and the person can act
+      on more projects than one search reads: the results come from the first
+      of them. Search another by naming it in `project_id`. Always false when
+      the request names a project or uses a project secret.

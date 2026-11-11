@@ -90494,9 +90494,14 @@ type SearchResponse struct {
 	Results []SearchResult `json:"results"`
 	// The requested types whose matches are not all in `results`: there were
 	// more than `limit_per_type`, the text was too short to search that type,
-	// or the project holds more of that type than one search reads. Empty when
-	// every requested type is complete.
+	// a project holds more matches of that type than one search reads, or
+	// `more_projects` is true. Empty when every requested type is complete.
 	IncompleteTypes []SearchResultType `json:"incomplete_types"`
+	// True when a session searched without `project_id` and the person can act
+	// on more projects than one search reads: the results come from the first
+	// of them. Search another by naming it in `project_id`. Always false when
+	// the request names a project or uses a project secret.
+	MoreProjects bool `json:"more_projects"`
 }
 
 // GetResults returns the value of Results.
@@ -90509,6 +90514,11 @@ func (s *SearchResponse) GetIncompleteTypes() []SearchResultType {
 	return s.IncompleteTypes
 }
 
+// GetMoreProjects returns the value of MoreProjects.
+func (s *SearchResponse) GetMoreProjects() bool {
+	return s.MoreProjects
+}
+
 // SetResults sets the value of Results.
 func (s *SearchResponse) SetResults(val []SearchResult) {
 	s.Results = val
@@ -90517,6 +90527,11 @@ func (s *SearchResponse) SetResults(val []SearchResult) {
 // SetIncompleteTypes sets the value of IncompleteTypes.
 func (s *SearchResponse) SetIncompleteTypes(val []SearchResultType) {
 	s.IncompleteTypes = val
+}
+
+// SetMoreProjects sets the value of MoreProjects.
+func (s *SearchResponse) SetMoreProjects(val bool) {
+	s.MoreProjects = val
 }
 
 func (*SearchResponse) searchRes() {}

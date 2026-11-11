@@ -133619,11 +133619,16 @@ func (s *SearchResponse) encodeFields(e *jx.Encoder) {
 		}
 		e.ArrEnd()
 	}
+	{
+		e.FieldStart("more_projects")
+		e.Bool(s.MoreProjects)
+	}
 }
 
-var jsonFieldsNameOfSearchResponse = [2]string{
+var jsonFieldsNameOfSearchResponse = [3]string{
 	0: "results",
 	1: "incomplete_types",
+	2: "more_projects",
 }
 
 // Decode decodes SearchResponse from json.
@@ -133671,6 +133676,18 @@ func (s *SearchResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"incomplete_types\"")
 			}
+		case "more_projects":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Bool()
+				s.MoreProjects = bool(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"more_projects\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -133681,7 +133698,7 @@ func (s *SearchResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

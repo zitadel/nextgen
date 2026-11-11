@@ -5608,8 +5608,8 @@
     "/search": {
       "post": {
         "operationId": "search",
-        "summary": "Search a project",
-        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
+        "summary": "Search projects",
+        "description": "Finds the resources of one project, or of the projects a person can act on, that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, its `project_id`, a `title` and sometimes a `subtitle`. Read the\nresource itself with the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the\nresult's project.\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of a value. Every other type matches from\nthe start of a name or of a word in it, so `staff` finds \"Partner Staff\"\nand `sso` finds `partner-sso`. Matching ignores case. A `query` that is the\n`id` of a resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision.\n\n`project_id` names the project to search. Without it, a project secret\nsearches its own project, and a console session searches the projects the\nperson can act on: the ones `listMyProjects` (`GET /users/me/projects`)\nlists, at most the first 10 in its order. `more_projects` says the person\ncan act on more than that; search one of the others by naming it. A caller\nwith access to part of a project finds only what that access covers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type\nacross every searched project, and types can be mixed in the order.\n`incomplete_types` lists the types that have more to show: page those with\nthe type's own list, such as `queryUsers` (`POST /users/query`) or\n`queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
         "tags": [
           "Search"
         ],
@@ -5625,7 +5625,14 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/project-id-query"
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "description": "The project to search, by the `id` that `createProject` (`POST /projects`)\nreturns. Omit it to search the credential's own project with a project\nsecret, or the projects the person can act on with a session.\n",
+            "schema": {
+              "$ref": "#/components/schemas/project-id"
+            },
+            "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
           }
         ],
         "requestBody": {
@@ -18764,7 +18771,8 @@
         "description": "The best matches of each requested type.",
         "required": [
           "results",
-          "incomplete_types"
+          "incomplete_types",
+          "more_projects"
         ],
         "properties": {
           "results": {
@@ -18777,10 +18785,14 @@
           "incomplete_types": {
             "type": "array",
             "uniqueItems": true,
-            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\nor the project holds more of that type than one search reads. Empty when\nevery requested type is complete.\n",
+            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\na project holds more matches of that type than one search reads, or\n`more_projects` is true. Empty when every requested type is complete.\n",
             "items": {
               "$ref": "#/components/schemas/search-result-type"
             }
+          },
+          "more_projects": {
+            "type": "boolean",
+            "description": "True when a session searched without `project_id` and the person can act\non more projects than one search reads: the results come from the first\nof them. Search another by naming it in `project_id`. Always false when\nthe request names a project or uses a project secret.\n"
           }
         }
       },

@@ -1,6 +1,8 @@
 # ADR 087: Search
 
-> **Status:** Proposed
+> **Status:** Proposed (amended 2026-11-10: a session searches across its
+> projects, and every type matches from an index, see
+> [Amendment](#amendment-2026-11-10-across-projects-every-match-from-an-index))
 > **Date:** 2026-11-10
 > **Builds on:** [ADR 031](031-openapi-querying.md) (query endpoints),
 > [ADR 047](047-dialect-id-generation.md) (prefixed ids),
@@ -141,7 +143,8 @@ Each is an addition under this contract:
 - Text inside a value: an email's domain, a word after the first of a name.
 - The same index for a team's name.
 - Search across the projects a person can act on, by leaving out `project_id`
-  on a session; `project_id` on every result is there for it.
+  on a session; `project_id` on every result is there for it. Done by the
+  amendment below.
 - A `zitadel search` command.
 
 ## Rejected alternatives
@@ -155,3 +158,78 @@ Each is an addition under this contract:
   index is a different mechanism on each of Postgres, Spanner and SQLite. A
   prefix match needs only an ordinary index, the same on all three, so users
   have one. The contract depends on neither.
+
+## Amendment (2026-11-10): across projects, every match from an index
+
+Leaving out `project_id` on a session now searches the projects the person can
+act on. That widens every read by a factor of projects, so none of them may
+scan: the team match read every team of the project, and schemas, flow
+definitions and identity providers matched one page in the server. Each now
+matches from an index on Postgres, Spanner and SQLite. Supersedes §5, and
+amends §1 and §4.
+
+### 6. A session without `project_id` searches its projects
+
+- The projects are those `listMyProjects` (`GET /users/me/projects`) lists:
+  the ones the person's project-scoped grants reach, and every project for a
+  platform operator ([ADR 075](075-platform-operators.md)). A grant scoped to
+  one team lists no project, there or here.
+- A search reads the first 10 of them in that list's order, so a platform
+  operator's search costs what a person's with 10 projects does. The response
+  says `more_projects` when there are more, and lists every requested type in
+  `incomplete_types`; naming a project searches that one.
+- Each project costs one access check, and its decision gates every type read
+  in it, as that type's own list would gate it. A listed project the person
+  cannot read is left out.
+- `limit_per_type` counts the matches of all projects together, and every
+  result carries its `project_id`.
+- A project secret, and any request naming `project_id`, searches one project
+  as before.
+
+### 7. Every type matches from an index
+
+Users keep their index ([ADR 058](058-user-identity-designation-and-references.md)).
+Teams, user schemas, flow definitions and identity provider connections get
+one table, `search_entries`, written by the statements that write the
+resource, in their transaction, as the resource scope index is:
+
+- A resource has one row per text it is found by: each of its names, folded
+  as uniqueness folds (`domain.SearchText`, at most 256 characters), and the
+  name's tail from each of its next eight words. "Partner Staff" is
+  `partner staff` and `staff`; a word starts at a letter or digit after a
+  character that is neither, so `partner-sso` is also `sso`.
+- The primary key is `(project_id, resource_kind, search_text,
+  resource_key)`. A search is one range of it, read in key order to a fixed
+  limit, so it costs the same in a project of three teams and in one of a
+  million. Each dialect compares the text by code point (Postgres collation
+  `C`, Spanner's STRING order, SQLite's bytes), and Spanner reads the table
+  itself.
+- A row carries what search answers with: the id, the title and the subtitle.
+  `resource_key` is what a newer revision replaces an entry by (a schema's
+  object type, a flow's name, else the id), so an entry always names the
+  newest revision; deleting that revision points it at the newest left.
+- An id is still read by its primary key, through the type's list.
+
+What changes for the person typing: these types match from the start of a
+name or of a word in it, no longer inside a word. `staff` finds "Partner
+Staff", `pay` no longer finds "Prepay", and `%` starts no word. Ranking is a
+whole name, then the start of a name, then the start of a later word.
+
+### Read plan
+
+A session's search without `project_id`, for every type, at the default
+`limit_per_type` of 5, reads in each of at most 10 projects:
+
+| Read | Statements | Rows |
+| --- | --- | --- |
+| Access check | 2: the active catalog, the check | the person's grants on the project |
+| `user` | 1 per designated property, plus the schema read and the user refs of ADR 058 | per property at most 6 × the properties one schema designates (18 for three) index entries, then those users |
+| `team`, `schema`, `flow_definition`, `idp` | 1 each | at most 24 rows of `search_entries` each |
+| An id | 1 by primary key | 1 |
+
+Before them, two reads: the session's user, by primary key, and the projects,
+from the person's grants or, for an operator, the first 11 projects by id. Nothing grows with the number of users,
+teams or configuration rows a project holds. Two costs stay: the user read
+lists every user schema revision of the project to learn which properties are
+searched, and a caller whose grant covers part of a project reads each row
+through that grant's filter, as on the type's own list.

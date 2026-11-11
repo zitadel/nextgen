@@ -6592,6 +6592,45 @@ func (c *MockAllStatementsScanEventsCall) DoAndReturn(f func(context.Context, *d
 	return c
 }
 
+// SearchEntries mocks base method.
+func (m *MockAllStatements) SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchEntries", ctx, kind, projectID, prefix, limit)
+	ret0, _ := ret[0].([]domain.SearchEntryMatch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchEntries indicates an expected call of SearchEntries.
+func (mr *MockAllStatementsMockRecorder) SearchEntries(ctx, kind, projectID, prefix, limit any) *MockAllStatementsSearchEntriesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchEntries", reflect.TypeOf((*MockAllStatements)(nil).SearchEntries), ctx, kind, projectID, prefix, limit)
+	return &MockAllStatementsSearchEntriesCall{Call: call}
+}
+
+// MockAllStatementsSearchEntriesCall wrap *gomock.Call
+type MockAllStatementsSearchEntriesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsSearchEntriesCall) Return(arg0 []domain.SearchEntryMatch, arg1 error) *MockAllStatementsSearchEntriesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsSearchEntriesCall) Do(f func(context.Context, domain.ResourceKind, string, string, int) ([]domain.SearchEntryMatch, error)) *MockAllStatementsSearchEntriesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsSearchEntriesCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string, int) ([]domain.SearchEntryMatch, error)) *MockAllStatementsSearchEntriesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetAuthAttemptChallenge mocks base method.
 func (m *MockAllStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()

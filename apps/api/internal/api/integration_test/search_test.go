@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -200,10 +201,23 @@ func TestSearch(t *testing.T) {
 		assert.Equal(t, []api.SearchResultType{api.SearchResultTypeUser}, got.IncompleteTypes)
 	})
 
+	t.Run("a later word of a name finds its team", func(t *testing.T) {
+		t.Parallel()
+		got := search(t, &api.SearchRequest{Query: "ALPH", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
+		assert.Equal(t, []string{paymentsAlpha}, searchResultIDs(got.Results))
+
+		// A word starts at a letter or digit, so "%" starts none and "rem" one.
+		got = search(t, &api.SearchRequest{Query: "rem", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
+		assert.Equal(t, []string{remote}, searchResultIDs(got.Results))
+	})
+
 	t.Run("a wildcard character is text", func(t *testing.T) {
 		t.Parallel()
-		got := search(t, &api.SearchRequest{Query: "%", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
+		got := search(t, &api.SearchRequest{Query: "100%", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
 		assert.Equal(t, []string{remote}, searchResultIDs(got.Results))
+
+		got = search(t, &api.SearchRequest{Query: "%", Types: []api.SearchResultType{api.SearchResultTypeTeam}})
+		assert.Empty(t, got.Results)
 
 		got = search(t, &api.SearchRequest{Query: "%@%", Types: []api.SearchResultType{api.SearchResultTypeUser}})
 		assert.Empty(t, got.Results)
@@ -460,5 +474,131 @@ func TestSearchConfiguration(t *testing.T) {
 			Types: []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam},
 		})
 		assert.Empty(t, got.Results)
+	})
+}
+
+// A Console session that names no project searches the projects the person
+// can act on, the ones listMyProjects lists, and every result says which
+// project it is in. Grants decide, project by project, and the search reads at
+// most the first ten of them.
+func TestSearchAcrossProjects(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	stmts := harness.EnsureServiceDB(t).Statements()
+	// Only the project that holds a user needs the default schemas.
+	newProject := func(t *testing.T, seedDefaults bool) string {
+		t.Helper()
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, seedDefaults)
+		require.NoError(t, err)
+		t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+		return project.ID
+	}
+	createTeam := func(t *testing.T, projectID, name string) string {
+		t.Helper()
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{ProjectID: projectID, Name: name})
+		require.NoError(t, err)
+		return team.ID
+	}
+	teams := []api.SearchResultType{api.SearchResultTypeTeam}
+
+	person := harness.CreateUserWithTeam(t, platform.ID)
+	viewed, administered, foreign := newProject(t, true), newProject(t, false), newProject(t, false)
+	harness.SeedProjectViewer(t, viewed, person)
+	harness.SeedProjectAdmin(t, administered, person)
+	viewedTeam := createTeam(t, viewed, "Orbit Alpha")
+	administeredTeam := createTeam(t, administered, "Orbit Beta")
+	createTeam(t, foreign, "Orbit Gamma")
+	viewedUser := seedSearchUser(t, viewed, "", map[string]any{"email": "orbit-ann@across.example.com"})
+	client := sessionClientForUser(t, person)
+
+	t.Run("finds matches in every project the person can act on, each in its project", func(t *testing.T) {
+		t.Parallel()
+		got := searchResults(t, client, &api.SearchRequest{
+			Query: "orbit",
+			Types: []api.SearchResultType{api.SearchResultTypeUser, api.SearchResultTypeTeam},
+		}, api.SearchParams{})
+
+		assert.ElementsMatch(t, []string{viewedUser, viewedTeam, administeredTeam}, searchResultIDs(got.Results))
+		projects := map[string]api.ProjectID{}
+		for _, result := range got.Results {
+			projects[result.ID] = result.ProjectID
+		}
+		assert.Equal(t, api.ProjectID(viewed), projects[viewedTeam])
+		assert.Equal(t, api.ProjectID(viewed), projects[viewedUser])
+		assert.Equal(t, api.ProjectID(administered), projects[administeredTeam])
+		assert.False(t, got.MoreProjects)
+		assert.Empty(t, got.IncompleteTypes)
+	})
+
+	t.Run("the limit counts every project's matches together", func(t *testing.T) {
+		t.Parallel()
+		got := searchResults(t, client, &api.SearchRequest{Query: "orbit", Types: teams, LimitPerType: api.NewOptInt(1)},
+			api.SearchParams{})
+		assert.Equal(t, []string{viewedTeam}, searchResultIDs(got.Results), "Orbit Alpha reads before Orbit Beta")
+		assert.Equal(t, teams, got.IncompleteTypes)
+	})
+
+	t.Run("naming a project searches it alone", func(t *testing.T) {
+		t.Parallel()
+		got := searchResults(t, client, &api.SearchRequest{Query: "orbit", Types: teams},
+			api.SearchParams{ProjectID: api.NewOptProjectID(api.ProjectID(administered))})
+		assert.Equal(t, []string{administeredTeam}, searchResultIDs(got.Results))
+		assert.False(t, got.MoreProjects)
+	})
+
+	t.Run("a project the person cannot act on is not found, named or not", func(t *testing.T) {
+		t.Parallel()
+		resp, err := client.Search(t.Context(), &api.SearchRequest{Query: "orbit", Types: teams},
+			api.SearchParams{ProjectID: api.NewOptProjectID(api.ProjectID(foreign))})
+		require.NoError(t, err)
+		require.IsType(t, &api.SearchNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assertAuthzError(t, resp, domain.ErrProjectNotFound().Code)
+	})
+
+	t.Run("a person without grants finds nothing", func(t *testing.T) {
+		t.Parallel()
+		got := searchResults(t, sessionClientForUser(t, harness.CreateUserWithTeam(t, platform.ID)),
+			&api.SearchRequest{Query: "orbit", Types: teams}, api.SearchParams{})
+		assert.Empty(t, got.Results)
+		assert.False(t, got.MoreProjects)
+	})
+
+	t.Run("reads at most the first ten projects and says there are more", func(t *testing.T) {
+		t.Parallel()
+		many := harness.CreateUserWithTeam(t, platform.ID)
+		var first, last string
+		for i := range 11 {
+			projectID := newProject(t, false)
+			harness.SeedProjectViewer(t, projectID, many)
+			team := createTeam(t, projectID, "Nebula "+strconv.Itoa(i))
+			if i == 0 {
+				first = team
+			}
+			last = team
+		}
+		got := searchResults(t, sessionClientForUser(t, many), &api.SearchRequest{Query: "nebula", Types: teams, LimitPerType: api.NewOptInt(20)},
+			api.SearchParams{})
+
+		// Projects list oldest first, so the eleventh is the one left out.
+		assert.Len(t, got.Results, 10)
+		assert.Contains(t, searchResultIDs(got.Results), first)
+		assert.NotContains(t, searchResultIDs(got.Results), last)
+		assert.True(t, got.MoreProjects)
+		assert.Equal(t, teams, got.IncompleteTypes)
+	})
+
+	t.Run("a platform operator reads every project, bounded the same way", func(t *testing.T) {
+		t.Parallel()
+		operator := platformUser(t)
+		grantPlatformOperator(t, operator)
+		// More projects than one search reads exist whatever ran before.
+		for range 11 {
+			newProject(t, false)
+		}
+		got := searchResults(t, sessionClientForUser(t, operator), &api.SearchRequest{Query: "orbit", Types: teams},
+			api.SearchParams{})
+		assert.True(t, got.MoreProjects)
+		assert.Equal(t, teams, got.IncompleteTypes)
 	})
 }

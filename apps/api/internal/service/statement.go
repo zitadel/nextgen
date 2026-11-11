@@ -53,6 +53,7 @@ type AllStatements interface {
 	VariableSetStatements
 	ClaimStatements
 	ResourceScopeStatements
+	SearchEntryStatements
 	AuthzAssignmentStatements
 	AuthzMembershipEdgeStatements
 	AuthzCatalogStatements
@@ -766,6 +767,20 @@ type ClaimStatements interface {
 //   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
 //     schema / flow_definition / session delete today; branding relies on project
 //     cascade; project delete cascades RSI via project_id FK).
+// SearchEntryStatements reads what search finds teams, user schemas, flow
+// definitions and identity provider connections by (ADR 087 §5): their
+// [domain.SearchEntry] rows. The statements that write those resources write
+// their entries in the same transaction, so nothing else writes them.
+type SearchEntryStatements interface {
+	Statements
+	// SearchEntries returns the entries of kind in projectID with a text that
+	// starts with prefix, a text as [domain.SearchText] folds it: at most limit
+	// rows of one index range, by matched text, then by key. An entry found by
+	// several of its texts appears once per text. Like a list, it reads behind
+	// the authz list filter on ctx and refuses a context without one.
+	SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) ([]domain.SearchEntryMatch, error)
+}
+
 type ResourceScopeStatements interface {
 	Statements
 	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
