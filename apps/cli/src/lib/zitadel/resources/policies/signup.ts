@@ -67,8 +67,8 @@ export class SignupPolicy extends Policy {
    *
    * @remarks
    * The default, which restates the server's own protection: a proof of work
-   * on every password sign-up. Deleting the file changes nothing, because the
-   * server applies that protection without a policy.
+   * on every password or passkey sign-up. Deleting the file changes nothing,
+   * because the server applies that protection without a policy.
    *
    * @returns A new policy at {@link PATH} holding the default's `config`.
    */

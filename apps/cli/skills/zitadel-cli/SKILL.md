@@ -698,8 +698,8 @@ no app: where it would scaffold one, it previews the project, and
 `--password-min-length <n>` only when the user asks for another value (`0` sets
 none), and give test users passwords at least that long. It writes the
 sign-up policy (`.zitadel/policies/user.create.json`) too, which that deploy
-publishes: the default, the built-in proof of work every password sign-up
-solves with or without the file; passkey and sign-in provider sign-ups are not
+publishes: the default, the built-in proof of work every password or passkey
+sign-up solves with or without the file; sign-in provider sign-ups are not
 challenged. A server too old to take it gets a warning and no file; a file
 `--force` kept stays, and every `deploy` fails until the server is upgraded or
 the file moves out of `.zitadel/policies/`.
