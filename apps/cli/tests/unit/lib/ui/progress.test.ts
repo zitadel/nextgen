@@ -235,7 +235,7 @@ describe("progress for a command that draws no chain", () => {
   it("keeps its spinner out of the gutter too", async () => {
     await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
 
-    expect(spinner).toHaveBeenCalledWith({ withGuide: false });
+    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: false }));
   });
 
   it("indents what the work reported under its result", async () => {

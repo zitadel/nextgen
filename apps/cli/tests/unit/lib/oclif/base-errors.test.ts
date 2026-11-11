@@ -277,3 +277,37 @@ describe("BaseCommand on an interrupted run", () => {
     vi.restoreAllMocks();
   });
 });
+
+// A wizard's failure is read on stderr like any other, while the chain it
+// drew into is still closed on a line of its own.
+describe("BaseCommand on a wizard that fails", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("writes the error to stderr while its chain is open", async () => {
+    const cmd = new FailingWizard(false);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      cmd.ui.say("something happened");
+      await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port"));
+      cmd.ui.releaseNarration();
+    });
+
+    expect(cmd.stderr.join("\n")).toContain("Bad port");
+  });
+
+  it("closes its chain without the error", async () => {
+    const cmd = new FailingWizard(false);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      cmd.ui.say("something happened");
+      await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port"));
+      cmd.ui.releaseNarration();
+    });
+
+    expect(outro).toHaveBeenCalledWith(expect.not.stringContaining("Bad port"));
+  });
+});

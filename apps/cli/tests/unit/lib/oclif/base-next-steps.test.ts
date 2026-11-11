@@ -222,7 +222,7 @@ describe("BaseCommand next steps", () => {
       expect(cmd.stdout).toEqual(["row"]);
     });
 
-    it("goes to stderr beside output a script reads, after a blank line", async () => {
+    it("goes to stderr beside piped output without a blank line first", async () => {
       const cmd = makeCommand();
 
       await offTerminal(() =>
@@ -235,7 +235,7 @@ describe("BaseCommand next steps", () => {
         }),
       );
 
-      expect(cmd.stderr).toEqual([`\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
+      expect(cmd.stderr).toEqual([`Next:\n  $ ${PUBLIC_DEPLOY}`]);
     });
 
     it("is set apart from output a script reads when both share a terminal", async () => {

@@ -1,3 +1,6 @@
+import { EventEmitter } from "node:events";
+import { Writable } from "node:stream";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
@@ -8,6 +11,43 @@ import { DrawnSpinner, QuietSpinner, type Spinner } from "@/lib/ui/spinner";
 
 /** The handle clack handed back to the last spinner that was started. */
 const handle = () => vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+
+/** A terminal to read keys from, `isTTY` or not. */
+const terminal = (isTTY: boolean): EventEmitter & { isTTY: boolean } => {
+  return Object.assign(new EventEmitter(), { isTTY });
+};
+
+/** A terminal to draw on that keeps what was written to it, as `written()`. */
+const screen = (): Writable & { isTTY: boolean; written(): string } => {
+  const chunks: string[] = [];
+  const stream = new Writable({
+    write(chunk, _encoding, done) {
+      chunks.push(String(chunk));
+      done();
+    },
+  });
+  return Object.assign(stream, {
+    isTTY: true,
+    written: () => {
+      return chunks.join("");
+    },
+  });
+};
+
+/** Runs `act` and returns how many SIGINTs reached the process meanwhile. */
+const interrupts = (act: () => void): number => {
+  let count = 0;
+  const listener = (): void => {
+    count += 1;
+  };
+  process.on("SIGINT", listener);
+  try {
+    act();
+  } finally {
+    process.off("SIGINT", listener);
+  }
+  return count;
+};
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -25,25 +65,55 @@ describe("DrawnSpinner", () => {
   it("runs in the chain's gutter unless it is told not to", () => {
     new DrawnSpinner("Fetching users");
 
-    expect(spinner).toHaveBeenCalledWith({ withGuide: true });
+    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: true }));
   });
 
   it("stays out of the gutter for work that clears itself", () => {
     // A cleared spinner that drew a guide line leaves that line behind.
     new DrawnSpinner("Checking for a local Zitadel server", false);
 
-    expect(spinner).toHaveBeenCalledWith({ withGuide: false });
+    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: false }));
   });
 
-  it("leaves Ctrl-C as a signal, which clack's raw mode would turn into an exit with status 0", () => {
-    const modes: boolean[] = [];
+  it("raises Ctrl-C, a key in raw mode, as SIGINT", () => {
+    const input = terminal(true);
+    new DrawnSpinner("Creating the project", true, input);
 
-    new DrawnSpinner("Creating the project", true, {
-      isTTY: true,
-      setRawMode: (mode) => modes.push(mode),
+    expect(interrupts(() => input.emit("data", Buffer.from("\u0003")))).toBe(1);
+  });
+
+  it("raises nothing for any other key", () => {
+    const input = terminal(true);
+    new DrawnSpinner("Creating the project", true, input);
+
+    expect(interrupts(() => input.emit("data", Buffer.from("q")))).toBe(0);
+  });
+
+  it("takes off the key handler clack added, which exits 0 on Ctrl-C", () => {
+    const input = terminal(true);
+    const clacks = vi.mocked(spinner).getMockImplementation();
+    vi.mocked(spinner).mockImplementationOnce((options) => {
+      input.on("keypress", () => undefined);
+      return clacks?.(options) as ReturnType<typeof spinner>;
     });
 
-    expect(modes).toEqual([false]);
+    new DrawnSpinner("Creating the project", true, input);
+
+    expect(input.listenerCount("keypress")).toBe(0);
+  });
+
+  it("stops reading keys once it is cleared", () => {
+    const input = terminal(true);
+    new DrawnSpinner("Creating the project", true, input).clear();
+
+    expect(input.listenerCount("data")).toBe(0);
+  });
+
+  it("stops reading keys once it is stopped", () => {
+    const input = terminal(true);
+    new DrawnSpinner("Creating the project", true, input).stop("Created");
+
+    expect(input.listenerCount("data")).toBe(0);
   });
 
   it("registers one SIGTERM listener of its own, however many spinners start", () => {
@@ -63,15 +133,11 @@ describe("DrawnSpinner", () => {
     expect(added).toHaveLength(1);
   });
 
-  it("leaves a stream that is not a terminal alone", () => {
-    const modes: boolean[] = [];
+  it("reads nothing from a stream that is not a terminal", () => {
+    const input = terminal(false);
+    new DrawnSpinner("Creating the project", true, input);
 
-    new DrawnSpinner("Creating the project", true, {
-      isTTY: false,
-      setRawMode: (mode) => modes.push(mode),
-    });
-
-    expect(modes).toEqual([]);
+    expect(input.listenerCount("data")).toBe(0);
   });
 
   it("renames itself while the work goes on", () => {
@@ -119,6 +185,48 @@ describe("DrawnSpinner.around", () => {
 
   it("starts nothing when no spinner is running", () => {
     DrawnSpinner.around(() => undefined);
+
+    expect(spinner).not.toHaveBeenCalled();
+  });
+
+  it("erases the guide line a running spinner drew, so a pause adds no empty line", () => {
+    const output = screen();
+    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+
+    DrawnSpinner.around(() => undefined);
+
+    expect(output.written()).toBe("\u001b[1A\u001b[0J");
+    running.clear();
+  });
+
+  it("erases no line above a spinner kept out of the gutter", () => {
+    const output = screen();
+    const running = new DrawnSpinner("Checking", false, terminal(true), output);
+
+    DrawnSpinner.around(() => undefined);
+
+    expect(output.written()).toBe("");
+    running.clear();
+  });
+
+  it("does not read keys while it is paused", () => {
+    const input = terminal(true);
+    const running = new DrawnSpinner("Deploying", true, input, screen());
+
+    DrawnSpinner.around(() => {
+      expect(input.listenerCount("data")).toBe(0);
+    });
+
+    running.clear();
+  });
+
+  it("does not bring back a spinner stopped while it was paused", () => {
+    const running = new DrawnSpinner("Deploying");
+    const resume = DrawnSpinner.pause();
+    running.stop("Deployed");
+    vi.mocked(spinner).mockClear();
+
+    resume();
 
     expect(spinner).not.toHaveBeenCalled();
   });

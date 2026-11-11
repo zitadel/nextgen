@@ -304,7 +304,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     normally().spinner("Fetching users");
 
     expect(intro).not.toHaveBeenCalled();
-    expect(spinner).toHaveBeenCalledWith({ withGuide: false });
+    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: false }));
   });
 
   it("clears a running spinner before it narrates a line and draws it again after", () => {

@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 
 import { Cmd } from "@/lib/cmd";
@@ -19,10 +21,39 @@ describe("Cmd.quote", () => {
     expect(Cmd.quote("=cmd")).toBe("'=cmd'");
   });
 
-  it("spells out ESC, tab and newline so a suggestion stays one visible line", () => {
-    expect(Cmd.quote("a\u001bb")).toBe("'a\\x1bb'");
-    expect(Cmd.quote("a\tb")).toBe("'a\\x09b'");
-    expect(Cmd.quote("a\nb")).toBe("'a\\x0ab'");
+  it.each([
+    { name: "a tab", value: "my\tdir", quoted: "$'my\\tdir'" },
+    { name: "a newline", value: "a\nb", quoted: "$'a\\nb'" },
+    { name: "a carriage return", value: "a\rb", quoted: "$'a\\rb'" },
+    { name: "ESC before a hex digit", value: "a\u001bb", quoted: "$'a\\x1bb'" },
+    { name: "DEL", value: "a\u007fb", quoted: "$'a\\x7fb'" },
+    { name: "a C1 control", value: "a\u009bb", quoted: "$'a\\xc2\\x9bb'" },
+    { name: "a bidi override", value: "a‮b", quoted: "$'a\\xe2\\x80\\xaeb'" },
+    { name: "a tag character", value: "a\u{e0041}b", quoted: "$'a\\xf3\\xa0\\x81\\x81b'" },
+    { name: "a single quote beside a tab", value: "it's\t", quoted: "$'it\\'s\\t'" },
+    { name: "a backslash beside a tab", value: "a\\b\t", quoted: "$'a\\\\b\\t'" },
+  ])("writes a value holding $name in ANSI-C quotes", ({ value, quoted }) => {
+    expect(Cmd.quote(value)).toBe(quoted);
+  });
+
+  it.each([
+    "my\tdir",
+    "a\nb",
+    "a\rb",
+    "a\u001bb",
+    "a\u007fb",
+    "a\u009bb",
+    "a‮b",
+    "a\u{e0041}b",
+    "it's\t",
+    "a\\b\t",
+    "$(whoami)\n",
+  ])("is read back by bash as the value it quoted (%j)", (value) => {
+    const read = execFileSync("bash", ["-c", `printf '%s' ${Cmd.quote(value)}`], {
+      encoding: "utf8",
+    });
+
+    expect(read).toBe(value);
   });
 
   it("leaves a plain safe word unchanged", () => {

@@ -1,3 +1,6 @@
+import type { EventEmitter } from "node:events";
+import type { Writable } from "node:stream";
+
 import { spinner } from "@clack/prompts";
 
 /**
@@ -30,6 +33,15 @@ export class QuietSpinner implements Spinner {
   clear(): void {}
 }
 
+/** The terminal a spinner reads keys from: a TTY switched to raw mode while it draws. */
+export type SpinnerInput = EventEmitter & { isTTY?: boolean };
+
+/** The terminal a spinner draws on. */
+export type SpinnerOutput = Writable & { isTTY?: boolean };
+
+/** Ctrl-C as a raw-mode terminal sends it: a key, not a signal. */
+const CTRL_C = "\u0003";
+
 /**
  * A spinner drawn in the chain's gutter. `guide: false` keeps it out of the
  * gutter, for a probe that clears itself: a cleared spinner that drew a guide
@@ -44,25 +56,30 @@ export class DrawnSpinner implements Spinner {
   private handle: ReturnType<typeof spinner>;
   private text: string;
   private readonly guide: boolean;
-  private readonly input: { isTTY?: boolean; setRawMode?: (mode: boolean) => unknown };
+  private readonly input: SpinnerInput;
+  private readonly output: SpinnerOutput;
 
   /**
    * @param label - What the work is.
    * @param guide - Whether the spinner sits in the chain's gutter.
-   * @param input - The terminal Ctrl-C is read from. Clack's spinner switches it
-   *   to raw mode, where Ctrl-C arrives as a key and clack answers it with
-   *   `process.exit(0)`: no `E_CANCELLED`, no rollback, and an exit status that
-   *   says the run succeeded. Raw mode is switched off again, so Ctrl-C is the
-   *   signal the command's own handler turns into a cancellation.
+   * @param input - The terminal keys are read from. Clack's spinner switches it
+   *   to raw mode, so a key pressed meanwhile is not echoed over the frame, and
+   *   answers Ctrl-C there with `process.exit(0)`: no `E_CANCELLED`, no
+   *   rollback, and an exit status that says the run succeeded. Raw mode is
+   *   kept, clack's key handling is taken off, and Ctrl-C is raised as the
+   *   SIGINT the command's own handler turns into a cancellation.
+   * @param output - The terminal the spinner is drawn on.
    */
   constructor(
     label: string,
     guide = true,
-    input: { isTTY?: boolean; setRawMode?: (mode: boolean) => unknown } = process.stdin,
+    input: SpinnerInput = process.stdin,
+    output: SpinnerOutput = process.stdout,
   ) {
     this.text = label;
     this.guide = guide;
     this.input = input;
+    this.output = output;
     this.handle = this.spin();
     DrawnSpinner.active.add(this);
   }
@@ -89,11 +106,15 @@ export class DrawnSpinner implements Spinner {
   static pause(): () => void {
     const running = [...DrawnSpinner.active];
     for (const one of running) {
-      one.handle.clear();
+      one.release();
+      one.eraseGuide();
     }
     return () => {
+      // A spinner stopped or cleared while paused stays stopped.
       for (const one of running) {
-        one.handle = one.spin();
+        if (DrawnSpinner.active.has(one)) {
+          one.handle = one.spin();
+        }
       }
     };
   }
@@ -112,15 +133,57 @@ export class DrawnSpinner implements Spinner {
 
   stop(text?: string): void {
     DrawnSpinner.active.delete(this);
+    this.input.off("data", this.onKeys);
     this.handle.stop(text);
   }
 
   clear(): void {
     DrawnSpinner.active.delete(this);
+    this.release();
+  }
+
+  /** Clears the frame and stops reading keys, leaving the guide line it drew. */
+  private release(): void {
+    this.input.off("data", this.onKeys);
     this.handle.clear();
   }
 
-  /** Starts clack's spinner under the current text, with Ctrl-C left as a signal. */
+  /**
+   * Erases the guide line {@link spin} drew above the frame, which clearing
+   * the frame leaves behind: without this, every pause and resume would add
+   * one more empty guide line to the chain.
+   */
+  private eraseGuide(): void {
+    if (this.guide && this.output.isTTY === true) {
+      // Up one line, then erase from there down.
+      this.output.write("\u001b[1A\u001b[0J");
+    }
+  }
+
+  /**
+   * Raises Ctrl-C, which a raw-mode terminal sends as a key, as the SIGINT it
+   * would have been: to the command's handler when there is one, or to the
+   * process, which Node then ends as a shell expects.
+   *
+   * @param chunk - What the terminal sent.
+   */
+  private readonly onKeys = (chunk: Buffer | string): void => {
+    if (!String(chunk).includes(CTRL_C)) {
+      return;
+    }
+    if (process.listenerCount("SIGINT") > 0) {
+      process.emit("SIGINT", "SIGINT");
+      return;
+    }
+    process.kill(process.pid, "SIGINT");
+  };
+
+  /**
+   * Starts clack's spinner under the current text, with Ctrl-C raised as a
+   * signal.
+   *
+   * @returns Clack's handle on the spinner it started.
+   */
   private spin(): ReturnType<typeof spinner> {
     const events = ["SIGINT", "SIGTERM", "exit", "uncaughtExceptionMonitor", "unhandledRejection"];
     const before = events.map((event) => {
@@ -129,7 +192,8 @@ export class DrawnSpinner implements Spinner {
         listeners: new Set(process.listeners(event as NodeJS.Signals)),
       };
     });
-    const handle = spinner({ withGuide: this.guide });
+    const keys = new Set(this.input.listeners("keypress"));
+    const handle = spinner({ withGuide: this.guide, output: this.output });
     handle.start(this.text);
     // Clack's own handlers print "Canceled" or an error line of theirs; the
     // command's single `Cancelled` ending is the only one wanted.
@@ -155,7 +219,15 @@ export class DrawnSpinner implements Spinner {
       });
     }
     if (this.input.isTTY === true) {
-      this.input.setRawMode?.(false);
+      // Clack's key handler exits 0 on Ctrl-C, and its line editor would echo
+      // what it reads; raw mode stays on, so the terminal echoes nothing either.
+      for (const listener of this.input.listeners("keypress")) {
+        if (!keys.has(listener)) {
+          this.input.removeListener("keypress", listener as (...args: unknown[]) => void);
+        }
+      }
+      this.input.off("data", this.onKeys);
+      this.input.on("data", this.onKeys);
     }
     return handle;
   }

@@ -650,7 +650,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
         this.log(stripColumnMarks(rendered));
       }
       if (next !== "") {
-        this.logAside(rendered !== "" ? `\n${next}` : next);
+        // Set apart from the result only when both share a screen; a piped
+        // result is not on screen to be set apart from.
+        this.logAside(rendered !== "" && this.isOnScreen ? `\n${next}` : next);
       }
       if (footer !== undefined) {
         this.log(`\n${stripColumnMarks(footer)}`);
@@ -858,12 +860,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
     } else if (zitadelError.code === "E_CANCELLED") {
       this.ui.stop(zitadelError);
     } else {
-      const ending = failureSummary(zitadelError, meta);
+      // An open chain is closed on its own line, but the failure goes to stderr
+      // like every other failure, so `2>errors.log` keeps a wizard's too.
       if (this.ui.interactive && this.ui.opened) {
-        this.ui.finish(ending);
-      } else {
-        this.logAside(this.ui.written(ending).replace(/\n+$/, ""));
+        this.ui.finish({
+          title: "Failed",
+          sections: [],
+          failed: true,
+        });
       }
+      this.logAside(this.ui.written(failureSummary(zitadelError, meta)).replace(/\n+$/, ""));
     }
     return this.exit(zitadelError.exitCode);
   }

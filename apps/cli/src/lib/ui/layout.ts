@@ -282,11 +282,18 @@ const argumentBreaks = (command: string): number[] => {
  * shell removes together with the newline, so what is copied out of the box is
  * still the one command it was and still runs.
  *
- * A break at a space between two arguments keeps `lead`, since the spaces that
- * rejoins only separate arguments that were already separate. An argument too
- * long to fit on a line of its own is broken where it must be and continued at
- * the margin, since `\`-newline is all the shell removes and an indent would
- * land inside the argument.
+ * Lines break only at a space between two arguments, never inside quotes or
+ * at an escaped space, and every line starts with `lead`: the shell reads the
+ * indent as more of the space that already separated those arguments. Where
+ * nothing is left to break at within `width`, the rest stays whole on its last
+ * line and runs past it, since inside quotes `\`-newline is kept as written and
+ * a break there would change the argument.
+ *
+ * @param command - The command, already quoted the way it is to be pasted.
+ * @param width - The columns each line may take, `lead` included.
+ * @param lead - What each line starts with, such as the indent of a frame.
+ * @returns The lines, each but the last ending in ` \`; a single line when the
+ *   command fits or has no space to break at.
  */
 export const wrapCommand = (command: string, width: number, lead = ""): string[] => {
   const lines: string[] = [];
