@@ -111,8 +111,9 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 				ev.Metadata = meta
 			}
 		}
-		// With events.request.flush_wait this returns once the event is
-		// written, and the response ends only then.
+		// With events.request.flush_wait the response stays open until the
+		// flusher is done with the event, written or given up on, for that
+		// long at most.
 		buf.EnqueueSince(ctx, ev, start)
 	})
 }
