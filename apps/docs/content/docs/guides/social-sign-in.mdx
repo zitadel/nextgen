@@ -113,7 +113,7 @@ npx @zitadel/cli@latest deploy
 ```
 
 `--dry-run` prints the diff of the files `sso enable` wrote, and `deploy` prints
-`Deployed sha256:<digest>`. Only deploy once the provider's OAuth client exists.
+`Release sha256:<digest> is now live on <origin>`, with the first 12 digits of the digest. Only deploy once the provider's OAuth client exists.
 Reload the app: the sign-in, registration and password steps show a "Continue
 with Google" button.
 
@@ -201,8 +201,8 @@ This example fills a new property `staffNumber` from a claim the provider calls
    ([What deploy checks](/docs/concepts/repo-config#what-deploy-checks)):
 
    ```
-   Error E_VALIDATION: Configuration validation failed (1 issue):
-     - .zitadel/idps/<slug>.json: claim_mapping target "staffNumber" is not a property of any schema that lists "<slug>" in sso.providers. Fix the name, or remove the row.
+   Error: Configuration validation failed (1 issue):
+     - .zitadel/idps/<slug>.json: claim_mapping target "staffNumber" is not a property of any schema that lists "<slug>" in sso.providers. Fix the name, or remove the row. (E_VALIDATION)
    ```
 
    Make the key in `claim_mapping` match a property of the schema, then run
@@ -328,8 +328,8 @@ signed in through it, and can't change:
 `deploy` refuses an edit to one of them and names the field:
 
 ```text
-Error E_VALIDATION: release: invalid
-idp google: identity provider connection: the field is fixed for the life of the connection: subject_claim.
+Error: Release: invalid
+idp google: identity provider connection: the field is fixed for the life of the connection: subject_claim. (E_VALIDATION)
 ```
 
 Restore the stored value, or add a new connection file with its own slug.

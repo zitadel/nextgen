@@ -65,7 +65,7 @@ auth.factor.password.set  (.zitadel/policies/auth.factor.password.set.json)
 A case that does not hold fails the command with `E_VALIDATION`. The output shows what you expected and what the server decided. Lower `min_length` to 6 and run it again:
 
 ```text
-Error E_VALIDATION: 1 of 2 policy test cases failed
+Error: 1 of 2 policy test cases failed (E_VALIDATION)
 auth.factor.password.set  (.zitadel/policies/auth.factor.password.set.json)
   ✗ too short: expected refused (min_length), got allowed
   ✓ long enough

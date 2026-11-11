@@ -34,13 +34,14 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>"
 
 `-m` records why on the release and the deployment ([Messages](#messages)). A non-interactive run, such as CI, fails without it unless a pull request title or a clean git commit supplies one. A release carries a content digest, so re-running `deploy` on unchanged configuration returns the same release.
 
-On success it prints the digest, how many resources the release pins (includes) and each origin it went live on:
+On success it prints how many resources the release pins (includes), then the start of its digest and each origin it went live on:
 
 ```text
-Deployed sha256:<digest>
-  <n> resources to <m> origins
-  - <origin>
+Deployed <n> resources
+Release sha256:<first 12 digits> is now live on <origin>.
 ```
+
+The full digest is `content_hash` in the `--json` envelope.
 
 Under `--json` the result is one envelope on stdout. `data` carries `release_id`, `content_hash`, `deployment_id`, `resources`, `origins` and `diff`, and `data.next_commands` suggests `deployment list`. `diff.files` lists each changed file with its `status` and its `patch`, the file's part of the diff. It is `null` when there is nothing to diff against yet, such as before the first deploy, and `diff.note` says why.
 

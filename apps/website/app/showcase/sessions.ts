@@ -130,11 +130,11 @@ export const sessions: Session[] = [
       commands: [
         {
           command: dryRunCommand,
-          output: "Validated 3 resources. Nothing was deployed (dry run).",
+          output: "Validated 3 resources and deployed nothing (dry run)",
         },
         {
           command: deployCommand,
-          output: "Deployed sha256:a2807ed6…\n  3 resources to 1 origin\n  - http://localhost:3000",
+          output: "Deployed 3 resources\nRelease sha256:a2807ed6… is now live on http://localhost:3000.",
         },
       ],
     },
@@ -176,11 +176,11 @@ export const sessions: Session[] = [
       commands: [
         {
           command: dryRunCommand,
-          output: "Validated 3 resources. Nothing was deployed (dry run).",
+          output: "Validated 3 resources and deployed nothing (dry run)",
         },
         {
           command: deployCommand,
-          output: "Deployed sha256:7166cbe0…\n  3 resources to 1 origin\n  - http://localhost:3000",
+          output: "Deployed 3 resources\nRelease sha256:7166cbe0… is now live on http://localhost:3000.",
         },
       ],
     },
