@@ -2067,6 +2067,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       status: "ok",
       data: {
         title: "Zitadel is ready",
+        ...(this.dryRun ? { dry_run: true } : {}),
         project: {
           project_id: project.id,
           issuer,

@@ -689,7 +689,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         dry_run: true,
       },
       summary: {
-        title: escapeControlCharacters(said[0] === undefined ? "" : `${said[0]} (dry run)`),
+        title: escapeControlCharacters(
+          said[0] === undefined ? "Nothing would change (dry run)" : `${said[0]} (dry run)`,
+        ),
         sections: [],
         lines: said.slice(1).map((line) => {
           return escapeControlCharacters(line);
@@ -833,12 +835,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: this.title(name, unpublished, stored),
+        title: this.title(name, unpublished),
         ...payload,
         next_args: followUps.args,
       },
       summary: {
-        title: escapeControlCharacters(this.title(name, unpublished, false)),
+        title: escapeControlCharacters(this.title(name, unpublished)),
         sections: [],
         lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
         next: [
@@ -954,20 +956,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * The result's title: whether the provider is configured, and whether its
-   * credentials are stored on the Project.
+   * The result's title: whether the provider is configured. The terminal and
+   * the envelope say it in these same words.
    *
    * @param name - The provider's display name.
    * @param unpublished - Whether the configuration has changes to deploy.
-   * @param stored - Whether both credentials reached the project.
    * @returns The title.
    */
-  private title(name: string, unpublished: boolean, stored: boolean): string {
+  private title(name: string, unpublished: boolean): string {
     if (!unpublished) {
       return `${name} sign-in is already configured locally`;
-    }
-    if (stored) {
-      return `${name} sign-in is configured locally and its credentials are stored in your project`;
     }
     return `${name} sign-in is configured locally`;
   }
