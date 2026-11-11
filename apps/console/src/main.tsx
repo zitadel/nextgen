@@ -1,3 +1,6 @@
+// First, before anything that could read the page's URL (root ADR 086 §3).
+import "./features/invitations/capture-token";
+
 import { RouterProvider } from "@tanstack/react-router";
 import ReactDOM, { type Root } from "react-dom/client";
 

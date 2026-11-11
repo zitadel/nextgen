@@ -37,6 +37,10 @@ const PREVIEW: Origin = { pattern: "https://*-acmeinc.vercel.app", kind: "previe
 beforeEach(() =>
   server.use(
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    // The Invitations tab's read rides on the page's loader; none here.
+    http.get("http://localhost/api/v1/invitations", () =>
+      HttpResponse.json({ invitations: [], next_page_token: null }),
+    ),
     http.get("http://localhost/api/v1/projects/:id/admins", () =>
       HttpResponse.json({ admins: [] }),
     ),

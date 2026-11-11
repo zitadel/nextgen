@@ -27,6 +27,9 @@ beforeEach(() =>
     http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/invitations", () =>
+      HttpResponse.json({ invitations: [], next_page_token: null }),
+    ),
     http.get("http://localhost/api/v1/deployments", () =>
       HttpResponse.json({ deployments: [], next_page_token: null }),
     ),

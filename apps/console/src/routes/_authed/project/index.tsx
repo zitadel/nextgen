@@ -10,6 +10,12 @@ import {
   AddAdminButton,
   ProjectAdmins,
 } from "@/features/project-settings/components/project-admins";
+import {
+  type InvitationsRead,
+  InviteMemberButton,
+  ProjectInvitations,
+  readInvitations,
+} from "@/features/invitations/components/project-invitations";
 import { ProjectOrigins } from "@/features/project-settings/components/project-origins";
 import {
   type PasswordPolicyRead,
@@ -54,6 +60,12 @@ import { projectScopeDeps, requireProjectScope } from "@/features/projects/proje
  * the variables are loaded with it, since the four reads are the same viewer
  * check on the same project and succeed or fail as one. The password policy
  * is read beside them but fails on its own: its card only shows it.
+ *
+ * Invitations is the third tab (root ADR 086 §6, #2855): the links made to
+ * bring colleagues in, in a table apart from the people who are in. Its read
+ * fails on its own too, so a refused or unavailable invitations list costs
+ * that tab its table and nothing else. Admins keeps Add admin until the
+ * members list replaces it (#2857).
  */
 export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
@@ -64,7 +76,7 @@ export const Route = createFileRoute("/_authed/project/")({
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [project, admins, grants, variables, policies] = await Promise.all([
+    const [project, admins, grants, variables, policies, invitations] = await Promise.all([
       api.getProject(projectId),
       // One page each: a project's admins are a handful. Add paging with the
       // first project that needs it. The people and how they hold access come
@@ -85,6 +97,11 @@ export const Route = createFileRoute("/_authed/project/")({
           error: describeError(cause, "The password policy could not be read."),
         }),
       ),
+      readInvitations(projectId).catch(
+        (cause): InvitationsRead => ({
+          error: describeError(cause, "The invitations could not be read."),
+        }),
+      ),
     ]);
     return {
       project,
@@ -92,15 +109,16 @@ export const Route = createFileRoute("/_authed/project/")({
       grants: grants.grants,
       variables,
       passwordPolicy: policies,
+      invitations,
     };
   },
   component: ProjectDetail,
 });
 
-type Tab = "overview" | "admins";
+type Tab = "overview" | "admins" | "invitations";
 
 function ProjectDetail() {
-  const { project, admins, grants, variables, passwordPolicy } = Route.useLoaderData();
+  const { project, admins, grants, variables, passwordPolicy, invitations } = Route.useLoaderData();
   const { session } = Route.useRouteContext();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -130,8 +148,16 @@ function ProjectDetail() {
           <TabsList aria-label="Project detail sections">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="admins">Admins</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
           </TabsList>
           {tab === "admins" && <AddAdminButton projectId={project.id} onAdded={reload} />}
+          {tab === "invitations" && (
+            <InviteMemberButton
+              projectId={project.id}
+              projectName={project.name}
+              onInvited={reload}
+            />
+          )}
         </div>
 
         {/* The page owns the 16px between its cards. */}
@@ -158,6 +184,15 @@ function ProjectDetail() {
             admins={admins}
             grants={grants}
             viewerUserId={session.user_id ?? undefined}
+            onChanged={reload}
+          />
+        </TabsContent>
+
+        <TabsContent value="invitations">
+          <ProjectInvitations
+            projectId={project.id}
+            projectName={project.name}
+            read={invitations}
             onChanged={reload}
           />
         </TabsContent>

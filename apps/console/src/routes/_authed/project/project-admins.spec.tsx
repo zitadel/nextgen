@@ -121,6 +121,10 @@ function stubProject(
     http.get("http://localhost/api/v1/deployments", () =>
       HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
+    // The Invitations tab's read rides on the page's loader; none here.
+    http.get("http://localhost/api/v1/invitations", () =>
+      HttpResponse.json({ invitations: [], next_page_token: null }),
+    ),
     http.get(`${PROJECTS_URL}/:id/admins`, ({ params }) => {
       adminReads.push(params.id as string);
       return HttpResponse.json({ admins });

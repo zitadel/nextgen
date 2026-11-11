@@ -13,6 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as ClaimIndexRouteImport } from './routes/claim/index'
+import { Route as InvitationsAcceptRouteImport } from './routes/invitations/accept'
 import { Route as AuthedAuthenticationIndexRouteImport } from './routes/_authed/authentication/index'
 import { Route as AuthedBrandingIndexRouteImport } from './routes/_authed/branding/index'
 import { Route as AuthedDeploymentsIndexRouteImport } from './routes/_authed/deployments/index'
@@ -50,6 +51,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
 const ClaimIndexRoute = ClaimIndexRouteImport.update({
   id: '/claim/',
   path: '/claim/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvitationsAcceptRoute = InvitationsAcceptRouteImport.update({
+  id: '/invitations/accept',
+  path: '/invitations/accept',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedAuthenticationIndexRoute =
@@ -155,6 +161,7 @@ const AuthedAuthenticationIdpsIdpIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
+  '/invitations/accept': typeof InvitationsAcceptRoute
   '/claim/': typeof ClaimIndexRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/invitations/accept': typeof InvitationsAcceptRoute
   '/': typeof AuthedIndexRoute
   '/claim': typeof ClaimIndexRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
+  '/invitations/accept': typeof InvitationsAcceptRoute
   '/_authed/': typeof AuthedIndexRoute
   '/claim/': typeof ClaimIndexRoute
   '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/invitations/accept'
     | '/claim/'
     | '/flow-definitions/$definitionId'
     | '/projects/$projectId'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/invitations/accept'
     | '/'
     | '/claim'
     | '/flow-definitions/$definitionId'
@@ -279,6 +290,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authed'
     | '/login'
+    | '/invitations/accept'
     | '/_authed/'
     | '/claim/'
     | '/_authed/flow-definitions/$definitionId'
@@ -305,6 +317,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  InvitationsAcceptRoute: typeof InvitationsAcceptRoute
   ClaimIndexRoute: typeof ClaimIndexRoute
 }
 
@@ -336,6 +349,13 @@ declare module '@tanstack/react-router' {
       path: '/claim'
       fullPath: '/claim/'
       preLoaderRoute: typeof ClaimIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invitations/accept': {
+      id: '/invitations/accept'
+      path: '/invitations/accept'
+      fullPath: '/invitations/accept'
+      preLoaderRoute: typeof InvitationsAcceptRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/authentication/': {
@@ -527,6 +547,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
+  InvitationsAcceptRoute: InvitationsAcceptRoute,
   ClaimIndexRoute: ClaimIndexRoute,
 }
 export const routeTree = rootRouteImport

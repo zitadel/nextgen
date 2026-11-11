@@ -194,6 +194,19 @@ properties:
     type: list
     values: [user_schema, login_flow, branding, policy, identity_provider]
     description: Configuration a deployment actually changed, never one it merely included.
+  role:
+    type: string
+    values: [project_viewer, project_editor, project_admin, team_member]
+    description: >-
+      What an invitation grants: its type and that type's role combined (ADR
+      086 §9).
+  invitation_journey_id:
+    type: string
+    description: >-
+      An invitation's `journey_id`, which a replacement keeps: a random
+      correlation id, never the invitation's id, its token or its link. The
+      events of one journey join on it, since the person who creates an
+      invitation is not the one who accepts it.
   preview_option:
     type: string
     values: [journey, viewport, theme, state, flow]
@@ -604,6 +617,32 @@ components:
           Analytics Plus's limit.
         destinations: [vercel]
         properties: [page, utm_source, utm_medium, utm_campaign, referrer_host]
+      invitation_created:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed an invitation made from the project's Invitations
+          tab, a replacement (`Regenerate link`) included. Only the cloud build
+          sends it, to Vercel like `copied_command`; Mixpanel follows once the
+          Console has a sink for it.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_accepted:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed the accept on the invitation page. Sent like
+          `invitation_created`.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
+      invitation_rejected:
+        status: emitted
+        plan: "#2859"
+        trigger: >-
+          The API confirmed the decline on the invitation page. Sent like
+          `invitation_created`.
+        destinations: [vercel, mixpanel]
+        properties: [role, invitation_journey_id]
       viewed_page:
         status: planned
         plan: "#2233"

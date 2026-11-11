@@ -116,6 +116,8 @@ Canonical examples:
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
 | Create or edit drawer | `FormSheet` (`src/components/form-sheet.tsx`) |
 | Mutation error inside a form or card | `FormError` (`src/components/form-error.tsx`) |
+| Empty table with a way to fill it | `Empty` in a `Card` (`src/components/ui/empty.tsx`) |
+| Field with a control inside its frame (a copy button under a message) | `InputGroup` (`src/components/ui/input-group.tsx`) |
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |

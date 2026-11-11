@@ -46,6 +46,10 @@ beforeEach(() =>
 function stubVariables(body: Record<string, unknown>, status = 200) {
   const projects: (string | null)[] = [];
   server.use(
+    // The Invitations tab's read rides on the page's loader; none here.
+    http.get("http://localhost/api/v1/invitations", () =>
+      HttpResponse.json({ invitations: [], next_page_token: null }),
+    ),
     http.get("http://localhost/api/v1/projects/:id/admins", () =>
       HttpResponse.json({ admins: [] }),
     ),
