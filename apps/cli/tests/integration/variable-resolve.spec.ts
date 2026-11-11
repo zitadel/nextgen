@@ -120,6 +120,62 @@ describe("variable resolve", () => {
       });
     });
 
+    describe("a named deployment", () => {
+      it("reads the variables that deployment froze, not the ones set since", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
+        const deployed = await app.deployData();
+        await app.setVariable("LATER", "set after the deploy");
+
+        const result = await app.resolveVariables({ deploymentId: deployed.deployment_id });
+
+        expect(result).toSucceed();
+        const data = app.envelopeOf<{ deployment_id: string; items: { name: string }[] }>(
+          result,
+        ).data;
+        expect(data.deployment_id).toBe(deployed.deployment_id);
+        expect(data.items.map((item) => item.name)).toContain("HOST");
+        expect(data.items.map((item) => item.name)).not.toContain("LATER");
+      });
+
+      it("is a miss for a deployment the project does not have", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.resolveVariables({
+          deploymentId: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+        });
+
+        expect(result).toFailWith("E_NOT_FOUND");
+      });
+
+      it("is refused together with an origin", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.resolveVariables({
+          deploymentId: deployed.deployment_id,
+          origin: "https://app.acme.com",
+        });
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("holds its invariants in every rendering", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("BANNER", "a\u001b[2Jwiped");
+        const deployed = await app.deployData();
+        platform.servesAHostileOrigin();
+        const args = ["variable", "resolve", deployed.deployment_id ?? ""];
+
+        await app.inEveryRendering((how) =>
+          app.run(how.json ? [...args, "--json"] : args, how.env),
+        );
+      });
+    });
+
     describe("--plain", () => {
       it("prints each frozen variable as a tab-separated record", async () => {
         const app = await aSetUpApp();
