@@ -127,9 +127,9 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
   base64. A caller cannot choose it.
 - It is returned once, in the response to create and to `rotate_secret`. No
   other response, event or log carries it.
-- Both operations take an `Idempotency-Key`, as creating an application
-  does: a caller whose response was lost repeats the request and gets the
-  same secret, where otherwise nobody would hold it.
+- A repeated create makes a second webhook and a repeated rotation rotates
+  again; neither takes an `Idempotency-Key`, because the server keeps no
+  record of one for any operation (see Open questions).
 - It is stored encrypted with the project's secret encryption key
   ([ADR 029](029-cryptography-secrets-and-key-lifecycle.md)), through the
   `KeyService` the variable service encrypts a secret variable with. It is not a variable: a variable is frozen per deployment and
@@ -232,8 +232,10 @@ disable it and rotate its secret.
   (ADR 049, amendment 2026-10-27). A `/cron/events-export` trigger is the same
   fix and delivers at best once a minute; a queue in `apps/cloud-functions`
   delivers sooner and is new infrastructure.
-- **`request.api` and the secret.** Confirm with a test that the request
-  event of create and of `rotate_secret` records no response body.
+- **A lost rotate response.** Rotating again drops the secret the endpoint
+  still uses, so its deliveries fail until it has the newest one. An
+  `Idempotency-Key` would let the caller repeat the request and get the same
+  secret, and needs an idempotency store the server does not have.
 - **Loopback in development.** The egress policy refuses loopback URLs, so a
   webhook to `localhost` needs the allow-list exception whose development
   gating is open on #928.
