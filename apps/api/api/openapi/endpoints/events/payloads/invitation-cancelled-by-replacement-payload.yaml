@@ -1,0 +1,20 @@
+title: InvitationCancelledByReplacementPayload
+description: |
+  An `invitation.cancelled` payload for an invitation a replacement
+  cancelled.
+type: object
+required:
+  - journey_id
+  - reason
+  - replaced_by_invitation_id
+properties:
+  journey_id:
+    type: string
+    description: Shared by an invitation and every invitation that replaces it.
+  reason:
+    type: string
+    enum:
+      - replaced
+  replaced_by_invitation_id:
+    type: string
+    description: The invitation that replaced this one.

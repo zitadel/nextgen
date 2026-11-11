@@ -217,7 +217,7 @@ type ServerConfig struct {
 	// allocated only during requests. It turns nothing on by itself. Each
 	// background task says what it does in such a process
 	// (internal/background), and the settings a pause changes take their
-	// defaults from it: IdleTimeout and events.request.flush_wait (ADR 088).
+	// defaults from it: IdleTimeout and events.request.flush_wait (ADR 089).
 	RequestBound bool `mapstructure:"request_bound"`
 }
 

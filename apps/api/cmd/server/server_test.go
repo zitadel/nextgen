@@ -218,7 +218,7 @@ func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {
 }
 
 // server.request_bound is one fact about where the server runs, and the
-// settings a pause changes take their defaults from it (ADR 088). Each stays
+// settings a pause changes take their defaults from it (ADR 089). Each stays
 // a setting of its own: what the configuration says outranks the default.
 func TestLoadConfigRequestBound(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())

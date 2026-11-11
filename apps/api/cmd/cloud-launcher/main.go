@@ -20,7 +20,7 @@
 //     becomes a --user-file.
 //   - The pause. A function runs only while it serves a request, which the
 //     launcher tells a deployment's server as server.request_bound; what
-//     the server then does differently is the server's (ADR 088). Its
+//     the server then does differently is the server's (ADR 089). Its
 //     hourly audit event purge cannot run on a timer here: a Vercel Cron Job
 //     (repo-root vercel.json) calls the server's retention trigger instead,
 //     with CRON_SECRET as its bearer token, which becomes
@@ -536,7 +536,7 @@ func prepareServer(extra []string) ([]string, error) {
 	// one fact is all the launcher says: the server holds its background
 	// work to it and takes server.idle_timeout and
 	// events.request.flush_wait from it, unless a NEXTGEN_* variable sets
-	// those (ADR 088). A local run keeps running, and purges on its own
+	// those (ADR 089). A local run keeps running, and purges on its own
 	// timer without a CRON_SECRET.
 	if deployed(env) {
 		pinned["NEXTGEN_SERVER_REQUEST_BOUND"] = "true"
@@ -559,6 +559,27 @@ func prepareServer(extra []string) ([]string, error) {
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err
+		}
+	}
+	// An OTLP endpoint on the environment turns telemetry export on. The OTLP
+	// SDK reads it and OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
+	// itself, so the exporters' own endpoint stays unset; an environment
+	// without it exports nothing rather than retry localhost:4318. The batch
+	// durations are the SDK's defaults, named so the cloud's export cadence is
+	// read here rather than inherited.
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		for key, value := range map[string]string{
+			"NEXTGEN_INSTRUMENTATION_SERVICE_NAME":                   "nextgen-cloud",
+			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":            "http",
+			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION":  "5s",
+			"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE":           "http",
+			"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "60s",
+			"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE":              "http",
+			"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_BATCH_DURATION":    "1s",
+		} {
+			if err := setDefault(key, value); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// Added to, not defaulted: a deployment names its custom domains there, and

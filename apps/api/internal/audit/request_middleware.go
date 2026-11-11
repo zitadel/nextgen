@@ -93,26 +93,29 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		if route == "" && !isAPIMount(r.Pattern) {
 			route = r.Pattern
 		}
-		payload, err := events.MarshalPayload(domain.RequestAPIPayload{
+		request := domain.RequestAPIPayload{
 			OperationID:   operationID,
 			Method:        r.Method,
 			RouteTemplate: route,
 			Status:        status,
 			DurationMs:    time.Since(start).Milliseconds(),
-		})
+		}
+		payload, err := events.MarshalPayload(request)
 		if err != nil {
 			return
 		}
 		ev := FromContext(WithActorContext(r.Context(), *ac), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
+		ev.OperationID, ev.StatusClass = request.Indexed()
 		if c := clientFromRequest(r); c != nil {
 			if meta, err := withClient(ev.Metadata, c); err == nil {
 				ev.Metadata = meta
 			}
 		}
-		// With events.request.flush_wait this returns once the event is
-		// written, and the response ends only then.
+		// With events.request.flush_wait the response stays open until the
+		// flusher is done with the event, written or given up on, for that
+		// long at most.
 		buf.EnqueueSince(ctx, ev, start)
 	})
 }

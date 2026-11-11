@@ -5,7 +5,7 @@
 // a Vercel function, Cloud Run with CPU allocated only during requests) is
 // paused between requests, so such work runs late there, or never. Every task
 // therefore says what it does in such a process, and one that does not say
-// fails the start wherever the server runs (ADR 088).
+// fails the start wherever the server runs (ADR 089).
 package background
 
 import (
@@ -93,7 +93,7 @@ func (g *Group) Start(ctx context.Context, task Task) error {
 	}
 	answer := task.RequestBound
 	if answer.kind == unanswered || (answer.kind == inRequest && answer.start == nil) {
-		return fmt.Errorf("background task %q does not say what it does in a process that runs only while it serves a request: set Task.RequestBound (ADR 088)", task.Name)
+		return fmt.Errorf("background task %q does not say what it does in a process that runs only while it serves a request: set Task.RequestBound (ADR 089)", task.Name)
 	}
 	if task.Disabled {
 		return nil

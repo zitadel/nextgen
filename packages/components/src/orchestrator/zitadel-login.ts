@@ -36,6 +36,7 @@ import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
+import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -546,6 +547,8 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override disconnectedCallback(): void {
+    this.signupSolve?.abort();
+    this.signupPrepare?.controller.abort();
     super.disconnectedCallback();
     if (typeof window !== "undefined") {
       window.removeEventListener("popstate", this.handlePopState);
@@ -688,6 +691,13 @@ export class ZitadelLogin extends ZitadelSurface {
       // applied the first response — the initial paint, not a user-driven
       // step swap.
       void this.hydrateStepAfterRender(props.get("response") == null);
+      return;
+    }
+    if (props.has("loading")) {
+      // The loading toggle rebuilds the step from the server's field values:
+      // put back what was typed, which a submit reads again after a sign-up
+      // check, so the fields show what it sends.
+      void this.restoreValuesAfterRender();
       return;
     }
     if (previousTheme !== null && previousTheme !== this.lastRenderedTheme) {
@@ -1000,6 +1010,7 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private async applyResponse(wire: CreateFlow201): Promise<void> {
+    this.signupSolve?.abort();
     this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
@@ -1036,6 +1047,7 @@ export class ZitadelLogin extends ZitadelSurface {
       return;
     }
 
+    this.prepareSignupProof(wire.id, wire.step);
     this.syncBackSentinel(wire.step);
 
     if (await this.maybeRedirectToProvider(wire)) return;
@@ -1661,6 +1673,66 @@ export class ZitadelLogin extends ZitadelSurface {
     target?.focus();
   }
 
+  private signupSolve?: AbortController;
+  private signupProof?: { id: string; proof: string };
+  /** The check a passkey sign-up solves while its ceremony runs, by the ceremony's id. */
+  private signupPrepare?: { ceremony: string; controller: AbortController; done: Promise<void> };
+  /** The ceremony whose attestation {@link signupProof} is for. */
+  private signupCeremony?: string;
+
+  /**
+   * Solve a passkey sign-up's check while its ceremony runs, so the proof is
+   * ready before the authenticator stores a passkey. The step announces the
+   * gate; its challenge comes with a step GET, as for a password sign-up. A
+   * check that fails first takes the ceremony off the step, which stops it:
+   * nobody is left holding a passkey for an account that was never made. The
+   * browser's prompt is not held back for any of it.
+   */
+  private prepareSignupProof(flowId: string, step: CreateFlow201["step"]): void {
+    // Every response passes here, and one a host resumed from its own render
+    // may carry no `gates` at all: that is a step without a check.
+    const gates = step.gates as CreateFlow201["step"]["gates"] | undefined;
+    const ceremony = gates?.signup_pow ? step.challenge?.challenge_id : undefined;
+    if (this.signupPrepare && this.signupPrepare.ceremony !== ceremony) {
+      this.signupPrepare.controller.abort();
+      this.signupPrepare = undefined;
+    }
+    if (ceremony === undefined || this.signupPrepare) return;
+    if (this.signupCeremony === ceremony && this.signupProof) return;
+    const controller = new AbortController();
+    const prepare = async (): Promise<void> => {
+      const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      const fresh = await getCurrentStep(api, flowId);
+      stopIfAborted(controller.signal);
+      // A flow that moved on, or a server that stopped asking, needs no proof.
+      const gate = fresh.step.name === step.name ? fresh.step.gates.signup_pow : undefined;
+      if (!gate) return;
+      if (gate.provider !== "zitadel_pow" || gate.kind !== "captcha" || !gate.challenge) {
+        throw new Error("Signup check is unavailable. Refresh and try again.");
+      }
+      if (this.signupProof?.id !== gate.challenge.challenge_id) {
+        const proof = await solveSignupPow(gate.challenge, controller.signal);
+        this.signupProof = { id: gate.challenge.challenge_id, proof };
+      }
+      this.signupCeremony = ceremony;
+    };
+    const done = prepare()
+      .catch(async (error: unknown) => {
+        if (controller.signal.aborted) return;
+        // An attestation already on its way runs the check itself and reports.
+        if (this.loading || this.response?.step.challenge?.challenge_id !== ceremony) return;
+        if (await this.restartIfRequired(error)) return;
+        await this.keepSignupForm(error, apiErrorCode(error), true);
+      })
+      .finally(() => {
+        if (this.signupPrepare?.controller === controller) this.signupPrepare = undefined;
+      });
+    this.signupPrepare = { ceremony, controller, done };
+  }
+
+  /** Settles when the submit in flight ends, so a back gesture can wait out a stopped sign-up check. */
+  private submitted: Promise<void> = Promise.resolve();
+
   private async submit(
     action: string | null,
     challengeResponse?: SubmitFlowStepBodyChallengeResponse,
@@ -1669,9 +1741,14 @@ export class ZitadelLogin extends ZitadelSurface {
     // Every other entry point (actions, back, passkey proofs) lands here, so
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
-    const { id, session_token } = this.response;
+    const shown = this.response;
+    const { id, session_token } = shown;
     this.pendingAction = action ?? "submit";
     this.loading = true;
+    let settle = () => {};
+    this.submitted = new Promise((resolve) => (settle = resolve));
+    // From the step GET to the solved proof: a failure there keeps the form.
+    let checking = false;
     try {
       // Only send field values the current step defines. `formValues` carries
       // state across steps (e.g. email for the signed-in greeting), but
@@ -1690,19 +1767,160 @@ export class ZitadelLogin extends ZitadelSurface {
           : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      const wire = await apiSubmitStep(api, id, body);
+      // A password sign-up spends its proof on the step's submit, a passkey
+      // sign-up on the attestation. Only the step carrying the ceremony says
+      // whether it creates a user, so its proof is solved while the ceremony
+      // runs (`prepareSignupProof`) and is ready here.
+      const signingUp =
+        this.response.step.actions.find((a) => a.name === body.action)?.kind === "submit" ||
+        challengeResponse?.method === "passkey_register";
+      let wire: CreateFlow201 | undefined;
+      if (signingUp && this.response.step.gates.signup_pow) {
+        const controller = new AbortController();
+        this.signupSolve = controller;
+        checking = true;
+        let prepared: string | undefined;
+        if (challengeResponse) {
+          // A check still running when the ceremony ends is waited out.
+          await this.signupPrepare?.done;
+          stopIfAborted(controller.signal);
+          if (this.signupCeremony === challengeResponse.challenge_id) {
+            prepared = this.signupProof?.proof;
+            // Sent once: a later attestation of this ceremony asks again.
+            this.signupCeremony = undefined;
+          }
+        }
+        // Refresh before solving: a previous attempt may have spent its proof,
+        // or the person may have left the password form open past its expiry.
+        // Keep the entered fields; GET only refreshes the server-owned gate.
+        // An attestation holding the proof solved during its ceremony needs
+        // neither.
+        const fresh = prepared === undefined ? await getCurrentStep(api, id) : shown;
+        stopIfAborted(controller.signal);
+        if (prepared !== undefined) {
+          body.gate_proofs = { signup_pow: prepared };
+        } else if (fresh.step.name !== this.response.step.name) {
+          // The flow moved on without this submit: show where it is.
+          wire = fresh;
+        } else {
+          // A server that stopped asking for a proof (a rollback) takes the
+          // submit without one.
+          const gate = fresh.step.gates.signup_pow;
+          if (gate) {
+            if (gate.provider !== "zitadel_pow" || gate.kind !== "captcha" || !gate.challenge) {
+              throw new Error("Signup check is unavailable. Refresh and try again.");
+            }
+            if (this.signupProof?.id !== gate.challenge.challenge_id) {
+              this.signupProof = {
+                id: gate.challenge.challenge_id,
+                proof: await solveSignupPow(gate.challenge, controller.signal),
+              };
+            }
+            body.gate_proofs = { signup_pow: this.signupProof.proof };
+          }
+          // The last moment a back gesture can stop the sign-up.
+          stopIfAborted(controller.signal);
+          // The fields stay editable during the check: send what they show now.
+          body.fields = this.collectSubmitFields();
+        }
+        checking = false;
+      }
+      wire ??= await apiSubmitStep(api, id, body);
       void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // Only the step this attestation answered: a response that replaced
+        // it keeps its own ceremony.
+        if (challengeResponse && this.response === shown) this.holdCeremony();
+        return;
+      }
       if (await this.restartIfRequired(error)) return;
+      const code = apiErrorCode(error);
+      const refused = code === "flow.proof_invalid" || code === "flow.rate_limited";
+      // A dropped connection or a server fault during the check can pass on a
+      // retry; a 4xx such as a flow that is gone cannot.
+      const failed = checking && !(error instanceof ApiError && error.status < 500);
+      if (this.response && (refused || failed)) {
+        await this.keepSignupForm(error, code, challengeResponse !== undefined);
+        return;
+      }
       this.handleTransportError(error);
     } finally {
+      this.signupSolve = undefined;
       this.pendingAction = null;
       this.loading = false;
+      settle();
     }
     // Preview switched on while this submit was in flight: show the step it
     // landed on in the chosen state.
     if (this.preview) this.applyPreviewState();
+  }
+
+  /**
+   * Keep the sign-up form and its values for a retry after its check failed
+   * or the server refused the proof, with a message from the locale catalog.
+   * A refused proof is dropped and the step refreshed, so a step rendered
+   * without the gate, by a server from before it, carries it on the retry.
+   * After a passkey sign-up's attestation the step comes back without its
+   * ceremony, for the reason {@link holdCeremony} gives.
+   */
+  private async keepSignupForm(
+    error: unknown,
+    code: string | undefined,
+    ceremony = false,
+  ): Promise<void> {
+    const current = this.response;
+    if (!current) return;
+    console.warn("[zitadel-login] signup check failed:", error);
+    const key =
+      code === "flow.rate_limited"
+        ? "error.signup_rate_limited"
+        : globalThis.crypto?.subtle
+          ? "error.signup_check_failed"
+          : "error.signup_secure_connection";
+    let base = current;
+    if (code === "flow.proof_invalid") {
+      this.signupProof = undefined;
+      try {
+        const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+        const fresh = await getCurrentStep(api, current.id);
+        if (fresh.step.name === current.step.name) base = fresh;
+      } catch {
+        // The retry refreshes the step again before it solves.
+      }
+    }
+    const step = { ...base.step, error: key };
+    if (ceremony) delete step.challenge;
+    await this.applyResponse({ ...base, step });
+    emit(this, "zitadel-flow-error", { message: this.resolveLocale()[key] ?? key });
+  }
+
+  /**
+   * Drop the ceremony from the step a stopped or refused attestation left:
+   * rendered again, it would mount a fresh `<zl-passkey>` that starts the
+   * ceremony unasked. Picking the passkey again resumes the server's pending
+   * ceremony.
+   */
+  private holdCeremony(): void {
+    if (!this.response?.step.challenge) return;
+    const { challenge: _dropped, ...step } = this.response.step;
+    this.response = { ...this.response, step };
+  }
+
+  /**
+   * Submit the step's back action. During a sign-up check it stops the check
+   * first, so the account the person is leaving is not created; once the
+   * check's submit has been sent, it finishes and decides where the flow is.
+   */
+  private async goBack(action: string): Promise<void> {
+    if (this.signupSolve) {
+      const step = this.response?.step.name;
+      this.signupSolve.abort();
+      await this.submitted;
+      if (this.response?.step.name !== step) return;
+    }
+    await this.submit(action);
   }
 
   /**
@@ -1744,7 +1962,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (backAction) {
         history.pushState({ zl: true }, "");
         this.armed = true;
-        void this.submit(backAction.name);
+        void this.goBack(backAction.name);
       }
       return;
     }

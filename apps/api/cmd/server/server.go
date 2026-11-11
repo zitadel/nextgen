@@ -315,7 +315,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
-	eventService := service.NewEventService(serviceDBPool)
+	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -385,14 +385,21 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
+	// The sign-up guard asks the project's user.create policy which challenge
+	// to issue; without one, it issues its built-in proof of work.
+	userCreatePolicy, err := service.NewUserCreatePolicy(policyEngine, policyService)
+	if err != nil {
+		return err
+	}
+	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore, signupProtection)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
 		passwordPolicy,
 		userService,
 		schemaStore,
 		serviceDBPool,
-	)
+		signupProtection)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
 		// The raw statements: the state machine only hands this store to the
@@ -410,7 +417,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases, signupProtection)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
@@ -438,7 +445,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// Everything the server does outside a request starts through this
 	// group, which holds each task to what it does where the process runs
-	// only while it serves a request (ADR 088).
+	// only while it serves a request (ADR 089).
 	tasks := background.NewGroup(cfg.Server.RequestBound)
 	defer tasks.Close()
 
@@ -911,7 +918,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 }
 
 // requestBoundDefaults sets the defaults that depend on server.request_bound
-// (ADR 088). A value the configuration sets itself outranks them, as it does
+// (ADR 089). A value the configuration sets itself outranks them, as it does
 // every default.
 //
 // A paused process measures time it did not run: it wakes with its idle

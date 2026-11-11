@@ -27,7 +27,7 @@ Some platforms pause the process between requests: a Vercel function, a Cloud
 Run service with CPU allocated only during requests. Say so with
 `server.request_bound: true`. The setting turns nothing on by itself; the
 server then holds everything it does outside a request to that fact
-([ADR 088](../adrs/088-request-bound-runtime.md)):
+([ADR 089](../adrs/089-server-lifecycle.md)):
 
 | What | With `server.request_bound` |
 | --- | --- |

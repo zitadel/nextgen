@@ -10,6 +10,7 @@ import {
   type CliResult,
   type Credentials,
   type CustomConnection,
+  DEFAULT_SIGNUP_POLICY,
   PASSWORD_POLICY,
   type ScaffoldedApp,
   SETUP_ORIGIN,
@@ -483,6 +484,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -493,6 +495,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -503,6 +506,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -745,6 +749,37 @@ describe("setup", () => {
         });
       });
 
+      describe("against a server that does not take a sign-up policy yet", () => {
+        it("writes none, and deploys the rest", async () => {
+          const app = await anApp();
+          platform.predatesTheSignupPolicy();
+
+          const result = await app.setup();
+
+          expect(result).toSucceed();
+          expect((await app.snapshot()).paths()).not.toContain(
+            app.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+          );
+          expect(await app.publishedPolicies()).toEqual([
+            expect.objectContaining({ operation: PASSWORD_POLICY }),
+          ]);
+        });
+
+        it("leaves a sign-up policy --force keeps, which no deploy gets past", async () => {
+          const app = await anApp();
+          await app.writeSignupPolicy({});
+          platform.predatesTheSignupPolicy();
+
+          const result = await app.setup(["--force"]);
+
+          expect(result).toSucceed();
+          expect((await app.snapshot()).paths()).toContain(
+            app.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+          );
+          expect(await app.liveDeploymentCount()).toBe(0);
+        });
+      });
+
       it.each([
         { preset: "passkey-first", entersOn: "passkey-first" },
         { preset: "password-first", entersOn: "identifier" },
@@ -791,6 +826,55 @@ describe("setup", () => {
               return idp.slug;
             }),
           ).toEqual([provider.slug]);
+        });
+
+        it("reports the claim mapping the connection was written with", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { claim_mapping: Record<string, string> }[] }>(
+            result,
+          );
+          expect(data.sso[0]?.claim_mapping).toEqual({ email: "email" });
+        });
+
+        it("reports what makes the email verified apart from the mapping", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { verified_claims: Record<string, string> }[] }>(
+            result,
+          );
+          expect(data.sso[0]?.verified_claims).toEqual({ email: "email_verified" });
+        });
+
+        it("reports the scopes the connection asks for", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { scopes: string[] }[] }>(result);
+          expect(data.sso[0]?.scopes).toEqual(["openid", "profile", "email"]);
+        });
+
+        it("reports the attributes no claim fills", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { unmapped: unknown[] }[] }>(result);
+          expect(data.sso[0]?.unmapped).toEqual([]);
+        });
+
+        it("reports the schemas that sign in through the connection", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { used_by: string[] }[] }>(result);
+          expect(data.sso[0]?.used_by).toEqual(["default-human-user"]);
         });
 
         it("publishes the client id as a readable project variable", async () => {
@@ -988,6 +1072,50 @@ describe("setup", () => {
 
           expect(await before.changes()).toMatchObject(NO_CHANGES);
         });
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("names the provider in the connection's box", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("When someone signs in with Acme SSO");
+      });
+
+      it("says which claim fills each attribute", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("- email comes from the provider's email claim.");
+      });
+
+      it("says which schemas sign in through the connection", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("This connection is used by default-human-user");
+      });
+
+      it("says which scopes it asks the provider for", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint(
+          "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
+        );
+      });
+
+      it("says where to change the mapping", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("To change which claim fills an attribute, edit claim_mapping in");
       });
     });
   });

@@ -1,4 +1,4 @@
-// Package backgroundlint is a go/analysis analyzer behind ADR 088: what the
+// Package backgroundlint is a go/analysis analyzer behind ADR 089: what the
 // server does outside a request starts through internal/background, where
 // each task says what it does in a process that runs only while it serves a
 // request.
@@ -44,7 +44,7 @@ const (
 // Analyzer is the backgroundlint analyzer.
 var Analyzer = &analysis.Analyzer{
 	Name:     "backgroundlint",
-	Doc:      "reports goroutines started outside internal/background (ADR 088)",
+	Doc:      "reports goroutines started outside internal/background (ADR 089)",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
 }
@@ -98,7 +98,7 @@ func run(pass *analysis.Pass) (any, error) {
 		if covered {
 			pass.Reportf(pos, "%s directive needs a reason", Directive)
 		}
-		pass.Reportf(pos, "%s outside internal/background: start background work as a background.Task (ADR 088), or exempt with %s <reason>", what, Directive)
+		pass.Reportf(pos, "%s outside internal/background: start background work as a background.Task (ADR 089), or exempt with %s <reason>", what, Directive)
 	}
 
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)

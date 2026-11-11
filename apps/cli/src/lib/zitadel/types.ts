@@ -13,6 +13,7 @@ import type { Change } from "@/lib/zitadel/change";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
+import type { SignupPolicy } from "@/lib/zitadel/resources/policies/signup";
 import {
   type PasswordMinLength,
   POLICY_FILE_SUFFIX,
@@ -187,8 +188,19 @@ export type ScaffoldOptions<P extends ScaffoldedProvider = ScaffoldedProvider> =
   readonly passwordMinLength?: PasswordMinLength | undefined;
 
   /**
+   * Whether a project without a sign-up policy gets the default one; left
+   * out, it does.
+   *
+   * @remarks
+   * False for a server that does not take the policy yet. A sign-up policy
+   * kept by `force` stays either way: the file is the developer's.
+   */
+  readonly signupPolicy?: boolean | undefined;
+
+  /**
    * Whether the default schema and flow may replace the files at their
-   * paths, and an existing password policy is kept instead of refused.
+   * paths, and an existing password or sign-up policy is kept instead of
+   * refused.
    */
   readonly force: boolean;
 };
@@ -226,6 +238,12 @@ export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = {
    * kept, with the minimum it was given.
    */
   readonly policy: PasswordPolicy;
+
+  /**
+   * The sign-up policy the project holds afterwards: new, or the one it kept
+   * as it is. `undefined` when it has none.
+   */
+  readonly signupPolicy: SignupPolicy | undefined;
 };
 
 /**

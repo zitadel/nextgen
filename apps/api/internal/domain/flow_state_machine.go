@@ -12,6 +12,7 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 
+	"github.com/zitadel/nextgen/internal/crypto/pow"
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
@@ -157,8 +158,11 @@ type FlowStartInput struct {
 
 // FlowSubmitInput carries a single client submission.
 //
-// GateProofs is reserved; the state machine returns [ErrFlowUnsupported]
-// for any flow that exercises it today.
+// GateProofs carries the built-in signup proof to the submissions that can
+// create a user: create_user, and a passkey registration's attestation. Any
+// other submission to a step carrying that registration may bring it too and
+// leaves it unspent, since the step announces the gate. Other gate names, or
+// proofs on any other step, remain unsupported.
 type FlowSubmitInput struct {
 	Action     string
 	Fields     map[string]any
@@ -227,8 +231,10 @@ type FlowStepResult struct {
 // FlowStep is the capability payload the API surfaces to the client.
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
-	Name  string
-	Texts FlowStepTexts
+	SignupRequired  bool
+	SignupChallenge *pow.PublicChallenge
+	Name            string
+	Texts           FlowStepTexts
 	// Purpose is what the flow does on this step, the state's
 	// CurrentPurpose: a client tells a sign-in from a sign-up by it, since
 	// step names are the definition's to choose.
@@ -1091,15 +1097,17 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrFlowIntegrity())
 	}
-	if len(in.GateProofs) > 0 {
-		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
-	}
 
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
 	}
 
+	for name := range in.GateProofs {
+		if name != SignupGate || !acceptsSignupProof(currentStep, state, in) {
+			return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
+		}
+	}
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
 	// An external sign-in collects nothing on the step, so it skips the
 	// input pipeline like back and navigate do.
@@ -2025,7 +2033,8 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			// The verify transaction persists the credential, the user row
 			// (when the ceremony is provisional), and the attempt factors
 			// atomically — the attempt service decides provisional-or-not
-			// from the stored challenge.
+			// from the stored challenge, and a provisional one spends the
+			// sign-up proof first.
 			err := r.authAttempts.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:      state.ProjectID,
 				AttemptID:      state.AuthAttemptID,
@@ -2034,6 +2043,8 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				Attestation:    in.ChallengeResponse.Proof,
 				UserSchemaURL:  state.UserSchemaURL,
 				UserAttributes: state.CollectedData.UserData,
+				State:          state,
+				GateProofs:     in.GateProofs,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
@@ -2257,6 +2268,7 @@ func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowReso
 	switch *pc.currentStep.OnSuccess {
 	case FlowOnSuccessCreateUser:
 		return r.userCreater.Handle(pc.ctx, FlowOnSuccessInput{
+			GateProofs:    pc.in.GateProofs,
 			ProjectID:     pc.state.ProjectID,
 			UserSchemaURL: pc.state.UserSchemaURL,
 			Fields:        pc.in.Fields,
@@ -2666,6 +2678,27 @@ func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
 		return true
 	}
 	return kind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
+}
+
+// acceptsSignupProof reports whether a submission to step may carry the
+// sign-up proof: one to a step that creates its user on success, or one to a
+// step carrying a passkey registration, which creates its user when the
+// attempt has none yet. Only the attestation spends the proof there, but the
+// step announces the gate for as long as the ceremony is pending, so a client
+// solves it for whatever it submits next: the password path it falls back to
+// after a cancelled prompt must not be refused for bringing it.
+func acceptsSignupProof(step *FlowDefinitionStep, state *FlowState, in FlowSubmitInput) bool {
+	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
+		return true
+	}
+	if !stepHasActionKind(step, FlowActionKindPasskeyRegister) {
+		return false
+	}
+	pending := state.PendingChallenge != nil && state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
+	// Without a pending registration only its attestation may bring the
+	// proof: an assertion of a sign-in the step also offers creates nobody.
+	attests := in.ChallengeResponse != nil && in.ChallengeResponse.Method == FlowChallengeMethodPasskeyRegister
+	return pending || attests
 }
 
 // stepHasActionKind reports whether the step declares any action of the

@@ -28,13 +28,19 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
 
   // The directory lists name and creation date. A row opens the project —
-  // selects it and lands on its first screen — and the project's own page, where
-  // the id is, is `Settings` in the sidebar that selection fills.
+  // selects it and lands on its Overview (D35) — and the project's settings
+  // page is `Settings` in the sidebar that selection fills.
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
 
-  await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
+  await expect(page).toHaveURL(new RegExp(`/\\?project=${zitadel.handle.projectId}$`));
+  // Each card reads on its own, so a refused read would show in the card
+  // rather than as the error boundary: both cards are what proves the reads.
+  await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Recent activity" })).toBeVisible();
+  await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  await expectNoErrorBoundary(page);
   await page
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Settings" })
@@ -148,7 +154,7 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
 
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
-  await expect(row.getByText("active", { exact: true })).toBeVisible();
+  await expect(row.getByText("Active", { exact: true })).toBeVisible();
 });
 
 test("gives a colleague admin access to the project, and takes it away", async ({

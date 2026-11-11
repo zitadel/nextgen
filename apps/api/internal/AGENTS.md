@@ -13,7 +13,9 @@ predicate's cost grows with the rows in its tables.
   `authz_membership_edges`) cascade from `projects`.
 - Clean up anything written outside the test's project (the platform
   project, the catalog tables) with the test's own `t.Cleanup` and
-  `context.Background()`.
+  `context.Background()`, except the platform project's revisions.
+- Never delete a revision (schema, flow definition, IDP connection, policy,
+  branding) from the platform project: a test that deploys it pins them all.
 - A project created over HTTP goes through the cached handler's unwrapped
   service; remove it with `Harness.CleanupProject`.
 
@@ -53,7 +55,7 @@ through any wrapping.
 
 Work outside a request (a timer, a flusher, work at start) may never run
 where the process is paused between requests
-([ADR 088](../../../docs/adrs/088-request-bound-runtime.md)).
+([ADR 089](../../../docs/adrs/089-server-lifecycle.md)).
 
 - Start it as a `background.Task` through the group in `cmd/server`, with an
   answer for `server.request_bound`; never with a bare `go`.

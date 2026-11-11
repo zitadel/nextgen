@@ -103,3 +103,19 @@ func searchResultIDs(results []SearchResult) []string {
 	}
 	return ids
 }
+
+func TestIsSearchSchemaID(t *testing.T) {
+	t.Parallel()
+	for query, want := range map[string]bool{
+		"sch_01KWH3B72K7M7F0N9WD3P2E4YM":                  true,
+		"https://search.example.com/schemas/partner.json": true,
+		"urn:example:schema:partner":                      true,
+		"partner":                                         false,
+		"partner-staff":                                   false,
+		"ann@example.com":                                 false,
+		"/schemas/partner.json":                           false,
+		"https://example.com/a b":                         false,
+	} {
+		assert.Equal(t, want, IsSearchSchemaID(query), query)
+	}
+}
