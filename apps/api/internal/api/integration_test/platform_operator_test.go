@@ -230,3 +230,44 @@ func TestPlatformOperatorReadsUnclaimedEvents(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, status, raw)
 	})
 }
+
+// TestPlatformProjectReadGatesTheRoot pins the read the console lists its root
+// pages on (D41, Console ADR 0004 §5): GET /projects/{platform project}
+// answers for someone who can act on that project and for nobody else. A
+// person homed in it, and one who owns a team in it as every hosted customer
+// does, are refused: being signed in to the platform project grants nothing
+// (ADR 053 §9).
+func TestPlatformProjectReadGatesTheRoot(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	path := "/projects/" + platform.ID
+
+	operatorID := platformUser(t)
+	grantPlatformOperator(t, operatorID)
+
+	adminID := platformUser(t)
+	admin := harness.SeedProjectAdmin(t, platform.ID, adminID)
+	t.Cleanup(func() {
+		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, admin.ID)
+	})
+
+	teamOwnerID, _ := harness.CreateUserOwnedByTeam(t, platform.ID)
+
+	for name, tc := range map[string]struct {
+		userID string
+		status int
+	}{
+		"an operator": {operatorID, http.StatusOK},
+		"an administrator of the platform project": {adminID, http.StatusOK},
+		"a person homed in it":                     {platformUser(t), http.StatusNotFound},
+		// A team-scoped grant is a foothold in the project, so the miss reads
+		// as a refusal; the console takes either for "not yours".
+		"the owner of a team in it": {teamOwnerID, http.StatusForbidden},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, platformSessionCookie(t, tc.userID), http.MethodGet, path, "")
+			assert.Equal(t, tc.status, status, body)
+		})
+	}
+}

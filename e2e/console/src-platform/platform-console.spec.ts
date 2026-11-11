@@ -88,9 +88,18 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(projectLink).toBeVisible();
   // Bootstrap names the platform project "Platform" (internal/bootstrap/platform).
   await expect(page.getByRole("table").getByRole("link", { name: "Platform" })).toHaveCount(0);
-  await expect(
-    page.getByRole("navigation", { name: "Account" }).getByRole("link", { name: "Settings" }),
-  ).toHaveCount(0);
+  // Its pages refuse this operator outright: the server answers the platform
+  // project's read with a refusal, so a link to one lands on an empty Settings.
+  await page.goto("/ui/console/settings/people");
+  await expect(page).toHaveURL(/\/settings(\?|$)/);
+  await expect(page.getByText("Nothing here is yours to set.")).toBeVisible();
+  // With nothing in its list, the account sidebar has no Settings row. The
+  // read above has answered by now, so the row is absent, not on its way.
+  await page.goto("/ui/console/projects");
+  await expect(projectLink).toBeVisible();
+  const account = page.getByRole("navigation", { name: "Account" });
+  await expect(account.getByRole("link", { name: "Projects" })).toBeVisible();
+  await expect(account.getByRole("link", { name: "Settings" })).toHaveCount(0);
   await projectLink.click();
   await expect(page).toHaveURL(new RegExp(`/console/?\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
