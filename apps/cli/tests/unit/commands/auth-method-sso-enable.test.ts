@@ -903,6 +903,27 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  describe("when Ctrl-C is pressed during the origin read", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", () => {
+          process.emit("SIGINT", "SIGINT");
+          return HttpResponse.json({ id: PROJECT_ID, name: "app", lifecycle: "active" });
+        }),
+      );
+    });
+
+    it("writes no connection file", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
   describe("when a primary origin holds an escape sequence", () => {
     beforeEach(() => {
       platform.use(
