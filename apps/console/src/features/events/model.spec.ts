@@ -693,19 +693,32 @@ describe("what gives way, on every way into a list", () => {
   });
 
   it("holds one click on from every URL", () => {
+    // Most clicks land on a search another URL's click already reached (a
+    // filter set from an event is the same search from every URL), so each
+    // search is checked once. Checked on every click, the sweep outlasted the
+    // test timeout on a loaded CI runner.
+    const checked = new Set<string>();
+    const expectServedOnce = (search: LogsSearch) => {
+      const key = JSON.stringify(search);
+      if (checked.has(key)) return;
+      checked.add(key);
+      expectServed(search);
+    };
     for (const url of urls) {
       const current = parseLogsSearch(url);
-      for (const view of LOG_VIEWS) expectServed(withView(current, view));
+      for (const view of LOG_VIEWS) expectServedOnce(withView(current, view));
       for (const category of [...AUDIT_CATEGORIES, undefined]) {
-        expectServed(withCategory(current, category));
+        expectServedOnce(withCategory(current, category));
       }
-      for (const since of [...TIME_RANGES, undefined]) expectServed(withTimeRange(current, since));
-      expectServed(withCustomRange(current, "2026-11-10T08:00:00Z", "2026-11-10T09:00:00Z"));
-      expectServed(withTypes(current, FAILURE_TYPES));
+      for (const since of [...TIME_RANGES, undefined]) {
+        expectServedOnce(withTimeRange(current, since));
+      }
+      expectServedOnce(withCustomRange(current, "2026-11-10T08:00:00Z", "2026-11-10T09:00:00Z"));
+      expectServedOnce(withTypes(current, FAILURE_TYPES));
       for (const { key } of VALUE_FILTERS) {
-        expectServed(narrowedBy(current, key, "value_2"));
-        expectServed(narrowedBy(current, key, undefined));
-        expectServed(sharing(key, "value_2"));
+        expectServedOnce(narrowedBy(current, key, "value_2"));
+        expectServedOnce(narrowedBy(current, key, undefined));
+        expectServedOnce(sharing(key, "value_2"));
       }
     }
   });
