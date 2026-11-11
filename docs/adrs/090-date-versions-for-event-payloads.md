@@ -1,4 +1,4 @@
-# ADR 089: Date Versions for Event Payloads
+# ADR 090: Date Versions for Event Payloads
 
 > **Status:** Proposed
 > **Date:** 2026-11-11
@@ -9,13 +9,13 @@
 > (`/api/v1`, `Zitadel-Version` as target design).
 > **Amends if accepted:** [ADR 077](077-api-path-prefix.md)'s non-goal on the
 > versions of outgoing webhook payloads.
-> **Related:** ADR 088, proposed apart from this one (project webhooks, the
+> **Related:** ADR 089, proposed apart from this one (project webhooks, the
 > first thing to pin a version).
 
 ## Context
 
 An event's payload is the contract of `GET /events` and of every webhook
-(ADR 088). Its shape comes from the server's code,
+(ADR 089). Its shape comes from the server's code,
 and nothing names that shape:
 
 - the `events` table stores a payload and not which shape it has;
