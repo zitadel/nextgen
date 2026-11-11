@@ -475,7 +475,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` (`POST /schemas`)…",
+          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `publishSchema` (`POST…",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -695,7 +695,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST /schemas`)…",
+          "description": "The ID of the schema the user follows after this patch: the `id` that `publishSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -3739,7 +3739,7 @@
           "command": "api queryUsers -F limit=5"
         },
         {
-          "command": "api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
+          "command": "api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
         },
         {
           "command": "api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json"

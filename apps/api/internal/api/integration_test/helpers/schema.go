@@ -93,15 +93,15 @@ func (h *Harness) CreateUserSchema(t testing.TB, project *domain.Project, schema
 	err = apiSchema.UnmarshalJSON([]byte(schema))
 	require.NoError(t, err)
 
-	req := api.CreateSchemaReq{
-		Type:       api.UserSchemaCreateSchemaReq,
+	req := api.PublishSchemaReq{
+		Type:       api.UserSchemaPublishSchemaReq,
 		UserSchema: apiSchema,
 	}
-	params := api.CreateSchemaParams{
+	params := api.PublishSchemaParams{
 		ProjectID: api.ProjectID(project.ID),
 	}
 
-	resp, err := client.CreateSchema(t.Context(), req, params)
+	resp, err := client.PublishSchema(t.Context(), req, params)
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateSchemaResponse{}, resp, MustMarshal(t, resp))
 	return resp.(*api.CreateSchemaResponse).ID

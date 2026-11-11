@@ -75,7 +75,7 @@ export const Route = createFileRoute("/_authed/project/")({
       api.queryGrants({ limit: 100 }, { project_id: projectId }),
       // No kind: every name with its value per kind, which is what the table
       // shows side by side.
-      api.getVariables({ project_id: projectId }),
+      api.listVariables({ project_id: projectId }),
       // The password policy the primary origins enforce, which is the one
       // their release pins rather than the newest published revision.
       // Read-only, so a failed read costs the card its row, not the page its
@@ -143,7 +143,7 @@ function ProjectDetail() {
             label="Project name"
             value={project.name}
             onSave={async (name) => {
-              await api.patchProject(project.id, { name });
+              await api.updateProject(project.id, { name });
               await router.invalidate();
             }}
             errorFallback="Could not save the project."

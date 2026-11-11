@@ -79,7 +79,7 @@ export const Route = createFileRoute("/_authed/branding/")({
     }));
     const latest = revisions[0];
     if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
-    const found = await api.getBrandingById(latest.id);
+    const found = await api.getBranding(latest.id);
     return { revision: found.branding as BrandingRevision, flows: previewFlows };
   },
   component: BrandingScreen,

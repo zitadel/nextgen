@@ -67,7 +67,7 @@ Web/frontend client                    Any other client (mobile, backend, CLI)
 
 POST /flow                          POST /auth_attempts
   → get capabilities + template          → drive primitives directly
-POST /flow/{id}/submit             POST /auth_attempts/{id}/challenges
+POST /flow/{flow_id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
   → internally invokes auth_attempt      → submit factor proofs
     Go service layer (no HTTP)           → server verifies the declared proof

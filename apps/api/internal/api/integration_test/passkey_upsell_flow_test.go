@@ -46,7 +46,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
@@ -77,8 +77,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
@@ -95,8 +95,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
@@ -110,7 +110,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepErrorResponseStatusCode{}, replay, helpers.MustMarshal(t, replay))
 	require.Equal(t, 403, replay.(*api.SubmitFlowStepErrorResponseStatusCode).StatusCode)
@@ -126,7 +126,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	issueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey_register",
 	}, api.SubmitFlowStepParams{
-		ID:     flowID,
+		FlowID: flowID,
 		Zflow:  zflow,
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
@@ -171,8 +171,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 			Proof:       api.NewOptFlowSubmitRequestChallengeResponseProof(attestProof),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
@@ -201,7 +201,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
@@ -229,7 +229,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
 	regOK := regResp.(*api.SubmitFlowStepOK)
@@ -241,7 +241,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
 	pwOK := pwResp.(*api.SubmitFlowStepOK)
@@ -250,7 +250,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 
 	skipResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "skip",
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, skipResp, helpers.MustMarshal(t, skipResp))
 	skipOK := skipResp.(*api.SubmitFlowStepOK)

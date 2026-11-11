@@ -1,5 +1,5 @@
 post:
-  operationId: createApplication
+  operationId: publishApplication
   summary: Create or revise a registered application
   description: |
     Creates or revises a registered application that authenticates its users
@@ -207,4 +207,4 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      $ref: createApplication-error-response.yaml
+      $ref: publishApplication-error-response.yaml

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  type GetReleaseById200,
+  type GetRelease200,
   type ListEvents200,
   type ListEventsParams,
   type ListSchemas200,
@@ -26,8 +26,8 @@ import { it } from "@tests/helpers/fixtures";
 import {
   CreateUserBody,
   GetTeamResponse,
-  GetUserByIDResponse,
-  PatchUserByIDBody,
+  GetUserResponse,
+  UpdateUserBody,
   QueryUsersBody,
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
@@ -2136,7 +2136,7 @@ describe("the release resource", () => {
   });
 
   it("shows the resources a release pins as a table under its fields", async () => {
-    const release: GetReleaseById200 = {
+    const release: GetRelease200 = {
       id: "rel_1",
       project_id: "proj_1",
       content_hash: "sha256:1",
@@ -2204,8 +2204,8 @@ describe("the registry builders", () => {
     next: (page) => page.next_page_token,
   });
   const user = get({
-    call: ({ client }, id) => client.getUserByID(id),
-    response: GetUserByIDResponse,
+    call: ({ client }, id) => client.getUser(id),
+    response: GetUserResponse,
   });
 
   it("takes paths the list and get answer with", () => {
@@ -2330,7 +2330,7 @@ describe("the registry builders", () => {
       list: users,
       get: user,
       // @ts-expect-error this update answers with `user_id`, not the `id` field
-      update: update(PatchUserByIDBody, async () => ({ user_id: "user_1" })),
+      update: update(UpdateUserBody, async () => ({ user_id: "user_1" })),
     });
   });
 
@@ -2584,7 +2584,7 @@ describe("the registry builders", () => {
 
   it("refuses a response schema of another operation", () => {
     get({
-      call: ({ client }, id) => client.getUserByID(id),
+      call: ({ client }, id) => client.getUser(id),
       // @ts-expect-error a team's schema does not parse into a user
       response: GetTeamResponse,
     });

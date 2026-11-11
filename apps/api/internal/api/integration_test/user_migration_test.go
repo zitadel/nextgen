@@ -72,7 +72,7 @@ func TestPatchUserMigration(t *testing.T) {
 
 	// patch sends schemaURL (when set) and attributes (when any) in one
 	// request.
-	patch := func(t *testing.T, userID api.UserID, schemaURL string, attributes map[string]any) api.PatchUserByIDRes {
+	patch := func(t *testing.T, userID api.UserID, schemaURL string, attributes map[string]any) api.UpdateUserRes {
 		t.Helper()
 		body := map[string]any{}
 		if schemaURL != "" {
@@ -81,17 +81,17 @@ func TestPatchUserMigration(t *testing.T) {
 		if len(attributes) > 0 {
 			body["attributes"] = attributes
 		}
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: userID})
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, body), api.UpdateUserParams{UserID: userID})
 		require.NoError(t, err)
 		return resp
 	}
 
 	// assertUser checks the user both in a response and in a fresh read: the
 	// response is not the only witness, the stored user has to agree.
-	assertUser := func(t *testing.T, resp api.PatchUserByIDRes, userID api.UserID, wantSchema string, wantAttributes map[string]any) {
+	assertUser := func(t *testing.T, resp api.UpdateUserRes, userID api.UserID, wantSchema string, wantAttributes map[string]any) {
 		t.Helper()
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
-		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: userID})
+		got, err := client.GetUser(t.Context(), api.GetUserParams{UserID: userID})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 
@@ -106,10 +106,10 @@ func TestPatchUserMigration(t *testing.T) {
 	// opposed to any other 400, and that the user is exactly as stored. A
 	// schema refusal answers req.invalid like request validation, naming only
 	// fields under attributes.
-	assertRefused := func(t *testing.T, resp api.PatchUserByIDRes, userID api.UserID, wantSchema string, wantAttributes map[string]any) {
+	assertRefused := func(t *testing.T, resp api.UpdateUserRes, userID api.UserID, wantSchema string, wantAttributes map[string]any) {
 		t.Helper()
-		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		invalid := resp.(*api.PatchUserByIDBadRequest)
+		require.IsType(t, &api.UpdateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		invalid := resp.(*api.UpdateUserBadRequest)
 		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
 		var details struct {
 			Fields []string `json:"fields"`
@@ -120,7 +120,7 @@ func TestPatchUserMigration(t *testing.T) {
 			assert.True(t, strings.HasPrefix(field, "attributes"), "field %q is not an attribute", field)
 		}
 
-		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: userID})
+		got, err := client.GetUser(t.Context(), api.GetUserParams{UserID: userID})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 		assert.Equal(t, wantSchema, got.(*api.User).Schema)
@@ -317,8 +317,8 @@ func TestPatchUserMigration(t *testing.T) {
 		userID := createUser(t, from, map[string]any{"givenName": "Ada"})
 
 		resp := patch(t, userID, to, nil)
-		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		invalid := resp.(*api.PatchUserByIDBadRequest)
+		require.IsType(t, &api.UpdateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		invalid := resp.(*api.UpdateUserBadRequest)
 		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), invalid.Code)
 		assert.JSONEq(t, `{
 			"schema": "`+to+`",
@@ -327,7 +327,7 @@ func TestPatchUserMigration(t *testing.T) {
 			"current_object_type": "migration-cross-type-from"
 		}`, string(invalid.Details.Value["details"]))
 
-		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: userID})
+		got, err := client.GetUser(t.Context(), api.GetUserParams{UserID: userID})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 		assert.Equal(t, from, got.(*api.User).Schema, "the user stays on its schema")
@@ -383,7 +383,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	definition.Steps[0].Actions = append(definition.Steps[0].Actions,
 		api.StepAction{Name: "passkey", Kind: api.StepActionKindPasskey})
 	definition.Steps[0].Transitions.Value["passkey"] = api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")}
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: definition,
 	})
@@ -446,7 +446,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 			"color":     nil,
 		},
 	}))))
-	resp, err := f.client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(userID)})
+	resp, err := f.client.UpdateUser(t.Context(), req, api.UpdateUserParams{UserID: api.UserID(userID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
@@ -480,7 +480,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 		})
 		require.Contains(t, completedMethods(passworded), api.FactorMethodPassword)
 
-		handoff, err := f.client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
+		handoff, err := f.client.CreateAuthAttemptHandoff(t.Context(), api.CreateAuthAttemptHandoffParams{AttemptID: attemptID})
 		require.NoError(t, err)
 		require.IsType(t, &api.HandoffResponse{}, handoff, helpers.MustMarshal(t, handoff))
 	})
@@ -488,7 +488,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	t.Run("signs in with the passkey", func(t *testing.T) {
 		flow := f.startFlow(t, nil)
 		issued, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{Action: "passkey"},
-			api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow, Origin: api.NewOptURI(*rpOrigin)})
+			api.SubmitFlowStepParams{FlowID: flow.id, Zflow: flow.zflow, Origin: api.NewOptURI(*rpOrigin)})
 		require.NoError(t, err)
 		require.IsType(t, &api.SubmitFlowStepOK{}, issued, helpers.MustMarshal(t, issued))
 		issuedOK := issued.(*api.SubmitFlowStepOK)
@@ -511,7 +511,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 				Method:      api.NewOptString("passkey"),
 				Proof:       api.NewOptFlowSubmitRequestChallengeResponseProof(proof),
 			}),
-		}, api.SubmitFlowStepParams{ID: flow.id, Zflow: mustExtractZflow(t, issuedOK.SetCookie)})
+		}, api.SubmitFlowStepParams{FlowID: flow.id, Zflow: mustExtractZflow(t, issuedOK.SetCookie)})
 		require.NoError(t, err)
 		require.IsType(t, &api.SubmitFlowStepOK{}, verified, helpers.MustMarshal(t, verified))
 		assert.True(t, verified.(*api.SubmitFlowStepOK).Response.HandoffToken.Set, "a passkey sign-in hands off")
@@ -598,24 +598,24 @@ func TestPatchUserDryRun(t *testing.T) {
 	}
 	read := func(t *testing.T, id api.UserID) *api.User {
 		t.Helper()
-		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: id})
+		got, err := client.GetUser(t.Context(), api.GetUserParams{UserID: id})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 		return got.(*api.User)
 	}
-	send := func(t *testing.T, id api.UserID, dryRun bool, body map[string]any) api.PatchUserByIDRes {
+	send := func(t *testing.T, id api.UserID, dryRun bool, body map[string]any) api.UpdateUserRes {
 		t.Helper()
 		if dryRun {
 			body = maps.Clone(body)
 			body["dry_run"] = true
 		}
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id})
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, body), api.UpdateUserParams{UserID: id})
 		require.NoError(t, err)
 		return resp
 	}
 	// sameAsTheRealRequest sends body as a dry run and asserts it left no
 	// trace, then sends it for real and returns both answers.
-	sameAsTheRealRequest := func(t *testing.T, id api.UserID, body map[string]any) (dry, real api.PatchUserByIDRes) {
+	sameAsTheRealRequest := func(t *testing.T, id api.UserID, body map[string]any) (dry, real api.UpdateUserRes) {
 		t.Helper()
 		before, eventsBefore := read(t, id), userEvents(t, string(id))
 		dry = send(t, id, true, body)
@@ -653,7 +653,7 @@ func TestPatchUserDryRun(t *testing.T) {
 			},
 		})
 
-		require.IsType(t, &api.PatchUserByIDBadRequest{}, dry, helpers.MustMarshal(t, dry))
+		require.IsType(t, &api.UpdateUserBadRequest{}, dry, helpers.MustMarshal(t, dry))
 		assert.JSONEq(t, helpers.MustMarshal(t, real), helpers.MustMarshal(t, dry))
 		assert.Contains(t, helpers.MustMarshal(t, dry), "attributes.country")
 		assert.Contains(t, helpers.MustMarshal(t, dry), "attributes.phones.1.fax")
@@ -670,9 +670,9 @@ func TestPatchUserDryRun(t *testing.T) {
 
 		// Compared by code and details: the real answer's parent is the write's
 		// own database error, which a dry run never meets.
-		require.IsType(t, &api.PatchUserByIDConflict{}, dry, helpers.MustMarshal(t, dry))
-		require.IsType(t, &api.PatchUserByIDConflict{}, real, helpers.MustMarshal(t, real))
-		dryConflict, realConflict := dry.(*api.PatchUserByIDConflict), real.(*api.PatchUserByIDConflict)
+		require.IsType(t, &api.UpdateUserConflict{}, dry, helpers.MustMarshal(t, dry))
+		require.IsType(t, &api.UpdateUserConflict{}, real, helpers.MustMarshal(t, real))
+		dryConflict, realConflict := dry.(*api.UpdateUserConflict), real.(*api.UpdateUserConflict)
 		assert.Equal(t, realConflict.Code, dryConflict.Code)
 		assert.JSONEq(t, string(realConflict.Details.Value["details"]), string(dryConflict.Details.Value["details"]))
 		assert.Contains(t, string(dryConflict.Details.Value["details"]), "attributes.email")
@@ -681,7 +681,7 @@ func TestPatchUserDryRun(t *testing.T) {
 	t.Run("an unknown user answers the real 404", func(t *testing.T) {
 		t.Parallel()
 		resp := send(t, api.UserID("user_doesnotexist"), true, map[string]any{"attributes": map[string]any{"email": "a@example.com"}})
-		require.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.UpdateUserNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	// dry_run is a body field because a server refuses a field it does not
@@ -714,9 +714,9 @@ func TestPatchUserDryRun(t *testing.T) {
 		body := map[string]any{"attributes": map[string]any{"email": "guarded2@example.com"}}
 		dryBody := maps.Clone(body)
 		dryBody["dry_run"] = true
-		dry, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, dryBody), api.PatchUserByIDParams{UserID: id})
+		dry, err := outsider.UpdateUser(t.Context(), patchUserRequest(t, dryBody), api.UpdateUserParams{UserID: id})
 		require.NoError(t, err)
-		real, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id})
+		real, err := outsider.UpdateUser(t.Context(), patchUserRequest(t, body), api.UpdateUserParams{UserID: id})
 		require.NoError(t, err)
 		_, allowed := dry.(*api.User)
 		assert.False(t, allowed, helpers.MustMarshal(t, dry))

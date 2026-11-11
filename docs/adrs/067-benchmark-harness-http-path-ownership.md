@@ -26,7 +26,7 @@ Two shapes were posed:
   to be reachable from JavaScript.
 
 Both were prototyped against the same three operations — `POST /flow`,
-`POST /flow/{id}/submit` (identifier and password) and `GET /users/{id}` —
+`POST /flow/{flow_id}/submit` (identifier and password) and `GET /users/{id}` —
 on a local SQLite server at 1, 5 and 20 VUs, and compared on phase-breakdown
 fidelity, cookie handling, connection reuse, lines of JavaScript, and tag
 cardinality. The prototype is on branch

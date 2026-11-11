@@ -2,7 +2,7 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService, type Variable } from "@/lib/backend";
-import { GetDeploymentVariablesParams } from "@/lib/backend/schemas";
+import { ListDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { Cmd } from "@/lib/cmd";
 import { ZitadelError } from "@/lib/errors";
 import { type Refused, taken } from "@/lib/oclif/flags";
@@ -25,7 +25,7 @@ import { variableCell } from "@/lib/variables";
  * one looks like.
  */
 const DEPLOYMENT_ID: Refused<string> = {
-  schema: z.string().trim().pipe(GetDeploymentVariablesParams.shape.deployment_id),
+  schema: z.string().trim().pipe(ListDeploymentVariablesParams.shape.deployment_id),
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel deployment list`, or omit it to read the live deployment.",

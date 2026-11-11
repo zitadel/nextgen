@@ -71,35 +71,35 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
   createProject:
     "unauthenticated bootstrap minting secrets; `zitadel setup` and `zitadel env add` own it",
-  initClaim: "the browser claim flow; `zitadel claim` calls it",
-  getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
+  createProjectClaim: "the browser claim flow; `zitadel claim` calls it",
+  getProjectClaimStatus: "the browser claim flow; `zitadel claim` calls it",
   // These two are reached by nothing in the CLI at all — not the registry, not
   // `zitadel claim`. Either the claim flow is incomplete or they are dead
   // generated surface; recorded as a question rather than implied to be owned.
-  completeClaim: "part of the claim flow, but currently called by no command — unresolved",
-  getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  completeProjectClaim: "part of the claim flow, but currently called by no command — unresolved",
+  getProjectClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
   // A preview exists only through a deployment to it, so it has no create to
   // offer; listing and removing it are `zitadel preview`'s.
-  listPreviews: "previews are listed by `zitadel preview` (#1312)",
-  removePreview: "previews are removed by `zitadel preview` (#1312)",
+  listProjectPreviews: "previews are listed by `zitadel preview` (#1312)",
+  removeProjectPreview: "previews are removed by `zitadel preview` (#1312)",
 
   // Individual resource writes are not made here: `deploy` sends the whole
   // `.zitadel/` as one release bundle (ADR 035), so the per-kind create
   // endpoints are never called by the CLI.
-  createSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
-  createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  publishSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  publishBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
   // `deploy` builds a release from the `.zitadel/` bundle via `buildRelease`
   // (`POST /releases/build`); pinning pre-existing revision ids with
   // `createRelease` is not a CLI flow.
   createRelease:
     "the CLI builds from a bundle via buildRelease, not by pinning revision ids (ADR 035)",
-  createFlowDefinition:
+  publishFlowDefinition:
     "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
   getMyUser: "the end user's own view of themselves, on their own credential",
-  patchMyUser: "the end user's own view of themselves, on their own credential",
+  updateMyUser: "the end user's own view of themselves, on their own credential",
   getMyUserSchema: "the end user's own view of themselves, on their own credential",
   listMyTeams: "the end user's own view of themselves, on their own credential",
   listMyPasskeys: "the end user's own view of themselves, on their own credential",
@@ -114,9 +114,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // Session and passkey protocol, driven by the SDKs and the login flow.
   createSession: "a session is minted for an end user by the SDKs and the login flow",
   exchangeHandoff: "part of the login handoff protocol",
-  beginUserPasskeyRegistration:
+  createUserPasskeyRegistration:
     "WebAuthn registration needs an authenticator, which a terminal is not",
-  finishUserPasskeyRegistration:
+  completeUserPasskeyRegistration:
     "WebAuthn registration needs an authenticator, which a terminal is not",
 
   // ADR 063's revision routes. The CLI has no grammar for a sub-resource
@@ -127,7 +127,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   publishPolicy: "configuration: `deploy` publishes .zitadel/policies/ in the release bundle",
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
-  getIdpRevisionById: "reads one revision by revision id; same shape question as above",
+  getIdpRevision: "reads one revision by revision id; same shape question as above",
   evaluatePolicy:
     "a dry run `policies test` sends per case from commands/policies/test.ts; no registry verb evaluates",
 
@@ -138,8 +138,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
   listUserIdentityLinks: "not yet exposed — follow-up, a user sub-resource listing",
   getUserPasswordState: "not yet exposed — follow-up, a user sub-resource read",
-  addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
-  removeOrigin:
+  addProjectOrigin:
+    "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
+  removeProjectOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
   createInvitation: "not yet exposed — `zitadel invitation create` lands with #2858",

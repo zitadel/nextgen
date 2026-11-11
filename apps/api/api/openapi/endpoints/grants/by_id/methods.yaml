@@ -9,7 +9,7 @@ get:
 
     This API manages grants that bind a user or team to the viewer, editor or
     admin role. An expired grant is still returned, so you can revoke it with
-    `deleteGrant` (`DELETE /grants/{id}`) before you grant the same binding again. Authorization still
+    `deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization still
     ignores expired grants. Send `project_id` as well as the grant ID.
     Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
     (`relation=team`) rows and grants of another project all return `404`.

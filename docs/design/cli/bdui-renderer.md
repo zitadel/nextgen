@@ -55,7 +55,7 @@ Under the hood the component:
 4. Resolves every `text_key` through the `| t` LiquidJS filter against the active locale dictionary loaded at boot.
 5. Sanitizes the rendered HTML (DOMPurify) and injects it into the Shadow DOM.
 6. Mounts `<zl-*>` web components emitted by the template: `<zl-field>`, `<zl-action>`, `<zl-captcha>`, `<zl-passkey>`, `<zl-sso>`.
-7. On submit, collects field values from `<zl-field>` and gate proofs from `<zl-captcha>` / `<zl-passkey>`; POSTs `{ action, fields, gate_proofs?, sso_provider_id? }` to `/flow/{id}/submit` — note `fields` (object), not `data`.
+7. On submit, collects field values from `<zl-field>` and gate proofs from `<zl-captcha>` / `<zl-passkey>`; POSTs `{ action, fields, gate_proofs?, sso_provider_id? }` to `/flow/{flow_id}/submit` — note `fields` (object), not `data`.
 8. Applies the response: next step, or redirect on completion.
 
 Step rendering is the whole job, but rendering is now **Liquid execution**, not array iteration. The capability contract is defined by [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md); the renderer implements that contract and nothing else.

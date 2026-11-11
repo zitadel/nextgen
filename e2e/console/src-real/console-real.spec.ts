@@ -254,7 +254,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
 }) => {
   // The admins list is people only (#1462), so a grant to a team is a row of
   // its own from the grants read. Asserted against a real instance because
-  // which read carries the team, and that `DELETE /grants/{id}` takes the
+  // which read carries the team, and that `DELETE /grants/{grant_id}` takes the
   // team's grant without touching the operator's own, are server behaviour.
   const operator = await seed.user();
   const projectId = zitadel.handle.projectId;
@@ -300,7 +300,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     // come back as an id-only team row on later runs.
     if (grantId)
       await zitadel.api.deleteGrant(grantId, { project_id: projectId }).catch(() => undefined);
-    await zitadel.api.deleteTeam(team.id).catch(() => undefined);
+    await zitadel.api.deactivateTeam(team.id).catch(() => undefined);
   }
 });
 

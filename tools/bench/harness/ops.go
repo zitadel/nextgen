@@ -112,7 +112,7 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 		raw[k] = jx.Raw(b)
 	}
 	req := &api.FlowSubmitRequest{Action: "submit", Fields: api.NewOptFlowSubmitRequestFields(raw)}
-	res, err := c.SubmitFlowStep(WithOp(ctx, op), req, api.SubmitFlowStepParams{ID: id, Zflow: zflow})
+	res, err := c.SubmitFlowStep(WithOp(ctx, op), req, api.SubmitFlowStepParams{FlowID: id, Zflow: zflow})
 	if err != nil {
 		return nil, Classify(op, err)
 	}
@@ -135,16 +135,16 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 
 // GetUser performs GET /users/{id} with the operator bearer.
 func GetUser(ctx context.Context, c *api.Client, t Target) (*api.User, error) {
-	res, err := c.GetUserByID(WithOp(ctx, OpGetUser), api.GetUserByIDParams{UserID: api.UserID(t.UserID)})
+	res, err := c.GetUser(WithOp(ctx, OpGetUser), api.GetUserParams{UserID: api.UserID(t.UserID)})
 	if err != nil {
 		return nil, Classify(OpGetUser, err)
 	}
 	switch r := res.(type) {
 	case *api.User:
 		return r, nil
-	case *api.GetUserByIDUnauthorized:
+	case *api.GetUserUnauthorized:
 		return nil, classifyResponse(OpGetUser, http.StatusUnauthorized, (*api.ErrorDetails)(r))
-	case *api.GetUserByIDNotFound:
+	case *api.GetUserNotFound:
 		return nil, classifyResponse(OpGetUser, http.StatusNotFound, (*api.ErrorDetails)(r))
 	default:
 		return nil, classifyResponse(OpGetUser, 0, res)

@@ -65,7 +65,7 @@ func TestUserCreatePolicy(t *testing.T) {
 	})
 
 	t.Run("a sign-up under the policy solves the built-in proof of work", func(t *testing.T) {
-		def, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: combinedPasswordFlowDefinition(defaultSchemaURL())})
+		def, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: combinedPasswordFlowDefinition(defaultSchemaURL())})
 		require.NoError(t, err)
 		require.IsType(t, &api.FlowDefinitionResponse{}, def)
 		// The release pins the flow and the published policy, so the sign-up
@@ -84,7 +84,7 @@ func TestUserCreatePolicy(t *testing.T) {
 			Action:     "submit",
 			Fields:     api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"x-auth-methods#password": jx.Raw(`"correct-horse-battery-staple"`)}),
 			GateProofs: currentSignupProofs(t, client, start.Response.ID, cookie),
-		}, api.SubmitFlowStepParams{ID: start.Response.ID, Zflow: cookie})
+		}, api.SubmitFlowStepParams{FlowID: start.Response.ID, Zflow: cookie})
 		require.NoError(t, err)
 		require.IsType(t, &api.SubmitFlowStepOK{}, done, helpers.MustMarshal(t, done))
 		assert.Equal(t, "done", done.(*api.SubmitFlowStepOK).Response.Step.Name)

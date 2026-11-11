@@ -10,12 +10,12 @@ const INPUT = {
 
 describe("ReleaseService.get", () => {
   it("reads the release of the project it is bound to", async () => {
-    const getReleaseById = vi.fn(async () => ({ id: "rel_1" }));
-    const releaseService = new ReleaseService(fakeClient({ getReleaseById }), "proj_1");
+    const getRelease = vi.fn(async () => ({ id: "rel_1" }));
+    const releaseService = new ReleaseService(fakeClient({ getRelease }), "proj_1");
 
     await releaseService.get("rel_1");
 
-    expect(getReleaseById).toHaveBeenCalledWith("rel_1", { project_id: "proj_1" });
+    expect(getRelease).toHaveBeenCalledWith("rel_1", { project_id: "proj_1" });
   });
 });
 

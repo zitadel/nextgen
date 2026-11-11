@@ -74,7 +74,7 @@ bodies: `team create --name`, `grant create --relation` and
 `user create --attributes email=…` read well.
 
 It stops at the first nested object, and the identity provider connection is
-nested throughout. Everything in `CreateIdpBody` sits under `idp`, and the
+nested throughout. Everything in `PublishIdpBody` sits under `idp`, and the
 protocol settings under `idp.oidc`. On the shipped CLI:
 
 | What                                                          | Result                                                                                                                                                                              |

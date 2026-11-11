@@ -2,7 +2,7 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
-import { GetDeploymentByIdParams } from "@/lib/backend/schemas";
+import { GetDeploymentParams } from "@/lib/backend/schemas";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
@@ -14,7 +14,7 @@ import { painted } from "@/lib/oclif/rendering";
  * refused before anything is asked or called, and says what one looks like.
  */
 const DEPLOYMENT_ID: Refused<string> = {
-  schema: z.string().trim().pipe(GetDeploymentByIdParams.shape.deployment_id),
+  schema: z.string().trim().pipe(GetDeploymentParams.shape.deployment_id),
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel deployment list`.",

@@ -26,7 +26,7 @@ import (
 func mustInitClaim(t *testing.T, client *helpers.ApiClient, projectID string) *api.InitClaimResponse {
 	t.Helper()
 
-	resp, err := client.InitClaim(t.Context(), api.InitClaimParams{ProjectID: api.ProjectID(projectID)})
+	resp, err := client.CreateProjectClaim(t.Context(), api.CreateProjectClaimParams{ProjectID: api.ProjectID(projectID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.InitClaimResponse{}, resp, helpers.MustMarshal(t, resp))
 	return resp.(*api.InitClaimResponse)
@@ -119,7 +119,7 @@ func TestClaimHappyPath(t *testing.T) {
 	assert.Equal(t, string(initOK.ChallengeID), query.Get("challenge_id"))
 	assert.Equal(t, project.ID, query.Get("project_id"))
 
-	statusResp, err := client.GetClaimStatus(t.Context(), api.GetClaimStatusParams{
+	statusResp, err := client.GetProjectClaimStatus(t.Context(), api.GetProjectClaimStatusParams{
 		ProjectID:   api.ProjectID(project.ID),
 		ChallengeID: initOK.ChallengeID,
 	})
@@ -163,7 +163,7 @@ func TestClaimHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, platClient, platform)
 
-	defResp, err := platClient.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := platClient.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(platform.ID),
 		FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 	})
@@ -186,7 +186,7 @@ func TestClaimHappyPath(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email": jx.Raw(`"` + userEmail + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
 	idOK := idResp.(*api.SubmitFlowStepOK)
@@ -198,7 +198,7 @@ func TestClaimHappyPath(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + userPass + `"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
 	pwOK := pwResp.(*api.SubmitFlowStepOK)
@@ -209,9 +209,9 @@ func TestClaimHappyPath(t *testing.T) {
 	sessionCookie := exchangeForSessionCookie(t, platform.ID, platClient.Token(), handoffToken)
 
 	client.SetSessionToken(sessionCookie.Value)
-	completeResp, err := client.CompleteClaim(t.Context(),
+	completeResp, err := client.CompleteProjectClaim(t.Context(),
 		&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
-		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+		api.CompleteProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.CompleteClaimResponse{}, completeResp, helpers.MustMarshal(t, completeResp))
 	completed := completeResp.(*api.CompleteClaimResponse)
@@ -219,7 +219,7 @@ func TestClaimHappyPath(t *testing.T) {
 	assert.Equal(t, api.TeamID(team.ID), completed.TeamID)
 	assert.WithinDuration(t, time.Now(), completed.ClaimedAt, time.Minute)
 
-	statusResp, err = client.GetClaimStatus(t.Context(), api.GetClaimStatusParams{
+	statusResp, err = client.GetProjectClaimStatus(t.Context(), api.GetProjectClaimStatusParams{
 		ProjectID:   api.ProjectID(project.ID),
 		ChallengeID: initOK.ChallengeID,
 	})
@@ -306,7 +306,7 @@ func TestClaimExpiredChallenge(t *testing.T) {
 	// proof-of-possession gate passes and expiry is what answers.
 	client.SetToken(secret)
 
-	statusResp, err := client.GetClaimStatus(t.Context(), api.GetClaimStatusParams{
+	statusResp, err := client.GetProjectClaimStatus(t.Context(), api.GetProjectClaimStatusParams{
 		ProjectID:   api.ProjectID(project.ID),
 		ChallengeID: api.ChallengeID(plain),
 	})
@@ -314,17 +314,17 @@ func TestClaimExpiredChallenge(t *testing.T) {
 	// The 410 is a discriminated union since the claim window landed; a lapsed
 	// challenge must decode as the retryable proj.claim_expired variant, not
 	// the final closed-window refusal.
-	statusGone, ok := statusResp.(*api.GetClaimStatusGone)
+	statusGone, ok := statusResp.(*api.GetProjectClaimStatusGone)
 	require.True(t, ok, helpers.MustMarshal(t, statusResp))
 	assert.True(t, statusGone.IsProjClaimExpired(), helpers.MustMarshal(t, statusResp))
 
 	userID := harness.CreateUserWithTeam(t, harness.EnsurePlatformProject(t).ID)
 	client.SetSessionToken(platformSessionCookie(t, userID).Value)
-	completeResp, err := client.CompleteClaim(t.Context(),
+	completeResp, err := client.CompleteProjectClaim(t.Context(),
 		&api.CompleteClaimRequest{ChallengeID: api.ChallengeID(plain)},
-		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+		api.CompleteProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	completeGone, ok := completeResp.(*api.CompleteClaimGone)
+	completeGone, ok := completeResp.(*api.CompleteProjectClaimGone)
 	require.True(t, ok, helpers.MustMarshal(t, completeResp))
 	assert.True(t, completeGone.IsProjClaimExpired(), helpers.MustMarshal(t, completeResp))
 }
@@ -357,14 +357,14 @@ func TestCompleteClaimNoPersonalTeam(t *testing.T) {
 	}))
 
 	client.SetSessionToken(platformSessionCookie(t, userID).Value)
-	resp, err := client.CompleteClaim(t.Context(),
+	resp, err := client.CompleteProjectClaim(t.Context(),
 		&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
-		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+		api.CompleteProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	// The 403 is a sum type over the two codes that carry it, so a client can
 	// tell "no team yet" (this case, cleared by the next sign-in) from
 	// "team deactivated", which needs an administrator.
-	forbidden, ok := resp.(*api.CompleteClaimForbidden)
+	forbidden, ok := resp.(*api.CompleteProjectClaimForbidden)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 	body, ok := forbidden.GetClaimNoPersonalTeam()
 	require.True(t, ok, "expected the no-team variant, got %q", forbidden.Type)
@@ -412,12 +412,12 @@ func TestCompleteClaimPersonalTeamNotActive(t *testing.T) {
 	require.NoError(t, harness.EnsureTeamService(t).Delete(t.Context(), platformID, team.ID))
 
 	client.SetSessionToken(platformSessionCookie(t, userID).Value)
-	resp, err := client.CompleteClaim(t.Context(),
+	resp, err := client.CompleteProjectClaim(t.Context(),
 		&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
-		api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+		api.CompleteProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 
-	forbidden, ok := resp.(*api.CompleteClaimForbidden)
+	forbidden, ok := resp.(*api.CompleteProjectClaimForbidden)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 	body, ok := forbidden.GetClaimPersonalTeamNotActive()
 	require.True(t, ok, "expected the not-active variant, got %q", forbidden.Type)
@@ -456,7 +456,7 @@ func TestClaimStatusBearerMismatch(t *testing.T) {
 	initOK := mustInitClaim(t, client, project.ID)
 
 	client.SetToken(secretB)
-	statusResp, err := client.GetClaimStatus(t.Context(), api.GetClaimStatusParams{
+	statusResp, err := client.GetProjectClaimStatus(t.Context(), api.GetProjectClaimStatusParams{
 		ProjectID:   api.ProjectID(project.ID),
 		ChallengeID: initOK.ChallengeID,
 	})
@@ -484,7 +484,7 @@ func TestCompleteClaimConcurrent(t *testing.T) {
 	cookie := platformSessionCookie(t, userID)
 
 	const racers = 2
-	results := make([]api.CompleteClaimRes, racers)
+	results := make([]api.CompleteProjectClaimRes, racers)
 	errs := make([]error, racers)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
@@ -497,9 +497,9 @@ func TestCompleteClaimConcurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start // release together so the completes genuinely overlap
-			results[i], errs[i] = c.CompleteClaim(t.Context(),
+			results[i], errs[i] = c.CompleteProjectClaim(t.Context(),
 				&api.CompleteClaimRequest{ChallengeID: initOK.ChallengeID},
-				api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+				api.CompleteProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 		}()
 	}
 	close(start)
@@ -511,7 +511,7 @@ func TestCompleteClaimConcurrent(t *testing.T) {
 		switch results[i].(type) {
 		case *api.CompleteClaimResponse:
 			winners++
-		case *api.CompleteClaimGone, *api.AlreadyClaimedResponse:
+		case *api.CompleteProjectClaimGone, *api.AlreadyClaimedResponse:
 			losers++
 		default:
 			t.Fatalf("unexpected complete result: %T %s", results[i], helpers.MustMarshal(t, results[i]))
@@ -544,7 +544,7 @@ func TestCompleteClaimCrossChallengeRace(t *testing.T) {
 	userID := harness.CreateUserWithTeam(t, harness.EnsurePlatformProject(t).ID)
 	cookie := platformSessionCookie(t, userID)
 
-	results := make([]api.CompleteClaimRes, len(challenges))
+	results := make([]api.CompleteProjectClaimRes, len(challenges))
 	errs := make([]error, len(challenges))
 	start := make(chan struct{})
 	var wg sync.WaitGroup
@@ -556,9 +556,9 @@ func TestCompleteClaimCrossChallengeRace(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start // release together so the completes genuinely overlap
-			results[i], errs[i] = c.CompleteClaim(t.Context(),
+			results[i], errs[i] = c.CompleteProjectClaim(t.Context(),
 				&api.CompleteClaimRequest{ChallengeID: challenges[i]},
-				api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+				api.CompleteProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 		}()
 	}
 	close(start)
@@ -653,7 +653,7 @@ func TestGetClaimWindow(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 
-	resp, err := client.GetClaimWindow(t.Context(), api.GetClaimWindowParams{
+	resp, err := client.GetProjectClaimWindow(t.Context(), api.GetProjectClaimWindowParams{
 		ProjectID:   api.ProjectID(project.ID),
 		ChallengeID: init.ChallengeID,
 	})
@@ -665,10 +665,10 @@ func TestGetClaimWindow(t *testing.T) {
 	// domain.ClaimWindow from now.
 	assert.WithinDuration(t, time.Now().Add(domain.ClaimWindow), window.ExpiresAt, time.Minute)
 
-	unknown, err := client.GetClaimWindow(t.Context(), api.GetClaimWindowParams{
+	unknown, err := client.GetProjectClaimWindow(t.Context(), api.GetProjectClaimWindowParams{
 		ProjectID:   api.ProjectID(project.ID),
 		ChallengeID: api.ChallengeID("ch_" + helpers.RandString(16)),
 	})
 	require.NoError(t, err)
-	assert.IsType(t, &api.GetClaimWindowNotFound{}, unknown, helpers.MustMarshal(t, unknown))
+	assert.IsType(t, &api.GetProjectClaimWindowNotFound{}, unknown, helpers.MustMarshal(t, unknown))
 }

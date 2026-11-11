@@ -113,7 +113,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return nil, normalizeFlowError(err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
-	if state.ID != params.ID {
+	if state.ID != params.FlowID {
 		return nil, domain.ErrFlowNotFound()
 	}
 	// Admit Origin before reading the sealed release: a project that refuses
@@ -272,7 +272,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(ctx, err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
-	if state.ID != params.ID {
+	if state.ID != params.FlowID {
 		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
@@ -390,7 +390,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 		// Path=/ ensures that each Set-Cookie replaces the previous one in
 		// the browser's cookie jar rather than accumulating — without an
 		// explicit path the browser derives the path from the request URI,
-		// which differs across /flow and /flow/{id}/submit endpoints.
+		// which differs across /flow and /flow/{flow_id}/submit endpoints.
 		Path: "/",
 	}
 	if clear {

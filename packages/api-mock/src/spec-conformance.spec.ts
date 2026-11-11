@@ -16,7 +16,7 @@
  *   - POST /sessions/exchange           → ExchangeHandoffResponse
  *   - GET  /projects/:id                → GetProjectResponse
  *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
- *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
+ *   - GET  /flow_definitions/:flow_definition_id        → GetFlowDefinitionResponse
  *
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
@@ -26,9 +26,9 @@
  *
  * Also covered by zod here:
  *   - POST /projects                    → CreateProjectResponse
- *   - POST /projects/:id/origins        → AddOriginResponse
+ *   - POST /projects/:id/origins        → AddProjectOriginResponse
  *
- * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
+ * `GET /schemas/:schema_id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
  * the caller made. The structural test below just exercises the 404 path
  * (clear contract: spec-compliant error envelope).
@@ -36,17 +36,17 @@
 import type { Server } from "node:http";
 
 import {
-  AddOriginResponse,
-  CompleteClaimResponse,
-  CreateIdpResponse,
+  AddProjectOriginResponse,
+  CompleteProjectClaimResponse,
+  PublishIdpResponse,
   CreateProjectResponse,
   ExchangeHandoffResponse,
-  GetClaimStatusResponse,
+  GetProjectClaimStatusResponse,
   GetFlowDefinitionResponse,
-  GetIdpByIdResponse,
+  GetIdpResponse,
   GetMySessionResponse,
   GetProjectResponse,
-  GetVariablesResponse,
+  ListVariablesResponse,
   ListFlowDefinitionsResponse,
   QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
@@ -551,7 +551,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(first.status).toBe(201);
     const firstBody = await first.json();
-    expect(() => AddOriginResponse.parse(firstBody)).not.toThrow();
+    expect(() => AddProjectOriginResponse.parse(firstBody)).not.toThrow();
     expect(firstBody).toEqual({ pattern: "https://app.example.com", kind: "primary" });
     expect(firstBody).not.toHaveProperty("check");
     expect(firstBody).not.toHaveProperty("warning");
@@ -634,7 +634,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect((body.id as string).startsWith("sch_")).toBe(true);
   });
 
-  test("GET and DELETE /schemas/:id look up by id without project_id", async () => {
+  test("GET and DELETE /schemas/:schema_id look up by id without project_id", async () => {
     const create = await fetch(`${API}/schemas?project_id=proj_schema_owner`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -664,7 +664,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(ownerDelete.status).toBe(204);
   });
 
-  test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
+  test("GET /schemas/:schema_id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
     // (title, description). The mock must do the same,
@@ -1005,7 +1005,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(row).toEqual(detail);
   });
 
-  test("GET /flow_definitions/:id matches GetFlowDefinitionResponse", async () => {
+  test("GET /flow_definitions/:flow_definition_id matches GetFlowDefinitionResponse", async () => {
     const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1033,7 +1033,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     return { id: body.id, projectSecret: body.project_secret };
   }
 
-  async function initClaim(projectId: string, secret: string): Promise<Response> {
+  async function createProjectClaim(projectId: string, secret: string): Promise<Response> {
     return fetch(`${API}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${secret}` },
@@ -1070,7 +1070,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/init returns 201 with a claim challenge", async () => {
     const project = await createProject("claim-init");
-    const res = await initClaim(project.id, project.projectSecret);
+    const res = await createProjectClaim(project.id, project.projectSecret);
     expect(res.status).toBe(201);
     // orval emits no `*Response` zod for a 201 body — validate structurally,
     // mirroring the POST /projects test above.
@@ -1085,7 +1085,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     // response body, so the snapshot is its only route to the id the
     // completion and expiry mutators take.
     const project = await createProject("claim-snapshot");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     expect(snapshotPlatformStore().claimChallengeIds).toContain(challenge_id);
@@ -1093,13 +1093,13 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("GET /projects/:id/claim/status is pending before completion", async () => {
     const project = await createProject("claim-status-pending");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await claimStatus(project.id, challenge_id, project.projectSecret);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => GetClaimStatusResponse.parse(body)).not.toThrow();
+    expect(() => GetProjectClaimStatusResponse.parse(body)).not.toThrow();
     const parsed = body as Record<string, unknown>;
     expect(parsed.status).toBe("pending");
     expect(parsed.team_id).toBeUndefined();
@@ -1110,7 +1110,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("GET /projects/:id/claim/status with a foreign project secret returns 403", async () => {
     const project = await createProject("claim-status-owner");
     const other = await createProject("claim-status-foreign");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await claimStatus(project.id, challenge_id, other.projectSecret);
@@ -1121,7 +1121,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("full flow: init → complete with session cookie → status completed", async () => {
     const project = await createProject("claim-full-flow");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1132,7 +1132,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     });
     expect(complete.status).toBe(200);
     const completeBody = await complete.json();
-    expect(() => CompleteClaimResponse.parse(completeBody)).not.toThrow();
+    expect(() => CompleteProjectClaimResponse.parse(completeBody)).not.toThrow();
     const completed = completeBody as Record<string, unknown>;
     expect(completed.project_id).toBe(project.id);
     expect(typeof completed.team_id).toBe("string");
@@ -1141,7 +1141,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const status = await claimStatus(project.id, challenge_id, project.projectSecret);
     expect(status.status).toBe(200);
     const statusBody = await status.json();
-    expect(() => GetClaimStatusResponse.parse(statusBody)).not.toThrow();
+    expect(() => GetProjectClaimStatusResponse.parse(statusBody)).not.toThrow();
     const parsed = statusBody as Record<string, unknown>;
     expect(parsed.status).toBe("completed");
     expect(typeof parsed.team_id).toBe("string");
@@ -1151,7 +1151,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/init returns 409 once the project is claimed", async () => {
     const project = await createProject("claim-already-claimed");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
     await fetch(`${API}/projects/${project.id}/claim/complete`, {
@@ -1160,7 +1160,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
       body: JSON.stringify({ challenge_id }),
     });
 
-    const res = await initClaim(project.id, project.projectSecret);
+    const res = await createProjectClaim(project.id, project.projectSecret);
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string; details: Record<string, unknown> };
     expect(body.code).toBe("proj.already_claimed");
@@ -1170,7 +1170,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("an expired challenge makes status and complete return 410", async () => {
     const project = await createProject("claim-expired");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     expireClaimChallenge(challenge_id);
 
@@ -1194,11 +1194,11 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const project = await createProject("claim-window-expired");
     // Mint the challenge while the window is open, then close it: complete
     // must refuse even a live challenge once the project is too old.
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     expireClaimWindow(project.id);
 
-    const reinit = await initClaim(project.id, project.projectSecret);
+    const reinit = await createProjectClaim(project.id, project.projectSecret);
     expect(reinit.status).toBe(410);
     const reinitBody = (await reinit.json()) as Record<string, unknown>;
     expect(reinitBody.code).toBe("proj.claim_window_expired");
@@ -1241,7 +1241,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {
     const project = await createProject("claim-complete-no-cookie");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
@@ -1256,7 +1256,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete without the CSRF token returns 403", async () => {
     const project = await createProject("claim-complete-no-csrf");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1295,7 +1295,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/init with another project's secret returns 404", async () => {
     const project = await createProject("claim-init-owner");
     const other = await createProject("claim-init-foreign");
-    const res = await initClaim(project.id, other.projectSecret);
+    const res = await createProjectClaim(project.id, other.projectSecret);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("proj.not_found");
@@ -1303,7 +1303,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("GET /projects/:id/claim/status without a bearer token returns 401", async () => {
     const project = await createProject("claim-status-no-bearer");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await fetch(
@@ -1316,7 +1316,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete with a customer-project session returns 401", async () => {
     const project = await createProject("claim-complete-ineligible");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     // A session for the customer project, not the platform project, must not
@@ -1335,7 +1335,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete on a mismatched project returns 404", async () => {
     const project = await createProject("claim-complete-path-a");
     const other = await createProject("claim-complete-path-b");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1349,7 +1349,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("a claim challenge is single-use: a second completion returns 409", async () => {
     const project = await createProject("claim-single-use");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
     const url = `${API}/projects/${project.id}/claim/complete`;
@@ -1371,7 +1371,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   // that landed stays reported as completed even after its challenge's TTL.
   test("a completed claim stays completed on status past challenge expiry", async () => {
     const project = await createProject("claim-completed-expired");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
@@ -1395,9 +1395,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   // never a false "can no longer be claimed" verdict.
   test("a pending challenge on a project claimed elsewhere reports completed", async () => {
     const project = await createProject("claim-cross-challenge-status");
-    const first = await initClaim(project.id, project.projectSecret);
+    const first = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id: polled } = (await first.json()) as { challenge_id: string };
-    const second = await initClaim(project.id, project.projectSecret);
+    const second = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1463,7 +1463,7 @@ describe("api-mock idp connections and variables", () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(CreateIdpResponse.safeParse(body).success).toBe(true);
+    expect(PublishIdpResponse.safeParse(body).success).toBe(true);
     expect(body.slug).toBe("google");
     expect(String(body.id)).toMatch(/^idp_/);
     expect(String(body.revision_id)).toMatch(/^idprev_/);
@@ -1562,7 +1562,7 @@ describe("api-mock idp connections and variables", () => {
 
     const ok = await fetch(`${BASE}/idps/${created.id}?project_id=${mine}`);
     expect(ok.status).toBe(200);
-    expect(GetIdpByIdResponse.safeParse(await ok.json()).success).toBe(true);
+    expect(GetIdpResponse.safeParse(await ok.json()).success).toBe(true);
 
     const foreign = await fetch(`${BASE}/idps/${created.id}?project_id=${other}`);
     expect(foreign.status).toBe(404);
@@ -1602,7 +1602,7 @@ describe("api-mock idp connections and variables", () => {
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(GetVariablesResponse.safeParse(body).success).toBe(true);
+    expect(ListVariablesResponse.safeParse(body).success).toBe(true);
     expect(body.GOOGLE_CLIENT_ID).toEqual({
       primary: "824.apps.googleusercontent.com",
       preview: "824.apps.googleusercontent.com",
@@ -2691,21 +2691,21 @@ describe("api-mock releases and deployments", () => {
       ttl: "PT168H",
     });
 
-    const removePreview = () =>
+    const removeProjectPreview = () =>
       fetch(`${BASE}/projects/${project.id}/previews/remove`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
         body: JSON.stringify({ origin: url }),
       });
 
-    expect((await removePreview()).status).toBe(204);
+    expect((await removeProjectPreview()).status).toBe(204);
     const afterFirst = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
       previews: unknown[];
     };
     expect(afterFirst.previews).toHaveLength(0);
 
     // Idempotent: removing an already-gone preview still answers 204.
-    expect((await removePreview()).status).toBe(204);
+    expect((await removeProjectPreview()).status).toBe(204);
   });
 
   test("lets a release whose only preview was removed be revoked", async () => {

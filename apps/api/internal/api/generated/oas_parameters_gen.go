@@ -16,14 +16,14 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-// AddOriginParams is parameters of addOrigin operation.
-type AddOriginParams struct {
+// AddProjectOriginParams is parameters of addProjectOrigin operation.
+type AddProjectOriginParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
 	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
-func unpackAddOriginParams(packed middleware.Parameters) (params AddOriginParams) {
+func unpackAddProjectOriginParams(packed middleware.Parameters) (params AddProjectOriginParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -34,7 +34,7 @@ func unpackAddOriginParams(packed middleware.Parameters) (params AddOriginParams
 	return params
 }
 
-func decodeAddOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params AddOriginParams, _ error) {
+func decodeAddProjectOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params AddProjectOriginParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -91,88 +91,6 @@ func decodeAddOriginParams(args [1]string, argsEscaped bool, r *http.Request) (p
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// BeginUserPasskeyRegistrationParams is parameters of beginUserPasskeyRegistration operation.
-type BeginUserPasskeyRegistrationParams struct {
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
-}
-
-func unpackBeginUserPasskeyRegistrationParams(packed middleware.Parameters) (params BeginUserPasskeyRegistrationParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
-	return params
-}
-
-func decodeBeginUserPasskeyRegistrationParams(args [1]string, argsEscaped bool, r *http.Request) (params BeginUserPasskeyRegistrationParams, _ error) {
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -259,7 +177,7 @@ func decodeBuildReleaseParams(args [0]string, argsEscaped bool, r *http.Request)
 type CancelInvitationParams struct {
 	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
 	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
-	ID InvitationID
+	InvitationID InvitationID
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -269,10 +187,10 @@ type CancelInvitationParams struct {
 func unpackCancelInvitationParams(packed middleware.Parameters) (params CancelInvitationParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "invitation_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(InvitationID)
+		params.InvitationID = packed[key].(InvitationID)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -286,7 +204,7 @@ func unpackCancelInvitationParams(packed middleware.Parameters) (params CancelIn
 
 func decodeCancelInvitationParams(args [1]string, argsEscaped bool, r *http.Request) (params CancelInvitationParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
+	// Decode path: invitation_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -298,14 +216,14 @@ func decodeCancelInvitationParams(args [1]string, argsEscaped bool, r *http.Requ
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "invitation_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
 			})
 
 			if err := func() error {
-				var paramsDotIDVal string
+				var paramsDotInvitationIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -317,18 +235,18 @@ func decodeCancelInvitationParams(args [1]string, argsEscaped bool, r *http.Requ
 						return err
 					}
 
-					paramsDotIDVal = c
+					paramsDotInvitationIDVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ID = InvitationID(paramsDotIDVal)
+				params.InvitationID = InvitationID(paramsDotInvitationIDVal)
 				return nil
 			}(); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ID.Validate(); err != nil {
+				if err := params.InvitationID.Validate(); err != nil {
 					return err
 				}
 				return nil
@@ -341,7 +259,7 @@ func decodeCancelInvitationParams(args [1]string, argsEscaped bool, r *http.Requ
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "invitation_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -400,14 +318,14 @@ func decodeCancelInvitationParams(args [1]string, argsEscaped bool, r *http.Requ
 	return params, nil
 }
 
-// CompleteClaimParams is parameters of completeClaim operation.
-type CompleteClaimParams struct {
+// CompleteProjectClaimParams is parameters of completeProjectClaim operation.
+type CompleteProjectClaimParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
 	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
-func unpackCompleteClaimParams(packed middleware.Parameters) (params CompleteClaimParams) {
+func unpackCompleteProjectClaimParams(packed middleware.Parameters) (params CompleteProjectClaimParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -418,7 +336,7 @@ func unpackCompleteClaimParams(packed middleware.Parameters) (params CompleteCla
 	return params
 }
 
-func decodeCompleteClaimParams(args [1]string, argsEscaped bool, r *http.Request) (params CompleteClaimParams, _ error) {
+func decodeCompleteProjectClaimParams(args [1]string, argsEscaped bool, r *http.Request) (params CompleteProjectClaimParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -482,25 +400,241 @@ func decodeCompleteClaimParams(args [1]string, argsEscaped bool, r *http.Request
 	return params, nil
 }
 
-// CreateApplicationParams is parameters of createApplication operation.
-type CreateApplicationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
+// CompleteUserPasskeyRegistrationParams is parameters of completeUserPasskeyRegistration operation.
+type CompleteUserPasskeyRegistrationParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
+	// The `registration_id` that `createUserPasskeyRegistration` (`POST
+	// /users/{user_id}/passkeys/registrations`) returns.
+	RegistrationID string
+}
+
+func unpackCompleteUserPasskeyRegistrationParams(packed middleware.Parameters) (params CompleteUserPasskeyRegistrationParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "registration_id",
+			In:   "path",
+		}
+		params.RegistrationID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeCompleteUserPasskeyRegistrationParams(args [2]string, argsEscaped bool, r *http.Request) (params CompleteUserPasskeyRegistrationParams, _ error) {
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: registration_id.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "registration_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.RegistrationID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "registration_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// CreateAuthAttemptChallengeParams is parameters of createAuthAttemptChallenge operation.
+type CreateAuthAttemptChallengeParams struct {
+	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
+	AttemptID AttemptID
+}
+
+func unpackCreateAuthAttemptChallengeParams(packed middleware.Parameters) (params CreateAuthAttemptChallengeParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "attempt_id",
+			In:   "path",
+		}
+		params.AttemptID = packed[key].(AttemptID)
+	}
+	return params
+}
+
+func decodeCreateAuthAttemptChallengeParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateAuthAttemptChallengeParams, _ error) {
+	// Decode path: attempt_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "attempt_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotAttemptIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotAttemptIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.AttemptID = AttemptID(paramsDotAttemptIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.AttemptID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "attempt_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// CreateAuthAttemptHandoffParams is parameters of createAuthAttemptHandoff operation.
+type CreateAuthAttemptHandoffParams struct {
+	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
+	AttemptID AttemptID
 	// Optional retry key for safe retries of the call.
 	// Retries carrying the same key within the call window return the cached
 	// payload without creating a new resource. See details in the endpoint description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
-func unpackCreateApplicationParams(packed middleware.Parameters) (params CreateApplicationParams) {
+func unpackCreateAuthAttemptHandoffParams(packed middleware.Parameters) (params CreateAuthAttemptHandoffParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
+			Name: "attempt_id",
+			In:   "path",
 		}
-		params.ProjectID = packed[key].(ProjectID)
+		params.AttemptID = packed[key].(AttemptID)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -514,20 +648,28 @@ func unpackCreateApplicationParams(packed middleware.Parameters) (params CreateA
 	return params
 }
 
-func decodeCreateApplicationParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateApplicationParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
+func decodeCreateAuthAttemptHandoffParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateAuthAttemptHandoffParams, _ error) {
 	h := uri.NewHeaderDecoder(r.Header)
-	// Decode query: project_id.
+	// Decode path: attempt_id.
 	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
 		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "attempt_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
 
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
+			if err := func() error {
+				var paramsDotAttemptIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -539,18 +681,18 @@ func decodeCreateApplicationParams(args [0]string, argsEscaped bool, r *http.Req
 						return err
 					}
 
-					paramsDotProjectIDVal = c
+					paramsDotAttemptIDVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				params.AttemptID = AttemptID(paramsDotAttemptIDVal)
 				return nil
-			}); err != nil {
+			}(); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
+				if err := params.AttemptID.Validate(); err != nil {
 					return err
 				}
 				return nil
@@ -558,13 +700,13 @@ func decodeCreateApplicationParams(args [0]string, argsEscaped bool, r *http.Req
 				return err
 			}
 		} else {
-			return err
+			return validate.ErrFieldRequired
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
+			Name: "attempt_id",
+			In:   "path",
 			Err:  err,
 		}
 	}
@@ -604,81 +746,6 @@ func decodeCreateApplicationParams(args [0]string, argsEscaped bool, r *http.Req
 		return params, &ogenerrors.DecodeParamError{
 			Name: "Idempotency-Key",
 			In:   "header",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// CreateBrandingParams is parameters of createBranding operation.
-type CreateBrandingParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
-}
-
-func unpackCreateBrandingParams(packed middleware.Parameters) (params CreateBrandingParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	return params
-}
-
-func decodeCreateBrandingParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateBrandingParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
 			Err:  err,
 		}
 	}
@@ -902,215 +969,6 @@ func decodeCreateGrantParams(args [0]string, argsEscaped bool, r *http.Request) 
 	return params, nil
 }
 
-// CreateHandoffParams is parameters of createHandoff operation.
-type CreateHandoffParams struct {
-	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
-	AttemptID AttemptID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
-	IdempotencyKey OptString `json:",omitempty,omitzero"`
-}
-
-func unpackCreateHandoffParams(packed middleware.Parameters) (params CreateHandoffParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "attempt_id",
-			In:   "path",
-		}
-		params.AttemptID = packed[key].(AttemptID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "Idempotency-Key",
-			In:   "header",
-		}
-		if v, ok := packed[key]; ok {
-			params.IdempotencyKey = v.(OptString)
-		}
-	}
-	return params
-}
-
-func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateHandoffParams, _ error) {
-	h := uri.NewHeaderDecoder(r.Header)
-	// Decode path: attempt_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "attempt_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotAttemptIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotAttemptIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.AttemptID = AttemptID(paramsDotAttemptIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.AttemptID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "attempt_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode header: Idempotency-Key.
-	if err := func() error {
-		cfg := uri.HeaderParameterDecodingConfig{
-			Name:    "Idempotency-Key",
-			Explode: false,
-		}
-		if err := h.HasParam(cfg); err == nil {
-			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotIdempotencyKeyVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotIdempotencyKeyVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.IdempotencyKey.SetTo(paramsDotIdempotencyKeyVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "Idempotency-Key",
-			In:   "header",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// CreateIdpParams is parameters of createIdp operation.
-type CreateIdpParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
-}
-
-func unpackCreateIdpParams(packed middleware.Parameters) (params CreateIdpParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	return params
-}
-
-func decodeCreateIdpParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateIdpParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
 // CreateInvitationParams is parameters of createInvitation operation.
 type CreateInvitationParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
@@ -1186,6 +1044,88 @@ func decodeCreateInvitationParams(args [0]string, argsEscaped bool, r *http.Requ
 	return params, nil
 }
 
+// CreateProjectClaimParams is parameters of createProjectClaim operation.
+type CreateProjectClaimParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
+	ProjectID ProjectID
+}
+
+func unpackCreateProjectClaimParams(packed middleware.Parameters) (params CreateProjectClaimParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "path",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodeCreateProjectClaimParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateProjectClaimParams, _ error) {
+	// Decode path: project_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // CreateReleaseParams is parameters of createRelease operation.
 type CreateReleaseParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
@@ -1254,156 +1194,6 @@ func decodeCreateReleaseParams(args [0]string, argsEscaped bool, r *http.Request
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// CreateSchemaParams is parameters of createSchema operation.
-type CreateSchemaParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
-	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
-	// returns.
-	TeamID OptTeamID `json:",omitempty,omitzero"`
-}
-
-func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchemaParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "team_id",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.TeamID = v.(OptTeamID)
-		}
-	}
-	return params
-}
-
-func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateSchemaParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: team_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "team_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotTeamIDVal TeamID
-				if err := func() error {
-					var paramsDotTeamIDValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotTeamIDValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.TeamID.SetTo(paramsDotTeamIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.TeamID.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -1644,38 +1434,26 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// DeleteGrantParams is parameters of deleteGrant operation.
-type DeleteGrantParams struct {
-	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
-	// `queryGrants` (`POST /grants/query`) lists.
-	ID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
+// CreateUserPasskeyRegistrationParams is parameters of createUserPasskeyRegistration operation.
+type CreateUserPasskeyRegistrationParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
 }
 
-func unpackDeleteGrantParams(packed middleware.Parameters) (params DeleteGrantParams) {
+func unpackCreateUserPasskeyRegistrationParams(packed middleware.Parameters) (params CreateUserPasskeyRegistrationParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "user_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
+		params.UserID = packed[key].(UserID)
 	}
 	return params
 }
 
-func decodeDeleteGrantParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteGrantParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
+func decodeCreateUserPasskeyRegistrationParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateUserPasskeyRegistrationParams, _ error) {
+	// Decode path: user_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -1687,50 +1465,14 @@ func decodeDeleteGrantParams(args [1]string, argsEscaped bool, r *http.Request) 
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "user_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
 			})
 
 			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ID = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
+				var paramsDotUserIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -1742,18 +1484,18 @@ func decodeDeleteGrantParams(args [1]string, argsEscaped bool, r *http.Request) 
 						return err
 					}
 
-					paramsDotProjectIDVal = c
+					paramsDotUserIDVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				params.UserID = UserID(paramsDotUserIDVal)
 				return nil
-			}); err != nil {
+			}(); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
+				if err := params.UserID.Validate(); err != nil {
 					return err
 				}
 				return nil
@@ -1761,27 +1503,27 @@ func decodeDeleteGrantParams(args [1]string, argsEscaped bool, r *http.Request) 
 				return err
 			}
 		} else {
-			return err
+			return validate.ErrFieldRequired
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
+			Name: "user_id",
+			In:   "path",
 			Err:  err,
 		}
 	}
 	return params, nil
 }
 
-// DeleteTeamParams is parameters of deleteTeam operation.
-type DeleteTeamParams struct {
+// DeactivateTeamParams is parameters of deactivateTeam operation.
+type DeactivateTeamParams struct {
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
 	TeamID TeamID
 }
 
-func unpackDeleteTeamParams(packed middleware.Parameters) (params DeleteTeamParams) {
+func unpackDeactivateTeamParams(packed middleware.Parameters) (params DeactivateTeamParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "team_id",
@@ -1792,7 +1534,7 @@ func unpackDeleteTeamParams(packed middleware.Parameters) (params DeleteTeamPara
 	return params
 }
 
-func decodeDeleteTeamParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteTeamParams, _ error) {
+func decodeDeactivateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (params DeactivateTeamParams, _ error) {
 	// Decode path: team_id.
 	if err := func() error {
 		param := args[0]
@@ -1856,14 +1598,144 @@ func decodeDeleteTeamParams(args [1]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// DeleteUserByIDParams is parameters of DeleteUserByID operation.
-type DeleteUserByIDParams struct {
+// DeleteGrantParams is parameters of deleteGrant operation.
+type DeleteGrantParams struct {
+	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
+	// `queryGrants` (`POST /grants/query`) lists.
+	GrantID string
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
+func unpackDeleteGrantParams(packed middleware.Parameters) (params DeleteGrantParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "grant_id",
+			In:   "path",
+		}
+		params.GrantID = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodeDeleteGrantParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteGrantParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: grant_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "grant_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.GrantID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "grant_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// DeleteUserParams is parameters of deleteUser operation.
+type DeleteUserParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
 }
 
-func unpackDeleteUserByIDParams(packed middleware.Parameters) (params DeleteUserByIDParams) {
+func unpackDeleteUserParams(packed middleware.Parameters) (params DeleteUserParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "user_id",
@@ -1874,7 +1746,7 @@ func unpackDeleteUserByIDParams(packed middleware.Parameters) (params DeleteUser
 	return params
 }
 
-func decodeDeleteUserByIDParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteUserByIDParams, _ error) {
+func decodeDeleteUserParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteUserParams, _ error) {
 	// Decode path: user_id.
 	if err := func() error {
 		param := args[0]
@@ -2352,154 +2224,17 @@ func decodeExchangeHandoffParams(args [0]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
-// FinishUserPasskeyRegistrationParams is parameters of finishUserPasskeyRegistration operation.
-type FinishUserPasskeyRegistrationParams struct {
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
-	// The `registration_id` that `beginUserPasskeyRegistration` (`POST
-	// /users/{user_id}/passkeys/registrations`) returns.
-	RegistrationID string
-}
-
-func unpackFinishUserPasskeyRegistrationParams(packed middleware.Parameters) (params FinishUserPasskeyRegistrationParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "registration_id",
-			In:   "path",
-		}
-		params.RegistrationID = packed[key].(string)
-	}
-	return params
-}
-
-func decodeFinishUserPasskeyRegistrationParams(args [2]string, argsEscaped bool, r *http.Request) (params FinishUserPasskeyRegistrationParams, _ error) {
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode path: registration_id.
-	if err := func() error {
-		param := args[1]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[1])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "registration_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.RegistrationID = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "registration_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// GetApplicationByIdParams is parameters of getApplicationById operation.
-type GetApplicationByIdParams struct {
+// GetApplicationParams is parameters of getApplication operation.
+type GetApplicationParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The application ID: the `id` that `createApplication` (`POST /applications`) returns.
-	ID string
+	// The application ID: the `id` that `publishApplication` (`POST /applications`) returns.
+	ApplicationID string
 }
 
-func unpackGetApplicationByIdParams(packed middleware.Parameters) (params GetApplicationByIdParams) {
+func unpackGetApplicationParams(packed middleware.Parameters) (params GetApplicationParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -2509,15 +2244,15 @@ func unpackGetApplicationByIdParams(packed middleware.Parameters) (params GetApp
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "application_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.ApplicationID = packed[key].(string)
 	}
 	return params
 }
 
-func decodeGetApplicationByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetApplicationByIdParams, _ error) {
+func decodeGetApplicationParams(args [1]string, argsEscaped bool, r *http.Request) (params GetApplicationParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -2570,7 +2305,7 @@ func decodeGetApplicationByIdParams(args [1]string, argsEscaped bool, r *http.Re
 			Err:  err,
 		}
 	}
-	// Decode path: id.
+	// Decode path: application_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -2582,7 +2317,7 @@ func decodeGetApplicationByIdParams(args [1]string, argsEscaped bool, r *http.Re
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "application_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -2599,7 +2334,7 @@ func decodeGetApplicationByIdParams(args [1]string, argsEscaped bool, r *http.Re
 					return err
 				}
 
-				params.ID = c
+				params.ApplicationID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -2610,7 +2345,7 @@ func decodeGetApplicationByIdParams(args [1]string, argsEscaped bool, r *http.Re
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "application_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -2699,26 +2434,26 @@ func decodeGetAuthAttemptParams(args [1]string, argsEscaped bool, r *http.Reques
 	return params, nil
 }
 
-// GetBrandingByIdParams is parameters of getBrandingById operation.
-type GetBrandingByIdParams struct {
-	// The branding revision ID: the `id` that `createBranding` (`POST /branding`) returns or
+// GetBrandingParams is parameters of getBranding operation.
+type GetBrandingParams struct {
+	// The branding revision ID: the `id` that `publishBranding` (`POST /branding`) returns or
 	// `listBranding` (`GET /branding`) lists.
-	ID string
+	BrandingID string
 }
 
-func unpackGetBrandingByIdParams(packed middleware.Parameters) (params GetBrandingByIdParams) {
+func unpackGetBrandingParams(packed middleware.Parameters) (params GetBrandingParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "branding_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.BrandingID = packed[key].(string)
 	}
 	return params
 }
 
-func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetBrandingByIdParams, _ error) {
-	// Decode path: id.
+func decodeGetBrandingParams(args [1]string, argsEscaped bool, r *http.Request) (params GetBrandingParams, _ error) {
+	// Decode path: branding_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -2730,7 +2465,7 @@ func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Reque
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "branding_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -2747,7 +2482,7 @@ func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Reque
 					return err
 				}
 
-				params.ID = c
+				params.BrandingID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -2758,7 +2493,7 @@ func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Reque
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "branding_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -2766,298 +2501,8 @@ func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
-// GetClaimStatusParams is parameters of getClaimStatus operation.
-type GetClaimStatusParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
-	ProjectID ProjectID
-	// The `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returns for this
-	// claim. The claim URL
-	// carries it.
-	ChallengeID ChallengeID
-}
-
-func unpackGetClaimStatusParams(packed middleware.Parameters) (params GetClaimStatusParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "path",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "challenge_id",
-			In:   "query",
-		}
-		params.ChallengeID = packed[key].(ChallengeID)
-	}
-	return params
-}
-
-func decodeGetClaimStatusParams(args [1]string, argsEscaped bool, r *http.Request) (params GetClaimStatusParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: project_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "project_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode query: challenge_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "challenge_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotChallengeIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotChallengeIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ChallengeID = ChallengeID(paramsDotChallengeIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ChallengeID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "challenge_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// GetClaimWindowParams is parameters of getClaimWindow operation.
-type GetClaimWindowParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
-	ProjectID ProjectID
-	// The `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returns for this
-	// claim. The claim URL
-	// carries it.
-	ChallengeID ChallengeID
-}
-
-func unpackGetClaimWindowParams(packed middleware.Parameters) (params GetClaimWindowParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "path",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "challenge_id",
-			In:   "query",
-		}
-		params.ChallengeID = packed[key].(ChallengeID)
-	}
-	return params
-}
-
-func decodeGetClaimWindowParams(args [1]string, argsEscaped bool, r *http.Request) (params GetClaimWindowParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: project_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "project_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode query: challenge_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "challenge_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotChallengeIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotChallengeIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ChallengeID = ChallengeID(paramsDotChallengeIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ChallengeID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "challenge_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// GetDeploymentByIdParams is parameters of getDeploymentById operation.
-type GetDeploymentByIdParams struct {
+// GetDeploymentParams is parameters of getDeployment operation.
+type GetDeploymentParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -3067,7 +2512,7 @@ type GetDeploymentByIdParams struct {
 	DeploymentID DeploymentID
 }
 
-func unpackGetDeploymentByIdParams(packed middleware.Parameters) (params GetDeploymentByIdParams) {
+func unpackGetDeploymentParams(packed middleware.Parameters) (params GetDeploymentParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -3085,152 +2530,7 @@ func unpackGetDeploymentByIdParams(packed middleware.Parameters) (params GetDepl
 	return params
 }
 
-func decodeGetDeploymentByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetDeploymentByIdParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode path: deployment_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "deployment_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotDeploymentIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotDeploymentIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.DeploymentID = DeploymentID(paramsDotDeploymentIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.DeploymentID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "deployment_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// GetDeploymentVariablesParams is parameters of getDeploymentVariables operation.
-type GetDeploymentVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
-	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
-	// `listDeployments` (`GET /deployments`) lists.
-	DeploymentID DeploymentID
-}
-
-func unpackGetDeploymentVariablesParams(packed middleware.Parameters) (params GetDeploymentVariablesParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "deployment_id",
-			In:   "path",
-		}
-		params.DeploymentID = packed[key].(DeploymentID)
-	}
-	return params
-}
-
-func decodeGetDeploymentVariablesParams(args [1]string, argsEscaped bool, r *http.Request) (params GetDeploymentVariablesParams, _ error) {
+func decodeGetDeploymentParams(args [1]string, argsEscaped bool, r *http.Request) (params GetDeploymentParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -3349,7 +2649,7 @@ func decodeGetDeploymentVariablesParams(args [1]string, argsEscaped bool, r *htt
 // GetEventParams is parameters of getEvent operation.
 type GetEventParams struct {
 	// The event ID (`evt_<opaque>`): the `id` that `listEvents` (`GET /events`) returns.
-	ID string
+	EventID string
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -3359,10 +2659,10 @@ type GetEventParams struct {
 func unpackGetEventParams(packed middleware.Parameters) (params GetEventParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "event_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.EventID = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -3376,7 +2676,7 @@ func unpackGetEventParams(packed middleware.Parameters) (params GetEventParams) 
 
 func decodeGetEventParams(args [1]string, argsEscaped bool, r *http.Request) (params GetEventParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
+	// Decode path: event_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -3388,7 +2688,7 @@ func decodeGetEventParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "event_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -3405,7 +2705,7 @@ func decodeGetEventParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 					return err
 				}
 
-				params.ID = c
+				params.EventID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -3416,7 +2716,7 @@ func decodeGetEventParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "event_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -3477,23 +2777,23 @@ func decodeGetEventParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 
 // GetFlowDefinitionParams is parameters of getFlowDefinition operation.
 type GetFlowDefinitionParams struct {
-	// The `id` that `createFlowDefinition` (`POST /flow_definitions`) returns.
-	ID string
+	// The `id` that `publishFlowDefinition` (`POST /flow_definitions`) returns.
+	FlowDefinitionID string
 }
 
 func unpackGetFlowDefinitionParams(packed middleware.Parameters) (params GetFlowDefinitionParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "flow_definition_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.FlowDefinitionID = packed[key].(string)
 	}
 	return params
 }
 
 func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Request) (params GetFlowDefinitionParams, _ error) {
-	// Decode path: id.
+	// Decode path: flow_definition_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -3505,7 +2805,7 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "flow_definition_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -3522,7 +2822,7 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 					return err
 				}
 
-				params.ID = c
+				params.FlowDefinitionID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -3533,7 +2833,7 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "flow_definition_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -3543,14 +2843,14 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 
 // GetFlowStepParams is parameters of getFlowStep operation.
 type GetFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.
 	// Used to look up the correct flow state from the encrypted cookie,
 	// which can hold multiple concurrent flows. May change between responses
 	// when a flow pivot or pop occurs — always use the `id` from the latest response.
-	ID string
+	FlowID string
 	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{id}` path parameter must name that flow, any other id is
+	// `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
+	// flow; the `{flow_id}` path parameter must name that flow, any other id is
 	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
@@ -3560,10 +2860,10 @@ type GetFlowStepParams struct {
 func unpackGetFlowStepParams(packed middleware.Parameters) (params GetFlowStepParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "flow_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.FlowID = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -3577,7 +2877,7 @@ func unpackGetFlowStepParams(packed middleware.Parameters) (params GetFlowStepPa
 
 func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) (params GetFlowStepParams, _ error) {
 	c := uri.NewCookieDecoder(r)
-	// Decode path: id.
+	// Decode path: flow_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -3589,7 +2889,7 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "flow_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -3606,7 +2906,7 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 					return err
 				}
 
-				params.ID = c
+				params.FlowID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -3617,7 +2917,7 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "flow_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -3663,7 +2963,7 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 type GetGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
 	// `queryGrants` (`POST /grants/query`) lists.
-	ID string
+	GrantID string
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -3677,10 +2977,10 @@ type GetGrantParams struct {
 func unpackGetGrantParams(packed middleware.Parameters) (params GetGrantParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "grant_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.GrantID = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -3703,7 +3003,7 @@ func unpackGetGrantParams(packed middleware.Parameters) (params GetGrantParams) 
 
 func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (params GetGrantParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
+	// Decode path: grant_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -3715,7 +3015,7 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "grant_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -3732,7 +3032,7 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 					return err
 				}
 
-				params.ID = c
+				params.GrantID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -3743,7 +3043,7 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "grant_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -3881,18 +3181,18 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 	return params, nil
 }
 
-// GetIdpByIdParams is parameters of getIdpById operation.
-type GetIdpByIdParams struct {
+// GetIdpParams is parameters of getIdp operation.
+type GetIdpParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection ID: the `id` that `createIdp` (`POST /idps`) returns or `queryIdps` (`POST
+	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST
 	// /idps/query`) lists.
-	ID string
+	IdpID string
 }
 
-func unpackGetIdpByIdParams(packed middleware.Parameters) (params GetIdpByIdParams) {
+func unpackGetIdpParams(packed middleware.Parameters) (params GetIdpParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -3902,15 +3202,15 @@ func unpackGetIdpByIdParams(packed middleware.Parameters) (params GetIdpByIdPara
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "idp_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.IdpID = packed[key].(string)
 	}
 	return params
 }
 
-func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetIdpByIdParams, _ error) {
+func decodeGetIdpParams(args [1]string, argsEscaped bool, r *http.Request) (params GetIdpParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -3963,7 +3263,7 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 			Err:  err,
 		}
 	}
-	// Decode path: id.
+	// Decode path: idp_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -3975,7 +3275,7 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "idp_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -3992,7 +3292,7 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 					return err
 				}
 
-				params.ID = c
+				params.IdpID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -4003,7 +3303,7 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "idp_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -4011,18 +3311,18 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// GetIdpRevisionByIdParams is parameters of getIdpRevisionById operation.
-type GetIdpRevisionByIdParams struct {
+// GetIdpRevisionParams is parameters of getIdpRevision operation.
+type GetIdpRevisionParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The revision ID: the `revision_id` that `createIdp` (`POST /idps`) returns, or that
-	// `listIdpRevisions` (`GET /idps/{id}/revisions`) lists.
+	// The revision ID: the `revision_id` that `publishIdp` (`POST /idps`) returns, or that
+	// `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists.
 	RevisionID string
 }
 
-func unpackGetIdpRevisionByIdParams(packed middleware.Parameters) (params GetIdpRevisionByIdParams) {
+func unpackGetIdpRevisionParams(packed middleware.Parameters) (params GetIdpRevisionParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -4040,7 +3340,7 @@ func unpackGetIdpRevisionByIdParams(packed middleware.Parameters) (params GetIdp
 	return params
 }
 
-func decodeGetIdpRevisionByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetIdpRevisionByIdParams, _ error) {
+func decodeGetIdpRevisionParams(args [1]string, argsEscaped bool, r *http.Request) (params GetIdpRevisionParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -4145,7 +3445,7 @@ func decodeGetIdpRevisionByIdParams(args [1]string, argsEscaped bool, r *http.Re
 type GetInvitationParams struct {
 	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
 	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
-	ID InvitationID
+	InvitationID InvitationID
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -4155,10 +3455,10 @@ type GetInvitationParams struct {
 func unpackGetInvitationParams(packed middleware.Parameters) (params GetInvitationParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "invitation_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(InvitationID)
+		params.InvitationID = packed[key].(InvitationID)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -4172,7 +3472,7 @@ func unpackGetInvitationParams(packed middleware.Parameters) (params GetInvitati
 
 func decodeGetInvitationParams(args [1]string, argsEscaped bool, r *http.Request) (params GetInvitationParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
+	// Decode path: invitation_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -4184,14 +3484,14 @@ func decodeGetInvitationParams(args [1]string, argsEscaped bool, r *http.Request
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "invitation_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
 			})
 
 			if err := func() error {
-				var paramsDotIDVal string
+				var paramsDotInvitationIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -4203,18 +3503,18 @@ func decodeGetInvitationParams(args [1]string, argsEscaped bool, r *http.Request
 						return err
 					}
 
-					paramsDotIDVal = c
+					paramsDotInvitationIDVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ID = InvitationID(paramsDotIDVal)
+				params.InvitationID = InvitationID(paramsDotInvitationIDVal)
 				return nil
 			}(); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ID.Validate(); err != nil {
+				if err := params.InvitationID.Validate(); err != nil {
 					return err
 				}
 				return nil
@@ -4227,7 +3527,7 @@ func decodeGetInvitationParams(args [1]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "invitation_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -5136,8 +4436,298 @@ func decodeGetProjectParams(args [1]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// GetReleaseByIdParams is parameters of getReleaseById operation.
-type GetReleaseByIdParams struct {
+// GetProjectClaimStatusParams is parameters of getProjectClaimStatus operation.
+type GetProjectClaimStatusParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
+	ProjectID ProjectID
+	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns
+	// for this claim. The claim URL
+	// carries it.
+	ChallengeID ChallengeID
+}
+
+func unpackGetProjectClaimStatusParams(packed middleware.Parameters) (params GetProjectClaimStatusParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "path",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "challenge_id",
+			In:   "query",
+		}
+		params.ChallengeID = packed[key].(ChallengeID)
+	}
+	return params
+}
+
+func decodeGetProjectClaimStatusParams(args [1]string, argsEscaped bool, r *http.Request) (params GetProjectClaimStatusParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: project_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode query: challenge_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "challenge_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotChallengeIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotChallengeIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ChallengeID = ChallengeID(paramsDotChallengeIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ChallengeID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "challenge_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetProjectClaimWindowParams is parameters of getProjectClaimWindow operation.
+type GetProjectClaimWindowParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
+	ProjectID ProjectID
+	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns
+	// for this claim. The claim URL
+	// carries it.
+	ChallengeID ChallengeID
+}
+
+func unpackGetProjectClaimWindowParams(packed middleware.Parameters) (params GetProjectClaimWindowParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "path",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "challenge_id",
+			In:   "query",
+		}
+		params.ChallengeID = packed[key].(ChallengeID)
+	}
+	return params
+}
+
+func decodeGetProjectClaimWindowParams(args [1]string, argsEscaped bool, r *http.Request) (params GetProjectClaimWindowParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: project_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode query: challenge_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "challenge_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotChallengeIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotChallengeIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ChallengeID = ChallengeID(paramsDotChallengeIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ChallengeID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "challenge_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetReleaseParams is parameters of getRelease operation.
+type GetReleaseParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -5147,7 +4737,7 @@ type GetReleaseByIdParams struct {
 	ReleaseID ReleaseID
 }
 
-func unpackGetReleaseByIdParams(packed middleware.Parameters) (params GetReleaseByIdParams) {
+func unpackGetReleaseParams(packed middleware.Parameters) (params GetReleaseParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -5165,7 +4755,7 @@ func unpackGetReleaseByIdParams(packed middleware.Parameters) (params GetRelease
 	return params
 }
 
-func decodeGetReleaseByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetReleaseByIdParams, _ error) {
+func decodeGetReleaseParams(args [1]string, argsEscaped bool, r *http.Request) (params GetReleaseParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -5281,11 +4871,11 @@ func decodeGetReleaseByIdParams(args [1]string, argsEscaped bool, r *http.Reques
 	return params, nil
 }
 
-// GetSchemaByIdParams is parameters of getSchemaById operation.
-type GetSchemaByIdParams struct {
-	// The schema ID: the `id` that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET
+// GetSchemaParams is parameters of getSchema operation.
+type GetSchemaParams struct {
+	// The schema ID: the `id` that `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET
 	// /schemas`) lists.
-	ID string
+	SchemaID string
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
@@ -5294,13 +4884,13 @@ type GetSchemaByIdParams struct {
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
-func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaByIdParams) {
+func unpackGetSchemaParams(packed middleware.Parameters) (params GetSchemaParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "schema_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.SchemaID = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -5323,9 +4913,9 @@ func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaBy
 	return params
 }
 
-func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetSchemaByIdParams, _ error) {
+func decodeGetSchemaParams(args [1]string, argsEscaped bool, r *http.Request) (params GetSchemaParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
+	// Decode path: schema_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -5337,7 +4927,7 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "schema_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -5354,7 +4944,7 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 					return err
 				}
 
-				params.ID = c
+				params.SchemaID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -5365,7 +4955,7 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "schema_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -5664,8 +5254,8 @@ func decodeGetTeamParams(args [1]string, argsEscaped bool, r *http.Request) (par
 	return params, nil
 }
 
-// GetUserByIDParams is parameters of GetUserByID operation.
-type GetUserByIDParams struct {
+// GetUserParams is parameters of getUser operation.
+type GetUserParams struct {
 	// Serves the user only when they hold an active membership in this team,
 	// and answers `404` otherwise. Use the `id` that `createTeam` (`POST /teams`) returns or
 	// `queryTeams` (`POST /teams/query`) lists.
@@ -5686,7 +5276,7 @@ type GetUserByIDParams struct {
 	UserID UserID
 }
 
-func unpackGetUserByIDParams(packed middleware.Parameters) (params GetUserByIDParams) {
+func unpackGetUserParams(packed middleware.Parameters) (params GetUserParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "team_id",
@@ -5706,7 +5296,7 @@ func unpackGetUserByIDParams(packed middleware.Parameters) (params GetUserByIDPa
 	return params
 }
 
-func decodeGetUserByIDParams(args [1]string, argsEscaped bool, r *http.Request) (params GetUserByIDParams, _ error) {
+func decodeGetUserParams(args [1]string, argsEscaped bool, r *http.Request) (params GetUserParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: team_id.
 	if err := func() error {
@@ -6125,311 +5715,6 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 	return params, nil
 }
 
-// GetVariablesParams is parameters of getVariables operation.
-type GetVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
-	ProjectID ProjectID
-	// The kind of value to address. Omit it for both kinds.
-	Kind OptVariableKind `json:",omitempty,omitzero"`
-}
-
-func unpackGetVariablesParams(packed middleware.Parameters) (params GetVariablesParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "kind",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.Kind = v.(OptVariableKind)
-		}
-	}
-	return params
-}
-
-func decodeGetVariablesParams(args [0]string, argsEscaped bool, r *http.Request) (params GetVariablesParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: kind.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "kind",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotKindVal VariableKind
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotKindVal = VariableKind(c)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.Kind.SetTo(paramsDotKindVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.Kind.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "kind",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// InitClaimParams is parameters of initClaim operation.
-type InitClaimParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
-	ProjectID ProjectID
-}
-
-func unpackInitClaimParams(packed middleware.Parameters) (params InitClaimParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "path",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	return params
-}
-
-func decodeInitClaimParams(args [1]string, argsEscaped bool, r *http.Request) (params InitClaimParams, _ error) {
-	// Decode path: project_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "project_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// IssueChallengeParams is parameters of issueChallenge operation.
-type IssueChallengeParams struct {
-	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
-	AttemptID AttemptID
-}
-
-func unpackIssueChallengeParams(packed middleware.Parameters) (params IssueChallengeParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "attempt_id",
-			In:   "path",
-		}
-		params.AttemptID = packed[key].(AttemptID)
-	}
-	return params
-}
-
-func decodeIssueChallengeParams(args [1]string, argsEscaped bool, r *http.Request) (params IssueChallengeParams, _ error) {
-	// Decode path: attempt_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "attempt_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotAttemptIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotAttemptIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.AttemptID = AttemptID(paramsDotAttemptIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.AttemptID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "attempt_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
 // ListBrandingParams is parameters of listBranding operation.
 type ListBrandingParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
@@ -6499,6 +5784,151 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
 			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// ListDeploymentVariablesParams is parameters of listDeploymentVariables operation.
+type ListDeploymentVariablesParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
+	// `listDeployments` (`GET /deployments`) lists.
+	DeploymentID DeploymentID
+}
+
+func unpackListDeploymentVariablesParams(packed middleware.Parameters) (params ListDeploymentVariablesParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "deployment_id",
+			In:   "path",
+		}
+		params.DeploymentID = packed[key].(DeploymentID)
+	}
+	return params
+}
+
+func decodeListDeploymentVariablesParams(args [1]string, argsEscaped bool, r *http.Request) (params ListDeploymentVariablesParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode path: deployment_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "deployment_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotDeploymentIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotDeploymentIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.DeploymentID = DeploymentID(paramsDotDeploymentIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.DeploymentID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "deployment_id",
+			In:   "path",
 			Err:  err,
 		}
 	}
@@ -8618,9 +8048,9 @@ type ListIdpRevisionsParams struct {
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection ID: the `id` that `createIdp` (`POST /idps`) returns or `queryIdps` (`POST
+	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST
 	// /idps/query`) lists.
-	ID string
+	IdpID string
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results.
@@ -8640,10 +8070,10 @@ func unpackListIdpRevisionsParams(packed middleware.Parameters) (params ListIdpR
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "id",
+			Name: "idp_id",
 			In:   "path",
 		}
-		params.ID = packed[key].(string)
+		params.IdpID = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -8719,7 +8149,7 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 			Err:  err,
 		}
 	}
-	// Decode path: id.
+	// Decode path: idp_id.
 	if err := func() error {
 		param := args[0]
 		if argsEscaped {
@@ -8731,7 +8161,7 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
+				Param:   "idp_id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -8748,7 +8178,7 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 					return err
 				}
 
-				params.ID = c
+				params.IdpID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -8759,7 +8189,7 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
+			Name: "idp_id",
 			In:   "path",
 			Err:  err,
 		}
@@ -10877,230 +10307,6 @@ func decodeListPolicyRevisionsParams(args [1]string, argsEscaped bool, r *http.R
 	return params, nil
 }
 
-// ListPreviewsParams is parameters of listPreviews operation.
-type ListPreviewsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
-	ProjectID ProjectID
-	// Maximum number of items to return.
-	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
-	PageToken OptPageToken `json:",omitempty,omitzero"`
-}
-
-func unpackListPreviewsParams(packed middleware.Parameters) (params ListPreviewsParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "path",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "limit",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.Limit = v.(OptLimit)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "page_token",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.PageToken = v.(OptPageToken)
-		}
-	}
-	return params
-}
-
-func decodeListPreviewsParams(args [1]string, argsEscaped bool, r *http.Request) (params ListPreviewsParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: project_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "project_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Set default value for query: limit.
-	{
-		val := int(20)
-		params.Limit.SetTo(Limit(val))
-	}
-	// Decode query: limit.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "limit",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotLimitVal Limit
-				if err := func() error {
-					var paramsDotLimitValVal int
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToInt(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotLimitValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotLimitVal = Limit(paramsDotLimitValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.Limit.SetTo(paramsDotLimitVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.Limit.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "limit",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: page_token.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "page_token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotPageTokenVal PageToken
-				if err := func() error {
-					var paramsDotPageTokenValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotPageTokenValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotPageTokenVal = PageToken(paramsDotPageTokenValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.PageToken.SetTo(paramsDotPageTokenVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "page_token",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
 // ListProjectAdminsParams is parameters of listProjectAdmins operation.
 type ListProjectAdminsParams struct {
 	// Maximum number of items to return.
@@ -11317,6 +10523,230 @@ func decodeListProjectAdminsParams(args [1]string, argsEscaped bool, r *http.Req
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// ListProjectPreviewsParams is parameters of listProjectPreviews operation.
+type ListProjectPreviewsParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
+	ProjectID ProjectID
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+}
+
+func unpackListProjectPreviewsParams(packed middleware.Parameters) (params ListProjectPreviewsParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "path",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "limit",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Limit = v.(OptLimit)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "page_token",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.PageToken = v.(OptPageToken)
+		}
+	}
+	return params
+}
+
+func decodeListProjectPreviewsParams(args [1]string, argsEscaped bool, r *http.Request) (params ListProjectPreviewsParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: project_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Set default value for query: limit.
+	{
+		val := int(20)
+		params.Limit.SetTo(Limit(val))
+	}
+	// Decode query: limit.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotLimitVal Limit
+				if err := func() error {
+					var paramsDotLimitValVal int
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToInt(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotLimitValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotLimitVal = Limit(paramsDotLimitValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Limit.SetTo(paramsDotLimitVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Limit.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "limit",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: page_token.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotPageTokenVal PageToken
+				if err := func() error {
+					var paramsDotPageTokenValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotPageTokenValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotPageTokenVal = PageToken(paramsDotPageTokenValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.PageToken.SetTo(paramsDotPageTokenVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "page_token",
+			In:   "query",
 			Err:  err,
 		}
 	}
@@ -12829,35 +12259,37 @@ func decodeListUserTeamsParams(args [1]string, argsEscaped bool, r *http.Request
 	return params, nil
 }
 
-// PatchMyUserParams is parameters of patchMyUser operation.
-type PatchMyUserParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
-	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
-	ProjectID OptProjectID `json:",omitempty,omitzero"`
+// ListVariablesParams is parameters of listVariables operation.
+type ListVariablesParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The kind of value to address. Omit it for both kinds.
+	Kind OptVariableKind `json:",omitempty,omitzero"`
 }
 
-func unpackPatchMyUserParams(packed middleware.Parameters) (params PatchMyUserParams) {
+func unpackListVariablesParams(packed middleware.Parameters) (params ListVariablesParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
 			In:   "query",
 		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "kind",
+			In:   "query",
+		}
 		if v, ok := packed[key]; ok {
-			params.ProjectID = v.(OptProjectID)
+			params.Kind = v.(OptVariableKind)
 		}
 	}
 	return params
 }
 
-func decodePatchMyUserParams(args [0]string, argsEscaped bool, r *http.Request) (params PatchMyUserParams, _ error) {
+func decodeListVariablesParams(args [0]string, argsEscaped bool, r *http.Request) (params ListVariablesParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -12869,100 +12301,6 @@ func decodePatchMyUserParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal ProjectID
-				if err := func() error {
-					var paramsDotProjectIDValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotProjectIDValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID.SetTo(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.ProjectID.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// PatchProjectParams is parameters of patchProject operation.
-type PatchProjectParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
-	ProjectID ProjectID
-}
-
-func unpackPatchProjectParams(packed middleware.Parameters) (params PatchProjectParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "path",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	return params
-}
-
-func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request) (params PatchProjectParams, _ error) {
-	// Decode path: project_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "project_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
 				var paramsDotProjectIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
@@ -12982,7 +12320,7 @@ func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request)
 				}
 				params.ProjectID = ProjectID(paramsDotProjectIDVal)
 				return nil
-			}(); err != nil {
+			}); err != nil {
 				return err
 			}
 			if err := func() error {
@@ -12994,58 +12332,27 @@ func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request)
 				return err
 			}
 		} else {
-			return validate.ErrFieldRequired
+			return err
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
-			In:   "path",
+			In:   "query",
 			Err:  err,
 		}
 	}
-	return params, nil
-}
-
-// PatchUserByIDParams is parameters of PatchUserByID operation.
-type PatchUserByIDParams struct {
-	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
-	// returns.
-	UserID UserID
-}
-
-func unpackPatchUserByIDParams(packed middleware.Parameters) (params PatchUserByIDParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
-	return params
-}
-
-func decodePatchUserByIDParams(args [1]string, argsEscaped bool, r *http.Request) (params PatchUserByIDParams, _ error) {
-	// Decode path: user_id.
+	// Decode query: kind.
 	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "kind",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
 		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
 
-			if err := func() error {
-				var paramsDotUserIDVal string
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotKindVal VariableKind
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -13057,18 +12364,112 @@ func decodePatchUserByIDParams(args [1]string, argsEscaped bool, r *http.Request
 						return err
 					}
 
-					paramsDotUserIDVal = c
+					paramsDotKindVal = VariableKind(c)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.UserID = UserID(paramsDotUserIDVal)
+				params.Kind.SetTo(paramsDotKindVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Kind.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
 				return nil
 			}(); err != nil {
 				return err
 			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "kind",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// PublishApplicationParams is parameters of publishApplication operation.
+type PublishApplicationParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
+}
+
+func unpackPublishApplicationParams(packed middleware.Parameters) (params PublishApplicationParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Idempotency-Key",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.IdempotencyKey = v.(OptString)
+		}
+	}
+	return params
+}
+
+func decodePublishApplicationParams(args [0]string, argsEscaped bool, r *http.Request) (params PublishApplicationParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
 			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
+				if err := params.ProjectID.Validate(); err != nil {
 					return err
 				}
 				return nil
@@ -13076,13 +12477,202 @@ func decodePatchUserByIDParams(args [1]string, argsEscaped bool, r *http.Request
 				return err
 			}
 		} else {
-			return validate.ErrFieldRequired
+			return err
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode header: Idempotency-Key.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Idempotency-Key",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotIdempotencyKeyVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotIdempotencyKeyVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.IdempotencyKey.SetTo(paramsDotIdempotencyKeyVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Idempotency-Key",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// PublishBrandingParams is parameters of publishBranding operation.
+type PublishBrandingParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
+func unpackPublishBrandingParams(packed middleware.Parameters) (params PublishBrandingParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodePublishBrandingParams(args [0]string, argsEscaped bool, r *http.Request) (params PublishBrandingParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// PublishIdpParams is parameters of publishIdp operation.
+type PublishIdpParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
+func unpackPublishIdpParams(packed middleware.Parameters) (params PublishIdpParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodePublishIdpParams(args [0]string, argsEscaped bool, r *http.Request) (params PublishIdpParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
 			Err:  err,
 		}
 	}
@@ -13157,6 +12747,156 @@ func decodePublishPolicyParams(args [0]string, argsEscaped bool, r *http.Request
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// PublishSchemaParams is parameters of publishSchema operation.
+type PublishSchemaParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
+	TeamID OptTeamID `json:",omitempty,omitzero"`
+}
+
+func unpackPublishSchemaParams(packed middleware.Parameters) (params PublishSchemaParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "team_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.TeamID = v.(OptTeamID)
+		}
+	}
+	return params
+}
+
+func decodePublishSchemaParams(args [0]string, argsEscaped bool, r *http.Request) (params PublishSchemaParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: team_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "team_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotTeamIDVal TeamID
+				if err := func() error {
+					var paramsDotTeamIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotTeamIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.TeamID.SetTo(paramsDotTeamIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.TeamID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -13565,14 +13305,14 @@ func decodeQueryUsersParams(args [0]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// RemoveOriginParams is parameters of removeOrigin operation.
-type RemoveOriginParams struct {
+// RemoveProjectOriginParams is parameters of removeProjectOrigin operation.
+type RemoveProjectOriginParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
 	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
-func unpackRemoveOriginParams(packed middleware.Parameters) (params RemoveOriginParams) {
+func unpackRemoveProjectOriginParams(packed middleware.Parameters) (params RemoveProjectOriginParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -13583,7 +13323,7 @@ func unpackRemoveOriginParams(packed middleware.Parameters) (params RemoveOrigin
 	return params
 }
 
-func decodeRemoveOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params RemoveOriginParams, _ error) {
+func decodeRemoveProjectOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params RemoveProjectOriginParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -13647,14 +13387,14 @@ func decodeRemoveOriginParams(args [1]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
-// RemovePreviewParams is parameters of removePreview operation.
-type RemovePreviewParams struct {
+// RemoveProjectPreviewParams is parameters of removeProjectPreview operation.
+type RemoveProjectPreviewParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
 	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
-func unpackRemovePreviewParams(packed middleware.Parameters) (params RemovePreviewParams) {
+func unpackRemoveProjectPreviewParams(packed middleware.Parameters) (params RemoveProjectPreviewParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -13665,7 +13405,7 @@ func unpackRemovePreviewParams(packed middleware.Parameters) (params RemovePrevi
 	return params
 }
 
-func decodeRemovePreviewParams(args [1]string, argsEscaped bool, r *http.Request) (params RemovePreviewParams, _ error) {
+func decodeRemoveProjectPreviewParams(args [1]string, argsEscaped bool, r *http.Request) (params RemoveProjectPreviewParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -14421,264 +14161,8 @@ func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
-// SubmitFlowStepParams is parameters of submitFlowStep operation.
-type SubmitFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
-	ID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{id}` path parameter must name that flow, any other id is
-	// refused.
-	// Browsers send this automatically; non-browser clients must capture the
-	// `Set-Cookie` header and resend it.
-	Zflow string
-	// Standard browser `Origin` header. When a step issues a passkey
-	// challenge, the server derives the WebAuthn relying-party ID and the
-	// allowed origin from this value. An sso submission is bound to it as
-	// well: `return_target` must be on this origin, and the callback route
-	// is built under it (see External sign-in above). Browsers send it
-	// automatically on the fetch POST; no client action is required.
-	Origin OptURI `json:",omitempty,omitzero"`
-}
-
-func unpackSubmitFlowStepParams(packed middleware.Parameters) (params SubmitFlowStepParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "id",
-			In:   "path",
-		}
-		params.ID = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "_zflow",
-			In:   "cookie",
-		}
-		params.Zflow = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "Origin",
-			In:   "header",
-		}
-		if v, ok := packed[key]; ok {
-			params.Origin = v.(OptURI)
-		}
-	}
-	return params
-}
-
-func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) (params SubmitFlowStepParams, _ error) {
-	h := uri.NewHeaderDecoder(r.Header)
-	c := uri.NewCookieDecoder(r)
-	// Decode path: id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ID = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode cookie: _zflow.
-	if err := func() error {
-		cfg := uri.CookieParameterDecodingConfig{
-			Name:    "_zflow",
-			Explode: true,
-		}
-		if err := c.HasParam(cfg); err == nil {
-			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.Zflow = c
-				return nil
-			}); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "_zflow",
-			In:   "cookie",
-			Err:  err,
-		}
-	}
-	// Decode header: Origin.
-	if err := func() error {
-		cfg := uri.HeaderParameterDecodingConfig{
-			Name:    "Origin",
-			Explode: false,
-		}
-		if err := h.HasParam(cfg); err == nil {
-			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotOriginVal url.URL
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToURL(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotOriginVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.Origin.SetTo(paramsDotOriginVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "Origin",
-			In:   "header",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// UpdateTeamParams is parameters of updateTeam operation.
-type UpdateTeamParams struct {
-	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
-	// returns.
-	TeamID TeamID
-}
-
-func unpackUpdateTeamParams(packed middleware.Parameters) (params UpdateTeamParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "team_id",
-			In:   "path",
-		}
-		params.TeamID = packed[key].(TeamID)
-	}
-	return params
-}
-
-func decodeUpdateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (params UpdateTeamParams, _ error) {
-	// Decode path: team_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "team_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotTeamIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotTeamIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.TeamID = TeamID(paramsDotTeamIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.TeamID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "team_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// UpdateVariablesParams is parameters of updateVariables operation.
-type UpdateVariablesParams struct {
+// SetVariablesParams is parameters of setVariables operation.
+type SetVariablesParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -14687,7 +14171,7 @@ type UpdateVariablesParams struct {
 	Kind OptVariableKind `json:",omitempty,omitzero"`
 }
 
-func unpackUpdateVariablesParams(packed middleware.Parameters) (params UpdateVariablesParams) {
+func unpackSetVariablesParams(packed middleware.Parameters) (params SetVariablesParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -14707,7 +14191,7 @@ func unpackUpdateVariablesParams(packed middleware.Parameters) (params UpdateVar
 	return params
 }
 
-func decodeUpdateVariablesParams(args [0]string, argsEscaped bool, r *http.Request) (params UpdateVariablesParams, _ error) {
+func decodeSetVariablesParams(args [0]string, argsEscaped bool, r *http.Request) (params SetVariablesParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -14819,11 +14303,528 @@ func decodeUpdateVariablesParams(args [0]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
-// VerifyChallengeProofParams is parameters of verifyChallengeProof operation.
-type VerifyChallengeProofParams struct {
+// SubmitFlowStepParams is parameters of submitFlowStep operation.
+type SubmitFlowStepParams struct {
+	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.
+	// Used to look up the correct flow state from the encrypted cookie,
+	// which can hold multiple concurrent flows. May change between responses
+	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	FlowID string
+	// Encrypted flow state cookie set by `POST /flow` or the previous
+	// `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
+	// flow; the `{flow_id}` path parameter must name that flow, any other id is
+	// refused.
+	// Browsers send this automatically; non-browser clients must capture the
+	// `Set-Cookie` header and resend it.
+	Zflow string
+	// Standard browser `Origin` header. When a step issues a passkey
+	// challenge, the server derives the WebAuthn relying-party ID and the
+	// allowed origin from this value. An sso submission is bound to it as
+	// well: `return_target` must be on this origin, and the callback route
+	// is built under it (see External sign-in above). Browsers send it
+	// automatically on the fetch POST; no client action is required.
+	Origin OptURI `json:",omitempty,omitzero"`
+}
+
+func unpackSubmitFlowStepParams(packed middleware.Parameters) (params SubmitFlowStepParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "flow_id",
+			In:   "path",
+		}
+		params.FlowID = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "_zflow",
+			In:   "cookie",
+		}
+		params.Zflow = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Origin",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.Origin = v.(OptURI)
+		}
+	}
+	return params
+}
+
+func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) (params SubmitFlowStepParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	c := uri.NewCookieDecoder(r)
+	// Decode path: flow_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "flow_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.FlowID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "flow_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode cookie: _zflow.
+	if err := func() error {
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Zflow = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "_zflow",
+			In:   "cookie",
+			Err:  err,
+		}
+	}
+	// Decode header: Origin.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotOriginVal url.URL
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToURL(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotOriginVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Origin.SetTo(paramsDotOriginVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Origin",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// UpdateMyUserParams is parameters of updateMyUser operation.
+type UpdateMyUserParams struct {
+	// The project the caller signs its users in to. The cookie's session is used
+	// only when it belongs to this project; a session of any other project answers
+	// `403` with `sess.project_mismatch`.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app passes its own project, so that a session of
+	// another project never reads or acts as one of its users, and signing out of
+	// the app never ends it. The SDKs pass it when they read the session or sign
+	// out.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
+func unpackUpdateMyUserParams(packed middleware.Parameters) (params UpdateMyUserParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	return params
+}
+
+func decodeUpdateMyUserParams(args [0]string, argsEscaped bool, r *http.Request) (params UpdateMyUserParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// UpdateProjectParams is parameters of updateProject operation.
+type UpdateProjectParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
+	ProjectID ProjectID
+}
+
+func unpackUpdateProjectParams(packed middleware.Parameters) (params UpdateProjectParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "path",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodeUpdateProjectParams(args [1]string, argsEscaped bool, r *http.Request) (params UpdateProjectParams, _ error) {
+	// Decode path: project_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// UpdateTeamParams is parameters of updateTeam operation.
+type UpdateTeamParams struct {
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
+	TeamID TeamID
+}
+
+func unpackUpdateTeamParams(packed middleware.Parameters) (params UpdateTeamParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "team_id",
+			In:   "path",
+		}
+		params.TeamID = packed[key].(TeamID)
+	}
+	return params
+}
+
+func decodeUpdateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (params UpdateTeamParams, _ error) {
+	// Decode path: team_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "team_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotTeamIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotTeamIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.TeamID = TeamID(paramsDotTeamIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.TeamID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "team_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// UpdateUserParams is parameters of updateUser operation.
+type UpdateUserParams struct {
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
+	UserID UserID
+}
+
+func unpackUpdateUserParams(packed middleware.Parameters) (params UpdateUserParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	return params
+}
+
+func decodeUpdateUserParams(args [1]string, argsEscaped bool, r *http.Request) (params UpdateUserParams, _ error) {
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// VerifyAuthAttemptChallengeParams is parameters of verifyAuthAttemptChallenge operation.
+type VerifyAuthAttemptChallengeParams struct {
 	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
-	// The `challenge_id` that `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) returns.
+	// The `challenge_id` that `createAuthAttemptChallenge` (`POST
+	// /auth_attempts/{attempt_id}/challenges`) returns.
 	ChallengeID ChallengeID
 	// Optional retry key for safe retries of the call.
 	// Retries carrying the same key within the call window return the cached
@@ -14831,7 +14832,7 @@ type VerifyChallengeProofParams struct {
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
-func unpackVerifyChallengeProofParams(packed middleware.Parameters) (params VerifyChallengeProofParams) {
+func unpackVerifyAuthAttemptChallengeParams(packed middleware.Parameters) (params VerifyAuthAttemptChallengeParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "attempt_id",
@@ -14858,7 +14859,7 @@ func unpackVerifyChallengeProofParams(packed middleware.Parameters) (params Veri
 	return params
 }
 
-func decodeVerifyChallengeProofParams(args [2]string, argsEscaped bool, r *http.Request) (params VerifyChallengeProofParams, _ error) {
+func decodeVerifyAuthAttemptChallengeParams(args [2]string, argsEscaped bool, r *http.Request) (params VerifyAuthAttemptChallengeParams, _ error) {
 	h := uri.NewHeaderDecoder(r.Header)
 	// Decode path: attempt_id.
 	if err := func() error {

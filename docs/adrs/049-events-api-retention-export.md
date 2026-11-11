@@ -61,7 +61,7 @@ GET /events?project_id=…
          &order=desc
          &page_token=…
 
-GET /events/{id}?project_id=…   # project scope required (see below)
+GET /events/{event_id}?project_id=…   # project scope required (see below)
 ```
 
 **Filter semantics:**
@@ -121,7 +121,7 @@ extension** (predicate filters only — keyset pagination stays on
 }
 ```
 
-`GET /events/{id}` may additionally include delivery status (RECOMMENDED):
+`GET /events/{event_id}` may additionally include delivery status (RECOMMENDED):
 
 ```json
 {
@@ -165,7 +165,7 @@ options. Index: `(project_id, created_at, id)`.
   users and resources can move teams; that must not leak or hide historical
   events.
 
-**`GET /events/{id}` — project-scoped (no `resource_scope_index`):**
+**`GET /events/{event_id}` — project-scoped (no `resource_scope_index`):**
 
 Events are **not** registered in `resource_scope_index` ([ADR 048](048-wide-events-internal-audit-primitive.md)).
 That index stays for durable resources only.
@@ -345,7 +345,7 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 
 - Events are **emitted and stored** for unclaimed projects (including
   `project.created` and pre-claim admin activity).
-- Until claim succeeds, `GET /events`, `GET /events/{id}`, and the shipper
+- Until claim succeeds, `GET /events`, `GET /events/{event_id}`, and the shipper
   treat the project as **not visible** (empty list / 404 / skip ship) — same
   gate for operators and export.
 - After claim, stored history becomes readable and exportable; **no backfill
@@ -364,7 +364,7 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 - Real-time push subscriptions (webhook shipper is pull-based batching; SSE
   is a future extension).
 - Cross-project event search (always scoped to `project_id`).
-- Flat-by-ID `GET /events/{id}` without project scope / `resource_scope_index`
+- Flat-by-ID `GET /events/{event_id}` without project scope / `resource_scope_index`
   for events.
 - Unbounded multi-webhook lists or additional sink types in v1.
 - Blocking retention on sink delivery.
@@ -527,7 +527,7 @@ empty.
 **Decision.** The platform project's events are visible as a claimed
 project's are.
 
-- `GET /events` and `GET /events/{id}` read them, and the shipper exports
+- `GET /events` and `GET /events/{event_id}` read them, and the shipper exports
   them: one gate for reads and export, as §4 says.
 - The platform project is the one the server already names for claims and
   grants: `platform.project_id`, or the built-in project under
@@ -557,7 +557,7 @@ their own platform.
 **Decision.** A platform operator reads every project's events, claimed or
 not, and the deployment's sinks ship them.
 
-- `GET /events` and `GET /events/{id}` show an operator an unclaimed
+- `GET /events` and `GET /events/{event_id}` show an operator an unclaimed
   project's events as they show a claimed project's. Everyone else, the
   project's own secret and a platform user who is not an operator included,
   still gets an empty list or a 404 until the claim.

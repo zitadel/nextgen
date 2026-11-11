@@ -99,7 +99,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	// Two-step flow: passkey auth → passkey_register → done.
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-auth-then-register",
@@ -149,7 +149,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	authIssueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey",
 	}, api.SubmitFlowStepParams{
-		ID:     flowID,
+		FlowID: flowID,
 		Zflow:  zflow,
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
@@ -178,8 +178,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 			Proof:       api.NewOptFlowSubmitRequestChallengeResponseProof(assertionProof),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, authVerifyResp, "auth verify failed: %s", helpers.MustMarshal(t, authVerifyResp))
@@ -191,7 +191,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	regIssueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey_register",
 	}, api.SubmitFlowStepParams{
-		ID:     flowID,
+		FlowID: flowID,
 		Zflow:  zflow,
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
@@ -225,8 +225,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 			Proof:       api.NewOptFlowSubmitRequestChallengeResponseProof(attestProof),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, regVerifyResp, "registration verify failed: %s", helpers.MustMarshal(t, regVerifyResp))

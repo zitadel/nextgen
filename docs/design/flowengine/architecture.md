@@ -57,7 +57,7 @@ sequenceDiagram
     H->>K: sealState(_zflow)
     H-->>C: 201 + Set-Cookie
 
-    Note over C,SM: GET /flow/{id}
+    Note over C,SM: GET /flow/{flow_id}
     C->>H: GetFlowStep (_zflow cookie)
     H->>K: openState(_zflow)
     K-->>H: *FlowState
@@ -67,7 +67,7 @@ sequenceDiagram
     S-->>H: FlowStepResult
     H-->>C: 200 + buildFlowResponse
 
-    Note over C,SM: POST /flow/{id}/submit
+    Note over C,SM: POST /flow/{flow_id}/submit
     C->>H: SubmitFlowStep (_zflow cookie + body)
     H->>K: openState(_zflow)
     K-->>H: *FlowState

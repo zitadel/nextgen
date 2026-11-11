@@ -107,7 +107,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /flow/{id}/submit → receives next step
+    ZL->>ZL: POST /flow/{flow_id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -222,7 +222,7 @@ loop:
 
   { action, fields } = waitForCustomEvent()
 
-  response = POST /flow/{id}/submit {
+  response = POST /flow/{flow_id}/submit {
     action: action,
     fields: fields
   }

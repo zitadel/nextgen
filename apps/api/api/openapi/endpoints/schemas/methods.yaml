@@ -1,5 +1,5 @@
 post:
-  operationId: createSchema
+  operationId: publishSchema
   summary: Create a schema
   description: |
     Creates a user schema, the JSON Schema that says which attributes a user
@@ -62,7 +62,7 @@ post:
                 An example of the response to creating a user schema.
               externalValue: examples/create-user-schema-response-example.yaml
     default:
-      $ref: createSchema-error-response.yaml
+      $ref: publishSchema-error-response.yaml
 
 get:
   operationId: listSchemas

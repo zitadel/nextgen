@@ -1,4 +1,4 @@
-import { CreateSchemaBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { PublishSchemaBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -53,7 +53,7 @@ describe("default config rendering", () => {
     (preset, useCase) => {
       const schema = getDefaultHumanUserSchema({ preset, useCase });
 
-      expect(CreateSchemaBody.safeParse(schema).success).toBe(true);
+      expect(PublishSchemaBody.safeParse(schema).success).toBe(true);
       expect(schema).toMatchObject({ kind: "user-schema", $id: expect.any(String) });
     },
   );

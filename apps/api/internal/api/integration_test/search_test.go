@@ -384,7 +384,7 @@ func TestSearchConfiguration(t *testing.T) {
 	}`)
 
 	flowSchema := harness.CreateUserSchema(t, f.project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
-	flowResp, err := f.client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(
+	flowResp, err := f.client.PublishFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(
 		f.projectID(), newFlowDefinitionFixture("partner-sign-in", flowSchema)))
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, flowResp, helpers.MustMarshal(t, flowResp))

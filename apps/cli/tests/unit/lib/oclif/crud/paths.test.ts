@@ -1,5 +1,5 @@
 import {
-  GetUserByIDResponse,
+  GetUserResponse,
   ListEventsResponse,
   QueryTeamsResponse,
   QueryUsersResponse,
@@ -37,7 +37,7 @@ describe("fieldPaths", () => {
   });
 
   it("reads a record response directly, without an item array", () => {
-    const paths = pathsOf(GetUserByIDResponse);
+    const paths = pathsOf(GetUserResponse);
     expect(allows(paths, "metadata.created_at")).toBe(true);
   });
 

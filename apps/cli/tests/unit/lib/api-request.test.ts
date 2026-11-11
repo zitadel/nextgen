@@ -26,7 +26,7 @@ const requestFor = (
 
 describe("pathValuesOf", () => {
   it("reads the positionals in the path's order", () => {
-    const target = resolveTarget("finishUserPasskeyRegistration");
+    const target = resolveTarget("completeUserPasskeyRegistration");
 
     expect(pathValuesOf(target, ["user_1", "reg_1"], undefined)).toEqual({
       values: { user_id: "user_1", registration_id: "reg_1" },
@@ -35,7 +35,7 @@ describe("pathValuesOf", () => {
   });
 
   it("names the parameters still missing", () => {
-    const target = resolveTarget("finishUserPasskeyRegistration");
+    const target = resolveTarget("completeUserPasskeyRegistration");
 
     expect(pathValuesOf(target, ["user_1"], undefined).missing).toEqual(["registration_id"]);
   });
@@ -147,18 +147,18 @@ describe("buildRequest", () => {
   });
 
   it("refuses a field an operation without a body has no query parameter for", () => {
-    expect(() => requestFor("GetUserByID", ["nope=1"], { positionals: ["user_1"] })).toThrow(
+    expect(() => requestFor("getUser", ["nope=1"], { positionals: ["user_1"] })).toThrow(
       expect.objectContaining({
-        message: "GetUserByID takes no body, and nope is none of its query parameters",
+        message: "getUser takes no body, and nope is none of its query parameters",
         hint: "Its query parameters: team_id.",
       }),
     );
   });
 
   it("refuses a path parameter given as a field", () => {
-    expect(() =>
-      requestFor("GetUserByID", ["user_id=user_1"], { positionals: ["user_1"] }),
-    ).toThrow("user_id is a path parameter of GetUserByID; give it as an argument");
+    expect(() => requestFor("getUser", ["user_id=user_1"], { positionals: ["user_1"] })).toThrow(
+      "user_id is a path parameter of getUser; give it as an argument",
+    );
   });
 
   it("fills a required project_id the caller left out", () => {

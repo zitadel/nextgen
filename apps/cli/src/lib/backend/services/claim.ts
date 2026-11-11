@@ -1,15 +1,15 @@
-import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
+import type { GetProjectClaimStatus200, CreateProjectClaim201 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
 import { BackendError } from "@/lib/backend/errors";
 
 /** A claim link, as the server mints it. */
-export type ClaimChallenge = InitClaim201;
+export type ClaimChallenge = CreateProjectClaim201;
 
 /** A claim that finished: the team that owns the project now. */
 export type CompletedClaim = Extract<
-  GetClaimStatus200,
+  GetProjectClaimStatus200,
   {
     status: "completed";
   }
@@ -124,7 +124,7 @@ export class ClaimService extends ApiService {
    */
   async start(): Promise<ClaimStart> {
     try {
-      const challenge = await this.client.initClaim(this.projectId);
+      const challenge = await this.client.createProjectClaim(this.projectId);
       return {
         outcome: "started",
         challenge,
@@ -159,7 +159,7 @@ export class ClaimService extends ApiService {
    */
   async status(challengeId: string): Promise<ClaimProgress> {
     try {
-      const status = await this.client.getClaimStatus(this.projectId, {
+      const status = await this.client.getProjectClaimStatus(this.projectId, {
         challenge_id: challengeId,
       });
       if (status.status === "completed") {

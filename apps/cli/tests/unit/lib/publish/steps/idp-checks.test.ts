@@ -18,7 +18,7 @@ const ACME = aConfig({ connections: { "acme.json": anOidcConnection() } });
  * The project's variables, which this run's token may not read.
  */
 const FORBIDDEN: ClientStubs = {
-  getVariables: async () => {
+  listVariables: async () => {
     throw new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" });
   },
 };

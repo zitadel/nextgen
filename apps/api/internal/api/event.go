@@ -103,7 +103,7 @@ func (h *Handler) GetEvent(ctx context.Context, params api.GetEventParams) (api.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
 		return nil, err
 	}
-	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.ID, h.eventsPlatformOperator)
+	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.EventID, h.eventsPlatformOperator)
 	if err != nil {
 		return nil, err
 	}

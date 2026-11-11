@@ -1,5 +1,5 @@
 get:
-  operationId: GetUserByID
+  operationId: getUser
   x-zitadel-cli: users get
   summary: Get a user by ID
   description: |
@@ -63,10 +63,10 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: GetUserByID-error-response.yaml
+      $ref: getUser-error-response.yaml
 
 patch:
-  operationId: PatchUserByID
+  operationId: updateUser
   x-zitadel-cli: users update
   summary: Update a user by ID
   description: |
@@ -76,7 +76,7 @@ patch:
     last-write-wins.
 
     To move the user, send `schema` with the `id` of a registered schema, as
-    `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+    `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
 
     To ask whether a patch would succeed, send it with `"dry_run": true`. It takes
     the same permission and answers the same status and `details` as the real
@@ -162,10 +162,10 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: PatchUserByID-error-response.yaml
+      $ref: updateUser-error-response.yaml
 
 delete:
-    operationId: DeleteUserByID
+    operationId: deleteUser
     x-zitadel-cli: users delete
     summary: Delete a user by ID
     description: |
@@ -211,4 +211,4 @@ delete:
             schema:
               $ref: ../../../components/error-details.yaml
       default:
-        $ref: DeleteUserByID-error-response.yaml
+        $ref: deleteUser-error-response.yaml

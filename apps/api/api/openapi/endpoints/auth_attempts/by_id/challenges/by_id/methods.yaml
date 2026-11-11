@@ -1,5 +1,5 @@
 post:
-  operationId: verifyChallengeProof
+  operationId: verifyAuthAttemptChallenge
   summary: Verify a challenge proof
   description: |
     Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.
@@ -13,7 +13,7 @@ post:
 
     On success, the factor is recorded on the authentication attempt. The
     attempt moves to the next pending challenge, or completes when every required
-    factor is verified. Then call `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
+    factor is verified. Then call `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
 
     A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
     again. There is no retry limit: you can retry until the attempt expires.
@@ -60,4 +60,4 @@ post:
                 code: att.proof_rejected
                 message: 'the submitted proof was rejected'
     default:
-      $ref: verifyChallengeProof-error-response.yaml
+      $ref: verifyAuthAttemptChallenge-error-response.yaml

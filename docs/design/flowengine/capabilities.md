@@ -12,8 +12,8 @@ to be a fast answer to "can I build flow X right now?"
 ### Flow lifecycle
 
 - `POST /flow` — mint a fresh flow handle, return the first step.
-- `POST /flow/{id}/submit` — advance the state machine; rotate the cookie.
-- `GET /flow/{id}` — re-render the current step without advancing.
+- `POST /flow/{flow_id}/submit` — advance the state machine; rotate the cookie.
+- `GET /flow/{flow_id}` — re-render the current step without advancing.
 - Encrypted `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, 600s max-age).
 - Cookie cleared on terminal step.
 - Step error mode: same step re-rendered with `Error` set; cookie rotates to prevent replay.

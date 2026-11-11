@@ -25,31 +25,31 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { serverCanonicalFlow } from "./server-canonical-flow.js";
 
 import type {
-  AddOrigin201,
-  CompleteClaim200,
-  CreateFlowDefinition201,
+  AddProjectOrigin201,
+  CompleteProjectClaim200,
+  PublishFlowDefinition201,
   CreateProject201,
   CreateProject201OriginsItem,
-  CreateSchema201,
-  GetClaimWindow200,
-  GetClaimStatus200,
+  PublishSchema201,
+  GetProjectClaimWindow200,
+  GetProjectClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
-  GetSchemaById200,
-  GetSchemaById200Schema,
-  InitClaim201,
+  GetSchema200,
+  GetSchema200Schema,
+  CreateProjectClaim201,
   ListFlowDefinitions200,
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
-  AddOriginBody,
-  AddOriginParams,
-  AddOriginResponse,
-  CompleteClaimResponse,
-  CreateFlowDefinitionBody,
-  CreateIdpBody,
-  CreateIdpQueryParams,
-  CreateIdpResponse,
+  AddProjectOriginBody,
+  AddProjectOriginParams,
+  AddProjectOriginResponse,
+  CompleteProjectClaimResponse,
+  PublishFlowDefinitionBody,
+  PublishIdpBody,
+  PublishIdpQueryParams,
+  PublishIdpResponse,
   BuildReleaseBody,
   BuildReleaseQueryParams,
   CreateDeploymentBody,
@@ -57,24 +57,24 @@ import {
   CreateProjectBody,
   CreateReleaseBody,
   CreateReleaseQueryParams,
-  CreateSchemaQueryParams,
+  PublishSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
-  GetClaimStatusParams,
-  GetClaimStatusQueryParams,
-  GetClaimStatusResponse,
-  GetClaimWindowParams,
-  GetClaimWindowQueryParams,
-  GetClaimWindowResponse,
-  GetDeploymentByIdParams,
-  GetDeploymentByIdQueryParams,
-  GetDeploymentVariablesParams,
-  GetDeploymentVariablesQueryParams,
+  GetProjectClaimStatusParams,
+  GetProjectClaimStatusQueryParams,
+  GetProjectClaimStatusResponse,
+  GetProjectClaimWindowParams,
+  GetProjectClaimWindowQueryParams,
+  GetProjectClaimWindowResponse,
+  GetDeploymentParams,
+  GetDeploymentQueryParams,
+  ListDeploymentVariablesParams,
+  ListDeploymentVariablesQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
-  GetIdpByIdParams,
-  GetIdpByIdQueryParams,
-  GetIdpByIdResponse,
+  GetIdpParams,
+  GetIdpQueryParams,
+  GetIdpResponse,
   GetPolicyParams,
   GetPolicyQueryParams,
   GetPolicyResponse,
@@ -83,22 +83,22 @@ import {
   GetPolicyRevisionResponse,
   GetProjectParams,
   GetProjectResponse,
-  GetReleaseByIdParams,
-  GetReleaseByIdQueryParams,
-  GetSchemaByIdParams,
-  GetSchemaByIdQueryParams,
+  GetReleaseParams,
+  GetReleaseQueryParams,
+  GetSchemaParams,
+  GetSchemaQueryParams,
   GetVariableParams,
   GetVariableQueryParams,
   GetVariableResponse,
-  GetVariablesQueryParams,
-  GetVariablesResponse,
-  InitClaimParams,
+  ListVariablesQueryParams,
+  ListVariablesResponse,
+  CreateProjectClaimParams,
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
-  ListPreviewsParams,
-  ListPreviewsQueryParams,
-  ListPreviewsResponse,
+  ListProjectPreviewsParams,
+  ListProjectPreviewsQueryParams,
+  ListProjectPreviewsResponse,
   ListReleasesQueryParams,
   ListPoliciesQueryParams,
   ListPoliciesResponse,
@@ -115,18 +115,18 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
-  RemoveOriginBody,
-  RemoveOriginParams,
-  RemovePreviewBody,
-  RemovePreviewParams,
+  RemoveProjectOriginBody,
+  RemoveProjectOriginParams,
+  RemoveProjectPreviewBody,
+  RemoveProjectPreviewParams,
   RevokeReleaseParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
   RollbackDeploymentParams,
   RollbackDeploymentQueryParams,
-  UpdateVariablesBody,
-  UpdateVariablesQueryParams,
-  UpdateVariablesResponse,
+  SetVariablesBody,
+  SetVariablesQueryParams,
+  SetVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
@@ -290,7 +290,7 @@ type FlowDefinitionRecord = {
 
 /**
  * Server-side metadata wrapped around the schema body so the mock can answer
- * `POST /schemas` (returns id) and, for `GET /schemas/:id` and `GET /schemas`,
+ * `POST /schemas` (returns id) and, for `GET /schemas/:schema_id` and `GET /schemas`,
  * build the `{id, schema, metadata}` envelope around the stored document
  * (list filterable by object_type).
  */
@@ -300,7 +300,7 @@ type SchemaRecord = {
   objectType?: string;
   createdAt: string;
   seq: number;
-  body: GetSchemaById200Schema;
+  body: GetSchema200Schema;
 };
 
 /**
@@ -521,7 +521,7 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   } as unknown as GetFlowDefinition200;
 }
 
-function defaultHumanUserSchema(): GetSchemaById200Schema {
+function defaultHumanUserSchema(): GetSchema200Schema {
   return getDefaultHumanUserSchema();
 }
 
@@ -548,12 +548,12 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   });
 }
 
-function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
+function schemaObjectType(body: GetSchema200Schema): string | undefined {
   const value = (body as unknown as { objectType?: unknown }).objectType;
   return typeof value === "string" ? value : undefined;
 }
 
-function schemaKind(body: GetSchemaById200Schema): string | undefined {
+function schemaKind(body: GetSchema200Schema): string | undefined {
   const value = (body as unknown as { kind?: unknown }).kind;
   return typeof value === "string" ? value : undefined;
 }
@@ -1019,7 +1019,7 @@ export function expireClaimWindow(projectId: string): void {
 export function completeClaimChallenge(
   challengeId: string,
   projectId: string,
-): { status: number; body: CompleteClaim200 | ErrorBody } {
+): { status: number; body: CompleteProjectClaim200 | ErrorBody } {
   const challenge = store.claimChallenges.get(challengeId);
   if (!challenge || challenge.projectId !== projectId) {
     return {
@@ -1075,12 +1075,12 @@ export function completeClaimChallenge(
   store.claims.set(projectId, claim);
   challenge.status = "completed";
 
-  const responseBody: CompleteClaim200 = {
+  const responseBody: CompleteProjectClaim200 = {
     project_id: projectId,
     team_id: claim.teamId,
     claimed_at: claim.claimedAt,
   };
-  const out = CompleteClaimResponse.safeParse(responseBody);
+  const out = CompleteProjectClaimResponse.safeParse(responseBody);
   if (!out.success) {
     return {
       status: 500,
@@ -1089,7 +1089,7 @@ export function completeClaimChallenge(
       }),
     };
   }
-  return { status: 200, body: out.data as CompleteClaim200 };
+  return { status: 200, body: out.data as CompleteProjectClaim200 };
 }
 
 /**
@@ -1210,7 +1210,7 @@ function materializeBundle(
         objectType: handle,
         createdAt: nowIso(),
         seq: ++store.lastSeq,
-        body: resource as unknown as GetSchemaById200Schema,
+        body: resource as unknown as GetSchema200Schema,
       });
     }
     pointers.push({ kind: "schema", handle, revision_id: id });
@@ -1745,7 +1745,7 @@ export function setupPlatformHandlers() {
     // POST /projects/:project_id/origins/remove — drop one pattern. Missing
     // project is 404; removing an already-absent pattern is idempotent 204.
     http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
-      const path = parse(RemoveOriginParams, params, "invalid_request");
+      const path = parse(RemoveProjectOriginParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
@@ -1753,7 +1753,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      const body = parse(RemoveProjectOriginBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -1777,7 +1777,7 @@ export function setupPlatformHandlers() {
     // pattern+kind is idempotent 201; same pattern with a different kind is
     // origin.kind_conflict. No check/warning field on the response.
     http.post("*/projects/:project_id/origins", async ({ params, request }) => {
-      const path = parse(AddOriginParams, params, "invalid_request");
+      const path = parse(AddProjectOriginParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
@@ -1785,7 +1785,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(AddOriginBody, raw, "invalid_request");
+      const body = parse(AddProjectOriginBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -1817,8 +1817,8 @@ export function setupPlatformHandlers() {
         project.updatedAt = nowIso();
       }
 
-      const responseBody: AddOrigin201 = existing ?? origin;
-      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      const responseBody: AddProjectOrigin201 = existing ?? origin;
+      const out = parse(AddProjectOriginResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -1967,11 +1967,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/releases/:release_id", ({ params, request }) => {
-      const path = parse(GetReleaseByIdParams, params, "invalid_request");
+      const path = parse(GetReleaseParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetReleaseByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetReleaseQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2325,11 +2325,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/deployments/:deployment_id", ({ params, request }) => {
-      const path = parse(GetDeploymentByIdParams, params, "invalid_request");
+      const path = parse(GetDeploymentParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetDeploymentQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2440,7 +2440,7 @@ export function setupPlatformHandlers() {
     // works — the Go handlers are unimplemented stubs regardless.
 
     http.get("*/projects/:project_id/previews", ({ params, request }) => {
-      const path = parse(ListPreviewsParams, params, "invalid_request");
+      const path = parse(ListProjectPreviewsParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
@@ -2449,7 +2449,7 @@ export function setupPlatformHandlers() {
       const record = queryRecord(request);
       const { limit, ...rest } = record;
       const query = parse(
-        ListPreviewsQueryParams,
+        ListProjectPreviewsQueryParams,
         { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
         "invalid_query",
       );
@@ -2478,7 +2478,7 @@ export function setupPlatformHandlers() {
       const nextPageToken =
         start + query.data.limit < live.length ? String(start + query.data.limit) : null;
       const out = parse(
-        ListPreviewsResponse,
+        ListProjectPreviewsResponse,
         { previews, next_page_token: nextPageToken },
         "mock_response_invalid",
       );
@@ -2489,7 +2489,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/projects/:project_id/previews/remove", async ({ params, request }) => {
-      const path = parse(RemovePreviewParams, params, "invalid_request");
+      const path = parse(RemoveProjectPreviewParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
@@ -2497,7 +2497,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(RemovePreviewBody, raw, "invalid_request");
+      const body = parse(RemoveProjectPreviewBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -2516,7 +2516,7 @@ export function setupPlatformHandlers() {
     // mirrors the real server: the project secret is the bearer (as in GET
     // /users). First-claim-wins is a 409 derived from the existing claim.
     http.post("*/projects/:project_id/claim/init", ({ params, request }) => {
-      const path = parse(InitClaimParams, params, "invalid_request");
+      const path = parse(CreateProjectClaimParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
@@ -2561,7 +2561,7 @@ export function setupPlatformHandlers() {
         status: "pending",
         expiresAt,
       });
-      const responseBody: InitClaim201 = {
+      const responseBody: CreateProjectClaim201 = {
         claim_url: `${new URL(request.url).origin}/claim/${id}`,
         challenge_id: id,
         expires_at: expiresAt,
@@ -2574,11 +2574,11 @@ export function setupPlatformHandlers() {
     // that initiated the challenge (403 otherwise). Outbound-validated like
     // GET /projects/:id so the mock cannot lie about its own output.
     http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
-      const path = parse(GetClaimStatusParams, params, "invalid_request");
+      const path = parse(GetProjectClaimStatusParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetClaimStatusQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetProjectClaimStatusQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2618,7 +2618,7 @@ export function setupPlatformHandlers() {
       // closed window alike. `authed` initiated this challenge (403 above),
       // so it is the challenge's own project.
       const claim = store.claims.get(challenge.projectId);
-      let responseBody: GetClaimStatus200;
+      let responseBody: GetProjectClaimStatus200;
       if (claim) {
         responseBody = {
           status: "completed",
@@ -2626,7 +2626,11 @@ export function setupPlatformHandlers() {
           claimed_at: claim.claimedAt,
           dashboard_url: claim.dashboardUrl,
         };
-        const completedOut = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+        const completedOut = parse(
+          GetProjectClaimStatusResponse,
+          responseBody,
+          "mock_response_invalid",
+        );
         if (!completedOut.ok) {
           return completedOut.response;
         }
@@ -2650,7 +2654,7 @@ export function setupPlatformHandlers() {
       }
 
       responseBody = { status: "pending" };
-      const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+      const out = parse(GetProjectClaimStatusResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -2663,11 +2667,11 @@ export function setupPlatformHandlers() {
     // capability. An unknown challenge is the only refusal, so a caller
     // learns nothing about which project ids exist.
     http.get("*/projects/:project_id/claim/window", ({ params, request }) => {
-      const path = parse(GetClaimWindowParams, params, "invalid_request");
+      const path = parse(GetProjectClaimWindowParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetClaimWindowQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetProjectClaimWindowQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2695,11 +2699,11 @@ export function setupPlatformHandlers() {
       // lapsed challenge still reports it, because the page shows the
       // deadline beside the outcome it is explaining.
       const expiresAt = new Date(new Date(project.createdAt).getTime() + CLAIM_WINDOW_MS);
-      const responseBody: GetClaimWindow200 = {
+      const responseBody: GetProjectClaimWindow200 = {
         expires_at: expiresAt.toISOString(),
         expired: expiresAt.getTime() < Date.now(),
       };
-      const out = parse(GetClaimWindowResponse, responseBody, "mock_response_invalid");
+      const out = parse(GetProjectClaimWindowResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -2729,7 +2733,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/schemas", async ({ request }) => {
-      const query = parse(CreateSchemaQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(PublishSchemaQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2746,7 +2750,7 @@ export function setupPlatformHandlers() {
         );
       }
 
-      const schemaBody = raw as unknown as GetSchemaById200Schema;
+      const schemaBody = raw as unknown as GetSchema200Schema;
       const id = `sch_${shortId()}`;
       store.schemas.set(id, {
         id,
@@ -2756,7 +2760,7 @@ export function setupPlatformHandlers() {
         seq: ++store.lastSeq,
         body: schemaBody,
       });
-      const responseBody: CreateSchema201 = { id };
+      const responseBody: PublishSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -2804,23 +2808,23 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    http.get("*/schemas/:id", ({ params, request }) => {
-      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+    http.get("*/schemas/:schema_id", ({ params, request }) => {
+      const path = parse(GetSchemaParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
       // Flat-by-id: OpenAPI dropped required project_id; optional team_id may
       // still appear. Authz on the real server resolves ownership via RSI.
-      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetSchemaQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
 
-      const record = store.schemas.get(schemaID(path.data.id));
+      const record = store.schemas.get(schemaID(path.data.schema_id));
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetSchemaById200 = {
+      const responseBody: GetSchema200 = {
         id: record.id,
         schema: record.body,
         metadata: { created_at: record.createdAt },
@@ -2828,17 +2832,17 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    http.delete("*/schemas/:id", ({ params, request }) => {
-      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+    http.delete("*/schemas/:schema_id", ({ params, request }) => {
+      const path = parse(GetSchemaParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetSchemaQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
 
-      const key = schemaID(path.data.id);
+      const key = schemaID(path.data.schema_id);
       const record = store.schemas.get(key);
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
@@ -2852,7 +2856,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateFlowDefinitionBody, raw, "invalid_request");
+      const body = parse(PublishFlowDefinitionBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -2878,7 +2882,7 @@ export function setupPlatformHandlers() {
           : flowDefinition,
       };
       store.flowDefinitions.set(id, record);
-      const responseBody: CreateFlowDefinition201 = flowResponse(record);
+      const responseBody: PublishFlowDefinition201 = flowResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -2915,7 +2919,7 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/flow_definitions/:id", ({ params }) => {
+    http.get("*/flow_definitions/:flow_definition_id", ({ params }) => {
       const path = parse(GetFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
@@ -2923,7 +2927,7 @@ export function setupPlatformHandlers() {
 
       // Flat-by-id: no project_id query — ownership is resolved via RSI+Check
       // on the real server.
-      const record = store.flowDefinitions.get(path.data.id);
+      const record = store.flowDefinitions.get(path.data.flow_definition_id);
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
@@ -2942,7 +2946,7 @@ export function setupPlatformHandlers() {
     // the real service fails.
 
     http.post("*/idps", async ({ request }) => {
-      const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(PublishIdpQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2950,7 +2954,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateIdpBody, raw, "invalid_request");
+      const body = parse(PublishIdpBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -3008,7 +3012,7 @@ export function setupPlatformHandlers() {
       store.idps.set(record.id, record);
 
       const responseBody = idpResponse(record);
-      const out = parse(CreateIdpResponse, responseBody, "mock_response_invalid");
+      const out = parse(PublishIdpResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -3048,23 +3052,23 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/idps/:id", ({ params, request }) => {
-      const path = parse(GetIdpByIdParams, params, "invalid_request");
+    http.get("*/idps/:idp_id", ({ params, request }) => {
+      const path = parse(GetIdpParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetIdpByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetIdpQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
-      const record = store.idps.get(path.data.id);
+      const record = store.idps.get(path.data.idp_id);
       if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(
           errorBody("idp.not_found", "identity provider connection: not found"),
           { status: 404 },
         );
       }
-      const out = parse(GetIdpByIdResponse, idpResponse(record), "mock_response_invalid");
+      const out = parse(GetIdpResponse, idpResponse(record), "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -3264,11 +3268,15 @@ export function setupPlatformHandlers() {
 
     // Registered ahead of `*/variables`, which would otherwise match it.
     http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
-      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      const path = parse(ListDeploymentVariablesParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(
+        ListDeploymentVariablesQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
       if (!query.ok) {
         return query.response;
       }
@@ -3282,7 +3290,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/variables", ({ request }) => {
-      const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListVariablesQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -3291,7 +3299,7 @@ export function setupPlatformHandlers() {
         query.data.project_id,
         variableKinds(query.data.kind),
       );
-      const out = parse(GetVariablesResponse, body, "mock_response_invalid");
+      const out = parse(ListVariablesResponse, body, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -3354,7 +3362,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.patch("*/variables", async ({ request }) => {
-      const query = parse(UpdateVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(SetVariablesQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -3362,7 +3370,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(UpdateVariablesBody, raw, "invalid_request");
+      const body = parse(SetVariablesBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -3400,7 +3408,7 @@ export function setupPlatformHandlers() {
       }
       // 200 with the variables read back, including what the write did not touch.
       const response = variablesResponse(store.variables, projectId, kinds);
-      const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
+      const out = parse(SetVariablesResponse, response, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

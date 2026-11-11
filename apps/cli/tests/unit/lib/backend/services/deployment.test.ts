@@ -172,7 +172,7 @@ describe("DeploymentService.get", () => {
   it("answers the deployment the project holds", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({
-        getDeploymentById: async () => primary("dep_1"),
+        getDeployment: async () => primary("dep_1"),
       }),
       "proj_1",
     );
@@ -181,27 +181,27 @@ describe("DeploymentService.get", () => {
   });
 
   it("reads it for the project it is bound to", async () => {
-    const getDeploymentById = vi.fn(async () => primary("dep_1"));
-    const deploymentService = new DeploymentService(fakeClient({ getDeploymentById }), "proj_1");
+    const getDeployment = vi.fn(async () => primary("dep_1"));
+    const deploymentService = new DeploymentService(fakeClient({ getDeployment }), "proj_1");
 
     await deploymentService.get("dep_1");
 
-    expect(getDeploymentById).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
+    expect(getDeployment).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
   });
 
   it("reads no variables, so it takes no permission to read them", async () => {
-    const getDeploymentVariables = vi.fn(async () => ({}));
+    const listDeploymentVariables = vi.fn(async () => ({}));
     const deploymentService = new DeploymentService(
       fakeClient({
-        getDeploymentById: async () => primary("dep_1"),
-        getDeploymentVariables,
+        getDeployment: async () => primary("dep_1"),
+        listDeploymentVariables,
       }),
       "proj_1",
     );
 
     await deploymentService.get("dep_1");
 
-    expect(getDeploymentVariables).not.toHaveBeenCalled();
+    expect(listDeploymentVariables).not.toHaveBeenCalled();
   });
 });
 
@@ -209,7 +209,7 @@ describe("DeploymentService.variables", () => {
   it("answers a secret as held, without its value", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({
-        getDeploymentVariables: async () => ({ TOKEN: { secret: true } }),
+        listDeploymentVariables: async () => ({ TOKEN: { secret: true } }),
       }),
       "proj_1",
     );

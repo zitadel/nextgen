@@ -80,7 +80,7 @@ same TX (shared `request_id`).
 
 `PATCH /projects/{id}` today only renames (`name`). Origins are set on
 **create** and changed only through add/remove (`origin.added` /
-`origin.removed`), never through `patchProject`. Create emits `name` and
+`origin.removed`), never through `updateProject`. Create emits `name` and
 `origins`; update emits `name` when renamed.
 
 ### SIEM join path

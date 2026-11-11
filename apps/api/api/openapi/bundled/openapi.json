@@ -203,7 +203,7 @@
         "operationId": "createUser",
         "x-zitadel-cli": "users create",
         "summary": "Create a user",
-        "description": "Creates a user whose attributes satisfy the user schema named in the request.\n\nThe server assigns the user's ID and returns it. `schema` is the `id` of a\nschema, as `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With\n`team_id`, the user also becomes an active member of that team. A value the\nschema marks unique that another user already holds is refused with `409`;\nsend a different value.\n",
+        "description": "Creates a user whose attributes satisfy the user schema named in the request.\n\nThe server assigns the user's ID and returns it. `schema` is the `id` of a\nschema, as `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With\n`team_id`, the user also becomes an active member of that team. A value the\nschema marks unique that another user already holds is refused with `409`;\nsend a different value.\n",
         "tags": [
           "Users"
         ],
@@ -292,7 +292,7 @@
             }
           },
           "500": {
-            "description": "Something went wrong on the server. This was not your fault.\n\nOne case is recoverable: the user was created but the server could not\nread it back to answer with. The body then carries the created user's\nID in `details.user_id`. Fetch that user by ID with `GetUserByID` (`GET /users/{user_id}`).\nRepeating the create would conflict with the user that already exists.\n",
+            "description": "Something went wrong on the server. This was not your fault.\n\nOne case is recoverable: the user was created but the server could not\nread it back to answer with. The body then carries the created user's\nID in `details.user_id`. Fetch that user by ID with `getUser` (`GET /users/{user_id}`).\nRepeating the create would conflict with the user that already exists.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -391,7 +391,7 @@
     },
     "/users/{user_id}": {
       "get": {
-        "operationId": "GetUserByID",
+        "operationId": "getUser",
         "x-zitadel-cli": "users get",
         "summary": "Get a user by ID",
         "description": "Returns a user by ID, with the attributes its schema defines.\n\nWith `team_id`, the user is returned only while they are an active member\nof that team.\n",
@@ -453,15 +453,15 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/GetUserByID-error-response"
+            "$ref": "#/components/responses/getUser-error-response"
           }
         }
       },
       "patch": {
-        "operationId": "PatchUserByID",
+        "operationId": "updateUser",
         "x-zitadel-cli": "users update",
         "summary": "Update a user by ID",
-        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `\"dry_run\": true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n\n`dry_run` is a body field so that a server from before it refuses the\nrequest as malformed (`400 req.invalid`) instead of applying the patch.\n",
+        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `\"dry_run\": true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n\n`dry_run` is a body field so that a server from before it refuses the\nrequest as malformed (`400 req.invalid`) instead of applying the patch.\n",
         "tags": [
           "Users"
         ],
@@ -553,12 +553,12 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/PatchUserByID-error-response"
+            "$ref": "#/components/responses/updateUser-error-response"
           }
         }
       },
       "delete": {
-        "operationId": "DeleteUserByID",
+        "operationId": "deleteUser",
         "x-zitadel-cli": "users delete",
         "summary": "Delete a user by ID",
         "description": "Deletes a user, removes them from every team they belong to, and revokes\nevery grant they hold, on any project.\n\nThe user is removed, not deactivated, and the deletion emits `user.deleted`,\nplus `authz.revoked` for each grant on that grant's project.\nWith a project secret the request is idempotent: deleting a user that exists\nin no project succeeds without changing anything. Deleting the last active\nmember of a project's owning team returns 409 `proj.last_owner` and changes\nnothing.\n",
@@ -615,7 +615,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/DeleteUserByID-error-response"
+            "$ref": "#/components/responses/deleteUser-error-response"
           }
         }
       }
@@ -814,9 +814,9 @@
     },
     "/users/{user_id}/passkeys/registrations": {
       "post": {
-        "operationId": "beginUserPasskeyRegistration",
+        "operationId": "createUserPasskeyRegistration",
         "summary": "Begin a passkey registration",
-        "description": "Starts a WebAuthn registration ceremony for the user and returns the\ncreation options for `navigator.credentials.create()`. A passkey is\nregistered in two steps: this one returns options for the browser, and\n`finishUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.\n\nComplete the ceremony with\n`POST /users/{user_id}/passkeys/registrations/{registration_id}` within five\nminutes, using the `registration_id` this response returns. Credentials\nalready registered for the user are excluded automatically.\n",
+        "description": "Starts a WebAuthn registration ceremony for the user and returns the\ncreation options for `navigator.credentials.create()`. A passkey is\nregistered in two steps: this one returns options for the browser, and\n`completeUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.\n\nComplete the ceremony with\n`POST /users/{user_id}/passkeys/registrations/{registration_id}` within five\nminutes, using the `registration_id` this response returns. Credentials\nalready registered for the user are excluded automatically.\n",
         "tags": [
           "Users"
         ],
@@ -904,16 +904,16 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/beginUserPasskeyRegistration-error-response"
+            "$ref": "#/components/responses/createUserPasskeyRegistration-error-response"
           }
         }
       }
     },
     "/users/{user_id}/passkeys/registrations/{registration_id}": {
       "post": {
-        "operationId": "finishUserPasskeyRegistration",
+        "operationId": "completeUserPasskeyRegistration",
         "summary": "Finish a passkey registration",
-        "description": "Verifies the attestation against the registration ceremony and stores\nthe new passkey for the user. `registration_id` is the one that\n`beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)\nreturned when it started the ceremony. The attestation is\nthe browser's answer from `navigator.credentials.create()`.\n\nA rejected attestation leaves the ceremony open for a retry. An expired ceremony answers\n`att.stale_challenge`: begin a new registration. An unknown or\nalready-consumed registration ID answers `att.not_found`.\n",
+        "description": "Verifies the attestation against the registration ceremony and stores\nthe new passkey for the user. `registration_id` is the one that\n`createUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)\nreturned when it started the ceremony. The attestation is\nthe browser's answer from `navigator.credentials.create()`.\n\nA rejected attestation leaves the ceremony open for a retry. An expired ceremony answers\n`att.stale_challenge`: begin a new registration. An unknown or\nalready-consumed registration ID answers `att.not_found`.\n",
         "tags": [
           "Users"
         ],
@@ -1004,7 +1004,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/finishUserPasskeyRegistration-error-response"
+            "$ref": "#/components/responses/completeUserPasskeyRegistration-error-response"
           }
         }
       }
@@ -1335,7 +1335,7 @@
         }
       },
       "patch": {
-        "operationId": "patchMyUser",
+        "operationId": "updateMyUser",
         "summary": "Update my user information",
         "description": "Partially updates the caller's own schema-defined attributes. The merged\nresult is validated against the user's schema before commit. Concurrent\nwrites are last-write-wins.\n\nWith `project_id`, the user is updated only when the session belongs to\nthat project.\n",
         "tags": [
@@ -1374,7 +1374,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip` or `attributes.phones.0.fax`, never the\nrejected values. Fix the fields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`updateUser` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip` or `attributes.phones.0.fax`, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1424,7 +1424,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/patchMyUser-error-response"
+            "$ref": "#/components/responses/updateMyUser-error-response"
           }
         }
       }
@@ -1897,7 +1897,7 @@
       "post": {
         "operationId": "createFlow",
         "summary": "Start a flow",
-        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flow/{id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
+        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{flow_id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flow/{flow_id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
         "tags": [
           "Flows"
         ],
@@ -2019,11 +2019,11 @@
         }
       }
     },
-    "/flow/{id}": {
+    "/flow/{flow_id}": {
       "get": {
         "operationId": "getFlowStep",
         "summary": "Get the current step of a flow",
-        "description": "Returns the current step of a flow without advancing it. Use it to render\nthe step again after a page reload or a network error.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and\n`submitFlowStep` (`POST /flow/{id}/submit`) advances it.\n\nFor a sign-up step, prepares `step.gates.signup_pow.challenge`: one that\ncreates its user on submit, or one carrying a passkey registration that\ncreates its user.\nReuses challenges with more than a minute remaining; otherwise issues a\nnew one. If this render resolves parked SSO state, it first returns the\nupdated cookie; fetch the step again to obtain its puzzle.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
+        "description": "Returns the current step of a flow without advancing it. Use it to render\nthe step again after a page reload or a network error.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and\n`submitFlowStep` (`POST /flow/{flow_id}/submit`) advances it.\n\nFor a sign-up step, prepares `step.gates.signup_pow.challenge`: one that\ncreates its user on submit, or one carrying a passkey registration that\ncreates its user.\nReuses challenges with more than a minute remaining; otherwise issues a\nnew one. If this render resolves parked SSO state, it first returns the\nupdated cookie; fetch the step again to obtain its puzzle.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
         "tags": [
           "Flows"
         ],
@@ -2100,7 +2100,7 @@
         }
       }
     },
-    "/flow/{id}/submit": {
+    "/flow/{flow_id}/submit": {
       "post": {
         "operationId": "submitFlowStep",
         "summary": "Submit a flow step",
@@ -2204,7 +2204,7 @@
       "post": {
         "operationId": "createAuthAttempt",
         "summary": "Create an authentication attempt",
-        "description": "Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.\n\nAn authentication attempt collects the proofs for one sign-in and ends in a\nhandoff token. A handoff token is the short-lived, single-use credential that\na completed attempt hands to the session exchange. A client makes these calls\nin order:\n\n1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.\n2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as\n   `identifier`, `password` or `passkey`.\n3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the\n   credential, code or assertion. Repeat steps 2 and 3 until\n   `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in\n   `required_factors` is verified.\n4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.\n5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token\n   for the session and its `session_token`.\n\nThe body takes a `project_id` and a `challenge_nonce` (from\n`POST /bootstrap/challenge`). For step-up authentication, which adds factors\nto an existing session, also send that session's `session_id` and its\n`session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.\nThe attempt's `attempt_id` in the response is the ID every later call takes.\n\nThe project comes from the project secret. A body `project_id` that names\nanother project answers `403` with `proj.mismatch`: send the credential's own\nproject. The attempt seals the project's newest primary deployment, whatever\nthe caller's `Origin`. With none it answers `409` with `rel.no_default`, and a\nrevoked release answers `409` with `rel.revoked`.\n",
+        "description": "Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.\n\nAn authentication attempt collects the proofs for one sign-in and ends in a\nhandoff token. A handoff token is the short-lived, single-use credential that\na completed attempt hands to the session exchange. A client makes these calls\nin order:\n\n1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.\n2. `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as\n   `identifier`, `password` or `passkey`.\n3. `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the\n   credential, code or assertion. Repeat steps 2 and 3 until\n   `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in\n   `required_factors` is verified.\n4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.\n5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token\n   for the session and its `session_token`.\n\nThe body takes a `project_id` and a `challenge_nonce` (from\n`POST /bootstrap/challenge`). For step-up authentication, which adds factors\nto an existing session, also send that session's `session_id` and its\n`session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.\nThe attempt's `attempt_id` in the response is the ID every later call takes.\n\nThe project comes from the project secret. A body `project_id` that names\nanother project answers `403` with `proj.mismatch`: send the credential's own\nproject. The attempt seals the project's newest primary deployment, whatever\nthe caller's `Origin`. With none it answers `409` with `rel.no_default`, and a\nrevoked release answers `409` with `rel.revoked`.\n",
         "tags": [
           "Authentication Attempts"
         ],
@@ -2300,9 +2300,9 @@
     },
     "/auth_attempts/{attempt_id}/challenges": {
       "post": {
-        "operationId": "issueChallenge",
+        "operationId": "createAuthAttemptChallenge",
         "summary": "Issue a factor challenge",
-        "description": "Issues a challenge, a request to prove one factor, within an authentication attempt.\n\nA challenge names one factor method, such as password, passkey, TOTP or OTP\nvia SMS. The response carries the challenge's `challenge_id`, method,\nmetadata and any UI hints. The client then submits the proof with\n`verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.\n",
+        "description": "Issues a challenge, a request to prove one factor, within an authentication attempt.\n\nA challenge names one factor method, such as password, passkey, TOTP or OTP\nvia SMS. The response carries the challenge's `challenge_id`, method,\nmetadata and any UI hints. The client then submits the proof with\n`verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.\n",
         "tags": [
           "Authentication Attempts"
         ],
@@ -2340,16 +2340,16 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/issueChallenge-error-response"
+            "$ref": "#/components/responses/createAuthAttemptChallenge-error-response"
           }
         }
       }
     },
     "/auth_attempts/{attempt_id}/challenges/{challenge_id}/verify": {
       "post": {
-        "operationId": "verifyChallengeProof",
+        "operationId": "verifyAuthAttemptChallenge",
         "summary": "Verify a challenge proof",
-        "description": "Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.\n\nThe proof format depends on the challenge method. For example:\n\n- `password` method: { password: \"…\" }\n- `totp` method: { totp: { code: \"123456\" } }\n- `passkey` method: { passkey: { assertion: \"…\" } }\n- `recovery_code` method: { recovery_code: \"…\" }\n\nOn success, the factor is recorded on the authentication attempt. The\nattempt moves to the next pending challenge, or completes when every required\nfactor is verified. Then call `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).\n\nA `409` with `att.proof_rejected` means the proof was wrong. Check it and try\nagain. There is no retry limit: you can retry until the attempt expires.\n",
+        "description": "Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.\n\nThe proof format depends on the challenge method. For example:\n\n- `password` method: { password: \"…\" }\n- `totp` method: { totp: { code: \"123456\" } }\n- `passkey` method: { passkey: { assertion: \"…\" } }\n- `recovery_code` method: { recovery_code: \"…\" }\n\nOn success, the factor is recorded on the authentication attempt. The\nattempt moves to the next pending challenge, or completes when every required\nfactor is verified. Then call `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).\n\nA `409` with `att.proof_rejected` means the proof was wrong. Check it and try\nagain. There is no retry limit: you can retry until the attempt expires.\n",
         "tags": [
           "Authentication Attempts"
         ],
@@ -2413,14 +2413,14 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/verifyChallengeProof-error-response"
+            "$ref": "#/components/responses/verifyAuthAttemptChallenge-error-response"
           }
         }
       }
     },
     "/auth_attempts/{attempt_id}/handoff": {
       "post": {
-        "operationId": "createHandoff",
+        "operationId": "createAuthAttemptHandoff",
         "summary": "Complete an authentication attempt and create a handoff token",
         "description": "Completes an authentication attempt and mints a `handoff_token`.\n\nA handoff token is the short-lived credential that a completed attempt hands\nto the session exchange. Call this after every required factor is verified and\nthe attempt is in `completed` state. Otherwise it answers `409` with\n`att.not_completed`: verify the remaining factors, then call again.\n\nExchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`)) within 60\nseconds to receive the session and its `session_token`. The handoff token is:\n\n- Single-use: exchange it once, with no retry.\n- Bound to the project: the exchange needs the same project's credential.\n- Created once: a second call answers `409 att.already_handed_off`, even\n  with the same idempotency key.\n\nA revoked release is refused when the handoff is exchanged, not here. A\nrelease is the configuration that `zitadel deploy` publishes.\n",
         "tags": [
@@ -2473,7 +2473,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/createHandoff-error-response"
+            "$ref": "#/components/responses/createAuthAttemptHandoff-error-response"
           }
         }
       }
@@ -2482,7 +2482,7 @@
       "post": {
         "operationId": "createProject",
         "summary": "Create a project",
-        "description": "Creates a project and returns its project secret and preview secret, which no\nother endpoint returns.\n\nA project is the top-level boundary that holds users, sessions and\nconfiguration. It has no owning team until someone claims it; see `initClaim` (`POST /projects/{project_id}/claim/init`).\n\nThe request needs no credential and is rate-limited. On `429`, wait and retry.\nUnless `seed_defaults` is `false`, the project starts with a default user schema\nand flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.\n",
+        "description": "Creates a project and returns its project secret and preview secret, which no\nother endpoint returns.\n\nA project is the top-level boundary that holds users, sessions and\nconfiguration. It has no owning team until someone claims it; see `createProjectClaim` (`POST /projects/{project_id}/claim/init`).\n\nThe request needs no credential and is rate-limited. On `429`, wait and retry.\nUnless `seed_defaults` is `false`, the project starts with a default user schema\nand flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.\n",
         "tags": [
           "Projects"
         ],
@@ -2669,7 +2669,7 @@
         }
       },
       "patch": {
-        "operationId": "patchProject",
+        "operationId": "updateProject",
         "x-zitadel-cli": "projects update",
         "summary": "Update a project",
         "description": "Updates a project's name or password hashing method.\n\nFields you leave out keep their value. Sending `password_hash: null` drops\nthe project's own method and returns to the server default. A change of\nmethod rewrites no stored password: each moves to the new method when its\nowner next signs in or sets a new password.\n\nAuthenticate with the project secret, or with the session of a signed-in\nperson who can act on the project.\n",
@@ -2744,7 +2744,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/patchProject-error-response"
+            "$ref": "#/components/responses/updateProject-error-response"
           }
         }
       }
@@ -2842,9 +2842,9 @@
     },
     "/projects/{project_id}/claim/init": {
       "post": {
-        "operationId": "initClaim",
+        "operationId": "createProjectClaim",
         "summary": "Initialize a project claim",
-        "description": "Starts a claim, which attaches a project created before sign-in to a\nteam, and returns the `claim_url` to open in a browser.\n\nA claim [attaches a project to a team](/docs/concepts/project-team-user#claim)\nso that the team's members administer it. This operation mints a\nsingle-use, short-lived challenge for an unclaimed project. The developer\nopens `claim_url`, signs in and completes the claim in the browser; see\n`completeClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`,\nas `zitadel claim` does. The response's `expires_at` carries the exact expiry.\n\nAuthenticate with the project secret that `createProject` (`POST /projects`) returns as\n`project_secret`.\n\nA `409` means a team already claimed the project, and its details name\nthat team. A `410` means the project's 14-day claim window has closed,\nwhich is final.\n",
+        "description": "Starts a claim, which attaches a project created before sign-in to a\nteam, and returns the `claim_url` to open in a browser.\n\nA claim [attaches a project to a team](/docs/concepts/project-team-user#claim)\nso that the team's members administer it. This operation mints a\nsingle-use, short-lived challenge for an unclaimed project. The developer\nopens `claim_url`, signs in and completes the claim in the browser; see\n`completeProjectClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`,\nas `zitadel claim` does. The response's `expires_at` carries the exact expiry.\n\nAuthenticate with the project secret that `createProject` (`POST /projects`) returns as\n`project_secret`.\n\nA `409` means a team already claimed the project, and its details name\nthat team. A `410` means the project's 14-day claim window has closed,\nwhich is final.\n",
         "tags": [
           "Projects"
         ],
@@ -2912,16 +2912,16 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/initClaim-error-response"
+            "$ref": "#/components/responses/createProjectClaim-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/claim/status": {
       "get": {
-        "operationId": "getClaimStatus",
+        "operationId": "getProjectClaimStatus",
         "summary": "Get the status of a project claim",
-        "description": "Returns the status of a claim challenge, `pending` or `completed`, while a\nbrowser completes the claim.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim).\n`zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`) starts the claim.\nOnce the project is claimed, the response is `completed` with the owning\nteam, the claim timestamp and the dashboard URL.\n\nThe claim itself, not the polled challenge, decides the status. A project\nclaimed through another concurrent challenge also reports `completed`. A\ncompleted claim keeps reporting `completed` past this challenge's expiry\nand past the project's claim window.\n\nPass the `challenge_id` that `initClaim` returns. Authenticate with the\nproject secret that started the challenge. On `410` with `proj.claim_expired`, call\n`initClaim` again for a fresh challenge.\n",
+        "description": "Returns the status of a claim challenge, `pending` or `completed`, while a\nbrowser completes the claim.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim).\n`zitadel claim` polls this operation after `createProjectClaim` (`POST /projects/{project_id}/claim/init`) starts the claim.\nOnce the project is claimed, the response is `completed` with the owning\nteam, the claim timestamp and the dashboard URL.\n\nThe claim itself, not the polled challenge, decides the status. A project\nclaimed through another concurrent challenge also reports `completed`. A\ncompleted claim keeps reporting `completed` past this challenge's expiry\nand past the project's claim window.\n\nPass the `challenge_id` that `createProjectClaim` returns. Authenticate with the\nproject secret that started the challenge. On `410` with `proj.claim_expired`, call\n`createProjectClaim` again for a fresh challenge.\n",
         "tags": [
           "Projects"
         ],
@@ -2972,7 +2972,7 @@
             }
           },
           "404": {
-            "description": "Challenge not found. Use the `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returned.",
+            "description": "Challenge not found. Use the `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returned.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3016,16 +3016,16 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getClaimStatus-error-response"
+            "$ref": "#/components/responses/getProjectClaimStatus-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/claim/complete": {
       "post": {
-        "operationId": "completeClaim",
+        "operationId": "completeProjectClaim",
         "summary": "Complete a project claim",
-        "description": "Completes a claim by attaching the project to the signed-in developer's\npersonal team.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim),\nso that the team's members administer it. The claim page in the browser\ncalls this operation after the developer signs in, with the session cookie.\nThe `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the\nrequest's single-use, browser-safe authorization.\n\nClaims are first-claim-wins and spend the challenge. If a team already\nclaimed the project, the request answers `409`. If the challenge lapsed\n(`410` with `proj.claim_expired`), call `initClaim` again for a fresh one.\n",
+        "description": "Completes a claim by attaching the project to the signed-in developer's\npersonal team.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim),\nso that the team's members administer it. The claim page in the browser\ncalls this operation after the developer signs in, with the session cookie.\nThe `challenge_id` from the claim URL that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns is the\nrequest's single-use, browser-safe authorization.\n\nClaims are first-claim-wins and spend the challenge. If a team already\nclaimed the project, the request answers `409`. If the challenge lapsed\n(`410` with `proj.claim_expired`), call `createProjectClaim` again for a fresh one.\n",
         "tags": [
           "Projects"
         ],
@@ -3163,16 +3163,16 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/completeClaim-error-response"
+            "$ref": "#/components/responses/completeProjectClaim-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/claim/window": {
       "get": {
-        "operationId": "getClaimWindow",
+        "operationId": "getProjectClaimWindow",
         "summary": "Get the claim window for a project",
-        "description": "Returns when a project's claim window closes and whether it has already\nclosed.\n\nThe claim window is the 14 days after a project is created during which a\nteam can [claim it](/docs/concepts/project-team-user#claim). The claim page\nin the browser calls this operation to show how long is left.\n\nThe request needs no credential, because the claim page calls it before the\ndeveloper has signed in. Holding the `challenge_id` from the claim URL that\n`initClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one `completeClaim` (`POST /projects/{project_id}/claim/complete`)\naccepts. The response reveals only the window, never the project itself.\nUnlike `completeClaim` it spends nothing, so reloading the page is safe.\n",
+        "description": "Returns when a project's claim window closes and whether it has already\nclosed.\n\nThe claim window is the 14 days after a project is created during which a\nteam can [claim it](/docs/concepts/project-team-user#claim). The claim page\nin the browser calls this operation to show how long is left.\n\nThe request needs no credential, because the claim page calls it before the\ndeveloper has signed in. Holding the `challenge_id` from the claim URL that\n`createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`)\naccepts. The response reveals only the window, never the project itself.\nUnlike `completeProjectClaim` it spends nothing, so reloading the page is safe.\n",
         "tags": [
           "Projects"
         ],
@@ -3217,17 +3217,17 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getClaimWindow-error-response"
+            "$ref": "#/components/responses/getProjectClaimWindow-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/origins": {
       "post": {
-        "operationId": "addOrigin",
+        "operationId": "addProjectOrigin",
         "x-zitadel-cli": "origin add",
         "summary": "Add an origin pattern",
-        "description": "Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.\n\nAn origin pattern says which web origins the project accepts. A `primary`\npattern must be an exact URL with no wildcard. A `preview` pattern may\ninclude a single DNS-label wildcard.\n\nWhile the project has no patterns, it admits no origin except a loopback\norigin, so the first pattern you add opens it to the origins that\npattern matches. Admitting an origin is not serving it: a new `primary`\norigin answers `rel.not_deployed` until the next deploy to primary\n(`zitadel deploy`).\n\nAdding a pattern that already exists with the same kind is idempotent and\nanswers `201` with the stored origin. If the pattern exists with the other\nkind, the request is refused with `origin.kind_conflict`: remove it with\n`removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.\n",
+        "description": "Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.\n\nAn origin pattern says which web origins the project accepts. A `primary`\npattern must be an exact URL with no wildcard. A `preview` pattern may\ninclude a single DNS-label wildcard.\n\nWhile the project has no patterns, it admits no origin except a loopback\norigin, so the first pattern you add opens it to the origins that\npattern matches. Admitting an origin is not serving it: a new `primary`\norigin answers `rel.not_deployed` until the next deploy to primary\n(`zitadel deploy`).\n\nAdding a pattern that already exists with the same kind is idempotent and\nanswers `201` with the stored origin. If the pattern exists with the other\nkind, the request is refused with `origin.kind_conflict`: remove it with\n`removeProjectOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.\n",
         "tags": [
           "Projects"
         ],
@@ -3268,18 +3268,18 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/addOrigin-error-response"
+            "$ref": "#/components/responses/addProjectOrigin-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/origins/remove": {
       "post": {
-        "operationId": "removeOrigin",
+        "operationId": "removeProjectOrigin",
         "x-zitadel-cli": "origin rm",
         "x-zitadel-destructive": true,
         "summary": "Remove an origin pattern",
-        "description": "Removes one origin pattern from the project's origins.\n\nRequests from URLs only that pattern admitted are refused from then on.\nLive previews and deployment history are untouched. Removing the last\npattern leaves an empty list, which admits no origin except a loopback\norigin.\nRemoving a pattern that is already absent is idempotent and answers `204`.\n\nThe body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.\n",
+        "description": "Removes one origin pattern from the project's origins.\n\nRequests from URLs only that pattern admitted are refused from then on.\nLive previews and deployment history are untouched. Removing the last\npattern leaves an empty list, which admits no origin except a loopback\norigin.\nRemoving a pattern that is already absent is idempotent and answers `204`.\n\nThe body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`) stored.\n",
         "tags": [
           "Projects"
         ],
@@ -3310,7 +3310,7 @@
                 "properties": {
                   "pattern": {
                     "type": "string",
-                    "description": "The origin pattern exactly as stored on the project: the string\nthat `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addOrigin` (`POST /projects/{project_id}/origins`) returns.\n",
+                    "description": "The origin pattern exactly as stored on the project: the string\nthat `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addProjectOrigin` (`POST /projects/{project_id}/origins`) returns.\n",
                     "example": "https://app.example.com"
                   }
                 }
@@ -3323,14 +3323,14 @@
             "description": "The pattern was removed."
           },
           "default": {
-            "$ref": "#/components/responses/removeOrigin-error-response"
+            "$ref": "#/components/responses/removeProjectOrigin-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/previews": {
       "get": {
-        "operationId": "listPreviews",
+        "operationId": "listProjectPreviews",
         "x-zitadel-cli": "preview list",
         "summary": "List a project's previews",
         "description": "Lists the project's live previews, newest first by `created_at`.\n\nA preview is a URL with a deployment on it, served until it expires.\nAn expired or removed preview is not listed. What was deployed to it stays\nin `GET /deployments`.\n",
@@ -3388,18 +3388,18 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/listPreviews-error-response"
+            "$ref": "#/components/responses/listProjectPreviews-error-response"
           }
         }
       }
     },
     "/projects/{project_id}/previews/remove": {
       "post": {
-        "operationId": "removePreview",
+        "operationId": "removeProjectPreview",
         "x-zitadel-cli": "preview rm",
         "x-zitadel-destructive": true,
         "summary": "Remove a preview",
-        "description": "Ends a preview before it expires: the URL stops being served at once.\n\nThe deployments to it stay in the history. The call is idempotent.\nA URL with no live preview answers `204` too. That includes one that\nexpired or was removed before, so a cleanup that races the expiry still\nsucceeds.\n\nThe URL travels in the body rather than the path because an origin\ncontains `/`. Take it from `listPreviews` (`GET /projects/{project_id}/previews`).\n",
+        "description": "Ends a preview before it expires: the URL stops being served at once.\n\nThe deployments to it stay in the history. The call is idempotent.\nA URL with no live preview answers `204` too. That includes one that\nexpired or was removed before, so a cleanup that races the expiry still\nsucceeds.\n\nThe URL travels in the body rather than the path because an origin\ncontains `/`. Take it from `listProjectPreviews` (`GET /projects/{project_id}/previews`).\n",
         "tags": [
           "Previews"
         ],
@@ -3438,7 +3438,7 @@
             "description": "The URL has no live preview."
           },
           "default": {
-            "$ref": "#/components/responses/removePreview-error-response"
+            "$ref": "#/components/responses/removeProjectPreview-error-response"
           }
         }
       }
@@ -3583,7 +3583,7 @@
       "post": {
         "operationId": "exchangeHandoff",
         "summary": "Exchange a handoff token for a session",
-        "description": "Exchanges a handoff token for a session and a `session_token`.\n\nA handoff token is the short-lived, single-use credential that\n`createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication attempt is\ncomplete. This call consumes it. It is the last step of the sign-in sequence:\ncreate the attempt, issue a challenge, verify the proof, create the handoff,\nexchange it.\n\nThe server resolves the originating authentication attempt from the token and then:\n\n| Originating authentication attempt | Outcome |\n|---|---|\n| No `session_id` | A new authenticated session is **created**. |\n| `session_id` points to an anonymous session | Existing session is **upgraded**: user and factors written in, lifetime reset to the full session lifetime. |\n| `session_id` points to an active session (step-up) | Existing session is **upgraded**: new factors merged, `assurance_levels[]` expanded. |\n\nThe response shape is identical in all three cases.\n\nThe `session_token` supersedes any previously issued `session_token` for the\nsame session. Clients must replace their stored token at this point.\n\nRequires a project service key (OAuth2 client credentials). The project comes\nfrom the project secret. A query `project_id` that disagrees answers `403`\nwith `proj.mismatch`.\n\nThe exchange resolves a deployment the same way as other runtime operations.\nA deployment makes a release live, and a release is the configuration that\n`zitadel deploy` publishes. With no browser `Origin` and\nnothing deployed to the resolved target, the response is `409` with\n`rel.not_deployed`: run `zitadel deploy`, then retry. A revoked release\nanswers `409` with `rel.revoked`.\n",
+        "description": "Exchanges a handoff token for a session and a `session_token`.\n\nA handoff token is the short-lived, single-use credential that\n`createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication attempt is\ncomplete. This call consumes it. It is the last step of the sign-in sequence:\ncreate the attempt, issue a challenge, verify the proof, create the handoff,\nexchange it.\n\nThe server resolves the originating authentication attempt from the token and then:\n\n| Originating authentication attempt | Outcome |\n|---|---|\n| No `session_id` | A new authenticated session is **created**. |\n| `session_id` points to an anonymous session | Existing session is **upgraded**: user and factors written in, lifetime reset to the full session lifetime. |\n| `session_id` points to an active session (step-up) | Existing session is **upgraded**: new factors merged, `assurance_levels[]` expanded. |\n\nThe response shape is identical in all three cases.\n\nThe `session_token` supersedes any previously issued `session_token` for the\nsame session. Clients must replace their stored token at this point.\n\nRequires a project service key (OAuth2 client credentials). The project comes\nfrom the project secret. A query `project_id` that disagrees answers `403`\nwith `proj.mismatch`.\n\nThe exchange resolves a deployment the same way as other runtime operations.\nA deployment makes a release live, and a release is the configuration that\n`zitadel deploy` publishes. With no browser `Origin` and\nnothing deployed to the resolved target, the response is `409` with\n`rel.not_deployed`: run `zitadel deploy`, then retry. A revoked release\nanswers `409` with `rel.revoked`.\n",
         "tags": [
           "Sessions"
         ],
@@ -4025,7 +4025,7 @@
     },
     "/schemas": {
       "post": {
-        "operationId": "createSchema",
+        "operationId": "publishSchema",
         "summary": "Create a schema",
         "description": "Creates a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response's `id` is what\n`createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
         "tags": [
@@ -4223,7 +4223,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/createSchema-error-response"
+            "$ref": "#/components/responses/publishSchema-error-response"
           }
         }
       },
@@ -4321,9 +4321,9 @@
         }
       }
     },
-    "/schemas/{id}": {
+    "/schemas/{schema_id}": {
       "get": {
-        "operationId": "getSchemaById",
+        "operationId": "getSchema",
         "x-zitadel-cli": "schemas get",
         "summary": "Get a schema by ID",
         "description": "Returns a schema by ID. A schema ID identifies one immutable revision, so\nthis returns exactly that revision. To find the current revision of an\nobject type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.\n\nSchema IDs are unique within a project, not across projects (the seeded\ndefault schema carries the same `$id` in every project). A console\nsession that manages more than one project names the project with\n`project_id`; without it, the ID is resolved in the credential's own\nproject when it is ambiguous. A project secret always resolves in its\nown project and ignores `project_id`.\n",
@@ -4363,14 +4363,14 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getSchemaById-error-response"
+            "$ref": "#/components/responses/getSchema-error-response"
           }
         }
       }
     },
     "/flow_definitions": {
       "post": {
-        "operationId": "createFlowDefinition",
+        "operationId": "publishFlowDefinition",
         "summary": "Create a flow definition",
         "description": "Creates a flow definition by publishing a new revision of it. It records a\n`flowdef.created` event.\n\nA [flow definition](/docs/concepts/flows-and-schemas) is a template that\ndefines the sequence of steps (capabilities) for one user journey, such as\nregistration, login or password reset. The body follows the flow\ndefinition schema, which includes the flow's purpose, audience and steps.\n\nEvery call allocates a new opaque ID. That `id` is the `revision_id` a\nrelease pins for `kind: flow_definition`.\n\nRevisions of one flow share its `name`. Posting a definition under an\nexisting `name` publishes a new revision of that flow, which is not a\nconflict. List with `name` to see a flow's revisions, newest by creation\ntime first.\n",
         "tags": [
@@ -5008,7 +5008,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/createFlowDefinition-error-response"
+            "$ref": "#/components/responses/publishFlowDefinition-error-response"
           }
         }
       },
@@ -5016,7 +5016,7 @@
         "operationId": "listFlowDefinitions",
         "x-zitadel-cli": "flow-definitions list",
         "summary": "List flow definitions",
-        "description": "Lists the project's flow definitions with their configurations, newest by\ncreation time first. A flow definition sets which step of a sign-in\nrenders when, and which fields each step collects.\n\nThe `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{id}`)\ntakes. Filter by `name` to list the revisions of one flow.\n",
+        "description": "Lists the project's flow definitions with their configurations, newest by\ncreation time first. A flow definition sets which step of a sign-in\nrenders when, and which fields each step collects.\n\nThe `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{flow_definition_id}`)\ntakes. Filter by `name` to list the revisions of one flow.\n",
         "tags": [
           "Flow Definitions"
         ],
@@ -5121,12 +5121,12 @@
         }
       }
     },
-    "/flow_definitions/{id}": {
+    "/flow_definitions/{flow_definition_id}": {
       "get": {
         "operationId": "getFlowDefinition",
         "x-zitadel-cli": "flow-definitions get",
         "summary": "Get a flow definition by ID",
-        "description": "Returns one flow definition revision. Pass the `id` that\n`createFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.\n",
+        "description": "Returns one flow definition revision. Pass the `id` that\n`publishFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.\n",
         "tags": [
           "Flow Definitions"
         ],
@@ -5436,7 +5436,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteTeam",
+        "operationId": "deactivateTeam",
         "x-zitadel-cli": "teams deactivate",
         "summary": "Deactivate a team",
         "description": "Deactivates a team and removes its memberships.\n\nThe team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with\nstatus `deactivated`. The users whose lifecycle the team owns are\ndeactivated with it.\n\nThe request is idempotent. Deleting a team that is already deactivated\nor does not exist succeeds without changing anything.\n\nA team that still owns a project is refused with `409 team.owns_project`.\nDeactivating it would leave the project owned by a deactivated team and so\nunmanageable. No endpoint ends a team's ownership of a project yet, so for\nnow such a team cannot be deactivated through the API.\n",
@@ -5500,7 +5500,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/deleteTeam-error-response"
+            "$ref": "#/components/responses/deactivateTeam-error-response"
           }
         }
       },
@@ -5609,7 +5609,7 @@
       "post": {
         "operationId": "search",
         "summary": "Search a project",
-        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
+        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `getUser`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
         "tags": [
           "Search"
         ],
@@ -5698,7 +5698,7 @@
     },
     "/branding": {
       "post": {
-        "operationId": "createBranding",
+        "operationId": "publishBranding",
         "summary": "Publish a branding revision",
         "description": "Publishes a new immutable branding revision for the project, and records a\n`branding.created` event. Branding revisions cannot be updated or deleted.\nEvery edit publishes a new revision. Flow responses carry the branding\nrevision the request's release pins.\n\nThe `id` of the new revision is the revision ID a release pins for\n`kind: branding`.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime, in `zitadel deploy` and `zitadel deploy --dry-run`.\n",
         "tags": [
@@ -5748,7 +5748,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/createBranding-error-response"
+            "$ref": "#/components/responses/publishBranding-error-response"
           }
         }
       },
@@ -5756,7 +5756,7 @@
         "operationId": "listBranding",
         "x-zitadel-cli": "branding list",
         "summary": "List branding revisions",
-        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision.\n\nThe `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and\nthat a release pins for `kind: branding`.\n",
+        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision.\n\nThe `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and\nthat a release pins for `kind: branding`.\n",
         "tags": [
           "Branding"
         ],
@@ -5792,12 +5792,12 @@
         }
       }
     },
-    "/branding/{id}": {
+    "/branding/{branding_id}": {
       "get": {
-        "operationId": "getBrandingById",
+        "operationId": "getBranding",
         "x-zitadel-cli": "branding get",
         "summary": "Get a branding revision by ID",
-        "description": "Returns one branding revision, including its stored configuration. Pass the\n`id` that `createBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.\n",
+        "description": "Returns one branding revision, including its stored configuration. Pass the\n`id` that `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.\n",
         "tags": [
           "Branding"
         ],
@@ -5838,14 +5838,14 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getBrandingById-error-response"
+            "$ref": "#/components/responses/getBranding-error-response"
           }
         }
       }
     },
     "/idps": {
       "post": {
-        "operationId": "createIdp",
+        "operationId": "publishIdp",
         "x-zitadel-cli": "idps create",
         "summary": "Create or revise an identity provider",
         "description": "Creates or revises an identity provider, an external sign-in such as\nGoogle, from its connection document. If the slug does not already exist,\na new identity provider is created. If one with that slug already exists,\na revision is created.\n\nA revision gets a new `revision_id` and does not modify the identity\nprovider's `id`. Identity links, which tie a user to an account at the\nprovider, keep resolving. Releases and authentication attempts stay pinned\nto the revision they captured.\n\nIdentity fields are fixed for the life of the identity provider and a\nrevision that changes one is rejected: `protocol`, `subject_claim`, and\n`issuer`, the field that names the authority. Their values decide which provider\naccount a stored subject belongs to, so changing one would silently\nrepoint existing identities at a different provider.\n\n`subject_claim` is optional, and `sub` is used as the default value. If a\nrevision updates `subject_claim` to a different value than the one set\nduring creation, the request is rejected.\n\nOIDC is the only protocol.\n\nThe document is validated against the `idp-connection.json` schema before\nanything is stored. The rules the server applies when it starts a sign-in\nthen run on the document, so a document that could never start one is\nrefused here with `idp.endpoints_partial`: the OIDC block sets an endpoint\nwithout the others. Set no endpoint, and discovery fills them, or set\n`authorization_endpoint`, `token_endpoint`, `jwks_uri`, and\n`userinfo_endpoint`. `userinfo_endpoint` may be left out when\n`id_token_mapping` is on, but setting it alone still counts as setting an\nendpoint. The details list the missing endpoints.\n\nA refused document stores nothing, and on a revise the current revision\nstays unchanged.\n",
@@ -6106,7 +6106,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/createIdp-error-response"
+            "$ref": "#/components/responses/publishIdp-error-response"
           }
         }
       }
@@ -6357,12 +6357,12 @@
         }
       }
     },
-    "/idps/{id}": {
+    "/idps/{idp_id}": {
       "get": {
-        "operationId": "getIdpById",
+        "operationId": "getIdp",
         "x-zitadel-cli": "idps get",
         "summary": "Get an identity provider by ID",
-        "description": "Returns an identity provider, an external sign-in such as Google, by ID at\nits newest revision. `listIdpRevisions` (`GET /idps/{id}/revisions`) lists\nevery revision of it.\n\nThe lookup is scoped to the project in `project_id`.\n",
+        "description": "Returns an identity provider, an external sign-in such as Google, by ID at\nits newest revision. `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists\nevery revision of it.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
           "Identity Providers"
         ],
@@ -6472,12 +6472,12 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getIdpById-error-response"
+            "$ref": "#/components/responses/getIdp-error-response"
           }
         }
       }
     },
-    "/idps/{id}/revisions": {
+    "/idps/{idp_id}/revisions": {
       "get": {
         "operationId": "listIdpRevisions",
         "summary": "List the revisions of an identity provider",
@@ -6648,7 +6648,7 @@
     },
     "/idps/revisions/{revision_id}": {
       "get": {
-        "operationId": "getIdpRevisionById",
+        "operationId": "getIdpRevision",
         "summary": "Get a revision of an identity provider",
         "description": "Returns one revision of an identity provider, an external sign-in such as\nGoogle, by its `revision_id`, the value an authentication attempt or a\nrelease pins.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
@@ -6760,14 +6760,14 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getIdpRevisionById-error-response"
+            "$ref": "#/components/responses/getIdpRevision-error-response"
           }
         }
       }
     },
     "/applications": {
       "post": {
-        "operationId": "createApplication",
+        "operationId": "publishApplication",
         "summary": "Create or revise a registered application",
         "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`application.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`application.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `application.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `application.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
         "tags": [
@@ -7008,16 +7008,16 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/createApplication-error-response"
+            "$ref": "#/components/responses/publishApplication-error-response"
           }
         }
       }
     },
-    "/applications/{id}": {
+    "/applications/{application_id}": {
       "get": {
-        "operationId": "getApplicationById",
+        "operationId": "getApplication",
         "summary": "Get an application by ID",
-        "description": "Returns an application that authenticates its users via Zitadel, by ID\nat its newest revision, with each client's `client_id` in `definition`. It\nnever returns a client secret: `createApplication` (`POST /applications`)\nshows one once, when it creates the client.\n\nThe lookup is scoped to the project in `project_id`.\n",
+        "description": "Returns an application that authenticates its users via Zitadel, by ID\nat its newest revision, with each client's `client_id` in `definition`. It\nnever returns a client secret: `publishApplication` (`POST /applications`)\nshows one once, when it creates the client.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
           "Applications"
         ],
@@ -7109,7 +7109,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getApplicationById-error-response"
+            "$ref": "#/components/responses/getApplication-error-response"
           }
         }
       }
@@ -7534,7 +7534,7 @@
       "post": {
         "operationId": "createRelease",
         "summary": "Create a release",
-        "description": "Creates a release from existing revisions, given as `(kind, revision_id)`\npairs. To build one from files on disk, use `buildRelease` (`POST /releases/build`)\n(`POST /releases/build`).\n\nA release is a snapshot of the project's configuration: it pins one\nrevision of each resource it includes, and it is not tied to an origin.\nTake each `revision_id` from the operation that created the revision, for\nexample the `id` that `createBranding` (`POST /branding`) or `createFlowDefinition` (`POST /flow_definitions`) returns.\n\nEach revision must exist in the project and is recorded under the handle\nit declares. The release must be complete and consistent:\n\n- Every handle its revisions name must be in the release: a flow's\n  `user_schema`, and the identity provider (IdP) connections named by a\n  flow step's `sso_providers` or a schema's `x-auth-methods.sso.providers`.\n  A missing one answers `rel.unresolved_reference`, naming the resource and\n  the handle, for example `flow_definition default-login: user_schema\n  human-user not found`. Add the missing revision to the request.\n- Every flow is validated as on save, against the user schema revision in\n  the release. A flow that fails answers `rel.invalid`, with the reason in\n  `details`. Fix the flow and send the request again.\n\nThe call is idempotent on the set of revisions: the same revisions with a\ndifferent `message` answer `200` with the existing release. A new release\nanswers `201`.\n\nCreating a release does not deploy it. Pass the returned `id` to\n`createDeployment` (`POST /deployments`) to make the release live.\n",
+        "description": "Creates a release from existing revisions, given as `(kind, revision_id)`\npairs. To build one from files on disk, use `buildRelease` (`POST /releases/build`)\n(`POST /releases/build`).\n\nA release is a snapshot of the project's configuration: it pins one\nrevision of each resource it includes, and it is not tied to an origin.\nTake each `revision_id` from the operation that created the revision, for\nexample the `id` that `publishBranding` (`POST /branding`) or `publishFlowDefinition` (`POST /flow_definitions`) returns.\n\nEach revision must exist in the project and is recorded under the handle\nit declares. The release must be complete and consistent:\n\n- Every handle its revisions name must be in the release: a flow's\n  `user_schema`, and the identity provider (IdP) connections named by a\n  flow step's `sso_providers` or a schema's `x-auth-methods.sso.providers`.\n  A missing one answers `rel.unresolved_reference`, naming the resource and\n  the handle, for example `flow_definition default-login: user_schema\n  human-user not found`. Add the missing revision to the request.\n- Every flow is validated as on save, against the user schema revision in\n  the release. A flow that fails answers `rel.invalid`, with the reason in\n  `details`. Fix the flow and send the request again.\n\nThe call is idempotent on the set of revisions: the same revisions with a\ndifferent `message` answer `200` with the existing release. A new release\nanswers `201`.\n\nCreating a release does not deploy it. Pass the returned `id` to\n`createDeployment` (`POST /deployments`) to make the release live.\n",
         "tags": [
           "Releases"
         ],
@@ -7711,7 +7711,7 @@
         "operationId": "listReleases",
         "x-zitadel-cli": "release list",
         "summary": "List releases",
-        "description": "Lists the project's releases, newest first. A release is a snapshot of the\nproject's configuration.\n\nEntries carry the digest, the metadata and `revoked_at`. The pinned set is\nomitted: read one release with `getReleaseById` (`GET /releases/{release_id}`) to get its pointers.\n\nThe `id` of an entry is the release ID that `getReleaseById`,\n`revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.\n\n`content_hash` looks a release up by its content, as the CLI does when a\nperson types the digest a transcript printed. The project holds at most\none release per digest, so the filtered list has one entry or none. An\nunknown digest is an empty list rather than an error. Paths take the\n`rel_` ID only, so use the matched entry's `id` there.\n",
+        "description": "Lists the project's releases, newest first. A release is a snapshot of the\nproject's configuration.\n\nEntries carry the digest, the metadata and `revoked_at`. The pinned set is\nomitted: read one release with `getRelease` (`GET /releases/{release_id}`) to get its pointers.\n\nThe `id` of an entry is the release ID that `getRelease`,\n`revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.\n\n`content_hash` looks a release up by its content, as the CLI does when a\nperson types the digest a transcript printed. The project holds at most\none release per digest, so the filtered list has one entry or none. An\nunknown digest is an empty list rather than an error. Paths take the\n`rel_` ID only, so use the matched entry's `id` there.\n",
         "tags": [
           "Releases"
         ],
@@ -8146,7 +8146,7 @@
     },
     "/releases/{release_id}": {
       "get": {
-        "operationId": "getReleaseById",
+        "operationId": "getRelease",
         "x-zitadel-cli": "release get",
         "summary": "Get a release by ID",
         "description": "Returns one release: its digest, its metadata, whether it was revoked, and\nthe `(kind, handle, revision_id)` tuples it pins. A release is a snapshot\nof the project's configuration.\n\nThe path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`),\n`buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a release from its\ndigest, list with the `content_hash` filter and read the matched entry's\n`id`.\n\nThe response does not embed resource content. Resolve each `revision_id`\nthrough the per-kind read endpoints when the bytes are needed.\n\nThe lookup is scoped to the project in `project_id`. A release ID\nbelonging to another project answers not found exactly as an unknown ID\ndoes, so the endpoint cannot be used to probe for releases in projects the\ncaller cannot read.\n",
@@ -8275,7 +8275,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getReleaseById-error-response"
+            "$ref": "#/components/responses/getRelease-error-response"
           }
         }
       }
@@ -8401,7 +8401,7 @@
         "operationId": "createGrant",
         "x-zitadel-cli": "grants create",
         "summary": "Create a grant",
-        "description": "Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.admin` role on a project.\n\nThe project is the one named by the `project_id` query parameter. Name the\nprincipal with `user` (`user_id` or `identifier`) or `team` (`team_id` or\n`name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that\n`getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team (`project.team`) grants are not\ncreated here: a claim, which attaches a project to a team, creates them.\n\nAn unrevoked grant with the same principal and relation holds that binding\neven after `expires_at`. Revoke it with `deleteGrant` before you create it\nagain.\n\nCreate does not accept `expand`. The `user_id` and team locators return `201`,\nwhose `user` and `team` carry only `user_id` and `team_id`. They still answer\n`404` or `409` when the principal is missing or the grant already exists.\nCreating by `user.identifier` answers `202` with no body on every outcome.\nGranting the session caller's own user is `grant.invalid` on either user\nlocator. A `201` grant names its user or team by ID only: read it back\nwith `getGrant` for the identifier and display name. A `202` returns no\ngrant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A session caller is authorized as the signed-in person\nagainst the target project, even when the session belongs to another project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.admin` role on a project.\n\nThe project is the one named by the `project_id` query parameter. Name the\nprincipal with `user` (`user_id` or `identifier`) or `team` (`team_id` or\n`name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that\n`getGrant` (`GET /grants/{grant_id}`) and `deleteGrant` (`DELETE /grants/{grant_id}`) take. Owning-team (`project.team`) grants are not\ncreated here: a claim, which attaches a project to a team, creates them.\n\nAn unrevoked grant with the same principal and relation holds that binding\neven after `expires_at`. Revoke it with `deleteGrant` before you create it\nagain.\n\nCreate does not accept `expand`. The `user_id` and team locators return `201`,\nwhose `user` and `team` carry only `user_id` and `team_id`. They still answer\n`404` or `409` when the principal is missing or the grant already exists.\nCreating by `user.identifier` answers `202` with no body on every outcome.\nGranting the session caller's own user is `grant.invalid` on either user\nlocator. A `201` grant names its user or team by ID only: read it back\nwith `getGrant` for the identifier and display name. A `202` returns no\ngrant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A session caller is authorized as the signed-in person\nagainst the target project, even when the session belongs to another project.\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Grants"
         ],
@@ -8515,7 +8515,7 @@
         "operationId": "queryGrants",
         "x-zitadel-cli": "grants list",
         "summary": "Query grants",
-        "description": "Returns a page of a project's grants.\n\nOnly unrevoked grants this API manages are listed, which bind a user or team\nto the viewer, editor or admin role. Expired grants are included, so a client\ncan revoke them with `deleteGrant` (`DELETE /grants/{id}`) before it grants the same binding again.\nProject-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are\nnot returned. Requires `project.read`.\n\n`expand: [\"principal\"]` adds envelope fields on `user` and `team`. For project\nsecrets it additionally requires `user.read` and `team.read`. A user-bound\nconsole session that already passed the project check may expand without those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
+        "description": "Returns a page of a project's grants.\n\nOnly unrevoked grants this API manages are listed, which bind a user or team\nto the viewer, editor or admin role. Expired grants are included, so a client\ncan revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding again.\nProject-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are\nnot returned. Requires `project.read`.\n\n`expand: [\"principal\"]` adds envelope fields on `user` and `team`. For project\nsecrets it additionally requires `user.read` and `team.read`. A user-bound\nconsole session that already passed the project check may expand without those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Grants"
         ],
@@ -8592,12 +8592,12 @@
         }
       }
     },
-    "/grants/{id}": {
+    "/grants/{grant_id}": {
       "get": {
         "operationId": "getGrant",
         "x-zitadel-cli": "grants get",
         "summary": "Get a grant by ID",
-        "description": "Returns a grant by ID, when this API manages it and it has not been revoked.\n\nThis API manages grants that bind a user or team to the viewer, editor or\nadmin role. An expired grant is still returned, so you can revoke it with\n`deleteGrant` (`DELETE /grants/{id}`) before you grant the same binding again. Authorization still\nignores expired grants. Send `project_id` as well as the grant ID.\nMisses, revoked grants, project-secret setup rows (`sk_proj`), owning-team\n(`relation=team`) rows and grants of another project all return `404`.\n\n`expand=principal` adds envelope fields on `user` or `team`. For project\nsecrets it requires `user.read` and `team.read` in addition to `project.read`.\nA user-bound console session that already passed the project check may expand\nwithout those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
+        "description": "Returns a grant by ID, when this API manages it and it has not been revoked.\n\nThis API manages grants that bind a user or team to the viewer, editor or\nadmin role. An expired grant is still returned, so you can revoke it with\n`deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization still\nignores expired grants. Send `project_id` as well as the grant ID.\nMisses, revoked grants, project-secret setup rows (`sk_proj`), owning-team\n(`relation=team`) rows and grants of another project all return `404`.\n\n`expand=principal` adds envelope fields on `user` or `team`. For project\nsecrets it requires `user.read` and `team.read` in addition to `project.read`.\nA user-bound console session that already passed the project check may expand\nwithout those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Grants"
         ],
@@ -9267,7 +9267,7 @@
         }
       }
     },
-    "/invitations/{id}": {
+    "/invitations/{invitation_id}": {
       "get": {
         "operationId": "getInvitation",
         "summary": "Get an invitation",
@@ -9409,7 +9409,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `actor_id` or `entity_type` with or without `category`, each\nwith or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `actor_id` or `entity_type` with or without `category`, each\nwith or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9652,7 +9652,7 @@
         }
       }
     },
-    "/events/{id}": {
+    "/events/{event_id}": {
       "get": {
         "operationId": "getEvent",
         "x-zitadel-cli": "events get",
@@ -9728,7 +9728,7 @@
     },
     "/variables": {
       "get": {
-        "operationId": "getVariables",
+        "operationId": "listVariables",
         "x-zitadel-cli": "variable list",
         "summary": "Get a project's variables",
         "description": "Returns the project's variables, keyed by name, each with its value for\neach kind: `primary` for primary origins and `preview` for preview URLs.\nWith `kind`, only that kind's values are returned.\n\nSecret values are not returned. A secret appears as `{\"secret\": true}`,\nwhich says a value is held without disclosing it.\n",
@@ -9765,12 +9765,12 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getVariables-error-response"
+            "$ref": "#/components/responses/listVariables-error-response"
           }
         }
       },
       "patch": {
-        "operationId": "updateVariables",
+        "operationId": "setVariables",
         "x-zitadel-cli": "variable set",
         "summary": "Update a project's variables",
         "description": "Sets, replaces and removes the project's variables for the requested\nkind, in one request. Names not in the body are untouched. Existing\ndeployments keep the values they froze.\n\nA bare scalar enters a non-secret value. `{\"value\": …, \"secret\": true}`\nstores the value encrypted under the project's active `secret` key, after\nwhich it can be referenced but not read back. `null` removes the name\n(RFC 7386), which is how several variables are removed in one request.\nRemoving a name the project does not hold is a no-op rather than an error.\n\nWithout `kind`, a plain value is written for both kinds. A secret is\nwritten for `primary` only and removes the name's `preview` value, so a\npreview never keeps a plaintext copy. Set a preview secret with\n`kind=preview`. `null` removes the name from both kinds.\n\nThe body is applied whole or not at all, so a rejected request leaves the\nproject's variables exactly as they were. Fix what the error reports and\nsend the request again. Writing the same name twice replaces the value\nrather than duplicating it, which makes a retry safe.\n\nEach kind written records a `variable.set` event, and each kind removed a\n`variable.removed` event. The value never appears in either.\n",
@@ -9828,7 +9828,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/updateVariables-error-response"
+            "$ref": "#/components/responses/setVariables-error-response"
           }
         }
       }
@@ -9838,7 +9838,7 @@
         "operationId": "getVariable",
         "x-zitadel-cli": "variable get",
         "summary": "Get a variable by name",
-        "description": "Returns one variable by name, with its value for each kind. A variable\nholds a value per kind: `primary` for primary origins and `preview` for\npreview URLs.\n\nPass the name of a variable the project holds, as `getVariables` (`GET /variables`) lists\nit. A name with no value for the requested kind answers `var.not_found`;\nset it with `updateVariables` (`PATCH /variables`). A secret reads back as `{\"secret\": true}`.\n",
+        "description": "Returns one variable by name, with its value for each kind. A variable\nholds a value per kind: `primary` for primary origins and `preview` for\npreview URLs.\n\nPass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists\nit. A name with no value for the requested kind answers `var.not_found`;\nset it with `setVariables` (`PATCH /variables`). A secret reads back as `{\"secret\": true}`.\n",
         "tags": [
           "Variables"
         ],
@@ -9883,7 +9883,7 @@
         "operationId": "deleteVariable",
         "x-zitadel-cli": "variable rm",
         "summary": "Delete a variable by name",
-        "description": "Deletes a variable for the requested kind, or for both kinds without\n`kind`. Existing deployments keep the values they froze. Each kind removed\nrecords a `variable.removed` event.\n\nA name with no value for that kind answers `var.not_found`: there is\nnothing to delete. `getVariables` (`GET /variables`) lists the names the project holds. To\nremove several names in one request, or to remove a name that may already\nbe absent, send `null` for each name to `updateVariables` (`PATCH /variables`).\n",
+        "description": "Deletes a variable for the requested kind, or for both kinds without\n`kind`. Existing deployments keep the values they froze. Each kind removed\nrecords a `variable.removed` event.\n\nA name with no value for that kind answers `var.not_found`: there is\nnothing to delete. `listVariables` (`GET /variables`) lists the names the project holds. To\nremove several names in one request, or to remove a name that may already\nbe absent, send `null` for each name to `setVariables` (`PATCH /variables`).\n",
         "tags": [
           "Variables"
         ],
@@ -9920,7 +9920,7 @@
         "operationId": "createDeployment",
         "x-zitadel-cli": "deployment create",
         "summary": "Create a deployment",
-        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or a list of\npreview URLs. `[\"primary\"]`, which clients released before this shape\nsend, still deploys to every primary origin until 1.0.0; its answer\ncarries a `Deprecation` header (RFC 9745) and a `Link` to these docs.\n\nThe project's newest primary deployment also serves every request with no\n`Origin`, such as a backend, a native app or the CLI, and the console's\nlogin preview of a project that does not list the console's origin. A\npreview URL serves only itself.\n\n`primary` records the project's current primary origins. One added later\nserves nothing until the next deployment to `primary`; one removed stops\nbeing served at once.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin among the preview URLs, sends\n  `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
+        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or a list of\npreview URLs. `[\"primary\"]`, which clients released before this shape\nsend, still deploys to every primary origin until 1.0.0; its answer\ncarries a `Deprecation` header (RFC 9745) and a `Link` to these docs.\n\nThe project's newest primary deployment also serves every request with no\n`Origin`, such as a backend, a native app or the CLI, and the console's\nlogin preview of a project that does not list the console's origin. A\npreview URL serves only itself.\n\n`primary` records the project's current primary origins. One added later\nserves nothing until the next deployment to `primary`; one removed stops\nbeing served at once.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin among the preview URLs, sends\n  `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `setVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
         "tags": [
           "Deployments"
         ],
@@ -10230,7 +10230,7 @@
         "operationId": "listDeployments",
         "x-zitadel-cli": "deployment list",
         "summary": "List deployments",
-        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment with every origin it names, an\norigin the project no longer lists included: that deployment also serves\nrequests with no `Origin`, so it stays live. It also holds the newest\ndeployment to each live preview URL, narrowed to the URLs it still\nserves. Combined with `origin`, it is the one deployment that origin\nserves, or empty, as it is for an origin the project no longer lists.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
+        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment with every origin it names, an\norigin the project no longer lists included: that deployment also serves\nrequests with no `Origin`, so it stays live. It also holds the newest\ndeployment to each live preview URL, narrowed to the URLs it still\nserves. Combined with `origin`, it is the one deployment that origin\nserves, or empty, as it is for an origin the project no longer lists.\n\nThe `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),\n`listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
         "tags": [
           "Deployments"
         ],
@@ -10512,7 +10512,7 @@
     },
     "/deployments/{deployment_id}": {
       "get": {
-        "operationId": "getDeploymentById",
+        "operationId": "getDeployment",
         "x-zitadel-cli": "deployment get",
         "summary": "Get a deployment by ID",
         "description": "Returns one deployment: the release it made live, the origins it made it\nlive on, and whether they still serve it.\n\nPass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) or\n`listDeployments` (`GET /deployments`) returns.\n\nThe lookup is scoped to the project in `project_id`. A deployment ID\nbelonging to another project answers not found exactly as an unknown ID\ndoes, so the endpoint cannot be used to probe for deployments in projects\nthe caller cannot read.\n",
@@ -10578,7 +10578,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getDeploymentById-error-response"
+            "$ref": "#/components/responses/getDeployment-error-response"
           }
         }
       }
@@ -10756,7 +10756,7 @@
     },
     "/deployments/{deployment_id}/variables": {
       "get": {
-        "operationId": "getDeploymentVariables",
+        "operationId": "listDeploymentVariables",
         "x-zitadel-cli": "variable resolve",
         "summary": "Get a deployment's variables",
         "description": "Returns the variable values the deployment froze when it was made. Later\nchanges to the project's variables do not affect them. A secret reads\nback as `{\"secret\": true}`.\n\nPass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments` (`GET /deployments`) returns.\n",
@@ -10791,7 +10791,7 @@
             }
           },
           "default": {
-            "$ref": "#/components/responses/getDeploymentVariables-error-response"
+            "$ref": "#/components/responses/listDeploymentVariables-error-response"
           }
         }
       }
@@ -12468,7 +12468,7 @@
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "The ID of the schema that defines the content of `attributes`: the `id`\nthat `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. A default schema is\nprovided.\n"
+            "description": "The ID of the schema that defines the content of `attributes`: the `id`\nthat `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. A default schema is\nprovided.\n"
           },
           "attributes": {
             "type": "object",
@@ -12824,7 +12824,7 @@
           },
           "schema": {
             "type": "string",
-            "description": "The ID of the schema that defines the content of `attributes`.\n`getSchemaById` (`GET /schemas/{id}`) returns it, and `createSchema` (`POST /schemas`) creates one.\n"
+            "description": "The ID of the schema that defines the content of `attributes`.\n`getSchema` (`GET /schemas/{schema_id}`) returns it, and `publishSchema` (`POST /schemas`) creates one.\n"
           },
           "attributes": {
             "$ref": "#/components/schemas/user-attributes"
@@ -13072,7 +13072,7 @@
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "The ID of the schema the user follows after this patch: the `id` that\n`createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the\ncurrent schema. The schema must already be registered and be a revision\nof the user's current schema.\n"
+            "description": "The ID of the schema the user follows after this patch: the `id` that\n`publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the\ncurrent schema. The schema must already be registered and be a revision\nof the user's current schema.\n"
           },
           "dry_run": {
             "type": "boolean",
@@ -13123,7 +13123,7 @@
           },
           "connection_id": {
             "type": "string",
-            "description": "The ID of the identity provider connection the account signs in through,\nnot a revision ID. `getIdpById` (`GET /idps/{id}`) resolves it.\n",
+            "description": "The ID of the identity provider connection the account signs in through,\nnot a revision ID. `getIdp` (`GET /idps/{idp_id}`) resolves it.\n",
             "example": "idp_01KWH3A9F2J7K5P3Q1W8E6Y4UB"
           },
           "created_at": {
@@ -13719,7 +13719,7 @@
       },
       "patch-my-user-request": {
         "title": "PatchMyUserRequest",
-        "description": "A partial update of the caller's own attributes, merged into the current\nstate: an omitted key stays untouched, an object merges recursively,\n`null` deletes the attribute, and any other value replaces the stored one.\nThe merged result is validated as a whole against the user's schema.\n\nUnlike `PatchUserByID` (`PATCH /users/{user_id}`), this request cannot move\nthe user to another schema: schema upgrades are a management operation.\n",
+        "description": "A partial update of the caller's own attributes, merged into the current\nstate: an omitted key stays untouched, an object merges recursively,\n`null` deletes the attribute, and any other value replaces the stored one.\nThe merged result is validated as a whole against the user's schema.\n\nUnlike `updateUser` (`PATCH /users/{user_id}`), this request cannot move\nthe user to another schema: schema upgrades are a management operation.\n",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -15146,7 +15146,7 @@
       "branding": {
         "x-meta-schema": true,
         "type": "object",
-        "description": "The branding of the login: logo, theme colors, typography, shape and\ntemplate. It has one shape in two places: the request body of\n`createBranding` (`POST /branding`), which publishes it as a new immutable\nrevision, and a read-only copy on flow responses, which carries the\nrevision the request's release pins. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's default, so a\nrevision carrying one color is as valid as one carrying the whole object.\n",
+        "description": "The branding of the login: logo, theme colors, typography, shape and\ntemplate. It has one shape in two places: the request body of\n`publishBranding` (`POST /branding`), which publishes it as a new immutable\nrevision, and a read-only copy on flow responses, which carries the\nrevision the request's release pins. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's default, so a\nrevision carrying one color is as valid as one carrying the whole object.\n",
         "additionalProperties": false,
         "properties": {
           "$schema": {
@@ -15598,7 +15598,7 @@
           "return_target": {
             "type": "string",
             "maxLength": 2048,
-            "description": "The page hosting the login component, where the flow resumes after an\nexternal sign-in: the callback sends the browser here unchanged, and\nthe page loads `GET /flow/{id}` to render the next step. The client\nputs the flow ID in it; the login component reads `?flow=<id>` on the\nreload. Required when `action` is \"sso\". An absolute URL; the server\nparses it and keeps a fragment, so a hash-routed page returns to its\nroute. Its origin must equal the request origin; any other origin is\nrejected and no sign-in is started.\n",
+            "description": "The page hosting the login component, where the flow resumes after an\nexternal sign-in: the callback sends the browser here unchanged, and\nthe page loads `GET /flow/{flow_id}` to render the next step. The client\nputs the flow ID in it; the login component reads `?flow=<id>` on the\nreload. Required when `action` is \"sso\". An absolute URL; the server\nparses it and keeps a fragment, so a hash-routed page returns to its\nroute. Its origin must equal the request origin; any other origin is\nrejected and no sign-in is started.\n",
             "example": "https://login.example.com/login?flow=flow_2"
           }
         }
@@ -15922,7 +15922,7 @@
       },
       "challenge-response": {
         "type": "object",
-        "description": "A challenge issued within an authentication attempt.\n\nA challenge asks the user to prove one factor: a password, a TOTP code, a\npasskey assertion and so on. The client submits the proof with\n`verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)\n(`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`).\n",
+        "description": "A challenge issued within an authentication attempt.\n\nA challenge asks the user to prove one factor: a password, a TOTP code, a\npasskey assertion and so on. The client submits the proof with\n`verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)\n(`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`).\n",
         "required": [
           "challenge_id",
           "method",
@@ -15935,7 +15935,7 @@
           },
           "method": {
             "$ref": "#/components/schemas/challenge-method",
-            "description": "The authentication method this challenge represents.\nIt determines which proof `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) expects.\n"
+            "description": "The authentication method this challenge represents.\nIt determines which proof `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) expects.\n"
           },
           "state": {
             "type": "string",
@@ -16674,7 +16674,7 @@
           },
           "grant_id": {
             "type": "string",
-            "description": "The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`."
+            "description": "The grant (`asgn_<opaque>`), as served by `GET /grants/{grant_id}`."
           },
           "team": {
             "description": "The team the grant is to, absent for a grant to the person directly. Its\n`name` is present only when the caller is a member of it.\n",
@@ -17266,7 +17266,7 @@
         "additionalProperties": false,
         "properties": {
           "origin": {
-            "description": "The preview URL, exactly as `listPreviews` (`GET /projects/{project_id}/previews`) returns it in `origin`.\n",
+            "description": "The preview URL, exactly as `listProjectPreviews` (`GET /projects/{project_id}/previews`) returns it in `origin`.\n",
             "$ref": "#/components/schemas/origin"
           }
         }
@@ -17602,7 +17602,7 @@
         "properties": {
           "handoff_token": {
             "type": "string",
-            "description": "The one-time handoff token that `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`)\n(`POST /auth_attempts/{id}/handoff`) returns as `handoff_token`.\nIt is single-use. Replaying it after a successful exchange returns `400`\nwith `sess.invalid_handoff_token`, the same answer as for an unknown or\nexpired token.\n",
+            "description": "The one-time handoff token that `createAuthAttemptHandoff`\n(`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token`.\nIt is single-use. Replaying it after a successful exchange returns `400`\nwith `sess.invalid_handoff_token`, the same answer as for an unknown or\nexpired token.\n",
             "example": "handoff_abc123def456xyz"
           },
           "ttl": {
@@ -17936,7 +17936,7 @@
       },
       "flow-definition-expand": {
         "type": "string",
-        "description": "A related entity to embed on each returned flow definition.\n\n- `user_schema`: the user schema the flow operates on, embedded as\n  `user_schema` on each entry. It is the same object `GET /schemas/{id}`\n  returns. The property is omitted when not requested. It is `null` when the\n  referenced schema no longer resolves or the caller may not read it, so\n  \"did not ask\" stays distinguishable from \"cannot resolve\". Requesting it\n  requires read access to schemas.\n",
+        "description": "A related entity to embed on each returned flow definition.\n\n- `user_schema`: the user schema the flow operates on, embedded as\n  `user_schema` on each entry. It is the same object `GET /schemas/{schema_id}`\n  returns. The property is omitted when not requested. It is `null` when the\n  referenced schema no longer resolves or the caller may not read it, so\n  \"did not ask\" stays distinguishable from \"cannot resolve\". Requesting it\n  requires read access to schemas.\n",
         "enum": [
           "user_schema"
         ]
@@ -18518,7 +18518,7 @@
           },
           "user_schema": {
             "type": "string",
-            "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
+            "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `publishSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
             "example": "human-user"
           },
           "purposes": {
@@ -18628,7 +18628,7 @@
           },
           "user_schema": {
             "readOnly": true,
-            "description": "The user schema this flow operates on: the same object\n`getSchemaById` (`GET /schemas/{id}`) returns. Present only when the request asked for it\nwith `expand=user_schema`; `null` when it was requested but the\nreferenced schema no longer resolves or the caller may not read it.\n",
+            "description": "The user schema this flow operates on: the same object\n`getSchema` (`GET /schemas/{schema_id}`) returns. Present only when the request asked for it\nwith `expand=user_schema`; `null` when it was requested but the\nreferenced schema no longer resolves or the caller may not read it.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/schema"
@@ -19550,7 +19550,7 @@
           },
           "revision_id": {
             "type": "string",
-            "description": "The ID of the revision this entry holds, pinned by authentication\nattempts and releases. `getIdpById` (`GET /idps/{id}`) and `queryIdps` (`POST /idps/query`)\nreturn the newest one; `getIdpRevisionById` (`GET /idps/revisions/{revision_id}`)\n(`GET /idps/revisions/{revision_id}`) returns the requested revision.\n",
+            "description": "The ID of the revision this entry holds, pinned by authentication\nattempts and releases. `getIdp` (`GET /idps/{idp_id}`) and `queryIdps` (`POST /idps/query`)\nreturn the newest one; `getIdpRevision` (`GET /idps/revisions/{revision_id}`)\n(`GET /idps/revisions/{revision_id}`) returns the requested revision.\n",
             "example": "idprev_01KWH3B72K7M7F0N9WD3P2E4YN"
           },
           "slug": {
@@ -19780,7 +19780,7 @@
       "application": {
         "x-meta-schema": true,
         "title": "Application",
-        "description": "An application that authenticates its users via Zitadel, with its OAuth\nclients. The document is the `application` field of the `createApplication`\n(`POST /applications`) body.\n",
+        "description": "An application that authenticates its users via Zitadel, with its OAuth\nclients. The document is the `application` field of the `publishApplication`\n(`POST /applications`) body.\n",
         "type": "object",
         "required": [
           "slug",
@@ -19855,7 +19855,7 @@
           },
           "revision_id": {
             "type": "string",
-            "description": "The ID of the revision this entry holds. `getApplicationById`\n(`GET /applications/{id}`) returns the newest one.\n",
+            "description": "The ID of the revision this entry holds. `getApplication`\n(`GET /applications/{application_id}`) returns the newest one.\n",
             "example": "apprev_01KWH3B72K7M7F0N9WD3P2E4YN"
           },
           "slug": {
@@ -19908,7 +19908,7 @@
         }
       },
       "create-application-response": {
-        "description": "An application as `createApplication` (`POST /applications`) wrote it, with\nits document as `definition` and the secrets of the clients it created.\n",
+        "description": "An application as `publishApplication` (`POST /applications`) wrote it, with\nits document as `definition` and the secrets of the clients it created.\n",
         "allOf": [
           {
             "$ref": "#/components/schemas/application-response"
@@ -20848,7 +20848,7 @@
       },
       "release": {
         "title": "Release",
-        "description": "An immutable snapshot of a project's configuration. It pins one revision of\nevery resource it includes.\n\nA release owns pointers and metadata, not content: it records *which*\nrevisions belong together. To get the resource bytes, resolve each\n`revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,\n`GET /flow_definitions/{id}`, …).\n\nA release exists on its own and is not tied to an origin. Deploying it is a\nseparate call (`createDeployment` (`POST /deployments`)).\n\nA release has two identifiers. `id` is the one paths and `release_id` fields\ntake. `content_hash` is the digest of the content the release pins. The CLI\nprints it, builds pin it, and fields that name it look a release up by it.\n",
+        "description": "An immutable snapshot of a project's configuration. It pins one revision of\nevery resource it includes.\n\nA release owns pointers and metadata, not content: it records *which*\nrevisions belong together. To get the resource bytes, resolve each\n`revision_id` through the per-kind read endpoints (`GET /schemas/{schema_id}`,\n`GET /flow_definitions/{flow_definition_id}`, …).\n\nA release exists on its own and is not tied to an origin. Deploying it is a\nseparate call (`createDeployment` (`POST /deployments`)).\n\nA release has two identifiers. `id` is the one paths and `release_id` fields\ntake. `content_hash` is the digest of the content the release pins. The CLI\nprints it, builds pin it, and fields that name it look a release up by it.\n",
         "type": "object",
         "required": [
           "id",
@@ -26873,7 +26873,7 @@
           }
         }
       },
-      "GetUserByID-error-response": {
+      "getUser-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -26940,7 +26940,7 @@
           }
         }
       },
-      "DeleteUserByID-error-response": {
+      "deleteUser-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -27028,7 +27028,7 @@
           }
         }
       },
-      "PatchUserByID-error-response": {
+      "updateUser-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -27264,7 +27264,7 @@
           }
         }
       },
-      "beginUserPasskeyRegistration-error-response": {
+      "createUserPasskeyRegistration-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -27373,7 +27373,7 @@
           }
         }
       },
-      "finishUserPasskeyRegistration-error-response": {
+      "completeUserPasskeyRegistration-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -27883,7 +27883,7 @@
           }
         }
       },
-      "patchMyUser-error-response": {
+      "updateMyUser-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -29387,7 +29387,7 @@
           }
         }
       },
-      "issueChallenge-error-response": {
+      "createAuthAttemptChallenge-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -29468,7 +29468,7 @@
           }
         }
       },
-      "verifyChallengeProof-error-response": {
+      "verifyAuthAttemptChallenge-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -29619,7 +29619,7 @@
           }
         }
       },
-      "createHandoff-error-response": {
+      "createAuthAttemptHandoff-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -29971,7 +29971,7 @@
           }
         }
       },
-      "patchProject-error-response": {
+      "updateProject-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30147,7 +30147,7 @@
           }
         }
       },
-      "initClaim-error-response": {
+      "createProjectClaim-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30235,7 +30235,7 @@
           }
         }
       },
-      "getClaimStatus-error-response": {
+      "getProjectClaimStatus-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30323,7 +30323,7 @@
           }
         }
       },
-      "completeClaim-error-response": {
+      "completeProjectClaim-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30446,7 +30446,7 @@
           }
         }
       },
-      "getClaimWindow-error-response": {
+      "getProjectClaimWindow-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30485,7 +30485,7 @@
           }
         }
       },
-      "addOrigin-error-response": {
+      "addProjectOrigin-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30601,7 +30601,7 @@
           }
         }
       },
-      "removeOrigin-error-response": {
+      "removeProjectOrigin-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30696,7 +30696,7 @@
           }
         }
       },
-      "listPreviews-error-response": {
+      "listProjectPreviews-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -30763,7 +30763,7 @@
           }
         }
       },
-      "removePreview-error-response": {
+      "removeProjectPreview-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -31601,7 +31601,7 @@
           }
         }
       },
-      "createSchema-error-response": {
+      "publishSchema-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -31731,7 +31731,7 @@
           }
         }
       },
-      "getSchemaById-error-response": {
+      "getSchema-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -31893,7 +31893,7 @@
           }
         }
       },
-      "createFlowDefinition-error-response": {
+      "publishFlowDefinition-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -32326,7 +32326,7 @@
           }
         }
       },
-      "deleteTeam-error-response": {
+      "deactivateTeam-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -32741,7 +32741,7 @@
           }
         }
       },
-      "createBranding-error-response": {
+      "publishBranding-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -32829,7 +32829,7 @@
           }
         }
       },
-      "getBrandingById-error-response": {
+      "getBranding-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -32896,7 +32896,7 @@
           }
         }
       },
-      "createIdp-error-response": {
+      "publishIdp-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -33065,7 +33065,7 @@
           }
         }
       },
-      "getIdpById-error-response": {
+      "getIdp-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -33199,7 +33199,7 @@
           }
         }
       },
-      "getIdpRevisionById-error-response": {
+      "getIdpRevision-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -33266,7 +33266,7 @@
           }
         }
       },
-      "createApplication-error-response": {
+      "publishApplication-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -33319,7 +33319,7 @@
           }
         }
       },
-      "getApplicationById-error-response": {
+      "getApplication-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -34171,7 +34171,7 @@
           }
         }
       },
-      "getReleaseById-error-response": {
+      "getRelease-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -35365,7 +35365,7 @@
           }
         }
       },
-      "getVariables-error-response": {
+      "listVariables-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -35432,7 +35432,7 @@
           }
         }
       },
-      "updateVariables-error-response": {
+      "setVariables-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -35921,7 +35921,7 @@
           }
         }
       },
-      "getDeploymentById-error-response": {
+      "getDeployment-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -36125,7 +36125,7 @@
           }
         }
       },
-      "getDeploymentVariables-error-response": {
+      "listDeploymentVariables-error-response": {
         "description": "Error response",
         "content": {
           "application/json": {
@@ -36266,7 +36266,7 @@
         "name": "registration_id",
         "in": "path",
         "required": true,
-        "description": "The `registration_id` that `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`) returns.\n",
+        "description": "The `registration_id` that `createUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`) returns.\n",
         "schema": {
           "type": "string"
         },
@@ -36283,10 +36283,10 @@
         "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
       "flow-id": {
-        "name": "id",
+        "name": "flow_id",
         "in": "path",
         "required": true,
-        "description": "Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.\nUsed to look up the correct flow state from the encrypted cookie,\nwhich can hold multiple concurrent flows. May change between responses\nwhen a flow pivot or pop occurs — always use the `id` from the latest response.\n",
+        "description": "Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.\nUsed to look up the correct flow state from the encrypted cookie,\nwhich can hold multiple concurrent flows. May change between responses\nwhen a flow pivot or pop occurs — always use the `id` from the latest response.\n",
         "schema": {
           "type": "string"
         },
@@ -36296,7 +36296,7 @@
         "name": "_zflow",
         "in": "cookie",
         "required": true,
-        "description": "Encrypted flow state cookie set by `POST /flow` or the previous\n`POST /flow/{id}/submit`. The cookie holds the sealed state of one\nflow; the `{id}` path parameter must name that flow, any other id is\nrefused.\n\nBrowsers send this automatically; non-browser clients must capture the\n`Set-Cookie` header and resend it.\n",
+        "description": "Encrypted flow state cookie set by `POST /flow` or the previous\n`POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one\nflow; the `{flow_id}` path parameter must name that flow, any other id is\nrefused.\n\nBrowsers send this automatically; non-browser clients must capture the\n`Set-Cookie` header and resend it.\n",
         "schema": {
           "type": "string"
         }
@@ -36315,7 +36315,7 @@
         "name": "challenge_id",
         "in": "path",
         "required": true,
-        "description": "The `challenge_id` that `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) returns.",
+        "description": "The `challenge_id` that `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) returns.",
         "schema": {
           "$ref": "#/components/schemas/challenge-id"
         },
@@ -36345,7 +36345,7 @@
         "name": "challenge_id",
         "in": "query",
         "required": true,
-        "description": "The `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returns for this claim. The claim URL\ncarries it.\n",
+        "description": "The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns for this claim. The claim URL\ncarries it.\n",
         "schema": {
           "$ref": "#/components/schemas/challenge-id"
         },
@@ -36371,20 +36371,20 @@
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
       "schema-id": {
-        "name": "id",
+        "name": "schema_id",
         "in": "path",
         "required": true,
-        "description": "The schema ID: the `id` that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists.\n",
+        "description": "The schema ID: the `id` that `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists.\n",
         "schema": {
           "type": "string"
         },
         "example": "sch_01KWHF2XY6RN7F0N9WD3P2E4YM"
       },
       "flow-definition-id": {
-        "name": "id",
+        "name": "flow_definition_id",
         "in": "path",
         "required": true,
-        "description": "The `id` that `createFlowDefinition` (`POST /flow_definitions`) returns.\n",
+        "description": "The `id` that `publishFlowDefinition` (`POST /flow_definitions`) returns.\n",
         "schema": {
           "type": "string"
         },
@@ -36401,20 +36401,20 @@
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
       "branding-id": {
-        "name": "id",
+        "name": "branding_id",
         "in": "path",
         "required": true,
-        "description": "The branding revision ID: the `id` that `createBranding` (`POST /branding`) returns or\n`listBranding` (`GET /branding`) lists.\n",
+        "description": "The branding revision ID: the `id` that `publishBranding` (`POST /branding`) returns or\n`listBranding` (`GET /branding`) lists.\n",
         "schema": {
           "type": "string"
         },
         "example": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
       "idp-id": {
-        "name": "id",
+        "name": "idp_id",
         "in": "path",
         "required": true,
-        "description": "The connection ID: the `id` that `createIdp` (`POST /idps`) returns or `queryIdps` (`POST /idps/query`) lists.\n",
+        "description": "The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST /idps/query`) lists.\n",
         "schema": {
           "type": "string"
         },
@@ -36424,17 +36424,17 @@
         "name": "revision_id",
         "in": "path",
         "required": true,
-        "description": "The revision ID: the `revision_id` that `createIdp` (`POST /idps`) returns, or that\n`listIdpRevisions` (`GET /idps/{id}/revisions`) lists.\n",
+        "description": "The revision ID: the `revision_id` that `publishIdp` (`POST /idps`) returns, or that\n`listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists.\n",
         "schema": {
           "type": "string"
         },
         "example": "idprev_01KWH3B72K7M7F0N9WD3P2E4YN"
       },
       "application-id": {
-        "name": "id",
+        "name": "application_id",
         "in": "path",
         "required": true,
-        "description": "The application ID: the `id` that `createApplication` (`POST /applications`) returns.\n",
+        "description": "The application ID: the `id` that `publishApplication` (`POST /applications`) returns.\n",
         "schema": {
           "type": "string"
         },
@@ -36478,7 +36478,7 @@
         "example": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
       },
       "grant-id": {
-        "name": "id",
+        "name": "grant_id",
         "in": "path",
         "required": true,
         "description": "The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or `queryGrants` (`POST /grants/query`) lists.\n",
@@ -36488,7 +36488,7 @@
         "example": "asgn_01KWH9D4R2V7F0N9WD3P2E4YM8"
       },
       "invitation-id": {
-        "name": "id",
+        "name": "invitation_id",
         "in": "path",
         "required": true,
         "description": "The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`\n(`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.\n",
@@ -36498,7 +36498,7 @@
         "example": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E"
       },
       "event-id": {
-        "name": "id",
+        "name": "event_id",
         "in": "path",
         "required": true,
         "description": "The event ID (`evt_<opaque>`): the `id` that `listEvents` (`GET /events`) returns.\n",
@@ -36556,7 +36556,7 @@
         "example": "private, no-store"
       },
       "set-cookie-flow": {
-        "description": "The cookies this response sets, one `Set-Cookie` line per element; the\ngenerated server emits the lines separately, since the comma-joined form\nOpenAPI prescribes for array headers is invalid for `Set-Cookie`\n(RFC 6265). Browsers never expose the header to script, so this shape\nconcerns server-side and generated non-browser clients only.\n\nThe first element is always `_zflow`, the encrypted flow state: HttpOnly,\nSecure, SameSite=Strict, Path=/. Starting a flow and every submit\nresponse rotate it, including validation failures; `GET /flow/{id}`\nsets it only when the render resolved a parked SSO identity. The\n`sso-redirect` response appends the browser-binding cookie the callback\nchecks.\n",
+        "description": "The cookies this response sets, one `Set-Cookie` line per element; the\ngenerated server emits the lines separately, since the comma-joined form\nOpenAPI prescribes for array headers is invalid for `Set-Cookie`\n(RFC 6265). Browsers never expose the header to script, so this shape\nconcerns server-side and generated non-browser clients only.\n\nThe first element is always `_zflow`, the encrypted flow state: HttpOnly,\nSecure, SameSite=Strict, Path=/. Starting a flow and every submit\nresponse rotate it, including validation failures; `GET /flow/{flow_id}`\nsets it only when the render resolved a parked SSO identity. The\n`sso-redirect` response appends the browser-binding cookie the callback\nchecks.\n",
         "schema": {
           "type": "array",
           "items": {

@@ -12,7 +12,7 @@ import "time"
 // that only makes sense at the top level.
 type FlowState struct {
 	// ID is the flow handle minted at Start. The handler verifies it
-	// matches the path (`/flow/{id}/...`) to reject path/cookie mismatches.
+	// matches the path (`/flow/{flow_id}/...`) to reject path/cookie mismatches.
 	ID string
 
 	// ProjectID scopes the flow to a single tenant.

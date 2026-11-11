@@ -1,9 +1,9 @@
-import type { GetBrandingById200, ListBranding200Item } from "@zitadel/api/generated/model";
+import type { GetBranding200, ListBranding200Item } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
 
 /** A branding revision, as a read returns it. */
-export type BrandingRevision = GetBrandingById200;
+export type BrandingRevision = GetBranding200;
 
 /** A branding revision, as the list of them returns it. */
 export type BrandingSummary = ListBranding200Item;
@@ -52,6 +52,6 @@ export class BrandingService extends ApiService {
    * @returns The revision.
    */
   async get(revisionId: string): Promise<BrandingRevision> {
-    return this.client.getBrandingById(revisionId);
+    return this.client.getBranding(revisionId);
   }
 }

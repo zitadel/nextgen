@@ -30,13 +30,13 @@ flow step progression:
 Step 1 (login):
   actions: { submit, passkey }    ← passkey is a plain action, no options
   User clicks "Sign in with passkey"
-  → POST /flow/{id}/submit { action: "passkey" }
+  → POST /flow/{flow_id}/submit { action: "passkey" }
 
 Step 2 (passkey challenge):
   challenge: { method: "passkey", challenge_id: "ch_123", options: {...} }
   actions: { submit }
   <zl-passkey> reads step.challenge.options → triggers navigator.credentials.get()
-  → POST /flow/{id}/submit { action: "submit", challenge_response: { challenge_id, method: "passkey", proof: {...} } }
+  → POST /flow/{flow_id}/submit { action: "submit", challenge_response: { challenge_id, method: "passkey", proof: {...} } }
 
 Step 3 (done):
   complete: "redirect"
@@ -44,7 +44,7 @@ Step 3 (done):
 
 The flow engine internally calls `svc.IssueChallenge(method: "passkey")` when
 processing the passkey action — no HTTP round-trip from the client to
-`auth_attempts`. The client only talks to `/flow/{id}/submit`.
+`auth_attempts`. The client only talks to `/flow/{flow_id}/submit`.
 
 ### Key design choices
 

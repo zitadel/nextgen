@@ -29,22 +29,22 @@ func TestLastProjectOwner(t *testing.T) {
 		team := createLastOwnerTeam(t, f.platform.ID, userID)
 		harness.SeedOwningTeam(t, f.customer.ID, team.ID)
 
-		resp, err := f.platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(userID)})
+		resp, err := f.platformClient.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
-		conflict, ok := resp.(*api.DeleteUserByIDConflict)
+		conflict, ok := resp.(*api.DeleteUserConflict)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assertLastOwner(t, conflict.Code, conflict.Message, conflict.Details, f.customer.ID)
 
-		got, err := f.platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		got, err := f.platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 
 		other := harness.CreateUserWithTeam(t, f.platform.ID)
 		require.NoError(t, harness.EnsureServiceDB(t).Statements().UpsertAuthzMembershipEdge(
 			t.Context(), domain.NewUserTeamMembershipEdge(f.platform.ID, team.ID, other)))
-		resp, err = f.platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(userID)})
+		resp, err = f.platformClient.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.DeleteUserByIDNoContent{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.DeleteUserNoContent{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("an admin grant does not stand in for an owner", func(t *testing.T) {
@@ -55,9 +55,9 @@ func TestLastProjectOwner(t *testing.T) {
 		harness.SeedOwningTeam(t, f.customer.ID, team.ID)
 		createLastOwnerGrant(t, f.customerClient, f.customer.ID, userIDGrant(harness.CreateUserWithTeam(t, f.platform.ID), api.CreateGrantRequestRelationAdmin))
 
-		resp, err := f.platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(userID)})
+		resp, err := f.platformClient.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
-		conflict, ok := resp.(*api.DeleteUserByIDConflict)
+		conflict, ok := resp.(*api.DeleteUserConflict)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assertLastOwner(t, conflict.Code, conflict.Message, conflict.Details, f.customer.ID)
 	})
@@ -71,7 +71,7 @@ func TestLastProjectOwner(t *testing.T) {
 		grantID := createLastOwnerGrant(t, f.customerClient, f.customer.ID, userIDGrant(userID, api.CreateGrantRequestRelationAdmin))
 
 		resp, err := f.customerClient.DeleteGrant(t.Context(), api.DeleteGrantParams{
-			ID:        grantID,
+			GrantID:   grantID,
 			ProjectID: api.ProjectID(f.customer.ID),
 		})
 		require.NoError(t, err)
@@ -86,9 +86,9 @@ func TestLastProjectOwner(t *testing.T) {
 		userID := harness.CreateUserWithTeam(t, f.platform.ID)
 		createLastOwnerGrant(t, f.customerClient, f.customer.ID, userIDGrant(userID, api.CreateGrantRequestRelationAdmin))
 
-		resp, err := f.platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(userID)})
+		resp, err := f.platformClient.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.DeleteUserByIDNoContent{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.DeleteUserNoContent{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("deleting an owning team stays team.owns_project", func(t *testing.T) {
@@ -98,9 +98,9 @@ func TestLastProjectOwner(t *testing.T) {
 		team := createLastOwnerTeam(t, f.platform.ID, userID)
 		harness.SeedOwningTeam(t, f.customer.ID, team.ID)
 
-		resp, err := f.platformClient.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(team.ID)})
+		resp, err := f.platformClient.DeactivateTeam(t.Context(), api.DeactivateTeamParams{TeamID: api.TeamID(team.ID)})
 		require.NoError(t, err)
-		conflict, ok := resp.(*api.DeleteTeamConflict)
+		conflict, ok := resp.(*api.DeactivateTeamConflict)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("team.owns_project"), conflict.Code)
 	})

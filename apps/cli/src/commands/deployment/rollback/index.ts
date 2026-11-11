@@ -251,7 +251,7 @@ async function originChanges(
 ): Promise<{ dropped: string[]; restored: string[]; unserved: string[] } | undefined> {
   // Only a warning hangs on this, so a failed read says so and rolls back.
   const read = await Promise.all([
-    client.getDeploymentById(deploymentId, { project_id: projectId }),
+    client.getDeployment(deploymentId, { project_id: projectId }),
     client.getProject(projectId),
     deployments.newestPrimary(),
   ]).catch((error: unknown) => {

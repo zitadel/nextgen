@@ -136,17 +136,17 @@ const (
 var gateRows = []gateRow{
 	// Branding.
 	{op: "ListBranding", cookie: true, relation: viewer, target: onProject, list: true, miss: brandingCodes.readMiss},
-	{op: "CreateBranding", relation: editor, target: onProject, denied: brandingCodes.denied, miss: brandingCodes.writeMiss},
-	{op: "GetBrandingById", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindBranding, denied: brandingCodes.denied, miss: brandingCodes.readMiss},
+	{op: "PublishBranding", relation: editor, target: onProject, denied: brandingCodes.denied, miss: brandingCodes.writeMiss},
+	{op: "GetBranding", cookie: true, relation: viewer, target: onResource, idField: "BrandingID", kind: domain.ResourceKindBranding, denied: brandingCodes.denied, miss: brandingCodes.readMiss},
 
 	// Deployments and previews.
 	{op: "ListDeployments", cookie: true, relation: viewer, target: onProject, list: true, miss: deploymentCodes.readMiss},
 	{op: "CreateDeployment", cookie: true, relation: editor, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss},
-	{op: "GetDeploymentById", cookie: true, relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
+	{op: "GetDeployment", cookie: true, relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
 	{op: "RollbackDeployment", cookie: true, relation: editor, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss},
-	{op: "GetDeploymentVariables", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
-	{op: "ListPreviews", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
-	{op: "RemovePreview", relation: editor, why: whyPreviewRemoval, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss, open: openWriteIsNotDelete},
+	{op: "ListDeploymentVariables", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
+	{op: "ListProjectPreviews", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
+	{op: "RemoveProjectPreview", relation: editor, why: whyPreviewRemoval, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss, open: openWriteIsNotDelete},
 
 	// Events.
 	{op: "ListEvents", cookie: true, relation: viewer, target: onProject, denied: eventCodes.denied, miss: eventCodes.readMiss},
@@ -154,8 +154,8 @@ var gateRows = []gateRow{
 
 	// Flow definitions.
 	{op: "ListFlowDefinitions", cookie: true, relation: viewer, target: onProject, list: true, miss: flowDefCodes.readMiss},
-	{op: "CreateFlowDefinition", relation: editor, target: onProject, denied: flowDefCodes.denied, miss: flowDefCodes.writeMiss},
-	{op: "GetFlowDefinition", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindFlowDefinition, denied: flowDefCodes.denied, miss: flowDefCodes.readMiss},
+	{op: "PublishFlowDefinition", relation: editor, target: onProject, denied: flowDefCodes.denied, miss: flowDefCodes.writeMiss},
+	{op: "GetFlowDefinition", cookie: true, relation: viewer, target: onResource, idField: "FlowDefinitionID", kind: domain.ResourceKindFlowDefinition, denied: flowDefCodes.denied, miss: flowDefCodes.readMiss},
 
 	// Grants.
 	{op: "CreateGrant", cookie: true, relation: admin, why: whyGrantEscalation, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
@@ -164,14 +164,14 @@ var gateRows = []gateRow{
 	{op: "DeleteGrant", cookie: true, relation: admin, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
 
 	// Identity provider connections.
-	{op: "CreateIdp", relation: editor, target: onProject, denied: idpCodes.denied, miss: idpCodes.writeMiss},
+	{op: "PublishIdp", relation: editor, target: onProject, denied: idpCodes.denied, miss: idpCodes.writeMiss},
 	{op: "QueryIdps", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: idpCodes.readMiss},
-	{op: "GetIdpById", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindIDPConnection, denied: idpCodes.denied, miss: idpCodes.readMiss},
-	{op: "ListIdpRevisions", relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindIDPConnection, denied: idpCodes.denied, miss: idpCodes.readMiss},
+	{op: "GetIdp", cookie: true, relation: viewer, target: onResource, idField: "IdpID", kind: domain.ResourceKindIDPConnection, denied: idpCodes.denied, miss: idpCodes.readMiss},
+	{op: "ListIdpRevisions", relation: viewer, target: onResource, idField: "IdpID", kind: domain.ResourceKindIDPConnection, denied: idpCodes.denied, miss: idpCodes.readMiss},
 	// The revision is read before the gate: a found revision is checked on
 	// its connection, an unknown one on its own id as the target (#2112).
 	{
-		op: "GetIdpRevisionById", variant: "revision found", cookie: true, relation: viewer, target: onResource,
+		op: "GetIdpRevision", variant: "revision found", cookie: true, relation: viewer, target: onResource,
 		idField: "RevisionID", kind: domain.ResourceKindIDPConnection, rsiID: "idp_of_revision",
 		denied: idpCodes.denied, miss: idpCodes.readMiss,
 		setup: func(_ *testing.T, f *gateFixture, c gateCall) {
@@ -179,7 +179,7 @@ var gateRows = []gateRow{
 		},
 	},
 	{
-		op: "GetIdpRevisionById", variant: "revision unknown", cookie: true, relation: viewer, target: onTarget,
+		op: "GetIdpRevision", variant: "revision unknown", cookie: true, relation: viewer, target: onTarget,
 		idField: "RevisionID", denied: idpCodes.denied, miss: idpCodes.readMiss,
 		setup: func(_ *testing.T, f *gateFixture, c gateCall) {
 			f.idps.EXPECT().GetRevision(gomock.Any(), c.project, c.id).Return(nil, domain.ErrIDPConnectionNotFound())
@@ -203,24 +203,24 @@ var gateRows = []gateRow{
 	// Projects, their admins, claim and origins.
 	{op: "QueryProjects", relation: viewer, why: whyQuery, target: onOwnProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "GetProject", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
-	{op: "PatchProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
+	{op: "UpdateProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "ListProjectAdmins", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
-	{op: "InitClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
-	{op: "GetClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
-	{op: "AddOrigin", cookie: true, relation: editor, target: onProject, denied: originCodes.denied, miss: originCodes.writeMiss},
-	{op: "RemoveOrigin", cookie: true, relation: admin, target: onProject, denied: originCodes.denied, miss: originCodes.readMiss},
+	{op: "CreateProjectClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
+	{op: "GetProjectClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
+	{op: "AddProjectOrigin", cookie: true, relation: editor, target: onProject, denied: originCodes.denied, miss: originCodes.writeMiss},
+	{op: "RemoveProjectOrigin", cookie: true, relation: admin, target: onProject, denied: originCodes.denied, miss: originCodes.readMiss},
 
 	// Releases.
 	{op: "ListReleases", cookie: true, relation: viewer, target: onProject, list: true, miss: releaseCodes.readMiss},
 	{op: "CreateRelease", relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss},
 	{op: "BuildRelease", relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss},
-	{op: "GetReleaseById", cookie: true, relation: viewer, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.readMiss},
+	{op: "GetRelease", cookie: true, relation: viewer, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.readMiss},
 	{op: "RevokeRelease", cookie: true, relation: editor, why: whyReleaseRevoke, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss, open: openWriteIsNotDelete},
 
 	// User schemas.
 	{op: "ListSchemas", cookie: true, relation: viewer, target: onProject, list: true, miss: schemaCodes.readMiss},
-	{op: "CreateSchema", relation: editor, target: onProject, denied: schemaCodes.denied, miss: schemaCodes.writeMiss},
-	{op: "GetSchemaById", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindSchema, denied: schemaCodes.denied, miss: schemaCodes.readMiss},
+	{op: "PublishSchema", relation: editor, target: onProject, denied: schemaCodes.denied, miss: schemaCodes.writeMiss},
+	{op: "GetSchema", cookie: true, relation: viewer, target: onResource, idField: "SchemaID", kind: domain.ResourceKindSchema, denied: schemaCodes.denied, miss: schemaCodes.readMiss},
 
 	// Search answers for the project before it reads any type.
 	{op: "Search", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: projectCodes.readMiss},
@@ -236,26 +236,26 @@ var gateRows = []gateRow{
 	{op: "QueryTeams", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: teamCodes.readMiss},
 	{op: "GetTeam", cookie: true, relation: viewer, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.readMiss},
 	{op: "UpdateTeam", cookie: true, relation: editor, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.readMiss},
-	{op: "DeleteTeam", relation: admin, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.denied},
+	{op: "DeactivateTeam", relation: admin, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.denied},
 
 	// Users.
 	{op: "CreateUser", cookie: true, relation: editor, target: onProject, denied: userCodes.denied, miss: userCodes.writeMiss},
 	{op: "QueryUsers", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: userCodes.readMiss},
-	{op: "GetUserByID", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
-	{op: "PatchUserByID", cookie: true, relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
-	{op: "DeleteUserByID", cookie: true, relation: admin, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
+	{op: "GetUser", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
+	{op: "UpdateUser", cookie: true, relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
+	{op: "DeleteUser", cookie: true, relation: admin, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "ListUserIdentityLinks", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "ListUserPasskeys", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "ListUserTeams", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "GetUserPasswordState", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "SetUserPassword", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
-	{op: "BeginUserPasskeyRegistration", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
-	{op: "FinishUserPasskeyRegistration", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
+	{op: "CreateUserPasskeyRegistration", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
+	{op: "CompleteUserPasskeyRegistration", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
 
 	// Variables and secrets.
-	{op: "GetVariables", cookie: true, relation: viewer, target: onProject, denied: variableCodes.denied, miss: variableCodes.readMiss},
+	{op: "ListVariables", cookie: true, relation: viewer, target: onProject, denied: variableCodes.denied, miss: variableCodes.readMiss},
 	{op: "GetVariable", cookie: true, relation: viewer, target: onProject, denied: variableCodes.denied, miss: variableCodes.readMiss},
-	{op: "UpdateVariables", relation: editor, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss},
+	{op: "SetVariables", relation: editor, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss},
 	{op: "DeleteVariable", relation: editor, why: whyVariableDelete, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss, open: openWriteIsNotDelete},
 }
 
@@ -829,8 +829,8 @@ func TestGateRelationsFollowTheOperation(t *testing.T) {
 // so only the bearer-only plane stops that.
 var credentialTierOperations = []string{
 	"SetUserPassword",
-	"BeginUserPasskeyRegistration",
-	"FinishUserPasskeyRegistration",
+	"CreateUserPasskeyRegistration",
+	"CompleteUserPasskeyRegistration",
 }
 
 // credentialTierPath matches a management route that writes another user's

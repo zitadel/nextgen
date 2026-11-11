@@ -93,7 +93,7 @@ export function UserProfileCard({
   );
   const save = useSubmit(async () => {
     try {
-      await api.patchUserByID(userId, { attributes: patch });
+      await api.updateUser(userId, { attributes: patch });
     } catch (cause) {
       form.applyServerError(cause);
       throw cause;

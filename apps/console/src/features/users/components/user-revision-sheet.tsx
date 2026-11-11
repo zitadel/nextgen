@@ -71,7 +71,7 @@ async function dryRunMove(
   schema: string,
 ): Promise<{ refused: string[]; message?: string }> {
   try {
-    await api.patchUserByID(userId, { schema, dry_run: true });
+    await api.updateUser(userId, { schema, dry_run: true });
     return { refused: [] };
   } catch (cause) {
     const refused = errorFieldNames(cause);
@@ -179,10 +179,7 @@ function RevisionForm({
   useEffect(() => {
     if (!targetId) return;
     let cancelled = false;
-    Promise.all([
-      api.getSchemaById(targetId, { project_id: projectId }),
-      dryRunMove(userId, targetId),
-    ])
+    Promise.all([api.getSchema(targetId, { project_id: projectId }), dryRunMove(userId, targetId)])
       .then(([body, answer]) => {
         if (cancelled) return;
         setLoaded({ id: targetId, schema: body.schema as UserSchema, refused: answer.refused });
@@ -236,7 +233,7 @@ function RevisionForm({
     );
     setLeftUnchanged(false);
     try {
-      await api.patchUserByID(userId, {
+      await api.updateUser(userId, {
         schema: targetId,
         ...(Object.keys(patch).length > 0 ? { attributes: patch } : {}),
       });

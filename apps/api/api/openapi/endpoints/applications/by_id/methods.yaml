@@ -1,10 +1,10 @@
 get:
-  operationId: getApplicationById
+  operationId: getApplication
   summary: Get an application by ID
   description: |
     Returns an application that authenticates its users via Zitadel, by ID
     at its newest revision, with each client's `client_id` in `definition`. It
-    never returns a client secret: `createApplication` (`POST /applications`)
+    never returns a client secret: `publishApplication` (`POST /applications`)
     shows one once, when it creates the client.
 
     The lookup is scoped to the project in `project_id`.
@@ -65,4 +65,4 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: getApplicationById-error-response.yaml
+      $ref: getApplication-error-response.yaml

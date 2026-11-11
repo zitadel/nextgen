@@ -156,7 +156,7 @@ Events are **not** registered in `resource_scope_index`. That table stays a
 small map for durable globally-addressable resources
 ([ADR 033](033-internal-permission-management.md),
 [url-architecture.md](../design/api/url-architecture.md)); high-volume TTL audit
-rows do not belong there. `GET /events/{id}` is **project-scoped** (see ADR 049).
+rows do not belong there. `GET /events/{event_id}` is **project-scoped** (see ADR 049).
 
 Per-sink export delivery is tracked with per-(sink, project) watermark cursors;
 see [ADR 049 §3](049-events-api-retention-export.md).

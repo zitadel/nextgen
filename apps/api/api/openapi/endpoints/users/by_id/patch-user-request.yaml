@@ -29,7 +29,7 @@ properties:
     minLength: 1
     description: |
       The ID of the schema the user follows after this patch: the `id` that
-      `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the
+      `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the
       current schema. The schema must already be registered and be a revision
       of the user's current schema.
   # No default: a client that fills one in would send dry_run: false on every

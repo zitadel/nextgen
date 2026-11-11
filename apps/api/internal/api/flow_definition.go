@@ -13,7 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
+func (h Handler) PublishFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.PublishFlowDefinitionRes, error) {
 	if err := h.requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -31,11 +31,11 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opRead)
+	projectID, err := h.requireResourceAccess(ctx, params.FlowDefinitionID, flowDefinitionAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.ID)
+	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.FlowDefinitionID)
 	if err != nil {
 		return nil, err
 	}

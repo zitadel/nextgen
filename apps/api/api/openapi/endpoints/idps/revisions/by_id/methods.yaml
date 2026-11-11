@@ -1,5 +1,5 @@
 get:
-  operationId: getIdpRevisionById
+  operationId: getIdpRevision
   summary: Get a revision of an identity provider
   description: |
     Returns one revision of an identity provider, an external sign-in such as
@@ -79,4 +79,4 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     default:
-      $ref: getIdpRevisionById-error-response.yaml
+      $ref: getIdpRevision-error-response.yaml

@@ -98,7 +98,7 @@ export async function columnsForUsers(
       const held = known.get(id);
       if (held) return held;
       try {
-        return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
+        return (await api.getSchema(id, { project_id: projectId })).schema as UserSchema;
       } catch {
         // One unreadable schema costs its titles and labels, not the screen.
         // Its users still render from the fallback below.
@@ -119,7 +119,7 @@ export async function columnsForUsers(
 
 /** Everything the user detail screen shows, read for its loader. */
 export async function fetchUserDetail(userId: string, projectId: string) {
-  const user = await api.getUserByID(userId);
+  const user = await api.getUser(userId);
 
   // All are chrome for the record rather than the record itself, so none is
   // allowed to reject the loader: a failure costs a row, not the screen.
@@ -127,7 +127,7 @@ export async function fetchUserDetail(userId: string, projectId: string) {
   const readingSchema = schemaId
     ? api
         // Schema ids are unique per project only, so name the selected one.
-        .getSchemaById(schemaId, { project_id: projectId })
+        .getSchema(schemaId, { project_id: projectId })
         .then((value) => ({ id: value.id, schema: value.schema as UserSchema }))
         .catch(() => undefined)
     : Promise.resolve(undefined);

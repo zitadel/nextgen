@@ -42,8 +42,8 @@ docs link the same set at `/favicons/`
 publishes the built-in schemas the server names under
 `https://zitadel.com/schemas/v1`: `/schemas/v1/user-schema.json` answers with
 the document whose `$id` is that URL, while the API keeps
-`/api/v1/schemas` and `/api/v1/schemas/{id}`, and until 1.0.0 `/schemas` and
-`/schemas/{id}` (the runbook's
+`/api/v1/schemas` and `/api/v1/schemas/{schema_id}`, and until 1.0.0 `/schemas` and
+`/schemas/{schema_id}` (the runbook's
 [Built-in schemas](../../docs/runbooks/cloud.md#built-in-schemas)).
 
 The services install and build from `vercel.json` itself. The install

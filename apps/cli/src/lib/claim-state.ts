@@ -83,7 +83,7 @@ export function isAttached(
  * Decides the attachment state from local state alone.
  *
  * **Why no network call.** The contract exposes no ambient claim-state read:
- * `getClaimStatus` answers for one live challenge and rejects a secret that did
+ * `getProjectClaimStatus` answers for one live challenge and rejects a secret that did
  * not mint it, and claim attributes were deliberately kept off
  * `GET /projects/{id}` because they belong to the grant, not the project. So
  * `.zitadel/secret` is the only source, which is also why `status` and `doctor`

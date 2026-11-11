@@ -102,7 +102,7 @@ func newSSOConflictFixture(t *testing.T) *ssoResolutionFixture {
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	var def api.FlowDefinition
 	require.NoError(t, def.UnmarshalJSON(fmt.Appendf(nil, ssoConflictFlowDefinition, defaultSchemaURL())))
-	resp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: def,
 	})
@@ -127,7 +127,7 @@ func (f *ssoResolutionFixture) submitAction(t *testing.T, flow ssoFlow, action s
 		}
 		req.Fields = api.NewOptFlowSubmitRequestFields(raw)
 	}
-	resp, err := f.client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	resp, err := f.client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{FlowID: flow.id, Zflow: flow.zflow})
 	require.NoError(t, err)
 	return resp
 }

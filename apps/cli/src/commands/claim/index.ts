@@ -11,7 +11,7 @@ import { requireValue } from "@/lib/environment";
 import { ZitadelError } from "@/lib/errors";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
-import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
+import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { isLoopbackUrl } from "@/lib/server";
@@ -95,7 +95,7 @@ const TIMEOUT: Refused<number> = {
  * asked or sent.
  */
 const CHALLENGE_ID: Refused<string> = {
-  schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),
+  schema: z.string().trim().regex(getProjectClaimStatusQueryChallengeIdRegExp),
   refusal: {
     message:
       "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",
@@ -204,7 +204,7 @@ export default class Claim extends EnvironmentCommand {
     }
 
     // `--dry-run` promises to mutate neither files nor the platform, so it has
-    // to stop before `initClaim`: minting a challenge is a platform write, and
+    // to stop before `createProjectClaim`: minting a challenge is a platform write, and
     // a developer who then finished the browser step would really claim the
     // project while this run deliberately skipped recording it — the local file
     // and the platform would disagree, which is worse than not previewing at

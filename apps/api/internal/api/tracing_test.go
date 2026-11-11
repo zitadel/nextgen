@@ -33,7 +33,7 @@ func TestOgenTracerProvider_RecordError(t *testing.T) {
 			exporter := tracetest.NewInMemoryExporter()
 			provider := NewOgenTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter)))
 
-			_, span := provider.Tracer("ogen").Start(t.Context(), "PatchUserByID")
+			_, span := provider.Tracer("ogen").Start(t.Context(), "UpdateUser")
 			span.RecordError(tt.err)
 			span.End()
 
@@ -63,7 +63,7 @@ func TestOgenTracerProvider_storesServerSpanContext(t *testing.T) {
 			provider := NewOgenTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(tt.sampler)))
 			ctx := middleware.WithOperationIDContext(t.Context(), "")
 
-			_, span := provider.Tracer("ogen").Start(ctx, "PatchUserByID", trace.WithSpanKind(tt.kind))
+			_, span := provider.Tracer("ogen").Start(ctx, "UpdateUser", trace.WithSpanKind(tt.kind))
 			defer span.End()
 
 			want := trace.SpanContext{}
@@ -95,7 +95,7 @@ func TestOgenTracerProvider_SetStatus(t *testing.T) {
 			exporter := tracetest.NewInMemoryExporter()
 			provider := NewOgenTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter)))
 
-			_, span := provider.Tracer("ogen").Start(t.Context(), "PatchUserByID", trace.WithSpanKind(trace.SpanKindServer))
+			_, span := provider.Tracer("ogen").Start(t.Context(), "UpdateUser", trace.WithSpanKind(trace.SpanKindServer))
 			span.SetStatus(tt.code, tt.description)
 			span.End()
 

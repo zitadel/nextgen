@@ -1,5 +1,5 @@
 post:
-  operationId: createFlowDefinition
+  operationId: publishFlowDefinition
   summary: Create a flow definition
   description: |
     Creates a flow definition by publishing a new revision of it. It records a
@@ -64,7 +64,7 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      $ref: createFlowDefinition-error-response.yaml
+      $ref: publishFlowDefinition-error-response.yaml
 
 get:
   operationId: listFlowDefinitions
@@ -75,7 +75,7 @@ get:
     creation time first. A flow definition sets which step of a sign-in
     renders when, and which fields each step collects.
 
-    The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{id}`)
+    The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{flow_definition_id}`)
     takes. Filter by `name` to list the revisions of one flow.
   tags:
     - Flow Definitions

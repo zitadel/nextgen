@@ -57,10 +57,10 @@ describe("eventSubject", () => {
       event_type: "request.api",
       category: "request",
       payload: {
-        operation_id: "getUserByID",
+        operation_id: "getUser",
         method: "GET",
         // The server records the operation as the route, never the raw path.
-        route_template: "getUserByID",
+        route_template: "getUser",
         status: 404,
         duration_ms: 3,
       },
@@ -68,7 +68,7 @@ describe("eventSubject", () => {
     expect(eventSubject(request)).toEqual({
       kind: "request",
       method: "GET",
-      route: "getUserByID",
+      route: "getUser",
       status: 404,
     });
   });
@@ -750,7 +750,7 @@ describe("searchMeanings", () => {
 
   it("reads one camel-cased word as an API operation", () => {
     expect(meanings("createUser")).toEqual(["operation createUser"]);
-    expect(meanings("deleteUserByID")).toEqual(["operation deleteUserByID"]);
+    expect(meanings("deleteUser")).toEqual(["operation deleteUser"]);
     // A lowercase word or an ID is not one.
     expect(meanings("admin")).toEqual(["actor admin", "resource admin"]);
   });

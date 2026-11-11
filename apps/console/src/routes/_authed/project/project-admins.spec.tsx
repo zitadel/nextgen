@@ -158,7 +158,7 @@ function stubCreateGrant() {
   return created;
 }
 
-/** Every `DELETE /grants/{id}` the console sends, with the project it named. */
+/** Every `DELETE /grants/{grant_id}` the console sends, with the project it named. */
 function stubDeleteGrant() {
   const deleted: { id: string; projectId: string | null }[] = [];
   server.use(
@@ -586,7 +586,7 @@ describe("project admins", () => {
   });
 
   it("removes an admin from the route's project after confirming", async () => {
-    // The revoke is scoped like the read: `DELETE /grants/{id}` carries the
+    // The revoke is scoped like the read: `DELETE /grants/{grant_id}` carries the
     // route's project, not the console's own.
     stubProject({
       admins: [admin({ user_id: "user_1", display: "Maya Patel" }, [source.grant()])],

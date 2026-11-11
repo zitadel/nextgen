@@ -203,7 +203,7 @@ func TestVerifyClaimSession(t *testing.T) {
 func TestSessionCookieOperationsIncludeCompleteClaim(t *testing.T) {
 	t.Parallel()
 
-	require.True(t, sessionCookieOperations[api.CompleteClaimOperation])
+	require.True(t, sessionCookieOperations[api.CompleteProjectClaimOperation])
 }
 
 // Every public claim error code must map to its documented HTTP status

@@ -380,7 +380,7 @@ any other, and ADR 007's experimental note no longer covers it.
 
 The revision routes those connections carry
 ([ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)) are out of
-scope. `GET /idps/{id}/revisions` is a listing under one resource, and the
+scope. `GET /idps/{idp_id}/revisions` is a listing under one resource, and the
 grammar has no verb for that. Inventing one for a single resource is what §4
 rules out, so the shape needs deciding before any resource gets it.
 

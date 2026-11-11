@@ -2,9 +2,9 @@ import type {
   BuildRelease200,
   BuildRelease201,
   BuildReleaseBody,
-  GetReleaseById200,
-  GetReleaseById200PointersItem,
-  GetReleaseById200PointersItemKind,
+  GetRelease200,
+  GetRelease200PointersItem,
+  GetRelease200PointersItemKind,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
@@ -20,13 +20,13 @@ export type ReleaseInput = Readonly<BuildReleaseBody>;
 export type Release = BuildRelease200 | BuildRelease201;
 
 /** A release with the revisions it points at, as a read returns it. */
-export type ReleaseRecord = GetReleaseById200;
+export type ReleaseRecord = GetRelease200;
 
 /** One revision a release pins. */
-export type ReleasePointer = GetReleaseById200PointersItem;
+export type ReleasePointer = GetRelease200PointersItem;
 
 /** The kind of resource a release pins a revision of. */
-export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+export type ReleasePointerKind = GetRelease200PointersItemKind;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -59,7 +59,7 @@ export class ReleaseService extends ApiService {
    * @returns The release, with the revisions it points at.
    */
   async get(releaseId: string): Promise<ReleaseRecord> {
-    return this.client.getReleaseById(releaseId, {
+    return this.client.getRelease(releaseId, {
       project_id: this.projectId,
     });
   }

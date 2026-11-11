@@ -269,7 +269,7 @@ function returnsContent(operation: OperationObject): boolean {
 const verbs =
   /^(?:add|begin|build|complete|create|delete|exchange|finish|get|init|issue|list|patch|query|remove|revoke|rollback|set|submit|update|verify)(?=[A-Z])/;
 
-// What the call returns, named after the operation: getUserByID's is `user`.
+// What the call returns, named after the operation: getUser's is `user`.
 function resultName(method: string): string {
   const noun = method.replace(verbs, "").replace(/By[A-Z][A-Za-z]*$/, "");
   if (noun === method || noun === "") return "result";

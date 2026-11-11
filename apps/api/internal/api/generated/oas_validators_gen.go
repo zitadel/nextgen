@@ -4088,22 +4088,6 @@ func (s ConfigurationBundleSchemasItem) Validate() error {
 	}
 }
 
-func (s *CreateApplicationCreated) Validate() error {
-	alias := (*CreateApplicationResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *CreateApplicationOK) Validate() error {
-	alias := (*CreateApplicationResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *CreateApplicationRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4565,22 +4549,6 @@ func (s CreateGrantRequestRelation) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
-}
-
-func (s *CreateIdpCreated) Validate() error {
-	alias := (*IdpResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *CreateIdpOK) Validate() error {
-	alias := (*IdpResponse)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *CreateIdpRequest) Validate() error {
@@ -5343,20 +5311,6 @@ func (s *CreateReleaseRequest) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s CreateSchemaReq) Validate() error {
-	switch s.Type {
-	case UserSchemaCreateSchemaReq:
-		if err := s.UserSchema.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case SchemaURLCreateSchemaReq:
-		return nil // no validation needed
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
 }
 
 func (s *CreateSessionRequest) Validate() error {
@@ -14668,6 +14622,38 @@ func (s ProjectUpdatedEventDelegationType) Validate() error {
 	}
 }
 
+func (s *PublishApplicationCreated) Validate() error {
+	alias := (*CreateApplicationResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishApplicationOK) Validate() error {
+	alias := (*CreateApplicationResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishIdpCreated) Validate() error {
+	alias := (*IdpResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PublishIdpOK) Validate() error {
+	alias := (*IdpResponse)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s PublishPolicyRequest) Validate() error {
 	switch s.Type {
 	case PasswordSetPolicyInputPublishPolicyRequest:
@@ -14680,6 +14666,20 @@ func (s PublishPolicyRequest) Validate() error {
 			return err
 		}
 		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s PublishSchemaReq) Validate() error {
+	switch s.Type {
+	case UserSchemaPublishSchemaReq:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchemaURLPublishSchemaReq:
+		return nil // no validation needed
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}

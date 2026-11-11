@@ -49,7 +49,7 @@ func testVU(t *testing.T) (*modulestest.VU, chan metrics.SampleContainer) {
 }
 
 // TestDoerBoundsTagsByOperation is the #1104 cardinality property at the
-// request layer: a hundred requests to a hundred distinct /flow/{id}/submit
+// request layer: a hundred requests to a hundred distinct /flow/{flow_id}/submit
 // paths produce samples whose name and url tags are all the operation id,
 // so the time-series count does not grow with the ids.
 func TestDoerBoundsTagsByOperation(t *testing.T) {
