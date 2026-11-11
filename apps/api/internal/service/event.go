@@ -45,16 +45,21 @@ const eventScanBudget = 1000
 
 // EventService lists and loads audit events (ADR 049).
 type EventService struct {
-	v2Pool     *DB
-	scanBudget uint32
+	v2Pool            *DB
+	platformProjectID string
+	scanBudget        uint32
 }
 
-func NewEventService(v2Pool *DB) *EventService {
-	return &EventService{v2Pool: v2Pool, scanBudget: eventScanBudget}
+// NewEventService builds the events service. platformProjectID is the
+// deployment's platform project, whose events are visible without a claim
+// (ADR 049 §4); empty, every project needs one.
+func NewEventService(v2Pool *DB, platformProjectID string) *EventService {
+	return &EventService{v2Pool: v2Pool, platformProjectID: platformProjectID, scanBudget: eventScanBudget}
 }
 
-// List returns events for a claimed project with optional filters and keyset
-// pagination on (created_at, id). Pre-claim projects yield an empty page.
+// List returns events for a claimed project, or the platform project, with
+// optional filters and keyset pagination on (created_at, id). Any other
+// project yields an empty page.
 //
 // Every list is read as ranges of an index, each no further than the page or
 // than eventScanBudget (planEventRead). So a list whose filter no index holds
@@ -114,8 +119,8 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *List
 	}, nil
 }
 
-// Get loads one event by (project_id, id). Pre-claim projects and misses
-// return not found (no existence leak).
+// Get loads one event by (project_id, id). Unclaimed projects other than the
+// platform project, and misses, return not found (no existence leak).
 func (s *EventService) Get(ctx context.Context, projectID, id string) (_ *domain.Event, err error) {
 	ctx, end := startSpan(ctx, "EventService.Get")
 	defer end(&err)
@@ -145,11 +150,14 @@ func (s *EventService) Get(ctx context.Context, projectID, id string) (_ *domain
 	return event, nil
 }
 
-// projectEventsVisible implements the ADR 049 pre-claim gate. Claim is a
-// project→team grant (ADR 046), denormalized onto resource_scope_index.team_id
-// for the project row when claim completes. Until that team stamp exists the
-// project is treated as pre-claim: list returns empty, get returns not found.
+// projectEventsVisible implements the ADR 049 §4 pre-claim gate: a project's
+// events are visible once it holds an active owning-team grant (ADR 046). The
+// platform project never does, but has its admins from the start, so its
+// events are always visible; EventExportAdapter ships the same projects.
 func (s *EventService) projectEventsVisible(ctx context.Context, projectID string) (bool, error) {
+	if s.platformProjectID != "" && projectID == s.platformProjectID {
+		return true, nil
+	}
 	return projectIsClaimed(ctx, s.v2Pool.Statements(), projectID)
 }
 

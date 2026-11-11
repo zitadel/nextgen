@@ -127,12 +127,12 @@ type tracedExportSource struct {
 	listErr, cursorErr, afterErr, upsertErr error
 }
 
-func (s *tracedExportSource) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
+func (s *tracedExportSource) ListVisibleProjectIDs(ctx context.Context) ([]string, error) {
 	s.list = trace.SpanContextFromContext(ctx)
 	if s.listErr != nil {
 		return nil, s.listErr
 	}
-	return s.fakeExportSource.ListClaimedProjectIDs(ctx)
+	return s.fakeExportSource.ListVisibleProjectIDs(ctx)
 }
 
 func (s *tracedExportSource) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
@@ -166,7 +166,7 @@ func TestShipper_failedStepFailsItsSpan(t *testing.T) {
 		src      tracedExportSource
 		wantSpan string
 	}{
-		{name: "project list", src: tracedExportSource{listErr: failed}, wantSpan: "audit.ListClaimedProjects"},
+		{name: "project list", src: tracedExportSource{listErr: failed}, wantSpan: "audit.ListVisibleProjects"},
 		{name: "cursor read", src: tracedExportSource{cursorErr: failed}, wantSpan: "audit.ShipEvents"},
 		{name: "event list", src: tracedExportSource{afterErr: failed}, wantSpan: "audit.ShipEvents"},
 		{name: "cursor write", src: tracedExportSource{upsertErr: failed}, wantSpan: "audit.ShipEvents"},
@@ -208,7 +208,7 @@ func TestShipper_runIsTraced(t *testing.T) {
 
 	s.shipOnce()
 
-	list := jobSpan(t, "audit.ListClaimedProjects")
+	list := jobSpan(t, "audit.ListVisibleProjects")
 	assert.Equal(t, list.SpanContext, src.list, "the project list runs under the list span")
 
 	ships := rootSpans("audit.ShipEvents")

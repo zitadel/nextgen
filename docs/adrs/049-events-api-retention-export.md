@@ -14,6 +14,10 @@
 > **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
 > settled events, so no cursor skips an event whose transaction commits late.
 > See [the amendment](#amendment-2026-10-30-no-cursor-skips-a-late-commit).
+>
+> **Amendment (2026-11-10):** §4's gate lets the deployment's platform project
+> through without a claim, for reads and export alike. See
+> [the amendment](#amendment-2026-11-10-the-platform-project-needs-no-claim).
 
 ## Context
 
@@ -344,6 +348,8 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
   job**.
 - Retention remains **time-only** for unclaimed projects (same window); disk
   does not grow forever waiting for claim or sinks.
+- The deployment's platform project is never claimed and is visible from the
+  start ([amendment 2026-11-10](#amendment-2026-11-10-the-platform-project-needs-no-claim)).
 
 ## Non-goals
 
@@ -501,3 +507,29 @@ ascending list apply it.
   the database's oldest open transaction, a retention purge or a dump
   included. It also sees only the sessions of the reader's role, and only
   while `track_activities` is on.
+
+## Amendment (2026-11-10): the platform project needs no claim
+
+§4 hides a project's events until it is claimed, so that nobody reads its
+history before an accountable owner exists
+([ADR 046](046-claim-lifecycle-v2.md)). The platform project is never
+claimed: it is the deployment's own, with its operators from the start. Its
+events were stored but shown to no one, so the console's Logs for it stayed
+empty.
+
+**Decision.** The platform project's events are visible as a claimed
+project's are.
+
+- `GET /events` and `GET /events/{id}` read them, and the shipper exports
+  them: one gate for reads and export, as §4 says.
+- The platform project is the one the server already names for claims and
+  grants: `platform.project_id`, or the built-in project under
+  `platform.bootstrap_project`. Without one, every project waits for its
+  claim, as before.
+- Unclaimed customer projects stay hidden. The gate's reason, no history
+  before an owner, does not apply to a project that has its admins from the
+  start.
+- Who may read is unchanged: `events.read` on the platform project decides,
+  so only those who already administer it gain anything.
+- An export without a cursor for the platform project ships its retained
+  history from the start (§3), once.
