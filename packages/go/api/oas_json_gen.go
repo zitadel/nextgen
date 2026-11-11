@@ -31335,6 +31335,22 @@ func (s CreateSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMismatchCreateSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+		{
+			s := s.ProjMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateSessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -31449,6 +31465,9 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedCreateSessionErrorResponse
 					found = true
+				case "proj.mismatch":
+					s.Type = ProjMismatchCreateSessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateSessionErrorResponse
 					found = true
@@ -31505,6 +31524,10 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedCreateSessionErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMismatchCreateSessionErrorResponse:
+		if err := s.ProjMismatch.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateSessionErrorResponse:

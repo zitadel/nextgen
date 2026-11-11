@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 
 /**
@@ -65,19 +66,10 @@ export function CopyButton({
         className={cn(SIZE[size].className, className)}
         aria-label={label}
         onClick={() => {
-          // `navigator.clipboard` is absent on an insecure origin. Guarded
-          // explicitly rather than by optional-chaining the call: both are
-          // safe, but the chain form reads as though `.then()` runs on
-          // `undefined`.
-          const { clipboard } = navigator;
-          if (!clipboard) return;
-          void clipboard.writeText(value).then(
-            () => {
-              setCopied(true);
-              onCopied?.();
-            },
-            () => setCopied(false),
-          );
+          void copyText(value).then((ok) => {
+            setCopied(ok);
+            if (ok) onCopied?.();
+          });
         }}
       >
         {copied ? (

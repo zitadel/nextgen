@@ -48,7 +48,7 @@ export function ProductionCard({ live }: { live: CardRead<Deployment | undefined
 function LiveDeployment({ deployment }: { deployment: Deployment }) {
   const { message } = deployment.metadata;
   const origins = deployment.targets.map((target) => target.origin);
-  // The event page's rhythm: rows 12px apart with a rule between them.
+  // Rows 12px apart with a rule between them.
   return (
     <div className="flex flex-col gap-3">
       <DetailRow align="center" label="Release">
