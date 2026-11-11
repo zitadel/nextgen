@@ -67,7 +67,7 @@ import { SETTINGS_PATH } from "./user-menu";
  * identity providers), each matched on the server, an id pasted into the
  * field included, in the selected project or, above every project (All
  * projects, Projects, Settings), in the projects the person can act on
- * (D38); projects, matched on the server
+ * (D39); projects, matched on the server
  * across every project the person can act on; and the account's pages. They
  * are ranked together (`ranked`), the selected project's first among equally
  * good matches, and each row says beneath its name where it is, so a page of
@@ -183,7 +183,7 @@ export function SearchDialog({
   userId?: string;
   /**
    * The person is above every project (Projects, Settings), so the server
-   * searches all their projects even while one stays selected (D38).
+   * searches all their projects even while one stays selected (D39).
    */
   allProjects?: boolean;
 }) {
@@ -256,7 +256,7 @@ function SearchPalette({
   const projectId = useProjectScope();
   // The project the server searches: the selected one inside a project,
   // none above every project or with none selected, which searches the
-  // person's projects (D38). The selected one's hits still rank first.
+  // person's projects (D39). The selected one's hits still rank first.
   const scope = allProjects ? undefined : projectId;
   // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
@@ -387,7 +387,7 @@ function SearchPalette({
     const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
     // A hit opens in its own project, which opening it selects (`?project=`,
-    // D38).
+    // D39).
     const openHit = (hit: SearchHit) => {
       const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
