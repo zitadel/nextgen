@@ -1,6 +1,41 @@
 package domain
 
-import "time"
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"time"
+)
+
+// InvitationExpiration is how long an invitation's link can be redeemed.
+const InvitationExpiration = 72 * time.Hour
+
+// NewInvitationToken mints a link token: 16 random bytes, of which only the
+// HashSecret is stored.
+func NewInvitationToken() (plain, hash string, err error) {
+	plain, err = randomURLString(16)
+	if err != nil {
+		return "", "", ErrInternal(err).WithMessage("failed to generate invitation token")
+	}
+	return plain, HashSecret(plain), nil
+}
+
+// NewInvitationJourneyID mints the random id that ties an invitation to its
+// replacements. It names no resource.
+func NewInvitationJourneyID() (string, error) {
+	id, err := randomURLString(16)
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to generate invitation journey id")
+	}
+	return id, nil
+}
+
+func randomURLString(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
 
 // PrefixInvitation is the dialect-minted ID prefix for invitations (inv_<opaque>)
 // and the public error-code prefix (inv.not_found).
@@ -67,6 +102,12 @@ type InvitationProjectMember struct {
 	// Relation is the project role the accepter receives: viewer, editor or
 	// admin, as in POST /grants.
 	Relation string `json:"relation"`
+}
+
+// InvitationMetadata is what the administrator entered so other
+// administrators know who the link is for. It is displayed, never matched.
+type InvitationMetadata struct {
+	Name string `json:"name"`
 }
 
 // Invitation is a link that grants its type's target to whoever redeems it

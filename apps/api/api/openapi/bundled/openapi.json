@@ -34333,7 +34333,19 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-decrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-encrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-not_found"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/tkn-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/inv-invalid"
@@ -34360,6 +34372,9 @@
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-unknown_alg"
+                },
+                {
                   "$ref": "#/components/schemas/unavailable"
                 }
               ],
@@ -34368,7 +34383,11 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "enc_key.decrypt_failed": "#/components/schemas/enc_key-decrypt_failed",
+                  "enc_key.encrypt_failed": "#/components/schemas/enc_key-encrypt_failed",
+                  "enc_key.not_found": "#/components/schemas/enc_key-not_found",
                   "internal": "#/components/schemas/internal",
+                  "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "inv.invalid": "#/components/schemas/inv-invalid",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.pending_limit": "#/components/schemas/inv-pending_limit",
@@ -34377,6 +34396,7 @@
                   "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
+                  "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable"
                 }
               }
@@ -34388,8 +34408,20 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "enc_key.decrypt_failed": {
+                "$ref": "#/components/examples/enc_key-decrypt_failed"
+              },
+              "enc_key.encrypt_failed": {
+                "$ref": "#/components/examples/enc_key-encrypt_failed"
+              },
+              "enc_key.not_found": {
+                "$ref": "#/components/examples/enc_key-not_found"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "tkn.invalid": {
+                "$ref": "#/components/examples/tkn-invalid"
               },
               "inv.invalid": {
                 "$ref": "#/components/examples/inv-invalid"
@@ -34414,6 +34446,9 @@
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
+              },
+              "enc_key.unknown_alg": {
+                "$ref": "#/components/examples/enc_key-unknown_alg"
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"

@@ -17704,7 +17704,11 @@ type CreateInvitationErrorResponse struct {
 	Type                CreateInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyEncryptFailed EncKeyEncryptFailed
+	EncKeyNotFound      EncKeyNotFound
 	Internal            Internal
+	TknInvalid          TknInvalid
 	InvInvalid          InvInvalid
 	InvNotFound         InvNotFound
 	InvPendingLimit     InvPendingLimit
@@ -17713,6 +17717,7 @@ type CreateInvitationErrorResponse struct {
 	InvProjectUnclaimed InvProjectUnclaimed
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
 }
 
@@ -17723,7 +17728,11 @@ type CreateInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "enc_key.not_found"
 	InternalCreateInvitationErrorResponse            CreateInvitationErrorResponseType = "internal"
+	TknInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "tkn.invalid"
 	InvInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "inv.invalid"
 	InvNotFoundCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "inv.not_found"
 	InvPendingLimitCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "inv.pending_limit"
@@ -17732,6 +17741,7 @@ const (
 	InvProjectUnclaimedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "inv.project_unclaimed"
 	NotImplementedCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "not_implemented"
 	ReqInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "unavailable"
 )
 
@@ -17745,9 +17755,29 @@ func (s CreateInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateInvitationErrorResponse
 }
 
+// IsEncKeyDecryptFailed reports whether CreateInvitationErrorResponse is EncKeyDecryptFailed.
+func (s CreateInvitationErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateInvitationErrorResponse
+}
+
+// IsEncKeyEncryptFailed reports whether CreateInvitationErrorResponse is EncKeyEncryptFailed.
+func (s CreateInvitationErrorResponse) IsEncKeyEncryptFailed() bool {
+	return s.Type == EncKeyEncryptFailedCreateInvitationErrorResponse
+}
+
+// IsEncKeyNotFound reports whether CreateInvitationErrorResponse is EncKeyNotFound.
+func (s CreateInvitationErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundCreateInvitationErrorResponse
+}
+
 // IsInternal reports whether CreateInvitationErrorResponse is Internal.
 func (s CreateInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateInvitationErrorResponse
+}
+
+// IsTknInvalid reports whether CreateInvitationErrorResponse is TknInvalid.
+func (s CreateInvitationErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidCreateInvitationErrorResponse
 }
 
 // IsInvInvalid reports whether CreateInvitationErrorResponse is InvInvalid.
@@ -17788,6 +17818,11 @@ func (s CreateInvitationErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether CreateInvitationErrorResponse is ReqInvalid.
 func (s CreateInvitationErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateInvitationErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateInvitationErrorResponse is EncKeyUnknownAlg.
+func (s CreateInvitationErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateInvitationErrorResponse
 }
 
 // IsUnavailable reports whether CreateInvitationErrorResponse is Unavailable.
@@ -17837,6 +17872,69 @@ func NewAuthUnauthorizedCreateInvitationErrorResponse(v AuthUnauthorized) Create
 	return s
 }
 
+// SetEncKeyDecryptFailed sets CreateInvitationErrorResponse to EncKeyDecryptFailed.
+func (s *CreateInvitationErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateInvitationErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateInvitationErrorResponse is EncKeyDecryptFailed.
+func (s CreateInvitationErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateInvitationErrorResponse(v EncKeyDecryptFailed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyEncryptFailed sets CreateInvitationErrorResponse to EncKeyEncryptFailed.
+func (s *CreateInvitationErrorResponse) SetEncKeyEncryptFailed(v EncKeyEncryptFailed) {
+	s.Type = EncKeyEncryptFailedCreateInvitationErrorResponse
+	s.EncKeyEncryptFailed = v
+}
+
+// GetEncKeyEncryptFailed returns EncKeyEncryptFailed and true boolean if CreateInvitationErrorResponse is EncKeyEncryptFailed.
+func (s CreateInvitationErrorResponse) GetEncKeyEncryptFailed() (v EncKeyEncryptFailed, ok bool) {
+	if !s.IsEncKeyEncryptFailed() {
+		return v, false
+	}
+	return s.EncKeyEncryptFailed, true
+}
+
+// NewEncKeyEncryptFailedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyEncryptFailed.
+func NewEncKeyEncryptFailedCreateInvitationErrorResponse(v EncKeyEncryptFailed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyEncryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets CreateInvitationErrorResponse to EncKeyNotFound.
+func (s *CreateInvitationErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundCreateInvitationErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if CreateInvitationErrorResponse is EncKeyNotFound.
+func (s CreateInvitationErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundCreateInvitationErrorResponse(v EncKeyNotFound) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
 // SetInternal sets CreateInvitationErrorResponse to Internal.
 func (s *CreateInvitationErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateInvitationErrorResponse
@@ -17855,6 +17953,27 @@ func (s CreateInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateInvitationErrorResponse(v Internal) CreateInvitationErrorResponse {
 	var s CreateInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets CreateInvitationErrorResponse to TknInvalid.
+func (s *CreateInvitationErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidCreateInvitationErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if CreateInvitationErrorResponse is TknInvalid.
+func (s CreateInvitationErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from TknInvalid.
+func NewTknInvalidCreateInvitationErrorResponse(v TknInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetTknInvalid(v)
 	return s
 }
 
@@ -18023,6 +18142,27 @@ func (s CreateInvitationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateInvitationErrorResponse(v ReqInvalid) CreateInvitationErrorResponse {
 	var s CreateInvitationErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetEncKeyUnknownAlg sets CreateInvitationErrorResponse to EncKeyUnknownAlg.
+func (s *CreateInvitationErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateInvitationErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateInvitationErrorResponse is EncKeyUnknownAlg.
+func (s CreateInvitationErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateInvitationErrorResponse(v EncKeyUnknownAlg) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyUnknownAlg(v)
 	return s
 }
 
