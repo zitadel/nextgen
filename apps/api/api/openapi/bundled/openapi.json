@@ -51,7 +51,7 @@
     },
     {
       "name": "Search",
-      "description": "Search finds the resources of a project that match a text, across\nresource types in one request. It answers with references; the\nresources themselves are read through their own operations.\n"
+      "description": "Search finds the resources of a project, or of the projects a person\ncan act on, that match a text, across resource types in one request. It\nanswers with references; the resources themselves are read through their\nown operations.\n"
     },
     {
       "name": "Schemas",
