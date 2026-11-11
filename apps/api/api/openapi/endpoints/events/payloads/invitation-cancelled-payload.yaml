@@ -1,0 +1,14 @@
+title: InvitationCancelledPayload
+description: |
+  Payload for `invitation.cancelled`. The invitation ID is the event's
+  `entity_id`. Discriminate on `reason`: `cancelled` when an administrator
+  cancelled it, `replaced` when a replacement cancelled it, which then names
+  the replacement in `replaced_by_invitation_id`.
+oneOf:
+  - $ref: invitation-cancelled-by-administrator-payload.yaml
+  - $ref: invitation-cancelled-by-replacement-payload.yaml
+discriminator:
+  propertyName: reason
+  mapping:
+    cancelled: invitation-cancelled-by-administrator-payload.yaml
+    replaced: invitation-cancelled-by-replacement-payload.yaml
