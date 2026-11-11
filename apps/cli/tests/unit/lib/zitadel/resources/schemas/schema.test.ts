@@ -258,6 +258,21 @@ describe("UserSchema.requiredByServer", () => {
       all: ["name", "email"],
     });
   });
+
+  it("includes what an allOf requires", () => {
+    const schema = UserSchema.of(
+      aFile(
+        "schemas",
+        SCHEMA_FILE,
+        aUserSchema({
+          properties: { email: { type: "string" }, name: { type: "string" } },
+          allOf: [{ required: ["name"] }],
+        }),
+      ),
+    );
+
+    expect(schema.requiredByServer).toEqual(["name"]);
+  });
 });
 
 describe("UserSchema.providers", () => {

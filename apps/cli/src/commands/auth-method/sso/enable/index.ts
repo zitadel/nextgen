@@ -50,7 +50,13 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
-import { type Change, Connection, type DocumentChange, type UserSchema } from "@/lib/zitadel";
+import {
+  type Change,
+  Connection,
+  type ConnectionSummary,
+  type DocumentChange,
+  type UserSchema,
+} from "@/lib/zitadel";
 
 /**
  * The flags that pick the environment a run reads its issuer from.
@@ -230,7 +236,7 @@ type Outcome = {
  */
 type ResultInput = {
   readonly summary: Summary;
-  readonly change: Change;
+  readonly change: DocumentChange<Connection>;
   readonly written: readonly string[];
   readonly published: PublishedCredentials;
   readonly delivery: CredentialDelivery;
@@ -241,7 +247,7 @@ type ResultInput = {
  */
 type PayloadInput = {
   readonly summary: Summary;
-  readonly change: Change;
+  readonly change: DocumentChange<Connection>;
   readonly published: PublishedCredentials;
   readonly names: CredentialNames;
 };
@@ -265,6 +271,11 @@ type Payload = {
     readonly action: "reuse" | "create";
     readonly slug: string;
     readonly file: string;
+    readonly claim_mapping: Readonly<Record<string, string>>;
+    readonly verified_claims: Readonly<Record<string, string | boolean>>;
+    readonly scopes: readonly string[];
+    readonly unmapped: ConnectionSummary["unmapped"];
+    readonly used_by: readonly string[];
   };
   readonly callback_uri: string;
   readonly changed: readonly string[];
@@ -272,6 +283,11 @@ type Payload = {
   readonly client_id: PublishedVariable | null;
   readonly secret: PublishedVariable | null;
 };
+
+/**
+ * Joins names as "a, b, and c" in the summary box.
+ */
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
 
 /**
  * Nothing sent to the project, as a dry run reports it.
@@ -524,7 +540,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       consola.info(`Schema    ${schema.path}`);
     }
     if (!summary.reused) {
-      consola.info(`${provider.displayName} needs an OAuth application.`);
+      consola.info(
+        `${escapeControlCharacters(provider.displayName, { keepLayout: false })} needs an OAuth application.`,
+      );
     }
     consola.info(`Callback URI   ${summary.callbackUri}`);
     // A custom provider has no console to send the developer to: it is
@@ -554,6 +572,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     givenClientId: ClientId | undefined,
   ): JsonEnvelope {
     this.report(change);
+    if (!this.isJson) {
+      this.drawMapping(change);
+    }
     const toStore = this.wouldStore(summary.reused, names, givenClientId);
     const writes = change.changedPaths.map((file) => {
       return `Would write ${file}`;
@@ -660,7 +681,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
       consola.info(
-        `${outcome.schema.name} and its login flow already offer ${provider.displayName}`,
+        `${outcome.schema.name} and its login flow already offer ${escapeControlCharacters(provider.displayName, { keepLayout: false })}`,
       );
     }
   }
@@ -699,6 +720,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       ? { actions, commands: followUps.commands }
       : { commands: followUps.commands };
 
+    if (!this.isJson) {
+      this.drawMapping(input.change);
+    }
+
     return this.emit({
       status: "ok",
       data: {
@@ -708,6 +733,88 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       },
       next,
     });
+  }
+
+  /**
+   * Print what the connection maps: which claim fills each user
+   * attribute and what verifies it, the scopes it asks for, the attributes no
+   * claim fills, the schemas that sign in through it, and where to change it.
+   *
+   * @remarks
+   * Every value read from a file is escaped on its own, newlines included, so a
+   * name cannot drive the terminal or forge a line of the notice.
+   *
+   * @param change - The change that adds the connection.
+   */
+  private drawMapping(change: DocumentChange<Connection>): void {
+    const text = (value: string) => {
+      return escapeControlCharacters(value, { keepLayout: false });
+    };
+    const connection = change.document;
+    const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
+      change.after.connections.summarize(connection);
+    const verifiedBy = new Map(
+      verifications.map(({ property, claim }) => {
+        return [property, claim];
+      }),
+    );
+    const sections = [
+      mappings.length === 0
+        ? []
+        : [
+            createsUsers
+              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+            ...mappings.map(({ property, claim }) => {
+              const how = verifiedBy.get(property);
+              const verified =
+                how === true
+                  ? "always counts as verified"
+                  : typeof how === "string"
+                    ? `counts as verified when ${text(how)} is true`
+                    : "is not treated as verified";
+              return [
+                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                `  It ${verified}.`,
+              ].join("\n");
+            }),
+          ],
+      scopes.length === 0
+        ? []
+        : [
+            `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+          ],
+      unmapped.length === 0
+        ? []
+        : [
+            "These attributes have no claim yet:",
+            ...unmapped.map(({ property, required }) => {
+              if (!required) {
+                return `- ${text(property)} is optional, so it can stay empty.`;
+              }
+              return createsUsers
+                ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                : `- ${text(property)} is required, but this connection does not create users.`;
+            }),
+          ],
+      usedBy.length === 0
+        ? []
+        : [
+            `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+          ],
+      [
+        `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
+      ],
+    ].filter((section) => {
+      return section.length > 0;
+    });
+    consola.info(
+      sections
+        .flatMap((section, at) => {
+          return at === 0 ? section : ["", ...section];
+        })
+        .join("\n"),
+    );
   }
 
   /**
@@ -739,6 +846,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   private payload(input: PayloadInput): Payload {
     const summary = input.summary;
     const action = summary.reused ? "reuse" : "create";
+    const mapped = input.change.after.connections.summarize(input.change.document);
     return {
       project_id: summary.projectId,
       provider: summary.provider,
@@ -747,6 +855,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action,
         slug: summary.connection.slug,
         file: summary.connection.path,
+        claim_mapping: Object.fromEntries(
+          mapped.mappings.map(({ property, claim }) => {
+            return [property, claim];
+          }),
+        ),
+        verified_claims: Object.fromEntries(
+          mapped.verifications.map(({ property, claim }) => {
+            return [property, claim];
+          }),
+        ),
+        scopes: mapped.scopes,
+        unmapped: mapped.unmapped,
+        used_by: mapped.usedBy,
       },
       callback_uri: summary.callbackUri,
       changed: [...input.change.changedPaths],

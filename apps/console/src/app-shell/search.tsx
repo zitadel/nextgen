@@ -4,6 +4,8 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ProjectMark } from "@/components/project-mark";
+import { copyText } from "@/lib/clipboard";
+
 import {
   Command,
   CommandEmpty,
@@ -575,12 +577,8 @@ const LIST_PATH: Record<SearchResultType, string> = {
  * copy.
  */
 async function copyProjectId(projectId: string) {
-  try {
-    await navigator.clipboard.writeText(projectId);
-    toast.success("Project ID copied");
-  } catch {
-    toast.error("Could not copy the project ID");
-  }
+  if (await copyText(projectId)) toast.success("Project ID copied");
+  else toast.error("Could not copy the project ID");
 }
 
 /** How many of each kind the server is asked for: the best few, not a list. */

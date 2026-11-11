@@ -156,7 +156,8 @@ describe("project overview", () => {
     expect(card.getAllByRole("listitem")).toHaveLength(2);
     expect(card.getByRole("link", { name: "user.created" })).toHaveAttribute(
       "href",
-      scopedPath("/events/evt_2"),
+      // Opened over the audit view, which the card heads.
+      scopedPath("/events/evt_2?view=audit"),
     );
     expect(card.getByText("user_new")).toBeInTheDocument();
     // Logs' default view, the audit events, and only a handful of them.
