@@ -25,7 +25,9 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 // Zitadel: 56px, so the rail's 36px squares keep each glyph where the
-// extended row draws it (20px in) and collapsing moves nothing sideways.
+// extended row draws it (20px in) and collapsing moves nothing sideways. The
+// group and footer insets (8px → 10px) animate with the rows' padding
+// (12px → 10px), so the glyphs hold still through the transition too.
 const SIDEBAR_WIDTH_ICON = "3.5rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
@@ -358,7 +360,10 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2 group-data-[collapsible=icon]:px-2.5", className)}
+      className={cn(
+        "flex flex-col gap-2 p-2 transition-[padding] group-data-[collapsible=icon]:px-2.5",
+        className,
+      )}
       {...props}
     />
   );
@@ -395,7 +400,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sidebar-group"
       data-sidebar="group"
       className={cn(
-        "relative flex w-full min-w-0 flex-col p-2 group-data-[collapsible=icon]:px-2.5",
+        "relative flex w-full min-w-0 flex-col p-2 transition-[padding] group-data-[collapsible=icon]:px-2.5",
         className,
       )}
       {...props}
