@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	google_trace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
@@ -27,10 +28,20 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 		trace.WithSampler(NewSampler(traceIDRatio)),
 	}
 	if exporter != nil {
-		opts = append(opts, trace.WithBatcher(exporter, trace.WithBatchTimeout(cfg.BatchDuration)))
+		opts = append(opts, trace.WithBatcher(exporter, spanBatchOptions(cfg.BatchDuration)...))
 	}
 	tracerProvider := trace.NewTracerProvider(opts...)
 	return tracerProvider, nil
+}
+
+// spanBatchOptions leaves an unset batch duration to the SDK's default: the
+// SDK takes a zero timeout as is and then exports on every loop, which keeps
+// a core busy while the server idles.
+func spanBatchOptions(batchDuration time.Duration) []trace.BatchSpanProcessorOption {
+	if batchDuration <= 0 {
+		return nil
+	}
+	return []trace.BatchSpanProcessorOption{trace.WithBatchTimeout(batchDuration)}
 }
 
 // JobRoot marks the root span of one run of a background job. Pass it with
