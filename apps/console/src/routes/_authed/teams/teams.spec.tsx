@@ -140,7 +140,7 @@ describe("teams screen", () => {
     );
     await renderTeams();
 
-    await userEvent.click(await screen.findByRole("button", { name: /Add/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add team" }));
 
     const name = await screen.findByLabelText("Team name");
     // `POST /teams` takes a single `name`, so the drawer is one field — not

@@ -242,11 +242,12 @@ function UsersScreen() {
         }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
-            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                `px-2.5`, which renders the 68px control at 72px. */}
+            {/* Named for what it adds, as its sheet is titled and as Projects'
+                and Deployments' buttons are. `px-2.5!` — `Button`'s
+                `has-[>svg]:px-3` out-specifies a plain `px-2.5`. */}
             <Button className="shrink-0 gap-1.5 px-2.5!">
               <Plus aria-hidden />
-              Add
+              Add user
             </Button>
           </AddUserSheet>
         }
