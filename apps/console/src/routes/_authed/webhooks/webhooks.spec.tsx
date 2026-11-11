@@ -104,7 +104,7 @@ describe("webhooks screen", () => {
     const first = await rowOf("https://api.acme.com/hooks/zitadel");
     expect(first.getByText("User sync")).toBeInTheDocument();
     expect(first.getByText("3 event types")).toBeInTheDocument();
-    expect(first.getByText("active")).toBeInTheDocument();
+    expect(first.getByText("Active")).toBeInTheDocument();
     expect(first.queryByText("Never")).not.toBeInTheDocument();
 
     const second = await rowOf("https://siem.acme.com/zitadel");
@@ -136,7 +136,7 @@ describe("webhooks screen", () => {
     await renderWebhooks();
 
     expect((await rowOf("https://failing.example/hook")).getByText("Failing")).toBeInTheDocument();
-    expect((await rowOf("https://off.example/hook")).getByText("disabled")).toBeInTheDocument();
+    expect((await rowOf("https://off.example/hook")).getByText("Disabled")).toBeInTheDocument();
     // Off with its last attempt failed: the server turned it off.
     expect(
       (await rowOf("https://stopped.example/hook")).getByText("Disabled after repeated failures"),

@@ -61,7 +61,7 @@ test("adds a webhook, shows its secret once, disables, rotates and deletes it", 
     await page.reload();
     const row = page.getByRole("row").filter({ hasText: url });
     await expect(row.getByText("user.created", { exact: true })).toBeVisible();
-    await expect(row.getByText("active", { exact: true })).toBeVisible();
+    await expect(row.getByText("Active", { exact: true })).toBeVisible();
     await expect(page.getByText(/whsec_/)).toHaveCount(0);
 
     await row.getByRole("link", { name: url, exact: true }).click();

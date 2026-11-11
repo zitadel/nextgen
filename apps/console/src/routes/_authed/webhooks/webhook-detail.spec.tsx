@@ -92,7 +92,7 @@ describe("webhook detail", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(WEBHOOK_ID)).toBeInTheDocument();
     const delivery = card("Delivery");
-    expect(delivery.getByText("active")).toBeInTheDocument();
+    expect(delivery.getByText("Active")).toBeInTheDocument();
     expect(delivery.getByText(formatDateTime("2026-11-01T10:00:12Z"))).toBeInTheDocument();
     expect(delivery.queryByText("Last error")).not.toBeInTheDocument();
     // What it receives is named, not only counted.
@@ -134,7 +134,7 @@ describe("webhook detail", () => {
 
     await userEvent.click(card("Delivery").getByRole("button", { name: "Disable" }));
     expect(await card("Delivery").findByRole("button", { name: "Enable" })).toBeInTheDocument();
-    expect(card("Delivery").getByText("disabled")).toBeInTheDocument();
+    expect(card("Delivery").getByText("Disabled")).toBeInTheDocument();
 
     await userEvent.click(card("Delivery").getByRole("button", { name: "Enable" }));
     expect(await card("Delivery").findByRole("button", { name: "Disable" })).toBeInTheDocument();
