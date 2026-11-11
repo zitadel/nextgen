@@ -16,6 +16,7 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_DENSITY,
   RESOURCE_MENU_CELL_NARROW,
   RESOURCE_ROW_LINK,
   RESOURCE_STICKY_BODY,
@@ -234,7 +235,8 @@ function LogsScreen() {
         <div
           ref={scroll.ref}
           data-scroll-end={scroll.edges.end || undefined}
-          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+          // One line a row, read by the screenful: the compact rows.
+          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL} ${RESOURCE_DENSITY.compact}`}
         >
           {/* An event type runs to thirty characters, and the time must show
               its milliseconds, which tell the events of one request apart.
@@ -373,7 +375,7 @@ function EventRow({
           selected ? "bg-muted" : failure ? FAILURE_STICKY : RESOURCE_STICKY_BODY,
         )}
       >
-        <RowMenu name={`${event.event_type}, ${event.id}`} contentClassName="w-56">
+        <RowMenu name={`${event.event_type}, ${event.id}`} size="icon-xs" contentClassName="w-56">
           <DropdownMenuItem asChild>
             <Link to="/events/$eventId" params={params} search={search}>
               View event

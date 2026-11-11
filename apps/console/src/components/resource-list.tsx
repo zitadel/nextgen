@@ -167,17 +167,37 @@ export const RESOURCE_STICKY_END =
 export const RESOURCE_STICKY_BODY =
   "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
-/** One body cell: 56px tall, inset 24px. */
-export const RESOURCE_CELL = "h-14 px-6 py-2";
+/**
+ * How tall a table's rows are, set once on its card (`RESOURCE_TABLE_WRAP`)
+ * and read by every head and body cell beneath it, so a screen chooses what
+ * fits its rows and never restates a height per cell.
+ *
+ * `comfortable`, the default, is the design's 56px with 8px block padding: a
+ * row with a second line under its name, or a mark beside it. `compact` is
+ * 40px with 4px: one line a row, where the list is read by the screenful
+ * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`.
+ */
+export const RESOURCE_DENSITY = {
+  comfortable: "",
+  compact: "[--resource-row:2.5rem] [--resource-row-pad:0.25rem]",
+} as const;
+
+export type ResourceDensity = keyof typeof RESOURCE_DENSITY;
+
+/** One body cell: as tall as the table's density (56px by default), inset 24px. */
+export const RESOURCE_CELL =
+  "h-[var(--resource-row,3.5rem)] px-6 py-[var(--resource-row-pad,0.5rem)]";
 
 /**
  * The row menu's body cell in a narrow menu column: inset 8px, not the cells'
  * 24px, which would make the column 84px wide for one 36px button.
  */
-export const RESOURCE_MENU_CELL_NARROW = "h-14 px-2 py-2";
+export const RESOURCE_MENU_CELL_NARROW =
+  "h-[var(--resource-row,3.5rem)] px-2 py-[var(--resource-row-pad,0.5rem)]";
 
 /** A body cell holding secondary text. */
-export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+export const RESOURCE_CELL_MUTED =
+  "text-muted-foreground h-[var(--resource-row,3.5rem)] truncate px-6 py-[var(--resource-row-pad,0.5rem)] text-sm";
 
 // The row's copy button rests hidden and shows on the row's hover or its own
 // focus, so a keyboard reaches it; where there is no hover it always shows.
@@ -247,7 +267,7 @@ export function ResourceHeadCell({
   return (
     <TableHead
       className={cn(
-        "text-foreground h-14 py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
+        "text-foreground h-[var(--resource-row,3.5rem)] py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
         className,
       )}
     >
@@ -267,7 +287,11 @@ export function ResourceMenuHead({
   className?: string;
   narrow?: boolean;
 }) {
-  return <TableHead className={cn("h-14", narrow ? "px-2" : "px-6", className)} />;
+  return (
+    <TableHead
+      className={cn("h-[var(--resource-row,3.5rem)]", narrow ? "px-2" : "px-6", className)}
+    />
+  );
 }
 
 /**
