@@ -187,12 +187,12 @@ func TestMetadataRefusals(t *testing.T) {
 	})
 	t.Run("admission refused", func(t *testing.T) {
 		t.Parallel()
-		mux := newMux(t, Config{Admission: DenyAll{}})
+		mux := newMux(t, Config{Admission: &admission{err: domain.ErrOriginNotFound()}})
 		assertNoMetadata(t, send(t, mux, http.MethodGet, metadataPath+"/oauth/proj_123", "app.example.com", https))
 	})
 	t.Run("oauth not enabled", func(t *testing.T) {
 		t.Parallel()
-		mux := newMux(t, Config{Settings: NotEnabled{}})
+		mux := newMux(t, Config{Settings: settings{}})
 		assertNoMetadata(t, send(t, mux, http.MethodGet, metadataPath+"/oauth/proj_123", "app.example.com", https))
 	})
 	t.Run("tenant is not a project", func(t *testing.T) {

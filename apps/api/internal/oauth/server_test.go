@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func decodeJSON(body string, into any) error {
@@ -56,7 +58,7 @@ func TestOPEndpointsContinueWithoutAnIssuer(t *testing.T) {
 
 	// The server's own origin, refused by the admission, still reaches the
 	// endpoint: the method decides what no issuer means.
-	refused := &admission{err: DenyAll{}.Admit(t.Context(), "", "")}
+	refused := &admission{err: domain.ErrOriginNotFound()}
 	mux = newMux(t, Config{Admission: refused})
 	rec = send(t, mux, http.MethodPost, "/oauth/proj_123/token", "api.example.com", https)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)

@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/securityheaders"
@@ -175,6 +176,18 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 	}
 }
 
+// denyAll admits no origin as an issuer and notEnabled has OAuth off for
+// every project: the OAuth server with nothing behind it.
+type (
+	denyAll    struct{}
+	notEnabled struct{}
+)
+
+func (denyAll) Admit(context.Context, string, string) error { return domain.ErrOriginNotFound() }
+func (notEnabled) Get(context.Context, oauth.Issuer) (oauth.Settings, error) {
+	return oauth.Settings{}, nil
+}
+
 // With oauth.enabled, the OAuth server takes the well-known metadata paths
 // and the endpoints under its prefix ahead of the API's root alias, through
 // the request ID and logging chain only: a client's request carries no CSRF
@@ -182,7 +195,7 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 func TestBuildHTTPMuxMountsTheOAuthServer(t *testing.T) {
 	publicBase, err := url.Parse("https://api.example.com")
 	require.NoError(t, err)
-	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: oauth.DenyAll{}, Settings: oauth.NotEnabled{}})
+	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: denyAll{}, Settings: notEnabled{}})
 	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
 		nil, nil, handlers)
