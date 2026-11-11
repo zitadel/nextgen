@@ -13,6 +13,7 @@ import {
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { isErrno, ZitadelError } from "@/lib/errors";
+import { pathExists } from "@/lib/fs";
 import { log } from "@/lib/log";
 import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
@@ -158,6 +159,12 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
     // The README and the editor's meta-schema are not configuration.
     const write = async (relPath: string, content: string, overwrite: boolean): Promise<void> => {
       const dest = join(this.cwd, relPath);
+      if (this.dryRun) {
+        if (overwrite || !(await pathExists(dest))) {
+          filesWritten.push(relPath);
+        }
+        return;
+      }
       await mkdir(dirname(dest), { recursive: true });
       try {
         await writeFile(dest, content, overwrite ? undefined : { flag: "wx" });
@@ -184,7 +191,14 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       .branding.put(descriptor)
       .withText(DEFAULT_BRANDING_TEMPLATE_PATH, template);
     try {
-      filesWritten.push(...(await change.save(new DiskStore(this.cwd), { overwrite: this.force })));
+      if (this.dryRun) {
+        await change.check(new DiskStore(this.cwd), { overwrite: this.force });
+        filesWritten.push(...change.changedPaths);
+      } else {
+        filesWritten.push(
+          ...(await change.save(new DiskStore(this.cwd), { overwrite: this.force })),
+        );
+      }
     } catch (error) {
       if (error instanceof FileExistsError) {
         throw new ZitadelError("E_CONFLICT", error.message, {
@@ -208,11 +222,31 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
     const brandingMeta = projectMetaSchemas(this.cliVersion).filter((file) => {
       return file.path === `${META_SCHEMA_DIR}/branding.json`;
     });
-    const metaWrites = await writeMetaSchemas(this.cwd, brandingMeta, { dryRun: false });
+    const metaWrites = await writeMetaSchemas(this.cwd, brandingMeta, { dryRun: this.dryRun });
     for (const artifact of metaWrites.written) {
       if (artifact.kind === "file") {
         filesWritten.push(artifact.path);
       }
+    }
+
+    const unchanged = change.changedPaths.length + 1 + brandingMeta.length - filesWritten.length;
+    if (this.dryRun) {
+      const wouldTitle = `Would eject the ${design} design into ${CONFIG_DIRECTORIES.branding}/ (dry run)`;
+
+      return this.emit({
+        status: "ok",
+        data: {
+          dry_run: true,
+          title: wouldTitle,
+          design,
+          files_would_write: filesWritten,
+        },
+        summary: {
+          title: wouldTitle,
+          sections: [],
+          lines: [`Files: ${filesWritten.length} would be written, ${unchanged} unchanged`],
+        },
+      });
     }
 
     for (const file of filesWritten) {
@@ -230,7 +264,7 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       summary: {
         title,
         sections: [],
-        lines: [`Files: ${filesWritten.length} written, 0 unchanged`],
+        lines: [`Files: ${filesWritten.length} written, ${unchanged} unchanged`],
       },
       next: {
         actions: [

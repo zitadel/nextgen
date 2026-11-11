@@ -1,9 +1,15 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { Config } from "@oclif/core";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import Logs from "@/commands/logs";
 import { it } from "@tests/helpers/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
+import { pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
+import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
 
 const config = {
   version: "0.0.0-test",
@@ -82,5 +88,33 @@ describe("--follow beside --json", () => {
     await expect(logs.run()).rejects.toMatchObject({
       message: "Local Zitadel runtime has not been started",
     });
+  });
+});
+
+describe("--follow off a terminal", () => {
+  it("ends the stream on the last log line", async ({ dir }) => {
+    await mkdir(join(dir, ".zitadel/local/data"), { recursive: true });
+    const logPath = join(dir, "server.log");
+    await writeFile(logPath, "level=INFO msg=first\nlevel=INFO msg=last\n");
+    await writeRuntimeMetadata(
+      dir,
+      aBinaryRecord({
+        pid: 2_147_483_000,
+        command: "nextgen --migrate",
+        log_path: logPath,
+        data_dir: join(dir, ".zitadel/local/data"),
+      }),
+    );
+    const listening = process.listenerCount("SIGINT");
+
+    const running = runCliForTest(["logs", "--no-telemetry", "--cwd", dir, "--follow"]);
+    await vi.waitFor(() => {
+      expect(process.listenerCount("SIGINT")).toBeGreaterThan(listening + 1);
+    });
+    pressCtrlC();
+    const { stdout } = await running;
+
+    const lines = stdout.trimEnd().split("\n");
+    expect(lines.at(-1)).toContain("msg=last");
   });
 });

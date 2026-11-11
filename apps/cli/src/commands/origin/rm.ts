@@ -12,7 +12,6 @@ import {
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
-import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
@@ -49,10 +48,10 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${args.pattern} from the project`,
+        name: `remove ${escapeControlCharacters(args.pattern)} from the project`,
         message: async () => {
           const { projectId, server } = await this.connect();
-          return `Remove ${args.pattern} from project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
+          return `Remove ${escapeControlCharacters(args.pattern)} from project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
         },
         preview: () => {
           return dryRunResult({
@@ -91,9 +90,6 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
-                pretty: prose(
-                  `Removed ${removal.pattern}; the project has no origins left and admits no origin except a loopback origin`,
-                ),
                 summary: {
                   title: `Removed ${escapeControlCharacters(removal.pattern)}`,
                   sections: [],

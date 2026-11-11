@@ -927,6 +927,34 @@ describe("local runtime commands", () => {
     ]);
   });
 
+  it("stop --all --dry-run stops nothing and lists what it would stop", async () => {
+    const cwd = await tempProject("zitadel-stop-all-dry-run-");
+    const servers = aMachineRunning({
+      pid: process.pid,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    });
+
+    const result = await runCliForTest(
+      ["stop", "--cwd", cwd, "--json", "--all", "--dry-run"],
+      {},
+      undefined,
+      servers,
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      data: { dry_run: boolean; title: string; sweep: { count: number; results?: unknown } };
+      status: string;
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.dry_run).toBe(true);
+    expect(envelope.data.title).toMatch(/ \(dry run\)$/);
+    expect(envelope.data.sweep.count).toBe(1);
+    expect(envelope.data.sweep.results).toBeUndefined();
+    expect(() => process.kill(process.pid, 0)).not.toThrow();
+  });
+
   it("reset --force deletes local runtime data without suggesting a restart", async () => {
     const cwd = await tempProject("zitadel-reset-");
     const fake = await fakeDocker();

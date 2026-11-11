@@ -25,14 +25,13 @@
 - A command the CLI suggests running next (`next.commands` on a result,
   `nextCommands` on an error, an input question's `retry`) is a
   `SuggestedCommand` from `src/lib/suggestion.ts`, and only its builders make
-  one: `this.suggest(args)` on an `EnvironmentCommand` appends the run's
-  `--env`/`--env-file`/`--server`; `this.suggestUnscoped(args)` /
-  `unscopedCommand` is the deliberate opt-out for a command that targets no
-  project (`setup`, `start`, `doctor`); `projectCommand` takes an
-  `EnvironmentSelector`, which only `environmentSelectorSuffix` makes;
-  `shellCommand` is for anything that is not the CLI, and `inShell` adds a pipe
-  or redirection around a suggestion. A raw string does not typecheck there, so
-  a retry cannot silently fall back to the default project (#1689).
+  one; a raw string does not typecheck there (#1689).
+- Build every suggested command with `this.suggest(args)` from the `Suggestible`
+  mixin (`src/lib/oclif/suggestible.ts`); the target's own flags decide whether
+  the environment selector goes on (`env-file` present) or only `--cwd`.
+- `unscopedCommand` is for an error raised outside a command (`project.ts`),
+  `shellCommand` for anything that is not the CLI, and `inShell` adds a pipe or
+  redirection around a suggestion.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
   in its data: `emit` writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a

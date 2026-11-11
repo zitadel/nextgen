@@ -46,6 +46,23 @@ describe("DrawnSpinner", () => {
     expect(modes).toEqual([false]);
   });
 
+  it("registers one SIGTERM listener of its own, however many spinners start", () => {
+    const hooks = DrawnSpinner as unknown as { exitHooked: boolean };
+    hooks.exitHooked = false;
+    const before = new Set(process.listeners("SIGTERM"));
+
+    new DrawnSpinner("Fetching users");
+    new DrawnSpinner("Fetching groups");
+
+    const added = process.listeners("SIGTERM").filter((listener) => {
+      return !before.has(listener);
+    });
+    for (const listener of added) {
+      process.removeListener("SIGTERM", listener);
+    }
+    expect(added).toHaveLength(1);
+  });
+
   it("leaves a stream that is not a terminal alone", () => {
     const modes: boolean[] = [];
 

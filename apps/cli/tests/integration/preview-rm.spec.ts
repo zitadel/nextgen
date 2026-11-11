@@ -188,7 +188,7 @@ describe("preview rm", () => {
 
         const result = await app.run(["preview", "rm", PREVIEW_URL, "--force"]);
 
-        expect(result).toPrint("is not a live preview of the project; nothing was removed");
+        expect(result).toPrint("is not a live preview of the project");
       });
     });
   });

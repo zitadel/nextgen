@@ -141,6 +141,32 @@ describe("moveDevPort", () => {
     });
   });
 
+  describe("when it moves the files", () => {
+    it("says so before it asks for consent", async ({ dir }) => {
+      await setUpApp(dir);
+      const order: string[] = [];
+
+      await moveDevPort({
+        cwd: dir,
+        devPort: 3101,
+        source: CLOUD,
+        orca: createOrca(),
+        cliVersion: "0.0.0",
+        dryRun: false,
+        signal: new AbortController().signal,
+        filesMoved: () => {
+          order.push("moved");
+        },
+        consent: () => {
+          order.push("asked");
+          return Promise.resolve(undefined);
+        },
+      });
+
+      expect(order).toEqual(["moved", "asked"]);
+    });
+  });
+
   describe("when asking to remove the previous origin fails for a reason other than a refusal", () => {
     it("stops with that failure", async ({ dir }) => {
       await aNextApp(dir, { scripts: { dev: "next dev" } });

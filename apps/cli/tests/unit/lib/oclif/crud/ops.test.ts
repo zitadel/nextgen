@@ -9,7 +9,7 @@ vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).cla
 
 import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
 
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif";
 import {
@@ -432,6 +432,49 @@ describe("write results", () => {
     expect(stdout.join("\n")).not.toBe("{}");
     expect(stdout.join("\n")).toContain("Command completed");
   });
+
+  it.each([
+    ["create", CreateOperation, []],
+    ["update", UpdateOperation, ["team_1"]],
+  ] as const)(
+    "draws the %s summary on a terminal and the record when piped",
+    async (verb, Operation, ids) => {
+      const written: CreateSpec<Ctx> & UpdateSpec<Ctx> = {
+        schema,
+        call: async () => ({ id: "team_1", name: "a" }),
+      };
+      const command = bindOperation(
+        Operation as OperationClass<Ctx, CreateSpec<Ctx>>,
+        definition(written),
+      );
+      const argv = [...ids, "--name", "a"];
+
+      const drawn: string[] = [];
+      vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+        drawn.push(String(chunk));
+        return true;
+      });
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        drawn.push(String(chunk));
+        return true;
+      });
+      vi.spyOn(console, "log").mockImplementation((...args) => {
+        drawn.push(`${args.join(" ")}\n`);
+      });
+      await asTerminal(() =>
+        (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv),
+      );
+      const onScreen = drawn.join("");
+      drawn.length = 0;
+      await offTerminal(() =>
+        (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv),
+      );
+      const piped = drawn.join("");
+
+      expect(onScreen).toContain(`${verb === "create" ? "Created" : "Updated"} team team_1`);
+      expect(piped).toContain('"id": "team_1"');
+    },
+  );
 
   it("asks the server on a dry run of an update that can check, and never writes", async () => {
     const call = vi.fn(async () => ({ id: "team_1" }));

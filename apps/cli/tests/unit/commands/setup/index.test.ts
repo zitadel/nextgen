@@ -59,6 +59,7 @@ import { usePlatformServer } from "@tests/helpers/platform-project";
 import {
   expectedPublicCliCommand,
   parseJson,
+  pressCtrlC,
   runCliForTest,
   stripAnsi,
 } from "@tests/helpers/run-cli";
@@ -346,6 +347,8 @@ type CapturingPlatform = {
   rejectsReleases(): void;
   /** Refuses a sign-up policy's evaluation as malformed, as a server from before the policy does. */
   predatesTheSignupPolicy(): void;
+  /** Leaves a sign-up policy's evaluation unanswered; resolves once it has been asked. */
+  hangsOnTheSignupPolicy(): Promise<void>;
 };
 
 /**
@@ -420,6 +423,7 @@ async function aCapturingPlatform(
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
   const failing = { releases: false, signupPolicy: false };
+  let signupPolicyAsked: (() => void) | undefined;
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
@@ -438,6 +442,10 @@ async function aCapturingPlatform(
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
+      return;
+    }
+    if (req.method === "POST" && path === "/api/v1/policies/evaluate" && signupPolicyAsked) {
+      signupPolicyAsked();
       return;
     }
     if (req.method === "POST" && path === "/api/v1/policies/evaluate" && failing.signupPolicy) {
@@ -489,6 +497,11 @@ async function aCapturingPlatform(
     },
     predatesTheSignupPolicy() {
       failing.signupPolicy = true;
+    },
+    hangsOnTheSignupPolicy() {
+      return new Promise<void>((asked) => {
+        signupPolicyAsked = asked;
+      });
     },
   };
 }
@@ -1002,6 +1015,21 @@ describe("setup", () => {
       });
     });
 
+    it("names its own directory once in the start it suggests from a subdirectory", async ({
+      dir,
+      serve,
+    }) => {
+      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
+      const cwd = join(dir, "my-app");
+      await mkdir(cwd);
+
+      const res = await runCliForTest(setupIn(cwd, "--framework", "next", ...LOCAL, ...SCRIPTED));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        next_commands: [expectedPublicCliCommand(`start --cwd ${dir}`), expect.any(String)],
+      });
+    });
+
     it("writes nothing beside what start left", async ({ dir, serve }) => {
       await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
 
@@ -1510,19 +1538,41 @@ describe("setup", () => {
       );
 
       expect(framed(res.stdout)).toContain("Summary");
-      expect(res.stdout).not.toContain("Zitadel is ready");
+      expect(stripAnsi(res.stdout)).toMatch(/^Would set up Zitadel in this app \(dry run\)$/m);
       expect(res.stdout).not.toContain("✓");
       expect(res.stdout).not.toContain("DETECTED");
     });
 
-    it("closes the box with the project and server it ran against", async ({ dir }) => {
+    it("names no project it ran against, since a dry run creates none", async ({ dir }) => {
       await aNextApp(dir);
 
       const res = await runCliForTest(
         setupIn(dir, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
       );
 
-      expect(framed(res.stdout).at(-1)).toContain("Using project ");
+      expect(res.stdout).not.toContain("Using project ");
+    });
+
+    it("ends the drawn report and the written title on one headline saying dry run", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+      const args = setupIn(
+        dir,
+        "--server",
+        CLOUD,
+        "--non-interactive",
+        "--skip-install",
+        ...DRY_RUN_NEXT,
+      );
+
+      const plain = await runCliForTest(args);
+      const json = await runCliForTest([...args, "--json"]);
+
+      expect(parseJson(json.stdout)).toMatchObject({
+        data: { title: "Would set up Zitadel in this app (dry run)", dry_run: true },
+      });
+      expect(stripAnsi(plain.stdout)).toContain("Would set up Zitadel in this app (dry run)");
     });
 
     it.for([
@@ -2035,13 +2085,11 @@ describe("setup", () => {
         scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
       );
 
-      expect(parseJson(res.stdout)).toMatchObject({
-        warnings: [
-          expect.stringContaining(
-            "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ",
-          ),
-        ],
-      });
+      const [warning] = (parseJson(res.stdout) as { warnings: string[] }).warnings;
+      expect(warning).toContain(
+        "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ",
+      );
+      expect(warning).toContain(`--env-file ${dir}/.env.development.local`);
     });
 
     it("warns that a sign-up policy --force keeps fails every deploy", async ({ dir, serve }) => {
@@ -2066,6 +2114,23 @@ describe("setup", () => {
           ),
         ],
       });
+    });
+  });
+
+  describe("when Ctrl-C is pressed while it asks whether the server takes a sign-up policy", () => {
+    it("ends cancelled and leaves no zitadel.json behind", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+      const asked = platform.hangsOnTheSignupPolicy();
+
+      const result = runCliForTest(
+        scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
+      );
+      await asked;
+      pressCtrlC();
+
+      expect(await result).toFailWith("E_CANCELLED");
+      expect(existsSync(join(dir, "zitadel.json"))).toBe(false);
     });
   });
 
@@ -2643,6 +2708,33 @@ describe("setup", () => {
           previous_issuer: "http://localhost:3000",
           issuer: "http://localhost:3101",
         },
+      });
+    });
+
+    describe("as a dry run", () => {
+      it("answers as a dry run that would move, and says nothing happened", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--dry-run", "--json"));
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          status: "ok",
+          data: {
+            title: "Would move the app to http://localhost:3101 (dry run)",
+            dry_run: true,
+            moved: true,
+          },
+        });
+      });
+
+      it("does not tell the developer to restart the dev server", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--dry-run", "--json"));
+
+        expect(res.stdout).not.toContain("Restart the dev server");
       });
     });
 

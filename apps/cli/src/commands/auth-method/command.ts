@@ -104,6 +104,12 @@ export type SchemaTargetInput = {
    * Whether `--cwd` was given, so follow-ups repeat it.
    */
   readonly cwdGiven: boolean;
+
+  /**
+   * Turns a refusal's `next` command into the suggestion the run's own
+   * builders make.
+   */
+  readonly suggest?: (command: string) => SuggestedCommand;
 };
 
 /**
@@ -195,7 +201,7 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
   // The schema is chosen from the files alone, so a refusal about the schema
   // comes before anything else, the state file included.
   const loaded = await ZitadelConfig.loadUnchecked(store);
-  const schema = chosenOrBroken(loaded, input.schema);
+  const schema = chosenOrBroken(loaded, input.schema, input.suggest);
   if (schema.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
       file: schema.path,
@@ -238,7 +244,11 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema` and no broken schema file is the one it asks for.
  */
-function chosenOrBroken(config: ZitadelConfig, requested: string | undefined): UserSchema {
+function chosenOrBroken(
+  config: ZitadelConfig,
+  requested: string | undefined,
+  suggest?: (command: string) => SuggestedCommand,
+): UserSchema {
   try {
     config.schemas.resolve(requested);
   } catch (error) {
@@ -253,7 +263,7 @@ function chosenOrBroken(config: ZitadelConfig, requested: string | undefined): U
       }
     }
   }
-  return chosenSchema(config.schemas, requested);
+  return chosenSchema(config.schemas, requested, suggest);
 }
 
 /**
@@ -365,6 +375,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       cwd: this.cwd,
       schema: flags.schema,
       cwdGiven: flags.cwd !== undefined,
+      suggest: (next) => {
+        return this.suggest(next);
+      },
     });
   }
 
@@ -777,12 +790,16 @@ function namesOf(schemas: readonly UserSchema[]): readonly string[] {
  * @throws {@link ZitadelError} When there is none, the name matches none or
  *   several, or several exist and none is named.
  */
-function chosenSchema(schemas: Schemas, requested: string | undefined): UserSchema {
+function chosenSchema(
+  schemas: Schemas,
+  requested: string | undefined,
+  suggest?: (command: string) => SuggestedCommand,
+): UserSchema {
   try {
     return schemas.resolve(requested);
   } catch (error) {
     if (error instanceof SchemaNotFoundError && error.known.length === 0) {
-      throw refusalError(NO_SCHEMA_REFUSAL, {});
+      throw refusalError(NO_SCHEMA_REFUSAL, {}, suggest);
     }
     if (error instanceof SchemaNotFoundError) {
       throw refusalError(UNKNOWN_SCHEMA_REFUSAL, {

@@ -1000,6 +1000,7 @@ describe("variable set --as", () => {
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
+  let extraFlags: string[] = [];
   const removingOn = async (serverUrl: string, cwd: string, ...answers: unknown[]) => {
     const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
     const written: string[] = [];
@@ -1009,7 +1010,7 @@ describe("variable rm asked on a terminal", () => {
     });
     try {
       const result = await asPerson(() =>
-        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", serverUrl]),
+        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", serverUrl, ...extraFlags]),
       );
       return { result, shown: written.join(""), talk };
     } finally {
@@ -1030,6 +1031,7 @@ describe("variable rm asked on a terminal", () => {
   };
 
   afterEach(() => {
+    extraFlags = [];
     vi.mocked(confirm).mockReset();
     vi.mocked(isCancel).mockReset();
     vi.mocked(isCancel).mockReturnValue(false);
@@ -1043,6 +1045,18 @@ describe("variable rm asked on a terminal", () => {
 
     expect(talk.asked()).toEqual([
       "Remove SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("says only the preview value goes when asked with --preview", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+    extraFlags = ["--preview"];
+
+    const { talk } = await removing(cwd, true);
+
+    expect(talk.asked()).toEqual([
+      "Remove the preview value of SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
     ]);
   });
 

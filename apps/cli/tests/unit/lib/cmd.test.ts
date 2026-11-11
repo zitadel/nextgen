@@ -14,6 +14,20 @@ describe("Cmd.quote", () => {
   it("escapes an embedded single quote", () => {
     expect(Cmd.quote("it's")).toBe(`'it'\\''s'`);
   });
+
+  it("quotes a word that starts with `=`, which a shell would expand", () => {
+    expect(Cmd.quote("=cmd")).toBe("'=cmd'");
+  });
+
+  it("spells out ESC, tab and newline so a suggestion stays one visible line", () => {
+    expect(Cmd.quote("a\u001bb")).toBe("'a\\x1bb'");
+    expect(Cmd.quote("a\tb")).toBe("'a\\x09b'");
+    expect(Cmd.quote("a\nb")).toBe("'a\\x0ab'");
+  });
+
+  it("leaves a plain safe word unchanged", () => {
+    expect(Cmd.quote("my-app_1.0")).toBe("my-app_1.0");
+  });
 });
 
 describe("Cmd.option", () => {

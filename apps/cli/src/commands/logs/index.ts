@@ -8,7 +8,7 @@ import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-se
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { painted } from "@/lib/oclif/rendering";
+import { painted, prose } from "@/lib/oclif/rendering";
 import { Suggestible } from "@/lib/oclif/suggestible";
 
 /** How many lines `--tail` shows when it is not given. */
@@ -119,6 +119,7 @@ export default class Logs extends Suggestible(BaseCommand) {
       return this.emit({
         status: "ok",
         data: { title },
+        ...(this.isOnScreen ? {} : { pretty: prose("") }),
         summary: {
           title,
           sections: [],

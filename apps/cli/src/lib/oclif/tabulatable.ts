@@ -248,7 +248,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...rendered,
-        summary: await this.listSummary(view, more),
+        summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       };
     }
@@ -258,7 +258,11 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * headline, the table is what it produced, and the footer lines sit beside
      * it. A list that found nothing says so, in the one sentence every list uses.
      */
-    private async listSummary(view: ListView, more: readonly string[]): Promise<Summary> {
+    private async listSummary(
+      view: ListView,
+      more: readonly string[],
+      drawn: boolean,
+    ): Promise<Summary> {
       if (view.rows.length === 0) {
         return {
           title: escapeControlCharacters(view.empty),
@@ -269,7 +273,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       return {
         title: `Found ${view.rows.length} ${new Intl.PluralRules("en").select(view.rows.length) === "one" ? view.singular : (view.plural ?? `${view.singular}s`)}`,
         sections: [],
-        lines: (await this.tabulate(view.columns, view.rows)).split("\n"),
+        ...(drawn ? { lines: (await this.tabulate(view.columns, view.rows)).split("\n") } : {}),
         extras: [
           ...view.footer.map((line) => {
             return escapeControlCharacters(line);

@@ -64,6 +64,8 @@ export async function moveDevPort(opts: {
   signal: AbortSignal;
   /** Asks to remove the previous origin; the command's own confirmation. */
   consent: (gate: Gate) => Promise<Consent | undefined>;
+  /** Told once the files have moved, before the consent is asked. */
+  filesMoved?: (moved: Pick<DevPortMove, "previousIssuer" | "issuer" | "result">) => void;
 }): Promise<DevPortMove> {
   const { cwd, devPort, source, orca, cliVersion, dryRun, signal } = opts;
   const context = await loadPatchContext(cwd, orca, cliVersion);
@@ -134,6 +136,11 @@ export async function moveDevPort(opts: {
   }
   const served =
     dryRun || !moving ? {} : await serveNewOrigin(client, secret.project_id, issuer, devPort);
+  opts.filesMoved?.({
+    previousIssuer,
+    issuer,
+    result,
+  });
   const replacing = !dryRun && moving && portFromIssuer(previousIssuer) !== undefined;
   // A refusal for want of --force leaves the origin behind and says so;
   // anything else the request for consent throws (Ctrl-C, a bug) stops

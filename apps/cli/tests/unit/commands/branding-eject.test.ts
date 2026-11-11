@@ -186,6 +186,43 @@ describe("branding eject", () => {
     expect(json.hint).toBe("Pick one of: centered, minimal.");
   });
 
+  it("--dry-run writes no file and says what it would eject", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--dry-run");
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    const envelope = parseJson(res.stdout) as {
+      status: string;
+      data: { dry_run: boolean; title: string; files_would_write: string[] };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.dry_run).toBe(true);
+    expect(envelope.data.title).toBe(
+      "Would eject the centered design into .zitadel/branding/ (dry run)",
+    );
+    expect(envelope.data.files_would_write).toContain(".zitadel/branding/login.liquid");
+    await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("counts the files a re-run with --force left unchanged", async () => {
+    const cwd = await makeProject();
+    await eject(cwd);
+
+    const res = await runCliForTest([
+      "branding",
+      "eject",
+      "--cwd",
+      cwd,
+      "--force",
+      "--non-interactive",
+    ]);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    expect(res.stdout).toContain("Files: 2 written, 2 unchanged");
+  });
+
   it("refuses to overwrite existing files without --force", async () => {
     const cwd = await makeProject();
     await eject(cwd);

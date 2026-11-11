@@ -43,7 +43,9 @@ export class Cmd {
    * returned as it is. Anything else is wrapped in single quotes, with each
    * embedded single quote written as `'\''` (close the quote, an escaped
    * quote, reopen it), which is the one form every POSIX shell reads the same
-   * way.
+   * way. A word starting with `=` is quoted too, which a shell would expand.
+   * Control characters (ESC, tab, newline) are spelled out as `\xNN` first, so
+   * a suggestion stays one visible line and cannot drive the reader's terminal.
    *
    * @param value - Any text, trusted or not.
    * @example

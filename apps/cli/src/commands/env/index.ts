@@ -1,6 +1,5 @@
 import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { painted } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -79,18 +78,6 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
           };
         }),
       },
-      // Painted, because the two tables below are the CLI's own; the heading
-      // names a value read from a file, so it is spelled out here.
-      pretty: painted(
-        [
-          escapeControlCharacters(`Environment ${name.value} (from ${name.source})`),
-          "",
-          variables,
-          "",
-          "Consulted, in order:",
-          sources,
-        ].join("\n"),
-      ),
       summary: {
         title: escapeControlCharacters(`Using the ${name.value} environment (from ${name.source})`),
         sections: [],

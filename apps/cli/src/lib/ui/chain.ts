@@ -244,18 +244,31 @@ export class Chain implements Drawing, Narratable {
       force: audience.force,
     };
 
+    let resume: (() => void) | undefined;
+    const pause = (): void => {
+      resume = DrawnSpinner.pause();
+    };
+    const resumeSpinners = (): void => {
+      resume?.();
+      resume = undefined;
+    };
+
     return this.presentation === "plain"
       ? asker({
           ...session,
           guide: false,
+          before: pause,
+          after: resumeSpinners,
         })
       : asker({
           ...session,
           before: () => {
+            pause();
             return this.open();
           },
           after: () => {
-            return this.answered();
+            this.answered();
+            return resumeSpinners();
           },
         });
   }

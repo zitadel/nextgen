@@ -247,7 +247,8 @@ export class Facts implements Renderable {
  * Where a command may be broken across lines: at a space between two of its
  * arguments. A space inside quotes is not one of them, because `\` before a
  * newline is literal inside single quotes, so breaking there would change the
- * argument rather than continue the command.
+ * argument rather than continue the command. A `\` outside single quotes
+ * escapes the next character, so `'\''` and `\ ` open no break.
  *
  * A quote only opens one where something closes it. An apostrophe reaches here
  * on its own — a sentence that names a command carries the words after it into
@@ -258,8 +259,13 @@ export class Facts implements Renderable {
 const argumentBreaks = (command: string): number[] => {
   const at: number[] = [];
   let quote: string | undefined;
+  let escaped = false;
   for (const [index, character] of [...command].entries()) {
-    if (quote !== undefined) {
+    if (escaped) {
+      escaped = false;
+    } else if (character === "\\" && quote !== "'") {
+      escaped = true;
+    } else if (quote !== undefined) {
       quote = character === quote ? undefined : quote;
     } else if ((character === "'" || character === '"') && command.includes(character, index + 1)) {
       quote = character;

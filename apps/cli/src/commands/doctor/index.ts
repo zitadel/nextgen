@@ -46,7 +46,13 @@ import {
   projectEnvFile,
 } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
-import { asStepsShown, type NextSteps, nextStepsData, stepsOf } from "@/lib/oclif/next-steps";
+import {
+  asStepsShown,
+  type NextSteps,
+  nextStepsData,
+  renderNextSteps,
+  stepsOf,
+} from "@/lib/oclif/next-steps";
 import { createOrca } from "@/lib/orca";
 import { listenersForPort } from "@/lib/prober/ports";
 import {
@@ -442,6 +448,8 @@ export default class Doctor extends Destructive(BaseCommand) {
     }
 
     const report = doctorReport(reportInput);
+    // Only the terminal ending draws a summary's steps, so a pipe is given them as lines.
+    const piped = this.isOnScreen ? "" : renderNextSteps(report.next);
 
     return this.emit({
       status: "ok",
@@ -449,8 +457,8 @@ export default class Doctor extends Destructive(BaseCommand) {
       summary: {
         title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",
         sections: [],
-        lines: report.lines,
-        next: stepsOf(report.next),
+        lines: [...report.lines, ...(piped === "" ? [] : ["", ...piped.split("\n")])],
+        ...(this.isOnScreen ? { next: stepsOf(report.next) } : {}),
       },
       next,
       warnings: warnings.map((warning) => {

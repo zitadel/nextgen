@@ -306,7 +306,10 @@ Each invocation prints one JSON object:
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
 - On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
-  `nothing-to-eject`).
+  `nothing-to-eject`). `skipped` means nothing was done because a person
+  declined or there was nothing to do.
+- A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
+  ending in `(dry run)`, never `skipped`.
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
   is structured context.

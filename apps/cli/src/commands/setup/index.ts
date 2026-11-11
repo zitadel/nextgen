@@ -57,7 +57,7 @@ import {
 } from "@/lib/claim-state";
 import { Cmd } from "@/lib/cmd";
 import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
-import { errorMessage, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
+import { errorMessage, isCancellation, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
   type CustomFlagValues,
   callbackUriFor,
@@ -662,13 +662,14 @@ async function refuseOtherReleasesServer(
   ) {
     return;
   }
+  const start = nearest.dir === meta.cwd ? "start" : `start ${Cmd.option("--cwd", nearest.dir)}`;
   throw refusalError(
     SERVER_VERSION_REFUSAL,
     {
       running: runtime.server_version,
       expected,
       serverUrl: runtime.server_url,
-      start: nearest.dir === meta.cwd ? "start" : `start ${Cmd.option("--cwd", nearest.dir)}`,
+      start,
       where:
         nearest.dir === meta.cwd
           ? ""
@@ -678,7 +679,12 @@ async function refuseOtherReleasesServer(
         cwd: undefined,
       })}`,
     },
-    suggest,
+    (command) => {
+      // The start command names the server's own directory, so the typed --cwd is not added.
+      return command === start && nearest.dir !== meta.cwd
+        ? unscopedCommand(command, meta.cliVersion)
+        : suggest(command);
+    },
   );
 }
 
@@ -991,6 +997,9 @@ const INITIAL_DEPLOY_MESSAGE = "Initial deployment from setup";
 
 /** The line a finished setup closes on. */
 const SET_UP_TITLE = "Set up Zitadel in this app";
+
+/** The line a dry run closes on. */
+const WOULD_SET_UP_TITLE = "Would set up Zitadel in this app (dry run)";
 
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
@@ -1578,7 +1587,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
               filesWritten: [],
               passwordMinLength: signInOf(answers).password_min_length,
             }
-          : await this.writeConfiguration(answers, project);
+          : await this.writeConfiguration(answers, project, recoverySelector(flags.cwd));
       } catch (error) {
         // Setup is not atomic: the patcher already wrote `zitadel.json` (the
         // marker the already-initialized guard skips on) and `.zitadel/secret`.
@@ -1863,6 +1872,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             );
         }
       } catch (error) {
+        if (isCancellation(error) || this.signal.aborted) {
+          throw error;
+        }
         reportWarning(
           `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
         );
@@ -1938,12 +1950,15 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    const title = this.dryRun ? WOULD_SET_UP_TITLE : SET_UP_TITLE;
     let summary: Summary = {
-      title: SET_UP_TITLE,
+      title,
       sections: [],
     };
     let report = "";
-    this.ui.ranAgainst(project.id, answers.server);
+    if (!this.dryRun) {
+      this.ui.ranAgainst(project.id, answers.server);
+    }
     if (!this.isJson) {
       const projectFacts = await detectProjectFacts(this.cwd, app.framework);
       const sections = buildSummary({
@@ -2037,7 +2052,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         ];
       });
       summary = {
-        title: SET_UP_TITLE,
+        title,
         sections: summarySections(sections),
         lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
         next: nextActions,
@@ -2049,7 +2064,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           .map((line) => {
             return line.trim();
           });
-        report = this.ui.ending({
+        const ending = this.ui.ending({
           ...summary,
           next: [
             ...nextActions,
@@ -2063,13 +2078,15 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
                 ]),
           ],
         });
+        // The ending is only what sits under the closing line, so the headline is added.
+        report = `${title}\n${ending}`;
       }
     }
 
     return this.emit({
       status: "ok",
       data: {
-        title: this.dryRun ? "Zitadel would be set up (dry run)" : "Zitadel is ready",
+        title,
         ...(this.dryRun ? { dry_run: true } : {}),
         project: {
           project_id: project.id,
@@ -2268,6 +2285,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       });
       return true;
     } catch (error) {
+      if (isCancellation(error) || this.signal.aborted) {
+        throw error;
+      }
       return !(error instanceof InvalidError && error.serverCode === "req.invalid");
     }
   }
@@ -2288,6 +2308,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
    * @param answers - What to scaffold.
    * @param project - The project just created, whose server is asked whether
    *   it takes a sign-up policy.
+   * @param selector - Pins the deploy the sign-up policy warning suggests.
    * @returns The absolute paths written, and the minimum password length the
    *   policy holds.
    * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
@@ -2297,13 +2318,14 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
   private async writeConfiguration(
     answers: SetupAnswers,
     project: CreatedProject,
+    selector: EnvironmentSelector,
   ): Promise<ScaffoldedConfiguration> {
     const signupPolicy = await this.serverTakesSignupPolicy(answers.server, project);
     const scaffold = await scaffoldOf(this.cwd, this.force, answers, signupPolicy);
     if (!signupPolicy) {
       reportWarning(
         scaffold.signupPolicy === undefined
-          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${this.suggest(DEPLOY_ARGS)}.`
+          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${projectCommand(DEPLOY_ARGS, selector, this.cliVersion)}.`
           : `The server does not take a sign-up policy yet, so every deploy fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
       );
     }
@@ -2448,6 +2470,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       );
       return deployment;
     } catch (error) {
+      if (isCancellation(error) || this.signal.aborted) {
+        throw error;
+      }
       deploying.done("Left .zitadel/ undeployed");
       reportWarning(
         `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish .zitadel/.`,
@@ -2471,6 +2496,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     const moving = this.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
     );
+    let ended = false;
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -2482,15 +2508,28 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       consent: (gate) => {
         return this.consent(gate);
       },
+      filesMoved: (moved) => {
+        for (const file of moved.result.filesWritten) {
+          moving.detail(
+            `${dryRun ? "Would update" : "Updated"} ${escapeControlCharacters(relativeDisplay(cwd, file))}`,
+          );
+        }
+        // Ended before the consent question, which a spinner would draw over.
+        if (moved.previousIssuer === moved.issuer) {
+          moving.done(`Already on ${moved.issuer}`);
+        } else {
+          moving.done(
+            `${dryRun ? "Would move" : "Moved"} from ${moved.previousIssuer} to ${moved.issuer}`,
+          );
+        }
+        ended = true;
+      },
     }).catch((error: unknown) => {
-      moving.fail();
+      if (!ended) {
+        moving.fail();
+      }
       throw error;
     });
-    for (const file of move.result.filesWritten) {
-      moving.detail(
-        `${dryRun ? "Would update" : "Updated"} ${escapeControlCharacters(relativeDisplay(cwd, file))}`,
-      );
-    }
     // Pinned to the project just moved, as the other recoveries are: its env
     // file, or the server the move used for a project setup gave none, never
     // what the shell has exported.
@@ -2538,20 +2577,16 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       );
     }
     const moved = move.previousIssuer !== move.issuer;
-    if (moved) {
-      moving.done(`Moved from ${move.previousIssuer} to ${move.issuer}`);
-    } else {
-      moving.done(`Already on ${move.issuer}`);
-    }
-
-    const title = moved
-      ? `Moved the app to ${move.issuer}`
+    const headline = moved
+      ? `${dryRun ? "Would move" : "Moved"} the app to ${move.issuer}`
       : `The app is already on ${move.issuer}`;
+    const title = dryRun ? `${headline} (dry run)` : headline;
 
     return this.emit({
       status: "ok",
       data: {
         title,
+        ...(dryRun ? { dry_run: true } : {}),
         moved,
         previous_issuer: move.previousIssuer,
         issuer: move.issuer,
@@ -2567,7 +2602,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         boxed: true,
       },
       next: {
-        actions: [`Restart the dev server and open ${move.issuer}/login.`],
+        actions: dryRun ? [] : [`Restart the dev server and open ${move.issuer}/login.`],
         ...(deploy === undefined && cleanup === undefined
           ? {}
           : {

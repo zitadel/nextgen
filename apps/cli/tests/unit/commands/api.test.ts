@@ -1,3 +1,6 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
@@ -5,7 +8,9 @@ vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).cla
 import * as prompts from "@clack/prompts";
 import { Config } from "@oclif/core";
 
-import Api from "@/commands/api/index";
+import Api, { readOperation } from "@/commands/api/index";
+import { unscopedCommand } from "@/lib/suggestion";
+import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/helpers/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
@@ -169,5 +174,57 @@ describe("zitadel api, rendered for a terminal", () => {
     expect(shown).toContain("curl -X GET 'http://localhost:8080/api/v1/livez'");
     expect(shown).toContain("Would call getLive");
     expect(shown).toContain("project proj_01TEST");
+  });
+});
+
+describe("zitadel api for an operation the CLI cannot call", () => {
+  it("suggests listing what it can call", () => {
+    const error = ((): unknown => {
+      try {
+        readOperation("getMyUser", undefined, (next) => {
+          return unscopedCommand(next);
+        });
+      } catch (thrown) {
+        return thrown;
+      }
+      return undefined;
+    })();
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect((error as ZitadelError).nextCommands).toEqual([unscopedCommand("api ls")]);
+  });
+});
+
+describe("zitadel api, answering a call at a terminal", () => {
+  it("draws its summary, with the response under it", async ({ dir }) => {
+    const server = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ status: "serving" }));
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const drawn: string[] = [];
+    try {
+      const cwd = await makeProject(dir, { linked: true });
+      vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+        drawn.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        return true;
+      });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const config = await Config.load({ root: cliPackageRoot });
+      const { port } = server.address() as AddressInfo;
+
+      await Api.run(
+        ["--cwd", cwd, "--no-telemetry", "--server", `http://127.0.0.1:${port}`, "getLive"],
+        config,
+      );
+    } finally {
+      server.close();
+    }
+
+    const shown = stripAnsi(drawn.join(""));
+    expect(shown).toContain("Called getLive");
+    expect(shown).toContain("serving");
   });
 });

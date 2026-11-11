@@ -6,7 +6,6 @@ import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive, Settled } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { filled, type Refused, taken } from "@/lib/oclif/flags";
-import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -59,10 +58,10 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `stop serving ${args.url}`,
+        name: `stop serving ${escapeControlCharacters(args.url)}`,
         message: async () => {
           const { projectId, server } = await this.connect();
-          return `Stop serving ${args.url} for project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
+          return `Stop serving ${escapeControlCharacters(args.url)} for project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
         },
         preview: () => {
           return dryRunResult({
@@ -87,9 +86,6 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
-              pretty: prose(
-                `${args.url} is not a live preview of the project; nothing was removed`,
-              ),
               summary: {
                 title: "Nothing was removed",
                 sections: [],

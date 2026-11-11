@@ -75,14 +75,27 @@ export class DrawnSpinner implements Spinner {
    * @param write - Writes the line.
    */
   static around(write: () => void): void {
+    const resume = DrawnSpinner.pause();
+    write();
+    resume();
+  }
+
+  /**
+   * Clears every running spinner, for a prompt that is about to be drawn: a
+   * spinner left drawing would write over it.
+   *
+   * @returns Draws the cleared spinners again, once the prompt is answered.
+   */
+  static pause(): () => void {
     const running = [...DrawnSpinner.active];
     for (const one of running) {
       one.handle.clear();
     }
-    write();
-    for (const one of running) {
-      one.handle = one.spin();
-    }
+    return () => {
+      for (const one of running) {
+        one.handle = one.spin();
+      }
+    };
   }
 
   /** Stops every spinner still drawing, so what ends a run is not drawn over. */
@@ -131,6 +144,14 @@ export class DrawnSpinner implements Spinner {
       DrawnSpinner.exitHooked = true;
       process.once("exit", () => {
         DrawnSpinner.clearAll();
+      });
+      // Clack's SIGTERM handler is removed above, so this restores the cursor
+      // and ends the run as Node would have, unless another handler owns it.
+      process.once("SIGTERM", () => {
+        DrawnSpinner.clearAll();
+        if (process.listenerCount("SIGTERM") === 0) {
+          process.kill(process.pid, "SIGTERM");
+        }
       });
     }
     if (this.input.isTTY === true) {

@@ -72,6 +72,29 @@ describe("preview rm", () => {
   });
 });
 
+describe("preview rm asked about a URL with a control character", () => {
+  it("spells the character out in the question it asks a person", async () => {
+    const { cwd } = await aProjectWithPreviewsOnTwoPages();
+
+    const result = await runCliForTest([
+      "preview",
+      "rm",
+      "https://pr-1\u001b[31m.app.acme.com",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { code: string; hint: string };
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
+    expect(envelope.hint).toContain("\\x1b[31m");
+    expect(envelope.hint).not.toContain("\u001b");
+  });
+});
+
 describe("preview rm asked on a terminal", () => {
   const removingOn = async (serverUrl: string) => {
     const { cwd } = await aProjectWithPreviewsOnTwoPages();

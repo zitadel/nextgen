@@ -104,6 +104,10 @@ export default class Stop extends Suggestible(BaseCommand) {
   }
 
   private async stopAllManagedRuntimes(): Promise<JsonEnvelope> {
+    if (this.dryRun) {
+      return this.wouldStopAllManagedRuntimes();
+    }
+
     const sweep = await LocalServer.stopAll(this.localServers());
     if (!sweep.supported) {
       const title = "Managed local runtime process discovery is unavailable";
@@ -141,6 +145,35 @@ export default class Stop extends Suggestible(BaseCommand) {
           count: sweep.results.length,
           results: sweep.results,
         },
+      },
+      summary: {
+        title,
+        sections: [],
+      },
+    });
+  }
+
+  private async wouldStopAllManagedRuntimes(): Promise<JsonEnvelope> {
+    const discovery = await this.localServers().current();
+    const title = "Would stop host-wide managed local runtime processes (dry run)";
+
+    return this.emit({
+      status: "ok",
+      data: {
+        dry_run: true,
+        title,
+        sweep: discovery.supported
+          ? {
+              supported: true,
+              scope: "host",
+              count: discovery.processes.length,
+              processes: discovery.processes,
+            }
+          : {
+              supported: false,
+              error: discovery.error,
+              processes: [],
+            },
       },
       summary: {
         title,

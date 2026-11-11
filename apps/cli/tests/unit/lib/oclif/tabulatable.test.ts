@@ -270,6 +270,13 @@ describe("a list for a script", () => {
     expect(await offTerminal(() => printed({ plain: undefined }, view))).toBe("a");
   });
 
+  it("builds no table for a plain run, which draws none", async () => {
+    await asTerminal(() => draw().drawList({ plain: true }, view));
+    await offTerminal(() => draw().drawList({ plain: false }, view));
+
+    expect(makeTable).not.toHaveBeenCalled();
+  });
+
   it("is a table for a terminal that did not ask for plain", async () => {
     const summary = await asTerminal(() => summarised({ plain: undefined }, view));
 

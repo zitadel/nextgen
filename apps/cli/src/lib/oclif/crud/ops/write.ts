@@ -243,7 +243,7 @@ abstract class WriteOperation<
       // A write that answered no body has no record to print, so it keeps the
       // generic rendering that says the command completed. Printing `{}` would
       // be the record the write did not make.
-      ...(result === undefined ? {} : { pretty: json(result) }),
+      ...(result === undefined || this.isOnScreen ? {} : { pretty: json(result) }),
       summary,
       ...(result && resource.get
         ? {

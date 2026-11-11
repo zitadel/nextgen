@@ -160,6 +160,27 @@ describe("origin rm", () => {
     ]);
   });
 
+  it("spells out a control character in the pattern in the question it asks a person", async () => {
+    const cwd = await anAppDir();
+
+    const result = await runCliForTest([
+      "origin",
+      "rm",
+      "https://app\u001b[31m.acme.com",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { code: string; hint: string };
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
+    expect(envelope.hint).toContain("\\x1b[31m");
+    expect(envelope.hint).not.toContain("\u001b");
+  });
+
   it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {
     const cwd = await anAppDir();
 

@@ -130,6 +130,18 @@ describe("BaseCommand errors", () => {
     expect(cmd.exitCode).toBe(130);
   });
 
+  it("reports the cancellation, not a validation error, when Ctrl-C was followed by another error", async () => {
+    const cmd = new FailingCommand(true);
+    (cmd as unknown as { controller: AbortController }).controller.abort(
+      new ZitadelError("E_CANCELLED", "Cancelled"),
+    );
+
+    await cmd.fail(new Error("socket hang up"));
+
+    expect(cmd.json).toEqual([expect.objectContaining({ code: "E_CANCELLED" })]);
+    expect(cmd.exitCode).toBe(130);
+  });
+
   it("still answers --json with the envelope for Ctrl-C", async () => {
     const cmd = new FailingCommand(true);
 

@@ -402,6 +402,28 @@ describe("doctor command", () => {
     expect(stripAnsi(res.stdout)).not.toContain("Next:");
   });
 
+  it("says a next step that no row shows once, in what a pipe reads", async () => {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+
+    const res = await runCliForTest(
+      ["doctor", "--cwd", cwd, "--port", String(nextPort())],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+      undefined,
+      aMachineRunning({
+        pid: 999_991,
+        ppid: 1,
+        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+      }),
+    );
+
+    const stop = expectedPublicCliCommand("stop --all");
+    expect(stripAnsi(res.stdout).split(stop)).toHaveLength(2);
+  });
+
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
   // warning has to survive it rather than being silently "repaired".
   it("leaves the claim warning (and the secret) alone under --fix", async () => {

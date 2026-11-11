@@ -207,6 +207,24 @@ describe("wrapCommand", () => {
     expect(pasted(wrapCommand(command, 40))).toBe(command);
   });
 
+  it.each([
+    [
+      "npm --prefix '/Users/jane/Bob'\\''s Projects/the app/frontend' install --no-fund",
+      40,
+      ["npm --prefix \\", "'/Users/jane/Bob'\\''s Projects/the app/frontend' install --no-fund"],
+    ],
+    [
+      "cd /Users/me/My\\ Projects/the\\ app && npm run dev",
+      30,
+      ["cd \\", "/Users/me/My\\ Projects/the\\ app && npm run dev"],
+    ],
+  ])("breaks %s only between arguments", (command, width, expected) => {
+    const lines = wrapCommand(command, width);
+
+    expect(lines).toEqual(expected);
+    expect(pasted(lines)).toBe(command);
+  });
+
   // An apostrophe reaches a command on its own: a sentence that names one
   // carries the words after it into it, so `the app's config` is one quote.
   // Read as an opening quote it left everything after it unbreakable.

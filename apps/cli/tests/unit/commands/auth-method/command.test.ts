@@ -15,6 +15,7 @@ import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type clackDouble } from "@tests/helpers/clack";
 import { recordLog } from "@tests/helpers/log";
@@ -165,7 +166,14 @@ function target(
   cwd: string,
   flags: { schema?: string; cwdGiven?: boolean } = {},
 ): Promise<SchemaTarget> {
-  return readSchemaTarget({ cwd, schema: flags.schema, cwdGiven: flags.cwdGiven ?? false });
+  return readSchemaTarget({
+    cwd,
+    schema: flags.schema,
+    cwdGiven: flags.cwdGiven ?? false,
+    suggest: (next) => {
+      return unscopedCommand(next);
+    },
+  });
 }
 
 /**
@@ -878,6 +886,16 @@ describe("readSchemaTarget", () => {
 
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({ code: "E_NOT_FOUND" });
+    });
+
+    it("suggests setting the Project up", async ({ dir }) => {
+      const cwd = await makeProject(dir);
+
+      const error = await rejectionOf(() => {
+        return target(cwd);
+      });
+
+      expect(error).toMatchObject({ nextCommands: [unscopedCommand("setup")] });
     });
   });
 

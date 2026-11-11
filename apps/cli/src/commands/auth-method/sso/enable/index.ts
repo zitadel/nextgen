@@ -54,7 +54,7 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { DEPLOY_ARGS, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { NEXT_LABEL } from "@/lib/ui/summary";
 import { reportWarning } from "@/lib/warnings";
@@ -153,6 +153,7 @@ const NO_ISSUER_REFUSAL: Refusal = {
  * @param cwd - The project root.
  * @param flags - The flags that pick the environment.
  * @param env - The process environment.
+ * @param suggest - Turns the refusal's `next` command into the run's own suggestion.
  * @returns The issuer.
  * @throws {@link ZitadelError} When the Project has none, so it has not been set up.
  */
@@ -160,6 +161,7 @@ export async function developmentIssuer(
   cwd: string,
   flags: EnvironmentFlags,
   env: NodeJS.ProcessEnv = process.env,
+  suggest?: (command: string) => SuggestedCommand,
 ): Promise<string> {
   const environment = await resolveEnvironment({
     cwd,
@@ -170,7 +172,7 @@ export async function developmentIssuer(
   });
   const issuer = environment.values.ZITADEL_ISSUER?.value;
   if (issuer === undefined) {
-    throw refusalError(NO_ISSUER_REFUSAL, {});
+    throw refusalError(NO_ISSUER_REFUSAL, {}, suggest);
   }
   return issuer;
 }
@@ -400,7 +402,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const choice = ProviderChoice.fromFlags(flags, {
       interactive: !this.nonInteractive && !this.dryRun,
     });
-    const issuer = await developmentIssuer(this.cwd, flags, this.env);
+    const issuer = await developmentIssuer(this.cwd, flags, this.env, (next) => {
+      return this.suggest(next);
+    });
     const target = await this.loadSchemaTarget(flags);
     // Refused before anything is asked: a provider no flow offers is no
     // sign-in button however well everything else goes.

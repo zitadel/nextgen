@@ -32,7 +32,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 import { Suggestible } from "@/lib/oclif/suggestible";
 import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
-import { unscopedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
@@ -104,6 +104,7 @@ function resolveTarget(ref: string, method?: string): Target {
 export function readOperation(
   ref: string | undefined,
   method: string | undefined,
+  suggest?: (command: string) => SuggestedCommand,
 ): Target | undefined {
   if (ref === undefined) {
     return undefined;
@@ -111,9 +112,13 @@ export function readOperation(
   const target = resolveTarget(ref, method);
   const reason = target.operation.uncallable;
   if (reason !== undefined) {
-    throw refusalError(UNCALLABLE_REFUSAL, {
-      reason,
-    });
+    throw refusalError(
+      UNCALLABLE_REFUSAL,
+      {
+        reason,
+      },
+      suggest,
+    );
   }
   return target;
 }
@@ -312,7 +317,9 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
   }
 
   protected async execute({ argv, args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
-    const named = readOperation(args.operation, flags.method);
+    const named = readOperation(args.operation, flags.method, (next) => {
+      return this.suggest(next);
+    });
     refuseUnpaged(named, flags.paginate);
     const secret = await readProjectSecret(named, this.cwd);
     this.ui.ranAgainst(secret?.project_id, this.meta.source);
@@ -460,7 +467,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
         sections: [],
         lines: pretty.text.split("\n"),
       },
-      pretty,
+      ...(this.isOnScreen ? {} : { pretty }),
     };
   }
 
