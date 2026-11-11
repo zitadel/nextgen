@@ -498,6 +498,24 @@ describe("Connections.summarize", () => {
     expect(summary.unmapped).toEqual([{ property: "address", required: true }]);
   });
 
+  it("marks a property required when an allOf requires it", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: {
+        email: { type: "string" },
+        companyName: { type: "string" },
+      },
+      allOf: [{ required: ["companyName"] }],
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([{ property: "companyName", required: true }]);
+  });
+
   it("does not mark the identifier a password signs in with as required", () => {
     const body = aUserSchema({
       objectType: "customers",
