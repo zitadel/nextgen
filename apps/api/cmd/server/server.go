@@ -517,7 +517,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		oauthHandlers = oauth.New(oauth.Config{
 			PublicBase:      publicBase,
 			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
-			Admission:       oauth.NewProjectAdmission(projectService, publicBase),
+			Admission:       oauth.NewProjectAdmission(projectService, consoleHosts),
 			Settings:        oauth.NewReleaseSettings(runtimeResolver, oauthSettingsService),
 		})
 	}
