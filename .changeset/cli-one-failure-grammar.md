@@ -1,5 +1,7 @@
 ---
-"@zitadel/cli": patch
+"@zitadel/cli": minor
 ---
 
-Every failure now reads the same way: `Error: <sentence> (E_CODE)`, the sentence said once, the hint under it, and the commands to run next under `Next:`. A long message is no longer swapped for its bare code and then repeated underneath, so `zitadel release list` and `zitadel users list` fail in the same shape however long the server's message is, and a failure is written on one line however long it is, for the terminal to wrap. A refused command line is answered in the CLI's own words rather than oclif's, with that command's help offered under `Next:` instead of "See more help with --help". A message the platform wrote as a lowercase fragment is said as a sentence, while one that opens on a URL, a path or an id is left exactly as it came. A failing command now also says which project and server it failed against, which is what you need when a run went to the wrong one. Cancelling says one thing, `Cancelled`, in a wizard and at a plain prompt alike. `--json` keeps the shape of its envelope and the exit codes, but the `message`, `hint` and `next_commands` of a failure follow the new wording and suggestions wherever a command's were reworded.
+Every failure reads `Error: <sentence> (E_CODE)`, with the hint under it and the commands to run next under `Next:`. A refused command line is answered in the CLI's own words, with its help offered under `Next:`, and cancelling says one word, `Cancelled`, everywhere. A failing command also says which project and server it failed against.
+
+**Breaking:** the code moved from the front of the failure line to the end, so anything that reads stderr for `Error E_…:` must read `Error: … (E_…)`. `--json` and the exit codes keep their shape.
