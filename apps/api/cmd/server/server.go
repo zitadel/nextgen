@@ -385,13 +385,20 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
+	// The sign-up guard asks the project's user.create policy which challenge
+	// to issue; without one, it issues its built-in proof of work.
+	userCreatePolicy, err := service.NewUserCreatePolicy(policyEngine, policyService)
+	if err != nil {
+		return err
+	}
+	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
 		passwordPolicy,
 		userService,
 		schemaStore,
 		serviceDBPool,
-	)
+		signupProtection)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
 		// The raw statements: the state machine only hands this store to the
@@ -409,7 +416,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases, signupProtection)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──

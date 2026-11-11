@@ -23,6 +23,7 @@ import { Flows } from "@/lib/zitadel/resources/flows/collection";
 import { Policies } from "@/lib/zitadel/resources/policies/collection";
 import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
 import type { Policy } from "@/lib/zitadel/resources/policies/policy";
+import { SignupPolicy } from "@/lib/zitadel/resources/policies/signup";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 import { POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies/types";
 import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
@@ -469,7 +470,7 @@ export class ZitadelConfig {
   /**
    * Scaffold a new project's configuration on top of this one: the default
    * user schema and login flow for a preset and use case, a connection for
-   * each chosen provider, and the password policy.
+   * each chosen provider, the password policy and the sign-up policy.
    *
    * @remarks
    * Every file is refused before anything is built, so a conflict is found
@@ -477,10 +478,10 @@ export class ZitadelConfig {
    * refused with or without `force`: the file is the developer's, holding a
    * client id registered with the vendor and a slug other files may name, so
    * it is never replaced. Each connection's claim mapping reads the template's
-   * properties, which enabling a provider does not change. A password policy
-   * kept by `force` is deployed as it is, so it must be a sound password
-   * policy. A broken file at any of these paths stands in the way just as a
-   * document there does.
+   * properties, which enabling a provider does not change. A password or
+   * sign-up policy kept by `force` is deployed as it is, so it must be a sound
+   * policy of its operation. A broken file at any of these paths stands in
+   * the way just as a document there does.
    *
    * @typeParam P - The provider as the caller chose it, handed back with its
    *   connection.
@@ -489,11 +490,11 @@ export class ZitadelConfig {
    * @throws {@link ConnectionExistsError} When a chosen provider already has
    *   a connection.
    * @throws {@link FileExistsError} Without `force`, when the default schema,
-   *   flow or password policy file is already there.
+   *   flow, password policy or sign-up policy file is already there.
    * @throws {@link ConflictError} When a chosen provider's connection would
    *   collide with another connection, by file name, slug or variables.
-   * @throws {@link ConfigError} When `force` keeps a password policy file
-   *   that is not a sound password policy.
+   * @throws {@link ConfigError} When `force` keeps a password or sign-up
+   *   policy file that is not a sound policy of its operation.
    */
   scaffold<P extends ScaffoldedProvider>(options: ScaffoldOptions<P>): Scaffold<P> {
     const variant = { preset: options.preset, useCase: options.useCase };
@@ -520,6 +521,7 @@ export class ZitadelConfig {
       this.schemas.get(DEFAULT_SCHEMA_CONFIG_PATH) ?? this.findBroken(DEFAULT_SCHEMA_CONFIG_PATH),
       this.flows.get(DEFAULT_FLOW_CONFIG_PATH) ?? this.findBroken(DEFAULT_FLOW_CONFIG_PATH),
       this.policies.get(PasswordPolicy.PATH) ?? this.findBroken(PasswordPolicy.PATH),
+      this.policies.get(SignupPolicy.PATH) ?? this.findBroken(SignupPolicy.PATH),
     ];
     for (const taken of defaults) {
       if (!options.force && taken !== undefined) {
@@ -527,6 +529,7 @@ export class ZitadelConfig {
       }
     }
     const policy = this.scaffoldedPasswordPolicy(options);
+    const signupPolicy = this.scaffoldedSignupPolicy(options);
     const slugs = options.sso.map((chosen) => {
       return providerOf(chosen.selection).slug;
     });
@@ -545,7 +548,13 @@ export class ZitadelConfig {
     const written = connections.map((scaffolded) => {
       return scaffolded.connection;
     });
-    const documents: readonly AnyDocument[] = [schema, flow, ...written, policy];
+    const documents: readonly AnyDocument[] = [
+      schema,
+      flow,
+      ...written,
+      policy,
+      ...(signupPolicy === undefined ? [] : [signupPolicy]),
+    ];
     const after = documents.reduce((current: ZitadelConfig, document) => {
       return current.with(document);
     }, this);
@@ -555,6 +564,7 @@ export class ZitadelConfig {
       flow,
       connections,
       policy,
+      signupPolicy,
     };
   }
 
@@ -747,6 +757,34 @@ export class ZitadelConfig {
       });
     }
     return kept.withMinLength(options.passwordMinLength).document;
+  }
+
+  /**
+   * The sign-up policy a scaffold leaves the project with: the one `force`
+   * keeps, as it is, or the default.
+   *
+   * @param options - Whether files may be replaced, and whether a project
+   *   without the policy gets the default.
+   * @returns The policy, or `undefined` when the project has none and gets
+   *   none.
+   * @throws {@link ConfigError} When `force` keeps a sign-up policy file that
+   *   is not a sound sign-up policy.
+   */
+  private scaffoldedSignupPolicy(options: ScaffoldOptions): SignupPolicy | undefined {
+    const taken = options.force
+      ? (this.policies.get(SignupPolicy.PATH) ?? this.findBroken(SignupPolicy.PATH))
+      : undefined;
+    if (taken === undefined) {
+      return options.signupPolicy === false ? undefined : SignupPolicy.initial();
+    }
+    const kept = this.policies.signup;
+    if (kept === undefined) {
+      throw new ConfigError(`${SignupPolicy.PATH} is not a valid sign-up policy`, {
+        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
+        details: { file: SignupPolicy.PATH },
+      });
+    }
+    return kept;
   }
 
   /**
