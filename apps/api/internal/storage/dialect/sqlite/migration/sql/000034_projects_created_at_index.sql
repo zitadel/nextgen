@@ -1,6 +1,6 @@
 -- +goose Up
 -- Projects newest first; see the postgres peer
--- (000046_projects_created_at_index.sql).
+-- (000047_projects_created_at_index.sql).
 
 -- +goose StatementBegin
 CREATE INDEX IF NOT EXISTS idx_projects_created_at

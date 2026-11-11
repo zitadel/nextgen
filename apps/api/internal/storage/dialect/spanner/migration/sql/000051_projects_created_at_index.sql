@@ -1,7 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- Projects newest first; see the postgres peer
--- (000046_projects_created_at_index.sql). Descending keys, because newest
+-- (000047_projects_created_at_index.sql). Descending keys, because newest
 -- first is the order both readers ask for, and Spanner reads an index fastest
 -- in its own order.
 

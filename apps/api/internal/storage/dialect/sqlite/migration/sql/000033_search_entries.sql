@@ -1,6 +1,6 @@
 -- +goose Up
 -- What search finds a team, a user schema, a flow definition and an identity
--- provider connection by. See the postgres peer (000045_search_entries.sql)
+-- provider connection by. See the postgres peer (000046_search_entries.sql)
 -- for the table. SQLite compares TEXT byte by byte, which is the code point
 -- order the search ranges rely on.
 

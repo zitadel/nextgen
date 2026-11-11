@@ -19,7 +19,7 @@ func TestSearchEntriesBackfill(t *testing.T) {
 	require.NoError(t, createSchema(ctx, db, migrationSessionLocker{}))
 	p, err := newProvider(db)
 	require.NoError(t, err)
-	_, err = p.UpTo(ctx, 44)
+	_, err = p.UpTo(ctx, 45)
 	require.NoError(t, err)
 
 	exec := func(query string, args ...any) {
@@ -41,7 +41,7 @@ func TestSearchEntriesBackfill(t *testing.T) {
 		VALUES ('p', 'r1', 'c1', '{"display_name":"Old"}', '2026-01-01'),
 		       ('p', 'r2', 'c1', '{"display_name":"Partner Portal"}', '2026-01-02')`)
 
-	_, err = p.UpTo(ctx, 45)
+	_, err = p.UpTo(ctx, 46)
 	require.NoError(t, err)
 
 	rows, err := db.QueryContext(ctx, `SELECT resource_kind || '|' || resource_id || '|' || search_text || '|' || name_start::text || '|' || title || '|' || subtitle

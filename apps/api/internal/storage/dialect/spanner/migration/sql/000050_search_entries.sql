@@ -1,7 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- What search finds a team, a user schema, a flow definition and an identity
--- provider connection by. See the postgres peer (000045_search_entries.sql)
+-- provider connection by. See the postgres peer (000046_search_entries.sql)
 -- for the table. The search order is the primary key's, so a search reads the
 -- table itself; Spanner orders STRING by code point, which is the order the
 -- search ranges rely on.
