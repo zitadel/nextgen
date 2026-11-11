@@ -489,6 +489,9 @@ type Handler interface {
 	// - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
 	// can be correlated with the eventual authenticated session from the start.
 	// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+	// The session belongs to the project of the project secret. A `project_id` that
+	// names another project answers `403` with `proj.mismatch` and creates nothing:
+	// send the credential's own project.
 	// Creating a session runs on the project credential (`session.write`). The returned
 	// `session_token` is a session credential for the end-user client, not a
 	// management scope. It is delivered as the `__Host-zitadel_session` cookie

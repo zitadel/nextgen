@@ -20604,6 +20604,7 @@ type CreateSessionErrorResponse struct {
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
 	NotImplemented          NotImplemented
+	ProjMismatch            ProjMismatch
 	ReqInvalid              ReqInvalid
 	SessTokenCreationFailed SessTokenCreationFailed
 	EncKeyUnknownAlg        EncKeyUnknownAlg
@@ -20623,6 +20624,7 @@ const (
 	TknInvalidCreateSessionErrorResponse              CreateSessionErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateSessionErrorResponse         CreateSessionErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedCreateSessionErrorResponse          CreateSessionErrorResponseType = "not_implemented"
+	ProjMismatchCreateSessionErrorResponse            CreateSessionErrorResponseType = "proj.mismatch"
 	ReqInvalidCreateSessionErrorResponse              CreateSessionErrorResponseType = "req.invalid"
 	SessTokenCreationFailedCreateSessionErrorResponse CreateSessionErrorResponseType = "sess.token_creation_failed"
 	EncKeyUnknownAlgCreateSessionErrorResponse        CreateSessionErrorResponseType = "enc_key.unknown_alg"
@@ -20667,6 +20669,11 @@ func (s CreateSessionErrorResponse) IsTknInvalidTknid() bool {
 // IsNotImplemented reports whether CreateSessionErrorResponse is NotImplemented.
 func (s CreateSessionErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateSessionErrorResponse
+}
+
+// IsProjMismatch reports whether CreateSessionErrorResponse is ProjMismatch.
+func (s CreateSessionErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchCreateSessionErrorResponse
 }
 
 // IsReqInvalid reports whether CreateSessionErrorResponse is ReqInvalid.
@@ -20854,6 +20861,27 @@ func (s CreateSessionErrorResponse) GetNotImplemented() (v NotImplemented, ok bo
 func NewNotImplementedCreateSessionErrorResponse(v NotImplemented) CreateSessionErrorResponse {
 	var s CreateSessionErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMismatch sets CreateSessionErrorResponse to ProjMismatch.
+func (s *CreateSessionErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchCreateSessionErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if CreateSessionErrorResponse is ProjMismatch.
+func (s CreateSessionErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchCreateSessionErrorResponse returns new CreateSessionErrorResponse from ProjMismatch.
+func NewProjMismatchCreateSessionErrorResponse(v ProjMismatch) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetProjMismatch(v)
 	return s
 }
 
