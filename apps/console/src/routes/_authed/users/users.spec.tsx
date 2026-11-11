@@ -1672,9 +1672,12 @@ describe("users screen", () => {
   it("reads only the rows for a new term, keeping the older revisions filter", async () => {
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    // The load's schema reads are lists. A read of one schema by id comes only
+    // from the columns of rows this test never has: an earlier test's search
+    // still reading, which MSW reports to every listener.
     let schemaReads = 0;
     const countSchemaReads = ({ request }: { request: Request }) => {
-      if (new URL(request.url).pathname.startsWith("/api/v1/schemas")) schemaReads += 1;
+      if (new URL(request.url).pathname === "/api/v1/schemas") schemaReads += 1;
     };
     await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
     await screen.findByText("No users match this filter.");
