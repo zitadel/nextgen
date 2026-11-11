@@ -244,4 +244,8 @@ func (s *stubQueryUsersService) SearchUsers(context.Context, service.SearchUsers
 	return nil, errors.New("unexpected SearchUsers")
 }
 
+func (s *stubQueryUsersService) SearchUsersInProjects(context.Context, service.SearchUsersInProjectsInput) (*service.SearchUsersOutput, error) {
+	return nil, errors.New("unexpected SearchUsersInProjects")
+}
+
 var _ service.UserService = (*stubQueryUsersService)(nil)

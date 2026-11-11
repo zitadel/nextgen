@@ -42,7 +42,7 @@ import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "@/nav";
-import { type NavItem, useNavItems } from "./use-nav-items";
+import { type NavItem, PROJECT_SETTINGS_PATH, useNavItems } from "./use-nav-items";
 import { SETTINGS_PATH } from "./user-menu";
 
 /**
@@ -62,12 +62,14 @@ import { SETTINGS_PATH } from "./user-menu";
  * (Projects, then Settings' pages).
  *
  * Once something is typed it is one list, best match first, as Vercel's is
- * (D37): those pages and actions; what `POST /search` finds in the selected
- * project (root ADR 087), which is users, teams and configuration (user
- * schemas, login flows, identity providers), each matched on the server, an
- * id pasted into the field included; projects, matched on the server across
- * every project the person can act on; and the account's pages. They are
- * ranked together (`ranked`), the selected project's first among equally
+ * (D37): those pages and actions; what `POST /search` finds (root ADR 087),
+ * which is users, teams and configuration (user schemas, login flows,
+ * identity providers), each matched on the server, an id pasted into the
+ * field included, in the selected project or, above every project (All
+ * projects, Projects, Settings), in the projects the person can act on
+ * (D39); projects, matched on the server
+ * across every project the person can act on; and the account's pages. They
+ * are ranked together (`ranked`), the selected project's first among equally
  * good matches, and each row says beneath its name where it is, so a page of
  * the project and a project of that name read apart.
  */
@@ -173,11 +175,17 @@ export function SearchDialog({
   open,
   onOpenChange,
   userId,
+  allProjects = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Whose recent projects the palette opens on. */
   userId?: string;
+  /**
+   * The person is above every project (Projects, Settings), so the server
+   * searches all their projects even while one stays selected (D39).
+   */
+  allProjects?: boolean;
 }) {
   // The drawer an action opened. It outlives the palette, which closes first.
   const [adding, setAdding] = useState<"user" | "team" | null>(null);
@@ -208,6 +216,7 @@ export function SearchDialog({
             onOpenChange={onOpenChange}
             onAdd={setAdding}
             userId={userId}
+            allProjects={allProjects}
           />
         </DialogContent>
       </Dialog>
@@ -234,33 +243,58 @@ function SearchPalette({
   onOpenChange,
   onAdd,
   userId,
+  allProjects,
 }: {
   onOpenChange: (open: boolean) => void;
   /** Opens the drawer an action names, which outlives the palette. */
   onAdd: (kind: "user" | "team") => void;
   userId: string | undefined;
+  allProjects: boolean;
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const projectId = useProjectScope();
+  // The project the server searches: the selected one inside a project,
+  // none above every project or with none selected, which searches the
+  // person's projects (D39). The selected one's hits still rank first.
+  const scope = allProjects ? undefined : projectId;
   // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
-  // Users apart from the rest, so the quick types do not wait for them.
-  // A search that is not sent, or fails, answers its text with nothing, so
-  // the palette can tell an answer from one still on its way.
+  // Inside a project, users are asked for apart from the rest, so the quick
+  // types do not wait for them; asking twice there costs one access check.
+  // Across projects one request asks for every type, so the server lists the
+  // person's projects and decides their access once per pause in typing. A
+  // search that is not sent, or fails, answers its text with nothing, so the
+  // palette can tell an answer from one still on its way.
+  const across = scope === undefined;
   const nothing = { ...NO_ANSWER, term: typed };
-  const users = useAsync(
-    typed.length >= USER_SEARCH_MIN_LENGTH && projectId
-      ? () => search(projectId, typed, USER_TYPES, HITS_PER_TYPE)
+  const everything = useAsync(
+    across && typed
+      ? () =>
+          search(
+            undefined,
+            typed,
+            typed.length >= USER_SEARCH_MIN_LENGTH ? [...USER_TYPES, ...OTHER_TYPES] : OTHER_TYPES,
+            HITS_PER_TYPE,
+          )
       : null,
     nothing,
-    [typed, projectId],
+    [typed, across],
   );
-  const others = useAsync(
-    typed && projectId ? () => search(projectId, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
+  const usersApart = useAsync(
+    !across && typed.length >= USER_SEARCH_MIN_LENGTH
+      ? () => search(scope, typed, USER_TYPES, HITS_PER_TYPE)
+      : null,
     nothing,
-    [typed, projectId],
+    [typed, scope],
   );
+  const othersApart = useAsync(
+    !across && typed ? () => search(scope, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
+    nothing,
+    [typed, scope],
+  );
+  const users = across ? everything : usersApart;
+  const others = across ? everything : othersApart;
   // The server's matches once something is typed; each answer stays until the
   // next lands, less what the typing has since ruled out.
   const found = useProjectSearch(query, PROJECT_RESULTS);
@@ -272,6 +306,7 @@ function SearchPalette({
   const pages = useNavItems();
   const account = useNavItems("account");
   const settings = useNavItems("settings");
+  const projectSettings = useNavItems("project-settings");
 
   const selected = useSelectedProject();
   const projectName = selected?.name;
@@ -300,18 +335,27 @@ function SearchPalette({
           id: `page:${item.to}`,
           icon: <item.nav.icon aria-hidden />,
           label: item.nav.label,
-          description: list ?? description,
+          description: [list, description].filter(Boolean).join(" · ") || undefined,
           inProject,
           kind,
           go: close(() => void navigate({ to: item.to })),
         }));
 
     // The project's pages. With none selected, opening one asks for one (D22).
-    const pageResults = navResults(pages, {
+    // Its Settings row is a list (D40): the list's pages stand in for it,
+    // marked Settings as the root Settings' are, then the project.
+    const inProject = {
       description: where(place ?? CHOOSE_A_PROJECT),
       inProject: projectId !== undefined,
       kind: projectId ? KIND.page : KIND.pageOfNoProject,
-    });
+    };
+    const pageResults = [
+      ...navResults(
+        pages.filter((item) => item.to !== PROJECT_SETTINGS_PATH),
+        inProject,
+      ),
+      ...navResults(projectSettings, { ...inProject, list: "Settings" }),
+    ];
 
     // What the palette does in the selected project: what its list screens'
     // own buttons do. The server refuses what the person may not do, as it
@@ -352,38 +396,55 @@ function SearchPalette({
     // A hit wears the glyph of the sidebar page that lists its kind.
     const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
+    // A hit opens in its own project, which opening it selects (`?project=`,
+    // D39).
     const openHit = (hit: SearchHit) => {
+      const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
         case "user":
-          return navigate({ to: "/users/$userId", params: { userId: hit.id } });
+          return navigate({ to: "/users/$userId", params: { userId: hit.id }, search });
         case "team":
-          return navigate({ to: "/teams/$teamId", params: { teamId: hit.id } });
+          return navigate({ to: "/teams/$teamId", params: { teamId: hit.id }, search });
         case "schema":
-          return navigate({ to: "/schemas/$schemaId", params: { schemaId: hit.id } });
+          return navigate({ to: "/schemas/$schemaId", params: { schemaId: hit.id }, search });
         case "flow_definition":
           return navigate({
             to: "/flow-definitions/$definitionId",
             params: { definitionId: hit.id },
+            search,
           });
         case "idp":
-          return navigate({ to: "/authentication/idps/$idpId", params: { idpId: hit.id } });
+          return navigate({
+            to: "/authentication/idps/$idpId",
+            params: { idpId: hit.id },
+            search,
+          });
       }
     };
+    // The project a hit is in, by name: the selected one's, else the person's
+    // projects the palette holds, else its id, which the server answers with.
+    const projectNames = new Map<string, string>();
+    for (const project of [...(mine?.projects ?? []), ...(found?.projects ?? [])]) {
+      projectNames.set(project.id, project.name);
+    }
+    const placeOf = (hitProject: string) =>
+      hitProject === projectId ? place : (projectNames.get(hitProject) ?? hitProject);
     // Beneath a hit: the server's second line (a user's identifier), then the
     // project it is in.
     const hitResult = (hit: SearchHit, group: string): RankedResult => {
       const Icon = iconOf(hit.type);
       return {
-        id: `${group}:${hit.type}:${hit.id}`,
+        id: `${group}:${hit.type}:${hit.projectId}:${hit.id}`,
         icon: <Icon aria-hidden />,
         label: hit.title,
         // The server matches a user on their identifier too, which is this line.
         alias: hit.subtitle,
-        description: [hit.subtitle, place].filter(Boolean).join(" · ") || undefined,
-        inProject: true,
+        description:
+          [hit.subtitle, placeOf(hit.projectId)].filter(Boolean).join(" · ") || undefined,
+        inProject: hit.projectId === projectId,
         kind: HIT_KIND[hit.type],
         go: close(() => {
-          if (projectId) rememberHit(projectId, hit);
+          rememberHit(hit.projectId, hit);
           void openHit(hit);
         }),
       };
@@ -462,10 +523,12 @@ function SearchPalette({
     // The palette shows the best few; the Users list searches the same text
     // across every page, the users the list has no room for among them. Its
     // row takes the list's last place, so the list never grows past the cap.
+    // That list is one project's, so the row needs one selected.
     const shown = all.slice(0, MAX_RESULTS);
     const seeAllUsers =
-      hasMore(users ?? NO_ANSWER, query, "user") ||
-      userResults.some((result) => !shown.includes(result));
+      scope !== undefined &&
+      (hasMore(users ?? NO_ANSWER, query, "user") ||
+        userResults.some((result) => !shown.includes(result)));
     const best = seeAllUsers ? all.slice(0, MAX_RESULTS - 1) : shown;
     if (seeAllUsers) {
       best.push({
@@ -483,6 +546,7 @@ function SearchPalette({
     pages,
     account,
     settings,
+    projectSettings,
     users,
     others,
     found,
@@ -490,6 +554,7 @@ function SearchPalette({
     recentProjects,
     selected,
     projectId,
+    scope,
     projectName,
     place,
     q,
@@ -503,6 +568,21 @@ function SearchPalette({
   // Every search has answered the text in the field: until then an empty
   // list is not "nothing matches".
   const answered = users?.term === text && others?.term === text && (!text || found?.term === text);
+  // Searched across projects, the server read the newest ten of them only.
+  const moreProjects = !scope && (users?.moreProjects || others?.moreProjects);
+  // The server reads a bounded number of rows of each kind, and a grant that
+  // covers part of a project sees only some of those: more of a kind may
+  // match than it found, which Users' own row says for users in a project.
+  const moreMayMatch =
+    Boolean(text) &&
+    answered &&
+    !moreProjects &&
+    (across ? [...USER_TYPES, ...OTHER_TYPES] : OTHER_TYPES).some((type) =>
+      hasMore((type === "user" ? users : others) ?? NO_ANSWER, query, type),
+    );
+  // Users are matched from three characters, so a shorter text did not ask
+  // for them.
+  const usersSearched = text.length >= USER_SEARCH_MIN_LENGTH;
   return (
     // Filtering is ours, not cmdk's: what the server found arrives already
     // matched and ranked, and the pages match as a substring, any case.
@@ -519,17 +599,20 @@ function SearchPalette({
       </div>
       <CommandList className="max-h-[440px] p-1.5">
         {/* Says where it looked: users, teams and configuration are found in
-            the selected project only, and in none without one. */}
+            the project searched, or across the person's projects, the newest
+            ten of them when there are more. */}
         <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
           {answered ? (
             <>
               <p className="tracking-wide uppercase">
-                {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
+                {scope && place
+                  ? `Nothing in ${place} matches “${text}”`
+                  : `Nothing matches “${text}”`}
               </p>
               <p className="mt-1">
-                {place
+                {scope
                   ? "Users, teams and configuration are found in the selected project only."
-                  : "Choose a project to search its users, teams and configuration."}
+                  : searchedAcross(usersSearched, Boolean(moreProjects))}
               </p>
             </>
           ) : (
@@ -552,6 +635,17 @@ function SearchPalette({
           </CommandGroup>
         ))}
       </CommandList>
+      {/* With matches too, the list says it is from some of the projects. */}
+      {text && answered && moreProjects && groups.some((group) => group.results.length > 0) && (
+        <p className="px-3.5 pb-2 text-xs text-muted-foreground">
+          {searchedAcross(usersSearched, true)}
+        </p>
+      )}
+      {moreMayMatch && (
+        <p className="px-3.5 pb-2 text-xs text-muted-foreground">
+          More may match. Type more to narrow it down.
+        </p>
+      )}
       <p className="border-t border-border px-3.5 py-2 text-xs text-muted-foreground">
         ↑↓ to move · Enter to open · Searching inside a list stays in that list’s toolbar
       </p>
@@ -563,7 +657,7 @@ function SearchPalette({
 interface NavPlace {
   /** The list's name, which marks its pages and finds them all. */
   list?: string;
-  /** Beneath a page that has no list's name. */
+  /** Beneath a page, after its list's name when it has one. */
   description?: string;
   inProject: boolean;
   kind: number;
@@ -589,6 +683,22 @@ const LIST_PATH: Record<SearchResultType, string> = {
  * missing clipboard on an insecure origin, says that instead of claiming a
  * copy.
  */
+/**
+ * What a search across the person's projects read: users only from three
+ * characters, and the newest ten projects when there are more.
+ */
+function searchedAcross(usersSearched: boolean, moreProjects: boolean): string {
+  const kinds = usersSearched ? "users, teams and configuration" : "teams and configuration";
+  const where = moreProjects ? "the newest ten of your projects" : "every project you can act on";
+  return [
+    `Searched ${kinds} in ${where}.`,
+    usersSearched ? "" : "Users are found from three characters.",
+    moreProjects ? "Choose a project to search the others." : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 async function copyProjectId(projectId: string) {
   if (await copyText(projectId)) toast.success("Project ID copied");
   else toast.error("Could not copy the project ID");
