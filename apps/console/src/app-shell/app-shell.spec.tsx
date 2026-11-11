@@ -1823,7 +1823,10 @@ describe("search", () => {
 
     // Beneath each: the project it is in.
     await waitFor(() =>
-      expect(rows(dialog.getByRole("listbox"))).toEqual(["Support · Delta", "Support Desk · proj_9"]),
+      expect(rows(dialog.getByRole("listbox"))).toEqual([
+        "Support · Delta",
+        "Support Desk · proj_9",
+      ]),
     );
     await userEvent.click(dialog.getByRole("option", { name: /Delta/ }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_d"));

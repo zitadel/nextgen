@@ -5,7 +5,13 @@ import { type SearchAnswer, closeness, hasMore, hitsFor, ranked } from "./model"
 const answer: SearchAnswer = {
   term: "ann",
   hits: [
-    { type: "user", id: "user_1", projectId: "proj_1", title: "Ann Lee", subtitle: "ann@example.com" },
+    {
+      type: "user",
+      id: "user_1",
+      projectId: "proj_1",
+      title: "Ann Lee",
+      subtitle: "ann@example.com",
+    },
     {
       type: "user",
       id: "user_2",

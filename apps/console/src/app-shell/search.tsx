@@ -374,7 +374,8 @@ function SearchPalette({
         id: `${group}:${hit.type}:${hit.projectId}:${hit.id}`,
         icon: <Icon aria-hidden />,
         label: hit.title,
-        description: [hit.subtitle, placeOf(hit.projectId)].filter(Boolean).join(" · ") || undefined,
+        description:
+          [hit.subtitle, placeOf(hit.projectId)].filter(Boolean).join(" · ") || undefined,
         inProject: hit.projectId === projectId,
         kind: HIT_KIND[hit.type],
         go: close(() => {
