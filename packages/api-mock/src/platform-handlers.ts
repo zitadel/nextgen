@@ -46,11 +46,11 @@ import {
   AddOriginParams,
   AddOriginResponse,
   CompleteClaimResponse,
-  CreateFlowDefinitionBody,
   CreateIdpBody,
   CreateIdpQueryParams,
   CreateIdpResponse,
   BuildReleaseBody,
+  buildReleaseBodyBundleFlowDefinitionsMax,
   BuildReleaseQueryParams,
   CreateDeploymentBody,
   CreateDeploymentQueryParams,
@@ -132,9 +132,23 @@ import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
 import { schemaFileIssues } from "@zitadel/config/meta-schemas";
-import { policyConfigSchema } from "@zitadel/config/schemas";
+import {
+  createFlowDefinitionRequestSchema,
+  flowConfigSchema,
+  policyConfigSchema,
+} from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
+
+/** The build body with each flow definition as strict as the server holds it. */
+const buildReleaseRequestSchema = BuildReleaseBody.extend({
+  bundle: BuildReleaseBody.shape.bundle.extend({
+    flow_definitions: z
+      .array(flowConfigSchema)
+      .max(buildReleaseBodyBundleFlowDefinitionsMax)
+      .optional(),
+  }),
+});
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1802,7 +1816,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(BuildReleaseBody, raw, "invalid_request");
+      const body = parse(buildReleaseRequestSchema, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }
@@ -2813,7 +2827,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateFlowDefinitionBody, raw, "invalid_request");
+      const body = parse(createFlowDefinitionRequestSchema, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
       }

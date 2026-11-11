@@ -907,6 +907,19 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.details).toContain('targets unknown step "missing"');
   });
 
+  test("POST /flow_definitions refuses a key the definition does not have, as the server does", async () => {
+    const res = await fetch(`${API}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "proj_conformance",
+        flow_definition: { ...validFlowDefinitionBody(), status: "active" },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("invalid_request");
+  });
+
   test("POST /flow_definitions with a repeated name publishes a new revision", async () => {
     const publish = async () => {
       const res = await fetch(`${API}/flow_definitions`, {
@@ -2014,6 +2027,19 @@ describe("api-mock releases and deployments", () => {
     );
 
     expect(await res.json()).toEqual({ HOST: "first.acme.com" });
+  });
+
+  test("refuses a bundled flow definition with a key the definition does not have", async () => {
+    const project = await newProject("release-build-flow-key");
+    const res = await fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({
+        bundle: { flow_definitions: [{ ...validFlowDefinitionBody(), status: "active" }] },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("invalid_request");
   });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {

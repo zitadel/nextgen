@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { brandingConfigSchema, policyTestFileSchema, schemaConfigSchema } from "./schemas.js";
+import { getDefaultLoginFlow } from "./defaults.js";
+import {
+  brandingConfigSchema,
+  flowConfigSchema,
+  policyTestFileSchema,
+  schemaConfigSchema,
+} from "./schemas.js";
 
 /**
  * Direct coverage for the branding descriptor gate `zitadel plan`/`apply`
@@ -363,6 +369,17 @@ describe("brandingConfigSchema", () => {
  * The gate `zitadel policies test` runs on a `.zitadel/policies/*.test.json`
  * file before it sends a case: strict like the editor's `policy-test.json`.
  */
+describe("flowConfigSchema", () => {
+  it("refuses a key the definition does not have, as the server does", () => {
+    const flow = getDefaultLoginFlow();
+    expect(flowConfigSchema.safeParse(flow).success).toBe(true);
+    const result = flowConfigSchema.safeParse({ ...flow, status: "active" });
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ code: "unrecognized_keys", keys: ["status"] }),
+    ]);
+  });
+});
+
 describe("policyTestFileSchema", () => {
   const testCase = {
     name: "too short",
