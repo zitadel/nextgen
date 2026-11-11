@@ -105,3 +105,14 @@ describe("ranked", () => {
     expect(ranked("user_", rows).map((r) => r.label)).toEqual(["Zed", "Amy"]);
   });
 });
+
+describe("ranked by an alias", () => {
+  it("ranks a row by its second name when that is the closer match", () => {
+    // Found by the start of the email, which the row shows beneath the name.
+    const rows = [
+      { label: "Blogs", inProject: true, kind: 0 },
+      { label: "L. Smith", alias: "logan.smith@example.com", inProject: true, kind: 2 },
+    ];
+    expect(ranked("log", rows).map((r) => r.label)).toEqual(["L. Smith", "Blogs"]);
+  });
+});

@@ -62,7 +62,7 @@ import { SETTINGS_PATH } from "./user-menu";
  * (Projects, then Settings' pages).
  *
  * Once something is typed it is one list, best match first, as Vercel's is
- * (D36): those pages and actions; what `POST /search` finds in the selected
+ * (D37): those pages and actions; what `POST /search` finds in the selected
  * project (root ADR 087), which is users, teams and configuration (user
  * schemas, login flows, identity providers), each matched on the server, an
  * id pasted into the field included; projects, matched on the server across
@@ -146,7 +146,8 @@ interface ResultGroup {
 /**
  * Kinds in the order a tie between equally good matches of one place falls:
  * what the sidebar lists, what it does, what the project holds, then what is
- * above every project.
+ * above every project: projects first, since a project's page opens only once
+ * one is chosen.
  */
 const KIND = {
   page: 0,
@@ -155,7 +156,9 @@ const KIND = {
   team: 3,
   configuration: 4,
   project: 5,
-  account: 6,
+  // A project's page while no project is selected: opening it asks for one.
+  pageOfNoProject: 6,
+  account: 7,
 } as const;
 
 const HIT_KIND: Record<SearchResultType, number> = {
@@ -180,6 +183,13 @@ export function SearchDialog({
   const [adding, setAdding] = useState<"user" | "team" | null>(null);
   const navigate = useNavigate();
   const projectId = useProjectScope();
+  // Counts the openings, to key the palette by. The dialog keeps its content
+  // mounted while it animates out, so reopening it in that moment would
+  // otherwise bring back the last opening's text.
+  const [opening, setOpening] = useState({ open, count: 0 });
+  if (opening.open !== open) {
+    setOpening({ open, count: open ? opening.count + 1 : opening.count });
+  }
 
   return (
     <>
@@ -189,10 +199,16 @@ export function SearchDialog({
           <DialogDescription className="sr-only">
             Search for a page, an action, a user, a team, configuration or a project.
           </DialogDescription>
-          {/* Mounted only while the palette is open: each opening starts
-              empty, and closing it drops its pending searches and timers
-              instead of letting them land on a closed palette. */}
-          <SearchPalette onOpenChange={onOpenChange} onAdd={setAdding} userId={userId} />
+          {/* Mounted only while the palette is open, and anew for each
+              opening: it starts empty, and closing it drops its pending
+              searches and timers instead of letting them land on a closed
+              palette. */}
+          <SearchPalette
+            key={opening.count}
+            onOpenChange={onOpenChange}
+            onAdd={setAdding}
+            userId={userId}
+          />
         </DialogContent>
       </Dialog>
       {projectId && (
@@ -230,16 +246,19 @@ function SearchPalette({
   // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
   // Users apart from the rest, so the quick types do not wait for them.
+  // A search that is not sent, or fails, answers its text with nothing, so
+  // the palette can tell an answer from one still on its way.
+  const nothing = { ...NO_ANSWER, term: typed };
   const users = useAsync(
     typed.length >= USER_SEARCH_MIN_LENGTH && projectId
       ? () => search(projectId, typed, USER_TYPES, HITS_PER_TYPE)
       : null,
-    NO_ANSWER,
+    nothing,
     [typed, projectId],
   );
   const others = useAsync(
     typed && projectId ? () => search(projectId, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
-    NO_ANSWER,
+    nothing,
     [typed, projectId],
   );
   // The server's matches once something is typed; each answer stays until the
@@ -290,8 +309,8 @@ function SearchPalette({
     // The project's pages. With none selected, opening one asks for one (D22).
     const pageResults = navResults(pages, {
       description: where(place ?? CHOOSE_A_PROJECT),
-      inProject: true,
-      kind: KIND.page,
+      inProject: projectId !== undefined,
+      kind: projectId ? KIND.page : KIND.pageOfNoProject,
     });
 
     // What the palette does in the selected project: what its list screens'
@@ -358,6 +377,8 @@ function SearchPalette({
         id: `${group}:${hit.type}:${hit.id}`,
         icon: <Icon aria-hidden />,
         label: hit.title,
+        // The server matches a user on their identifier too, which is this line.
+        alias: hit.subtitle,
         description: [hit.subtitle, place].filter(Boolean).join(" · ") || undefined,
         inProject: true,
         kind: HIT_KIND[hit.type],
@@ -389,7 +410,7 @@ function SearchPalette({
     const accountResults = [
       ...navResults(
         account.filter((item) => item.to !== SETTINGS_PATH),
-        { inProject: false, kind: KIND.account },
+        { description: where(ACCOUNT), inProject: false, kind: KIND.account },
       ),
       ...navResults(settings, { list: "Settings", inProject: false, kind: KIND.account }),
     ];
@@ -398,6 +419,12 @@ function SearchPalette({
       const current =
         selected?.name === undefined ? undefined : { ...selected, name: selected.name };
       const opening = mine ? openingList(mine, current, recentProjects) : { recent: [], rest: [] };
+      // Past one page the list opens on the recent ones alone, since that
+      // page is only the first of them. The palette still fills its group
+      // from it, so it never opens on no project while there are some.
+      const firstPage = (mine?.more ? mine.projects : []).filter(
+        (project) => !opening.recent.some((recent) => recent.id === project.id),
+      );
       return [
         {
           heading: "Recent",
@@ -407,11 +434,11 @@ function SearchPalette({
         { heading: "Actions", results: actions },
         {
           heading: "Projects",
-          results: [...opening.recent, ...opening.rest]
+          results: [...opening.recent, ...opening.rest, ...firstPage]
             .slice(0, PROJECT_RESULTS)
             .map(projectResult),
         },
-        { heading: "Account", results: accountResults },
+        { heading: ACCOUNT, results: accountResults },
       ].filter((group) => group.results.length > 0);
     }
 
@@ -473,6 +500,9 @@ function SearchPalette({
   ]);
 
   const text = query.trim();
+  // Every search has answered the text in the field: until then an empty
+  // list is not "nothing matches".
+  const answered = users?.term === text && others?.term === text && (!text || found?.term === text);
   return (
     // Filtering is ours, not cmdk's: what the server found arrives already
     // matched and ranked, and the pages match as a substring, any case.
@@ -491,14 +521,20 @@ function SearchPalette({
         {/* Says where it looked: users, teams and configuration are found in
             the selected project only, and in none without one. */}
         <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
-          <p className="tracking-wide uppercase">
-            {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
-          </p>
-          <p className="mt-1">
-            {place
-              ? "Users, teams and configuration are found in the selected project only."
-              : "Choose a project to search its users, teams and configuration."}
-          </p>
+          {answered ? (
+            <>
+              <p className="tracking-wide uppercase">
+                {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
+              </p>
+              <p className="mt-1">
+                {place
+                  ? "Users, teams and configuration are found in the selected project only."
+                  : "Choose a project to search its users, teams and configuration."}
+              </p>
+            </>
+          ) : (
+            <p className="tracking-wide uppercase">Searching…</p>
+          )}
         </CommandEmpty>
         {groups.map((group) => (
           <CommandGroup key={group.heading ?? "ranked"} heading={group.heading} className={GROUP}>
@@ -535,6 +571,9 @@ interface NavPlace {
 
 /** Beneath a project's page while no project is selected: opening it asks for one. */
 const CHOOSE_A_PROJECT = "Choose a project";
+
+/** What is above every project: the menu's heading, and beneath its rows once typed. */
+const ACCOUNT = "Account";
 
 /** The list screen of each kind of hit: where its glyph comes from. */
 const LIST_PATH: Record<SearchResultType, string> = {

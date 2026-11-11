@@ -1103,7 +1103,7 @@ describe("project pill", () => {
  * Search moves you somewhere: the sidebar's field (or ⌘K / Ctrl K) opens a "Go to"
  * palette. Before anything is typed it is a menu in groups; once something is,
  * one list, best match first, each row saying beneath its name where it is
- * (D36).
+ * (D37).
  */
 describe("search", () => {
   it("opens from the sidebar and goes to a page", async () => {
@@ -1699,9 +1699,103 @@ describe("search", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
 
-    // The first page is the oldest projects, not the ones in use.
+    // The first page is not the projects in use: those come first, then it.
     const projects = await dialog.findByRole("group", { name: "Projects" });
-    expect(rows(projects)).toEqual(["console-dev · proj_1", "Delta · proj_3"]);
+    expect(rows(projects)).toEqual(["console-dev · proj_1", "Delta · proj_3", "Alpha · proj_2"]);
+  });
+
+  it("opens on the first projects when none is selected or recent", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+          next_page_token: "page-2",
+        }),
+      ),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+
+    // More projects than one page, nothing to put first: still not none.
+    const projects = await dialog.findByRole("group", { name: "Projects" });
+    expect(rows(projects)).toEqual(["River · proj_1", "Delta · proj_2"]);
+  });
+
+  it("says it is searching until the server has answered", async () => {
+    // Users and the other types are asked for apart: two requests to hold.
+    const answers: (() => void)[] = [];
+    server.use(
+      http.post(SEARCH, async () => {
+        await new Promise<void>((resolve) => {
+          answers.push(resolve);
+        });
+        return HttpResponse.json({ results: [], incomplete_types: [] });
+      }),
+      http.get(MY_PROJECTS, ({ request }) =>
+        HttpResponse.json({
+          projects: new URL(request.url).searchParams.has("name_contains")
+            ? []
+            : [{ id: "proj_1", name: "console-dev" }],
+        }),
+      ),
+    );
+    renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "zzzz",
+    );
+
+    // An empty list is not "nothing matches" while a search is on its way.
+    await waitFor(() => expect(answers).toHaveLength(2));
+    expect(dialog.getByText("Searching…")).toBeInTheDocument();
+    expect(dialog.queryByText(/^Nothing in/)).not.toBeInTheDocument();
+
+    for (const answer of answers) answer();
+    expect(await dialog.findByText("Nothing in console-dev matches “zzzz”")).toBeInTheDocument();
+  });
+
+  it("puts projects before a project's pages while none is selected, and names the account", async () => {
+    server.use(
+      http.get(MY_PROJECTS, ({ request }) =>
+        HttpResponse.json({
+          projects: new URL(request.url).searchParams.has("name_contains")
+            ? [{ id: "proj_7", name: "Logbook" }]
+            : [
+                { id: "proj_1", name: "River" },
+                { id: "proj_2", name: "Delta" },
+              ],
+        }),
+      ),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const field = dialog.getByPlaceholderText(
+      "Go to a page, user, team or project, or run an action",
+    );
+
+    // A project opens at once; its pages ask for one first.
+    await userEvent.type(field, "log");
+    await waitFor(() =>
+      expect(rows(dialog.getByRole("listbox"))).toEqual([
+        "Logbook · proj_7",
+        "Login flows · Choose a project",
+        "Logs · Choose a project",
+      ]),
+    );
+
+    // The account's own row says where it is, as every typed row does.
+    await userEvent.clear(field);
+    await userEvent.type(field, "projects");
+    await waitFor(() => expect(rows(dialog.getByRole("listbox"))).toContain("Projects · Account"));
   });
 
   it("says where it looked when nothing matches", async () => {
