@@ -39,8 +39,9 @@ export default class SkillsAdd extends BaseCommand {
 
     // The sentence that introduces the paths comes first, so it is the body's
     // first line: a headline closes the output, and would put it under them.
+    const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}`;
     const said = [
-      `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion} to:`,
+      `${title} to:`,
       ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
       "Run this again after updating the CLI to keep them in step with it.",
     ];
@@ -48,7 +49,7 @@ export default class SkillsAdd extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: this.dryRun ? "Zitadel agent skills to add." : "Zitadel agent skills added.",
+        title,
         skills,
         directories: dirs,
         ...(this.dryRun ? { dry_run: true } : {}),

@@ -1269,7 +1269,11 @@ export class ScaffoldedApp {
       return;
     }
     const said = parsed.data.status === "error" ? parsed.data.message : parsed.data.data?.title;
-    if (said === undefined || /[\u0000-\u001f\u007f-\u009f]/.test(said)) {
+    const hasControl = [...(said ?? "")].some((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      return code < 0x20 || (code >= 0x7f && code <= 0x9f);
+    });
+    if (said === undefined || hasControl) {
       return;
     }
     expect(
