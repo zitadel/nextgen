@@ -1,0 +1,5 @@
+---
+"@zitadel/server": minor
+---
+
+The console's Logs opens an event in a drawer over the list instead of a page of its own, so the list keeps its rows, scroll and loaded pages: the arrows in the drawer, or ↑ and ↓ (k and j), step through the rows, and an API request lists the events it caused in the order they happened. **Live** adds events recorded after the list loaded every few seconds, and **My activity** narrows the list to what the signed-in person did. The time range offers 30 minutes to 14 days and a custom range with fixed ends, and a row's menu reads the minutes around it. The type is chosen from the event types, several at once, with **Only failures** for the failure types; Application, Device and Resource type join the filters. Failed events are tinted, times show milliseconds where the server records them, and **Export** copies the loaded events or downloads them as JSON or CSV.

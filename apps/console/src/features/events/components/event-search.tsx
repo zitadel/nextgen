@@ -35,7 +35,7 @@ export function EventSearch({ current }: { current: LogsSearch }) {
     setTerm("");
     setOpen(false);
     if (meaning.kind === "event") {
-      void navigate({ to: "/events/$eventId", params: { eventId: meaning.id } });
+      void navigate({ to: "/events/$eventId", params: { eventId: meaning.id }, search: current });
     } else {
       void navigate({
         to: "/events",
