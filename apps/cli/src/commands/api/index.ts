@@ -10,8 +10,10 @@ import {
   Operation,
   OperationService,
   type Target,
+  type ZitadelClient,
 } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
+import { DEFAULT_SERVER } from "@/lib/server";
 import { unscopedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 import {
@@ -21,11 +23,11 @@ import {
   readInput,
   withPathValues,
 } from "@/lib/api-request";
-import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
 import {
   type Admitted,
-  BaseCommand,
   CommandGroups,
+  CREDENTIALS,
+  EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
@@ -127,23 +129,14 @@ export function refuseUnpaged(target: Target | undefined, paginate: boolean): vo
 }
 
 /**
- * The project the operation is called on behalf of, when there is one. An
- * operation that needs no credential runs anywhere; one that does needs the
- * project `zitadel setup` wrote, and is refused without it. Either way a
- * project at hand fills a `project_id` left out, and with the operation still
- * to be chosen a missing project only narrows what can be chosen.
+ * Where a call goes, the project a `project_id` left out is filled from, and
+ * the client that sends it.
  */
-export async function readProjectSecret(
-  target: Target | undefined,
-  cwd: string,
-): Promise<ZitadelSecret | undefined> {
-  if (target?.operation.auth === "secret") {
-    return readZitadelSecret(cwd);
-  }
-  return readZitadelSecret(cwd).catch(() => {
-    return undefined;
-  });
-}
+type Reach = Readonly<{
+  server: string;
+  projectId: string | undefined;
+  client: ZitadelClient;
+}>;
 
 /**
  * Every path parameter's value the command line gives: from the path itself
@@ -216,6 +209,8 @@ function quote(value: string): string {
  * `zitadel api` — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
  * resource command covers yet, as `gh api` and `vercel api` are for theirs.
+ * Both come from the same environment, so the secret only ever goes to the
+ * server its project belongs to.
  *
  * The operations are the spec's (`@zitadel/api/generated/operations`), so an
  * operation is named by its `operationId` or found by its path, a field is
@@ -224,7 +219,7 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Destructive(BaseCommand) {
+export default class Api extends Destructive(EnvironmentCommand) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.diagnostics;
@@ -305,23 +300,23 @@ export default class Api extends Destructive(BaseCommand) {
   protected async execute({ argv, args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
-    const secret = await readProjectSecret(named, this.cwd);
 
-    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
+    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate));
     const { operation } = target;
     this.recordTelemetry({ operation: operation.id, is_paginated: flags.paginate });
+    const { server, projectId, client } = await this.reach(operation);
 
-    const built = await requestOf(target, flags, secret?.project_id);
+    const built = await requestOf(target, flags, projectId);
     refuseUnforced(built, this.meta);
     const request = withPathValues(
       built,
       await this.pathValues(
         target,
-        pathValuesFromWords(target, argv, args.operation !== undefined, secret?.project_id),
+        pathValuesFromWords(target, argv, args.operation !== undefined, projectId),
       ),
     );
 
-    const url = operation.urlOn(this.meta.source, request);
+    const url = operation.urlOn(server, request);
     if (this.dryRun) {
       return this.emit({
         status: "ok",
@@ -335,7 +330,7 @@ export default class Api extends Destructive(BaseCommand) {
                 body: request.body,
               }),
         },
-        pretty: prose(this.curlFor(request)),
+        pretty: prose(this.curlFor(request, server)),
       });
     }
 
@@ -368,13 +363,6 @@ export default class Api extends Destructive(BaseCommand) {
         reason: "call-cancelled",
       });
     }
-    const token = operation.auth === "secret" ? secret?.project_secret : undefined;
-    const client = createZitadelClient({
-      userAgent: userAgent(),
-      baseUrl: this.meta.source,
-      token,
-      signal: this.signal,
-    });
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
@@ -411,16 +399,45 @@ export default class Api extends Destructive(BaseCommand) {
     return json(response.body);
   }
 
-  /** Choose an operation the CLI can call: its part of the API, then the operation. */
-  private async chooseOperation(
-    paginate: boolean,
-    secret: ZitadelSecret | undefined,
-  ): Promise<string> {
+  /**
+   * The server, project and client a call to `operation` uses. One that needs
+   * the project secret takes all three from the environment, as every other
+   * command does, and is refused, naming the variable, when one is missing:
+   * the secret is never sent to a server its project did not name. One that
+   * needs no credential runs anywhere: against the project's server when the
+   * environment names one, else against the cloud, with no project to fill in.
+   */
+  private async reach(operation: Operation): Promise<Reach> {
+    if (operation.auth === "secret") {
+      return this.connect({ quiet: true });
+    }
+    const { values } = this.environment;
+    const named = values.ZITADEL_URL?.value;
+    const server = named ?? DEFAULT_SERVER;
+    return {
+      server,
+      projectId: named === undefined ? undefined : values.ZITADEL_PROJECT_ID?.value,
+      client: createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token: undefined,
+        signal: this.signal,
+      }),
+    };
+  }
+
+  /**
+   * Choose an operation the CLI can call: its part of the API, then the
+   * operation. One that needs the project secret is offered only where the
+   * environment has one.
+   */
+  private async chooseOperation(paginate: boolean): Promise<string> {
+    const hasSecret = this.environment.values[CREDENTIALS.project] !== undefined;
     const callable = Operation.all().filter((operation) => {
       return (
         operation.uncallable === undefined &&
         (!paginate || operation.paging !== null) &&
-        (operation.auth !== "secret" || secret !== undefined)
+        (operation.auth !== "secret" || hasSecret)
       );
     });
     const retry = this.suggestUnscoped("api ls --json");
@@ -478,7 +495,7 @@ export default class Api extends Destructive(BaseCommand) {
         kind: "text",
         name,
         message: `What is the value of ${name}?`,
-        retry: this.suggestUnscoped(`api ${target.operation.id} ${spelled}`),
+        retry: this.suggest(`api ${target.operation.id} ${spelled}`),
         parse: (value: string) => {
           const typed = value.trim();
           if (typed === "") {
@@ -504,11 +521,12 @@ export default class Api extends Destructive(BaseCommand) {
    * double quotes so the shell expands it.
    *
    * @param request - The request.
+   * @param server - The server it is sent to.
    * @returns The command.
    */
-  private curlFor(request: ApiRequest): string {
+  private curlFor(request: ApiRequest, server: string): string {
     return [
-      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(this.meta.source, request))}`,
+      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(server, request))}`,
       ...(request.operation.auth === "secret"
         ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
         : []),
