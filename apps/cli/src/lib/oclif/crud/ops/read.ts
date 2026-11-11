@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
 import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
-import { article, idArg, idName, idValue } from "@/lib/oclif/crud/shared";
+import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
 import type { CommandResult } from "@/lib/oclif/types";
 import { json, painted } from "@/lib/oclif/rendering";
@@ -35,7 +35,6 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
   }: OperationDefinition<Ctx, GetSpec<Ctx>>): OperationStatics {
     return {
       // A resource addressed by more than an id says so, as its argument does.
-      heading: `Reading ${article(resource.singular)} ${resource.singular}`,
       description: `Get one ${resource.singular} by ${resource.idDescription ?? "id"}.`,
       examples: [
         `<%= config.bin %> ${topic} get <${idName(resource)}>`,

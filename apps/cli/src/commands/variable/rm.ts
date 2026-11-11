@@ -18,7 +18,6 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Removing a variable";
   static override examples = [
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID",
     "<%= config.bin %> variable rm API_URL --preview",

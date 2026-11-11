@@ -25,7 +25,6 @@ export default class Console extends BaseCommand {
   static override description =
     "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
 
-  static override heading = "Opening the local console";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 1;
 

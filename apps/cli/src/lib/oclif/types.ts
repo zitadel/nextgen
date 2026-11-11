@@ -150,8 +150,6 @@ export type CommandResult =
        * it the ending is split out of `pretty`.
        */
       readonly summary: Summary;
-      /** Show the ending of the output as a bordered box, for a result with next steps. */
-      readonly boxed?: boolean;
     }
   | {
       readonly status: "skipped";

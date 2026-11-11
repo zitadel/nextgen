@@ -17,19 +17,25 @@ import type { Summary } from "./summary";
  * to remember to print one.
  *
  * ```ts
- * export default class OriginRm extends Promptable(EnvironmentCommand) {
- *   static override heading = "Removing an origin";
- *
+ * export default class OriginSync extends Promptable(EnvironmentCommand) {
  *   override async execute() {
- *     const remove = await this.ask.confirm({
- *       name: "remove the origin",
- *       message: `Remove ${pattern}?`,
+ *     const go = await this.ask.yesNo({
+ *       name: "sync the origins",
+ *       message: "Would you like to sync the origins?",
  *     });
- *     if (!remove) {
- *       return this.emit({ status: "skipped", reason: "remove-cancelled" });
+ *     if (!go) {
+ *       return this.emit({
+ *         status: "skipped",
+ *         reason: "sync-cancelled",
+ *         summary: { title: "Cancelled", sections: [] },
+ *       });
  *     }
- *     await this.ui.task("Removing the origin", () => remove(pattern));
- *     return this.emit({ status: "ok", pretty: `Removed ${pattern}` });
+ *     await this.ui.task("Syncing the origins", () => sync());
+ *     return this.emit({
+ *       status: "ok",
+ *       data: {},
+ *       summary: { title: "Synced the origins", sections: [] },
+ *     });
  *   }
  * }
  * ```

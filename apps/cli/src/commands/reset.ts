@@ -18,7 +18,6 @@ export default class Reset extends Destructive(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
 
-  static override heading = "Resetting the local Zitadel server";
   static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({

@@ -68,7 +68,6 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Listing deployments";
   static override examples = [
     "<%= config.bin %> deployment list",
     "<%= config.bin %> deployment list --all",

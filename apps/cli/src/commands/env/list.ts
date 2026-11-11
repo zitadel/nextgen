@@ -15,7 +15,6 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Listing environments";
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
     plain: plainFlag,

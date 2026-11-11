@@ -120,8 +120,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
 
-  static override heading = "Ejecting the branding template";
-
   static override group = CommandGroups.configuration;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
@@ -218,7 +216,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
 
     return this.emit({
       status: "ok",
-      boxed: true,
       data: {
         title: ejected,
         design,

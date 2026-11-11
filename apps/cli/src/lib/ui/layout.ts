@@ -14,9 +14,6 @@ import type { Section } from "./summary";
 /** The widest anything the CLI draws may be, however wide the terminal is. */
 export const WIDTH = 80;
 
-/** What the chain's own gutter (`│  `) costs a line drawn inside it. */
-export const GUTTER = 3;
-
 /** Anything that can turn itself into the text that is printed. */
 export interface Renderable {
   render(): string;

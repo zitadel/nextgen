@@ -34,7 +34,6 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
   static override description = "Show the variables the live deployment froze for a target.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Resolving the variables";
   static override examples = [
     "<%= config.bin %> variable resolve",
     "<%= config.bin %> variable resolve --origin https://app.acme.com",

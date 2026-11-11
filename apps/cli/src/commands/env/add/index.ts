@@ -139,8 +139,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Adding an environment";
-
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
@@ -391,7 +389,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     return this.emit({
       status: "ok",
-      boxed: true,
       data: {
         title: `Bound ${args.name} to ${projectId}.`,
         environment: args.name,

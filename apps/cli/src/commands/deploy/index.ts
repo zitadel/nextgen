@@ -173,8 +173,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
 
-  static override heading = "Deploying the configuration";
-
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [
@@ -334,7 +332,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         title: deployed(resourceCount),
         sections: [],
         lines: [liveOn(release.content_hash, servedOrigins)],
-        boxed: true,
       },
     });
   }

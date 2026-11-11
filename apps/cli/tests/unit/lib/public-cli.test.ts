@@ -250,13 +250,6 @@ describe("the CLI names itself once in human output", () => {
   const COMMANDS = join(import.meta.dirname, "../../../src/commands");
 
   /**
-   * The commands whose prose still spells a command by hand. Pinned so that
-   * the list only ever shrinks: it is empty, and a command that needs a
-   * command in its prose builds it with `suggest`.
-   */
-  const NOT_YET_CONVERTED: string[] = [];
-
-  /**
    * The source with every comment blanked, keeping each line where it was.
    *
    * String literals are matched first and kept. A slash-star inside a string
@@ -295,9 +288,6 @@ describe("the CLI names itself once in human output", () => {
     const found = await Promise.all(
       files.map(async (file) => {
         const name = asWritten(file);
-        if (NOT_YET_CONVERTED.includes(name)) {
-          return [];
-        }
         const lines = blankComments(await readFile(file, "utf8")).split("\n");
         return lines.flatMap((line, index) => {
           return !HINT.test(line) && offends(line) ? [`${name}:${index + 1}`] : [];

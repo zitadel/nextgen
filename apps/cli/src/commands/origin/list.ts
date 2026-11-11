@@ -16,7 +16,6 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the origin patterns on the project.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Listing origins";
   static override examples = [
     "<%= config.bin %> origin list",
     "<%= config.bin %> origin list --plain",

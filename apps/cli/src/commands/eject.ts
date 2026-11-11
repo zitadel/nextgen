@@ -197,7 +197,6 @@ function cancelledSummary(removeIt: SuggestedCommand): Summary {
     sections: [],
     lines: ["Nothing was removed. Zitadel is still set up in this app."],
     next: [{ text: "Remove it whenever you like:", command: removeIt }],
-    boxed: true,
   };
 }
 
@@ -212,7 +211,6 @@ function nothingToEjectSummary(setItUp: SuggestedCommand): Summary {
     sections: [],
     lines: ["Zitadel is not set up in this app, so nothing was removed."],
     next: [{ text: "Set it up whenever you like:", command: setItUp }],
-    boxed: true,
   };
 }
 
@@ -281,8 +279,6 @@ function ejected(
 export default class Eject extends Destructive(BaseCommand) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
-
-  static override heading = "Ejecting Zitadel from this app";
 
   static override groupOrder = 5;
   static override aliases = ["uninstall"];

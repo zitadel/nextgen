@@ -52,7 +52,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Setting a variable";
   static override examples = [
     "<%= config.bin %> variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com",
     "<%= config.bin %> variable set GOOGLE_CLIENT_SECRET --secret < secret.txt",

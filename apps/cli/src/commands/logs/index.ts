@@ -48,7 +48,6 @@ export default class Logs extends BaseCommand {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
 
-  static override heading = "Reading the local server logs";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 2;
 

@@ -47,7 +47,6 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     "<%= config.bin %> api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'",
   ];
 
-  static override heading = "Listing API operations";
   static override args = {
     filter: Args.string({
       description: "Only operations whose id, path, summary or tag contains this text.",

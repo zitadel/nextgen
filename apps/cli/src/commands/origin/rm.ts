@@ -26,7 +26,6 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Removing an origin";
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",
     "<%= config.bin %> origin rm https://app.acme.com --force",

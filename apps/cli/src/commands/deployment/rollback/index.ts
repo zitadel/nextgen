@@ -83,7 +83,6 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Rolling back a deployment";
   static override examples = [
     "<%= config.bin %> deployment rollback",
     "<%= config.bin %> deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",

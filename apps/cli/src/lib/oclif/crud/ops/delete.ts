@@ -13,13 +13,6 @@ import {
   ResourceCommand,
 } from "./command";
 
-/** The gerund each verb heads its output with. */
-const GERUND: Readonly<Record<string, string>> = {
-  delete: "deleting",
-  revoke: "revoking",
-  deactivate: "deactivating",
-};
-
 /** Past tense reported beside the id, per verb. */
 const PAST: Readonly<Record<string, string>> = {
   delete: "deleted",
@@ -43,7 +36,6 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
   }: OperationDefinition<Ctx, DeleteSpec<Ctx>>): OperationStatics {
     const verb = spec.verb ?? "delete";
     return {
-      heading: `${capitalize(GERUND[verb] ?? `${verb}ing`)} ${article(resource.singular)} ${resource.singular}`,
       description: `${capitalize(verb)} ${article(resource.singular)} ${resource.singular} by id.`,
       examples: [`<%= config.bin %> ${topic} ${verb} <id> --force --json`],
       // `--force` is per command, not global: here it permits a deletion,

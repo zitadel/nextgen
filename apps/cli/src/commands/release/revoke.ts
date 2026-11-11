@@ -36,7 +36,6 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.configuration;
 
-  static override heading = "Revoking a release";
   static override examples = [
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force",
