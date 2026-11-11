@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import type { ProjectRef } from "./model";
+import { byName, type ProjectRef } from "./model";
 import type { SelectedProject } from "./project-scope";
 
 /**
@@ -66,6 +66,34 @@ export function useRememberRecentProject(
       rememberRecentProject(userId, host ? { id, name, host } : { id, name });
     }
   }, [userId, id, name, host, refused]);
+}
+
+/**
+ * What a list of projects opens on before anything is typed (the switcher,
+ * search): the selected project, then the recent ones, then, while the first
+ * page holds all of the person's projects, the rest by name. A recent project that full list lacks is gone,
+ * or no longer theirs; past one page that cannot be told, so recent ones stand
+ * as they were kept.
+ */
+export function openingList(
+  mine: { projects: ProjectRef[]; more: boolean },
+  current: ProjectRef | undefined,
+  recents: ProjectRef[],
+): { recent: ProjectRef[]; rest: ProjectRef[] } {
+  const listed = new Map(mine.projects.map((project) => [project.id, project]));
+  const recent: ProjectRef[] = [];
+  for (const project of current ? [current, ...recents] : recents) {
+    if (recent.length === RECENT_PROJECT_LIMIT) break;
+    if (recent.some((shown) => shown.id === project.id)) continue;
+    // The list's copy carries the name as it is now.
+    const fresh = listed.get(project.id);
+    if (fresh) recent.push(fresh);
+    else if (mine.more || project === current) recent.push(project);
+  }
+  const rest = mine.more
+    ? []
+    : byName(mine.projects.filter((project) => !recent.some((shown) => shown.id === project.id)));
+  return { recent, rest };
 }
 
 function write(userId: string, projects: ProjectRef[]): void {

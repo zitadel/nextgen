@@ -1,32 +1,38 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Boxes, Copy, type LucideIcon, Plus, Search } from "lucide-react";
+import { Copy, type LucideIcon, Plus, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ProjectMark } from "@/components/project-mark";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandItemText,
   CommandList,
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useAsync } from "@/hooks/use-async";
 import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
-import { useProjectSearch } from "@/features/projects/my-projects";
+import type { ProjectRef } from "@/features/projects/model";
+import { useMyProjects, useProjectSearch } from "@/features/projects/my-projects";
 import { useProjectScope, useSelectedProject } from "@/features/projects/project-scope";
+import { openingList, readRecentProjects } from "@/features/projects/recent-projects";
 import { search } from "@/features/search/api";
 import {
   NO_ANSWER,
   OTHER_TYPES,
+  type Rankable,
   type SearchHit,
   type SearchResultType,
   USER_SEARCH_MIN_LENGTH,
   USER_TYPES,
   hasMore,
   hitsFor,
+  ranked,
 } from "@/features/search/model";
 import { recentHits, rememberHit } from "@/features/search/recents";
 import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
@@ -47,14 +53,21 @@ import { SETTINGS_PATH } from "./user-menu";
  * (D27): in the bar it stacked on a list's own search, two fields a row apart.
  * A row of the sidebar's menu: a field at full width, its glyph in the rail.
  *
- * Groups, top to bottom: what was opened from here last, until something is
- * typed; pages in the selected project; actions in it (the drawers its list
- * screens open, and its id to copy); what `POST /search` finds in it (root ADR
- * 087), which is users, teams and configuration (user schemas, login flows,
- * identity providers), each matched and ranked on the server, an id pasted
- * into the field included; projects, matched on the server across every
- * project the person can act on; and the account (Projects, then Settings'
- * pages, which "Settings" finds too).
+ * Before anything is typed the palette is a menu in groups, top to bottom:
+ * what was opened from here last; pages in the selected project; actions in
+ * it (the drawers its list screens open, and its id to copy); projects, the
+ * selected and recent ones first, as the switcher opens; and the account
+ * (Projects, then Settings' pages).
+ *
+ * Once something is typed it is one list, best match first, as Vercel's is
+ * (D36): those pages and actions; what `POST /search` finds in the selected
+ * project (root ADR 087), which is users, teams and configuration (user
+ * schemas, login flows, identity providers), each matched on the server, an
+ * id pasted into the field included; projects, matched on the server across
+ * every project the person can act on; and the account's pages. They are
+ * ranked together (`ranked`), the selected project's first among equally
+ * good matches, and each row says beneath its name where it is, so a page of
+ * the project and a project of that name read apart.
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
@@ -108,22 +121,58 @@ export function useSearchShortcut(): [boolean, (open: boolean) => void] {
   return [open, setOpen];
 }
 
+/** One row of the palette. */
 interface Result {
   id: string;
-  /** A Lucide glyph, or the sidebar's own icon type (which Lucide satisfies). */
-  icon: LucideIcon | NavIcon;
+  /** What heads the row: a glyph, or a project's mark. */
+  icon: ReactNode;
   label: string;
-  /** Muted text on the right: where the result lives. */
-  context?: string;
+  /** Beneath the label: where the result is, or what tells it from another of its name. */
+  description?: string;
   go: () => void;
 }
+
+/** A row of the typed list, which ranks every kind together. */
+interface RankedResult extends Result, Rankable {}
+
+/** A group of rows, headed before anything is typed and not after. */
+interface ResultGroup {
+  heading?: string;
+  results: Result[];
+}
+
+/**
+ * Kinds in the order a tie between equally good matches of one place falls:
+ * what the sidebar lists, what it does, what the project holds, then what is
+ * above every project.
+ */
+const KIND = {
+  page: 0,
+  action: 1,
+  user: 2,
+  team: 3,
+  configuration: 4,
+  project: 5,
+  account: 6,
+} as const;
+
+const HIT_KIND: Record<SearchResultType, number> = {
+  user: KIND.user,
+  team: KIND.team,
+  schema: KIND.configuration,
+  flow_definition: KIND.configuration,
+  idp: KIND.configuration,
+};
 
 export function SearchDialog({
   open,
   onOpenChange,
+  userId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Whose recent projects the palette opens on. */
+  userId?: string;
 }) {
   const [query, setQuery] = useState("");
   // The drawer an action opened. It outlives the palette, which closes first.
@@ -145,9 +194,13 @@ export function SearchDialog({
     NO_ANSWER,
     [typed, projectId],
   );
-  // The first page until something is typed, then the server's matches; each
-  // answer stays until the next lands, so the group never empties mid-typing.
-  const projects = useProjectSearch(open ? query : "", PROJECT_RESULTS);
+  // The server's matches once something is typed; each answer stays until the
+  // next lands, less what the typing has since ruled out.
+  const found = useProjectSearch(open ? query : "", PROJECT_RESULTS);
+  // Before anything is typed: the selected and recent projects, then the rest
+  // while one page holds them all (`openingList`), as the switcher opens.
+  const mine = useMyProjects();
+  const recentProjects = useMemo(() => (open ? readRecentProjects(userId) : []), [open, userId]);
   const pages = useNavItems();
   const account = useNavItems("account");
   const settings = useNavItems("settings");
@@ -157,51 +210,77 @@ export function SearchDialog({
     if (open) setQuery("");
   }, [open]);
 
-  const projectName = useSelectedProject()?.name;
+  const selected = useSelectedProject();
+  const projectName = selected?.name;
+  // Where the selected project's rows are: its name, or its id until that is read.
+  const place = projectId ? (projectName ?? projectId) : undefined;
   const q = query.trim().toLowerCase();
 
-  const groups = useMemo(() => {
+  const groups = useMemo((): ResultGroup[] => {
     const matches = (text: string) => !q || text.toLowerCase().includes(q);
     const close = (go: () => void) => () => {
       onOpenChange(false);
       go();
     };
+    // In the typed list every row says where it is; in the menu its group does.
+    const where = (description: string | undefined) => (q ? description : undefined);
 
     // Every page of a sidebar list, in its order. A list that has a name
     // marks its pages with it, and the name finds them all.
-    const navResults = (items: NavItem[], list?: string): Result[] =>
+    const navResults = (
+      items: NavItem[],
+      { list, description, inProject, kind }: NavPlace,
+    ): RankedResult[] =>
       items
         .filter((item) => matches(item.nav.label) || (!!list && matches(list)))
         .map((item) => ({
           id: `page:${item.to}`,
-          icon: item.nav.icon,
+          icon: <item.nav.icon aria-hidden />,
           label: item.nav.label,
-          context: list,
+          description: list ?? description,
+          inProject,
+          kind,
           go: close(() => void navigate({ to: item.to })),
         }));
+
+    // The project's pages. With none selected, opening one asks for one (D22).
+    const pageResults = navResults(pages, {
+      description: where(place ?? CHOOSE_A_PROJECT),
+      inProject: true,
+      kind: KIND.page,
+    });
 
     // What the palette does in the selected project: what its list screens'
     // own buttons do. The server refuses what the person may not do, as it
     // does there.
-    const actions: Result[] = projectId
+    const actions: RankedResult[] = projectId
       ? [
           {
             id: "action:add-user",
-            icon: Plus,
+            icon: <Plus aria-hidden />,
             label: "Add user",
+            description: where(place),
+            inProject: true,
+            kind: KIND.action,
             go: close(() => setAdding("user")),
           },
           {
             id: "action:add-team",
-            icon: Plus,
+            icon: <Plus aria-hidden />,
             label: "Add team",
+            description: where(place),
+            inProject: true,
+            kind: KIND.action,
             go: close(() => setAdding("team")),
           },
           {
             id: "action:copy-project-id",
-            icon: Copy,
+            icon: <Copy aria-hidden />,
             label: "Copy project ID",
-            context: projectId,
+            // What it copies.
+            description: projectId,
+            inProject: true,
+            kind: KIND.action,
             go: close(() => void copyProjectId(projectId)),
           },
         ].filter((action) => matches(action.label))
@@ -227,86 +306,120 @@ export function SearchDialog({
           return navigate({ to: "/authentication/idps/$idpId", params: { idpId: hit.id } });
       }
     };
-    // A row without a subtitle says which project it is in.
-    const hitResult = (hit: SearchHit, group: string): Result => ({
-      id: `${group}:${hit.type}:${hit.id}`,
-      icon: iconOf(hit.type),
-      label: hit.title,
-      context: hit.subtitle ?? projectName,
-      go: close(() => {
-        if (projectId) rememberHit(projectId, hit);
-        void openHit(hit);
-      }),
-    });
+    // Beneath a hit: the server's second line (a user's identifier), then the
+    // project it is in.
+    const hitResult = (hit: SearchHit, group: string): RankedResult => {
+      const Icon = iconOf(hit.type);
+      return {
+        id: `${group}:${hit.type}:${hit.id}`,
+        icon: <Icon aria-hidden />,
+        label: hit.title,
+        description: [hit.subtitle, place].filter(Boolean).join(" · ") || undefined,
+        inProject: true,
+        kind: HIT_KIND[hit.type],
+        go: close(() => {
+          if (projectId) rememberHit(projectId, hit);
+          void openHit(hit);
+        }),
+      };
+    };
     // What the server found of one type, for the text in the field now
     // (`hitsFor`).
-    const hitResults = (answer: typeof users, type: SearchResultType): Result[] =>
+    const hitResults = (answer: typeof users, type: SearchResultType): RankedResult[] =>
       hitsFor(answer ?? NO_ANSWER, query, type).map((hit) => hitResult(hit, "hit"));
 
+    // Beneath a project, as the switcher draws it (D21): its site's host, or
+    // else its id, which tells two of one name apart.
+    const projectResult = (project: ProjectRef): RankedResult => ({
+      id: `project:${project.id}`,
+      icon: <ProjectMark projectId={project.id} className="size-4" />,
+      label: project.name,
+      description: project.host ?? project.id,
+      inProject: false,
+      kind: KIND.project,
+      // Selecting a project is a navigation: the selection lives in the URL.
+      go: close(() => void navigate({ to: "/", search: { project: project.id } })),
+    });
+
+    // The Settings row is a list, not a page: its pages stand in for it.
+    const accountResults = [
+      ...navResults(
+        account.filter((item) => item.to !== SETTINGS_PATH),
+        { inProject: false, kind: KIND.account },
+      ),
+      ...navResults(settings, { list: "Settings", inProject: false, kind: KIND.account }),
+    ];
+
+    if (!q) {
+      const current =
+        selected?.name === undefined ? undefined : { ...selected, name: selected.name };
+      const opening = mine ? openingList(mine, current, recentProjects) : { recent: [], rest: [] };
+      return [
+        {
+          heading: "Recent",
+          results:
+            open && projectId ? recentHits(projectId).map((hit) => hitResult(hit, "recent")) : [],
+        },
+        { heading: projectName ? `Pages in ${projectName}` : "Pages", results: pageResults },
+        { heading: "Actions", results: actions },
+        {
+          heading: "Projects",
+          results: [...opening.recent, ...opening.rest]
+            .slice(0, PROJECT_RESULTS)
+            .map(projectResult),
+        },
+        { heading: "Account", results: accountResults },
+      ].filter((group) => group.results.length > 0);
+    }
+
     const userResults = hitResults(users, "user");
-    if (hasMore(users ?? NO_ANSWER, query, "user")) {
-      // The palette shows the best few; the Users list searches the same
-      // text across every page.
-      userResults.push({
+    // Re-matched against the field: until the next answer lands, the last one
+    // can name projects the typing has since ruled out.
+    const projectResults = (found?.projects ?? [])
+      .filter((project) => project.name.toLowerCase().includes(q))
+      .map(projectResult);
+    const best = ranked(query, [
+      ...pageResults,
+      ...actions,
+      ...userResults,
+      ...hitResults(others, "team"),
+      ...hitResults(others, "schema"),
+      ...hitResults(others, "flow_definition"),
+      ...hitResults(others, "idp"),
+      ...projectResults,
+      ...accountResults,
+    ]).slice(0, MAX_RESULTS);
+    // The palette shows the best few; the Users list searches the same text
+    // across every page, the users the list had no room for among them.
+    if (
+      hasMore(users ?? NO_ANSWER, query, "user") ||
+      userResults.some((result) => !best.includes(result))
+    ) {
+      best.push({
         id: "users:all",
-        icon: Search,
+        icon: <Search aria-hidden />,
         label: `See all users matching “${query.trim()}”`,
+        description: place,
+        inProject: true,
+        kind: KIND.user,
         go: close(() => void navigate({ to: "/users", search: { q: query.trim() } })),
       });
     }
-
-    const projectResults: Result[] = (projects?.projects ?? []).map((project) => ({
-      id: `project:${project.id}`,
-      icon: Boxes,
-      label: project.name,
-      // Selecting a project is a navigation: the selection lives in the URL.
-      go: close(() => void navigate({ to: "/", search: { project: project.id } })),
-    }));
-
-    return [
-      {
-        heading: "Recent",
-        // Until something is typed: then the server's matches take over.
-        results:
-          !q && open && projectId
-            ? recentHits(projectId).map((hit) => hitResult(hit, "recent"))
-            : [],
-      },
-      {
-        heading: projectName ? `Pages in ${projectName}` : "Pages",
-        results: navResults(pages),
-      },
-      { heading: "Actions", results: actions },
-      { heading: "Users", results: userResults },
-      { heading: "Teams", results: hitResults(others, "team") },
-      {
-        heading: "Configuration",
-        results: [
-          ...hitResults(others, "schema"),
-          ...hitResults(others, "flow_definition"),
-          ...hitResults(others, "idp"),
-        ],
-      },
-      { heading: "Projects", results: projectResults },
-      {
-        heading: "Account",
-        // The Settings row is a list, not a page: its pages stand in for it.
-        results: [
-          ...navResults(account.filter((item) => item.to !== SETTINGS_PATH)),
-          ...navResults(settings, "Settings"),
-        ],
-      },
-    ].filter((group) => group.results.length > 0);
-    // `open` is here for the recent hits, which are read when the palette opens.
+    return [{ results: best }];
+    // `open` is here for the recent hits and projects, read when the palette opens.
   }, [
     pages,
     account,
     settings,
     users,
     others,
-    projects,
+    found,
+    mine,
+    recentProjects,
+    selected,
     projectId,
     projectName,
+    place,
     q,
     query,
     open,
@@ -322,6 +435,7 @@ export function SearchDialog({
         query={query}
         onQueryChange={setQuery}
         groups={groups}
+        place={place}
       />
       {projectId && (
         <>
@@ -340,6 +454,19 @@ export function SearchDialog({
     </>
   );
 }
+
+/** Where a sidebar list's pages are, and how they rank. */
+interface NavPlace {
+  /** The list's name, which marks its pages and finds them all. */
+  list?: string;
+  /** Beneath a page that has no list's name. */
+  description?: string;
+  inProject: boolean;
+  kind: number;
+}
+
+/** Beneath a project's page while no project is selected: opening it asks for one. */
+const CHOOSE_A_PROJECT = "Choose a project";
 
 /** The list screen of each kind of hit: where its glyph comes from. */
 const LIST_PATH: Record<SearchResultType, string> = {
@@ -371,13 +498,17 @@ function SearchPalette({
   query,
   onQueryChange,
   groups,
+  place,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   query: string;
   onQueryChange: (query: string) => void;
-  groups: { heading: string; results: Result[] }[];
+  groups: ResultGroup[];
+  /** The selected project, which bounds what the server is asked: none without one. */
+  place: string | undefined;
 }) {
+  const text = query.trim();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className={PALETTE}>
@@ -399,12 +530,25 @@ function SearchPalette({
             />
             <Kbd className="absolute top-1/2 right-3 -translate-y-1/2">esc</Kbd>
           </div>
-          <CommandList className="max-h-[340px] p-1.5">
-            <CommandEmpty className="px-2 py-2 text-xs tracking-wide text-muted-foreground uppercase">
-              Nothing matches “{query.trim()}”
+          <CommandList className="max-h-[440px] p-1.5">
+            {/* Says where it looked: users, teams and configuration are
+                found in the selected project only, and in none without one. */}
+            <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
+              <p className="tracking-wide uppercase">
+                {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
+              </p>
+              <p className="mt-1">
+                {place
+                  ? "Users, teams and configuration are found in the selected project only."
+                  : "Choose a project to search its users, teams and configuration."}
+              </p>
             </CommandEmpty>
             {groups.map((group) => (
-              <CommandGroup key={group.heading} heading={group.heading} className={GROUP}>
+              <CommandGroup
+                key={group.heading ?? "ranked"}
+                heading={group.heading}
+                className={GROUP}
+              >
                 {group.results.map((result) => (
                   <CommandItem
                     key={result.id}
@@ -412,13 +556,8 @@ function SearchPalette({
                     onSelect={result.go}
                     className="gap-2.5 rounded-md px-2 py-2"
                   >
-                    <result.icon aria-hidden />
-                    <span className="truncate">{result.label}</span>
-                    {result.context && (
-                      <span className="ml-auto truncate text-xs text-muted-foreground">
-                        {result.context}
-                      </span>
-                    )}
+                    {result.icon}
+                    <CommandItemText label={result.label} description={result.description} />
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -436,6 +575,8 @@ function SearchPalette({
 /** How many of each kind the server is asked for: the best few, not a list. */
 const HITS_PER_TYPE = 5;
 const PROJECT_RESULTS = 8;
+/** How many rows the typed list holds, as Vercel's holds a handful. */
+const MAX_RESULTS = 8;
 
 function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
