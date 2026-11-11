@@ -1498,7 +1498,7 @@ describe("user detail", () => {
     await renderDetail();
     await screen.findByRole("heading", { name: "maya@acme.com" });
 
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("Created")).toBeInTheDocument();
     // Derived rather than hardcoded: the screen renders the viewer's locale, so
     // asserting one locale's output would pass only on machines set to it.
@@ -1542,7 +1542,7 @@ describe("user detail", () => {
     await screen.findByRole("heading", { name: "maya@acme.com" });
 
     expect(screen.queryByText("Created")).not.toBeInTheDocument();
-    expect(screen.queryByText("active")).not.toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
   it("does not show a last sign-in — no field carries it", async () => {

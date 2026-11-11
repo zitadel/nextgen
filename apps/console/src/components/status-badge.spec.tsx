@@ -20,9 +20,9 @@ describe("status tones", () => {
     expect(statusTone("constructor")).toBe("neutral");
   });
 
-  it("colours the pill's dot by the tone, and words it as the API does", () => {
+  it("colours the pill's dot by the tone, and words it as the filter does", () => {
     render(<StatusBadge status="pending_purge" />);
-    const pill = screen.getByText("pending purge");
+    const pill = screen.getByText("Pending Purge");
     expect(pill.querySelector("[data-tone]")).toHaveAttribute("data-tone", "critical");
     expect(pill.querySelector("[data-tone]")).toHaveClass("bg-destructive");
   });

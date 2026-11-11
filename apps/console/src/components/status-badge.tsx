@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * The dot's colour is the status's tone (`statusTone`), never a colour chosen
  * per status: see "Status tones" in `docs/styling.md` for what each tone means.
  *
- * The label is the API's own value, title-cased. The Teams mock writes the
+ * The label is the API's own value, title-cased (`statusLabel`). The Teams mock writes the
  * second state as `Inactive`, but the endpoint returns `deactivated` and the
  * team detail reads the same field — showing two words for one state would be
  * the console inventing vocabulary the API does not have.
@@ -77,11 +77,7 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-/**
- * A status in words as the pill draws it, `pending_purge` → `Pending Purge`,
- * for where there is no pill to capitalise it. The pill keeps the API's own
- * value as its text, which the screens' specs read.
- */
+/** A status in words, for the pill and a filter alike: `pending_purge` → `Pending Purge`. */
 function statusLabel(status: string): string {
   return status.replace(/_/g, " ").replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }
@@ -110,9 +106,9 @@ export function StatusBadge({ status }: { status?: string }) {
   if (!status) return <span className="text-muted-foreground">—</span>;
 
   return (
-    <Badge variant="secondary" className="capitalize">
+    <Badge variant="secondary">
       <StatusDot status={status} />
-      {status.replace(/_/g, " ")}
+      {statusLabel(status)}
     </Badge>
   );
 }

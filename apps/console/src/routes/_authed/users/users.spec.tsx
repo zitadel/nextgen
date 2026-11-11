@@ -648,7 +648,7 @@ describe("users screen", () => {
     await longPress(await screen.findByRole("link", { name: "maya@acme.com" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
-    await longPress(screen.getByText("active"));
+    await longPress(screen.getByText("Active"));
     expect(await screen.findByRole("menu")).toBeInTheDocument();
   });
 
@@ -1031,9 +1031,9 @@ describe("users screen", () => {
     await renderUsers();
     const table = within(await screen.findByRole("table"));
 
-    expect(table.getByText("active")).toBeInTheDocument();
+    expect(table.getByText("Active")).toBeInTheDocument();
     // Underscores read as words; the value is not otherwise reinterpreted.
-    expect(table.getByText("pending purge")).toBeInTheDocument();
+    expect(table.getByText("Pending Purge")).toBeInTheDocument();
     expect(table.getAllByText("—").length).toBeGreaterThan(0);
   });
 
