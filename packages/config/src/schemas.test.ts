@@ -365,10 +365,6 @@ describe("brandingConfigSchema", () => {
   });
 });
 
-/**
- * The gate `zitadel policies test` runs on a `.zitadel/policies/*.test.json`
- * file before it sends a case: strict like the editor's `policy-test.json`.
- */
 describe("flowConfigSchema", () => {
   it("refuses a key the definition does not have, as the server does", () => {
     const flow = getDefaultLoginFlow();
@@ -380,6 +376,10 @@ describe("flowConfigSchema", () => {
   });
 });
 
+/**
+ * The gate `zitadel policies test` runs on a `.zitadel/policies/*.test.json`
+ * file before it sends a case: strict like the editor's `policy-test.json`.
+ */
 describe("policyTestFileSchema", () => {
   const testCase = {
     name: "too short",

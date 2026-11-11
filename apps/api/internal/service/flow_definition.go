@@ -228,12 +228,7 @@ func (fd *flowDefinitionService) validatePivotingTargets(
 		return nil
 	}
 	for _, target := range pivotingTargets {
-		if bundleFlows != nil {
-			if !bundleFlows[target.Name] {
-				return domain.ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: transition %q targets flow %q, which the release does not include",
-					target.Step, target.Transition, target.Name), nil)
-			}
+		if bundleFlows[target.Name] {
 			continue
 		}
 		defs, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{

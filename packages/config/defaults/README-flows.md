@@ -34,11 +34,12 @@ The common workflow:
 3. Run `zitadel deploy` to publish it.
 
 Every deploy of an edited flow definition publishes a new immutable
-revision. Earlier revisions stay readable by id, and stay active. A login
-that pins the flow definition's name serves its newest active revision. A
-login without a pin serves the project default: the project's newest
-active unscoped revision for its purpose, whatever its name, so revising
-a flow definition can make it the project default.
+revision, and the deployed release pins it. Earlier revisions stay
+readable by id, but only the pinned one is served. A login that pins the
+flow definition's name serves that revision. A login without a pin serves
+the project default: of the flow definitions the release pins, the newest
+unscoped one for its purpose, whatever its name, so revising a flow
+definition can make it the project default.
 
 ### Collect another field
 
@@ -193,10 +194,10 @@ follows exactly one flow definition. Which one:
   whatever its `audience`; an unknown name or wrong purpose surfaces as
   a startup error in the widget.
 - **By the project default** — without `flowName`, the server serves the
-  project default: the newest active revision that serves the requested
-  purpose and has no `audience`. Older revisions count too, so adding an
-  `audience` to a flow definition you already applied without one doesn't
-  take that earlier revision out of the running.
+  project default: of the flow definitions the deployed release pins, the
+  newest that serves the requested purpose and has no `audience`. Only the
+  pinned revision counts, so adding an `audience` to a flow definition takes
+  it out of the running once you deploy.
 
 `audience.app_ids` / `audience.team_ids` select a flow definition only
 for callers of the flow API that send a matching `hint` (app match beats
