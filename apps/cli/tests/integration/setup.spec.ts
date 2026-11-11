@@ -1041,12 +1041,12 @@ describe("setup", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("heads the connection's box with the provider", async () => {
+      it("names the provider in the connection's box", async () => {
         const app = await anApp();
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("SIGN IN WITH ACME SSO");
+        expect(result).toPrint("When someone signs in with Acme SSO");
       });
 
       it("says which claim fills each attribute", async () => {
@@ -1054,7 +1054,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("- email comes from the email claim.");
+        expect(result).toPrint("- email comes from the provider's email claim,");
       });
 
       it("says which schemas sign in through the connection", async () => {
@@ -1062,7 +1062,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("Users of default-human-user sign in");
+        expect(result).toPrint("This connection is used by default-human-user");
       });
 
       it("says which scopes it asks the provider for", async () => {
@@ -1070,7 +1070,9 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("Scopes requested from your provider: openid, profile, and email.");
+        expect(result).toPrint(
+          "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
+        );
       });
 
       it("says where to change the mapping", async () => {
@@ -1078,7 +1080,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("Edit claim_mapping in .zitadel/idps/acme-sso.json");
+        expect(result).toPrint("To change which claim fills an attribute, edit claim_mapping in");
       });
     });
   });

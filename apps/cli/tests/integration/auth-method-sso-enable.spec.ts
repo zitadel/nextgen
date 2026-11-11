@@ -849,7 +849,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("SIGN IN WITH GOOGLE");
+        expect(result).toPrint("When someone signs in with Google");
       });
 
       it("shows what the connection would map on a dry run", async () => {
@@ -857,7 +857,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoDryRun(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("email comes from the email claim");
+        expect(result).toPrint("email comes from the provider's email claim");
       });
 
       it("shows the mapping a developer edited when enabled again, not a regenerated one", async () => {
@@ -869,7 +869,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("email comes from the mail claim");
+        expect(result).toPrint("email comes from the provider's mail claim");
       });
     });
   });

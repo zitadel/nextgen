@@ -733,13 +733,13 @@ describe("auth-method sso enable", () => {
         "an optional one",
         { nickname: { type: "string" } },
         [],
-        "- nickname (optional) - fine to leave empty.",
+        "- nickname is optional, so it can stay empty.",
       ],
       [
         "a required one",
         { companyName: { type: "string" } },
         ["companyName"],
-        "- companyName (required) - sign-up has to collect it.",
+        "- companyName is required, so sign-up will have to ask for it.",
       ],
       [
         "an object whose members are required",
@@ -751,7 +751,7 @@ describe("auth-method sso enable", () => {
           },
         },
         ["address"],
-        "- address (required) - sign-up has to collect it.",
+        "- address is required, so sign-up will have to ask for it.",
       ],
     ] as const)("lists %s", async ([, properties, required, line], { dir }) => {
       const cwd = await setUpProject(dir, {
@@ -783,7 +783,9 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("- companyName (required) - not filled by this connection.");
+      expect(result.stdout).toContain(
+        "- companyName is required, but this connection does not create users.",
+      );
     });
   });
 
@@ -799,7 +801,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("It is always trusted.");
+      expect(result.stdout).toContain("and always counts as");
     });
 
     it("says a mapped attribute nothing verifies is not verified", async ({ dir }) => {
@@ -813,7 +815,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("It is not verified.");
+      expect(result.stdout).toContain("and is not treated as");
     });
 
     it("draws no mapping lines for a connection that maps nothing", async ({ dir }) => {
@@ -828,7 +830,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).not.toContain("These user attributes are filled");
+      expect(result.stdout).not.toContain("Zitadel fills in their user like this");
     });
 
     it("prints a claim name holding a newline on one line", async ({ dir }) => {
@@ -856,7 +858,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("- nick\\x1b[2Jname (optional)");
+      expect(result.stdout).toContain("- nick\\x1b[2Jname is optional");
     });
 
     it("prints a display name as text in the title", async ({ dir }) => {
@@ -879,7 +881,7 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout).toContain("SIGN IN WITH EVIL\\x1b[2J SSO");
+      expect(result.stdout).toContain("signs in with Evil\\x1b[2J SSO");
     });
   });
 
@@ -929,13 +931,14 @@ describe("auth-method sso enable", () => {
 
   describe("with --provider custom in a script", () => {
     it.for([
-      "SIGN IN WITH ACME SSO",
-      "These user attributes are filled from a claim your provider returns:",
-      "- email comes from the email claim.",
-      "It is verified when email_verified is true.",
-      "Scopes requested from your provider: openid, profile, and email.",
-      "Users of default-human-user sign in",
-      "Edit claim_mapping in .zitadel/idps/acme-sso.json",
+      "When someone signs in with Acme SSO, Zitadel fills in their user like",
+      "- email comes from the provider's email claim,",
+      "and counts as verified",
+      "email_verified is true.",
+      "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
+      "This connection is used by default-human-user",
+      "To change which claim fills an attribute, edit claim_mapping in",
+      ".zitadel/idps/acme-sso.json and run deploy.",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);
 
@@ -979,7 +982,7 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout.indexOf("SIGN IN WITH ACME SSO")).toBeGreaterThan(
+      expect(result.stdout.indexOf("When someone signs in with Acme SSO")).toBeGreaterThan(
         result.stdout.indexOf(`Wrote ${ACME.file}`),
       );
     });

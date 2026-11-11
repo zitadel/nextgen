@@ -160,7 +160,7 @@ import {
   type Section,
 } from "./summary";
 import { Cmd } from "@/lib/cmd";
-import { dim, id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
+import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import { showSkillsHint } from "@/lib/skills-hint";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -1834,49 +1834,49 @@ export default class Setup extends Destructive(BaseCommand) {
                 mappings.length === 0
                   ? []
                   : [
-                      "These user attributes are filled from a claim your provider returns:",
-                      ...mappings.flatMap(({ property, claim }) => {
+                      `When someone signs in with ${text(connection.displayName)}, Zitadel fills in their user like this:`,
+                      ...mappings.map(({ property, claim }) => {
                         const how = verifiedBy.get(property);
-                        return [
-                          `- ${text(property)} comes from the ${text(claim)} claim.`,
+                        const verified =
                           how === true
-                            ? "  It is always trusted."
+                            ? "and always counts as verified"
                             : typeof how === "string"
-                              ? `  It is verified when ${text(how)} is true.`
-                              : "  It is not verified.",
-                        ];
+                              ? `and counts as verified when ${text(how)} is true`
+                              : "and is not treated as verified";
+                        return `- ${text(property)} comes from the provider's ${text(claim)} claim, ${verified}.`;
                       }),
                     ],
                 scopes.length === 0
                   ? []
-                  : [`Scopes requested from your provider: ${LIST.format(scopes.map(text))}.`],
+                  : [
+                      `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+                    ],
                 unmapped.length === 0
                   ? []
                   : [
-                      "Some attributes have no claim yet:",
+                      "These attributes have no claim yet:",
                       ...unmapped.map(({ property, required }) => {
                         if (!required) {
-                          return `- ${text(property)} (optional) - fine to leave empty.`;
+                          return `- ${text(property)} is optional, so it can stay empty.`;
                         }
                         return createsUsers
-                          ? `- ${text(property)} (required) - sign-up has to collect it.`
-                          : `- ${text(property)} (required) - not filled by this connection.`;
+                          ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                          : `- ${text(property)} is required, but this connection does not create users.`;
                       }),
                     ],
                 usedBy.length === 0
                   ? []
                   : [
-                      `Users of ${LIST.format(usedBy.map(text))} sign in through this connection, so changes here affect them.`,
+                      `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
                     ],
                 [
-                  `Edit claim_mapping in ${text(connection.path)} if your provider returns other claims, then deploy.`,
+                  `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
                 ],
               ].filter((section) => {
                 return section.length > 0;
               });
               return [
                 "",
-                dim(`SIGN IN WITH ${text(connection.displayName.toUpperCase())}`),
                 ...sections.flatMap((section, at) => {
                   return at === 0 ? section : ["", ...section];
                 }),
