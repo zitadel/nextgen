@@ -63,7 +63,9 @@ export function deployed(resources: number): string {
  * and is in the envelope, where a machine reads it.
  */
 export function liveOn(hash: string, origins: readonly string[]): string {
-  const release = `Release ${abbreviate(hash)} is now live`;
+  // The server named the hash, and the sentence is drawn as the CLI's own, so
+  // it is spelled out here like the origins below.
+  const release = `Release ${escapeControlCharacters(abbreviate(hash))} is now live`;
   if (origins.length === 0) {
     return `${release}.`;
   }

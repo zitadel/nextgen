@@ -160,6 +160,15 @@ export interface PlatformMock {
   admitsAHostileOriginPattern(): string;
 
   /**
+   * Answers a release build with a content hash holding a terminal escape
+   * sequence, before the colon that names its algorithm, which is the part a
+   * shortened hash keeps whole.
+   *
+   * @returns The hash it will answer with.
+   */
+  buildsAReleaseWithAHostileHash(): string;
+
+  /**
    * Answers a release revoke with an id holding a terminal escape sequence.
    *
    * @returns The id it will answer with.
@@ -447,6 +456,22 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return origin;
+    },
+
+    buildsAReleaseWithAHostileHash() {
+      const hash = `sha256\u001b[2Jwiped:${"a".repeat(64)}`;
+      server.use(
+        http.post("*/releases/build", () => {
+          return HttpResponse.json({
+            id: "rel_1",
+            project_id: "proj_1",
+            content_hash: hash,
+            created_at: "2026-01-01T00:00:00Z",
+            revoked_at: null,
+          });
+        }),
+      );
+      return hash;
     },
 
     revokesAHostileReleaseId() {

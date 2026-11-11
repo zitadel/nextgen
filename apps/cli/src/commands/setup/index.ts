@@ -2168,7 +2168,7 @@ export default class Setup extends Destructive(BaseCommand) {
       // with 64 hex digits is wider than one. The envelope carries the hash
       // in full, for whatever matches on it.
       deploying.done(
-        `Deployed ${abbreviate(deployment.contentHash)} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+        `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
       );
       return deployment;
     } catch (error) {

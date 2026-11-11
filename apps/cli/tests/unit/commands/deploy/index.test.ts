@@ -35,6 +35,14 @@ describe("where a release went", () => {
     expect(liveOn(HASH, ["a", "b", "c"])).toContain("live on a, b and c.");
   });
 
+  it("spells out a hash the server filled with a terminal escape", () => {
+    const hostile = "sha256\u001b[2Jwiped:abcdef0123456789";
+
+    expect(liveOn(hostile, ["http://localhost:3000"])).toBe(
+      "Release sha256\\x1b[2Jwiped:abcdef012345 is now live on http://localhost:3000.",
+    );
+  });
+
   it("says nothing about where when it landed nowhere", () => {
     expect(liveOn(HASH, [])).toBe("Release sha256:aaaaaaaaaaaa is now live.");
   });

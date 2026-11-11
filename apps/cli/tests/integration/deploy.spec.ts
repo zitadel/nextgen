@@ -47,6 +47,7 @@ describe("deploy", () => {
       const app = await aSetUpApp();
       await app.addPrimaryOrigin();
       platform.servesAHostileOrigin();
+      platform.buildsAReleaseWithAHostileHash();
       const args = ["deploy", "-m", "in every rendering"];
 
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
