@@ -260,23 +260,41 @@ function SearchPalette({
   const scope = allProjects ? undefined : projectId;
   // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
-  // Users apart from the rest, so the quick types do not wait for them. With
-  // no project to search, the server searches the person's projects. A search
-  // that is not sent, or fails, answers its text with nothing, so the palette
-  // can tell an answer from one still on its way.
+  // Inside a project, users are asked for apart from the rest, so the quick
+  // types do not wait for them; asking twice there costs one access check.
+  // Across projects one request asks for every type, so the server lists the
+  // person's projects and decides their access once per pause in typing. A
+  // search that is not sent, or fails, answers its text with nothing, so the
+  // palette can tell an answer from one still on its way.
+  const across = scope === undefined;
   const nothing = { ...NO_ANSWER, term: typed };
-  const users = useAsync(
-    typed.length >= USER_SEARCH_MIN_LENGTH
+  const everything = useAsync(
+    across && typed
+      ? () =>
+          search(
+            undefined,
+            typed,
+            typed.length >= USER_SEARCH_MIN_LENGTH ? [...USER_TYPES, ...OTHER_TYPES] : OTHER_TYPES,
+            HITS_PER_TYPE,
+          )
+      : null,
+    nothing,
+    [typed, across],
+  );
+  const usersApart = useAsync(
+    !across && typed.length >= USER_SEARCH_MIN_LENGTH
       ? () => search(scope, typed, USER_TYPES, HITS_PER_TYPE)
       : null,
     nothing,
     [typed, scope],
   );
-  const others = useAsync(
-    typed ? () => search(scope, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
+  const othersApart = useAsync(
+    !across && typed ? () => search(scope, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
     nothing,
     [typed, scope],
   );
+  const users = across ? everything : usersApart;
+  const others = across ? everything : othersApart;
   // The server's matches once something is typed; each answer stays until the
   // next lands, less what the typing has since ruled out.
   const found = useProjectSearch(query, PROJECT_RESULTS);
@@ -539,8 +557,18 @@ function SearchPalette({
   // Every search has answered the text in the field: until then an empty
   // list is not "nothing matches".
   const answered = users?.term === text && others?.term === text && (!text || found?.term === text);
-  // Searched across projects, the server read the newest of them only.
+  // Searched across projects, the server read the newest ten of them only.
   const moreProjects = !scope && (users?.moreProjects || others?.moreProjects);
+  // The server reads a bounded number of rows of each kind, and a grant that
+  // covers part of a project sees only some of those: more of a kind may
+  // match than it found, which Users' own row says for users in a project.
+  const moreMayMatch =
+    Boolean(text) &&
+    answered &&
+    !moreProjects &&
+    (across ? [...USER_TYPES, ...OTHER_TYPES] : OTHER_TYPES).some((type) =>
+      hasMore((type === "user" ? users : others) ?? NO_ANSWER, query, type),
+    );
   // Users are matched from three characters, so a shorter text did not ask
   // for them.
   const usersSearched = text.length >= USER_SEARCH_MIN_LENGTH;
@@ -600,6 +628,11 @@ function SearchPalette({
       {text && answered && moreProjects && groups.some((group) => group.results.length > 0) && (
         <p className="px-3.5 pb-2 text-xs text-muted-foreground">
           {searchedAcross(usersSearched, true)}
+        </p>
+      )}
+      {moreMayMatch && (
+        <p className="px-3.5 pb-2 text-xs text-muted-foreground">
+          More may match. Type more to narrow it down.
         </p>
       )}
       <p className="border-t border-border px-3.5 py-2 text-xs text-muted-foreground">

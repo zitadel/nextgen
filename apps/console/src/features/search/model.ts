@@ -21,7 +21,7 @@ export interface SearchAnswer {
   incomplete: SearchResultType[];
   /**
    * Searched without a project, the person can act on more projects than one
-   * search reads, so the hits come from the first of them.
+   * search reads, so the hits come from the newest ten of them.
    */
   moreProjects: boolean;
 }

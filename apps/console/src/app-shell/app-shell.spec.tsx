@@ -2071,6 +2071,91 @@ describe("search", () => {
     expect(asked.every((projectId) => projectId === null)).toBe(true);
   });
 
+  it("across projects asks once per pause for every type", async () => {
+    const asked: SearchBody[] = [];
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+      http.post(SEARCH, async ({ request }) => {
+        asked.push((await request.json()) as SearchBody);
+        return HttpResponse.json({ results: [], incomplete_types: [], more_projects: false });
+      }),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const field = dialog.getByPlaceholderText(
+      "Go to a page, user, team or project, or run an action",
+    );
+
+    // Too short for users: one request without them.
+    await userEvent.type(field, "su");
+    await waitFor(() => expect(asked).toHaveLength(1));
+    expect(asked[0]?.types).toEqual(["team", "schema", "flow_definition", "idp"]);
+
+    await userEvent.type(field, "pp");
+    await waitFor(() => expect(asked).toHaveLength(2));
+    expect(asked[1]?.types).toEqual(["user", "team", "schema", "flow_definition", "idp"]);
+  });
+
+  it("says more may match when a kind has more than the server read", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        if (!body.types.includes("team")) {
+          return HttpResponse.json({ results: [], incomplete_types: [], more_projects: false });
+        }
+        return HttpResponse.json({
+          results: [{ type: "team", id: "team_s", project_id: "proj_1", title: "Support" }],
+          incomplete_types: ["team"],
+          more_projects: false,
+        });
+      }),
+    );
+    renderShell(scopedPath("/teams", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "supp",
+    );
+
+    expect(await dialog.findByRole("option", { name: /Support/ })).toBeInTheDocument();
+    expect(
+      await dialog.findByText("More may match. Type more to narrow it down."),
+    ).toBeInTheDocument();
+  });
+
+  it("says more may match when a narrow grant saw none of what the server read", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        return HttpResponse.json({
+          results: [],
+          incomplete_types: body.types.includes("team") ? ["team"] : [],
+          more_projects: false,
+        });
+      }),
+    );
+    renderShell(scopedPath("/teams", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "qq",
+    );
+
+    expect(await dialog.findByText("Nothing in console-dev matches “qq”")).toBeInTheDocument();
+    expect(dialog.getByText("More may match. Type more to narrow it down.")).toBeInTheDocument();
+  });
+
   it("inside a project searches that project alone", async () => {
     const asked: (string | null)[] = [];
     server.use(
