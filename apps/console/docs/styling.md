@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`) in `ResourceTitle`'s `below` row, under the search: **Add filter** lists the resource's properties, then the chosen one's values by its type; each set filter is a chip. A screen describes its properties as `FilterDefinition`s (`src/lib/resource-filter.ts`) and keeps the values in its URL: copy `src/features/users/filters.tsx`; a status property takes `statusOptions` (`status-badge.tsx`), and the screen's empty state asks `isFiltered` and clears with `clearedFilters`. A revision row is `RevisionOption` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
+| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`), by the "List filters" recipe below |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
@@ -229,6 +229,34 @@ Two values here look like something they are not: the head label is
 glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
 the design even though its box measures correctly.
+
+### List filters
+
+A list is narrowed through `ResourceFilter` (`src/components/resource-filter.tsx`):
+**Add filter** lists the resource's properties, then the chosen property's
+values by its type, and each set filter is a chip. The Users list
+(`src/routes/_authed/users/index.tsx`) is the shipped example. To add it to a
+list:
+
+1. Describe the properties as `FilterDefinition`s (`src/lib/resource-filter.ts`)
+   in `src/features/<resource>/filters.tsx`. A fixed set of values is
+   `type: "options"`, a moment `type: "date"`; a status takes `statusOptions`
+   (`status-badge.tsx`). A property that depends on another names it in the
+   other's `clears` and says why it is `unavailable` until then.
+2. Keep each value in the URL under its definition's `key`: accept only what
+   the filter could have set in the route's `validateSearch`
+   (`parseDateFilter` for a date), and leave the keys in `loaderDeps`.
+3. Turn the values into the query's criteria in the feature, as `userFilter`
+   (`src/features/users/list.ts`) does. The server narrows; nothing filters or
+   counts the rows already loaded. A date's start is `dateFilterStart`.
+4. Render it in `ResourceTitle`'s `below` row, merging each `onChange` patch
+   into the search. The search field stays in `filter`.
+5. In the empty state, tell "no match" from "none yet" with `isFiltered`, and
+   clear with `clearedFilters`.
+
+A new kind of value (a number, free text) is a new `type` in
+`FilterDefinition` and its values list in the component, not a control beside
+it.
 
 ## Resource detail layout — one shell for every detail screen
 
