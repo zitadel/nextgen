@@ -30,7 +30,9 @@ import {
 } from "@/features/users/components/user-cells";
 import { IdText } from "@/components/id-text";
 import { SearchField } from "@/components/search-field";
-import { UsersFilter } from "@/features/users/components/users-filter";
+import { ResourceFilter } from "@/components/resource-filter";
+import { usersFilters } from "@/features/users/filters";
+import { parseDateFilter } from "@/lib/resource-filter";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
@@ -42,6 +44,8 @@ import {
   type UsersSearch,
   attributeSummary,
   columnsBeyondIdentity,
+  isFiltered,
+  parseUserStatus,
   pinnedColumns,
   toUserRow,
 } from "@/features/users/list";
@@ -80,9 +84,15 @@ export const Route = createFileRoute("/_authed/users/")({
       search.revision !== LEGACY_LATEST
         ? search.revision
         : undefined;
-    // All three keys, even unset: the router lays this over the raw search, so
-    // a key left out would keep the URL's value.
-    return { q: searchTerm(search.q), schema, revision };
+    // Every key, even unset: the router lays this over the raw search, so a
+    // key left out would keep the URL's value.
+    return {
+      q: searchTerm(search.q),
+      schema,
+      revision,
+      status: parseUserStatus(search.status),
+      created: parseDateFilter(search.created),
+    };
   },
   // The search term is left out of the deps, so a new term is not a new match:
   // past the router's pending delay a new match swaps the screen for the pending
@@ -194,8 +204,12 @@ function UsersScreen() {
   // `?q=` before the full list is back, and the field must not unmount in
   // between. A project with no users has nothing to search.
   const [searchable, setSearchable] = useState(false);
-  if (!searchable && (rows.length > 0 || search.q || search.schema)) setSearchable(true);
+  if (!searchable && (rows.length > 0 || search.q || isFiltered(search))) setSearchable(true);
   const scroll = useScrollEdges();
+  const filters = useMemo(
+    () => usersFilters({ options: loaded.options, revisions: loaded.revisions, search }),
+    [loaded.options, loaded.revisions, search],
+  );
   // Each row's schema, for the identity card's title and the attributes
   // popover's field labels.
   const schemas = useMemo(
@@ -217,19 +231,10 @@ function UsersScreen() {
                 className="grow basis-48 @3xl/title-row:max-w-48"
               />
             )}
-            <UsersFilter
-              options={loaded.options}
-              revisions={loaded.revisions}
-              search={search}
-              onChange={(next) =>
-                void navigate({
-                  search: (prev) => ({
-                    ...prev,
-                    schema: next.schema,
-                    revision: next.revision,
-                  }),
-                })
-              }
+            <ResourceFilter
+              filters={filters}
+              values={search}
+              onChange={(patch) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })}
             />
           </>
         }
@@ -291,7 +296,7 @@ function UsersScreen() {
                 <ResourceEmptyRow
                   colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 6 : 5)}
                 >
-                  {loaded.q || search.schema ? (
+                  {loaded.q || isFiltered(search) ? (
                     // On a phone the empty table still scrolls sideways, so the
                     // message and its control hold to the visible edge rather
                     // than center on a width that is partly out of view.
@@ -309,6 +314,8 @@ function UsersScreen() {
                               q: undefined,
                               schema: undefined,
                               revision: undefined,
+                              status: undefined,
+                              created: undefined,
                             }),
                           });
                         }}

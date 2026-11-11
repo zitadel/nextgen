@@ -39,19 +39,23 @@ test("narrows the users to one revision of a schema", async ({ page, zitadel, se
   await expect(table.getByRole("link", { name: older.id })).toBeVisible();
   await expect(table.getByRole("link", { name: newer.id })).toBeVisible();
 
-  await page.getByRole("combobox", { name: "Filter by schema" }).click();
+  // Add filter lists the properties, then the chosen one's values.
+  await page.getByRole("button", { name: "Add filter" }).click();
+  await page.getByRole("option", { name: "User schema" }).click();
   await page.getByRole("option", { name: `Staff ${suffix}` }).click();
-  await page.getByRole("combobox", { name: "Filter by revision" }).click();
+  await page.getByRole("button", { name: "Add filter" }).click();
+  await page.getByRole("option", { name: "Revision", exact: true }).click();
   await page.getByRole("option").and(page.getByTitle(older.id)).click();
   await expect(table.getByRole("link", { name: onOlder })).toBeVisible();
   await expect(table.getByRole("link", { name: onNewer })).toHaveCount(0);
 
-  await page.getByRole("combobox", { name: "Filter by revision" }).click();
+  // Once set, the filter's chip reopens its values.
+  await page.getByRole("button", { name: "Filter by revision" }).click();
   await page.getByRole("option").and(page.getByTitle(newer.id)).click();
   await expect(table.getByRole("link", { name: onNewer })).toBeVisible();
   await expect(table.getByRole("link", { name: onOlder })).toHaveCount(0);
 
-  await page.getByRole("combobox", { name: "Filter by revision" }).click();
+  await page.getByRole("button", { name: "Filter by revision" }).click();
   await page.getByRole("option", { name: "Older revisions" }).click();
   await expect(table.getByRole("link", { name: onOlder })).toBeVisible();
   await expect(table.getByRole("link", { name: onNewer })).toHaveCount(0);

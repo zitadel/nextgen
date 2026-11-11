@@ -63,7 +63,7 @@ async function openSheet() {
     history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
   });
   render(<RouterProvider router={router} />);
-  await userEvent.click(await screen.findByRole("button", { name: /^Add/ }));
+  await userEvent.click(await screen.findByRole("button", { name: "Add" }));
   return router;
 }
 
