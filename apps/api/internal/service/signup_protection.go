@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	mrand "math/rand/v2"
@@ -57,15 +58,29 @@ func signupBinding(state *domain.FlowState, id string, expires int64) pow.Bindin
 		Operation: "create_user", OperationInstanceID: state.ID, ChallengeID: id, ExpiresAt: expires}
 }
 
+// lockSignupLimits makes sure the flow has a limits row and locks it. The
+// insert leaves an existing row alone and takes no lock on it, so a sweep can
+// delete an hour-old row before the lock reads it; the row is then started
+// again, in this transaction, where no sweep sees it.
+func lockSignupLimits(ctx context.Context, st AllStatements, state *domain.FlowState) (*domain.SignupLimits, error) {
+	for range 2 {
+		if err := st.InsertSignupLimits(ctx, &domain.SignupLimits{ProjectID: state.ProjectID, FlowID: state.ID}); err != nil {
+			return nil, err
+		}
+		limits, err := st.LockSignupLimits(ctx, state.ProjectID, state.ID)
+		if err != nil || limits != nil {
+			return limits, err
+		}
+	}
+	return nil, domain.ErrInternal(errors.New("signup limits row is missing after it was inserted"))
+}
+
 // Limits belong to the server-issued flow, never to the entire project. New
 // flows still need ingress rate limits; forwarded IP headers are not trusted.
 func (s *signupProtection) charge(ctx context.Context, state *domain.FlowState, issue bool) error {
 	return s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()
-		if err := st.InsertSignupLimits(ctx, &domain.SignupLimits{ProjectID: state.ProjectID, FlowID: state.ID}); err != nil {
-			return err
-		}
-		limits, err := st.LockSignupLimits(ctx, state.ProjectID, state.ID)
+		limits, err := lockSignupLimits(ctx, st, state)
 		if err != nil {
 			return err
 		}

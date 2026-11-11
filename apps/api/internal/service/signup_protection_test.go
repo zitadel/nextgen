@@ -126,3 +126,30 @@ func TestSignupSweepNeverFailsIssuance(t *testing.T) {
 		})
 	}
 }
+
+// A sweep may delete a flow's hour-old limits row between the insert that
+// found it and the lock that reads it. The charge then starts the row again
+// rather than reading one that is not there.
+func TestSignupChargeSurvivesASweptLimitsRow(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, v2TestTx{stmts: stmts})
+		})
+	stmts.EXPECT().GetSignupChallenge(gomock.Any(), "project", "flow").Return(nil, nil)
+	gomock.InOrder(
+		stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil),
+		stmts.EXPECT().LockSignupLimits(gomock.Any(), "project", "flow").Return(nil, nil),
+		stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil),
+		stmts.EXPECT().LockSignupLimits(gomock.Any(), "project", "flow").Return(&domain.SignupLimits{
+			ProjectID: "project", FlowID: "flow", WindowStart: time.Now().Unix(), Issued: 10,
+		}, nil),
+	)
+	svc := service.NewSignupProtection(pool, nil)
+	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
+	// The row read on the second try is the one charged: its budget is spent.
+	require.ErrorIs(t, err, domain.ErrFlowRateLimited())
+}
