@@ -5,7 +5,7 @@ import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { shellCommand } from "@/lib/suggestion";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
-import { aConfig, aFile, anOidcConnection } from "@tests/helpers/config";
+import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import { test } from "@tests/helpers/fixtures";
 import { aDeployment, holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
@@ -21,7 +21,6 @@ const PREPARED: PreparedRelease = {
   warnings: [],
   notices: [],
   lockouts: [],
-  config: aConfig(),
   gitSha: "abc1234",
   gitDirty: false,
 };

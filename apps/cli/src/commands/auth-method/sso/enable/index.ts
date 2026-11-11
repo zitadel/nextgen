@@ -29,7 +29,6 @@ import { isDevelopmentBuild } from "@/lib/build-channel";
 import { resolveEnvironment } from "@/lib/environment";
 import {
   callbackUriFor,
-  type ConnectionState,
   CredentialDelivery,
   type CredentialNames,
   CredentialPrompt,
@@ -37,20 +36,13 @@ import {
   type GivenCredentials,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
-  mappingData,
   ProviderChoice,
   type PublishedCredentials,
   type PublishState,
   type SecretOutcome,
   type SecretPublisher,
-  stateLine,
-  stepLines,
-  stillToConfigure,
-  summaryLines,
 } from "@/lib/idp";
-import { BOX_STYLE, wrapForBox } from "@/lib/box";
 import { loopbackReach } from "@/lib/local-server/runtime";
-import { asStepsShown } from "@/lib/oclif/next-steps";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
@@ -238,7 +230,7 @@ type Outcome = {
  */
 type ResultInput = {
   readonly summary: Summary;
-  readonly change: DocumentChange<Connection>;
+  readonly change: Change;
   readonly written: readonly string[];
   readonly published: PublishedCredentials;
   readonly delivery: CredentialDelivery;
@@ -249,15 +241,9 @@ type ResultInput = {
  */
 type PayloadInput = {
   readonly summary: Summary;
-  readonly change: DocumentChange<Connection>;
+  readonly change: Change;
   readonly published: PublishedCredentials;
   readonly names: CredentialNames;
-
-  /**
-   * Where the connection stands once the run is done; left out of a dry run,
-   * which writes nothing.
-   */
-  readonly state?: ConnectionState;
 };
 
 /**
@@ -279,10 +265,6 @@ type Payload = {
     readonly action: "reuse" | "create";
     readonly slug: string;
     readonly file: string;
-    readonly state?: ConnectionState;
-    readonly claim_mapping: Readonly<Record<string, string>>;
-    readonly verified_claims: Readonly<Record<string, string | boolean>>;
-    readonly scopes: readonly string[];
   };
   readonly callback_uri: string;
   readonly changed: readonly string[];
@@ -704,18 +686,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !summary.reused || input.written.length > 0;
     const stored = input.delivery.areStored(input.published);
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
-    const state: ConnectionState = summary.reused ? "present" : "saved";
-    // The box ends with what is left to do, so nothing after it repeats it.
-    const nextShown = this.isJson
-      ? undefined
-      : this.drawConnection({
-          input,
-          state,
-          stored,
-          deploy: unpublished,
-          commands: followUps.commands.map(String),
-          republished: recovery.length,
-        });
     const actions = [
       `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
     ];
@@ -724,7 +694,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       change: input.change,
       published: input.published,
       names: input.delivery.names,
-      state,
     });
     const next = unpublished
       ? { actions, commands: followUps.commands }
@@ -738,65 +707,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         next_args: followUps.args,
       },
       next,
-      nextShown,
-      pretty: prose(""),
     });
-  }
-
-  /**
-   * Draw the run's whole human result in one box: the connection file and
-   * what it maps, where the connection stands, and what is left to do with
-   * the commands that do it.
-   *
-   * @param box - The result, where the connection stands, whether both
-   *   credentials are stored, whether a deploy is due, the follow-up commands,
-   *   and how many of them republish a credential.
-   * @param box.input - The result.
-   * @param box.state - Where the connection stands.
-   * @param box.stored - Whether both credentials reached the project.
-   * @param box.deploy - Whether a file changed that only a deploy publishes.
-   * @param box.commands - The follow-up commands, republishing ones first.
-   * @param box.republished - How many of them republish a credential.
-   * @returns Proof the next steps were shown.
-   */
-  private drawConnection(box: {
-    readonly input: ResultInput;
-    readonly state: ConnectionState;
-    readonly stored: boolean;
-    readonly deploy: boolean;
-    readonly commands: readonly string[];
-    readonly republished: number;
-  }): ReturnType<typeof asStepsShown> {
-    const change = box.input.change;
-    const connection = change.document;
-    const provider = box.input.summary.displayName;
-    const steps = stillToConfigure({
-      state: box.state,
-      file: connection.path,
-      provider,
-      deploy: box.deploy,
-      republish: box.commands.slice(0, box.republished),
-      deployCommands: box.commands.slice(box.republished),
-    });
-    const stored = box.stored ? ["Provider credentials are stored on your Project."] : [];
-    consola.box({
-      title: `${provider} is set up`,
-      message: wrapForBox(
-        [
-          `Connection file   ${connection.path}`,
-          "",
-          ...summaryLines(change.after.connections.summarize(connection), connection.path),
-          "",
-          stateLine(box.state),
-          ...stored,
-          "",
-          "Still to do:",
-          ...stepLines(steps),
-        ].join("\n"),
-      ),
-      style: BOX_STYLE.success,
-    });
-    return asStepsShown();
   }
 
   /**
@@ -828,9 +739,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   private payload(input: PayloadInput): Payload {
     const summary = input.summary;
     const action = summary.reused ? "reuse" : "create";
-    const change = input.change;
-    const mapped = change.after.connections.summarize(change.document);
-    const state = input.state === undefined ? {} : { state: input.state };
     return {
       project_id: summary.projectId,
       provider: summary.provider,
@@ -839,8 +747,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action,
         slug: summary.connection.slug,
         file: summary.connection.path,
-        ...state,
-        ...mappingData(mapped),
       },
       callback_uri: summary.callbackUri,
       changed: [...input.change.changedPaths],

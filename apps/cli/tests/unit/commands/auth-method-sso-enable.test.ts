@@ -354,10 +354,9 @@ describe("auth-method sso enable", () => {
     );
 
     it.for([
-      "Google is set up",
-      "Provider credentials are stored on your Project.",
-      "Deploy, so Google sign-in reaches your app:",
-      `\`${expectedPublicCliCommand("deploy --dry-run")}`,
+      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
+      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+      `  $ ${expectedPublicCliCommand("deploy --dry-run")}`,
     ])("says %s", async (line, { dir }) => {
       const cwd = await aProject(dir);
 
@@ -370,7 +369,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when publishing the credentials fails", () => {
-    it("says the provider is saved locally", async ({ dir }) => {
+    it("says the provider is configured locally", async ({ dir }) => {
       const cwd = await aProject(dir);
       refusePublishes();
 
@@ -378,7 +377,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain("Saved in your project. Not applied, not tested.");
+      expect(result.stdout).toContain("Google sign-in is configured locally.");
     });
 
     it("does not say the credentials are stored", async ({ dir }) => {
@@ -552,18 +551,18 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a custom provider", () => {
-    it.for(["Acme SSO is set up", "Sign in once with Acme SSO"])(
-      "says %s",
-      async (line, { dir }) => {
-        const cwd = await aProject(dir);
+    it.for([
+      "Acme SSO sign-in is configured locally.",
+      "then reload your app and test Acme SSO sign-in.",
+    ])("says %s", async (line, { dir }) => {
+      const cwd = await aProject(dir);
 
-        const result = await withStdin(SECRET, () => {
-          return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
-        });
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
+      });
 
-        expect(result.stdout).toContain(line);
-      },
-    );
+      expect(result.stdout).toContain(line);
+    });
   });
 
   describe("when the schema defines nothing the provider maps", () => {
@@ -641,14 +640,14 @@ describe("auth-method sso enable", () => {
       });
     });
 
-    it("says the connection is already in the project", async ({ dir }) => {
+    it("says the provider is already configured", async ({ dir }) => {
       const cwd = await aProjectWithGoogle(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
       });
 
-      expect(result.stdout).toContain("In your project.");
+      expect(result.stdout).toContain("Google sign-in is already configured locally.");
     });
 
     it("does not offer a deploy, since nothing changed", async ({ dir }) => {
