@@ -453,7 +453,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       return target.config.connections.enable(target.schema, located, options);
     });
     if (summary.reused) {
-      log.done(`Reusing ${summary.connection.path}`);
+      log.done(`Reusing ${escapeControlCharacters(summary.connection.path)}`);
     }
     // The credentials go before the files: saving writes the connection first,
     // so a write that then fails would leave a connection on disk whose
@@ -596,7 +596,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // printed before the first question: `connect()` above already recorded it.
     // The schema is this command's own subject, so it stays as narration.
     log.info(
-      `Editing ${schema.path}${schema.methods.length > 0 ? `, which offers ${schema.methods.join(", ")}` : ""}`,
+      `Editing ${escapeControlCharacters(schema.path)}${schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(schema.methods.join(", "))}` : ""}`,
     );
     if (!summary.reused) {
       log.info(
@@ -618,10 +618,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // A custom provider has no console to send the developer to: it is
     // theirs, and the issuer they gave is the only address known.
     if (!summary.reused && provider.consoleUrl === undefined) {
-      log.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
+      log.info(
+        `Register it as a client at ${escapeControlCharacters(provider.issuer)}, with the callback URI above.`,
+      );
     }
     if (!summary.reused && provider.consoleUrl !== undefined) {
-      log.info(`Create it at   ${provider.consoleUrl}`);
+      log.info(`Create it at   ${escapeControlCharacters(provider.consoleUrl)}`);
     }
   }
 

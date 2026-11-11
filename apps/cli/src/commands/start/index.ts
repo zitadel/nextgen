@@ -108,7 +108,8 @@ export default class Start extends BaseCommand {
       return this.emit({
         status: "ok",
         data: {
-          title: "Local Zitadel server start plan",
+          dry_run: true,
+          title: "Would start the local Zitadel server (dry run)",
           runtime: {
             backend: runtimeBackend,
             ...(runtimeBackend === "docker"
@@ -124,7 +125,7 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
           },
         },
-        summary: { title: "Local Zitadel server start plan", sections: [] },
+        summary: { title: "Would start the local Zitadel server (dry run)", sections: [] },
         next: { commands: [this.suggestUnscoped("start")] },
       });
     }

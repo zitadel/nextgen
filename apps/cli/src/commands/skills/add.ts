@@ -39,7 +39,7 @@ export default class SkillsAdd extends BaseCommand {
 
     // The sentence that introduces the paths comes first, so it is the body's
     // first line: a headline closes the output, and would put it under them.
-    const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}`;
+    const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}${this.dryRun ? " (dry run)" : ""}`;
     const said = [
       `${title} to:`,
       ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
@@ -55,9 +55,9 @@ export default class SkillsAdd extends BaseCommand {
         ...(this.dryRun ? { dry_run: true } : {}),
       },
       summary: {
-        title: "Done",
+        title: escapeControlCharacters(title),
         sections: [],
-        lines: said.map((line) => escapeControlCharacters(line)),
+        lines: said.slice(1).map((line) => escapeControlCharacters(line)),
       },
       pretty: prose(said.join("\n")),
     });

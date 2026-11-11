@@ -289,7 +289,7 @@ export default class Claim extends EnvironmentCommand {
       this.ui.note("Finish in your browser", [
         "Create an account or sign in to claim your project, make it permanent and start collaborating.",
       ]);
-      log.plain(challenge.claim_url);
+      log.plain(escapeControlCharacters(challenge.claim_url));
 
       if (flags.noWait) {
         return this.linkIssued(projectId, challenge);
@@ -494,7 +494,7 @@ export default class Claim extends EnvironmentCommand {
     dashboard_url?: string;
   }): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
-    log.info(`This project already belongs to team ${data.team_id}.`);
+    log.info(`This project already belongs to team ${escapeControlCharacters(data.team_id)}.`);
 
     return this.emit({
       status: "skipped",

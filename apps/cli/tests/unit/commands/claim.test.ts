@@ -777,6 +777,19 @@ describe("claim", () => {
       expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
     });
 
+    it("spells out an escape sequence in the claim link it prints", async ({ serve }) => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer(
+        serve,
+        "http://localhost/claim/ch_localstub\u001b[2Jwiped",
+      );
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
+
+      expect(`${res.stdout}${res.stderr}`).not.toContain("\u001b");
+    });
+
     it("does not warn when the claim page is on the local server itself", async ({ serve }) => {
       const { cwd } = await makeProject();
       const serverUrl = await startClaimServer(serve);

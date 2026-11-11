@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { CANCELLED } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
 import {
   type Admitted,
@@ -193,7 +194,7 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
  */
 function cancelledSummary(removeIt: SuggestedCommand): Summary {
   return {
-    title: "Cancelled, nothing was removed",
+    title: CANCELLED,
     sections: [],
     lines: ["Nothing was removed. Zitadel is still set up in this app."],
     next: [{ text: "Remove it whenever you like:", command: removeIt }],

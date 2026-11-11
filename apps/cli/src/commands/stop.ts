@@ -45,7 +45,8 @@ export default class Stop extends BaseCommand {
       return this.emit({
         status: "ok",
         data: {
-          title: "Local Zitadel server stop plan",
+          dry_run: true,
+          title: "Would stop the local Zitadel server (dry run)",
           runtime: {
             backend: runtime?.backend ?? "missing",
             ...(runtime?.backend === "binary"
@@ -55,7 +56,7 @@ export default class Stop extends BaseCommand {
             data_dir: runtime?.data_dir,
           },
         },
-        summary: { title: "Local Zitadel server stop plan", sections: [] },
+        summary: { title: "Would stop the local Zitadel server (dry run)", sections: [] },
         next: { commands: [this.suggestUnscoped("stop")] },
       });
     }

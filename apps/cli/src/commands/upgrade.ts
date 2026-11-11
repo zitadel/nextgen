@@ -128,11 +128,13 @@ export default class Upgrade extends BaseCommand {
       ...(commands.length > 0 ? { commands } : {}),
     };
 
-    const said = upToDate
-      ? `Zitadel is up to date at ${target}`
-      : dryRun
-        ? `Zitadel can be upgraded to ${target}`
-        : `Zitadel upgraded to ${target}`;
+    const said = `${
+      upToDate
+        ? `Zitadel is up to date at ${target}`
+        : dryRun
+          ? `Zitadel can be upgraded to ${target}`
+          : `Zitadel upgraded to ${target}`
+    }${dryRun ? " (dry run)" : ""}`;
     const rows = upgradeRows({ packages, leftAlone, refresh, dryRun, installSuggestion });
     return this.emit({
       status: "ok",
@@ -221,7 +223,7 @@ async function refreshProject(
 
 function renderBreakingChanges(breaking: readonly BreakingChange[]): string {
   const notes = breaking.flatMap(({ version, note }) => [
-    `  ${mark.warn} ${strong(version)}  ${note}`,
+    `  ${mark.warn} ${strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`,
   ]);
   return [
     ...(notes.length > 0 ? [strong("Breaking changes on the way:"), ...notes] : []),

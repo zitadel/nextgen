@@ -1,6 +1,7 @@
 import { installLogSink, type LogLevel } from "@/lib/log";
 import { GUIDE, MARK } from "./marks";
 import { writePlain } from "./plain";
+import { DrawnSpinner } from "./spinner";
 
 /**
  * Draws the narration that library code and commands write with `log`.
@@ -80,6 +81,7 @@ export class Narration {
       this.chain.narrate(MARKS[level], body);
       return;
     }
-    writePlain(level, body);
+    // A line written while a spinner draws would be glued to its frame.
+    DrawnSpinner.around(() => writePlain(level, body));
   }
 }

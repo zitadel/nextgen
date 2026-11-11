@@ -342,6 +342,8 @@ export default class Api extends Destructive(BaseCommand) {
       return this.emit({
         status: "ok",
         data: {
+          dry_run: true,
+          title: `Would call ${operation.id} (dry run)`,
           operation: operation.id,
           method: operation.method,
           url,
@@ -355,7 +357,7 @@ export default class Api extends Destructive(BaseCommand) {
         // told it is not sent, with the command under it exactly as written
         // because it is copied, not read.
         summary: {
-          title: `Would call ${operation.id}`,
+          title: `Would call ${operation.id} (dry run)`,
           sections: [],
           lines: curl.text.split("\n"),
         },

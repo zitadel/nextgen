@@ -1274,6 +1274,12 @@ export class ScaffoldedApp {
       expect(result.stdout + result.stderr, "the command ran").not.toContain(
         "is not a zitadel command",
       );
+      if (how.env.FORCE_COLOR === undefined) {
+        expect(
+          result.stdout + result.stderr,
+          "a run without colour carries no colour code",
+        ).not.toContain("\u001B");
+      }
     }
     // The two runs on a terminal came last and back to back, so they ended the
     // same way: what the envelope says, the screen says in the same words.
@@ -1302,6 +1308,7 @@ export class ScaffoldedApp {
       .object({
         status: z.string(),
         message: z.string().optional(),
+        warnings: z.array(z.string()).optional(),
         data: z.object({ title: z.string().optional() }).passthrough().optional(),
       })
       .safeParse(body);
@@ -1309,17 +1316,19 @@ export class ScaffoldedApp {
       return;
     }
     const said = parsed.data.status === "error" ? parsed.data.message : parsed.data.data?.title;
-    const hasControl = [...(said ?? "")].some((char) => {
-      const code = char.codePointAt(0) ?? 0;
-      return code < 0x20 || (code >= 0x7f && code <= 0x9f);
-    });
-    if (said === undefined || hasControl) {
+    if (said === undefined || hasControlCharacter(said)) {
       return;
     }
-    expect(
-      stripAnsi(`${screen.stdout}\n${screen.stderr}`),
-      "the screen says what the envelope says",
-    ).toContain(said);
+    const printed = stripAnsi(`${screen.stdout}\n${screen.stderr}`);
+    expect(printed, "the screen says what the envelope says").toContain(said);
+    for (const warning of parsed.data.warnings ?? []) {
+      if (!hasControlCharacter(warning)) {
+        expect(
+          printed.split(warning).length - 1,
+          `the warning "${warning}" is said once on the screen`,
+        ).toBeLessThanOrEqual(1);
+      }
+    }
   }
 
   /**
@@ -2432,6 +2441,56 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const contract = ContractEnvelope.parse(parsed);
   assertRunnableSuggestions(where, contract);
   assertDataShape(where, contract);
+  if (args.includes("--dry-run")) {
+    assertDryRun(where, parsed);
+  }
+}
+
+/**
+ * Whether a text holds a control character, which a screen spells out.
+ *
+ * @param text - The text.
+ * @returns Whether it holds one.
+ */
+function hasControlCharacter(text: string): boolean {
+  return [...text].some((char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code < 0x20 || (code >= 0x7f && code <= 0x9f);
+  });
+}
+
+/**
+ * A dry run answers `ok` with `data.dry_run: true` and a headline ending in
+ * `(dry run)`; it is never `skipped`, which means a person said no. Checked on
+ * every spec's `--dry-run --json` run, so a command that breaks the rule fails
+ * in its own spec. A refusal is an error, and a skip for another reason keeps
+ * its own token.
+ *
+ * @param where - The command, for the failure message.
+ * @param parsed - The parsed envelope.
+ */
+function assertDryRun(where: string, parsed: unknown): void {
+  const shape = z
+    .looseObject({
+      status: z.string(),
+      reason: z.string().optional(),
+      data: z.looseObject({ dry_run: z.unknown(), title: z.unknown() }).optional(),
+    })
+    .safeParse(parsed);
+  if (!shape.success) {
+    return;
+  }
+  const { status, reason, data } = shape.data;
+  expect(reason, `${where}: a dry run is answered ok, never skipped as a dry run`).not.toBe(
+    "dry-run",
+  );
+  if (status !== "ok") {
+    return;
+  }
+  expect(data?.dry_run, `${where}: a dry run says data.dry_run`).toBe(true);
+  if (typeof data?.title === "string") {
+    expect(data.title, `${where}: a dry run's headline ends in (dry run)`).toMatch(/\(dry run\)$/);
+  }
 }
 
 /**

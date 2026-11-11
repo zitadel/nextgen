@@ -48,7 +48,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
         return variableCell(item);
       });
       const columns = PREVIEW_COLUMNS;
-      const empty = nothingFound("variables");
+      const empty = nothingFound("preview variables");
       const footer: string[] = [];
       const page = null;
       const extra = {};
