@@ -55,8 +55,9 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     options: MetaOptions = {},
   ): Promise<GlobalOptions> {
     const flags = byName(given);
-    const text = (value: unknown): string | undefined =>
-      typeof value === "string" ? value : undefined;
+    const text = (value: unknown): string | undefined => {
+      return typeof value === "string" ? value : undefined;
+    };
     this.cwdFlag = text(flags.cwd);
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
@@ -70,6 +71,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
       envName: text(flags.env),
       envFile: text(flags.envFile),
     });
+
     return super.toMeta(given, {
       resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
@@ -91,6 +93,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
    */
   protected environmentSelector(): EnvironmentSelector {
     const { environment } = this;
+
     return environmentSelectorSuffix({
       cwd: this.cwdFlag,
       envFile: environment.envFile,
@@ -112,6 +115,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
    */
   protected environmentSelectorArgs(): string[] {
     const { environment } = this;
+
     return [
       ...(environment.envFile !== undefined
         ? optionArgs("--env-file", environment.envFile)
@@ -140,6 +144,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
       return super.retryCommand(words);
     }
     const line = Cmd.of(words).without(ENVIRONMENT_SELECTOR_OPTIONS);
+
     return this.suggest(line.toString());
   }
 
@@ -163,7 +168,9 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     // two "Project/Server" lines and two credential prompts.
     const key = JSON.stringify(
       Object.fromEntries(
-        Object.entries(options).sort(([one], [other]) => one.localeCompare(other)),
+        Object.entries(options).sort(([one], [other]) => {
+          return one.localeCompare(other);
+        }),
       ),
     );
     const already = this.connections.get(key);
@@ -177,6 +184,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
       throw error;
     });
     this.connections.set(key, open);
+
     return open;
   }
 
@@ -200,6 +208,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
     this.ui.ranAgainst(projectId, server);
+
     return {
       client: createZitadelClient({
         userAgent: userAgent(),

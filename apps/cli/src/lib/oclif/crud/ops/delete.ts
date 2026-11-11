@@ -35,6 +35,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
     options,
   }: OperationDefinition<Ctx, DeleteSpec<Ctx>>): OperationStatics {
     const verb = spec.verb ?? "delete";
+
     return {
       description: `${capitalize(verb)} ${article(resource.singular)} ${resource.singular} by id.`,
       examples: [`<%= config.bin %> ${topic} ${verb} <id> --force --json`],
@@ -62,12 +63,18 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
       name: `${verb} ${resource.singular} ${id}`,
       message: async () => {
         const { projectId, server } = await this.connect();
+
         return `${capitalize(verb)} ${resource.singular} ${id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
       },
-      preview: () => dryRunResult({ verb, topic, id }),
-      prepare: () => this.context(),
+      preview: () => {
+        return dryRunResult({ verb, topic, id });
+      },
+      prepare: () => {
+        return this.context();
+      },
       apply: async (consent, context) => {
         await spec.call(context, id, consent);
+
         return {
           status: "ok",
           data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),

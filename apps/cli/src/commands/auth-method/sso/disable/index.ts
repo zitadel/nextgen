@@ -121,6 +121,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.report(change);
+
       return this.emit({
         status: "ok",
         data: {

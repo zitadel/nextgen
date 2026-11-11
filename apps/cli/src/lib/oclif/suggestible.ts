@@ -45,6 +45,7 @@ export function Suggestible<TBase extends CommandClass<BaseCommand>>(Base: TBase
         const target = this.config.findCommand?.(words.slice(0, length).join(":"));
         if (target !== undefined) {
           const takesSelector = "env-file" in target.flags;
+
           return projectCommand(
             args,
             takesSelector ? this.selector() : this.cwdSelector(),
@@ -52,8 +53,10 @@ export function Suggestible<TBase extends CommandClass<BaseCommand>>(Base: TBase
           );
         }
       }
+
       return projectCommand(args, this.selector(), this.meta.cliVersion);
     }
   }
+
   return SuggestibleCommand;
 }

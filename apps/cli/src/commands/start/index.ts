@@ -107,7 +107,6 @@ export default class Start extends Suggestible(BaseCommand) {
       flags.image ??
       this.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.cliVersion);
-    const containerName = localContainerName(this.cwd);
     if (this.dryRun) {
       return this.emit({
         status: "ok",
@@ -118,7 +117,7 @@ export default class Start extends Suggestible(BaseCommand) {
             backend: runtimeBackend,
             ...(runtimeBackend === "docker"
               ? {
-                  container_name: containerName,
+                  container_name: localContainerName(this.cwd),
                   image,
                 }
               : {}),

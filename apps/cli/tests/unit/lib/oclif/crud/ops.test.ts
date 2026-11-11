@@ -637,6 +637,59 @@ describe("list paging", () => {
       "say Fetching teams — page 2",
     ]);
   });
+
+  it.each([
+    [1, "Fetched 1 team"],
+    [2, "Fetched 2 teams"],
+  ])("stops the drain's spinner on how many it found: %i", async (found, text) => {
+    const stop = vi.fn();
+    vi.mocked(spinner).mockReturnValueOnce({
+      start: vi.fn(),
+      stop,
+      clear: vi.fn(),
+      message: vi.fn(),
+    } as unknown as ReturnType<typeof spinner>);
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async () => {
+          return { teams: Array.from({ length: found }, (_, index) => ({ id: `t_${index}` })) };
+        },
+      }),
+    );
+
+    await asTerminal(() => printed(command, ["--all", "--plain"]));
+
+    expect(stop).toHaveBeenCalledWith(text);
+  });
+
+  it("clears the drain's spinner when a page throws", async () => {
+    const clear = vi.fn();
+    const stop = vi.fn();
+    vi.mocked(spinner).mockReturnValueOnce({
+      start: vi.fn(),
+      stop,
+      clear,
+      message: vi.fn(),
+    } as unknown as ReturnType<typeof spinner>);
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async () => {
+          throw new Error("the page failed");
+        },
+      }),
+    );
+
+    await asTerminal(() => printed(command, ["--all", "--plain"])).catch(() => undefined);
+
+    expect(clear).toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
 });
 
 describe("assembling a body", () => {

@@ -39,7 +39,7 @@ export default class SkillsAdd extends BaseCommand {
     }
 
     const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}${this.dryRun ? " (dry run)" : ""}`;
-    const said = [
+    const lines = [
       `${title} to:`,
       ...dirs.map((dir) => {
         return `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`;
@@ -55,11 +55,11 @@ export default class SkillsAdd extends BaseCommand {
         skills,
         directories: dirs,
       },
-      pretty: prose(said.join("\n")),
+      pretty: prose(lines.join("\n")),
       summary: {
         title: escapeControlCharacters(title),
         sections: [],
-        lines: said.slice(1).map((line) => {
+        lines: lines.slice(1).map((line) => {
           return escapeControlCharacters(line);
         }),
       },

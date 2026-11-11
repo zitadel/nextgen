@@ -104,6 +104,7 @@ export async function configIsDirty(cwd: string): Promise<boolean> {
     },
     [],
   );
+
   return files.some((file) => {
     return file.path.startsWith(".zitadel/");
   });
@@ -129,6 +130,7 @@ export async function diffConfigAgainst(
   referenced: readonly string[] = [],
 ): Promise<string | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
+
   return Repository.answer(
     cwd,
     (repository) => {
@@ -155,6 +157,7 @@ export async function diffConfigFilesAgainst(
   referenced: readonly string[] = [],
 ): Promise<readonly DiffedFile[] | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
+
   return Repository.answer(
     cwd,
     (repository) => {

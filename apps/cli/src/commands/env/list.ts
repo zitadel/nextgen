@@ -25,12 +25,14 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
 
     const bound = await readBoundEnvironments(this.cwd);
     const items = [
-      ...bound.map((entry) => ({
-        name: entry.name,
-        source: entry.file,
-        server: entry.values.ZITADEL_URL ?? "",
-        project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
-      })),
+      ...bound.map((entry) => {
+        return {
+          name: entry.name,
+          source: entry.file,
+          server: entry.values.ZITADEL_URL ?? "",
+          project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
+        };
+      }),
       ...(this.env.ZITADEL_PROJECT_ID
         ? [
             {
@@ -41,15 +43,19 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
             },
           ]
         : []),
-    ].map((entry) => ({
-      ...entry,
-      resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
-    }));
+    ].map((entry) => {
+      return {
+        ...entry,
+        resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
+      };
+    });
 
-    const rows = items.map((entry) => ({
-      ...entry,
-      resolved: entry.resolved ? "yes" : "",
-    }));
+    const rows = items.map((entry) => {
+      return {
+        ...entry,
+        resolved: entry.resolved ? "yes" : "",
+      };
+    });
     const columns = COLUMNS;
     const empty = "No environments found";
     const footer = [`Resolved now: ${name.value} (from ${name.source})`];

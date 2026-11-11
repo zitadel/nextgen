@@ -68,5 +68,6 @@ export async function askConnectionEndpoints(
     parse: parseIssuer,
     initialValue: idpProvider(question.provider).issuer,
   });
+
   return { issuer };
 }

@@ -1,3 +1,4 @@
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type {
   ClientId,
   ClientIdVariable,
@@ -100,10 +101,17 @@ export type ClientIdToPublish = {
  */
 export async function storeClientSecret(secret: SecretToStore): Promise<SecretOutcome> {
   if (secret.value === undefined) {
-    return { name: secret.name, published: "deferred" };
+    return {
+      name: secret.name,
+      published: "deferred",
+    };
   }
   const published = await publishSecret(secret.publish, secret.name, secret.value, true);
-  return { name: secret.name, published };
+
+  return {
+    name: secret.name,
+    published,
+  };
 }
 
 /**
@@ -146,6 +154,7 @@ async function publishSecret(
   }
   try {
     await publish(name, value, { secret });
+
     return "stored";
   } catch (error) {
     log.debug(`Publishing ${name} to the project failed`, error);
@@ -170,6 +179,7 @@ function republishArgsFor(name: CredentialVariable, secret: boolean): readonly s
   if (secret) {
     return ["variable", "set", name, "--secret"];
   }
+
   return ["variable", "set", name];
 }
 
@@ -240,6 +250,7 @@ export function republishArgs(
     if (credential.published === undefined || credential.published === "stored") {
       return [];
     }
+
     return [[...republishArgsFor(name, credential.secret), ...extraArgs]];
   });
 }
@@ -291,7 +302,7 @@ function reportPublished(
 ): void {
   switch (state) {
     case "stored": {
-      log.done(`Published ${name} to the project`);
+      log.done(`Published ${escapeControlCharacters(name)} to the project`);
       return;
     }
     case "deferred": {

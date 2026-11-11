@@ -473,13 +473,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const written = await change.save(target.store);
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
-        log.done(`Wrote ${path}`);
+        log.done(`Wrote ${escapeControlCharacters(path)}`);
       } else {
-        log.done(`Updated ${path}`);
+        log.done(`Updated ${escapeControlCharacters(path)}`);
       }
     }
     for (const path of change.removedPaths) {
-      log.done(`Removed ${path}`);
+      log.done(`Removed ${escapeControlCharacters(path)}`);
     }
     return written;
   }
@@ -498,7 +498,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       if (notice.severity === "warning") {
         reportWarning(notice.message);
       } else {
-        log.info(notice.message);
+        log.info(escapeControlCharacters(notice.message));
       }
     }
   }
@@ -606,6 +606,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     if (this.dryRun) {
       this.report(change);
+
       return this.emit({
         status: "ok",
         data: {

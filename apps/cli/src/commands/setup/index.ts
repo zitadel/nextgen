@@ -1162,6 +1162,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       }
 
       const skippedHost = hostUnlessDefault(preflight.server.value);
+
       return this.emit({
         status: "skipped",
         reason: "already-initialized",
@@ -1192,7 +1193,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
 
     const orca = createOrca();
 
-    const detecting = this.ui.begin(`Detecting framework in ${shortPath(this.cwd, this.env)}`);
+    const detecting = this.ui.begin(
+      `Detecting framework in ${escapeControlCharacters(shortPath(this.cwd, this.env))}`,
+    );
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -1416,7 +1419,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       // server fallback defaults; setup writes the default configuration files
       // and the first deploy publishes them.
       current = this.ui.begin(
-        `Creating project on ${answers.server}${this.dryRun ? " (dry run)" : ""}`,
+        `Creating project on ${escapeControlCharacters(answers.server)}${this.dryRun ? " (dry run)" : ""}`,
       );
       const unauthClient = createZitadelClient({
         userAgent: userAgent(),
@@ -1494,7 +1497,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       }
       for (const file of result.filesSkipped) {
         current?.detail(
-          `Left ${relativeDisplay(this.cwd, file)} unchanged (already matches target)`,
+          `Left ${escapeControlCharacters(relativeDisplay(this.cwd, file))} unchanged (already matches target)`,
         );
       }
       try {
@@ -1765,7 +1768,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
           this.ui
             .begin("Attaching the project to the local admin")
-            .done(`Project owned by ${admin.email} (team ${owner.team_id})`);
+            .done(
+              `Project owned by ${escapeControlCharacters(admin.email)} (team ${escapeControlCharacters(owner.team_id)})`,
+            );
         }
       } catch (error) {
         reportWarning(
@@ -1794,11 +1799,11 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
-            `Manage the project in the local console as ${ownedByLocalAdmin.email}: ${consoleCommand}`,
+            `Manage the project in the local console as ${escapeControlCharacters(ownedByLocalAdmin.email)}: ${consoleCommand}`,
           ],
           boxActions: [
             {
-              text: `Manage the project in the local console, signed in as ${ownedByLocalAdmin.email}:`,
+              text: `Manage the project in the local console, signed in as ${escapeControlCharacters(ownedByLocalAdmin.email)}:`,
               command: consoleCommand,
             },
           ],
@@ -2298,7 +2303,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       throw error;
     });
     for (const file of move.result.filesWritten) {
-      moving.detail(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
+      moving.detail(
+        `${dryRun ? "Would update" : "Updated"} ${escapeControlCharacters(relativeDisplay(cwd, file))}`,
+      );
     }
     // Pinned to the project just moved, as the other recoveries are: its env
     // file, or the server the move used for a project setup gave none, never
@@ -2458,7 +2465,9 @@ async function removeNewApp(
 ): Promise<void> {
   try {
     await newApp.undo();
-    say(`Removed the new app, so ${shortPath(cwd, env)} holds what it did before setup`);
+    say(
+      `Removed the new app, so ${escapeControlCharacters(shortPath(cwd, env))} holds what it did before setup`,
+    );
   } catch (error) {
     reportWarning(
       `Could not remove the new app setup scaffolded in ${cwd}: ${toZitadelError(error).message}`,
@@ -2887,9 +2896,9 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   const verb = dryRun ? "Would write" : "Wrote";
   const sentence = SENTENCE_BY_PATH[relPath];
   if (sentence) {
-    return `${verb} ${sentence.subject} (${stylePath(relPath)})`;
+    return `${verb} ${sentence.subject} (${stylePath(escapeControlCharacters(relPath))})`;
   }
-  return `${verb} ${stylePath(relPath)}`;
+  return `${verb} ${stylePath(escapeControlCharacters(relPath))}`;
 }
 
 /**

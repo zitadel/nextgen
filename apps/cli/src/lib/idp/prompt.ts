@@ -110,7 +110,12 @@ export class CredentialPrompt {
         stdin: true,
         optional: true,
       });
-      return { endpoints: undefined, clientId: givenClientId, secret };
+
+      return {
+        endpoints: undefined,
+        clientId: givenClientId,
+        secret,
+      };
     }
     // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
     // provider may be a local stand-in, and the client is registered with
@@ -133,7 +138,12 @@ export class CredentialPrompt {
       stdin: true,
       retry: this.retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
     });
-    return { endpoints, clientId, secret };
+
+    return {
+      endpoints,
+      clientId,
+      secret,
+    };
   }
 
   /**
@@ -146,6 +156,7 @@ export class CredentialPrompt {
     if (selection.kind !== "catalog") {
       return undefined;
     }
+
     return askConnectionEndpoints({
       provider: selection.id,
       developmentBuild: this.run.developmentBuild,
@@ -171,6 +182,7 @@ export class CredentialPrompt {
       this.run.selector,
       this.run.cliVersion,
     );
+
     return inShell(command, { before: pipe });
   }
 }

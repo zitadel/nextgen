@@ -157,6 +157,7 @@ export function customFlagValues<K extends FlagKeys>(
     }
     return undefined;
   };
+
   return {
     slug: read("slug"),
     displayName: read("displayName"),
@@ -199,6 +200,7 @@ export function loopbackIssuerWarning(
   if (reach === "container") {
     return `${issuer} is on this machine, but the local server runs in Docker, where localhost is the container itself, so sign-in will fail. Start the local server with its binary runtime instead.`;
   }
+
   return `${issuer} is on this machine, and a server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does. A local server the CLI starts allows it by default.`;
 }
 
@@ -220,6 +222,7 @@ export function customExample(flag: CustomFlagNames, withScopes = false): string
   if (withScopes) {
     return [...described, `${flag.scopes} 'openid profile email groups'`].join(" ");
   }
+
   return described.join(" ");
 }
 
@@ -257,6 +260,7 @@ function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
       details: { flag: name },
     });
   }
+
   return parsed.value;
 }
 
@@ -338,6 +342,7 @@ export function selectionFromFlags(
         hint: `Use one of ${known.join(", ")}.`,
       });
     }
+
     return selection;
   }
 
@@ -351,6 +356,7 @@ export function selectionFromFlags(
       details: { missing },
     });
   }
+
   return {
     kind: "custom",
     connection: {
@@ -399,6 +405,7 @@ export function ssoEnableArgs(selection: ProviderSelection): string {
   if (selection.kind !== "custom") {
     return command;
   }
+
   return `${command} ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`;
 }
 
@@ -413,6 +420,7 @@ function shellWord(value: string): string {
   if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
     return value;
   }
+
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
@@ -429,6 +437,7 @@ export function flagText(values: CustomFlagValues, flag: CustomFlagNames): strin
     if (value === undefined) {
       return [];
     }
+
     return [`${flag[setting]} ${shellWord(value)}`];
   }).join(" ");
 }

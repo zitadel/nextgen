@@ -14,7 +14,9 @@ import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/term
 /** Helpers shared by more than one verb builder. */
 
 /** The name of a resource's positional argument. */
-export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resource.idArg ?? "id";
+export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => {
+  return resource.idArg ?? "id";
+};
 
 /**
  * The single positional argument the id-taking verbs share. Given the
@@ -42,12 +44,14 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
             },
           }),
         });
+
   return { [name]: take({ required: true, description }) };
 };
 
 /** The value the caller passed for that argument, read as a command reads it. */
-export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string =>
-  String(args[named(idName(resource))]);
+export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string => {
+  return String(args[named(idName(resource))]);
+};
 
 /**
  * Words spelled with a vowel but said with a "yoo" sound, so they take "a":
@@ -61,10 +65,13 @@ const YOO_SOUND = /^(?:user|unique|unit|usage)/i;
  * connection". A vowel letter takes "an", except a word in {@link YOO_SOUND}.
  * A silent "h" ("an hour") is not handled; no resource noun starts with one.
  */
-export const article = (phrase: string): string =>
-  /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
+export const article = (phrase: string): string => {
+  return /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
+};
 
-export const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+export const capitalize = (word: string): string => {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+};
 
 /**
  * Validate with a generated schema, translating a failure into the CLI's
@@ -85,6 +92,7 @@ export const parseOrThrow = <B>(
       details: { issues: parsed.error.issues },
     });
   }
+
   return parsed.data;
 };
 
@@ -131,6 +139,7 @@ export const dryRunResult = ({
   const printed =
     shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
   const verdict = result === undefined ? "" : "\nThe server would accept this. Nothing changed.";
+
   return {
     status: "ok",
     data: {

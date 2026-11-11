@@ -1,3 +1,4 @@
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
@@ -207,7 +208,7 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
     }
 
     for (const file of filesWritten) {
-      log.info(`Wrote ${file}`);
+      log.info(`Wrote ${escapeControlCharacters(file)}`);
     }
     const ejected = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;
 

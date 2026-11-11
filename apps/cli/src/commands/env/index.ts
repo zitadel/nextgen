@@ -44,11 +44,13 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
       const shown = SECRET_KEYS.has(key) ? REDACTED : entry.value;
       return [{ variable: key, value: shown, source: entry.source }];
     });
-    const lookups = consulted.map(({ source, present, supplied }) => ({
-      source,
-      present,
-      supplied: supplied.join(", "),
-    }));
+    const lookups = consulted.map(({ source, present, supplied }) => {
+      return {
+        source,
+        present,
+        supplied: supplied.join(", "),
+      };
+    });
 
     this.ui.ranAgainst(values.ZITADEL_PROJECT_ID?.value, values.ZITADEL_URL?.value);
 
@@ -63,11 +65,13 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
           source: name.source,
         },
         values: resolved,
-        consulted: consulted.map(({ source, present, supplied }) => ({
-          source,
-          present,
-          supplied: [...supplied],
-        })),
+        consulted: consulted.map(({ source, present, supplied }) => {
+          return {
+            source,
+            present,
+            supplied: [...supplied],
+          };
+        }),
       },
       // Painted, because the two tables below are the CLI's own; the heading
       // names a value read from a file, so it is spelled out here.

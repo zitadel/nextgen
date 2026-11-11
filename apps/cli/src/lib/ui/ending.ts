@@ -71,6 +71,7 @@ export class Ending {
       const after = this.after();
       const under = [...(hint === "" ? [] : [hint]), ...(after === "" ? [] : ["", after])];
       const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
+
       return `${[...stated, ...under, ...footer].join("\n")}\n`;
     }
     const footer = [
@@ -85,6 +86,7 @@ export class Ending {
         return part !== "";
       })
       .join(" · ");
+
     return [
       ...(rendered.length === 0 && this.after() !== "" ? [""] : []),
       ...(body === "" ? [] : [body, ""]),
@@ -127,6 +129,7 @@ export class Ending {
     if (steps.length === 0) {
       return "";
     }
+
     return [
       strong(NEXT_LABEL),
       ...steps.flatMap((step) => {
@@ -167,6 +170,7 @@ export class Ending {
    */
   get line(): string {
     const title = stripColumnMarks(this.summary.title);
+
     return this.summary.failed === true ? pc.red(title) : title;
   }
 
@@ -180,6 +184,7 @@ export class Ending {
     if (!this.boxed()) {
       return body.length === 0 ? undefined : `${indent(stripColumnMarks(body.join("\n")))}\n`;
     }
+
     return `\n${new Frame(
       this.summary.boxTitle ?? "Summary",
       body,
@@ -200,6 +205,7 @@ export class Ending {
    */
   private body(withExtras = true, withSteps = true): string[] {
     const extras = this.summary.extras ?? [];
+
     return trimBlank([
       ...(this.summary.sections.length === 0
         ? []
@@ -245,6 +251,7 @@ export class Ending {
     if (this.presentation !== "wizard") {
       return false;
     }
+
     return this.summary.boxed === true || (this.summary.next ?? []).length > 0;
   }
 }
@@ -264,5 +271,6 @@ function trimBlank(lines: readonly string[]): string[] {
   while (out.at(-1)?.trim() === "") {
     out.pop();
   }
+
   return out;
 }

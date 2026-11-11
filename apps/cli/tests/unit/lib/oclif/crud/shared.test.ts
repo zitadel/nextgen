@@ -81,6 +81,21 @@ describe("dryRunResult", () => {
   });
 });
 
+describe("dryRunResult summary", () => {
+  it("titles the summary with what would happen", () => {
+    expect(dryRunResult({ verb: "create", topic: "users" }).summary?.title).toBe(
+      "Would create users (dry run)",
+    );
+  });
+
+  it("spells out an escape byte in the title", () => {
+    const title = dryRunResult({ verb: "create", topic: "users\u001b[2J" }).summary?.title;
+
+    expect(title).toBe("Would create users\\x1b[2J (dry run)");
+    expect(title).not.toContain("\u001b");
+  });
+});
+
 describe("dryRunResult redaction", () => {
   it("masks a credential that reached the body legitimately, from a file", () => {
     const result = dryRunResult({

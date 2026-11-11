@@ -280,7 +280,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await writeManagedEnvFile(environment.path, values);
-    log.done(`Wrote ${environment.file}`);
+    log.done(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
       { name: "ZITADEL_URL", value: server },
@@ -537,7 +537,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
         },
       });
       log.done(
-        `Deployed ${deployment.contentHash} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
+        `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;
     } catch (error) {

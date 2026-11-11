@@ -77,10 +77,6 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     const footer: string[] = [];
     const page = null;
     const extra = {};
-    const data = {
-      operations: items,
-      count: items.length,
-    };
 
     return this.emitList(flags, {
       columns,
@@ -90,7 +86,10 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
       footer,
       page,
       extra,
-      data,
+      data: {
+        operations: items,
+        count: items.length,
+      },
     });
   }
 }

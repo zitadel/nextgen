@@ -181,6 +181,7 @@ export class Chain implements Drawing, Narratable {
     if (ending.standalone) {
       return ending.renderStandalone();
     }
+
     return `${ending.line}\n${ending.render() ?? ""}`;
   }
 
@@ -212,6 +213,7 @@ export class Chain implements Drawing, Narratable {
     ) {
       return;
     }
+    DrawnSpinner.clearAll();
     if (!this.chained) {
       this.ended = true;
       process.stdout.write(`\n${pc.red(CANCELLED)}\n`);
@@ -240,6 +242,7 @@ export class Chain implements Drawing, Narratable {
       interactive: audience.interactive,
       force: audience.force,
     };
+
     return this.presentation === "plain"
       ? asker({
           ...session,
@@ -305,6 +308,7 @@ export class Chain implements Drawing, Narratable {
       return new DrawnSpinner(label, false);
     }
     this.open();
+
     return new DrawnSpinner(label, options.guide !== false);
   }
 

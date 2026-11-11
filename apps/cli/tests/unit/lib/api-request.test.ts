@@ -52,6 +52,17 @@ describe("pathValuesOf", () => {
     );
   });
 
+  it.each([
+    ["getSession", ["a", "b"], "getSession takes 1 path parameter (session_id), but got 2"],
+    [
+      "finishUserPasskeyRegistration",
+      ["a", "b", "c"],
+      "finishUserPasskeyRegistration takes 2 path parameters (user_id, registration_id), but got 3",
+    ],
+  ])("counts the path parameters of %s in the singular or plural", (operation, given, message) => {
+    expect(() => pathValuesOf(resolveTarget(operation), given, undefined)).toThrow(message);
+  });
+
   it("refuses a positional when the path already names its parameters", () => {
     expect(() => pathValuesOf(resolveTarget("/sessions/s_1"), ["s_2"], undefined)).toThrow(
       /already names session_id/,

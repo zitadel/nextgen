@@ -85,6 +85,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         },
       });
     }
+
     return this.emit({
       status: "ok",
       data: deployment,

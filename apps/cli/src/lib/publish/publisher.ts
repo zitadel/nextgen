@@ -228,13 +228,23 @@ export class Publisher {
       return issue.rule === DEPLOYED_DEPENDENT_RULE;
     });
     if (!needsDeployed) {
-      return { config: unknown, deployedUnknown: false };
+      return {
+        config: unknown,
+        deployedUnknown: false,
+      };
     }
     const deployed = await this.listDeployed();
     if (deployed === undefined) {
-      return { config: unknown, deployedUnknown: true };
+      return {
+        config: unknown,
+        deployedUnknown: true,
+      };
     }
-    return { config: unknown.withOptions({ deployed }), deployedUnknown: false };
+
+    return {
+      config: unknown.withOptions({ deployed }),
+      deployedUnknown: false,
+    };
   }
 
   /**
@@ -252,6 +262,7 @@ export class Publisher {
       if (isCancellation(error)) {
         throw error;
       }
+
       return undefined;
     }
   }
@@ -310,6 +321,7 @@ export class Publisher {
     // Together: neither answer depends on the other and each spawns git, so
     // asking in turn would cost a whole process for nothing.
     const [sha, dirty] = await Promise.all([headSha(request.cwd), worktreeIsDirty(request.cwd)]);
+
     return {
       bundle: Publisher.narrow(built.bundle),
       resourceCount: built.resourceCount,
@@ -351,6 +363,7 @@ export class Publisher {
       releaseId: release.id,
       message: request.message,
     });
+
     return {
       release,
       publication,
@@ -374,6 +387,7 @@ export class Publisher {
       message: request.message,
       ttl: request.ttl,
     });
+
     return {
       release,
       deployment,
@@ -395,6 +409,7 @@ export class Publisher {
       targets: "primary",
       message: request.message,
     });
+
     return {
       release,
       deployment,
@@ -426,6 +441,7 @@ export class Publisher {
     if (Publisher.isReleaseBundle(bundle)) {
       return bundle;
     }
+
     const issues = BuildReleaseBodySchema.shape.bundle.safeParse(bundle).error?.issues ?? [];
     const lines = issues.map((issue) => {
       const field = issue.path.join(".") || "(root)";

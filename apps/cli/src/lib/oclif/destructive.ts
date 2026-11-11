@@ -100,6 +100,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
           },
         };
       }
+
       // Without a `prepare`, `Ready` is its default, `undefined`.
       return apply(consent, ready as Ready);
     }
@@ -123,7 +124,9 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         ...this.ctor.baseFlags,
         ...this.ctor.flags,
       };
-      const redact = (word: string) => word.replace(CREDENTIALS, "$1");
+      const redact = (word: string) => {
+        return word.replace(CREDENTIALS, "$1");
+      };
       const positional = (
         gate.arguments ?? raw.flatMap((token) => (token.type === "arg" ? [token.input] : []))
       ).map(redact);
@@ -137,6 +140,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         if (definitions[token.flag]?.type === "boolean") {
           return [token.input];
         }
+
         return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
       });
       const delimited = positional.some((word) => word.startsWith("-"));
@@ -153,6 +157,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         force: this.meta.force,
         dryRun: this.meta.dryRun,
       };
+
       return Consent.request(
         "retry" in gate
           ? gate
@@ -167,5 +172,6 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       );
     }
   }
+
   return DestructiveCommand;
 }

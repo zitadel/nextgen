@@ -119,6 +119,32 @@ describe("validateStep", () => {
     });
   });
 
+  it("counts a single refused file as one issue", async () => {
+    const config = aConfig({ schemas: { "a.json": { objectType: "a" } } });
+
+    const error = await rejectionOf(() => {
+      return validateStep.run(aStepContext({ config }));
+    });
+
+    expect(error).toMatchObject({
+      message: expect.stringMatching(/^Configuration validation failed \(1 issue\):/),
+    });
+  });
+
+  it("counts several refused files as issues", async () => {
+    const config = aConfig({
+      schemas: { "a.json": { objectType: "a" }, "b.json": { objectType: "b" } },
+    });
+
+    const error = await rejectionOf(() => {
+      return validateStep.run(aStepContext({ config }));
+    });
+
+    expect(error).toMatchObject({
+      message: expect.stringMatching(/^Configuration validation failed \(\d+ issues\):/),
+    });
+  });
+
   describe("with a schema file", () => {
     it("refuses one that is not a user schema", async () => {
       const config = aConfig({ schemas: { "human-user.json": { objectType: "human-user" } } });

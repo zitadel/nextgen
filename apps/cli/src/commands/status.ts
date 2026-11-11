@@ -102,18 +102,6 @@ export default class Status extends EnvironmentCommand {
             });
           })
         : "unknown";
-    const nextCommands = nextCommandsFor(
-      serverLifecycle,
-      project,
-      users,
-      this.cliVersion,
-      this.environmentSelector(),
-      // `--cwd` as typed, for the follow-ups the selector does not carry: the
-      // runtime and the project files they act on live in that directory.
-      typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
-    );
-    const nextActions = nextActionsFor(project, users, this.cliVersion, this.environmentSelector());
-
     const serverUrl =
       server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
     const backend = server.runtime?.backend;
@@ -121,23 +109,10 @@ export default class Status extends EnvironmentCommand {
       server.runtime?.backend === "binary" && server.process !== undefined
         ? `${backend}, pid ${server.process.pid}`
         : backend;
-    const serverSaid = {
-      missing: "No local server was started in this directory",
-      stopped: `The local server is stopped, and last ran at ${serverUrl} (${how})`,
-      unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
-      running: `The local server is running and healthy at ${serverUrl} (${how})`,
-    }[server.lifecycle];
     let dockerSaid = "";
     if (backend === "docker" && !server.docker.available) {
       dockerSaid = `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`;
     }
-    const projectSaid = [
-      ...("project_id" in project && project.project_id !== undefined
-        ? [`Project ${project.project_id}`]
-        : []),
-      `lifecycle ${project.lifecycle}`,
-      ...("issuer" in project && project.issuer !== undefined ? [`issuer ${project.issuer}`] : []),
-    ];
 
     return this.emit({
       status: "ok",
@@ -159,14 +134,40 @@ export default class Status extends EnvironmentCommand {
         title: "Checked the status of the project",
         sections: [],
         lines: [
-          `${serverSaid}${dockerSaid}.`,
-          escapeControlCharacters(`${projectSaid.join(", ")}.`),
+          `${
+            {
+              missing: "No local server was started in this directory",
+              stopped: `The local server is stopped, and last ran at ${serverUrl} (${how})`,
+              unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
+              running: `The local server is running and healthy at ${serverUrl} (${how})`,
+            }[server.lifecycle]
+          }${dockerSaid}.`,
+          escapeControlCharacters(
+            `${[
+              ...("project_id" in project && project.project_id !== undefined
+                ? [`Project ${project.project_id}`]
+                : []),
+              `lifecycle ${project.lifecycle}`,
+              ...("issuer" in project && project.issuer !== undefined
+                ? [`issuer ${project.issuer}`]
+                : []),
+            ].join(", ")}.`,
+          ),
         ],
         overview: exploreAllCommands(this.cliVersion),
       },
       next: {
-        actions: nextActions,
-        commands: nextCommands,
+        actions: nextActionsFor(project, users, this.cliVersion, this.environmentSelector()),
+        commands: nextCommandsFor(
+          serverLifecycle,
+          project,
+          users,
+          this.cliVersion,
+          this.environmentSelector(),
+          // `--cwd` as typed, for the follow-ups the selector does not carry: the
+          // runtime and the project files they act on live in that directory.
+          typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
+        ),
       },
     });
   }

@@ -166,6 +166,7 @@ export class ProviderChoice {
     }
     const example = customExample(ENABLE_FLAG_NAMES);
     const selection = selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, example);
+
     return new ProviderChoice(selection, values);
   }
 
@@ -186,6 +187,7 @@ export class ProviderChoice {
     }
     const settings = await this.askCustomSettings(target, ask);
     const example = customExample(ENABLE_FLAG_NAMES);
+
     return selectionFromFlags(CUSTOM_PROVIDER, settings, ENABLE_FLAG_NAMES, example);
   }
 
@@ -204,6 +206,7 @@ export class ProviderChoice {
     if (this.values.scopes !== undefined) {
       return ["display name", "scopes"];
     }
+
     return ["display name"];
   }
 
@@ -226,7 +229,10 @@ export class ProviderChoice {
    */
   readStoredSettings(existing: Connection | undefined): StoredSettings {
     if (existing === undefined) {
-      return { displayName: undefined, issuer: undefined };
+      return {
+        displayName: undefined,
+        issuer: undefined,
+      };
     }
     existing.refuseNonOidc();
     const displayName = ProviderChoice.unlessGiven(this.values.displayName, () => {
@@ -235,7 +241,11 @@ export class ProviderChoice {
     const issuer = ProviderChoice.unlessGiven(this.values.issuer, () => {
       return existing.readUsableIssuer();
     });
-    return { displayName, issuer };
+
+    return {
+      displayName,
+      issuer,
+    };
   }
 
   /**
@@ -297,7 +307,13 @@ export class ProviderChoice {
       given: given.scopes ?? ProviderChoice.keptScopes(existing, defaultScopes),
       initialValue: defaultScopes,
     });
-    return { slug, displayName, issuer, scopes: scopes.join(" ") };
+
+    return {
+      slug,
+      displayName,
+      issuer,
+      scopes: scopes.join(" "),
+    };
   }
 
   /**
@@ -313,6 +329,7 @@ export class ProviderChoice {
     if (!parsed.ok) {
       return undefined;
     }
+
     return parsed.value;
   }
 
@@ -332,6 +349,7 @@ export class ProviderChoice {
     if (existing === undefined) {
       return undefined;
     }
+
     return defaultScopes;
   }
 
@@ -347,6 +365,7 @@ export class ProviderChoice {
     if (given !== undefined) {
       return undefined;
     }
+
     return read();
   }
 }

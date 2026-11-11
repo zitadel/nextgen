@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -106,7 +107,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
         title: `Created ${escapeControlCharacters(release.id)}`,
         sections: [],
       },
-      next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
+      next: { commands: [this.suggest(`deployment create --release ${Cmd.quote(release.id)}`)] },
     });
   }
 }

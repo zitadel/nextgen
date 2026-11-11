@@ -307,6 +307,32 @@ describe("a normal command's chain, which is no chain at all", () => {
     expect(spinner).toHaveBeenCalledWith({ withGuide: false });
   });
 
+  it("clears a running spinner before it narrates a line and draws it again after", () => {
+    const order: string[] = [];
+    const chain = watching();
+    const running = chain.spinner("Deploying");
+    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+    vi.mocked(handle.clear).mockImplementation(() => void order.push("clear"));
+    vi.mocked(log.message).mockImplementation(() => void order.push("line"));
+
+    chain.narrate("i", "halfway there");
+
+    const drawnAgain = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+    expect(order).toEqual(["clear", "line"]);
+    expect(drawnAgain.start).toHaveBeenCalledWith("Deploying");
+    running.clear();
+  });
+
+  it("clears a spinner still running when the run is cancelled, before Cancelled is said", () => {
+    const chain = watching();
+    chain.spinner("Deploying");
+    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
+
+    expect(handle.clear).toHaveBeenCalled();
+  });
+
   // `task` and `begin` got the gutter that `spinner` was taught to keep out
   // of, so a normal command that reported a step drew a `│` above its answer.
   it("keeps a step out of the gutter it does not have", async () => {

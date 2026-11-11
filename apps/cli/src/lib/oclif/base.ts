@@ -359,6 +359,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     this.reading ??= this.parse(this.command).catch((error: unknown) => {
       throw asRaised(error);
     });
+
     return this.reading;
   }
 
@@ -478,7 +479,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
         : await resolveServer({ cwd, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = isTerminal();
-    const verbose = Boolean(flags.verbose);
     const debug = Boolean(flags.debug);
     // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
@@ -502,7 +502,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       cliVersion: this.config.version,
       source: source.value,
       serverFlag,
-      verbose,
+      verbose: Boolean(flags.verbose),
       debug,
       env: process.env,
       isTTY,
@@ -608,6 +608,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
+
     return isTerminal();
   }
 
@@ -663,7 +664,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       if (footer !== undefined) {
         this.log(`\n${stripColumnMarks(footer)}`);
       }
-    } else {
+    } else if (!this.isJson) {
       const text = this.ui.written(ending).replace(/\n+$/, "");
       if (text !== "") {
         this.log(text);
@@ -692,14 +693,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
       own.next ??
       (result.status === "ok" && result.nextShown !== undefined ? [] : stepsOf(result.next));
     const ran = own.ran ?? this.serverRanOn();
-    const warnings =
-      result.status === "ok" && !result.warningsShown
-        ? (result.warnings ?? []).map(warningLine)
-        : [];
     const extras = [
       ...(own.extras ?? []),
       ...(footer === undefined ? [] : footer.split("\n")),
-      ...warnings,
+      ...(result.status === "ok" && !result.warningsShown
+        ? (result.warnings ?? []).map(warningLine)
+        : []),
     ];
     return this.withOverview(
       {
@@ -720,6 +719,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.meta.dryRun) {
       return undefined;
     }
+
     return hostUnlessDefault(this.meta.source);
   }
 
@@ -835,7 +835,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected override async catch(error: unknown): Promise<never> {
     const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
-    const zitadelError = toZitadelError(error);
+    const reason: unknown = this.signal.reason;
+    const cancelled =
+      this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
+    const zitadelError = cancelled ? reason : toZitadelError(error);
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
     if (this.telemetry?.enabled) {
@@ -928,6 +931,7 @@ function asRaised(error: unknown): unknown {
   if (!(error instanceof ZitadelError) || error.message === error.raised) {
     return error;
   }
+
   return new ZitadelError(error.code, error.raised, {
     hint: error.hint,
     nextCommands: error.nextCommands,
@@ -947,12 +951,12 @@ function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): Com
   if (stated.next?.commands === undefined) {
     return stated as CommandResult;
   }
-  const commands = normalizePublicCliCommands(stated.next.commands, meta.cliVersion);
+
   return {
     ...stated,
     next: {
       ...stated.next,
-      commands,
+      commands: normalizePublicCliCommands(stated.next.commands, meta.cliVersion),
     },
   } as CommandResult;
 }
@@ -970,6 +974,7 @@ function withReportedWarnings(result: CommandResult, reported: readonly string[]
   if (result.status !== "ok" || reported.length === 0) {
     return result;
   }
+
   return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
 }
 
@@ -999,6 +1004,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
       warnings: result.warnings ? [...result.warnings] : [],
     };
   }
+
   return {
     ...base,
     status: "skipped",

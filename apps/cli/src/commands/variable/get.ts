@@ -59,6 +59,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
         },
       });
     }
+
     const cell = variableCell(variable);
 
     return this.emit({

@@ -34,6 +34,7 @@ export type EndingStep = BoxAction;
  */
 export function stepsOf(next: NextSteps | undefined): EndingStep[] {
   const commands = next?.commands ?? [];
+
   return [
     ...(next?.actions ?? []).map((text) => {
       return { text };
@@ -87,6 +88,7 @@ export function renderNextSteps(next: NextSteps): string {
   if (actions.length === 0 && commands.length === 0) {
     return "";
   }
+
   // The block is coloured, so it is printed as it came and cannot be spelled
   // out as a whole. A suggested command goes through the palette, which spells
   // out what it is given; an action is prose nothing colours, and it names

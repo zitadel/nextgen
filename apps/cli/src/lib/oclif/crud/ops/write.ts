@@ -1,5 +1,7 @@
 import { Flags } from "@oclif/core";
 
+import { Cmd } from "@/lib/cmd";
+
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { named } from "@/lib/oclif/names";
@@ -93,12 +95,15 @@ const fieldsOf = <Ctx>(
   const under = `${spec.root ?? ""}\u0000${reserved.join("\u0000")}`;
   const forSchema = described.get(spec.schema as object) ?? new Map();
   described.set(spec.schema as object, forSchema);
+
   const already = forSchema.get(under);
   if (already !== undefined) {
     return already;
   }
+
   const fields = describeBody(spec.schema, { root: spec.root, reserved });
   forSchema.set(under, fields);
+
   return fields;
 };
 
@@ -107,8 +112,9 @@ const fieldsOf = <Ctx>(
  * `./identity-provider-connection.json`, where the singular itself would be
  * split by a shell into three arguments.
  */
-const exampleFile = (singular: string): string =>
-  `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+const exampleFile = (singular: string): string => {
+  return `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+};
 
 /**
  * `<topic> create` and `<topic> update <id>` share everything but the id
@@ -130,6 +136,7 @@ const describeWrite = <
   const example =
     spec.example ?? (flagsAloneMayBeIncomplete(fields) ? undefined : fieldExample(fields));
   const command = `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
+
   return {
     description:
       verb === "create"
@@ -140,7 +147,11 @@ const describeWrite = <
       `${command} --data '{...}' --json`,
       `${command} --file ${exampleFile(resource.singular)}`,
     ],
-    flags: { ...bodyFieldFlags(fields), ...rawBodyFlags(document, fields), ...options.flags },
+    flags: {
+      ...bodyFieldFlags(fields),
+      ...rawBodyFlags(document, fields),
+      ...options.flags,
+    },
     args: verb === "create" ? {} : idArg(resource, topic),
   };
 };
@@ -156,7 +167,9 @@ const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
     flags.data !== undefined ||
     flags.file !== undefined ||
     (Array.isArray(flags.set) && flags.set.length > 0) ||
-    fields.some((field) => field.flag !== undefined && flags[named(field.flag)] !== undefined)
+    fields.some((field) => {
+      return field.flag !== undefined && flags[named(field.flag)] !== undefined;
+    })
   );
 };
 
@@ -224,6 +237,7 @@ abstract class WriteOperation<
         lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
       };
     }
+
     return {
       status: "ok",
       data: result ?? {},
@@ -235,7 +249,9 @@ abstract class WriteOperation<
       ...(result && resource.get
         ? {
             next: {
-              commands: [this.suggest(`${topic} get ${String(resource.idOf(result))} --json`)],
+              commands: [
+                this.suggest(`${topic} get ${Cmd.quote(String(resource.idOf(result)))} --json`),
+              ],
             },
           }
         : {}),
@@ -277,6 +293,7 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected override async check(body: Json, id: string | undefined): Promise<WriteResult> {
     const { check } = this.definition.spec;
+
     return check === undefined ? undefined : check(await this.context(), id ?? "", body);
   }
 }

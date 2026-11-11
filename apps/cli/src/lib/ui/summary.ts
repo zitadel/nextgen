@@ -60,18 +60,18 @@ export type Summary = {
    * every command. `status` ends with it, as `setup` and every help page do.
    */
   readonly overview?: string;
-  /** The headline is a failure, so it closes the chain in red. */
-  readonly failed?: boolean;
-  /** Draw the box even with no steps, for a command whose body is instructions. */
-  readonly boxed?: boolean;
-  /** The box's own title. Defaults to "Summary". */
-  readonly boxTitle?: string;
   /**
    * Where the command ran, as the box's last line: the project and the server
    * it spoke to. Every command that reaches a server states it, in one place,
    * rather than printing it before the first question.
    */
   readonly ran?: string;
+  /** Draw the box even with no steps, for a command whose body is instructions. */
+  readonly boxed?: boolean;
+  /** The box's own title. Defaults to "Summary". */
+  readonly boxTitle?: string;
+  /** The headline is a failure, so it closes the chain in red. */
+  readonly failed?: boolean;
 };
 
 /**

@@ -50,39 +50,41 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
     const described = {
       backend: runtime?.backend ?? "missing",
       ...(runtime?.backend === "binary"
-        ? { pid: runtime.pid, log_path: runtime.log_path }
+        ? {
+            pid: runtime.pid,
+            log_path: runtime.log_path,
+          }
         : { container_name: containerName }),
       data_deleted: true,
     };
-
-    const dataDir = localRuntimePaths(this.cwd).dataDir;
-    const adminFile = join(this.cwd, LOCAL_ADMIN_FILE);
 
     return this.emit(
       await this.confirmed({
         verb: "reset",
         name: "delete the local runtime and its data",
         message: [
-          `Permanently delete the local Zitadel server's data in ${dataDir}?`,
+          `Permanently delete the local Zitadel server's data in ${localRuntimePaths(this.cwd).dataDir}?`,
           "",
           "It stops and removes the local server if one is running, so the status command no longer reports it.",
           "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
-          `Kept: ${adminFile}, the local admin sign-in, and everything else in your project.`,
+          `Kept: ${join(this.cwd, LOCAL_ADMIN_FILE)}, the local admin sign-in, and everything else in your project.`,
           `Run ${this.suggest("start")} afterwards to set up a fresh server.`,
         ].join("\n"),
-        preview: () => ({
-          status: "ok",
-          data: {
-            dry_run: true,
-            title: "Would reset the local Zitadel server runtime (dry run)",
-            runtime: described,
-          },
-          summary: {
-            title: "Would reset the local Zitadel server runtime (dry run)",
-            sections: [],
-          },
-          next: { commands: [this.suggest("reset --force")] },
-        }),
+        preview: () => {
+          return {
+            status: "ok",
+            data: {
+              dry_run: true,
+              title: "Would reset the local Zitadel server runtime (dry run)",
+              runtime: described,
+            },
+            summary: {
+              title: "Would reset the local Zitadel server runtime (dry run)",
+              sections: [],
+            },
+            next: { commands: [this.suggest("reset --force")] },
+          };
+        },
         apply: async (consent) => {
           await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
           return {

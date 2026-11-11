@@ -77,7 +77,9 @@ export class ResourceCommand<
 
   /** Open the platform connection; deferred so `--dry-run` connects only to ask the server. */
   protected context(): Promise<Ctx> {
-    return this.definition.options.connect(() => this.connect());
+    return this.definition.options.connect(() => {
+      return this.connect();
+    });
   }
 
   /**
@@ -114,6 +116,7 @@ export const bindOperation = <Ctx, Spec>(
   // serialized request schema inside it) is implementation detail that would
   // dwarf the metadata an agent actually reads.
   definitions.set(bound, definition as OperationDefinition<unknown, unknown>);
+
   return bound;
 };
 
@@ -123,4 +126,6 @@ const definitions = new WeakMap<object, OperationDefinition<unknown, unknown>>()
 /** The definition {@link bindOperation} recorded for a command class, if any. */
 export const definitionOf = (
   command: typeof Command,
-): OperationDefinition<unknown, unknown> | undefined => definitions.get(command);
+): OperationDefinition<unknown, unknown> | undefined => {
+  return definitions.get(command);
+};

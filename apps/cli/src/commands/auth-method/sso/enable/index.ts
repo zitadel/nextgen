@@ -594,7 +594,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         `${escapeControlCharacters(provider.displayName, { keepLayout: false })} needs an OAuth application.`,
       );
     }
-    log.info(`Callback URI   ${summary.callbackUri}`);
+    log.info(
+      `Callback URI   ${escapeControlCharacters(summary.callbackUri, { keepLayout: false })}`,
+    );
     for (const uri of summary.deployedCallbackUris) {
       log.info(`Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`);
     }
@@ -655,6 +657,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       }),
       ...stores,
     ];
+
     return this.emit({
       status: "ok",
       data: {
@@ -768,7 +771,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
       log.info(
-        `${outcome.schema.name} and its login flow already offer ${escapeControlCharacters(provider.displayName, { keepLayout: false })}`,
+        `${escapeControlCharacters(outcome.schema.name)} and its login flow already offer ${escapeControlCharacters(provider.displayName, { keepLayout: false })}`,
       );
     }
   }

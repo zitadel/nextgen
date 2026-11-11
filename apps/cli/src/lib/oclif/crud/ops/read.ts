@@ -67,6 +67,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     const heading = headingOf(resource.heading ?? resource.idField, item);
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular)}`;
+
     if (!this.isOnScreen) {
       return {
         status: "ok",
@@ -85,6 +86,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
           })) ?? [])
         : [];
     const record = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
+
     return {
       status: "ok",
       data: item,
@@ -104,14 +106,11 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
 
 /** The value that heads the rendering, when the record carries one. */
 const headingOf = (path: string, item: unknown): string | undefined => {
-  const value = path
-    .split(".")
-    .reduce<unknown>(
-      (current, key) =>
-        typeof current === "object" && current !== null
-          ? (current as Record<string, unknown>)[key]
-          : undefined,
-      item,
-    );
+  const value = path.split(".").reduce<unknown>((current, key) => {
+    return typeof current === "object" && current !== null
+      ? (current as Record<string, unknown>)[key]
+      : undefined;
+  }, item);
+
   return typeof value === "string" ? value : undefined;
 };

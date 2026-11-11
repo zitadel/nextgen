@@ -278,13 +278,6 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
-    const files = fileList(
-      pulled.map((entry) => {
-        return entry.path;
-      }),
-      this.dryRun,
-    );
-
     return this.emit({
       status: "ok",
       data: {
@@ -300,7 +293,12 @@ export default class Pull extends EnvironmentCommand {
             : `Pulled ${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"} from ${release.id}`,
         ),
         sections: [],
-        lines: files,
+        lines: fileList(
+          pulled.map((entry) => {
+            return entry.path;
+          }),
+          this.dryRun,
+        ),
       },
       next: {
         commands: this.dryRun || args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],

@@ -39,6 +39,8 @@ export class DrawnSpinner implements Spinner {
   /** The spinners that are drawing now, so a line written meanwhile can make room (read by the tests, which clear it). */
   static readonly active = new Set<DrawnSpinner>();
 
+  private static exitHooked = false;
+
   private handle: ReturnType<typeof spinner>;
   private text: string;
   private readonly guide: boolean;
@@ -107,8 +109,27 @@ export class DrawnSpinner implements Spinner {
 
   /** Starts clack's spinner under the current text, with Ctrl-C left as a signal. */
   private spin(): ReturnType<typeof spinner> {
+    const events = ["SIGINT", "SIGTERM", "exit", "uncaughtExceptionMonitor", "unhandledRejection"];
+    const before = events.map((event) => {
+      return { event, listeners: new Set(process.listeners(event as NodeJS.Signals)) };
+    });
     const handle = spinner({ withGuide: this.guide });
     handle.start(this.text);
+    // Clack's own handlers print "Canceled" or an error line of theirs; the
+    // command's single `Cancelled` ending is the only one wanted.
+    for (const { event, listeners } of before) {
+      for (const listener of process.listeners(event as NodeJS.Signals)) {
+        if (!listeners.has(listener)) {
+          process.removeListener(event, listener);
+        }
+      }
+    }
+    if (!DrawnSpinner.exitHooked) {
+      DrawnSpinner.exitHooked = true;
+      process.once("exit", () => {
+        DrawnSpinner.clearAll();
+      });
+    }
     if (this.input.isTTY === true) {
       this.input.setRawMode?.(false);
     }

@@ -334,6 +334,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
     const url = operation.urlOn(this.meta.source, request);
     if (this.dryRun) {
       const curl = prose(this.curlFor(request));
+
       return this.emit({
         status: "ok",
         data: {
@@ -360,7 +361,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (this.isOnScreen) {
-      log.info(`${operation.method} ${url}`);
+      log.info(`${operation.method} ${escapeControlCharacters(String(url))}`);
     }
     const destructive = request.operation.destructive;
     const consent = destructive
@@ -410,6 +411,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
       : await operationService.call(request);
 
     const answer = this.answered(operation.id, response);
+
     return this.emit({
       status: "ok",
       data: response.body ?? null,

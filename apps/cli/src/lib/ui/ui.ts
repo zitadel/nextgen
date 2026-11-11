@@ -214,6 +214,7 @@ export class Ui {
    */
   ending(summary: Summary): string {
     this.handedOver = true;
+
     return this.chain.ending(summary);
   }
 

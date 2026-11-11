@@ -177,6 +177,7 @@ function configErrorCode(error: ConfigError): ZitadelErrorCode {
   if (error instanceof ConfigNotFoundError) {
     return "E_NOT_FOUND";
   }
+
   return "E_VALIDATION";
 }
 
@@ -232,6 +233,7 @@ export function failureText(message: string): FailureText {
   const listed = rest.map((line) => {
     return line.split(/\s{2,}/)[0] ?? line;
   });
+
   return {
     sentence: head.endsWith(":")
       ? `${head} ${listed.join(", ")}`.trim()
@@ -329,6 +331,7 @@ function fromBackendError(error: BackendError): ZitadelError {
             : error instanceof UnavailableError
               ? "E_NETWORK"
               : "E_VALIDATION";
+
     return new ZitadelError(code, error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
@@ -360,6 +363,7 @@ function fromBackendError(error: BackendError): ZitadelError {
     const message = wrongServer
       ? `${error.message} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
       : error.message;
+
     return new ZitadelError("E_NOT_FOUND", message, { details });
   }
   // A 409 is the platform refusing because of the state it holds — a
@@ -407,6 +411,7 @@ function fromBackendError(error: BackendError): ZitadelError {
         ]
       : []),
   ].join(" ");
+
   return new ZitadelError(code, error.message, {
     ...(hint !== "" ? { hint } : {}),
     details,
@@ -445,6 +450,7 @@ function listedInDetails(
       }
     }
   }
+
   return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
 }
 
@@ -475,6 +481,7 @@ function rejectedResources(body: unknown): string[] {
     }
     node = (node as { details?: unknown }).details;
   }
+
   return lines;
 }
 
@@ -494,7 +501,12 @@ function resourceLine(item: unknown): string | undefined {
   if (text === "") {
     return undefined;
   }
-  const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+  const subject = [kind, handle]
+    .filter((part) => {
+      return typeof part === "string" && part !== "";
+    })
+    .join(" ");
+
   return subject === "" ? text : `${subject}: ${text}`;
 }
 

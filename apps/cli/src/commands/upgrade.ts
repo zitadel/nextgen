@@ -124,10 +124,6 @@ export default class Upgrade extends Suggestible(BaseCommand) {
           ]
         : []),
     ];
-    const next = {
-      ...(actions.length > 0 ? { actions } : {}),
-      ...(commands.length > 0 ? { commands } : {}),
-    };
 
     let said = `Zitadel upgraded to ${target}`;
     if (upToDate) {
@@ -156,6 +152,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         return `  ${dim(escapeControlCharacters(`- ${name} left at "${specifier}", not an exact version`))}`;
       }),
     ];
+
     return this.emit({
       status: "ok",
       data: {
@@ -182,7 +179,10 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         sections: [],
         lines: rows,
       },
-      next,
+      next: {
+        ...(actions.length > 0 ? { actions } : {}),
+        ...(commands.length > 0 ? { commands } : {}),
+      },
     });
   }
 

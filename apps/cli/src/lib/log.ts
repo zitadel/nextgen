@@ -38,7 +38,9 @@ export function installLogSink(next: LogSink): () => void {
   const previous = sink;
   sink = next;
   return () => {
-    sink = previous;
+    if (sink === next) {
+      sink = previous;
+    }
   };
 }
 

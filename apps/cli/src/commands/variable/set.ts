@@ -216,7 +216,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           credentialSet: true,
           strict: false,
         });
-        const previewable = verdict === "preview";
         let next: { actions: string[]; commands: SuggestedCommand[] } = {
           actions: [
             "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
@@ -230,7 +229,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             ],
             commands: [],
           };
-          if (previewable) {
+          if (verdict === "preview") {
             next.commands = [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")];
           } else if (verdict === "unnamed-ci-build") {
             next.actions.push(

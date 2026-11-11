@@ -91,7 +91,6 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
         created: preview.created_at,
       };
     });
-
     const columns = COLUMNS;
     const empty = "No previews found";
     const footer: string[] = [];

@@ -99,10 +99,11 @@ const ONE_LINE: EscapeOptions = { keepLayout: false };
  * escaped for all of them and none can drive the terminal.
  */
 const readCell = (column: string, item: unknown, options?: EscapeOptions): string => {
-  const value = column
-    .split(".")
-    .reduce<unknown>((current, key) => (isObject(current) ? current[key] : undefined), item);
+  const value = column.split(".").reduce<unknown>((current, key) => {
+    return isObject(current) ? current[key] : undefined;
+  }, item);
   const text = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+
   return escapeControlCharacters(text, options);
 };
 
@@ -117,7 +118,9 @@ const tabulateRows = (columns: readonly string[], items: readonly unknown[]): st
   return items
     .map((item) => {
       return columns
-        .map((column) => readCell(column, item).replaceAll("\t", "\\t").replaceAll("\n", "\\n"))
+        .map((column) => {
+          return readCell(column, item).replaceAll("\t", "\\t").replaceAll("\n", "\\n");
+        })
         .join("\t");
     })
     .join("\n");
@@ -165,10 +168,16 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       }
       const { makeTable } = await import("@oclif/table");
       const table = makeTable({
-        data: items.map((item) =>
-          Object.fromEntries(columns.map((column) => [column, readCell(column, item, ONE_LINE)])),
-        ),
-        columns: columns.map((key) => ({ key, name: key.split(".").at(-1) ?? key })),
+        data: items.map((item) => {
+          return Object.fromEntries(
+            columns.map((column) => {
+              return [column, readCell(column, item, ONE_LINE)];
+            }),
+          );
+        }),
+        columns: columns.map((key) => {
+          return { key, name: key.split(".").at(-1) ?? key };
+        }),
         borderStyle: "headers-only-with-underline",
         maxWidth: "none",
         // The library styles a header bold blue from its own reading of the
@@ -180,6 +189,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
           ? { bold: true, color: "blue" }
           : { bold: false, color: undefined },
       });
+
       return table.replace(/\n+$/, "");
     }
 
@@ -274,7 +284,9 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         nextPageToken: token,
         cursorKey: view.page?.cursorKey,
       });
-      const replaced = Object.keys(view.extra).filter((key) => key in canonical);
+      const replaced = Object.keys(view.extra).filter((key) => {
+        return key in canonical;
+      });
       if (replaced.length > 0) {
         throw new Error(`a list's extra fields may not replace ${replaced.join(", ")}`);
       }
@@ -293,6 +305,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (this.jsonEnabled() || !plain) {
         return "";
       }
+
       return tabulateRows(view.columns, view.rows);
     }
 
@@ -311,15 +324,28 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // Width is measured over the fields that survive, so an omitted one cannot
       // pad every other label out of alignment.
       const rows = fields
-        .map((field) => [field.split(".").at(-1) ?? field, readCell(field, item)] as const)
-        .filter(([, value]) => value !== "");
-      const width = Math.max(0, ...rows.map(([label]) => label.length));
-      const body = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
+        .map((field) => {
+          return [field.split(".").at(-1) ?? field, readCell(field, item)] as const;
+        })
+        .filter(([, value]) => {
+          return value !== "";
+        });
+      const width = Math.max(
+        0,
+        ...rows.map(([label]) => {
+          return label.length;
+        }),
+      );
+      const body = rows.map(([label, value]) => {
+        return `${label.padEnd(width)}  ${value}`;
+      });
       // The heading is a field of the record, so it is the server's text as
       // much as any cell is, and `readCell` spells out only the cells.
       const headed = heading === undefined ? [] : [escapeControlCharacters(heading), ""];
+
       return [...headed, ...body].join("\n");
     }
   }
+
   return TabulatableCommand;
 }

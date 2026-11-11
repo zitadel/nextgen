@@ -166,7 +166,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
    * @param deploymentId - The deployment the variables were frozen by.
    * @param items - The frozen variables.
    * @param where - The suffix naming the origins the deployment serves, or empty.
-   * @param extra - The origins the envelope carries beside the deployment id, or none.
+   * @param carried - The origins the envelope carries beside the deployment id, or none.
    * @returns The envelope to print.
    */
   private async render(
@@ -174,7 +174,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     deploymentId: string,
     items: readonly Variable[],
     where: string,
-    extra: { origins?: string[] },
+    carried: { origins?: string[] },
   ): Promise<JsonEnvelope> {
     this.recordTelemetry({
       variable_count: items.length,
@@ -187,9 +187,9 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const empty = `${deploymentId} froze no variables${where}`;
     const footer = [`Frozen by ${deploymentId}${where}`];
     const page = null;
-    const data = {
+    const extra = {
       deployment_id: deploymentId,
-      ...extra,
+      ...carried,
     };
 
     return this.emitList(flags, {
@@ -200,7 +200,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       empty,
       footer,
       page,
-      extra: data,
+      extra,
     });
   }
 }

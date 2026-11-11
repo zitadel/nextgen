@@ -77,9 +77,7 @@ export default class OriginAdd extends EnvironmentCommand {
         title: `Added ${escapeControlCharacters(added.pattern)} (${escapeControlCharacters(added.kind)})`,
         sections: [],
       },
-      next: {
-        commands: [this.suggest("origin list")],
-      },
+      next: { commands: [this.suggest("origin list")] },
     });
   }
 }

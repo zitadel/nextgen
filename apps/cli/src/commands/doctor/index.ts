@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
@@ -392,6 +393,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     }
 
     const report = doctorReport(reportInput);
+
     return this.emit({
       status: "ok",
       data,
@@ -501,7 +503,10 @@ export function failureAdvice(
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [shellCommand(`docker pull ${image}`), unscopedCommand("doctor", cliVersion)],
+      nextCommands: [
+        shellCommand(`docker pull ${Cmd.quote(image)}`),
+        unscopedCommand("doctor", cliVersion),
+      ],
     };
   }
 

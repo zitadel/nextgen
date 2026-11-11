@@ -1,3 +1,5 @@
+import { escapeControlCharacters } from "./terminal-text";
+
 /**
  * A command line, held as a list of words.
  *
@@ -50,11 +52,12 @@ export class Cmd {
    * Cmd.quote("it's"); // "'it'\\''s'"
    */
   static quote(value: string): string {
-    const isSafe = /^[A-Za-z0-9_.:@/=+-]+$/.test(value);
+    const word = escapeControlCharacters(value, { keepLayout: false });
+    const isSafe = /^[A-Za-z0-9_.:@/+-][A-Za-z0-9_.:@/=+-]*$/.test(word);
     if (isSafe) {
-      return value;
+      return word;
     }
-    return `'${value.replaceAll("'", `'\\''`)}'`;
+    return `'${word.replaceAll("'", `'\\''`)}'`;
   }
 
   /**

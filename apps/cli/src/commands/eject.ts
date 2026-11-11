@@ -295,6 +295,7 @@ export default class Eject extends Suggestible(Destructive(BaseCommand)) {
         return ejected(this.cwd, await ejectProject(this.cwd, consent), dir, setItUp);
       },
     });
+
     return this.emit(
       result.status === "skipped" && result.reason === "eject-cancelled"
         ? {

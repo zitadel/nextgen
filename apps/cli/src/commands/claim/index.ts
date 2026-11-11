@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { Flags } from "@oclif/core";
 import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
@@ -459,7 +460,7 @@ export default class Claim extends EnvironmentCommand {
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
-    const wait = this.suggest(`claim --challenge-id ${challenge.challenge_id}`);
+    const wait = this.suggest(`claim --challenge-id ${Cmd.quote(challenge.challenge_id)}`);
 
     return this.emit({
       status: "ok",

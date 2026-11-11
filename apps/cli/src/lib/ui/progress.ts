@@ -96,6 +96,7 @@ export class Progress {
         narration.info(`${verb} ${subject}`);
       }
       narration.done(done?.(result) ?? label);
+
       return result;
     }
     this.drawing.open();
@@ -106,6 +107,7 @@ export class Progress {
       this.drawing.closeGap();
       this.line(MARK.done, done?.(result) ?? label);
       this.draw(lines);
+
       return result;
     } catch (error) {
       progress.clear();
@@ -130,6 +132,7 @@ export class Progress {
         narrated = true;
         narrate();
       };
+
       return {
         detail: (text) => {
           return narration.info(text);
@@ -162,6 +165,7 @@ export class Progress {
         this.detail(line);
       }
     };
+
     return {
       detail: (text) => {
         if (ended) {
@@ -190,6 +194,7 @@ export class Progress {
         });
       };
     };
+
     return {
       done: line(""),
       skipped: line(MARK.skipped),
