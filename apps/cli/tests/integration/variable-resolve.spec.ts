@@ -142,7 +142,8 @@ describe("variable resolve", () => {
         await app.editUserSchema((schema) => {
           schema.properties.company = { type: "string" };
         });
-        await app.deployData();
+        const second = await app.deployData();
+        expect(second.release_id).not.toBe(first.release_id);
         return { app, firstDeploymentId: first.deployment_id ?? "" };
       }
 

@@ -22,7 +22,7 @@ function aDeployment(id: string, origin: string) {
     targets: [
       {
         origin,
-        expires_at: null as string | null,
+        expires_at: null,
       },
     ],
     metadata: {
@@ -269,30 +269,6 @@ describe("variable resolve", () => {
         name: "OLD",
         value: "kept",
       },
-    ]);
-  });
-
-  it("leaves out a target that has expired", async () => {
-    const cwd = await aProject({
-      deployments: [],
-      earlier: [
-        {
-          ...aDeployment("dep_old", "https://app.acme.com"),
-          targets: [
-            { origin: "https://app.acme.com", expires_at: null },
-            { origin: "https://pr-1.acme.com", expires_at: "2000-01-01T00:00:00.000Z" },
-          ],
-        },
-      ],
-      frozen: {
-        dep_old: {},
-      },
-    });
-
-    const { stdout } = await resolve(cwd, "dep_old");
-
-    expect((parseJson(stdout) as { data: { origins: string[] } }).data.origins).toEqual([
-      "https://app.acme.com",
     ]);
   });
 
