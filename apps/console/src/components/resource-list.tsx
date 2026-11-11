@@ -140,14 +140,16 @@ export const RESOURCE_TABLE_SCROLL = "group/scroll";
 
 /**
  * The leading column, pinned to the card's left edge from 640px. Its 1px
- * divider shows only while a column is scrolled under it.
+ * divider shows only while a column is scrolled under it. Raised one step, no
+ * more: over the cells scrolling under it, and under the shell's top bar
+ * (`z-10`), which the page scrolls it beneath.
  *
  * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
  * and a pinned identity column (up to 280px) beside the pinned menu would
  * leave no room for any column between them.
  */
 export const RESOURCE_STICKY_START =
-  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+  "sm:sticky sm:left-0 sm:z-1 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
 
 /**
  * The trailing column (the row menu), pinned to the card's right edge so the
@@ -155,7 +157,7 @@ export const RESOURCE_STICKY_START =
  * under it.
  */
 export const RESOURCE_STICKY_END =
-  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+  "sticky right-0 z-1 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
 
 /**
  * A body cell of a sticky column. It must be opaque, or the scrolled cells

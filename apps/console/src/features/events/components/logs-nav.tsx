@@ -7,7 +7,7 @@ import {
   type LucideIcon,
   ScrollText,
 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -241,7 +241,7 @@ const CUSTOM = "custom";
 /**
  * The time the list reads: a range counted back from when it loads, as
  * Vercel's Logs offers them, everything retained, or a range with fixed ends.
- * Choosing **Custom range** opens two fields, applied together.
+ * Choosing **Custom range** opens two fields, read as they are changed.
  */
 function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
   const custom = hasCustomRange(current);
@@ -280,8 +280,6 @@ function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSea
       </Field>
       {(custom || editing) && (
         <CustomRange
-          // A range set elsewhere (a row's "Events around this one") refills the fields.
-          key={`${current.from ?? ""}/${current.to ?? ""}`}
           from={current.from}
           to={current.to}
           onApply={(from, to) => {
@@ -310,10 +308,14 @@ function fromLocalInput(value: string): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+/** How long the fields rest before the range they hold is read. */
+const RANGE_PAUSE_MS = 600;
+
 /**
  * A range with fixed ends, in the viewer's local time: from, to, or both. A
- * new range starts at the last hour, so Apply alone reads something. A start
- * that is not before the end cannot be applied.
+ * new range starts at the last hour. It is read as it is changed, after a
+ * pause, as every other filter is on being chosen; Enter reads it at once. A
+ * start that is not before the end is not read, and says so.
  */
 function CustomRange({
   from,
@@ -329,18 +331,48 @@ function CustomRange({
     localInput(fresh ? new Date(Date.now() - 60 * 60 * 1000).toISOString() : from),
   );
   const [end, setEnd] = useState(() => localInput(fresh ? new Date().toISOString() : to));
+  // Only what the person set is read: a range from elsewhere carries seconds
+  // the fields do not show, and reading the fields back would round it.
+  const [edited, setEdited] = useState(fresh);
   const startAt = fromLocalInput(start);
   const endAt = fromLocalInput(end);
-  const valid = (startAt || endAt) && !(startAt && endAt && startAt >= endAt);
+  const backwards = !!startAt && !!endAt && startAt >= endAt;
+  const valid = (startAt || endAt) && !backwards;
   const fromId = useId();
   const toId = useId();
+
+  // A range set elsewhere (a row's "Events around this one") refills the
+  // fields; the one these fields sent is theirs already, and typing goes on.
+  const sent = useRef<{ from?: string; to?: string }>(undefined);
+  const [seen, setSeen] = useState({ from, to });
+  if (seen.from !== from || seen.to !== to) {
+    setSeen({ from, to });
+    if (sent.current?.from !== from || sent.current?.to !== to) {
+      setStart(localInput(from));
+      setEnd(localInput(to));
+      setEdited(false);
+    }
+  }
+
+  const apply = useRef(onApply);
+  apply.current = onApply;
+  const read = useCallback(() => {
+    sent.current = { from: startAt, to: endAt };
+    apply.current(startAt, endAt);
+  }, [startAt, endAt]);
+  const pending = edited && valid && (startAt !== from || endAt !== to);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(read, RANGE_PAUSE_MS);
+    return () => clearTimeout(timer);
+  }, [pending, read]);
 
   return (
     <form
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
-        if (valid) onApply(startAt, endAt);
+        if (pending) read();
       }}
     >
       <label htmlFor={fromId} className={FIELD_LABEL}>
@@ -350,7 +382,11 @@ function CustomRange({
         id={fromId}
         type="datetime-local"
         value={start}
-        onChange={(event) => setStart(event.target.value)}
+        aria-invalid={backwards || undefined}
+        onChange={(event) => {
+          setStart(event.target.value);
+          setEdited(true);
+        }}
         className={CONTROL}
       />
       <label htmlFor={toId} className={FIELD_LABEL}>
@@ -360,12 +396,20 @@ function CustomRange({
         id={toId}
         type="datetime-local"
         value={end}
-        onChange={(event) => setEnd(event.target.value)}
+        aria-invalid={backwards || undefined}
+        onChange={(event) => {
+          setEnd(event.target.value);
+          setEdited(true);
+        }}
         className={CONTROL}
       />
-      <Button type="submit" size="sm" variant="secondary" disabled={!valid} className="self-start">
-        Apply range
-      </Button>
+      {backwards && (
+        <p role="alert" className="text-destructive text-xs leading-4">
+          The start must be before the end.
+        </p>
+      )}
+      {/* Enter in a field submits only through a submit control. */}
+      <button type="submit" hidden />
     </form>
   );
 }
