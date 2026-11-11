@@ -178,7 +178,7 @@ describe("the cli", () => {
 
       /**
        * Colour itself is not asserted here, and an assertion about it would
-       * mislead: picocolors and consola decide colour when they load, from the
+       * mislead: picocolors decides colour when it loads, from the
        * real process streams, so a run in this harness emits no escape byte
        * whatever the flags say — a check for their absence would hold against
        * any implementation, broken ones included. What a run decides is pinned

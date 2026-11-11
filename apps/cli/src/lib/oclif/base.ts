@@ -134,7 +134,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * asked, whatever it warned about, and whether or not `--force` spared it a
    * question. See {@link Presentation}.
    *
-   * {@link Presentation} names the ten that set it. A command that merely
+   * {@link Presentation} names the one that sets it, `setup`. A command that merely
    * *does* something — `variable rm`, `users delete` — is not one of them,
    * however much it asks on the way.
    */
@@ -829,7 +829,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
     } else if (zitadelError.code === "E_CANCELLED") {
       // Ctrl-C is the person's own decision, and the terminal already shows it
-      // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
+      // (`^C`, or a cancelled prompt's "Cancelled"), so it gets no error
       // block. The exit code still says the command did not finish. The chain
       // it interrupted still has to be closed, or the shell prompt is drawn
       // inside the gutter.

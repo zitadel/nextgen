@@ -2285,7 +2285,7 @@ export function assertEndingIsWellFormed(
  * spelled for a person apart from one spelled for a parser.
  *
  * An object and nothing else: a `{` cannot begin anything else the CLI prints,
- * whereas a `[` begins consola's own `[info]` prefix as readily as an array, and
+ * whereas a `[` begins a line's own prefix as readily as an array, and
  * a rule that has to tell those apart would be guessing rather than checking. A
  * command whose body is a bare array says so in its own spec.
  */

@@ -57,7 +57,7 @@ describe("the UI package", () => {
   // it wants said and lets `this.ui` decide how it looks, so that `--json`
   // stays one envelope, every box is the same width, and a line always lands
   // in the chain it belongs to.
-  it("is the only place that draws, apart from the narration still to be moved", async () => {
+  it("is the only place that draws", async () => {
     const offenders: string[] = [];
     for (const file of await sourceFiles(SRC)) {
       if (file.startsWith(`${PACKAGE}${sep}`)) {

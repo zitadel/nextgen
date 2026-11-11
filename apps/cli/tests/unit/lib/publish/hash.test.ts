@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { abbreviate } from "@/lib/publish/hash";
 
 describe("abbreviate", () => {
-  // `Deployed sha256:<64 hex>` is wider than a closing line may be, so the
-  // whole sentence was thrown away and replaced by "Done".
+  // `Deployed sha256:<64 hex>` is wider than a closing line may be.
   it("cuts a content hash to a closing line a person can read", () => {
     expect(abbreviate(`sha256:${"a".repeat(64)}`)).toBe("sha256:aaaaaaaaaaaa");
   });

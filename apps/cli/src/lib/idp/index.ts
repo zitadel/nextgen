@@ -18,7 +18,7 @@
  * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
  * depends sideways only on `lib/zitadel` (the configuration a provider is
  * added to) and shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`), `lib/input` (`Asker`), `lib/warnings`
+ * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions`), `lib/warnings`
  * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
  */
 export {

@@ -85,7 +85,7 @@ export class Connections extends Collection<Connection> {
       throw new ConflictError(
         `More than one ${candidate.displayName} connection exists: ${matches.paths.join(", ")}`,
         {
-          hint: "Keep the one this Project should use and remove the others, then run the command again.",
+          hint: "Keep the one this project should use and remove the others, then run the command again.",
           details: { provider: candidate.slug, files: matches.paths },
         },
       );

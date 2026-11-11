@@ -255,7 +255,7 @@ describe("which shape an ending takes", () => {
   // The terminal wraps a long line to its own width, and a line it wraps is
   // still one line when it is copied. Only the box has a width of its own.
   describe("a line longer than the terminal", () => {
-    const long = `Error E_NETWORK: GET http://localhost:9/deployments?project_id=${"x".repeat(60)}&live=true got no response, and ${"then some ".repeat(8)}`;
+    const long = `Error: GET http://localhost:9/deployments?project_id=${"x".repeat(60)}&live=true got no response, and ${"then some ".repeat(8)} (E_NETWORK)`;
 
     it("closes a chain on its whole sentence, on one line", () => {
       expect(plain(ending({ title: long, failed: true }).line)).toBe(long);
@@ -300,16 +300,16 @@ describe("which shape an ending takes", () => {
   });
 
   // A dim unmarked footer is right for an answer and wrong for an error: it
-  // would make "Error E_NOT_FOUND: …" read exactly like "No variables on the
+  // would make "Error: … (E_NOT_FOUND)" read exactly like "No variables on the
   // project". With no chain to close in red, the headline itself is red.
   it("says a normal command's failure in red above what it has to say", () => {
     const shown = normally({
-      title: "Error E_NOT_FOUND: variable not found",
+      title: "Error: Variable not found (E_NOT_FOUND)",
       lines: ["Check the name."],
       failed: true,
     }).renderStandalone();
 
-    expect(shown).toContain(pc.red("Error E_NOT_FOUND: variable not found"));
+    expect(shown).toContain(pc.red("Error: Variable not found (E_NOT_FOUND)"));
     expect(plain(shown)).toContain("Check the name.");
   });
 
@@ -319,7 +319,7 @@ describe("which shape an ending takes", () => {
   // rather than beside it, because the failure is already said in red above.
   it("says where a normal command's failure happened, under it", () => {
     const shown = plain(
-      normally({ title: "Error E_NOT_FOUND: nope", failed: true }, somewhere).renderStandalone(),
+      normally({ title: "Error: Nope (E_NOT_FOUND)", failed: true }, somewhere).renderStandalone(),
     );
 
     expect(shown).toContain("project proj-1 on api.zitadel.cloud");

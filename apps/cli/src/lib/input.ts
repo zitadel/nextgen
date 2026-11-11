@@ -96,7 +96,7 @@ interface Prompter {
 /**
  * Clack's prompts, the only ones the CLI draws. A wizard draws them inside its
  * chain: the question against a mark, the answer in the guide under it, and
- * `└  Cancelled.` when the person walks away. A normal command draws the same
+ * `└  Cancelled` when the person walks away. A normal command draws the same
  * prompts without the guide and has no chain to close, so a cancel is left
  * for the run to report as it reports any other.
  */
@@ -245,8 +245,9 @@ class DrawnPrompter implements Prompter {
  * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
  * sentinel, so a command never carries on with a missing answer, and exits
  * 130 like Ctrl-C anywhere else. A drawn prompt closes its chain with
- * "Cancelled.", which is all a person is shown: a cancel is their own
- * decision, not an error. A plain one has no chain to close and says nothing.
+ * "Cancelled", which is all a person is shown: a cancel is their own
+ * decision, not an error. A plain one has no chain to close, so the run says
+ * "Cancelled" on a line of its own once the prompt is erased.
  */
 async function askOne(
   kind: Kind,

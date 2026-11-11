@@ -92,8 +92,7 @@ describe("release create at a terminal", () => {
     it("keeps what it did in the footer, rather than losing it to a long headline", async () => {
       const out = await created();
 
-      // A clause wider than the footer allows is replaced by "Done", which left
-      // this command's footer with its place half and nothing else.
+      // The footer carries what the command did, with the place after it.
       expect(out).toContain("Created rel_1 · project proj_01TEST");
       expect(out).not.toMatch(/^\s*project proj_01TEST on/m);
     });

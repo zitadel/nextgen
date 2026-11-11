@@ -106,7 +106,7 @@ class Coloured extends BaseCommand {
 
 /**
  * Every answer the run gives about colour. Colour itself cannot be asserted
- * through the CLI: picocolors and consola decide it when they load, from the
+ * through the CLI: picocolors decides it when it loads, from the
  * real process streams, so a run in a test never emits an escape byte whatever
  * the flags say. What the run decides is the thing worth pinning, and
  * `biome-plugins/no-own-colour.grit` keeps a command from deciding its own.

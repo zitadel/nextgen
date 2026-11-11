@@ -187,7 +187,7 @@ describe("claim", () => {
   it("prints the link and the permanence outcome, without team wording", async () => {
     const { cwd, project } = await makeProject();
 
-    // No `--json`: the envelope silences consola, and the point here is the
+    // No `--json`: the envelope silences the narration, and the point here is the
     // human-facing narration — the link on its own line, then the success
     // block in claim/permanence terms.
     const [res] = await Promise.all([
@@ -760,7 +760,7 @@ describe("claim", () => {
       expect((await readSecret(cwd)).team_id).toBe("team-local-stub");
     });
 
-    // No `--json` in the next two: the warning is consola narration, and the
+    // No `--json` in the next two: the warning is narration, and the
     // envelope silences it.
     it("warns when a local server advertises a remote claim page", async ({ serve }) => {
       const { cwd } = await makeProject();

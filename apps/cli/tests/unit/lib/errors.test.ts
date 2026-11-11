@@ -597,7 +597,7 @@ describe("isCancellation", () => {
   });
 });
 
-// Every failure the CLI reports is one grammar: `Error <code>: <sentence>`,
+// Every failure the CLI reports is one grammar: `Error: <sentence> (E_CODE)`,
 // said once. These are the two places the sentence a person reads differs
 // from the one `--json` carries, which is never touched.
 describe("a failure as a person is shown it", () => {

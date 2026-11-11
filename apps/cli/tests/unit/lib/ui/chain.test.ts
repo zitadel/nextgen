@@ -278,10 +278,10 @@ describe("a normal command's chain, which is no chain at all", () => {
   it("says a failure with no chain to close", () => {
     const chain = normally();
     removing(chain);
-    chain.finish({ title: "Error E_NOT_FOUND: no such variable", sections: [], failed: true });
+    chain.finish({ title: "Error: No such variable (E_NOT_FOUND)", sections: [], failed: true });
 
     expect(outro).not.toHaveBeenCalled();
-    expect(printed()).toContain("Error E_NOT_FOUND: no such variable");
+    expect(printed()).toContain("Error: No such variable (E_NOT_FOUND)");
   });
 
   it("keeps a spinner out of the gutter it does not have", () => {

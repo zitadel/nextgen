@@ -45,7 +45,7 @@ export async function runCliForTest(
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
   Object.assign(process.env, settled);
 
-  // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
+  // Capture both direct stream writes (e.g. the narration) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
     stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
