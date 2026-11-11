@@ -59,6 +59,10 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeAuthzRevoked:               "internal/service",
 	domain.EventTypeAuthFactorPasswordSet:      "internal/service",
 	domain.EventTypeAuthFactorPasskeyEnrolled:  "internal/service",
+	domain.EventTypeWebhookCreated:             "internal/service",
+	domain.EventTypeWebhookUpdated:             "internal/service",
+	domain.EventTypeWebhookDeleted:             "internal/service",
+	domain.EventTypeWebhookSecretRotated:       "internal/service",
 	domain.EventTypeRequestAPI:                 "internal/audit",
 }
 
@@ -92,5 +96,13 @@ func TestCatalogPathBTypesHaveProducers(t *testing.T) {
 	for et, pkg := range livePathBProducers {
 		_, ok := catalogTypes[et]
 		assert.Truef(t, ok, "producer allowlist entry %q (%s) missing from active catalog", et, pkg)
+	}
+
+	// The types a webhook may subscribe to are the ones with a producer.
+	written := domain.WrittenEventTypes()
+	assert.Len(t, written, len(livePathBProducers))
+	for _, et := range written {
+		_, ok := livePathBProducers[et]
+		assert.Truef(t, ok, "domain.WrittenEventTypes lists %q, which has no producer", et)
 	}
 }

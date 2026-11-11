@@ -146,7 +146,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).WithWebhookService(service.NewWebhookService(db, h.EnsureKeyService(t)))
 	}
 	return h.handler.value
 }

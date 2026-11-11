@@ -99,7 +99,7 @@
     },
     {
       "name": "Webhooks",
-      "description": "Webhooks are the URLs a project's events are sent to. These operations\ncreate, list, read, update and delete a project's webhooks and rotate a\nwebhook's signing secret. They are not available yet: each answers\n`501` `not_implemented`.\n\nA webhook names the event types it receives, or `*` for all of them\nexcept `request.api`. The server POSTs each matching event to the\nwebhook's `url` as it stores it, one event per request and in the order\nthey were stored. The Event Webhooks section describes the request's\nbody and its delivery.\n\nEvery request to a project's webhook is signed, following\n[Standard Webhooks](https://www.standardwebhooks.com/). It carries three\nheaders:\n\n- `webhook-id`: the event's `id`. It is the same on every retry, so drop\n  duplicates by it.\n- `webhook-timestamp`: when this attempt was sent, in seconds since the\n  Unix epoch. Refuse a request whose timestamp is more than five minutes\n  from your clock.\n- `webhook-signature`: `v1,` followed by the base64 of the HMAC-SHA256\n  of `{webhook-id}.{webhook-timestamp}.{body}`, where `{body}` is the\n  request body byte for byte. The key is the webhook's secret: the\n  base64 after `whsec_`, decoded. For 24 hours after\n  `rotateWebhookSecret` the header holds two signatures separated by a\n  space, one per secret; accept the request when either matches.\n\nVerify the signature over the raw body before parsing it, and compare\nin constant time.\n"
+      "description": "Webhooks are the URLs a project's events are sent to. These operations\ncreate, list, read, update and delete a project's webhooks and rotate a\nwebhook's signing secret. The server does not deliver events to a\nproject's webhooks yet: it stores a webhook and delivers nothing to it.\n\nA webhook names the event types it receives, or `*` for all of them\nexcept `request.api`. The server POSTs each matching event to the\nwebhook's `url` as it stores it, one event per request and in the order\nthey were stored. The Event Webhooks section describes the request's\nbody and its delivery.\n\nEvery request to a project's webhook is signed, following\n[Standard Webhooks](https://www.standardwebhooks.com/). It carries three\nheaders:\n\n- `webhook-id`: the event's `id`. It is the same on every retry, so drop\n  duplicates by it.\n- `webhook-timestamp`: when this attempt was sent, in seconds since the\n  Unix epoch. Refuse a request whose timestamp is more than five minutes\n  from your clock.\n- `webhook-signature`: `v1,` followed by the base64 of the HMAC-SHA256\n  of `{webhook-id}.{webhook-timestamp}.{body}`, where `{body}` is the\n  request body byte for byte. The key is the webhook's secret: the\n  base64 after `whsec_`, decoded. For 24 hours after\n  `rotateWebhookSecret` the header holds two signatures separated by a\n  space, one per secret; accept the request when either matches.\n\nVerify the signature over the raw body before parsing it, and compare\nin constant time.\n"
     },
     {
       "name": "Event Webhooks",
@@ -9840,7 +9840,7 @@
       "post": {
         "operationId": "createWebhook",
         "summary": "Create a webhook",
-        "description": "Creates a webhook for the project in `project_id` and returns it with its\nsigning secret.\n\nThe server then POSTs each of the project's events whose type is in\n`event_types` to `url`, one event per request, signed with the secret.\nDelivery starts with the events stored after this call: a new webhook\ngets no history. A project that is not claimed yet delivers nothing until\nthe [claim](/docs/concepts/project-team-user#claim) succeeds.\n\nThe server refuses a body that breaks one of these rules:\n\n- `url` is `https`, at most 2048 characters, and carries no user info.\n- `event_types` holds at least one entry and no entry twice. Each entry\n  is an event type the server writes, or `*`, and `*` stands alone.\n- A project holds at most 10 webhooks. One more answers `409`\n  `webhook.limit_reached`: delete one with `deleteWebhook`\n  (`DELETE /webhooks/{id}`) first. Two webhooks may name the\n  same `url`.\n\nThe `secret` appears only in this response. Store it where the endpoint\ncan read it, and verify each request with it.\n\nTo recover from a lost response, send `Idempotency-Key` and repeat the\nrequest with the same key: it returns the first response, `secret`\nincluded, and creates nothing. Without the key, a repeated request\ncreates a second webhook. Then find both with `listWebhooks`\n(`GET /webhooks`), delete one, and issue a secret for the other with\n`rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Creates a webhook for the project in `project_id` and returns it with its\nsigning secret.\n\nThe create records a `webhook.created` event, which never holds the\nsecret.\n\nThe server then POSTs each of the project's events whose type is in\n`event_types` to `url`, one event per request, signed with the secret.\nDelivery starts with the events stored after this call: a new webhook\ngets no history. A project that is not claimed yet delivers nothing until\nthe [claim](/docs/concepts/project-team-user#claim) succeeds.\n\nThe server refuses a body that breaks one of these rules:\n\n- `url` is `https`, at most 2048 characters, and carries no user info.\n- `event_types` holds at least one entry and no entry twice. Each entry\n  is an event type the server writes, or `*`, and `*` stands alone.\n- A project holds at most 10 webhooks. One more answers `409`\n  `webhook.limit_reached`: delete one with `deleteWebhook`\n  (`DELETE /webhooks/{id}`) first. Two webhooks may name the\n  same `url`.\n\nThe `secret` appears only in this response. Store it where the endpoint\ncan read it, and verify each request with it.\n\nA repeated request creates a second webhook. To recover from a lost\nresponse, find the webhook with `listWebhooks` (`GET /webhooks`) and\nissue a secret for it with `rotateWebhookSecret`\n(`POST /webhooks/{id}/rotate_secret`), or delete it and create it again.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Webhooks"
         ],
@@ -9857,10 +9857,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/project-id"
-          },
-          {
-            "$ref": "#/components/parameters/idempotency-key",
-            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `secret` included, instead of\ncreating another webhook. Without it, a retry after a lost response\ncreates a second webhook, and the first one's secret is lost.\n"
           }
         ],
         "requestBody": {
@@ -10084,7 +10080,7 @@
       "patch": {
         "operationId": "updateWebhook",
         "summary": "Update a webhook",
-        "description": "Changes a webhook's `url`, `description`, `event_types` or `enabled`, and\nreturns the updated webhook.\n\nFields you leave out keep their value. The body names at least one\nfield: an empty body is refused with `400`. `url` and `event_types`\nfollow the rules `createWebhook` (`POST /webhooks`) states.\n\nA new `url` gets the events the old one had not yet acknowledged: the\nwebhook keeps its place in the project's events. The signing secret\nstays the same.\n\n`enabled: false` stops delivery. `enabled: true` starts it again from\nnow, also for a webhook the server disabled after 3 days of failures or\na `410`: events stored while it was disabled are not sent.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Changes a webhook's `url`, `description`, `event_types` or `enabled`, and\nreturns the updated webhook.\n\nFields you leave out keep their value. The body names at least one\nfield: an empty body is refused with `400`. `url` and `event_types`\nfollow the rules `createWebhook` (`POST /webhooks`) states.\n\nThe update records a `webhook.updated` event that holds the fields the\nbody named, with their new values.\n\nA new `url` gets the events the old one had not yet acknowledged: the\nwebhook keeps its place in the project's events. The signing secret\nstays the same.\n\n`enabled: false` stops delivery. `enabled: true` starts it again from\nnow, also for a webhook the server disabled after 3 days of failures or\na `410`: events stored while it was disabled are not sent.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Webhooks"
         ],
@@ -10214,7 +10210,7 @@
       "delete": {
         "operationId": "deleteWebhook",
         "summary": "Delete a webhook",
-        "description": "Deletes a webhook. The server stops sending it events, including those\nit had not yet delivered, and its signing secret stops being valid.\n\nThis cannot be undone. To stop delivery and keep the webhook, send\n`enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)\ninstead.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who administers the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Deletes a webhook. The server stops sending it events, including those\nit had not yet delivered, and its signing secret stops being valid.\n\nThis cannot be undone. To stop delivery and keep the webhook, send\n`enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)\ninstead.\n\nThe delete records a `webhook.deleted` event.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who administers the project.\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Webhooks"
         ],
@@ -10280,7 +10276,7 @@
       "post": {
         "operationId": "rotateWebhookSecret",
         "summary": "Rotate a webhook's secret",
-        "description": "Issues a new signing secret for a webhook and returns the webhook with\nit.\n\nThe `secret` appears only in this response. The previous secret stays\nvalid for 24 hours, until `previous_secret_expires_at`: during that time\nevery delivery carries two signatures, one per secret, so the endpoint\ncan switch to the new secret without refusing a request. A second\nrotation within those 24 hours drops the older of the two secrets at\nonce.\n\nTo recover from a lost response, send `Idempotency-Key` and repeat the\nrequest with the same key: it returns the first response, `secret`\nincluded, and rotates nothing. Without the key, a repeated request\nrotates again: the secret of the lost response becomes the previous\none, and the secret the endpoint still verifies with stops being valid\nat once. Give the endpoint the secret of the second response right\naway, since it refuses every delivery until it has it.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Issues a new signing secret for a webhook and returns the webhook with\nit.\n\nThe `secret` appears only in this response. The previous secret stays\nvalid for 24 hours, until `previous_secret_expires_at`: during that time\nevery delivery carries two signatures, one per secret, so the endpoint\ncan switch to the new secret without refusing a request. A second\nrotation within those 24 hours drops the older of the two secrets at\nonce.\n\nThe rotation records a `webhook.secret_rotated` event, which holds\nneither secret.\n\nA repeated request rotates again. After a lost response that means the\nsecret nobody received becomes the previous one, and the secret the\nendpoint still verifies with stops being valid at once. Give the\nendpoint the secret of the second response right away, since it refuses\nevery delivery until it has it.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Webhooks"
         ],
@@ -10300,10 +10296,6 @@
           },
           {
             "$ref": "#/components/parameters/project-id"
-          },
-          {
-            "$ref": "#/components/parameters/idempotency-key",
-            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `secret` included, instead of\nrotating again. Without it, a retry after a lost response rotates a\nsecond time and drops the secret the endpoint still verifies with.\n"
           }
         ],
         "responses": {
@@ -23478,6 +23470,132 @@
           }
         ]
       },
+      "webhook-payload": {
+        "title": "WebhookPayload",
+        "type": "object",
+        "description": "Payload for `webhook.created`, which holds every field, and\n`webhook.updated`, which holds only the fields the update named, with their\nnew values. The webhook ID is the event's `entity_id`. The signing secret is\nnever included.\n",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL the webhook's events are sent to, without its query and\nfragment, which may carry a token.\n"
+          },
+          "description": {
+            "type": "string",
+            "description": "The note on what the webhook is for. Empty when it has none."
+          },
+          "event_types": {
+            "type": "array",
+            "description": "The event types the webhook receives, or the single entry `*`.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the server sends events to the webhook."
+          }
+        }
+      },
+      "webhook-created-event": {
+        "title": "WebhookCreatedEvent",
+        "description": "An event of type webhook.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "webhook.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/webhook-payload"
+              }
+            }
+          }
+        ]
+      },
+      "webhook-deleted-event": {
+        "title": "WebhookDeletedEvent",
+        "description": "An event of type webhook.deleted, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "webhook.deleted"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
+      "webhook-secret_rotated-event": {
+        "title": "WebhookSecretRotatedEvent",
+        "description": "An event of type webhook.secret_rotated, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "webhook.secret_rotated"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
+      "webhook-updated-event": {
+        "title": "WebhookUpdatedEvent",
+        "description": "An event of type webhook.updated, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "webhook.updated"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/webhook-payload"
+              }
+            }
+          }
+        ]
+      },
       "event": {
         "description": "An event of any type. Read event_type to tell which type it is; each type\ncarries its own typed payload.\n",
         "oneOf": [
@@ -23624,6 +23742,18 @@
           },
           {
             "$ref": "#/components/schemas/variable-set-event"
+          },
+          {
+            "$ref": "#/components/schemas/webhook-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/webhook-deleted-event"
+          },
+          {
+            "$ref": "#/components/schemas/webhook-secret_rotated-event"
+          },
+          {
+            "$ref": "#/components/schemas/webhook-updated-event"
           }
         ],
         "discriminator": {
@@ -23676,7 +23806,11 @@
             "user.deleted": "#/components/schemas/user-deleted-event",
             "user.updated": "#/components/schemas/user-updated-event",
             "variable.removed": "#/components/schemas/variable-removed-event",
-            "variable.set": "#/components/schemas/variable-set-event"
+            "variable.set": "#/components/schemas/variable-set-event",
+            "webhook.created": "#/components/schemas/webhook-created-event",
+            "webhook.deleted": "#/components/schemas/webhook-deleted-event",
+            "webhook.secret_rotated": "#/components/schemas/webhook-secret_rotated-event",
+            "webhook.updated": "#/components/schemas/webhook-updated-event"
           }
         }
       },
@@ -26175,6 +26309,106 @@
                   },
                   "data": {
                     "$ref": "#/components/schemas/variable-set-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "webhook.created",
+            "description": "A webhook was created. `data` holds its `url` without the query, and\nnever its signing secret.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "webhook.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/webhook-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "webhook.deleted",
+            "description": "A webhook was deleted.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "webhook.deleted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "webhook.secret_rotated",
+            "description": "A webhook's signing secret was rotated. The previous secret stays\nvalid for 24 hours. The event carries neither secret.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "webhook.secret_rotated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "webhook.updated",
+            "description": "A webhook was updated, which includes enabling and disabling it.\n`data` holds the fields the update named, with their new values.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "webhook.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/webhook-payload"
                   }
                 }
               }
@@ -36023,13 +36257,31 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-decrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-encrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/tkn-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
                   "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-unknown_alg"
                 },
                 {
                   "$ref": "#/components/schemas/unavailable"
@@ -36052,9 +36304,15 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "enc_key.decrypt_failed": "#/components/schemas/enc_key-decrypt_failed",
+                  "enc_key.encrypt_failed": "#/components/schemas/enc_key-encrypt_failed",
+                  "enc_key.not_found": "#/components/schemas/enc_key-not_found",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
+                  "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable",
                   "webhook.invalid": "#/components/schemas/webhook-invalid",
                   "webhook.limit_reached": "#/components/schemas/webhook-limit_reached",
@@ -36070,14 +36328,32 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "enc_key.decrypt_failed": {
+                "$ref": "#/components/examples/enc_key-decrypt_failed"
+              },
+              "enc_key.encrypt_failed": {
+                "$ref": "#/components/examples/enc_key-encrypt_failed"
+              },
+              "enc_key.not_found": {
+                "$ref": "#/components/examples/enc_key-not_found"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "tkn.invalid": {
+                "$ref": "#/components/examples/tkn-invalid"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
+              },
+              "enc_key.unknown_alg": {
+                "$ref": "#/components/examples/enc_key-unknown_alg"
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
@@ -36178,6 +36454,9 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -36201,6 +36480,7 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -36216,6 +36496,9 @@
               },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -36252,6 +36535,9 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -36278,6 +36564,7 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -36294,6 +36581,9 @@
               },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -36333,13 +36623,31 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-decrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-encrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/tkn-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
                   "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-unknown_alg"
                 },
                 {
                   "$ref": "#/components/schemas/unavailable"
@@ -36356,9 +36664,15 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "enc_key.decrypt_failed": "#/components/schemas/enc_key-decrypt_failed",
+                  "enc_key.encrypt_failed": "#/components/schemas/enc_key-encrypt_failed",
+                  "enc_key.not_found": "#/components/schemas/enc_key-not_found",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
+                  "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable",
                   "webhook.not_found": "#/components/schemas/webhook-not_found",
                   "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
@@ -36372,14 +36686,32 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "enc_key.decrypt_failed": {
+                "$ref": "#/components/examples/enc_key-decrypt_failed"
+              },
+              "enc_key.encrypt_failed": {
+                "$ref": "#/components/examples/enc_key-encrypt_failed"
+              },
+              "enc_key.not_found": {
+                "$ref": "#/components/examples/enc_key-not_found"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "tkn.invalid": {
+                "$ref": "#/components/examples/tkn-invalid"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
+              },
+              "enc_key.unknown_alg": {
+                "$ref": "#/components/examples/enc_key-unknown_alg"
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"

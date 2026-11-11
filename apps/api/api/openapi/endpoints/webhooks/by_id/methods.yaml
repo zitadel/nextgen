@@ -75,6 +75,9 @@ patch:
     field: an empty body is refused with `400`. `url` and `event_types`
     follow the rules `createWebhook` (`POST /webhooks`) states.
 
+    The update records a `webhook.updated` event that holds the fields the
+    body named, with their new values.
+
     A new `url` gets the events the old one had not yet acknowledged: the
     webhook keeps its place in the project's events. The signing secret
     stays the same.
@@ -174,6 +177,8 @@ delete:
     This cannot be undone. To stop delivery and keep the webhook, send
     `enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)
     instead.
+
+    The delete records a `webhook.deleted` event.
 
     Authenticate with a project secret (`oauth2`), or with the session cookie
     (`sessionCookie`) of a signed-in person who administers the project.

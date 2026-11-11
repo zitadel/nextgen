@@ -23,7 +23,6 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}/origins/remove
 /projects/{id}/signing_keys
 /projects/{id}/api_keys
-/projects/{id}/webhooks
 ```
 
 Branding is project-scoped but flat by revision id — see [Branding](#branding).
@@ -285,6 +284,27 @@ the event, not recomputed membership. See [ADR 049](../../adrs/049-events-api-re
 `category=admin` covers admin and configuration changes (formerly sketched as
 `/audit_events`). `category=auth` and `category=session` cover sign-in, token,
 and session lifecycle events.
+
+---
+
+## Webhooks
+
+The URLs a project's events are sent to ([ADR 088](../../adrs/088-project-webhooks.md)).
+The paths are flat and every operation names the project in `project_id`. A
+webhook is not registered in `resource_scope_index`: the project decides
+access. The server stores webhooks and does not deliver to them yet.
+
+```http
+POST   /webhooks?project_id=…                    # returns the signing secret, this once
+GET    /webhooks?project_id=…                    # newest first
+GET    /webhooks/{id}?project_id=…
+PATCH  /webhooks/{id}?project_id=…               # url, description, event_types, enabled
+DELETE /webhooks/{id}?project_id=…               # removes the row
+POST   /webhooks/{id}/rotate_secret?project_id=… # returns the new secret, this once
+```
+
+Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#project-scoped-configuration).
 
 ---
 

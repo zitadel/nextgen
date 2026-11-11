@@ -162,7 +162,45 @@ const (
 
 	EventTypeAuthFactorPasswordSet     EventType = "auth.factor.password.set"
 	EventTypeAuthFactorPasskeyEnrolled EventType = "auth.factor.passkey.enrolled"
+
+	EventTypeWebhookCreated       EventType = "webhook.created"
+	EventTypeWebhookUpdated       EventType = "webhook.updated"
+	EventTypeWebhookDeleted       EventType = "webhook.deleted"
+	EventTypeWebhookSecretRotated EventType = "webhook.secret_rotated"
 )
+
+// WrittenEventTypes is every event type the server writes: the Path A and
+// Path B types of docs/design/api/events-catalog.md. A retired type is not in
+// it, since nothing writes it any more. A webhook's filter is checked against
+// it (ADR 088 §1). The catalog's producer test keeps it in step with the
+// catalog.
+func WrittenEventTypes() []EventType {
+	return []EventType{
+		EventTypeRequestAPI,
+		EventTypeProjectCreated, EventTypeProjectUpdated, EventTypeProjectDeleted,
+		EventTypeUserCreated, EventTypeUserCreateFailed, EventTypeUserUpdated, EventTypeUserDeleted,
+		EventTypeTeamCreated, EventTypeTeamUpdated, EventTypeTeamDeactivated,
+		EventTypeAuthTokenIssued, EventTypeAuthTokenRevoked,
+		EventTypeSessionEstablished, EventTypeSessionDeleted,
+		EventTypeAuthAttemptCreated, EventTypeAuthAttemptHandedOff,
+		EventTypeAuthCheckFailed, EventTypeAuthCheckSucceeded,
+		EventTypeAuthSSOAuthorizationFailed, EventTypeAuthSSOExchangeSucceeded, EventTypeAuthSSOExchangeFailed,
+		EventTypeFlowdefCreated,
+		EventTypeSchemaCreated,
+		EventTypeBrandingCreated,
+		EventTypePolicyCreated, EventTypePolicyUpdated,
+		EventTypeReleaseCreated, EventTypeReleaseRevoked,
+		EventTypeIDPCreated, EventTypeIDPUpdated,
+		EventTypeIDPIdentityLinkCreated,
+		EventTypeDeploymentCreated,
+		EventTypeOriginAdded, EventTypeOriginRemoved,
+		EventTypeVariableSet, EventTypeVariableRemoved,
+		EventTypePreviewRemoved,
+		EventTypeAuthzGranted, EventTypeAuthzRevoked,
+		EventTypeAuthFactorPasswordSet, EventTypeAuthFactorPasskeyEnrolled,
+		EventTypeWebhookCreated, EventTypeWebhookUpdated, EventTypeWebhookDeleted, EventTypeWebhookSecretRotated,
+	}
+}
 
 // Event is one append-only wide-event row (ADR 048).
 type Event struct {

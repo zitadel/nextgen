@@ -466,3 +466,48 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 	}
 	return payload, nil
 }
+
+// WebhookPayload is shared by webhook.created (snapshot) and webhook.updated
+// (delta: only the fields the update named, with their new values). The
+// signing secret is never part of it, plain or encrypted, and the url is
+// recorded without its query and fragment, which may carry a token
+// (ADR 088 §5).
+//
+// Description and Enabled are pointers so the delta can tell "not named"
+// (absent) from the empty string and false.
+type WebhookPayload struct {
+	URL         string   `json:"url,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	EventTypes  []string `json:"event_types,omitempty"`
+	Enabled     *bool    `json:"enabled,omitempty"`
+}
+
+// WebhookPayloadSnapshot is the allowlisted create snapshot for
+// webhook.created.
+func WebhookPayloadSnapshot(webhook *Webhook) WebhookPayload {
+	return WebhookPayload{
+		URL:         redactSchemaURL(webhook.URL),
+		Description: &webhook.Description,
+		EventTypes:  webhook.EventTypes,
+		Enabled:     &webhook.Enabled,
+	}
+}
+
+// WebhookPayloadDelta is the webhook.updated payload: the fields update
+// named, each with the value stored afterwards.
+func WebhookPayloadDelta(update WebhookUpdate, stored *Webhook) WebhookPayload {
+	var payload WebhookPayload
+	if update.URL != nil {
+		payload.URL = redactSchemaURL(stored.URL)
+	}
+	if update.Description != nil {
+		payload.Description = &stored.Description
+	}
+	if update.EventTypes != nil {
+		payload.EventTypes = stored.EventTypes
+	}
+	if update.Enabled != nil {
+		payload.Enabled = &stored.Enabled
+	}
+	return payload
+}

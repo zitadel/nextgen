@@ -52,6 +52,10 @@ oneOf:
   - $ref: types/user-updated-event.yaml
   - $ref: types/variable-removed-event.yaml
   - $ref: types/variable-set-event.yaml
+  - $ref: types/webhook-created-event.yaml
+  - $ref: types/webhook-deleted-event.yaml
+  - $ref: types/webhook-secret_rotated-event.yaml
+  - $ref: types/webhook-updated-event.yaml
 discriminator:
   propertyName: event_type
   mapping:
@@ -103,3 +107,7 @@ discriminator:
     user.updated: types/user-updated-event.yaml
     variable.removed: types/variable-removed-event.yaml
     variable.set: types/variable-set-event.yaml
+    webhook.created: types/webhook-created-event.yaml
+    webhook.deleted: types/webhook-deleted-event.yaml
+    webhook.secret_rotated: types/webhook-secret_rotated-event.yaml
+    webhook.updated: types/webhook-updated-event.yaml

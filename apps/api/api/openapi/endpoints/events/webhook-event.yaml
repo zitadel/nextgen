@@ -781,5 +781,68 @@ oneOf:
             const: variable.set
           data:
             $ref: payloads/variable-set-payload.yaml
+  - title: webhook.created
+    description: |
+      A webhook was created. `data` holds its `url` without the query, and
+      never its signing secret.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: webhook.created
+          data:
+            $ref: payloads/webhook-payload.yaml
+  - title: webhook.deleted
+    description: |
+      A webhook was deleted.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: webhook.deleted
+          data:
+            $ref: payloads/empty-event-payload.yaml
+  - title: webhook.secret_rotated
+    description: |
+      A webhook's signing secret was rotated. The previous secret stays
+      valid for 24 hours. The event carries neither secret.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: webhook.secret_rotated
+          data:
+            $ref: payloads/empty-event-payload.yaml
+  - title: webhook.updated
+    description: |
+      A webhook was updated, which includes enabling and disabling it.
+      `data` holds the fields the update named, with their new values.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: webhook.updated
+          data:
+            $ref: payloads/webhook-payload.yaml
 discriminator:
   propertyName: type

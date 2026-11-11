@@ -80,6 +80,7 @@ same TX (shared `request_id`).
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
 | **Auth factor** | `user_id`, `factor_id` | Hash, public key material, challenges |
 | **Variable** | `kind` (the rest of the row key beside `entity_id`); `secret` on set | `name` (it is `entity_id`); the value, plain or as ciphertext |
+| **Webhook** | `url` without its query and fragment, `description`, `event_types`, `enabled` | The signing secret, plain or as ciphertext; the URL's query; delivery state |
 
 `PATCH /projects/{id}` today only renames (`name`). Origins are set on
 **create** and changed only through add/remove (`origin.added` /
@@ -174,6 +175,10 @@ tracked below.
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
 | VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |
 | VariableService delete, a `null` in a patch, or a secret patched without a kind clearing its preview value (one event per row actually removed; a name the project did not hold emits nothing) | `variable.removed` | `entity` | `variable` | `kind` (no `secret`: a removal learns nothing about the row) |
+| WebhookService create | `webhook.created` | `admin` | `webhook` | `url` (no query), `description`, `event_types`, `enabled` |
+| WebhookService update (enabling and disabling included) | `webhook.updated` | `admin` | `webhook` | delta: the fields the update named, of `url` (no query), `description`, `event_types`, `enabled` |
+| WebhookService delete | `webhook.deleted` | `admin` | `webhook` | _(empty)_ |
+| WebhookService rotate secret | `webhook.secret_rotated` | `admin` | `webhook` | _(empty; never a secret)_ |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
@@ -234,4 +239,5 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
+| `webhook.disabled` | [ADR 088 §4](../../adrs/088-project-webhooks.md): the shipper disabling a webhook that failed for 3 days or answered `410`; lands with delivery |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

@@ -94,6 +94,11 @@ var payloadByEventType = map[string]string{
 
 	"auth.factor.password.set":     "auth-factor-payload.yaml",
 	"auth.factor.passkey.enrolled": "auth-factor-payload.yaml",
+
+	"webhook.created":        "webhook-payload.yaml",
+	"webhook.updated":        "webhook-payload.yaml",
+	"webhook.deleted":        "empty-event-payload.yaml",
+	"webhook.secret_rotated": "empty-event-payload.yaml",
 }
 
 // eventStatus says whether anything emits an event type, as the Path A/B,
@@ -221,6 +226,14 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"auth.factor.password.set":     {description: "A user's password was set."},
 	"auth.factor.passkey.enrolled": {description: "A passkey was enrolled for a user."},
+
+	"webhook.created": {description: "A webhook was created. `data` holds its `url` without the query, " +
+		"and never its signing secret."},
+	"webhook.updated": {description: "A webhook was updated, which includes enabling and disabling it. " +
+		"`data` holds the fields the update named, with their new values."},
+	"webhook.deleted": {description: "A webhook was deleted."},
+	"webhook.secret_rotated": {description: "A webhook's signing secret was rotated. The previous secret stays " +
+		"valid for 24 hours. The event carries neither secret."},
 }
 
 func main() {

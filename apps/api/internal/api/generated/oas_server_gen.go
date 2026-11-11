@@ -533,6 +533,8 @@ type Handler interface {
 	//
 	// Creates a webhook for the project in `project_id` and returns it with its
 	// signing secret.
+	// The create records a `webhook.created` event, which never holds the
+	// secret.
 	// The server then POSTs each of the project's events whose type is in
 	// `event_types` to `url`, one event per request, signed with the secret.
 	// Delivery starts with the events stored after this call: a new webhook
@@ -548,12 +550,10 @@ type Handler interface {
 	// same `url`.
 	// The `secret` appears only in this response. Store it where the endpoint
 	// can read it, and verify each request with it.
-	// To recover from a lost response, send `Idempotency-Key` and repeat the
-	// request with the same key: it returns the first response, `secret`
-	// included, and creates nothing. Without the key, a repeated request
-	// creates a second webhook. Then find both with `listWebhooks`
-	// (`GET /webhooks`), delete one, and issue a secret for the other with
-	// `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+	// A repeated request creates a second webhook. To recover from a lost
+	// response, find the webhook with `listWebhooks` (`GET /webhooks`) and
+	// issue a secret for it with `rotateWebhookSecret`
+	// (`POST /webhooks/{id}/rotate_secret`), or delete it and create it again.
 	// Authenticate with a project secret (`oauth2`), or with the session cookie
 	// (`sessionCookie`) of a signed-in person who can change the project.
 	// Cookie requests follow that scheme's CSRF rules.
@@ -618,6 +618,7 @@ type Handler interface {
 	// This cannot be undone. To stop delivery and keep the webhook, send
 	// `enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)
 	// instead.
+	// The delete records a `webhook.deleted` event.
 	// Authenticate with a project secret (`oauth2`), or with the session cookie
 	// (`sessionCookie`) of a signed-in person who administers the project.
 	// Cookie requests follow that scheme's CSRF rules.
@@ -1648,13 +1649,13 @@ type Handler interface {
 	// can switch to the new secret without refusing a request. A second
 	// rotation within those 24 hours drops the older of the two secrets at
 	// once.
-	// To recover from a lost response, send `Idempotency-Key` and repeat the
-	// request with the same key: it returns the first response, `secret`
-	// included, and rotates nothing. Without the key, a repeated request
-	// rotates again: the secret of the lost response becomes the previous
-	// one, and the secret the endpoint still verifies with stops being valid
-	// at once. Give the endpoint the secret of the second response right
-	// away, since it refuses every delivery until it has it.
+	// The rotation records a `webhook.secret_rotated` event, which holds
+	// neither secret.
+	// A repeated request rotates again. After a lost response that means the
+	// secret nobody received becomes the previous one, and the secret the
+	// endpoint still verifies with stops being valid at once. Give the
+	// endpoint the secret of the second response right away, since it refuses
+	// every delivery until it has it.
 	// Authenticate with a project secret (`oauth2`), or with the session cookie
 	// (`sessionCookie`) of a signed-in person who can change the project.
 	// Cookie requests follow that scheme's CSRF rules.
@@ -1812,6 +1813,8 @@ type Handler interface {
 	// Fields you leave out keep their value. The body names at least one
 	// field: an empty body is refused with `400`. `url` and `event_types`
 	// follow the rules `createWebhook` (`POST /webhooks`) states.
+	// The update records a `webhook.updated` event that holds the fields the
+	// body named, with their new values.
 	// A new `url` gets the events the old one had not yet acknowledged: the
 	// webhook keeps its place in the project's events. The signing secret
 	// stays the same.

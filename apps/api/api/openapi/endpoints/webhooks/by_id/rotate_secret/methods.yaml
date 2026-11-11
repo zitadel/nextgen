@@ -12,13 +12,14 @@ post:
     rotation within those 24 hours drops the older of the two secrets at
     once.
 
-    To recover from a lost response, send `Idempotency-Key` and repeat the
-    request with the same key: it returns the first response, `secret`
-    included, and rotates nothing. Without the key, a repeated request
-    rotates again: the secret of the lost response becomes the previous
-    one, and the secret the endpoint still verifies with stops being valid
-    at once. Give the endpoint the secret of the second response right
-    away, since it refuses every delivery until it has it.
+    The rotation records a `webhook.secret_rotated` event, which holds
+    neither secret.
+
+    A repeated request rotates again. After a lost response that means the
+    secret nobody received becomes the previous one, and the secret the
+    endpoint still verifies with stops being valid at once. Give the
+    endpoint the secret of the second response right away, since it refuses
+    every delivery until it has it.
 
     Authenticate with a project secret (`oauth2`), or with the session cookie
     (`sessionCookie`) of a signed-in person who can change the project.
@@ -32,12 +33,6 @@ post:
   parameters:
     - $ref: ../../../../components/parameters/webhook-id.yaml
     - $ref: ../../../../components/parameters/project-id.yaml
-    - $ref: ../../../../components/parameters/idempotency-key.yaml
-      description: |
-        Optional retry key. A retry carrying the same key within the retry
-        window returns the first response, `secret` included, instead of
-        rotating again. Without it, a retry after a lost response rotates a
-        second time and drops the secret the endpoint still verifies with.
   responses:
     '200':
       description: The webhook, with its new signing secret, this once.

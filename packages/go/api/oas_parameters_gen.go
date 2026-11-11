@@ -166,10 +166,6 @@ type CreateWebhookParams struct {
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
-	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 // DeleteGrantParams is parameters of deleteGrant operation.
@@ -1192,10 +1188,6 @@ type RotateWebhookSecretParams struct {
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
-	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 // SearchParams is parameters of search operation.
