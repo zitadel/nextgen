@@ -231,12 +231,14 @@ function UsersScreen() {
                 className="grow basis-48 @3xl/title-row:max-w-48"
               />
             )}
-            <ResourceFilter
-              filters={filters}
-              values={search}
-              onChange={(patch) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })}
-            />
           </>
+        }
+        below={
+          <ResourceFilter
+            filters={filters}
+            values={search}
+            onChange={(patch) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })}
+          />
         }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>

@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`) in `ResourceTitle`'s `filter` slot: **Add filter** lists the resource's properties, then the chosen one's values by its type; each set filter is a chip. A screen describes its properties as `FilterDefinition`s (`src/lib/resource-filter.ts`) and keeps the values in its URL: copy `src/features/users/filters.tsx`. A revision row is `RevisionOption` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
+| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`) in `ResourceTitle`'s `below` row, under the search: **Add filter** lists the resource's properties, then the chosen one's values by its type; each set filter is a chip. A screen describes its properties as `FilterDefinition`s (`src/lib/resource-filter.ts`) and keeps the values in its URL: copy `src/features/users/filters.tsx`. A revision row is `RevisionOption` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
@@ -120,6 +120,23 @@ Canonical examples:
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 | Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
+
+### Status tones
+
+A status pill's dot (`StatusBadge`, `StatusDot` in `src/components/status-badge.tsx`)
+is coloured by what the status means, never per status. Add a new status to
+`STATUS_TONE` there, under the tone whose meaning it has; an unlisted one reads
+neutral.
+
+| Tone | Token | Meaning | Statuses |
+| --- | --- | --- | --- |
+| `positive` | `success` | in force and working | `active`, `live` |
+| `caution` | `warning` | held for now; someone can lift it | `suspended` |
+| `critical` | `destructive` | on its way out, not coming back by itself | `pending_purge` |
+| `neutral` | `muted-foreground` | off, or not yet on | `deactivated`, `inactive`, `draft` |
+
+A hard stop that is not one state among several (a revoked release) is the
+tinted `destructive` `Badge` with no dot, not a tone.
 
 Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in

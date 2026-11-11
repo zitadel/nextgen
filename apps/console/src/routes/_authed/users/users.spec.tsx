@@ -1862,8 +1862,7 @@ describe("users screen", () => {
     // A status is one of a set.
     await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
     await userEvent.click(await screen.findByRole("option", { name: "Status" }));
-    // The row is the table's own badge, which writes the API's value.
-    await userEvent.click(await screen.findByRole("option", { name: "suspended" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Suspended" }));
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
         filter: [{ field: "status", operation: "equals", value: "suspended" }],

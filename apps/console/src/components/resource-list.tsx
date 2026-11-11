@@ -62,13 +62,15 @@ export const RESOURCE_TITLE = PAGE_TITLE;
  * The title row of a list screen: the heading with, where the screen has one,
  * its primary action beside it at every width (D19), and any filter beside
  * that. 36px tall (`PAGE_TITLE_ROW`), except where the row is too narrow for a
- * filter, which then takes a row of its own under the title.
+ * filter, which then takes a row of its own under the title, and where the
+ * screen gives it a row `below`.
  */
 export function ResourceTitle({
   children,
   action,
   filter,
   filterBelow = false,
+  below,
 }: {
   children: ReactNode;
   action?: ReactNode;
@@ -86,12 +88,25 @@ export function ResourceTitle({
    * that wants the row's whole width (Logs' search, which fills with chips).
    */
   filterBelow?: boolean;
+  /**
+   * A row of its own under the title row at every width, flush with the table
+   * and filling from the left: a list's `ResourceFilter`, whose chips need the
+   * width the title row cannot promise.
+   */
+  below?: ReactNode;
 }) {
+  const belowRow = below && (
+    // Out of the header's 8px inset, as `filterBelow` is.
+    <div className="order-4 flex min-w-0 basis-full flex-wrap items-center gap-2 lg:-mx-2 lg:basis-[calc(100%+1rem)]">
+      {below}
+    </div>
+  );
   if (!filter) {
     return (
       <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
         <h1 className={RESOURCE_TITLE}>{children}</h1>
         <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+        {belowRow}
       </div>
     );
   }
@@ -123,6 +138,7 @@ export function ResourceTitle({
       >
         {action}
       </div>
+      {belowRow}
     </div>
   );
 }

@@ -28,7 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * A list's filter, for `ResourceTitle`'s `filter` slot: **Add filter** lists
+ * A list's filter, for `ResourceTitle`'s `below` row: **Add filter** lists
  * the properties the resource can be narrowed by, and choosing one swaps the
  * menu for that property's values, drawn by its type (`FilterDefinition`): a
  * searchable list for a set of options, ranges and a day for a date. Each
@@ -74,18 +74,20 @@ export function ResourceFilter({
         if (!value) return null;
         const name = filterName(filter);
         return (
-          // The Add button's own surface, as one control in two parts.
+          // The Add button's own surface, as one control. Its two parts are
+          // inset in it, so each one's hover fill is a rounded box of its own
+          // rather than a half of the chip cut at the seam.
           // biome-ignore lint/a11y/useSemanticElements: two buttons drawn as one control, not a <fieldset> of form fields
           <div
             key={filter.key}
             role="group"
             aria-label={`${filter.label} filter`}
-            className="bg-background dark:border-input dark:bg-input/30 flex h-9 max-w-full min-w-0 items-stretch rounded-md border text-sm font-medium shadow-xs"
+            className="bg-background dark:border-input dark:bg-input/30 flex h-9 max-w-full min-w-0 items-center rounded-md border pr-1 pl-1.5 text-sm font-medium shadow-xs"
           >
             <button
               type="button"
               aria-label={`Clear the ${name} filter`}
-              className={cn(CHIP_PART, "shrink-0 rounded-l-md pr-1.5 pl-2.5")}
+              className={cn(CHIP_PART, "size-6 shrink-0 justify-center")}
               onClick={() => {
                 set(filter, undefined);
                 // The chip goes with its filter, so focus goes to the button that stays.
@@ -98,7 +100,7 @@ export function ResourceFilter({
               <button
                 type="button"
                 aria-label={`Filter by ${name}`}
-                className={cn(CHIP_PART, "min-w-0 gap-1.5 rounded-r-md pr-2.5")}
+                className={cn(CHIP_PART, "h-7 min-w-0 gap-1.5 px-1.5")}
               >
                 <span className="text-muted-foreground">{filter.label}</span>
                 <FilterValue filter={filter} value={value} />
@@ -112,7 +114,7 @@ export function ResourceFilter({
 }
 
 const CHIP_PART =
-  "flex items-center outline-none hover:bg-accent hover:text-accent-foreground focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-input/50";
+  "flex items-center rounded-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-input/50";
 
 /** A chosen value on its chip. */
 function FilterValue({ filter, value }: { filter: FilterDefinition; value: string }) {

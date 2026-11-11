@@ -1,4 +1,4 @@
-import { StatusBadge } from "@/components/status-badge";
+import { StatusDot } from "@/components/status-badge";
 import { RevisionOption, RevisionValue } from "@/features/schemas/components/revision-select";
 import type { SchemaRevision } from "@/features/schemas/model";
 import type { FilterDefinition } from "@/lib/resource-filter";
@@ -74,14 +74,21 @@ export function usersFilters({
       options: USER_STATUSES.map((status) => ({
         value: status,
         label: STATUS_LABEL[status],
-        content: <StatusBadge status={status} />,
+        // The table's dot beside the name, not its pill: the pill's fill is
+        // the popover's own on the dark theme, and shows only under a hover.
+        content: (
+          <span className="flex min-w-0 flex-1 items-center gap-2 leading-5">
+            <StatusDot status={status} />
+            <span className="truncate">{STATUS_LABEL[status]}</span>
+          </span>
+        ),
       })),
     },
     { type: "date", key: "created", label: "Created" },
   ];
 }
 
-/** The API's own values in words, as `StatusBadge` writes them. */
+/** The API's own values in words, as `StatusBadge` shows them. */
 const STATUS_LABEL: Record<(typeof USER_STATUSES)[number], string> = {
   active: "Active",
   suspended: "Suspended",
