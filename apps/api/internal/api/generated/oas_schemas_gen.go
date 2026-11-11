@@ -32344,8 +32344,10 @@ type FlowSubmitRequest struct {
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
 	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-	// For password signup, the login component solves the built-in challenge
-	// with Web Crypto and submits its JSON proof under `signup_pow`.
+	// For sign-up, the login component solves the built-in challenge with Web
+	// Crypto and submits its JSON proof under `signup_pow`: with the password
+	// for a password sign-up, and with `challenge_response` for a passkey
+	// registration that creates the user.
 	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
 	// Response to a pending challenge on the step. Required when the step has a
 	// `challenge` property (for example, after submitting a passkey action).
@@ -32505,8 +32507,10 @@ func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
 }
 
 // Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-// For password signup, the login component solves the built-in challenge
-// with Web Crypto and submits its JSON proof under `signup_pow`.
+// For sign-up, the login component solves the built-in challenge with Web
+// Crypto and submits its JSON proof under `signup_pow`: with the password
+// for a password sign-up, and with `challenge_response` for a passkey
+// registration that creates the user.
 type FlowSubmitRequestGateProofs map[string]string
 
 func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
@@ -81968,7 +81972,8 @@ func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 // and the supplied salt. Match the first 16 derived bytes to key_prefix.
 // Submit gate_proofs.signup_pow as a JSON string containing protocol,
 // challenge_id and derived_key (the full 32 bytes in lowercase hex).
-// The proof is spent before password hashing, even if user creation fails.
+// The proof is spent before the user is created (for a password, before it
+// is hashed), even if user creation fails.
 // Ref: #
 type PowChallenge struct {
 	Protocol    string    `json:"protocol"`
@@ -93379,8 +93384,11 @@ type RuntimeGate struct {
 	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
 	// `x-credential` on a field, not as gates.
 	Kind RuntimeGateKind `json:"kind"`
-	// Implementation identifier. `zitadel_pow` protects password signup with
-	// the built-in proof-of-work solver. External providers are not supported.
+	// Implementation identifier. `zitadel_pow` protects sign-up with the
+	// built-in proof-of-work solver: a step that creates its user on submit
+	// (`create_user`), and a step carrying a passkey registration that creates
+	// its user, whose attestation carries the proof. External providers are
+	// not supported.
 	Provider  string          `json:"provider"`
 	Challenge OptPowChallenge `json:"challenge"`
 	// Reserved provider-specific configuration. The built-in signup gate uses
@@ -102973,14 +102981,15 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 // The settings of a `user.create` policy, checked before a sign-up creates a
 // user. Every setting is optional; a setting left out switches its rule off,
 // and `{}` switches every rule off. Zitadel's own sign-up protection, a proof
-// of work on every password sign-up and limits per sign-up flow, applies
-// either way: a policy chooses among challenges and never switches it off.
-// Sign-ups with a passkey or through a sign-in provider are not challenged.
+// of work on every sign-up with a password or a passkey and limits per
+// sign-up flow, applies either way: a policy chooses among challenges and
+// never switches it off. Sign-ups through a sign-in provider are not
+// challenged: each needs an account at the provider.
 // Ref: #
 type UserCreateConfig struct {
-	// The challenge a password sign-up must solve before the user is
-	// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
-	// password sign-up solves when no policy names a challenge.
+	// The challenge a sign-up with a password or a passkey must solve before
+	// the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+	// which every such sign-up solves when no policy names a challenge.
 	Challenge OptUserCreateConfigChallenge `json:"challenge"`
 }
 
@@ -102994,9 +103003,9 @@ func (s *UserCreateConfig) SetChallenge(val OptUserCreateConfigChallenge) {
 	s.Challenge = val
 }
 
-// The challenge a password sign-up must solve before the user is
-// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
-// password sign-up solves when no policy names a challenge.
+// The challenge a sign-up with a password or a passkey must solve before
+// the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+// which every such sign-up solves when no policy names a challenge.
 type UserCreateConfigChallenge string
 
 const (
