@@ -53,10 +53,11 @@
 - Name the CLI one way in anything a person reads — a hint, a warning, a box
   line, a description: the public `npx @zitadel/cli@<version> …` form, from a
   `src/lib/suggestion.ts` builder, never bare `zitadel …` and never in
-  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both.
+  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both,
+  and exempts only a `hint:` line (see the rule on quoting a command below).
   - Say it once: when the run's own step already prints the command, the
     prose says what to do and leaves the spelling to the step.
-- `Run next:` is the only label that introduces a command. Anything else that
+- `Next:` is the only label that introduces a command. Anything else that
   introduces one is a sentence saying what the command cannot say for itself —
   why it is there, or when to run it — ending in a colon, one fact per
   sentence. `Explore all commands:` is the exception: it closes every box by
@@ -125,11 +126,13 @@
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
-- Quote a command in a hint or message as `` `zitadel …` ``; the base command
-  spells it out as the `npx @zitadel/cli@<version> …` form and takes the other
-  backticks off (`spellOutCommands`). Source in `src/commands` still builds
-  its commands with `suggest`.
-- Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/confirm`
+- Quote a command in a `hint:` as `` `zitadel …` ``; the base command spells it
+  out as the `npx @zitadel/cli@<version> …` form and takes the other backticks
+  off (`spellOutCommands`). Only a `hint:` line may do this: a message, a
+  warning or a box line names its command with `suggest`, because the scan
+  above rejects backticks and a bare `zitadel …` anywhere else in
+  `src/commands`.
+- Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
   kind of question and no `kind` string: a unit test fails on a clack import
