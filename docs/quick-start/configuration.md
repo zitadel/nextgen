@@ -335,7 +335,7 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `zitadel.password_hashing.waiting` | gauge | - |  | Password hashes waiting for a slot. |
 | `zitadel.password_hashing.memory_reserved` | gauge | `By` |  | Memory the running password hashes are budgeted to use. |
 | `zitadel.password_hashing.rejected` | counter | - |  | Password hashes refused because no slot freed up within the configured wait. |
-| `zitadel.password_hashing.wait_duration` | histogram | `s` |  | Time a password hash waited for a slot before it ran. |
+| `zitadel.password_hashing.wait_duration` | histogram | `s` |  | Time a password hash waited for a slot, whether it got one or not; 0 when one was free. |
 
 ## Config file search paths
 

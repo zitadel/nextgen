@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"errors"
+	"math"
 
 	"github.com/zitadel/passwap/argon2"
 	"github.com/zitadel/passwap/scrypt"
@@ -42,17 +43,24 @@ func argon2Memory(memoryKiB int64) int64 {
 	return memoryKiB * 1024
 }
 
+// scryptMemory saturates rather than overflows: the limiter clamps any weight
+// at the budget anyway.
 func scryptMemory(ln, r int64) int64 {
-	if ln < 0 || ln > 62 {
+	if ln < 0 || r < 0 {
 		return 0
+	}
+	if ln > 55 || r > math.MaxInt64/(128<<ln) {
+		return math.MaxInt64
 	}
 	return 128 * r * (1 << ln)
 }
 
 // worstArgon2Memory and worstScryptMemory are the most a stored hash of that
-// algorithm may cost under the configured limits: what a hash that names the
-// algorithm but cannot be parsed is charged, so an unreadable string cannot
-// slip past the budget by being unreadable.
+// algorithm may cost under the configured limits. A hash that names the
+// algorithm but cannot be parsed is charged this, so an unreadable string
+// cannot slip past the budget by being unreadable; a parseable one is charged
+// its own cost, even above the limits, since verification does not enforce
+// them.
 func (l HashLimitsConfig) worstArgon2Memory() int64 {
 	return argon2Memory(int64(l.Argon2.MaxMemory))
 }

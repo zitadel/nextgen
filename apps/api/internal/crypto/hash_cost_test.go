@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,19 +68,14 @@ func TestEncodedMemory(t *testing.T) {
 			want:    64 << 20,
 		},
 		{
-			name:    "argon2i the same",
-			encoded: "$argon2i$v=19$m=4096,t=3,p=1$cmFuZG9tc2FsdGlzaGFyZA$CB0Du96aj3fQVcVSqb0LIA6Z6fpStjzjVkaC3RlpK9A",
-			want:    4 << 20,
-		},
-		{
 			name:    "scrypt reads ln= and r=",
 			encoded: "$scrypt$ln=16,r=8,p=1$cmFuZG9tc2FsdGlzaGFyZA$Rh+NnJNo1I6nRwaNqbDm6kmADswD1+7FTKZ7Ln9D8nQ",
 			want:    128 * 8 * (1 << 16),
 		},
 		{
-			name:    "the linux scrypt prefix the same",
-			encoded: "$7$ln=10,r=8,p=1$cmFuZG9tc2FsdGlzaGFyZA$Rh+NnJNo1I6nRwaNqbDm6kmADswD1+7FTKZ7Ln9D8nQ",
-			want:    128 * 8 * (1 << 10),
+			name:    "an scrypt cost past int64 saturates instead of wrapping",
+			encoded: "$scrypt$ln=60,r=8,p=1$cmFuZG9tc2FsdGlzaGFyZA$Rh+NnJNo1I6nRwaNqbDm6kmADswD1+7FTKZ7Ln9D8nQ",
+			want:    math.MaxInt64,
 		},
 		{
 			name:    "an argon2 string without parameters is charged the worst the limits allow",
@@ -161,4 +157,23 @@ func TestPasswapHasher_sharesTheFactoryLimiter(t *testing.T) {
 	release()
 	assert.NoError(t, factory.Default().VerifyHash(t.Context(), encoded, "Passw0rd!"))
 	assert.ErrorIs(t, project.VerifyHash(t.Context(), encoded, "wrong"), ErrHashMismatch)
+}
+
+// The largest hash is the default hasher's own cost when that is above
+// what the limits admit for stored hashes: the hasher is not held to them.
+func TestHashConfig_largestHash(t *testing.T) {
+	t.Parallel()
+
+	cfg := HashConfig{
+		Verifiers: []HashName{HashNameArgon2},
+		Hasher: HasherConfig{
+			Algorithm: HashNameArgon2id,
+			Params:    map[string]any{"Time": 1, "Memory": 1024 * 1024, "Threads": 1},
+		},
+		Limits: HashLimitsConfig{Argon2: Argon2LimitsConfig{MaxMemory: 512 * 1024}},
+	}
+	assert.Equal(t, int64(1<<30), cfg.largestHash(), "a 1 GiB default hasher")
+
+	cfg.Hasher = HasherConfig{Algorithm: HashNameBcrypt, Params: map[string]any{"Cost": 10}}
+	assert.Equal(t, int64(512<<20), cfg.largestHash(), "the stored-hash worst case")
 }

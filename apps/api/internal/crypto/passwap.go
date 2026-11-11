@@ -378,26 +378,27 @@ func (c *HashConfig) NewHasherFactory(opts ...metrics.Option) (*HasherFactory, e
 	if err != nil {
 		return nil, err
 	}
-	c.warnAboutOversizedHashes(limiter.budget)
+	if largest := c.largestHash(); largest > limiter.budget {
+		slog.Warn("password hashing admits a hash larger than the memory budget; such a hash runs alone",
+			"largest_hash_bytes", largest, "memory_budget_bytes", limiter.budget)
+	}
 	return factory, nil
 }
 
-// warnAboutOversizedHashes says so when the limits admit a single hash that
-// does not fit the memory budget. Such a hash still runs, alone, so the
+// largestHash is the most memory one hash may take under this configuration:
+// the default hasher's own cost, or the largest stored hash the limits admit.
+// When it does not fit the budget the hash still runs, alone, so the
 // configuration works; but the budget then is not the bound the operator
-// thinks it is, and the limits are where to fix that.
-func (c *HashConfig) warnAboutOversizedHashes(budget int64) {
-	var worst int64
+// thinks it is, and the hasher or the limits are where to fix that.
+func (c *HashConfig) largestHash() int64 {
+	worst := c.Hasher.hashMemory()
 	if slices.Contains(c.Verifiers, HashNameArgon2) {
 		worst = max(worst, c.Limits.worstArgon2Memory())
 	}
 	if slices.Contains(c.Verifiers, HashNameScrypt) {
 		worst = max(worst, c.Limits.worstScryptMemory())
 	}
-	if worst > budget {
-		slog.Warn("password hash limits admit a hash larger than the memory budget; such a hash runs alone",
-			"largest_hash_bytes", worst, "memory_budget_bytes", budget)
-	}
+	return worst
 }
 
 func (f *HasherFactory) Default() *PasswapHasher {

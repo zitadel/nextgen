@@ -1,6 +1,7 @@
 package metrics_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestPasswordHashing_RecordsEverySignal(t *testing.T) {
 
 	var collected metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &collected))
-	var waits uint64
+	var point *metricdata.HistogramDataPoint[float64]
 	for _, scope := range collected.ScopeMetrics {
 		for _, inst := range scope.Metrics {
 			if inst.Name != metrics.PasswordHashingWaitDuration {
@@ -46,12 +47,18 @@ func TestPasswordHashing_RecordsEverySignal(t *testing.T) {
 			}
 			hist, ok := inst.Data.(metricdata.Histogram[float64])
 			require.True(t, ok)
-			for _, point := range hist.DataPoints {
-				waits += point.Count
-			}
+			require.Len(t, hist.DataPoints, 1)
+			point = &hist.DataPoints[0]
 		}
 	}
-	assert.Equal(t, uint64(2), waits)
+	require.NotNil(t, point)
+	assert.Equal(t, uint64(2), point.Count)
+	// The shared duration buckets, not the SDK's millisecond defaults: a
+	// quarter-second wait lands in (0.1, 0.25], apart from the zero wait.
+	i := slices.Index(point.Bounds, 0.25)
+	require.Positive(t, i, "bounds %v", point.Bounds)
+	assert.Equal(t, uint64(1), point.BucketCounts[i])
+	assert.Equal(t, uint64(1), point.BucketCounts[0])
 }
 
 func TestPasswordHashing_NoProviderRecordsNothing(t *testing.T) {

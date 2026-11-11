@@ -18,10 +18,11 @@ import (
 )
 
 // What the limiter adds to the hashing span it runs under: the weight it
-// reserved, how long it waited for it, and an event when it refused.
+// reserved in bytes, how long it waited for it in seconds, and an event when
+// it refused.
 const (
 	HashWeightKey = attribute.Key("password_hashing.weight")
-	HashWaitKey   = attribute.Key("password_hashing.wait_ms")
+	HashWaitKey   = attribute.Key("password_hashing.wait_duration")
 
 	HashRejectedEvent = "password_hashing.rejected"
 )
@@ -98,13 +99,13 @@ type hashLimiter struct {
 }
 
 // floor is the least a hash weighs: an equal share of the budget among
-// max_operations hashes.
+// max_operations hashes, rounded up so that no more than max_operations fit.
 func (l *hashLimiter) floor() int64 {
 	operations := l.maxOperations
 	if operations == 0 {
 		operations = int64(max(l.procs(), 1))
 	}
-	return max(l.budget/operations, 1)
+	return max((l.budget+operations-1)/operations, 1)
 }
 
 func (l *hashLimiter) weight(estimate int64) int64 {
@@ -127,47 +128,38 @@ func (l *hashLimiter) acquire(ctx context.Context, estimate int64) (release func
 		return nil, err
 	}
 	weight := l.weight(estimate)
-	span := trace.SpanFromContext(ctx)
-
-	if l.sem.TryAcquire(weight) {
-		l.metrics.RecordWait(0)
-		span.SetAttributes(
-			HashWeightKey.Int64(weight),
-			HashWaitKey.Int64(0),
-		)
-		return l.releaseFunc(weight), nil
+	var waited time.Duration
+	if !l.sem.TryAcquire(weight) {
+		start := time.Now()
+		l.waiting.Add(1)
+		waitCtx, cancel := context.WithTimeoutCause(ctx, l.maxWait, ErrHashingBusy)
+		err = l.sem.Acquire(waitCtx, weight)
+		cancel()
+		l.waiting.Add(-1)
+		waited = time.Since(start)
+		if err != nil && errors.Is(context.Cause(waitCtx), ErrHashingBusy) {
+			err = ErrHashingBusy
+		}
 	}
-
-	start := time.Now()
-	l.waiting.Add(1)
-	waitCtx, cancel := context.WithTimeoutCause(ctx, l.maxWait, ErrHashingBusy)
-	err = l.sem.Acquire(waitCtx, weight)
-	cancel()
-	l.waiting.Add(-1)
-	waited := time.Since(start)
 	l.metrics.RecordWait(waited)
+	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		HashWeightKey.Int64(weight),
-		HashWaitKey.Int64(waited.Milliseconds()),
+		HashWaitKey.Float64(waited.Seconds()),
 	)
+	if errors.Is(err, ErrHashingBusy) {
+		l.metrics.RecordRejected()
+		span.AddEvent(HashRejectedEvent)
+	}
 	if err != nil {
-		if errors.Is(context.Cause(waitCtx), ErrHashingBusy) {
-			l.metrics.RecordRejected()
-			span.AddEvent(HashRejectedEvent)
-			return nil, ErrHashingBusy
-		}
 		return nil, err
 	}
-	return l.releaseFunc(weight), nil
-}
 
-// releaseFunc books the slot of weight and returns what gives it back.
-func (l *hashLimiter) releaseFunc(weight int64) (release func()) {
 	l.inFlight.Add(1)
 	l.reserved.Add(weight)
 	return func() {
 		l.inFlight.Add(-1)
 		l.reserved.Add(-weight)
 		l.sem.Release(weight)
-	}
+	}, nil
 }

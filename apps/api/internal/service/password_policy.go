@@ -270,8 +270,15 @@ func (h storedPasswordHistory) matches(ctx context.Context, in SetPasswordInput,
 	candidate := domain.NormalizePassword(in.Password)
 	matches := make([]bool, 0, min(int64(len(kept)), depth))
 	for _, pw := range kept[:min(int64(len(kept)), depth)] {
+		// A span per kept hash, so each one's limiter wait is its own.
+		verifyCtx, end := startSpan(ctx, "password.Verify")
 		start := time.Now()
-		err := h.verifier.VerifyHash(ctx, pw.EncodedHash, candidate)
+		err := h.verifier.VerifyHash(verifyCtx, pw.EncodedHash, candidate)
+		spanErr := err
+		if errors.Is(spanErr, crypto.ErrHashMismatch) {
+			spanErr = nil // the expected answer for an older password
+		}
+		end(&spanErr)
 		metrics.RecordPasswordVerification(ctx, metrics.PasswordHistory, passwordResult("", err), time.Since(start))
 		switch {
 		case err == nil:

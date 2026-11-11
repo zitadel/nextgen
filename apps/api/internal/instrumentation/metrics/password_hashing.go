@@ -51,8 +51,9 @@ func NewPasswordHashing(state PasswordHashingState, opts ...Option) (*PasswordHa
 		return nil, err
 	}
 	wait, err := m.Float64Histogram(PasswordHashingWaitDuration,
-		metric.WithDescription("Time a password hash waited for a slot before it ran."),
-		metric.WithUnit("s"))
+		metric.WithDescription("Time a password hash waited for a slot, whether it got one or not; 0 when one was free."),
+		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(durationBuckets...))
 	if err != nil {
 		return nil, err
 	}

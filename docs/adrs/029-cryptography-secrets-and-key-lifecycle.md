@@ -57,12 +57,15 @@ The server bounds how much hashing runs at once, per process
 bound). Each hash or verification takes a share of one memory budget, by
 default half of the container's memory limit: its own estimated memory, floored
 at `memory_budget / max_operations` so cheap algorithms are capped in number
-too. A hash that gets no share within `max_wait` is refused with
+too, and clamped at the budget so a larger hash runs alone rather than never. A
+hash that gets no share within `max_wait` is refused with
 `429 Too Many Requests` and `Retry-After`; the refusal is never recorded as a
-failed attempt, because it says nothing about the password. The limits above
-size the worst case: the largest hash they admit is the largest share a single
-verification can take, so tightening them is also how an operator keeps the
-budget honest.
+failed attempt, because it says nothing about the password. A verification is
+charged from the stored hash's own parameters, which the limits above do not
+bound, since stored and imported hashes predate them; they bound what a project
+may configure and what an unreadable stored hash is charged. A startup warning
+names a configuration whose default hasher or limits admit a hash larger than
+the budget.
 
 #### Tokens
 

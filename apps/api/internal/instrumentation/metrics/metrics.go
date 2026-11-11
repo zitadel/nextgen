@@ -9,10 +9,11 @@
 //     handed a provider, and nothing is recorded until the server installs one
 //     with a reader. This is the style for code that runs on every request.
 //   - A component that exists several times with a name of its own, such as a
-//     cache, or that is built by a constructor of its own, such as the password
+//     cache, or whose gauges read state only it holds, such as the password
 //     hashing limiter, builds its instrument set with WithMeterProvider
-//     (cache.go, password_hashing.go), so each instance reports under its name
-//     and a test or an embedded use without a provider records nothing.
+//     (cache.go, password_hashing.go): its callbacks close over that state, a
+//     named instance reports under its name, and a test or an embedded use
+//     without a provider records nothing.
 //
 // Everything in this package takes primitives -- a name, a func() int, a
 // typed constant -- and never a domain or storage type. That is what keeps it

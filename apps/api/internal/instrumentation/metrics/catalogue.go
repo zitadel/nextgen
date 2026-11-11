@@ -407,7 +407,7 @@ func Catalogue() []Instrument {
 		},
 		{
 			Name: PasswordHashingWaitDuration, Kind: KindHistogram, Unit: "s",
-			Description: "Time a password hash waited for a slot before it ran.",
+			Description: "Time a password hash waited for a slot, whether it got one or not; 0 when one was free.",
 		},
 	}
 }
