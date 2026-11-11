@@ -202,7 +202,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       reportWarning(warning);
     }
     this.narrate(prepared.notices);
-    if (!(await this.confirmLockouts(prepared.lockouts))) {
+    if (!(await this.confirmLockouts(prepared.lockouts, flags.message))) {
       return this.emit({
         status: "skipped",
         reason: "deploy-cancelled",
@@ -214,6 +214,12 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     }
     const { resourceCount } = prepared;
     this.recordTelemetry({ resources: resourceCount });
+    // The deploy again as it was typed: the message and `--force` the person
+    // gave, so a retry or the real run after a dry run asks for the same thing.
+    const again = [
+      flags.message === undefined ? DEPLOY_ARGS : `deploy ${Cmd.option("-m", flags.message)}`,
+      ...(flags.force ? ["--force"] : []),
+    ].join(" ");
     const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
 
     if (this.dryRun) {
@@ -233,16 +239,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           sections: [],
         },
         next: {
-          commands: [
-            this.suggest(
-              [
-                flags.message === undefined
-                  ? DEPLOY_ARGS
-                  : `deploy ${Cmd.option("-m", flags.message)}`,
-                ...(flags.force ? ["--force"] : []),
-              ].join(" "),
-            ),
-          ],
+          commands: [this.suggest(again)],
         },
       });
     }
@@ -279,7 +276,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           "E_CONFLICT",
           "Another deploy changed the targets since this one was prepared",
           {
-            hint: `Rerun ${this.suggest(DEPLOY_ARGS)}; it will build and deploy against the current state.`,
+            hint: `Rerun ${this.suggest(again)}; it will build and deploy against the current state.`,
             details:
               publication.current === undefined
                 ? undefined
@@ -351,11 +348,15 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
    * keeps `--dry-run`.
    *
    * @param lockouts - What the lockout check found.
+   * @param typed - The message the person gave with `-m`, kept on the re-run.
    * @returns Whether the deploy goes ahead.
    * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
    *   be asked and `--force` was not given.
    */
-  private async confirmLockouts(lockouts: readonly string[]): Promise<boolean> {
+  private async confirmLockouts(
+    lockouts: readonly string[],
+    typed: string | undefined,
+  ): Promise<boolean> {
     if (lockouts.length === 0) {
       return true;
     }
@@ -379,7 +380,15 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         {
           hint: confirmationHint(question),
           details: { question },
-          nextCommands: [this.suggest("deploy --dry-run --force")],
+          nextCommands: [
+            this.suggest(
+              [
+                "deploy --dry-run",
+                ...(typed === undefined ? [] : [Cmd.option("-m", typed)]),
+                "--force",
+              ].join(" "),
+            ),
+          ],
         },
       );
     }

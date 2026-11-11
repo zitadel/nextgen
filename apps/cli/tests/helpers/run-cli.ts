@@ -119,6 +119,8 @@ async function commandSeeing(
   if (name === "doctor") {
     const { default: Doctor } = await import("@/commands/doctor");
     return class extends Doctor {
+      static override id = "doctor";
+
       protected override localServers(): LocalServers {
         return machine;
       }
@@ -127,6 +129,8 @@ async function commandSeeing(
   if (name === "stop") {
     const { default: Stop } = await import("@/commands/stop");
     return class extends Stop {
+      static override id = "stop";
+
       protected override localServers(): LocalServers {
         return machine;
       }

@@ -223,9 +223,15 @@ function outcome(input: {
       ...verifyActions,
       ...customizeAndPublishActions(input.cliVersion, input.selector),
     ],
+    // The status command is in the box's steps, so a script gets it too.
     nextCommands: input.includeInstallCommand
-      ? [shellCommand(input.installCommand), shellCommand(input.devCommand), planCommand]
-      : [shellCommand(input.devCommand), planCommand],
+      ? [
+          shellCommand(input.installCommand),
+          shellCommand(input.devCommand),
+          planCommand,
+          statusCommand,
+        ]
+      : [shellCommand(input.devCommand), planCommand, statusCommand],
   };
 }
 

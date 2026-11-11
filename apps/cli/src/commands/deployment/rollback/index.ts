@@ -8,6 +8,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { RollbackDeploymentParams } from "@/lib/backend/schemas";
+import { Cmd } from "@/lib/cmd";
 import { isCancellation, toZitadelError } from "@/lib/errors";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -137,12 +138,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
 
     const effects: string[] = [];
     if (dropped.length > 0) {
-      effects.push(
-        `${escapeControlCharacters(dropped.join(", "))} refuse sign-in until the next deploy`,
-      );
+      effects.push(`${dropped.join(", ")} refuse sign-in until the next deploy`);
     }
     if (restored.length > 0) {
-      effects.push(`${escapeControlCharacters(restored.join(", "))} serve it again`);
+      effects.push(`${restored.join(", ")} serve it again`);
     }
     // Left out when the check failed: an empty list would claim it passed.
     const reported =
@@ -194,7 +193,18 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               title,
               sections: [],
             },
-            next: { commands: [this.suggest(`deployment rollback ${target.id} --force`)] },
+            next: {
+              commands: [
+                this.suggest(
+                  [
+                    `deployment rollback ${target.id} --force`,
+                    ...(flags.message === undefined
+                      ? []
+                      : [Cmd.option("--message", flags.message)]),
+                  ].join(" "),
+                ),
+              ],
+            },
           };
         },
         // The deployment the caller currently sees live: the project's newest
@@ -301,6 +311,11 @@ async function originChanges(
     client.getProject(projectId),
     deployments.newestPrimary(),
   ]).catch((error: unknown) => {
+    // Cancelling is not a check that could not run: the person asked the
+    // command to stop, so it stops.
+    if (isCancellation(error)) {
+      throw error;
+    }
     reportWarning(
       `Could not check which origins rolling back to ${deploymentId} changes: ${toZitadelError(error).message}`,
     );

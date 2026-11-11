@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 
+import { Cmd } from "@/lib/cmd";
 import { OriginService } from "@/lib/backend";
 import { errorMessage } from "@/lib/errors";
 import {
@@ -44,7 +45,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
     }),
   };
 
-  protected async execute({ args }: Admitted<typeof OriginRm>): Promise<JsonEnvelope> {
+  protected async execute({ args, flags }: Admitted<typeof OriginRm>): Promise<JsonEnvelope> {
     return this.emit(
       await this.confirmed({
         verb: "remove",
@@ -54,12 +55,23 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
           return `Remove ${args.pattern} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
         preview: () => {
-          return dryRunResult({
-            verb: "remove",
-            topic: "origin",
-            id: args.pattern,
-            clause: "from the project",
-          });
+          return {
+            ...dryRunResult({
+              verb: "remove",
+              topic: "origin",
+              id: args.pattern,
+              clause: "from the project",
+            }),
+            next: {
+              commands: [
+                this.suggest(
+                  ["origin rm", Cmd.quote(args.pattern), ...(flags.force ? ["--force"] : [])].join(
+                    " ",
+                  ),
+                ),
+              ],
+            },
+          };
         },
         prepare: () => {
           return this.connect();
@@ -67,16 +79,15 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId }) => {
           const originService = new OriginService(consent.unlock(client), projectId);
           const removal = await originService.remove(args.pattern);
-          const data = deletedData({
-            pattern: args.pattern,
-          });
+          const removed = `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`;
+          const emptied = `Removed ${escapeControlCharacters(removal.pattern)}`;
           switch (removal.outcome) {
             case "removed": {
               return {
                 status: "ok",
-                data,
+                data: deletedData({ title: removed, pattern: args.pattern }),
                 summary: {
-                  title: `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`,
+                  title: removed,
                   sections: [],
                 },
               };
@@ -89,9 +100,9 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               );
               return {
                 status: "ok",
-                data,
+                data: deletedData({ title: emptied, pattern: args.pattern }),
                 summary: {
-                  title: `Removed ${escapeControlCharacters(removal.pattern)}`,
+                  title: emptied,
                   sections: [],
                   lines: [
                     "The project has no origins left and admits no origin except a loopback origin",
@@ -105,9 +116,9 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               );
               return {
                 status: "ok",
-                data,
+                data: deletedData({ title: removed, pattern: args.pattern }),
                 summary: {
-                  title: `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`,
+                  title: removed,
                   sections: [],
                 },
               };

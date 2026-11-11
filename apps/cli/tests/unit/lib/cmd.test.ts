@@ -37,23 +37,32 @@ describe("Cmd.quote", () => {
   });
 
   it.each(
-    ["bash", "zsh"].flatMap((shell) => {
-      return [
-        [shell, "my\tdir"],
-        [shell, "a\nb"],
-        [shell, "a\rb"],
-        [shell, "a\u001bb"],
-        [shell, "a\u007fb"],
-        [shell, "a\u009bb"],
-        [shell, "a‮b"],
-        [shell, "a\u{e0041}b"],
-        [shell, "it's\t"],
-        [shell, "a\\b\t"],
-        [shell, "$(whoami)\n"],
-        [shell, "my dir"],
-        [shell, "it's"],
-      ];
-    }),
+    ["bash", "zsh"]
+      .filter((shell) => {
+        try {
+          execFileSync(shell, ["-c", "true"]);
+          return true;
+        } catch {
+          return false;
+        }
+      })
+      .flatMap((shell) => {
+        return [
+          [shell, "my\tdir"],
+          [shell, "a\nb"],
+          [shell, "a\rb"],
+          [shell, "a\u001bb"],
+          [shell, "a\u007fb"],
+          [shell, "a\u009bb"],
+          [shell, "a‮b"],
+          [shell, "a\u{e0041}b"],
+          [shell, "it's\t"],
+          [shell, "a\\b\t"],
+          [shell, "$(whoami)\n"],
+          [shell, "my dir"],
+          [shell, "it's"],
+        ];
+      }),
   )("is read back by %s as the value it quoted (%j)", (shell, value) => {
     const read = execFileSync(shell, ["-c", `printf '%s' ${Cmd.quote(value)}`], {
       encoding: "utf8",

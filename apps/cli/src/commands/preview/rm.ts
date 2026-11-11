@@ -1,5 +1,6 @@
 import { Args, Flags } from "@oclif/core";
 
+import { Cmd } from "@/lib/cmd";
 import { PreviewService } from "@/lib/backend";
 import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
@@ -54,7 +55,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     }),
   };
 
-  protected async execute({ args }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
+  protected async execute({ args, flags }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
     return this.emit(
       await this.confirmed({
         verb: "remove",
@@ -64,12 +65,23 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           return `Stop serving ${args.url} for project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
         preview: () => {
-          return dryRunResult({
-            verb: "stop",
-            topic: "preview",
-            noun: "serving",
-            id: args.url,
-          });
+          return {
+            ...dryRunResult({
+              verb: "stop",
+              topic: "preview",
+              noun: "serving",
+              id: args.url,
+            }),
+            next: {
+              commands: [
+                this.suggest(
+                  ["preview rm", Cmd.quote(args.url), ...(flags.force ? ["--force"] : [])].join(
+                    " ",
+                  ),
+                ),
+              ],
+            },
+          };
         },
         prepare: async () => {
           const { client, projectId } = await this.connect();
@@ -104,11 +116,12 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
         apply: async (consent, { client, projectId }) => {
           const previewService = new PreviewService(consent.unlock(client), projectId);
           await previewService.remove(args.url);
+          const title = `Stopped serving ${escapeControlCharacters(args.url)}`;
           return {
             status: "ok",
-            data: deletedData({ url: args.url }),
+            data: deletedData({ title, url: args.url }),
             summary: {
-              title: `Stopped serving ${escapeControlCharacters(args.url)}`,
+              title,
               sections: [],
             },
           };

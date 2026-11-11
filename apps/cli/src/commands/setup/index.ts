@@ -1250,6 +1250,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       return this.emit({
         status: "skipped",
         reason: "already-initialized",
+        data: { title: alreadyTitle },
         summary: alreadySummary,
       });
     }
@@ -2012,6 +2013,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         ...consoleStep.boxActions,
         ...ssoStep.boxActions,
         ...claimNudge.boxActions,
+        ...(this.dryRun ? [{ text: "Set it up for real:", command: this.setupForReal() }] : []),
       ];
       const connectionLines = planned.connections.flatMap((entry) => {
         const connection = entry.connection;
@@ -2242,12 +2244,31 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...ssoStep.commands,
+          ...(this.dryRun ? [this.setupForReal()] : []),
           ...claimNudge.commands,
         ],
       },
       // The box holds the next steps, so the base command does not repeat them.
       nextShown: this.isJson ? undefined : asStepsShown(),
     });
+  }
+
+  /**
+   * This run again without `--dry-run`, with every other flag as typed, which
+   * is what a preview's one follow-up is. A server URL's credentials are left
+   * out, as a suggested command is pasted somewhere they should not be.
+   */
+  private setupForReal(): SuggestedCommand {
+    return this.retryCommand([
+      "setup",
+      ...this.argv
+        .filter((word) => {
+          return word !== "--dry-run";
+        })
+        .map((word) => {
+          return word.replace(/(\w+:\/\/)[^/?#\s]*@/g, "$1");
+        }),
+    ]);
   }
 
   /**
@@ -2641,12 +2662,14 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       },
       next: {
         actions: dryRun ? [] : [`Restart the dev server and open ${move.issuer}/login.`],
-        ...(deploy === undefined && cleanup === undefined
+        ...(deploy === undefined && cleanup === undefined && !dryRun
           ? {}
           : {
-              commands: [deploy, cleanup].filter((command) => {
-                return command !== undefined;
-              }),
+              commands: [deploy, cleanup, dryRun ? this.setupForReal() : undefined].filter(
+                (command) => {
+                  return command !== undefined;
+                },
+              ),
             }),
       },
     });

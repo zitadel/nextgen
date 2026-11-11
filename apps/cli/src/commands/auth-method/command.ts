@@ -657,7 +657,14 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
           ? `Would ${verb} ${method} for ${schema.name} (dry run)`
           : `${unchanged} (dry run)`,
       );
-      const real = ["auth-method", method, verb, ...target.schemaArgs, ...target.cwdArgs];
+      const real = [
+        "auth-method",
+        method,
+        verb,
+        ...target.schemaArgs,
+        ...target.cwdArgs,
+        ...(this.force ? ["--force"] : []),
+      ];
 
       return this.emit({
         status: "ok",

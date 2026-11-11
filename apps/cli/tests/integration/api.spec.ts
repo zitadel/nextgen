@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, MOCK_SERVER_URL, type ScaffoldedApp } from "@tests/helpers/project";
+import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -23,6 +24,19 @@ describe("api", () => {
         const result = await app.api("getVariables");
 
         expect(result).toFailWith("E_NOT_FOUND");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_NOT_FOUND",
+          message: expect.stringContaining("is this a Zitadel platform API?"),
+          details: {
+            status: 404,
+            url: expect.stringMatching(/\/variables\?project_id=\S+$/),
+            body: "<html>not here</html>",
+          },
+        });
       });
     });
 
@@ -34,6 +48,43 @@ describe("api", () => {
         const result = await app.api("getVariables");
 
         expect(result).toFailWith("E_NETWORK");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_NETWORK",
+          message: "down",
+          details: {
+            status: 503,
+            url: expect.stringMatching(/\/variables\?project_id=\S+$/),
+            body: { code: "unavailable", message: "down" },
+          },
+        });
+      });
+    });
+
+    describe("that hangs", () => {
+      it("stops on Ctrl-C with one envelope", async () => {
+        const app = await aSetUpApp();
+        const waiting = platform.hangs();
+
+        const result = app.api("getVariables");
+        await waiting;
+        pressCtrlC();
+
+        const finished = await result;
+        expect(finished).toFailWith("E_CANCELLED");
+        expect(finished.exitCode).toBe(130);
+        expect(app.envelopeOf(finished)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_CANCELLED",
+          message: "Cancelled",
+          hint: "The command was cancelled with Ctrl-C.",
+        });
       });
     });
   });
@@ -53,6 +104,7 @@ describe("api", () => {
       const result = await app.apiRendered("help");
 
       expect(result.stdout).not.toMatch(/npx @zitadel\/cli@\S+ api ls/);
+      expect(result.stdout.endsWith("\n\n")).toBe(false);
     });
 
     it("points to api ls under --json", async () => {
@@ -60,9 +112,13 @@ describe("api", () => {
 
       const result = await app.api("help");
 
-      expect(app.envelopeOf(result)).toMatchObject({
+      expect(app.envelopeOf(result)).toEqual({
+        status: "ok",
+        cli_version: expect.any(String),
         command: "api",
-        data: { next_commands: [expect.stringMatching(/ api ls --cwd \S+$/)] },
+        source: "",
+        data: { next_commands: [expectedPublicCliCommand(`api ls --cwd ${app.path}`)] },
+        warnings: [],
       });
     });
   });
@@ -85,24 +141,152 @@ describe("api", () => {
 
         const result = await app.api("getVariable", "FOO");
 
-        expect(result).toSucceed();
-        expect(app.envelopeOf(result).data).toMatchObject({ primary: "bar" });
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: { primary: "bar", preview: "bar" },
+          warnings: [],
+        });
+      });
+
+      it("carries a body holding a control character raw", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("BANNER", "a\u001b[2Jwiped")).toSucceed();
+
+        const result = await app.api("getVariable", "BANNER");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: { primary: "a\u001b[2Jwiped", preview: "a\u001b[2Jwiped" },
+          warnings: [],
+        });
       });
 
       it("writes what its fields say", async () => {
         const app = await aSetUpApp();
 
-        await app.api("updateVariables", "-F", "FOO=bar");
+        const result = await app.api("updateVariables", "-F", "FOO=bar");
 
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: { FOO: { primary: "bar", preview: "bar" } },
+          warnings: [],
+        });
         expect(app.envelopeOf(await app.getVariable("FOO")).data).toMatchObject({ value: "bar" });
       });
 
       it("writes the body piped in with --input -", async () => {
         const app = await aSetUpApp();
 
-        await app.apiPiping('{"FOO":"bar"}', "updateVariables", "--input", "-");
+        const result = await app.apiPiping('{"FOO":"bar"}', "updateVariables", "--input", "-");
 
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: { FOO: { primary: "bar", preview: "bar" } },
+          warnings: [],
+        });
         expect(app.envelopeOf(await app.getVariable("FOO")).data).toMatchObject({ value: "bar" });
+      });
+
+      it("answers a dry run with the request it would send", async () => {
+        const app = await aSetUpApp();
+        const { ZITADEL_PROJECT_ID } = await app.developmentValues();
+
+        const result = await app.api("updateVariables", "-F", "FOO=bar", "--dry-run");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Would call updateVariables (dry run)",
+            dry_run: true,
+            operation: "updateVariables",
+            method: "PATCH",
+            url: `http://mock.zitadel.test/api/v1/variables?project_id=${ZITADEL_PROJECT_ID}`,
+            body: { FOO: "bar" },
+          },
+          warnings: [],
+        });
+      });
+
+      it("leaves the body out of a dry run that has none", async () => {
+        const app = await aSetUpApp();
+        const { ZITADEL_PROJECT_ID } = await app.developmentValues();
+
+        const result = await app.api("getVariable", "FOO", "--dry-run");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Would call getVariable (dry run)",
+            dry_run: true,
+            operation: "getVariable",
+            method: "GET",
+            url: `http://mock.zitadel.test/api/v1/variables/FOO?project_id=${ZITADEL_PROJECT_ID}`,
+          },
+          warnings: [],
+        });
+      });
+
+      it("carries a field holding a control character raw in a dry run", async () => {
+        const app = await aSetUpApp();
+        const { ZITADEL_PROJECT_ID } = await app.developmentValues();
+
+        const result = await app.api("updateVariables", "-F", "FOO=a\u001b[2Jb", "--dry-run");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Would call updateVariables (dry run)",
+            dry_run: true,
+            operation: "updateVariables",
+            method: "PATCH",
+            url: `http://mock.zitadel.test/api/v1/variables?project_id=${ZITADEL_PROJECT_ID}`,
+            body: { FOO: "a\u001b[2Jb" },
+          },
+          warnings: [],
+        });
+      });
+
+      it("answers a dry run of an operation that deletes without asking", async () => {
+        const app = await aSetUpApp();
+        const { ZITADEL_PROJECT_ID } = await app.developmentValues();
+
+        const result = await app.api("deleteVariable", "FOO", "--dry-run");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Would call deleteVariable (dry run)",
+            dry_run: true,
+            operation: "deleteVariable",
+            method: "DELETE",
+            url: `http://mock.zitadel.test/api/v1/variables/FOO?project_id=${ZITADEL_PROJECT_ID}`,
+          },
+          warnings: [],
+        });
       });
 
       it("sends nothing with --dry-run", async () => {
@@ -123,6 +307,14 @@ describe("api", () => {
         const result = await app.api("listSchemas", "-F", "limit=1", "--paginate");
 
         expect(total).toBeGreaterThan(1);
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: { schemas: expect.any(Array) },
+          warnings: [],
+        });
         expect(app.envelopeOf<{ schemas: unknown[] }>(result).data.schemas).toHaveLength(total);
       });
 
@@ -136,7 +328,14 @@ describe("api", () => {
           "--json",
         ]);
 
-        expect(app.envelopeOf(result).source).toBe(MOCK_SERVER_URL);
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: MOCK_SERVER_URL,
+          data: {},
+          warnings: [],
+        });
       });
 
       it("refuses a call that needs the project secret where no server is named", async () => {
@@ -151,6 +350,28 @@ describe("api", () => {
         ]);
 
         expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "",
+          code: "E_VALIDATION",
+          message: "ZITADEL_URL is not set for the development environment",
+          hint: "Consulted, in order: --server, process environment, .env.development.local, .env.local, .env.development, .env, .zitadel/secret. Set ZITADEL_URL in .env.development.local or the process environment.",
+          details: {
+            environment: "development",
+            variable: "ZITADEL_URL",
+            consulted: [
+              "--server",
+              "process environment",
+              ".env.development.local",
+              ".env.local",
+              ".env.development",
+              ".env",
+              ".zitadel/secret",
+            ],
+          },
+        });
       });
 
       it("fails as the server refuses", async () => {
@@ -159,34 +380,113 @@ describe("api", () => {
         const result = await app.api("getVariable", "NOT_THERE");
 
         expect(result).toFailWith("E_NOT_FOUND");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_NOT_FOUND",
+          message: "variable not found",
+          details: {
+            status: 404,
+            url: expect.stringMatching(/\/variables\/NOT_THERE\?project_id=\S+$/),
+            body: { code: "var.not_found", message: "variable not found" },
+          },
+        });
+      });
+
+      it("refuses an operation the spec does not have, and points to the list", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.api("nopeOp");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_VALIDATION",
+          message: "No operation is called nopeOp",
+          hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
+          next_commands: [expectedPublicCliCommand("api ls --json")],
+        });
+      });
+
+      it("carries an operation name holding a control character raw", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.api("a\u001b[2Jb");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_VALIDATION",
+          message: "No operation is called a\u001b[2Jb",
+          hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
+          next_commands: [expectedPublicCliCommand("api ls --json")],
+        });
+      });
+
+      it("refuses --paginate on an operation that does not page", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.api("getVariable", "FOO", "--paginate");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_VALIDATION",
+          message: "getVariable does not page, so --paginate has nothing to follow",
+          hint: "Leave out --paginate.",
+        });
+      });
+
+      it("refuses an operation only an end user's session authenticates", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.api("getMyUser");
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          code: "E_VALIDATION",
+          message:
+            "getMyUser is authenticated by an end user's session cookie, and the CLI holds a project secret",
+          hint: "Call it from the app it belongs to, through the SDK; the api ls command marks what the CLI can call.",
+          next_commands: [expectedPublicCliCommand(`api ls --cwd ${app.path}`)],
+        });
       });
 
       describe("without --force when no one can be asked", () => {
-        it("is refused", async () => {
+        it("is refused, with the question a person would be asked and the command to run again", async () => {
           const app = await aSetUpApp();
           expect(await app.setVariable("FOO", "bar")).toSucceed();
 
           const result = await app.api("deleteVariable", "FOO");
 
           expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
-        });
-
-        it("says to pass --force", async () => {
-          const app = await aSetUpApp();
-          expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-          const result = await app.api("deleteVariable", "FOO");
-
-          expect(result).toHintAt("--force");
-        });
-
-        it("suggests running it again with --force", async () => {
-          const app = await aSetUpApp();
-          expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-          const result = await app.api("deleteVariable", "FOO");
-
-          expect(result).toSuggestExactly(app.againAsRun("api deleteVariable FOO --force"));
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: expect.any(String),
+            command: "api",
+            source: "http://mock.zitadel.test",
+            code: "E_CONFIRMATION_REQUIRED",
+            message: "Cannot call deleteVariable without --force in non-interactive mode",
+            hint: `Ask a person first: Call deleteVariable in ${await app.projectPlace()}? Delete a variable by name. Pass --force only once they agree.`,
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("api deleteVariable FOO --force")),
+            ],
+            details: {
+              question: `Call deleteVariable in ${await app.projectPlace()}? Delete a variable by name.`,
+            },
+          });
         });
 
         it("deletes nothing", async () => {
@@ -197,48 +497,72 @@ describe("api", () => {
 
           expect(await app.projectVariables()).not.toEqual([]);
         });
+
+        it("repeats nothing of a refused request's body, and says to run it again with --force", async () => {
+          const app = await aSetUpApp();
+
+          const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
+
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: expect.any(String),
+            command: "api",
+            source: "http://mock.zitadel.test",
+            code: "E_CONFIRMATION_REQUIRED",
+            message: "Cannot call removePreview without --force in non-interactive mode",
+            hint: `Ask a person first: Call removePreview in ${await app.projectPlace()}? Remove a preview. Once they agree, run the same command again, with its --field values or the pipe into --input, and add --force.`,
+            details: {
+              question: `Call removePreview in ${await app.projectPlace()}? Remove a preview.`,
+            },
+          });
+        });
       });
 
       it("runs an operation that deletes with --force", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        await app.api("deleteVariable", "FOO", "--force");
+        const result = await app.api("deleteVariable", "FOO", "--force");
 
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: null,
+          warnings: [],
+        });
         expect(await app.projectVariables()).toEqual([]);
-      });
-
-      it("does not repeat a refused request's body in its suggestion", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
-
-        expect(result).not.toSuggest("pr-1.example.com");
-      });
-
-      it("says to run a refused request with a body again with --force", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
-
-        expect(result).toHintAt("Once they agree, run the same command again");
       });
 
       it("sends a merge patch with a null without asking, as before", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        await app.api("updateVariables", "-F", "FOO:=null");
+        const result = await app.api("updateVariables", "-F", "FOO:=null");
 
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "api",
+          source: "http://mock.zitadel.test",
+          data: {},
+          warnings: [],
+        });
         expect(await app.projectVariables()).toEqual([]);
       });
 
-      it("refuses an operation only an end user's session authenticates", async () => {
+      it.each([
+        ["a dry run", ["getVariables", "--dry-run"]],
+        ["a call", ["getVariables"]],
+      ])("never carries the project secret, in %s", async (_what, args) => {
         const app = await aSetUpApp();
 
-        const result = await app.api("getMyUser");
+        const result = await app.api(...args);
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(result.stdout + result.stderr).not.toContain(
+          (await app.developmentValues()).ZITADEL_PROJECT_SECRET,
+        );
       });
     });
 
@@ -249,15 +573,26 @@ describe("api", () => {
 
         const result = await app.apiRendered("getVariable", "FOO");
 
-        expect(result).toPrint('"primary": "bar"');
+        expect(JSON.parse(result.stdout)).toEqual({ primary: "bar", preview: "bar" });
       });
 
       it("prints the request as cURL with --dry-run", async () => {
         const app = await aSetUpApp();
+        const { ZITADEL_PROJECT_ID } = await app.developmentValues();
 
         const result = await app.apiRendered("getVariables", "--dry-run");
 
-        expect(result).toPrint("curl -X GET");
+        expect(result.stdout).toBe(
+          `curl -X GET 'http://mock.zitadel.test/api/v1/variables?project_id=${ZITADEL_PROJECT_ID}' \\\n  -H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"\n`,
+        );
+      });
+
+      it("prints a dry run's body once, in its curl line", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered("updateVariables", "-F", "FOO=bar", "--dry-run");
+
+        expect(result.stdout.split('-d \'{"FOO":"bar"}\'')).toHaveLength(2);
       });
 
       // The line is there to be copied into a shell, so the secret has to stay
@@ -269,16 +604,16 @@ describe("api", () => {
         const result = await app.apiRendered("getVariables", "--dry-run");
 
         expect(result).toPrint('-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"');
-        expect(result.stdout).not.toContain((await app.developmentValues()).ZITADEL_PROJECT_SECRET);
+        expect(result.stdout + result.stderr).not.toContain(
+          (await app.developmentValues()).ZITADEL_PROJECT_SECRET,
+        );
       });
 
       it("sends no credential for an operation that needs none", async () => {
         const app = await aSetUpApp();
-
         const result = await app.apiRendered("getLive", "--dry-run");
 
-        expect(result).toPrint("curl -X GET");
-        expect(result.stdout).not.toContain("Authorization");
+        expect(result.stdout).toBe("curl -X GET 'http://mock.zitadel.test/api/v1/livez'\n");
       });
 
       it("gives a pipe a body that parses back to what the server answered", async () => {
@@ -289,7 +624,53 @@ describe("api", () => {
 
         expect(result).toSucceed();
         expect(result.stdout).not.toContain("\u009b");
-        expect(JSON.parse(result.stdout)).toMatchObject({ primary: "a\u009bb" });
+        expect(JSON.parse(result.stdout)).toEqual({ primary: "a\u009bb", preview: "a\u009bb" });
+      });
+
+      it("spells out a control character in a dry run's body the way JSON does", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered(
+          "updateVariables",
+          "-F",
+          "FOO=a\u001b[2Jb",
+          "--dry-run",
+        );
+
+        expect(result.stdout).toContain(`-d '{"FOO":"a\\u001b[2Jb"}'`);
+        expect(result.stdout).not.toContain("\u001b");
+      });
+
+      it("spells out a control character in the operation it refuses", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered("a\u001b[2Jb");
+
+        expect(result).toSay("No operation is called a\\x1b[2Jb");
+        expect(result.stderr).not.toContain("\u001b");
+      });
+
+      it("says what it refuses, and the command to run again, once each", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.apiRendered("deleteVariable", "FOO");
+
+        expect(result).toSayOnce(
+          `Call deleteVariable in ${await app.projectPlace()}? Delete a variable by name.`,
+        );
+        expect(result).toSayOnce(
+          expectedPublicCliCommand(app.againAsRun("api deleteVariable FOO --force")),
+        );
+      });
+
+      it("says nothing on stdout for an answer without content", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.apiRendered("deleteVariable", "FOO", "--force");
+
+        expect(result.stdout).toBe("");
       });
     });
   });

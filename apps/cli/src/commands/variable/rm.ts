@@ -72,6 +72,18 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
               ...(result.data as object),
               kinds: removal.kinds,
             },
+            next: {
+              commands: [
+                this.suggest(
+                  [
+                    "variable rm",
+                    args.name,
+                    ...(flags.force ? ["--force"] : []),
+                    ...(removal.preview ? ["--preview"] : []),
+                  ].join(" "),
+                ),
+              ],
+            },
           };
         },
         prepare: () => {

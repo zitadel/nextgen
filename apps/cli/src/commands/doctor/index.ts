@@ -401,7 +401,7 @@ export default class Doctor extends Destructive(BaseCommand) {
               ...(planned
                 ? [
                     projectCommand(
-                      flags.force ? "doctor --fix --force" : "doctor --fix",
+                      `doctor --fix${flags.force ? " --force" : ""}${flags.port === undefined ? "" : ` --port ${flags.port}`}`,
                       selector,
                       this.cliVersion,
                     ),

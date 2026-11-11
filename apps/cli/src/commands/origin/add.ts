@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { Flags } from "@oclif/core";
 
 import { OriginService } from "@/lib/backend";
@@ -52,28 +53,38 @@ export default class OriginAdd extends EnvironmentCommand {
     // order the resource commands' `create` uses, which keeps
     // `--dry-run --non-interactive` usable.
     if (this.dryRun) {
-      return this.emit(
-        dryRunResult({
+      return this.emit({
+        ...dryRunResult({
           verb: "add",
           topic: "origin",
           id: args.pattern,
           body: { kind: flags.kind },
         }),
-      );
+        next: {
+          commands: [
+            this.suggest(
+              ["origin add", Cmd.quote(args.pattern), Cmd.option("--kind", flags.kind)].join(" "),
+            ),
+          ],
+        },
+      });
     }
 
     const { client, projectId } = await this.connect();
     const originService = new OriginService(client, projectId);
     const added = await originService.add(args.pattern, flags.kind);
 
+    const title = `Added ${escapeControlCharacters(added.pattern)} (${escapeControlCharacters(added.kind)})`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         pattern: added.pattern,
         kind: added.kind,
       },
       summary: {
-        title: `Added ${escapeControlCharacters(added.pattern)} (${escapeControlCharacters(added.kind)})`,
+        title,
         sections: [],
       },
       next: { commands: [this.suggest("origin list")] },

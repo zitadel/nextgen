@@ -1,5 +1,6 @@
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -11,7 +12,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
  * Adding them is this command's whole job, so it asks nothing; running it
  * again replaces them, which is how they follow a CLI update.
  */
-export default class SkillsAdd extends BaseCommand {
+export default class SkillsAdd extends Suggestible(BaseCommand) {
   static override description =
     "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.";
   static override group = CommandGroups.gettingStarted;
@@ -40,7 +41,8 @@ export default class SkillsAdd extends BaseCommand {
 
     const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}${this.dryRun ? " (dry run)" : ""}`;
     const lines = [
-      `${title} to:`,
+      title,
+      this.dryRun ? "Would add them to:" : "Added them to:",
       ...dirs.map((dir) => {
         return `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`;
       }),
@@ -63,6 +65,7 @@ export default class SkillsAdd extends BaseCommand {
           return escapeControlCharacters(line);
         }),
       },
+      ...(this.dryRun ? { next: { commands: [this.suggest("skills add")] } } : {}),
     });
   }
 }

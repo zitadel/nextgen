@@ -100,7 +100,7 @@ const CHALLENGE_ID: Refused<string> = {
   schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),
   refusal: {
     message:
-      "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_.",
+      "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
     next: ["claim --no-wait"],
   },
 };
@@ -431,7 +431,7 @@ export default class Claim extends EnvironmentCommand {
               poll_count: attempt,
             });
             throw new AbortError(
-              expiredError("The link expired before the browser step finished.", startOver),
+              expiredError("The link expired before the browser step finished", startOver),
             );
           }
           case "not-found": {
@@ -473,7 +473,7 @@ export default class Claim extends EnvironmentCommand {
         claim_outcome: "timeout",
         poll_count: error.attempt,
       });
-      throw expiredError("Stopped waiting for the browser step to finish.", startOver);
+      throw expiredError("Stopped waiting for the browser step to finish", startOver);
     });
   }
 

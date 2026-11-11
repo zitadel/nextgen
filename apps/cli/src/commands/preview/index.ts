@@ -352,9 +352,12 @@ export default class Preview extends PreviewCommand {
 
     const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
 
+    const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         content_hash: release.content_hash,
         deployment_id: deployment.id,
@@ -373,7 +376,7 @@ export default class Preview extends PreviewCommand {
         ].join("\n"),
       ),
       summary: {
-        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`,
+        title,
         sections: [],
         lines: [
           ...previews.map((preview) => {

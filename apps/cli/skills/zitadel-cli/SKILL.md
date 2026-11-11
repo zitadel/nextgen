@@ -46,7 +46,7 @@ on the dist-tag so the newest release does the upgrading. It re-pins the
 exactly-pinned `@zitadel/*` packages with the project's own package manager and
 runs the new release's `doctor --fix`. It reports `data.packages`,
 `data.breaking_changes` (read them first: `--dry-run` changes nothing) and
-`data.refresh` (`done`, `issues`, `failed` or `skipped`). A range or dist-tag is
+`data.refresh` (`done`, `issues`, `failed`, `planned` on a dry run, or `skipped`). A range or dist-tag is
 listed in `data.left_alone` and stays as it is. `E_NETWORK` means the registry
 did not say what the latest release is. `doctor` warns (`cli-version`) when a
 newer CLI exists, asking the npm registry at most once a day and never on CI;

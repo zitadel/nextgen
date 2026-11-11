@@ -21,6 +21,11 @@ const SELECTOR = " --env-file .env.development.local";
 const PLAN_COMMAND = `npx @zitadel/cli@1.2.3 deploy --dry-run${SELECTOR}`;
 
 /**
+ * The command the box points at for the next steps once login works.
+ */
+const STATUS_COMMAND = `npx @zitadel/cli@1.2.3 status${SELECTOR}`;
+
+/**
  * The directory `--cwd` names, as typed.
  */
 const CWD_FLAG = "shop";
@@ -232,7 +237,7 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, run: aRunner() }),
       );
 
-      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
   });
 
@@ -316,7 +321,7 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, depsAdded: [], scaffoldedFramework: true, run: aRunner() }),
       );
 
-      expect(result.nextCommands).toEqual(["pnpm dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual(["pnpm dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
   });
 
@@ -350,7 +355,12 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
       );
 
-      expect(result.nextCommands).toEqual(["npm install", "npm run dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual([
+        "npm install",
+        "npm run dev",
+        PLAN_COMMAND,
+        STATUS_COMMAND,
+      ]);
     });
 
     it("keeps the install step first in the box", async ({ dir }) => {
@@ -430,7 +440,7 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, depsAdded: [], run: aRunner() }),
       );
 
-      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
   });
 

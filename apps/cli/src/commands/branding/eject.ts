@@ -14,10 +14,9 @@ import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-
 
 import { isErrno, ZitadelError } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
-import { log } from "@/lib/log";
 import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
-import { filled, reads, suggesterOf } from "@/lib/oclif/flags";
+import { filled, reads } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Suggestible } from "@/lib/oclif/suggestible";
@@ -59,8 +58,8 @@ const RETIRED_DESIGN_REFUSAL: Refusal = {
 
 /**
  * How a `--design` that names no design, retired or shipped, is refused. The
- * value is quoted as JSON, so an escape sequence in it reads as text rather
- * than driving the terminal it is printed on.
+ * value is quoted as it was typed: the envelope carries it raw, and the
+ * terminal spells out an escape sequence in it rather than obeying it.
  */
 const UNKNOWN_DESIGN_REFUSAL: Refusal = {
   message: "Unknown design {design}",
@@ -68,16 +67,16 @@ const UNKNOWN_DESIGN_REFUSAL: Refusal = {
 };
 
 /**
- * The `parse` of `--design`: a design the CLI ships, refused by name where it
- * names one that was retired, and as unknown where it names none. Both are
- * refused on the way in, so nothing the command does can run against a design
- * that does not exist, and each keeps its own words and follow-up.
+ * The `parse` of `--design`: a design the CLI ships or one that was retired,
+ * and as unknown where it names neither. A retired one is refused by name in
+ * `execute`, where the follow-up it suggests can carry the run's `--cwd`,
+ * which a refusal raised while the flags parse has not read yet.
  */
 async function readsDesign(
   given: string,
   command: unknown,
   definition: { name: string },
-): Promise<BrandingDesign> {
+): Promise<string> {
   const design = await reads<string>({
     schema: filled,
     refusal: {
@@ -85,11 +84,8 @@ async function readsDesign(
       hint: "Pass a value for {input}, or omit it entirely.",
     },
   })(given, command, definition);
-  if (isRetiredDesign(design)) {
-    throw refusalError(RETIRED_DESIGN_REFUSAL, { design }, suggesterOf(command));
-  }
-  if (!isBrandingDesign(design)) {
-    throw refusalError(UNKNOWN_DESIGN_REFUSAL, { design: JSON.stringify(design) });
+  if (!isRetiredDesign(design) && !isBrandingDesign(design)) {
+    throw refusalError(UNKNOWN_DESIGN_REFUSAL, { design: `"${design}"` });
   }
   return design;
 }
@@ -129,7 +125,7 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
     // No oclif `options`: a retired design is refused by name, with a pointer
     // to where page layout lives, rather than by oclif's generic "expected one
     // of".
-    design: Flags.custom<BrandingDesign>({
+    design: Flags.custom<string>({
       parse: readsDesign,
     })({
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
@@ -141,6 +137,11 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
   };
 
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
+    if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
+      throw refusalError(RETIRED_DESIGN_REFUSAL, { design: flags.design }, (next) => {
+        return this.suggest(next);
+      });
+    }
     if (!(await hasZitadelConfig(this.cwd))) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {}, (next) => {
         return this.suggest(next);
@@ -203,6 +204,7 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       if (error instanceof FileExistsError) {
         throw new ZitadelError("E_CONFLICT", error.message, {
           hint: "Rerun with --force to replace it, or edit the existing file directly.",
+          nextCommands: [this.suggest(`branding eject --design ${design} --force`)],
           details: error.details,
         });
       }
@@ -259,9 +261,6 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       });
     }
 
-    for (const file of filesWritten) {
-      log.info(`Wrote ${escapeControlCharacters(file)}`);
-    }
     const title = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;
 
     return this.emit({
@@ -274,7 +273,12 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       summary: {
         title,
         sections: [],
-        lines: [`Files: ${filesWritten.length} written, ${unchanged} unchanged`],
+        lines: [
+          `Files: ${filesWritten.length} written, ${unchanged} unchanged`,
+          ...filesWritten.map((file) => {
+            return `Wrote ${escapeControlCharacters(file)}`;
+          }),
+        ],
       },
       next: {
         actions: [

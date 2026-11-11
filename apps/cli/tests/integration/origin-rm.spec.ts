@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
-import { expectedPublicCliCommand } from "@tests/helpers/run-cli";
+import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -21,6 +21,19 @@ describe("origin rm", () => {
         const result = await app.removeOrigin("https://app.acme.com");
 
         expect(result).toFailWith("E_NOT_FOUND");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          code: "E_NOT_FOUND",
+          message: expect.stringContaining("is this a Zitadel platform API?"),
+          details: {
+            status: 404,
+            url: expect.stringMatching(/\/projects\/\S+\/origins\/remove$/),
+            body: { raw: "<html>not here</html>" },
+          },
+        });
       });
     });
 
@@ -32,18 +45,70 @@ describe("origin rm", () => {
         const result = await app.removeOrigin("https://app.acme.com");
 
         expect(result).toFailWith("E_NETWORK");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          code: "E_NETWORK",
+          message: "down",
+          details: {
+            status: 503,
+            url: expect.stringMatching(/\/projects\/\S+\/origins\/remove$/),
+            body: { code: "unavailable", message: "down" },
+          },
+        });
       });
     });
-  });
 
-  describe("against a server that refuses connections", () => {
-    it("fails", async () => {
-      const app = await aSetUpApp();
-      platform.refusesConnections();
+    describe("that refuses connections", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.refusesConnections();
 
-      const result = await app.run(["origin", "rm", "https://app.acme.com", "--force", "--json"]);
+        const result = await app.removeOrigin("https://app.acme.com");
 
-      expect(result).toFailWith("E_NETWORK");
+        expect(result).toFailWith("E_NETWORK");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          code: "E_NETWORK",
+          message: expect.stringMatching(
+            /^POST \S+\/projects\/\S+\/origins\/remove got no response$/,
+          ),
+          hint: "Check your connection and the server URL (ZITADEL_URL or --server).",
+          details: {
+            reason: "unreachable",
+            url: expect.stringMatching(/\/projects\/\S+\/origins\/remove$/),
+          },
+        });
+      });
+    });
+
+    describe("that hangs", () => {
+      it("stops on Ctrl-C with one envelope", async () => {
+        const app = await aSetUpApp();
+        const waiting = platform.hangs();
+
+        const result = app.removeOrigin("https://app.acme.com");
+        await waiting;
+        pressCtrlC();
+
+        const finished = await result;
+        expect(finished).toFailWith("E_CANCELLED");
+        expect(finished.exitCode).toBe(130);
+        expect(app.envelopeOf(finished)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          code: "E_CANCELLED",
+          message: "Cancelled",
+          hint: "The command was cancelled with Ctrl-C.",
+        });
+      });
     });
   });
 
@@ -75,7 +140,21 @@ describe("origin rm", () => {
           "--json",
         ]);
 
-        expect(result).toSay("ZITADEL_PROJECT_SECRET");
+        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_SECRET is not set for the ci environment",
+          hint: "Consulted, in order: --server, process environment, .env.ci.local, .env.ci, .env. Set ZITADEL_PROJECT_SECRET in .env.ci.local or the process environment.",
+          details: {
+            environment: "ci",
+            variable: "ZITADEL_PROJECT_SECRET",
+            consulted: ["--server", "process environment", ".env.ci.local", ".env.ci", ".env"],
+          },
+        });
       });
 
       it("stops admitting a pattern that was added", async () => {
@@ -84,30 +163,80 @@ describe("origin rm", () => {
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toSucceed();
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Removed https://app.acme.com from the project's origins",
+            pattern: "https://app.acme.com",
+            deleted: true,
+          },
+          warnings: [],
+        });
         expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
       });
 
-      it("warns that removing the last origin admits no origin except loopback", async () => {
+      it("succeeds on a pattern the project does not hold, as the server answers 204", async () => {
         const app = await aSetUpApp();
-        await app.clearOrigins();
-        await app.addOrigin("https://app.acme.com", "primary");
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toSay("admits no origin except a loopback origin");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Removed https://app.acme.com from the project's origins",
+            pattern: "https://app.acme.com",
+            deleted: true,
+          },
+          warnings: [],
+        });
       });
 
-      it("says how to add an origin back after removing the last one", async () => {
+      it("carries a pattern holding a control character raw, and spells it out in the title", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.removeOrigin("https://w\u001b[2J.example.com");
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Removed https://w\\x1b[2J.example.com from the project's origins",
+            pattern: "https://w\u001b[2J.example.com",
+            deleted: true,
+          },
+          warnings: [],
+        });
+      });
+
+      it("warns once that removing the last origin admits no origin except loopback", async () => {
         const app = await aSetUpApp();
         await app.clearOrigins();
         await app.addOrigin("https://app.acme.com", "primary");
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toSay(
-          expectedPublicCliCommand("origin add '<your-app-url>' --kind primary"),
-        );
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Removed https://app.acme.com",
+            pattern: "https://app.acme.com",
+            deleted: true,
+          },
+          warnings: [
+            `https://app.acme.com was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${expectedPublicCliCommand(app.againAsRun("origin add '<your-app-url>' --kind primary"))}.`,
+          ],
+        });
       });
 
       it("does not warn while other origins remain", async () => {
@@ -117,34 +246,118 @@ describe("origin rm", () => {
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).not.toSay("admits no origin except a loopback origin");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: "Removed https://app.acme.com from the project's origins",
+            pattern: "https://app.acme.com",
+            deleted: true,
+          },
+          warnings: [],
+        });
       });
 
-      it("succeeds on a pattern the project does not hold, as the server answers 204", async () => {
+      it("answers a dry run with the pattern it would remove and the command to run for real", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.run([
+          "origin",
+          "rm",
+          "https://app.acme.com",
+          "--dry-run",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            dry_run: true,
+            title: "Would remove origin https://app.acme.com from the project (dry run)",
+            verb: "remove",
+            topic: "origin",
+            id: "https://app.acme.com",
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("origin rm https://app.acme.com")),
+            ],
+          },
+          warnings: [],
+        });
+      });
+
+      it("keeps the --force it was typed with in the command a dry run suggests", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.removeOrigin("https://app.acme.com");
+        const result = await app.run([
+          "origin",
+          "rm",
+          "https://app.acme.com",
+          "--force",
+          "--dry-run",
+          "--json",
+        ]);
 
-        expect(result).toSucceed();
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "origin:rm",
+          source: "http://mock.zitadel.test",
+          data: {
+            dry_run: true,
+            title: "Would remove origin https://app.acme.com from the project (dry run)",
+            verb: "remove",
+            topic: "origin",
+            id: "https://app.acme.com",
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("origin rm https://app.acme.com --force")),
+            ],
+          },
+          warnings: [],
+        });
+      });
+
+      it("removes nothing on a dry run", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        await app.run(["origin", "rm", "https://app.acme.com", "--dry-run", "--json"]);
+
+        expect(await app.projectOrigins()).toEqual([
+          SETUP_ORIGIN,
+          { pattern: "https://app.acme.com", kind: "primary" },
+        ]);
       });
 
       describe("without --force when no one can be asked", () => {
-        it("is refused", async () => {
+        it("is refused, naming what it would remove and how to run it again", async () => {
           const app = await aSetUpApp();
           await app.addOrigin("https://app.acme.com", "primary");
 
           const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
 
           expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
-        });
-
-        it("says to pass --force", async () => {
-          const app = await aSetUpApp();
-          await app.addOrigin("https://app.acme.com", "primary");
-
-          const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
-
-          expect(result).toHintAt("--force");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: expect.any(String),
+            command: "origin:rm",
+            source: "http://mock.zitadel.test",
+            code: "E_CONFIRMATION_REQUIRED",
+            message:
+              "Cannot remove https://app.acme.com from the project without --force in non-interactive mode",
+            hint: `Ask a person first: Remove https://app.acme.com from ${await app.projectPlace()}? Pass --force only once they agree.`,
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("origin rm https://app.acme.com --force")),
+            ],
+            details: {
+              question: `Remove https://app.acme.com from ${await app.projectPlace()}?`,
+            },
+          });
         });
 
         it.each(SERVERS)(
@@ -162,17 +375,55 @@ describe("origin rm", () => {
               "--json",
             ]);
 
-            expect(result).toHintAt(await app.projectPlace(server));
+            expect(app.envelopeOf(result)).toEqual({
+              status: "error",
+              cli_version: expect.any(String),
+              command: "origin:rm",
+              source: server,
+              code: "E_CONFIRMATION_REQUIRED",
+              message:
+                "Cannot remove https://app.acme.com from the project without --force in non-interactive mode",
+              hint: `Ask a person first: Remove https://app.acme.com from ${await app.projectPlace(server)}? Pass --force only once they agree.`,
+              next_commands: [
+                expectedPublicCliCommand(
+                  `origin rm https://app.acme.com --force --server ${server} --cwd ${app.path}`,
+                ),
+              ],
+              details: {
+                question: `Remove https://app.acme.com from ${await app.projectPlace(server)}?`,
+              },
+            });
           },
         );
 
-        it("suggests running it again with --force", async () => {
+        it("carries a control character raw in the question and spells it out in the suggestion", async () => {
           const app = await aSetUpApp();
-          await app.addOrigin("https://app.acme.com", "primary");
 
-          const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+          const result = await app.run([
+            "origin",
+            "rm",
+            "https://w\u001b[2J.example.com",
+            "--json",
+          ]);
 
-          expect(result).toSuggestExactly(app.againAsRun("origin rm https://app.acme.com --force"));
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: expect.any(String),
+            command: "origin:rm",
+            source: "http://mock.zitadel.test",
+            code: "E_CONFIRMATION_REQUIRED",
+            message:
+              "Cannot remove https://w\u001b[2J.example.com from the project without --force in non-interactive mode",
+            hint: `Ask a person first: Remove https://w\u001b[2J.example.com from ${await app.projectPlace()}? Pass --force only once they agree.`,
+            next_commands: [
+              expectedPublicCliCommand(
+                app.againAsRun("origin rm $'https://w\\x1b[2J.example.com' --force"),
+              ),
+            ],
+            details: {
+              question: `Remove https://w\u001b[2J.example.com from ${await app.projectPlace()}?`,
+            },
+          });
         });
 
         it("removes nothing", async () => {
@@ -190,13 +441,66 @@ describe("origin rm", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says what stops being admitted", async () => {
+      it("says what stops being admitted, as the envelope's title does", async () => {
         const app = await aSetUpApp();
         await app.addOrigin("https://app.acme.com", "primary");
 
         const result = await app.run(["origin", "rm", "https://app.acme.com", "--force"]);
 
-        expect(result).toPrint("https://app.acme.com");
+        expect(result.stdout.split("\n")[0]).toBe(
+          "Removed https://app.acme.com from the project's origins",
+        );
+      });
+
+      it("draws the dry run's headline", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "rm", "https://app.acme.com", "--dry-run"]);
+
+        expect(result.stdout.split("\n")[0]).toBe(
+          "Would remove origin https://app.acme.com from the project (dry run)",
+        );
+      });
+
+      it("spells out a control character in the pattern given", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "rm", "https://w\u001b[2J.example.com", "--force"]);
+
+        expect(result.stdout.split("\n")[0]).toBe(
+          "Removed https://w\\x1b[2J.example.com from the project's origins",
+        );
+      });
+
+      it("spells out a control character in the question it refuses with", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["origin", "rm", "https://w\u001b[2J.example.com"]);
+
+        expect(result).toSay("Remove https://w\\x1b[2J.example.com from");
+        expect(result.stderr).not.toContain("\u001b");
+      });
+
+      it("warns once that removing the last origin admits no origin except loopback", async () => {
+        const app = await aSetUpApp();
+        await app.clearOrigins();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.run(["origin", "rm", "https://app.acme.com", "--force"]);
+
+        expect(result).toSayOnce("admits no origin except a loopback origin. Add");
+      });
+
+      it("says how to add an origin back after removing the last one, once", async () => {
+        const app = await aSetUpApp();
+        await app.clearOrigins();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.run(["origin", "rm", "https://app.acme.com", "--force"]);
+
+        expect(result).toSayOnce(
+          expectedPublicCliCommand(app.againAsRun("origin add '<your-app-url>' --kind primary")),
+        );
       });
     });
   });

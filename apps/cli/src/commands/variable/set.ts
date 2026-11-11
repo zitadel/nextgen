@@ -2,6 +2,7 @@ import { Args, Flags } from "@oclif/core";
 
 import { previewVerdict } from "@/commands/preview";
 import { type Variable, VariableService, VariableWrite } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
@@ -129,6 +130,10 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         ].join(" "),
       });
 
+      // The real write, with what this run was given: a value typed here is
+      // kept, and one that was to be piped is piped again.
+      const real = pipeArgs(args.name, write, flags.as, args.value);
+
       return this.emit({
         ...preview,
         data: {
@@ -137,6 +142,15 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           type: flags.as,
           secret: write.secret,
           kinds: write.kinds,
+        },
+        next: {
+          commands: [
+            args.value === undefined
+              ? inShell(this.suggest(real), {
+                  after: " < value.txt",
+                })
+              : this.suggest(real),
+          ],
         },
       });
     }
@@ -337,17 +351,19 @@ function stateCell(state: KindState): string {
 }
 
 /**
- * The scripted form to suggest when a run supplied no value.
+ * The scripted form to suggest when a run supplied no value, or the write a
+ * dry run stood in for, with the value it was given.
  *
  * It carries the write the run actually made and the type it stored. Dropping
  * any of them would hand back a command that writes a credential as a readable
  * value, stores a number as a string, or writes the wrong kind.
  */
-function pipeArgs(name: string, write: VariableWrite, type: VariableType): string {
+function pipeArgs(name: string, write: VariableWrite, type: VariableType, value?: string): string {
   return [
     "variable",
     "set",
     name,
+    ...(value === undefined ? [] : [Cmd.quote(value)]),
     ...(write.secret ? ["--secret"] : []),
     ...(type === "string" ? [] : ["--as", type]),
     ...(write.preview ? ["--preview"] : []),

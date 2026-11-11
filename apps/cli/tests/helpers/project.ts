@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { parseEnv, promisify } from "node:util";
 
+import { snapshotPlatformStore } from "@zitadel/api-mock/platform";
 import { expect, vi } from "vitest";
 import { z } from "zod";
 
@@ -803,6 +804,26 @@ export class ScaffoldedApp {
           throw new Error("upgrade has not reached the fakes");
         }
         await stat(started);
+      },
+      { timeout: 30_000 },
+    );
+    pressCtrlC();
+    return running;
+  }
+
+  /**
+   * `claim --json` with Ctrl-C pressed once it is waiting on the browser step,
+   * which it is when the platform holds the challenge it opened.
+   *
+   * @returns What the interrupted run ended with.
+   */
+  async claimInterrupted(): Promise<CliResult> {
+    const running = this.cli(["claim", "--no-open", "--timeout", "30", "--json"]);
+    await vi.waitFor(
+      () => {
+        if (snapshotPlatformStore().claimChallengeIds.length === 0) {
+          throw new Error("claim has not opened a challenge");
+        }
       },
       { timeout: 30_000 },
     );

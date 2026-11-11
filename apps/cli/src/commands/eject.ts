@@ -232,7 +232,10 @@ function ejected(
     return `Remove the Zitadel configuration block from ${rel}`;
   });
 
-  if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
+  // The manual steps are not weighed: a patcher lists the config it edits whether
+  // or not setup ever ran, so an app with nothing of ours in it would otherwise
+  // be reported as having had Zitadel removed.
+  if (removed.length === 0 && backedUp.length === 0) {
     if (ejectForReal !== undefined) {
       const title = "Nothing would be removed (dry run)";
 
@@ -260,7 +263,7 @@ function ejected(
     return {
       status: "skipped",
       reason: "nothing-to-eject",
-      data: { cwd },
+      data: { title: "Nothing to remove", cwd },
       summary: {
         title: "Nothing to remove",
         sections: [],

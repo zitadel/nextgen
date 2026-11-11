@@ -28,7 +28,7 @@ import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
 const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** How rerunning `doctor --fix` at the new version ended, when it ran at all. */
-type Refresh = "done" | "issues" | "failed" | "skipped";
+type Refresh = "done" | "issues" | "failed" | "planned" | "skipped";
 
 type PackageUpgrade = { name: string; from: string; to: string };
 
@@ -119,10 +119,13 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     if (install !== undefined && installSuggestion !== undefined && !this.dryRun) {
       await this.install(install, installSuggestion);
     }
-    const refresh: Refresh =
-      install !== undefined && !this.dryRun && (await hasZitadelConfig(this.cwd))
-        ? await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal)
-        : "skipped";
+    const refreshes = install !== undefined && (await hasZitadelConfig(this.cwd));
+    let refresh: Refresh = "skipped";
+    if (refreshes) {
+      refresh = this.dryRun
+        ? "planned"
+        : await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal);
+    }
 
     // At the new version, and from the shell's directory like every suggestion.
     const atTarget = (args: string): SuggestedCommand => {

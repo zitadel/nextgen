@@ -2,6 +2,7 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
+import { GetDeploymentByIdParams, GetReleaseByIdParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
@@ -53,7 +54,7 @@ const LATEST_TARGET: PullTarget = {
  * @returns Whether it is a release id.
  */
 function isReleaseId(target: string): target is ReleaseId {
-  return target.startsWith("rel_");
+  return GetReleaseByIdParams.shape.release_id.safeParse(target).success;
 }
 
 /**
@@ -63,7 +64,7 @@ function isReleaseId(target: string): target is ReleaseId {
  * @returns Whether it is a deployment id.
  */
 function isDeploymentId(target: string): target is DeploymentId {
-  return target.startsWith("dep_");
+  return GetDeploymentByIdParams.shape.deployment_id.safeParse(target).success;
 }
 
 /**

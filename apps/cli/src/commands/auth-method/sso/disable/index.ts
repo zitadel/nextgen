@@ -133,6 +133,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         ...optionArgs("--provider", provider),
         ...target.schemaArgs,
         ...target.cwdArgs,
+        ...(this.force ? ["--force"] : []),
       ];
 
       return this.emit({
