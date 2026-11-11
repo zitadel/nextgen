@@ -249,10 +249,11 @@ function LogsScreen() {
                 <ResourceHeadCell className="w-[26%]">Event</ResourceHeadCell>
                 <ResourceHeadCell className="w-[27%]">Details</ResourceHeadCell>
                 <ResourceHeadCell className="w-[15%]">Actor</ResourceHeadCell>
-                <ResourceHeadCell className="w-[26%]">Time</ResourceHeadCell>
+                {/* No width: Time takes what the others and the menu column leave. */}
+                <ResourceHeadCell>Time</ResourceHeadCell>
                 {/* Pinned, as on Users: the table scrolls in its card, and the menu
                     stays in reach. */}
-                <ResourceMenuHead narrow className={`w-[6%] ${RESOURCE_STICKY_END}`} />
+                <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>

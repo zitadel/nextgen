@@ -283,8 +283,7 @@ function UsersScreen() {
                     cell's hover card (D23). */}
                 {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
                 <ResourceHeadCell>ID</ResourceHeadCell>
-                {/* 52px: the 36px menu button and 8px either side. */}
-                <ResourceMenuHead narrow className={`w-13 ${RESOURCE_STICKY_END}`} />
+                <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>

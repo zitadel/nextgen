@@ -175,11 +175,12 @@ export const RESOURCE_STICKY_BODY =
  * `comfortable`, the default, is the design's 56px with 8px block padding: a
  * row with a second line under its name, or a mark beside it. `compact` is
  * 40px with 4px: one line a row, where the list is read by the screenful
- * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`.
+ * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * a narrow menu column sizes itself for.
  */
 export const RESOURCE_DENSITY = {
   comfortable: "",
-  compact: "[--resource-row:2.5rem] [--resource-row-pad:0.25rem]",
+  compact: "[--resource-row:2.5rem] [--resource-row-pad:0.25rem] [--resource-menu:1.5rem]",
 } as const;
 
 export type ResourceDensity = keyof typeof RESOURCE_DENSITY;
@@ -289,7 +290,12 @@ export function ResourceMenuHead({
 }) {
   return (
     <TableHead
-      className={cn("h-[var(--resource-row,3.5rem)]", narrow ? "px-2" : "px-6", className)}
+      className={cn(
+        "h-[var(--resource-row,3.5rem)]",
+        // Narrow: the menu's button (36px, or the density's) and 8px either side.
+        narrow ? "w-[calc(var(--resource-menu,2.25rem)+1rem)] px-2" : "px-6",
+        className,
+      )}
     />
   );
 }
