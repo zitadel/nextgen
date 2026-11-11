@@ -10,6 +10,10 @@ describe("Where", () => {
     expect(new Where().known).toBe(false);
   });
 
+  it("knows nothing when the server resolved to nothing", () => {
+    expect(new Where(undefined, "").known).toBe(false);
+  });
+
   it("names the project and the server it ran against", () => {
     expect(plain(new Where("proj-1", "api.zitadel.cloud").render())).toBe(
       "Using project proj-1 on your Zitadel server at api.zitadel.cloud.",
