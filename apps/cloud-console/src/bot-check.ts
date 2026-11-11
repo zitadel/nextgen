@@ -1,3 +1,4 @@
+import { FLOW_WRITES } from "@zitadel/cloud-functions/contract";
 import { initBotId } from "botid/client/core";
 
 /**
@@ -10,10 +11,5 @@ import { initBotId } from "botid/client/core";
  * A call they miss goes unmarked, and the check refuses it as a bot.
  */
 export function startBotCheck(): void {
-  initBotId({
-    protect: [
-      { path: "/cloud/zitadel/api/v1/flow", method: "POST" },
-      { path: "/cloud/zitadel/api/v1/flow/*/submit", method: "POST" },
-    ],
-  });
+  initBotId({ protect: [...FLOW_WRITES] });
 }

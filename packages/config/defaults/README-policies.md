@@ -20,8 +20,8 @@ chose another minimum or none:
 ## Settings
 
 Every setting is optional. A setting left out is off, and `"config": {}`
-switches every rule off. Zitadel has no default: what this file sets is what
-applies.
+switches every rule off. For passwords, Zitadel has no default: what this
+file sets is what applies.
 
 | Setting | What it does | Bounds |
 | --- | --- | --- |
@@ -33,6 +33,33 @@ applies.
 not recommendations. NIST SP 800-63B asks for at least 15 characters when the
 password is the only factor, and at least 8 when it is always used with a
 second one.
+
+## The sign-up policy
+
+`user.create.json` is the sign-up policy, checked before a sign-up in your
+login creates a user. `zitadel setup` writes it as Zitadel's default:
+
+``` json
+{
+  "$schema": "../meta/policy.json",
+  "operation": "user.create",
+  "config": { "challenge": "zitadel_pow" }
+}
+```
+
+Every sign-up with a password or a passkey solves a proof of work in the
+browser before Zitadel creates the user, and each sign-up flow is limited in
+how often it can try. Zitadel applies both with or without this file, so
+deleting it, or deploying `"config": {}`, protects sign-ups the same way. The
+file shows that protection where you keep your other settings. Sign-ups through
+a sign-in provider are not challenged: each needs an account at the provider.
+
+| Setting | What it does | Values |
+| --- | --- | --- |
+| `challenge` | The challenge a sign-up with a password or a passkey must solve before the user is created. | `zitadel_pow`, the built-in proof of work |
+
+Users your backend creates through the API are never challenged: its
+credentials already name the caller.
 
 ## Publishing
 
@@ -92,6 +119,8 @@ reports the ones that do not hold. Your editor validates the file against
   The decision and the rules hold wherever a password is set; the `code` is
   what an API call answers, while your app's sign-up shows the same rules as
   errors on the password field.
+- A test of the sign-up policy, `user.create.test.json`, names the challenge
+  each sign-up solved: `"input": { "solved_challenge": "zitadel_pow" }`.
 
 `zitadel policies test --release <id>` runs the same cases against the policy a
 release pins. Test the files before `zitadel preview` or `deploy`: a pull

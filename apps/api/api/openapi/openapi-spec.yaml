@@ -338,6 +338,10 @@ paths:
 # One per domain event type, keyed by its event_type. gen_event_schemas writes
 # the files and fails until this list names exactly the domain's event types.
 webhooks:
+  flow.signup_challenge.issued:
+    $ref: endpoints/events/webhooks/flow-signup_challenge-issued.yaml
+  flow.signup_challenge.consumed:
+    $ref: endpoints/events/webhooks/flow-signup_challenge-consumed.yaml
   auth.attempt.created:
     $ref: endpoints/events/webhooks/auth-attempt-created.yaml
   auth.attempt.handed_off:

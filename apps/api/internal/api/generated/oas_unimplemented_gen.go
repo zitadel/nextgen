@@ -883,6 +883,12 @@ func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlo
 // The flow endpoints are the runtime calls the login component
 // (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
 // `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
+// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
+// creates its user on submit, or one carrying a passkey registration that
+// creates its user.
+// Reuses challenges with more than a minute remaining; otherwise issues a
+// new one. If this render resolves parked SSO state, it first returns the
+// updated cookie; fetch the step again to obtain its puzzle.
 // Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
 // re-resolve from `Origin`. If that release was revoked since the attempt
 // started, the response is `409` with `rel.revoked`.
@@ -1963,6 +1969,14 @@ func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPas
 // The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
 // with the new flow state. The server is stateless: all orchestration
 // state is carried in this cookie between requests.
+// Sign-up additionally requires a single-use `gate_proofs.signup_pow`
+// solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
+// sends it with the submit, and a passkey registration that creates its user
+// sends it with the attestation in `challenge_response`. Pending
+// challenges and rate counters are stored on the server. Invalid or spent
+// proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
+// `429 flow.rate_limited`. GET the current step to obtain or refresh its
+// challenge before solving. Start and Submit announce the gate without a puzzle.
 // **Important:** The `id` in the response may differ from the `id` used in
 // the request. This happens when a flow pivots (pushes a new flow onto the
 // stack) or when a stacked flow completes (auto-pops to the parent flow).

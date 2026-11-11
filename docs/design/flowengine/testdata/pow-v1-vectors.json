@@ -1,0 +1,78 @@
+{
+  "license": "MIT",
+  "description": "Public test keys and puzzle material. Never use in production.",
+  "vectors": [
+    {
+      "name": "level_1_counter_0",
+      "counter": 0,
+      "solution_key": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "context_json": "{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l1\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_1\",\"expires_at\":1793631900,\"salt\":\"101112131415161718191a1b1c1d1e1f\",\"nonce\":\"a1a2a3a4a5a6a7a8a9aaabacadaeafb0\"}",
+      "body": "{\"context\":{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l1\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_1\",\"expires_at\":1793631900,\"salt\":\"101112131415161718191a1b1c1d1e1f\",\"nonce\":\"a1a2a3a4a5a6a7a8a9aaabacadaeafb0\"},\"key_prefix\":\"d6b43ed560963f8eb291c574c7bc85c9\",\"key_mac\":\"620ee61f014a852932422d8195f765f1419f64e571d855b9984ff2380ffb9c19\"}",
+      "derived_key": "d6b43ed560963f8eb291c574c7bc85c9f8103b0489db4f1a4416d8d203b44d36",
+      "proof": "{\"protocol\":\"zitadel_pow_poc_v1\",\"challenge_id\":\"chl_vector_1\",\"derived_key\":\"d6b43ed560963f8eb291c574c7bc85c9f8103b0489db4f1a4416d8d203b44d36\"}",
+      "public": {
+        "protocol": "zitadel_pow_poc_v1",
+        "challenge_id": "chl_vector_1",
+        "profile_id": "pbkdf2_sha256_5000_l1",
+        "salt": "101112131415161718191a1b1c1d1e1f",
+        "nonce": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0",
+        "key_prefix": "d6b43ed560963f8eb291c574c7bc85c9",
+        "expires_at": "2026-11-02T15:05:00Z"
+      }
+    },
+    {
+      "name": "level_2_counter_1023",
+      "counter": 1023,
+      "solution_key": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "context_json": "{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l2\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_2\",\"expires_at\":1793631900,\"salt\":\"202122232425262728292a2b2c2d2e2f\",\"nonce\":\"a2a3a4a5a6a7a8a9aaabacadaeafb0b1\"}",
+      "body": "{\"context\":{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l2\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_2\",\"expires_at\":1793631900,\"salt\":\"202122232425262728292a2b2c2d2e2f\",\"nonce\":\"a2a3a4a5a6a7a8a9aaabacadaeafb0b1\"},\"key_prefix\":\"fc42da242e92f7f73d988be9c2395698\",\"key_mac\":\"a846eb0382fd46246831cbb793dfe3023e03b8b6c0bad80a56de76f33ef21206\"}",
+      "derived_key": "fc42da242e92f7f73d988be9c23956980970def5cdefb58f6f092aedf965b720",
+      "proof": "{\"protocol\":\"zitadel_pow_poc_v1\",\"challenge_id\":\"chl_vector_2\",\"derived_key\":\"fc42da242e92f7f73d988be9c23956980970def5cdefb58f6f092aedf965b720\"}",
+      "public": {
+        "protocol": "zitadel_pow_poc_v1",
+        "challenge_id": "chl_vector_2",
+        "profile_id": "pbkdf2_sha256_5000_l2",
+        "salt": "202122232425262728292a2b2c2d2e2f",
+        "nonce": "a2a3a4a5a6a7a8a9aaabacadaeafb0b1",
+        "key_prefix": "fc42da242e92f7f73d988be9c2395698",
+        "expires_at": "2026-11-02T15:05:00Z"
+      }
+    },
+    {
+      "name": "level_3_counter_256",
+      "counter": 256,
+      "solution_key": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "context_json": "{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l3\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_3\",\"expires_at\":1793631900,\"salt\":\"303132333435363738393a3b3c3d3e3f\",\"nonce\":\"a3a4a5a6a7a8a9aaabacadaeafb0b1b2\"}",
+      "body": "{\"context\":{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l3\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_3\",\"expires_at\":1793631900,\"salt\":\"303132333435363738393a3b3c3d3e3f\",\"nonce\":\"a3a4a5a6a7a8a9aaabacadaeafb0b1b2\"},\"key_prefix\":\"05fb95d26a2a89f7d0f1f8127269771e\",\"key_mac\":\"84ae7cf189da12783a212fc295a87cbf8df45693e429a52245c93bbb7a1f4c71\"}",
+      "derived_key": "05fb95d26a2a89f7d0f1f8127269771e966f62cdc5efadadaf68f9dfabc6d11a",
+      "proof": "{\"protocol\":\"zitadel_pow_poc_v1\",\"challenge_id\":\"chl_vector_3\",\"derived_key\":\"05fb95d26a2a89f7d0f1f8127269771e966f62cdc5efadadaf68f9dfabc6d11a\"}",
+      "public": {
+        "protocol": "zitadel_pow_poc_v1",
+        "challenge_id": "chl_vector_3",
+        "profile_id": "pbkdf2_sha256_5000_l3",
+        "salt": "303132333435363738393a3b3c3d3e3f",
+        "nonce": "a3a4a5a6a7a8a9aaabacadaeafb0b1b2",
+        "key_prefix": "05fb95d26a2a89f7d0f1f8127269771e",
+        "expires_at": "2026-11-02T15:05:00Z"
+      }
+    },
+    {
+      "name": "level_4_counter_4095",
+      "counter": 4095,
+      "solution_key": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "context_json": "{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l4\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_4\",\"expires_at\":1793631900,\"salt\":\"404142434445464748494a4b4c4d4e4f\",\"nonce\":\"a4a5a6a7a8a9aaabacadaeafb0b1b2b3\"}",
+      "body": "{\"context\":{\"protocol\":\"zitadel_pow_poc_v1\",\"profile_id\":\"pbkdf2_sha256_5000_l4\",\"project_id\":\"prj_vector\",\"operation\":\"auth.factor.password.check\",\"operation_instance_id\":\"op_vector\",\"challenge_id\":\"chl_vector_4\",\"expires_at\":1793631900,\"salt\":\"404142434445464748494a4b4c4d4e4f\",\"nonce\":\"a4a5a6a7a8a9aaabacadaeafb0b1b2b3\"},\"key_prefix\":\"fcfbbb22be1e064a0245e59cfdee426d\",\"key_mac\":\"11fd2155d7d8da1d67a1e4d1d7db874717060f1a374e2b9da8816e71a6e014a3\"}",
+      "derived_key": "fcfbbb22be1e064a0245e59cfdee426d8d839584c2c89cbc34d03c640d4ff57b",
+      "proof": "{\"protocol\":\"zitadel_pow_poc_v1\",\"challenge_id\":\"chl_vector_4\",\"derived_key\":\"fcfbbb22be1e064a0245e59cfdee426d8d839584c2c89cbc34d03c640d4ff57b\"}",
+      "public": {
+        "protocol": "zitadel_pow_poc_v1",
+        "challenge_id": "chl_vector_4",
+        "profile_id": "pbkdf2_sha256_5000_l4",
+        "salt": "404142434445464748494a4b4c4d4e4f",
+        "nonce": "a4a5a6a7a8a9aaabacadaeafb0b1b2b3",
+        "key_prefix": "fcfbbb22be1e064a0245e59cfdee426d",
+        "expires_at": "2026-11-02T15:05:00Z"
+      }
+    }
+  ]
+}

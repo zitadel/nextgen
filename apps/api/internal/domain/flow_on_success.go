@@ -28,6 +28,7 @@ func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
 // FlowOnSuccessInput is the per-call context the state machine threads
 // into a handler.
 type FlowOnSuccessInput struct {
+	GateProofs    map[string]string
 	ProjectID     string
 	UserSchemaURL string
 	Fields        map[string]any
