@@ -3447,7 +3447,7 @@
       "post": {
         "operationId": "createSession",
         "summary": "Create an anonymous session",
-        "description": "Creates an anonymous session with no user and no factors (`state: building`).\n\nA session is the durable record of a signed-in user. This call is optional: an\nauthentication attempt creates a session implicitly if none is provided.\nCreate one explicitly when you want to:\n\n- Pre-allocate a `session_id` before the user is known, so device and telemetry signals\n  can be correlated with the eventual authenticated session from the start.\n- Track anonymous state (bot detection, device fingerprint) that survives until authentication.\n\nCreating a session runs on the project credential (`session.write`). The returned\n`session_token` is a session credential for the end-user client, not a\nmanagement scope. It is delivered as the `__Host-zitadel_session` cookie\n(`zitadel_session` over plain http to a loopback host) and authorises the\nself-service operations `GET /sessions/me` and `DELETE /sessions/me`\n(`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`\nand `DELETE /sessions/{session_id}` are operator endpoints and require\n`session.read` / `session.delete` instead.\n\nThe `session_token` is superseded when a handoff exchange completes. Clients\nmust replace it at that point.\n\nAnonymous sessions expire after 10 minutes. The lifetime resets to the\nconfigured full session lifetime when a completing authentication attempt\nwrites the first authentication factor.\n",
+        "description": "Creates an anonymous session with no user and no factors (`state: building`).\n\nA session is the durable record of a signed-in user. This call is optional: an\nauthentication attempt creates a session implicitly if none is provided.\nCreate one explicitly when you want to:\n\n- Pre-allocate a `session_id` before the user is known, so device and telemetry signals\n  can be correlated with the eventual authenticated session from the start.\n- Track anonymous state (bot detection, device fingerprint) that survives until authentication.\n\nThe session belongs to the project of the project secret. A `project_id` that\nnames another project answers `403` with `proj.mismatch` and creates nothing:\nsend the credential's own project.\n\nCreating a session runs on the project credential (`session.write`). The returned\n`session_token` is a session credential for the end-user client, not a\nmanagement scope. It is delivered as the `__Host-zitadel_session` cookie\n(`zitadel_session` over plain http to a loopback host) and authorises the\nself-service operations `GET /sessions/me` and `DELETE /sessions/me`\n(`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`\nand `DELETE /sessions/{session_id}` are operator endpoints and require\n`session.read` / `session.delete` instead.\n\nThe `session_token` is superseded when a handoff exchange completes. Clients\nmust replace it at that point.\n\nAnonymous sessions expire after 10 minutes. The lifetime resets to the\nconfigured full session lifetime when a completing authentication attempt\nwrites the first authentication factor.\n",
         "tags": [
           "Sessions"
         ],
@@ -29899,6 +29899,9 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-mismatch"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -29922,6 +29925,7 @@
                   "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "tkn.invalid_tknid": "#/components/schemas/tkn-invalid_tknid",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.mismatch": "#/components/schemas/proj-mismatch",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "sess.token_creation_failed": "#/components/schemas/sess-token_creation_failed",
                   "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
@@ -29953,6 +29957,9 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.mismatch": {
+                "$ref": "#/components/examples/proj-mismatch"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
