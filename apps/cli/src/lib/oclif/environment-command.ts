@@ -199,7 +199,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
-    this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
+    this.ui.ranAgainst(projectId, server);
     return {
       client: createZitadelClient({
         userAgent: userAgent(),

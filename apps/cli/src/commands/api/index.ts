@@ -315,7 +315,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
     const secret = await readProjectSecret(named, this.cwd);
-    this.ui.ranAgainst(secret?.project_id, this.meta.source.replace(/^https?:\/\//, ""));
+    this.ui.ranAgainst(secret?.project_id, this.meta.source);
 
     const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
     const { operation } = target;

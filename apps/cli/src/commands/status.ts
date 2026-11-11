@@ -91,7 +91,7 @@ export default class Status extends EnvironmentCommand {
     );
     this.ui.ranAgainst(
       project.lifecycle === "configured" ? project.project_id : undefined,
-      (this.environment.values.ZITADEL_URL?.value ?? this.meta.source).replace(/^https?:\/\//, ""),
+      this.environment.values.ZITADEL_URL?.value ?? this.meta.source,
     );
     const users =
       project.lifecycle === "configured"

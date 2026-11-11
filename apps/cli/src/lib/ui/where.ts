@@ -13,7 +13,10 @@ export class Where {
 
   constructor(project?: string, server?: string) {
     this.project = project === undefined ? undefined : escapeControlCharacters(project);
-    this.server = server === undefined ? undefined : escapeControlCharacters(server);
+    this.server =
+      server === undefined
+        ? undefined
+        : escapeControlCharacters(server.replace(/^https?:\/\//, ""));
   }
 
   /** Whether anything is known about where this ran. */

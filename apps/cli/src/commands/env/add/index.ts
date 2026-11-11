@@ -267,7 +267,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       log.done(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
-    this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
+    this.ui.ranAgainst(projectId, server);
 
     const values: Record<string, string> = {
       ZITADEL_URL: server,

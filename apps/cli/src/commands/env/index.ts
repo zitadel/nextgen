@@ -50,10 +50,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
       supplied: supplied.join(", "),
     }));
 
-    this.ui.ranAgainst(
-      values.ZITADEL_PROJECT_ID?.value,
-      values.ZITADEL_URL?.value.replace(/^https?:\/\//, ""),
-    );
+    this.ui.ranAgainst(values.ZITADEL_PROJECT_ID?.value, values.ZITADEL_URL?.value);
 
     const variables = await this.tabulate(["variable", "value", "source"], resolved);
     const sources = await this.tabulate(["source", "present", "supplied"], lookups);

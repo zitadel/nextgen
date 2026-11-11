@@ -308,7 +308,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         ? environmentSelectorSuffix({ cwd: flags.cwd, server: projectServer })
         : undefined;
     const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
-    this.ui.ranAgainst(projectId, (projectServer ?? this.meta.source).replace(/^https?:\/\//, ""));
+    this.ui.ranAgainst(projectId, projectServer ?? this.meta.source);
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =

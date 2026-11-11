@@ -1833,7 +1833,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       sections: [],
     };
     let report = "";
-    this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
+    this.ui.ranAgainst(project.id, answers.server);
     if (!this.isJson) {
       const projectFacts = await detectProjectFacts(this.cwd, app.framework);
       const sections = buildSummary({
