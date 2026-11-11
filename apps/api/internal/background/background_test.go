@@ -15,102 +15,166 @@ type probe struct {
 	started, inRequest, stopped int
 }
 
+// task returns a task that gives answer in both lifecycles that need one.
+// WhileUp is no answer for RequestOnly, so there it becomes Unsupported.
 func (p *probe) task(answer func(*probe) Answer) Task {
-	return Task{
-		Name:         "probe",
-		Start:        func(context.Context) error { p.started++; return nil },
-		Stop:         func() { p.stopped++ },
-		RequestBound: answer(p),
+	task := Task{
+		Name:        "probe",
+		Start:       func(context.Context) error { p.started++; return nil },
+		Stop:        func() { p.stopped++ },
+		ScaleToZero: answer(p),
+		RequestOnly: answer(p),
 	}
+	if task.RequestOnly.kind == whileUp {
+		task.RequestOnly = Unsupported("turn it off")
+	}
+	return task
 }
 
 func answersInRequest(p *probe) Answer {
 	return InRequest(func(context.Context) error { p.inRequest++; return nil })
 }
 
+func answersWhileUp(*probe) Answer { return WhileUp() }
+
 var handler = http.NotFoundHandler()
 
-// A task that does not say what it does in a request-bound process fails the
-// start in every process, so adding one cannot go unnoticed until it meets
-// the deployment that pauses.
+func TestLifecycleValidate(t *testing.T) {
+	for _, lifecycle := range append([]Lifecycle{""}, Lifecycles...) {
+		assert.NoError(t, lifecycle.Validate(), lifecycle)
+	}
+	err := Lifecycle("serverless").Validate()
+	require.ErrorContains(t, err, `server.lifecycle is "serverless", not one of always_on, scale_to_zero, request_only`)
+}
+
+// A task that leaves a lifecycle without an answer fails the start in every
+// lifecycle, so adding one cannot go unnoticed until it meets the deployment
+// it does not run in.
 func TestGroupRefusesATaskWithoutAnAnswer(t *testing.T) {
-	for name, requestBound := range map[string]bool{"a process that keeps running": false, "request bound": true} {
-		t.Run(name, func(t *testing.T) {
-			for name, task := range map[string]Task{
-				"on":                   {Name: "new sweep", Start: func(context.Context) error { t.Error("started"); return nil }},
-				"off":                  {Name: "new sweep", Disabled: true},
-				"in request, no start": {Name: "new sweep", RequestBound: InRequest(nil)},
+	start := func(context.Context) error { return nil }
+	for _, lifecycle := range append([]Lifecycle{""}, Lifecycles...) {
+		t.Run(string(lifecycle), func(t *testing.T) {
+			for name, tc := range map[string]struct {
+				task  Task
+				field string
+			}{
+				"no answer":                 {Task{Start: start}, "server.lifecycle is scale_to_zero: set Task.ScaleToZero"},
+				"no answer, off":            {Task{Disabled: true}, "server.lifecycle is scale_to_zero: set Task.ScaleToZero"},
+				"scale to zero only":        {Task{Start: start, ScaleToZero: WhileUp()}, "server.lifecycle is request_only: set Task.RequestOnly"},
+				"request only only":         {Task{Start: start, RequestOnly: Unsupported("turn it off")}, "set Task.ScaleToZero"},
+				"in request, no start":      {Task{Start: start, ScaleToZero: WhileUp(), RequestOnly: InRequest(nil)}, "set Task.RequestOnly"},
+				"a timer where none runs":   {Task{Start: start, ScaleToZero: WhileUp(), RequestOnly: WhileUp()}, "set Task.RequestOnly"},
+				"scale to zero, no start":   {Task{Start: start, ScaleToZero: InRequest(nil), RequestOnly: Unsupported("turn it off")}, "set Task.ScaleToZero"},
+				"request only, zero answer": {Task{Start: start, ScaleToZero: Unsupported("turn it off"), RequestOnly: Answer{}}, "set Task.RequestOnly"},
 			} {
 				t.Run(name, func(t *testing.T) {
-					err := NewGroup(requestBound).Start(t.Context(), task)
-					require.ErrorContains(t, err, `background task "new sweep" does not say what it does`)
-					assert.ErrorContains(t, err, "Task.RequestBound")
+					tc.task.Name = "new sweep"
+					err := NewGroup(lifecycle).Start(t.Context(), tc.task)
+					require.ErrorContains(t, err, `background task "new sweep" does not say what it does where`)
+					assert.ErrorContains(t, err, tc.field)
 				})
 			}
 		})
 	}
 }
 
-func TestGroupStartsTheLoopInAProcessThatKeepsRunning(t *testing.T) {
+func TestGroupRefusesALifecycleItDoesNotKnow(t *testing.T) {
+	p := &probe{}
+	err := NewGroup("serverless").Start(t.Context(), p.task(answersWhileUp))
+	require.ErrorContains(t, err, `server.lifecycle is "serverless"`)
+	assert.Zero(t, *p)
+}
+
+// Always on, a task starts its loop whatever it answers for the others.
+func TestGroupAlwaysOnStartsTheLoop(t *testing.T) {
 	for name, answer := range map[string]func(*probe) Answer{
+		"while up":    answersWhileUp,
 		"in request":  answersInRequest,
 		"on trigger":  func(*probe) Answer { return OnTrigger(nil, "set a secret") },
 		"unsupported": func(*probe) Answer { return Unsupported("turn it off") },
 	} {
-		t.Run(name, func(t *testing.T) {
-			p := &probe{}
-			g := NewGroup(false)
-			require.NoError(t, g.Start(t.Context(), p.task(answer)))
-			assert.Equal(t, probe{started: 1}, *p)
-			g.Close()
-			assert.Equal(t, 1, p.stopped)
-		})
+		for _, lifecycle := range []Lifecycle{"", AlwaysOn} {
+			t.Run(name+"/"+string(lifecycle), func(t *testing.T) {
+				p := &probe{}
+				g := NewGroup(lifecycle)
+				require.NoError(t, g.Start(t.Context(), p.task(answer)))
+				assert.Equal(t, probe{started: 1}, *p)
+				g.Close()
+				assert.Equal(t, 1, p.stopped)
+			})
+		}
 	}
 }
 
-func TestGroupRequestBound(t *testing.T) {
-	t.Run("in request runs the answer's start, not the loop", func(t *testing.T) {
+// Each lifecycle follows its own answer and not the other's.
+func TestGroupFollowsTheAnswerOfItsLifecycle(t *testing.T) {
+	p := &probe{}
+	task := Task{
+		Name:        "probe",
+		Start:       func(context.Context) error { p.started++; return nil },
+		ScaleToZero: WhileUp(),
+		RequestOnly: answersInRequest(p),
+	}
+	require.NoError(t, NewGroup(ScaleToZero).Start(t.Context(), task))
+	assert.Equal(t, probe{started: 1}, *p)
+	require.NoError(t, NewGroup(RequestOnly).Start(t.Context(), task))
+	assert.Equal(t, probe{started: 1, inRequest: 1}, *p)
+}
+
+func TestGroupAnswers(t *testing.T) {
+	for _, lifecycle := range []Lifecycle{ScaleToZero, RequestOnly} {
+		t.Run(string(lifecycle), func(t *testing.T) {
+			t.Run("in request runs the answer's start, not the loop", func(t *testing.T) {
+				p := &probe{}
+				g := NewGroup(lifecycle)
+				require.NoError(t, g.Start(t.Context(), p.task(answersInRequest)))
+				g.Close()
+				assert.Equal(t, probe{inRequest: 1, stopped: 1}, *p)
+			})
+			t.Run("in request fails the start with the answer's error", func(t *testing.T) {
+				p := &probe{}
+				g := NewGroup(lifecycle)
+				err := g.Start(t.Context(), p.task(func(*probe) Answer {
+					return InRequest(func(context.Context) error { return errors.New("the wait is 0") })
+				}))
+				require.ErrorContains(t, err, "probe where server.lifecycle is "+string(lifecycle)+": the wait is 0")
+				g.Close()
+				assert.Zero(t, *p, "nothing started, nothing to stop")
+			})
+			t.Run("on trigger starts nothing", func(t *testing.T) {
+				p := &probe{}
+				g := NewGroup(lifecycle)
+				require.NoError(t, g.Start(t.Context(), p.task(func(*probe) Answer { return OnTrigger(handler, "set a secret") })))
+				g.Close()
+				assert.Zero(t, *p, "the trigger's caller runs the task")
+			})
+			t.Run("on trigger without its trigger fails the start", func(t *testing.T) {
+				p := &probe{}
+				err := NewGroup(lifecycle).Start(t.Context(), p.task(func(*probe) Answer { return OnTrigger(nil, "set a secret") }))
+				require.ErrorContains(t, err, "probe cannot run on a timer where server.lifecycle is "+string(lifecycle)+": set a secret")
+				assert.Zero(t, *p)
+			})
+			t.Run("unsupported fails the start", func(t *testing.T) {
+				p := &probe{}
+				err := NewGroup(lifecycle).Start(t.Context(), p.task(func(*probe) Answer { return Unsupported("turn it off") }))
+				require.ErrorContains(t, err, "probe cannot run where server.lifecycle is "+string(lifecycle)+": turn it off")
+				assert.Zero(t, *p)
+			})
+		})
+	}
+	t.Run("while up starts the loop where instances come and go", func(t *testing.T) {
 		p := &probe{}
-		g := NewGroup(true)
-		require.NoError(t, g.Start(t.Context(), p.task(answersInRequest)))
+		g := NewGroup(ScaleToZero)
+		require.NoError(t, g.Start(t.Context(), p.task(answersWhileUp)))
 		g.Close()
-		assert.Equal(t, probe{inRequest: 1, stopped: 1}, *p)
-	})
-	t.Run("in request fails the start with the answer's error", func(t *testing.T) {
-		p := &probe{}
-		g := NewGroup(true)
-		err := g.Start(t.Context(), p.task(func(*probe) Answer {
-			return InRequest(func(context.Context) error { return errors.New("the wait is 0") })
-		}))
-		require.ErrorContains(t, err, "probe where server.request_bound is set: the wait is 0")
-		g.Close()
-		assert.Zero(t, *p, "nothing started, nothing to stop")
-	})
-	t.Run("on trigger starts nothing", func(t *testing.T) {
-		p := &probe{}
-		g := NewGroup(true)
-		require.NoError(t, g.Start(t.Context(), p.task(func(*probe) Answer { return OnTrigger(handler, "set a secret") })))
-		g.Close()
-		assert.Zero(t, *p, "the trigger's caller runs the task")
-	})
-	t.Run("on trigger without its trigger fails the start", func(t *testing.T) {
-		p := &probe{}
-		err := NewGroup(true).Start(t.Context(), p.task(func(*probe) Answer { return OnTrigger(nil, "set a secret") }))
-		require.ErrorContains(t, err, "probe cannot run on a timer where server.request_bound is set: set a secret")
-		assert.Zero(t, *p)
-	})
-	t.Run("unsupported fails the start", func(t *testing.T) {
-		p := &probe{}
-		err := NewGroup(true).Start(t.Context(), p.task(func(*probe) Answer { return Unsupported("turn it off") }))
-		require.ErrorContains(t, err, "probe cannot run where server.request_bound is set: turn it off")
-		assert.Zero(t, *p)
+		assert.Equal(t, probe{started: 1, stopped: 1}, *p)
 	})
 	t.Run("a task that is off starts nowhere and fails nothing", func(t *testing.T) {
-		for _, requestBound := range []bool{false, true} {
+		for _, lifecycle := range Lifecycles {
 			p := &probe{}
 			task := p.task(func(*probe) Answer { return Unsupported("turn it off") })
 			task.Disabled = true
-			g := NewGroup(requestBound)
+			g := NewGroup(lifecycle)
 			require.NoError(t, g.Start(t.Context(), task))
 			g.Close()
 			assert.Zero(t, *p)
@@ -120,25 +184,29 @@ func TestGroupRequestBound(t *testing.T) {
 
 func TestGroupFailsTheStartWithTheTasksError(t *testing.T) {
 	task := Task{
-		Name:         "event export",
-		Start:        func(context.Context) error { return errors.New("unsupported sink") },
-		Stop:         func() { t.Error("stopped a task that never started") },
-		RequestBound: Unsupported("turn it off"),
+		Name:        "event export",
+		Start:       func(context.Context) error { return errors.New("unsupported sink") },
+		Stop:        func() { t.Error("stopped a task that never started") },
+		ScaleToZero: WhileUp(),
+		RequestOnly: Unsupported("turn it off"),
 	}
-	g := NewGroup(false)
-	require.ErrorContains(t, g.Start(t.Context(), task), "start event export: unsupported sink")
-	g.Close()
+	for _, lifecycle := range []Lifecycle{AlwaysOn, ScaleToZero} {
+		g := NewGroup(lifecycle)
+		require.ErrorContains(t, g.Start(t.Context(), task), "start event export: unsupported sink")
+		g.Close()
+	}
 }
 
 func TestGroupStopsTheLastTaskFirst(t *testing.T) {
 	var stopped []string
-	g := NewGroup(false)
+	g := NewGroup(AlwaysOn)
 	for _, name := range []string{"first", "second"} {
 		require.NoError(t, g.Start(t.Context(), Task{
-			Name:         name,
-			Start:        func(context.Context) error { return nil },
-			Stop:         func() { stopped = append(stopped, name) },
-			RequestBound: Unsupported("turn it off"),
+			Name:        name,
+			Start:       func(context.Context) error { return nil },
+			Stop:        func() { stopped = append(stopped, name) },
+			ScaleToZero: WhileUp(),
+			RequestOnly: Unsupported("turn it off"),
 		}))
 	}
 	g.Close()

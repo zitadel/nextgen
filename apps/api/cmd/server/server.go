@@ -444,9 +444,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer stop()
 
 	// Everything the server does outside a request starts through this
-	// group, which holds each task to what it does where the process runs
-	// only while it serves a request (ADR 089).
-	tasks := background.NewGroup(cfg.Server.RequestBound)
+	// group, which holds each task to what it does in the server's lifecycle
+	// (ADR 089).
+	tasks := background.NewGroup(cfg.Server.Lifecycle)
 	defer tasks.Close()
 
 	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
@@ -553,9 +553,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 // masterKeyRewrapTask re-wraps every project key to the current master key.
 // There is work only during a rotation, while the configuration still names
-// a key that only decrypts. A server that keeps running re-wraps beside its
-// requests. One that runs only while it serves a request re-wraps before it
-// takes the first, so a deployment that has started has re-wrapped, which is
+// a key that only decrypts. A server that runs between requests re-wraps
+// beside them, and where its instance is stopped first, the next one does it
+// again. One that is paused between requests re-wraps before it takes the
+// first, so a deployment that has started has re-wrapped, which is
 // when the operator removes the previous key. A failure is logged and the
 // server serves: the previous key still decrypts what it wrapped.
 //
@@ -580,7 +581,8 @@ func masterKeyRewrapTask(keys interface {
 			go rewrap(ctx) //background:allow the task "master key re-wrap"
 			return nil
 		},
-		RequestBound: background.InRequest(func(ctx context.Context) error {
+		ScaleToZero: background.WhileUp(),
+		RequestOnly: background.InRequest(func(ctx context.Context) error {
 			rewrap(ctx)
 			return nil
 		}),
@@ -728,9 +730,10 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.console_origins", []string{})
-	// Off: the process keeps running between requests. requestBoundDefaults
-	// sets what follows from it, server.idle_timeout among them.
-	v.SetDefault("server.request_bound", false)
+	// The process keeps running, and an instance is always up.
+	// lifecycleDefaults sets what follows from it, server.idle_timeout among
+	// them.
+	v.SetDefault("server.lifecycle", string(background.AlwaysOn))
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -875,9 +878,9 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 		override(v)
 	}
 
-	// Now that the file, the environment and the flags have said whether the
-	// process is request bound.
-	requestBoundDefaults(v)
+	// Now that the file, the environment and the flags have said how the
+	// platform keeps the process running.
+	lifecycleDefaults(v)
 
 	warnIgnoredMasterKeyEnv(os.Environ())
 
@@ -917,18 +920,19 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	return cfg, nil
 }
 
-// requestBoundDefaults sets the defaults that depend on server.request_bound
+// lifecycleDefaults sets the defaults that depend on server.lifecycle
 // (ADR 089). A value the configuration sets itself outranks them, as it does
 // every default.
 //
 // A paused process measures time it did not run: it wakes with its idle
 // timer long expired and closes the connection the platform's proxy, its
 // only client, is about to reuse. And what it leaves for after a response
-// runs at its next request, or never.
-func requestBoundDefaults(v *viper.Viper) {
+// runs at its next request, or never. A process that runs between requests
+// has neither problem, whether or not its last instance is stopped.
+func lifecycleDefaults(v *viper.Viper) {
 	idleTimeout, flushWait := 60*time.Second, time.Duration(0)
-	if v.GetBool("server.request_bound") {
-		idleTimeout, flushWait = 0, audit.RequestBoundFlushWait
+	if background.Lifecycle(v.GetString("server.lifecycle")) == background.RequestOnly {
+		idleTimeout, flushWait = 0, audit.RequestOnlyFlushWait
 	}
 	v.SetDefault("server.idle_timeout", idleTimeout)
 	v.SetDefault("events.request.flush_wait", flushWait)

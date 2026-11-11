@@ -33,20 +33,20 @@ type RequestBufferConfig struct {
 type RequestConfig struct {
 	// FlushWait makes a request wait, up to this long, until its event is
 	// written, where the server otherwise writes it up to a second after the
-	// response. It is for a server that runs only while it serves a request,
-	// such as a Vercel function: there a write after the response waits for
-	// the next request to wake the instance, and is lost with an instance
-	// that never wakes. Requests in flight together still share one write.
-	// Zero never waits, and is the default unless server.request_bound says
-	// the server is such a one: then it is RequestBoundFlushWait.
+	// response. It is for a server the platform pauses between requests, such
+	// as a Vercel function: there a write after the response waits for the
+	// next request to wake the instance, and is lost with an instance that
+	// never wakes. Requests in flight together still share one write. Zero
+	// never waits, and is the default unless server.lifecycle is
+	// request_only: then it is RequestOnlyFlushWait.
 	FlushWait time.Duration `mapstructure:"flush_wait"`
 }
 
-// RequestBoundFlushWait is FlushWait's default in a process that runs only
-// while it serves a request. The write takes milliseconds; the bound is for
+// RequestOnlyFlushWait is FlushWait's default in a process paused between
+// requests. The write takes milliseconds; the bound is for
 // a database that does not answer, so a request then ends two seconds late
 // instead of holding the instance.
-const RequestBoundFlushWait = 2 * time.Second
+const RequestOnlyFlushWait = 2 * time.Second
 
 func DefaultRequestBufferConfig() RequestBufferConfig {
 	return RequestBufferConfig{
@@ -119,19 +119,22 @@ func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *Reque
 	}
 }
 
-// Task is the flusher as background work. In a process that runs only while
-// it serves a request the flusher runs while a request waits for its event,
-// so it needs FlushWait: without it every write would come after a response.
+// Task is the flusher as background work. Where instances come and go it
+// flushes after the response as always, and Close drains it as the instance
+// stops. In a process paused between requests it runs while a request waits
+// for its event, so it needs FlushWait: without it every write would come
+// after a response.
 func (b *RequestBuffer) Task() background.Task {
 	start := func(context.Context) error {
 		go b.loop() //background:allow the task "request audit events"
 		return nil
 	}
 	return background.Task{
-		Name:  "request audit events",
-		Start: start,
-		Stop:  b.Close,
-		RequestBound: background.InRequest(func(ctx context.Context) error {
+		Name:        "request audit events",
+		Start:       start,
+		Stop:        b.Close,
+		ScaleToZero: background.WhileUp(),
+		RequestOnly: background.InRequest(func(ctx context.Context) error {
 			if b.cfg.FlushWait <= 0 {
 				return errors.New("events.request.flush_wait is 0, so no request would wait for its event: leave it unset or set how long a request may wait")
 			}

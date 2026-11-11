@@ -18,8 +18,8 @@
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
-//   - The pause. A function runs only while it serves a request, which the
-//     launcher tells a deployment's server as server.request_bound; what
+//   - The pause. A function is paused between requests, which the launcher
+//     tells a deployment's server as server.lifecycle: request_only; what
 //     the server then does differently is the server's (ADR 089). Its
 //     hourly audit event purge cannot run on a timer here: a Vercel Cron Job
 //     (repo-root vercel.json) calls the server's retention trigger instead,
@@ -67,6 +67,7 @@ import (
 
 	"github.com/zitadel/nextgen/cmd/server"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 )
@@ -539,7 +540,7 @@ func prepareServer(extra []string) ([]string, error) {
 	// those (ADR 089). A local run keeps running, and purges on its own
 	// timer without a CRON_SECRET.
 	if deployed(env) {
-		pinned["NEXTGEN_SERVER_REQUEST_BOUND"] = "true"
+		pinned["NEXTGEN_SERVER_LIFECYCLE"] = string(background.RequestOnly)
 	}
 	for key, value := range pinned {
 		if err := os.Setenv(key, value); err != nil {

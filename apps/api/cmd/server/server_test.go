@@ -217,12 +217,12 @@ func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {
 	assert.Equal(t, 2*time.Second, cfg.Events.Request.FlushWait)
 }
 
-// server.request_bound is one fact about where the server runs, and the
-// settings a pause changes take their defaults from it (ADR 089). Each stays
-// a setting of its own: what the configuration says outranks the default.
-func TestLoadConfigRequestBound(t *testing.T) {
+// server.lifecycle is one fact about where the server runs, and the settings
+// a pause changes take their defaults from it (ADR 089). Each stays a setting
+// of its own: what the configuration says outranks the default.
+func TestLoadConfigLifecycle(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
-	for _, key := range []string{"NEXTGEN_SERVER_REQUEST_BOUND", "NEXTGEN_SERVER_IDLE_TIMEOUT", "NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"} {
+	for _, key := range []string{"NEXTGEN_SERVER_LIFECYCLE", "NEXTGEN_SERVER_IDLE_TIMEOUT", "NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"} {
 		t.Setenv(key, "")
 	}
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
@@ -230,22 +230,33 @@ func TestLoadConfigRequestBound(t *testing.T) {
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
-	assert.False(t, cfg.Server.RequestBound, "a server keeps running unless it is told otherwise")
+	assert.Equal(t, background.AlwaysOn, cfg.Server.Lifecycle, "a server keeps running unless it is told otherwise")
+	assert.Equal(t, time.Minute, cfg.Server.IdleTimeout)
+	assert.Zero(t, cfg.Events.Request.FlushWait)
+
+	t.Run("scale to zero keeps the defaults of a process that runs between requests", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_LIFECYCLE", "scale_to_zero")
+		cfg, err := loadConfig(configPath)
+		require.NoError(t, err)
+		assert.Equal(t, background.ScaleToZero, cfg.Server.Lifecycle)
+		assert.Equal(t, time.Minute, cfg.Server.IdleTimeout)
+		assert.Zero(t, cfg.Events.Request.FlushWait, "the flusher writes after the response and the stop drains it")
+	})
 
 	for name, set := range map[string]func(t *testing.T){
-		"environment": func(t *testing.T) { t.Setenv("NEXTGEN_SERVER_REQUEST_BOUND", "true") },
+		"environment": func(t *testing.T) { t.Setenv("NEXTGEN_SERVER_LIFECYCLE", "request_only") },
 		"file": func(t *testing.T) {
-			require.NoError(t, os.WriteFile(configPath, []byte("server:\n  request_bound: true\n"), 0o600))
+			require.NoError(t, os.WriteFile(configPath, []byte("server:\n  lifecycle: request_only\n"), 0o600))
 			t.Cleanup(func() { require.NoError(t, os.WriteFile(configPath, nil, 0o600)) })
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run("request only, from the "+name, func(t *testing.T) {
 			set(t)
 			cfg, err := loadConfig(configPath)
 			require.NoError(t, err)
-			assert.True(t, cfg.Server.RequestBound)
+			assert.Equal(t, background.RequestOnly, cfg.Server.Lifecycle)
 			assert.Zero(t, cfg.Server.IdleTimeout, "the proxy's connections outlast a pause")
-			assert.Equal(t, audit.RequestBoundFlushWait, cfg.Events.Request.FlushWait, "a request waits for its event")
+			assert.Equal(t, audit.RequestOnlyFlushWait, cfg.Events.Request.FlushWait, "a request waits for its event")
 
 			t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "90s")
 			t.Setenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT", "5s")
@@ -257,49 +268,67 @@ func TestLoadConfigRequestBound(t *testing.T) {
 	}
 
 	t.Run("the file's own values outrank the defaults", func(t *testing.T) {
-		require.NoError(t, os.WriteFile(configPath, []byte("server:\n  request_bound: true\n  idle_timeout: 3m\nevents:\n  request:\n    flush_wait: 500ms\n"), 0o600))
+		require.NoError(t, os.WriteFile(configPath, []byte("server:\n  lifecycle: request_only\n  idle_timeout: 3m\nevents:\n  request:\n    flush_wait: 500ms\n"), 0o600))
+		t.Cleanup(func() { require.NoError(t, os.WriteFile(configPath, nil, 0o600)) })
 		cfg, err := loadConfig(configPath)
 		require.NoError(t, err)
 		assert.Equal(t, 3*time.Minute, cfg.Server.IdleTimeout)
 		assert.Equal(t, 500*time.Millisecond, cfg.Events.Request.FlushWait)
 	})
+
+	t.Run("a value it does not take fails the load and names the three", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_LIFECYCLE", "serverless")
+		_, err := loadConfig(configPath)
+		require.ErrorContains(t, err, `server.lifecycle is "serverless", not one of always_on, scale_to_zero, request_only`)
+	})
 }
 
-// A request-bound server whose configuration leaves a background task with
-// no way to run does not start: here the purge, which needs its trigger's
-// secret, and the request events, which a wait of zero would write after the
-// response. The error names the task and the setting.
-func TestRunRefusesARequestBoundStartThatWouldSkipATask(t *testing.T) {
+// A server whose lifecycle leaves a background task with no way to run does
+// not start: paused between requests, the purge needs its trigger's secret
+// and the request events a wait; the export has no trigger; and the ping
+// would count the starts of a platform that starts and stops instances. The
+// error names the task and the setting.
+func TestRunRefusesAStartThatWouldSkipATask(t *testing.T) {
 	for name, tc := range map[string]struct {
-		set  func(*Config)
-		want []string
+		lifecycle background.Lifecycle
+		set       func(*Config)
+		want      []string
 	}{
-		"no trigger secret": {
-			set:  func(*Config) {},
-			want: []string{"event retention cannot run on a timer where server.request_bound is set", "events.retention.trigger_secret"},
+		"request only, no trigger secret": {
+			lifecycle: background.RequestOnly,
+			set:       func(*Config) {},
+			want:      []string{"event retention cannot run on a timer where server.lifecycle is request_only", "events.retention.trigger_secret"},
 		},
-		"no wait for the request event": {
-			set:  func(cfg *Config) { cfg.Events.Request.FlushWait = 0 },
-			want: []string{"request audit events where server.request_bound is set", "events.request.flush_wait is 0"},
+		"request only, no wait for the request event": {
+			lifecycle: background.RequestOnly,
+			set:       func(cfg *Config) { cfg.Events.Request.FlushWait = 0 },
+			want:      []string{"request audit events where server.lifecycle is request_only", "events.request.flush_wait is 0"},
 		},
-		"event export on": {
+		"request only, event export on": {
+			lifecycle: background.RequestOnly,
 			set: func(cfg *Config) {
 				cfg.Events.Retention.Enabled = false
 				cfg.Events.Export.Enabled = true
 			},
-			want: []string{"event export cannot run where server.request_bound is set", "events.export.enabled"},
+			want: []string{"event export cannot run where server.lifecycle is request_only", "events.export.enabled"},
 		},
-		"service ping on": {
+		"request only, service ping on": {
+			lifecycle: background.RequestOnly,
 			set: func(cfg *Config) {
 				cfg.Events.Retention.Enabled = false
 				cfg.ServicePing.Enabled = true
 			},
-			want: []string{"service ping cannot run where server.request_bound is set", "service_ping.enabled"},
+			want: []string{"service ping cannot run where server.lifecycle is request_only", "service_ping.enabled"},
+		},
+		"scale to zero, service ping on": {
+			lifecycle: background.ScaleToZero,
+			set:       func(cfg *Config) { cfg.ServicePing.Enabled = true },
+			want:      []string{"service ping cannot run where server.lifecycle is scale_to_zero", "service_ping.enabled"},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, configPath := tempServerConfig(t)
-			t.Setenv("NEXTGEN_SERVER_REQUEST_BOUND", "true")
+			t.Setenv("NEXTGEN_SERVER_LIFECYCLE", string(tc.lifecycle))
 			cfg, err := loadConfig(configPath)
 			require.NoError(t, err)
 			tc.set(&cfg)
@@ -328,29 +357,34 @@ func (r *rewrapRecorder) MigrateToLatestMasterKey(context.Context) error {
 	return nil
 }
 
-// The re-wrap has work only during a rotation. A server that keeps running
-// re-wraps beside its requests; a request-bound one has re-wrapped by the
-// time it takes its first, because nothing runs after a response there.
+// The re-wrap has work only during a rotation. A server that runs between
+// requests re-wraps beside them; one paused between requests has re-wrapped
+// by the time it takes its first, because nothing runs after a response
+// there.
 func TestMasterKeyRewrapTask(t *testing.T) {
 	rotating := &domain.MasterKeys{Keys: []domain.MasterKey{{ID: "previous"}}, EncryptionKey: domain.MasterKey{ID: "current"}}
 
 	t.Run("no previous key, no work", func(t *testing.T) {
 		task := masterKeyRewrapTask(nil, &domain.MasterKeys{EncryptionKey: domain.MasterKey{ID: "current"}})
 		assert.True(t, task.Disabled)
-		for _, requestBound := range []bool{false, true} {
-			require.NoError(t, background.NewGroup(requestBound).Start(t.Context(), task))
+		for _, lifecycle := range background.Lifecycles {
+			require.NoError(t, background.NewGroup(lifecycle).Start(t.Context(), task))
 		}
 	})
-	t.Run("a server that keeps running re-wraps beside its requests", func(t *testing.T) {
-		keys := &rewrapRecorder{calls: make(chan struct{}), release: make(chan struct{})}
-		require.NoError(t, background.NewGroup(false).Start(t.Context(), masterKeyRewrapTask(keys, rotating)))
-		<-keys.calls
-		close(keys.release)
-	})
-	t.Run("a request-bound server re-wraps before it serves", func(t *testing.T) {
+	for _, lifecycle := range []background.Lifecycle{background.AlwaysOn, background.ScaleToZero} {
+		t.Run(string(lifecycle)+" re-wraps beside its requests", func(t *testing.T) {
+			keys := &rewrapRecorder{calls: make(chan struct{}), release: make(chan struct{})}
+			require.NoError(t, background.NewGroup(lifecycle).Start(t.Context(), masterKeyRewrapTask(keys, rotating)))
+			<-keys.calls
+			close(keys.release)
+		})
+	}
+	t.Run("request_only re-wraps before it serves", func(t *testing.T) {
 		keys := &rewrapRecorder{calls: make(chan struct{}, 1), release: make(chan struct{})}
 		started := make(chan error, 1)
-		go func() { started <- background.NewGroup(true).Start(t.Context(), masterKeyRewrapTask(keys, rotating)) }()
+		go func() {
+			started <- background.NewGroup(background.RequestOnly).Start(t.Context(), masterKeyRewrapTask(keys, rotating))
+		}()
 		<-keys.calls
 		select {
 		case err := <-started:

@@ -18,24 +18,40 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. With platform bootstrap on, it is the platform project's one primary origin, so servers sharing a database need the same value. |
 | `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login; signing in to the platform project works only at `server.public_base`. A comma-separated list in the environment. |
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
-| `server.idle_timeout`    | `NEXTGEN_SERVER_IDLE_TIMEOUT`    | `60s`; `0` with `server.request_bound`                              | How long the server keeps a connection open while it waits for the next request. Behind a proxy that reuses its connections, set it above the proxy's own idle timeout, or to `0` to never close one: a `POST` the proxy sends as the server closes the connection ends as the proxy's 502. |
-| `server.request_bound`   | `NEXTGEN_SERVER_REQUEST_BOUND`   | `false`                                                             | The process runs only while it serves a request; see [A server that runs only while it serves a request](#a-server-that-runs-only-while-it-serves-a-request) |
+| `server.idle_timeout`    | `NEXTGEN_SERVER_IDLE_TIMEOUT`    | `60s`; `0` where `server.lifecycle` is `request_only` | How long the server keeps a connection open while it waits for the next request. Behind a proxy that reuses its connections, set it above the proxy's own idle timeout, or to `0` to never close one: a `POST` the proxy sends as the server closes the connection ends as the proxy's 502. |
+| `server.lifecycle`       | `NEXTGEN_SERVER_LIFECYCLE`       | `always_on`                                                         | How the platform keeps the process running: `always_on`, `scale_to_zero` or `request_only`; see [Where the server runs](#where-the-server-runs) |
 
-### A server that runs only while it serves a request
+### Where the server runs
 
-Some platforms pause the process between requests: a Vercel function, a Cloud
-Run service with CPU allocated only during requests. Say so with
-`server.request_bound: true`. The setting turns nothing on by itself; the
-server then holds everything it does outside a request to that fact
-([ADR 089](../adrs/089-server-lifecycle.md)):
+What the server does outside a request (its timers, its writes after a
+response) depends on what the platform does with the process between
+requests. Say which it is with `server.lifecycle`
+([ADR 089](../adrs/089-server-lifecycle.md)). Two questions pick the value:
 
-| What | With `server.request_bound` |
-| --- | --- |
-| `server.idle_timeout` | Defaults to `0`: the platform's proxy reuses its connections across a pause |
-| `events.request.flush_wait` | Defaults to `2s`: a request waits for its [audit event](#request-audit-events); `0` fails the start |
-| [Audit event retention](#audit-event-retention) | Runs only from its trigger: the start fails without `events.retention.trigger_secret`, unless retention is off |
-| `events.export.enabled`, `service_ping.enabled` | Fail the start: both run on a timer |
-| Master key rotation | The server re-wraps before it takes its first request, where it otherwise re-wraps beside them |
+1. Does the platform give the process CPU after a response is sent? If not:
+   `request_only`.
+2. Otherwise, can it stop the last instance when no request comes? If so:
+   `scale_to_zero`. If not: `always_on`.
+
+| Where it runs | `server.lifecycle` | Also set |
+| --- | --- | --- |
+| Docker, Docker Compose, a VM, Kubernetes | `always_on` (the default) | Nothing |
+| Cloud Run with CPU always allocated and a minimum of one instance | `always_on` | Nothing |
+| Knative; Cloud Run with CPU always allocated and no minimum instance | `scale_to_zero` | Nothing. To purge audit events while no request comes: `events.retention.trigger_secret` and a scheduler |
+| Vercel function; Cloud Run by default (CPU only during requests) | `request_only` | `events.retention.trigger_secret` and a scheduler, or `events.retention.enabled: false` |
+
+The setting turns nothing on by itself. The server holds everything it does
+outside a request to it, and refuses to start with a setting that could not
+work there:
+
+| What | `scale_to_zero` | `request_only` |
+| --- | --- | --- |
+| `server.idle_timeout` | `60s`, as always on | Defaults to `0`: the platform's proxy reuses its connections across a pause |
+| `events.request.flush_wait` | `0s`, as always on: the event is written after the response, and before an instance stops | Defaults to `2s`: a request waits for its [audit event](#request-audit-events); `0` fails the start |
+| [Audit event retention](#audit-event-retention) | Purges as an instance starts and hourly while one is up | Runs only from its trigger: the start fails without `events.retention.trigger_secret`, unless retention is off |
+| `events.export.enabled` | Ships while an instance is up | Fails the start: it ships on a timer |
+| `service_ping.enabled` | Fails the start: it pings at each start | Fails the start |
+| Master key rotation | The server re-wraps beside its requests | The server re-wraps before it takes its first request |
 
 A value you set for `server.idle_timeout` or `events.request.flush_wait`
 outranks its default.
@@ -135,11 +151,11 @@ session:
 
 | YAML key                    | Environment                         | Default                               | Description                                                |
 | --------------------------- | ----------------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| `events.request.flush_wait` | `NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT` | `0s`; `2s` with `server.request_bound` | How long a request waits for its audit event to be written |
+| `events.request.flush_wait` | `NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT` | `0s`; `2s` where `server.lifecycle` is `request_only` | How long a request waits for its audit event to be written |
 
 The server writes a request's audit event up to a second after the response,
-many requests in one write. A server that
-[runs only while it serves a request](#a-server-that-runs-only-while-it-serves-a-request)
+many requests in one write. A server the platform
+[pauses between requests](#where-the-server-runs)
 may not get to that write before it is paused, so there a request ends once
 its event is written, or after `flush_wait` when the database does not
 answer. Requests in flight together still share a write.
@@ -153,8 +169,8 @@ answer. Requests in flight together still share a write.
 | `events.retention.interval`       | `NEXTGEN_EVENTS_RETENTION_INTERVAL`       | `1h`             | How often the server purges; the first purge runs as it starts |
 | `events.retention.trigger_secret` | `NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET` | (empty)          | Leaves the schedule to a scheduler outside the server (below)  |
 
-The server purges on its own timer. A server that
-[runs only while it serves a request](#a-server-that-runs-only-while-it-serves-a-request)
+The server purges on its own timer. A server the platform
+[pauses between requests](#where-the-server-runs)
 can't keep a timer, and does not start without `trigger_secret`. Set it to at
 least 16 printable ASCII characters (`openssl rand -hex 32`), and the server
 stops its timer and purges once per `GET` or `POST` to

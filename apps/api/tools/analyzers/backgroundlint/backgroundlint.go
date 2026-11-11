@@ -1,7 +1,6 @@
 // Package backgroundlint is a go/analysis analyzer behind ADR 089: what the
 // server does outside a request starts through internal/background, where
-// each task says what it does in a process that runs only while it serves a
-// request.
+// each task says what it does in each server.lifecycle.
 //
 // Nothing in Go stops a new timer or flusher from starting with a bare go
 // statement, and such a task runs late or never where the process is paused

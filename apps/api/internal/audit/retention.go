@@ -118,16 +118,18 @@ func NewRetentionJob(purge EventPurger, cfg RetentionConfig) *RetentionJob {
 	}
 }
 
-// Task is the purge as background work. In a process that runs only while it
-// serves a request no timer can run it, so it runs from its trigger and the
+// Task is the purge as background work. Where instances come and go it purges
+// as each one starts and on its timer while one is up. A process paused
+// between requests runs no timer, so there it runs from its trigger and the
 // start fails without a trigger secret.
 func (j *RetentionJob) Task() background.Task {
 	return background.Task{
-		Name:     "event retention",
-		Disabled: !j.cfg.Enabled,
-		Start:    func(context.Context) error { j.Start(); return nil },
-		Stop:     j.Close,
-		RequestBound: background.OnTrigger(j.Trigger(),
+		Name:        "event retention",
+		Disabled:    !j.cfg.Enabled,
+		Start:       func(context.Context) error { j.Start(); return nil },
+		Stop:        j.Close,
+		ScaleToZero: background.WhileUp(),
+		RequestOnly: background.OnTrigger(j.Trigger(),
 			"set events.retention.trigger_secret and have a scheduler call "+RetentionTriggerPath+", or turn the purge off with events.retention.enabled"),
 	}
 }

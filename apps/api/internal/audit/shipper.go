@@ -91,16 +91,18 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 	}
 }
 
-// Task is the shipper as background work. It ships on a timer and has no
-// trigger, so a process that runs only while it serves a request refuses to
+// Task is the shipper as background work. Where instances come and go it
+// ships while one is up, from the cursor the last one stored. It ships on a
+// timer and has no trigger, so a process paused between requests refuses to
 // start with export on.
 func (s *Shipper) Task() background.Task {
 	return background.Task{
-		Name:     "event export",
-		Disabled: !s.cfg.Enabled,
-		Start:    s.Start,
-		Stop:     s.Close,
-		RequestBound: background.Unsupported(
+		Name:        "event export",
+		Disabled:    !s.cfg.Enabled,
+		Start:       s.Start,
+		Stop:        s.Close,
+		ScaleToZero: background.WhileUp(),
+		RequestOnly: background.Unsupported(
 			"it ships on a timer and has no trigger; turn it off with events.export.enabled"),
 	}
 }

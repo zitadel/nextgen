@@ -162,18 +162,21 @@ func New(cfg Config, facts Facts) *Pinger {
 	}
 }
 
-// Task is the pinger as background work. It pings on a timer and has no
-// trigger, so a process that runs only while it serves a request refuses to
-// start with the ping on: a ping per start would count instances, not
-// deployments.
+// pingsPerStart is why the ping is off where instances come and go.
+const pingsPerStart = "it pings at each start, which would count starts and not deployments, and it has no trigger; turn it off with service_ping.enabled"
+
+// Task is the pinger as background work. It pings as it starts and then on a
+// timer, and has no trigger. Where the platform starts and stops instances
+// that would count starts, not deployments, so the server refuses to start
+// there with the ping on.
 func (p *Pinger) Task() background.Task {
 	return background.Task{
-		Name:     "service ping",
-		Disabled: !p.cfg.Enabled,
-		Start:    func(context.Context) error { p.Start(); return nil },
-		Stop:     p.Close,
-		RequestBound: background.Unsupported(
-			"it pings on a timer and has no trigger; turn it off with service_ping.enabled"),
+		Name:        "service ping",
+		Disabled:    !p.cfg.Enabled,
+		Start:       func(context.Context) error { p.Start(); return nil },
+		Stop:        p.Close,
+		ScaleToZero: background.Unsupported(pingsPerStart),
+		RequestOnly: background.Unsupported(pingsPerStart),
 	}
 }
 
