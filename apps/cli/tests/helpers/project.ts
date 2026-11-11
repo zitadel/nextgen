@@ -160,11 +160,17 @@ export interface PublishedPolicy {
   readonly id: string;
   readonly operation: string;
   readonly revision_id: string;
-  readonly config: Readonly<Record<string, number>>;
+  readonly config: Readonly<Record<string, number | string>>;
 }
 
 /** The operation the password policy guards, and its file's name. */
 export const PASSWORD_POLICY = "auth.factor.password.set";
+
+/** The sign-up policy `setup` publishes beside it: the default, the built-in proof of work. */
+export const DEFAULT_SIGNUP_POLICY = {
+  operation: "user.create",
+  config: { challenge: "zitadel_pow" },
+};
 
 /**
  * What a command did to the project, as a tree rather than as content.
@@ -182,6 +188,7 @@ export interface ProjectChanges {
 /** The user schema as committed, which the developer owns and edits. */
 export interface UserSchemaDocument {
   properties: Record<string, unknown>;
+  required?: string[];
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
@@ -191,7 +198,7 @@ export interface ConnectionDocument {
   protocol?: string;
   display_name?: string;
   subject_claim?: string;
-  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  oidc: { issuer: string; client_id?: string; client_secret?: string; scopes?: string[] };
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
 }
@@ -215,6 +222,7 @@ interface PackageJson {
 /** The checks behind {@link UserSchemaDocument}, run before a spec edits one. */
 const UserSchemaDocumentSchema: z.ZodType<UserSchemaDocument> = z.object({
   properties: z.record(z.string(), z.unknown()),
+  required: z.array(z.string()).optional(),
   "x-auth-methods": z
     .record(
       z.string(),
@@ -588,6 +596,23 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `auth-method sso enable --dry-run` without `--json`, for a spec asserting what the developer reads. */
+  enableSsoDryRun(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "auth-method",
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--dry-run",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
@@ -676,6 +701,27 @@ export class ScaffoldedApp {
   enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
     return this.pipingSecret(secret, () =>
       this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with a custom connection, without `--json`, for a spec asserting what the developer reads. */
+  setupWithCustomSsoRendered(
+    connection: CustomConnection,
+    credentials: Credentials,
+  ): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "setup",
+        "--non-interactive",
+        "--skip-install",
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ]),
     );
   }
 
@@ -1863,6 +1909,15 @@ export class ScaffoldedApp {
     await this.writeProjectFile(
       this.policyFile(name),
       `${JSON.stringify({ $schema: "../meta/policy.json", operation: PASSWORD_POLICY, config, ...extra }, null, 2)}\n`,
+    );
+  }
+
+  /** Writes the sign-up policy file, as the developer owning it would. */
+  async writeSignupPolicy(config: Record<string, string>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: DEFAULT_SIGNUP_POLICY.operation, config }, null, 2)}\n`,
     );
   }
 

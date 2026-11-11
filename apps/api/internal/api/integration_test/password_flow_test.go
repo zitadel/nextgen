@@ -215,7 +215,8 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	)
 
 	submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, flowHeaders.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email":                   jx.Raw(`"` + newEmail + `"`),
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
@@ -284,7 +285,8 @@ func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 	flowID := flowHeaders.Response.ID
 
 	submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, flowHeaders.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email":                   jx.Raw(`"pwregister-overcap@example.com"`),
 			"x-auth-methods#password": jx.Raw(`"` + strings.Repeat("a", domain.MaxPasswordLength+1) + `"`),
@@ -304,7 +306,8 @@ func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 	require.False(t, hasToken, "no handoff token on a refused password")
 
 	retryResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, badResp.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email":                   jx.Raw(`"pwregister-overcap@example.com"`),
 			"x-auth-methods#password": jx.Raw(`"some-strong-password"`),
@@ -367,7 +370,8 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, flowHeaders.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email":                   jx.Raw(`"` + conflictEmail + `"`),
 			"x-auth-methods#password": jx.Raw(`"some-strong-password"`),
@@ -391,7 +395,8 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 
 	// A corrected email continues the sign-up on the new attempt.
 	retryResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, badResp.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email":                   jx.Raw(`"pwregister-fresh@example.com"`),
 			"x-auth-methods#password": jx.Raw(`"some-strong-password"`),

@@ -6,7 +6,7 @@ import { listNewerEvents } from "./api";
 import type { LogEvent, LogsSearch } from "./model";
 
 /** How often Live asks for newer events. */
-export const LIVE_INTERVAL_MS = 3000;
+const LIVE_INTERVAL_MS = 3000;
 
 /**
  * Whether Live was left on. A new filter reads the list again under a new
@@ -61,6 +61,8 @@ export function useLiveEvents({
     });
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
+  // When Live last finished a read: what the screen says it is up to date with.
+  const [checkedAt, setCheckedAt] = useState<Date | undefined>(undefined);
   const seen = useRef(new Set<string>());
   const cursor = useRef<Cursor | undefined>(undefined);
   // The filters of the list on screen, read at each tick: a new list resets
@@ -85,7 +87,10 @@ export function useLiveEvents({
 
   const reading = on && enabled;
   useEffect(() => {
-    if (!reading) return;
+    if (!reading) {
+      setCheckedAt(undefined);
+      return;
+    }
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -114,6 +119,7 @@ export function useLiveEvents({
           ? { createdAfter: from.createdAfter, pageToken: page.nextPageToken }
           : { createdAfter: last?.created_at ?? from.createdAfter };
         setError(undefined);
+        setCheckedAt(new Date());
         schedule();
       } catch (cause) {
         if (stopped) return;
@@ -137,6 +143,8 @@ export function useLiveEvents({
     on: reading,
     /** The events Live read, newest first. */
     events,
+    /** When the last read finished; none before the first while Live is on, or while it is off. */
+    checkedAt,
     error,
     toggle: () => {
       setError(undefined);

@@ -1,6 +1,16 @@
+import {
+  EvaluatePolicyBody,
+  PublishPolicyBody,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
-import { brandingConfigSchema, policyTestFileSchema, schemaConfigSchema } from "./schemas.js";
+import {
+  brandingConfigSchema,
+  DEFAULT_USER_CREATE_POLICY,
+  policyConfigSchema,
+  policyTestFileSchema,
+  schemaConfigSchema,
+} from "./schemas.js";
 
 /**
  * Direct coverage for the branding descriptor gate `zitadel plan`/`apply`
@@ -399,6 +409,72 @@ describe("policyTestFileSchema", () => {
     ],
   ])("refuses %s", (_, value) => {
     expect(parses(value)).toBe(false);
+  });
+
+  it("takes each operation's own input and no facts it does not have", () => {
+    const signup = {
+      operation: "user.create",
+      cases: [
+        {
+          name: "the built-in proof of work",
+          input: { solved_challenge: "zitadel_pow" },
+          expect: { allowed: true },
+        },
+      ],
+    };
+    expect(parses(signup)).toBe(true);
+    expect(parses({ ...signup, cases: [{ ...signup.cases[0], input: { password: "x" } }] })).toBe(
+      false,
+    );
+    expect(
+      parses({ ...signup, cases: [{ ...signup.cases[0], facts: { self_service: true } }] }),
+    ).toBe(false);
+  });
+
+  it("has a branch for every operation the evaluate body takes", () => {
+    expect(
+      policyTestFileSchema.options.flatMap((branch) => branch.shape.operation.options),
+    ).toEqual(EvaluatePolicyBody.options.flatMap((branch) => branch.shape.operation.options));
+  });
+});
+
+/**
+ * The gate `deploy --dry-run` runs on a `.zitadel/policies/<operation>.json`
+ * file: strict per operation, like the editor's `policy.json`.
+ */
+describe("policyConfigSchema", () => {
+  const parses = (value: object): boolean => policyConfigSchema.safeParse(value).success;
+
+  it("accepts each operation's own settings", () => {
+    expect(parses({ operation: "auth.factor.password.set", config: { min_length: 15 } })).toBe(
+      true,
+    );
+    expect(parses({ operation: "user.create", config: { challenge: "zitadel_pow" } })).toBe(true);
+    expect(parses({ operation: "user.create", config: {} })).toBe(true);
+  });
+
+  it.each([
+    ["another operation's setting", { operation: "user.create", config: { min_length: 15 } }],
+    [
+      "a challenge the server cannot issue",
+      { operation: "user.create", config: { challenge: "turnstile" } },
+    ],
+    ["an unknown operation", { operation: "auth.check", config: {} }],
+  ])("refuses %s", (_, value) => {
+    expect(parses(value)).toBe(false);
+  });
+
+  it("has a branch for every operation the publish body takes", () => {
+    expect(policyConfigSchema.options.flatMap((branch) => branch.shape.operation.options)).toEqual(
+      PublishPolicyBody.options.flatMap((branch) => branch.shape.operation.options),
+    );
+  });
+
+  it("ships the default sign-up policy as a valid file", () => {
+    expect(DEFAULT_USER_CREATE_POLICY).toEqual({
+      operation: "user.create",
+      config: { challenge: "zitadel_pow" },
+    });
   });
 });
 

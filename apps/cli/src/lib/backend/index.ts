@@ -12,6 +12,7 @@ export type { Page, PageOptions } from "./api-service";
 export {
   allowDestructive,
   createZitadelClient,
+  isCancelled,
   pagedFunctions,
   REQUEST_TIMEOUT_MS,
   responseFailure,

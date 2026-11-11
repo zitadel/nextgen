@@ -13,9 +13,10 @@ post:
 
     A release that any origin still serves cannot be revoked. An origin serves
     the release of the newest deployment to it, so the call answers `409` with
-    `rel.in_use`, naming each such origin and that deployment. Deploy another
-    release there or roll back first, then revoke. Revoking therefore never
-    takes an origin down. Deployments that named the release earlier stay in
+    `rel.in_use`, naming each such origin, that deployment and whether the
+    origin is primary or a preview. Deploy another release to a primary origin
+    or roll it back, and remove a preview, then revoke. Revoking therefore
+    never takes an origin down. Deployments that named the release earlier stay in
     the history.
 
     The call is idempotent: revoking a release that is already revoked answers
@@ -74,7 +75,8 @@ post:
     '409':
       description: |
         At least one origin still serves the release. `details.origins`
-        names each such origin and the newest deployment to it.
+        names each such origin, the newest deployment to it and whether it
+        serves the release as a primary origin or a preview.
       content:
         application/json:
           schema:
@@ -83,8 +85,8 @@ post:
             stillServed:
               summary: Two origins still serve the release
               description: |
-                Deploy another release to these origins, or roll them back,
-                then revoke.
+                Deploy another release to the primary origin or roll it back,
+                remove the preview, then revoke.
               value:
                 code: rel.in_use
                 message: 'release: still served by an origin'
@@ -92,7 +94,9 @@ post:
                   origins:
                     - origin: https://app.acme.com
                       deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                      kind: primary
                     - origin: https://acme-git-sso-acmeinc.vercel.app
                       deployment_id: dep_01KX4SD2F7H3F0N9WD3P2E4YM5
+                      kind: preview
     default:
       $ref: revokeRelease-error-response.yaml

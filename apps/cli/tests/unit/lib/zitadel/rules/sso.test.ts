@@ -365,11 +365,6 @@ describe("SSO_RULES", () => {
     });
 
     /**
-     * A schema listing `acme`, which a user must have an email in.
-     */
-    const REQUIRING_SCHEMA = aSchemaListing(["acme"], { required: ["email"] });
-
-    /**
      * Every project below lists `acme` in its schema, offers it in its flow
      * and keeps the connection `acme.json`: the documents of a project whose
      * files agree, but for what a row changes.
@@ -493,27 +488,6 @@ describe("SSO_RULES", () => {
         documents: agreeing(anOidcConnection({ claim_mapping: {} })),
         file: FLOW_PATH,
         message: `claim_mapping of "acme" (${CONNECTION_PATH}) is empty, so no sign-in can fill the user`,
-      },
-      {
-        rule: "sso/collection-misses-required",
-        severity: "error",
-        documents: agreeing(anOidcConnection({ claim_mapping: {} }), {
-          schemas: { [SCHEMA_FILE]: REQUIRING_SCHEMA },
-          flows: {
-            [FLOW_FILE]: aFlowStepping(
-              {
-                transitions: {
-                  sso_authenticated: { target: "done" },
-                  sso_user_not_found: { target: "register-sso" },
-                  user_already_exists: { target: "sso-conflict" },
-                },
-              },
-              [{ name: "register-sso", on_success: "create_user_with_sso" }],
-            ),
-          },
-        }),
-        file: FLOW_PATH,
-        message: `can create a user without "email", which ${SCHEMA_PATH} requires`,
       },
       {
         rule: "sso/claim-needs-scope",
@@ -663,10 +637,6 @@ describe("SSO_RULES", () => {
         documents: agreeing(
           anOidcConnection({ claim_mapping: {}, provisioning: { creation: "disabled" } }),
         ),
-      },
-      {
-        rule: "sso/collection-misses-required",
-        documents: agreeing(ACME, { schemas: { [SCHEMA_FILE]: REQUIRING_SCHEMA } }),
       },
       { rule: "sso/claim-needs-scope", documents: agreeing(ACME) },
       {

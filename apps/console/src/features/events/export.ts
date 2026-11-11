@@ -1,8 +1,13 @@
+import { copyText } from "@/lib/clipboard";
+
 import { eventsCsv, type LogEvent } from "./model";
 
-/** The loaded events on the clipboard, as JSON: an array of what the API returned. */
-export async function copyEvents(events: readonly LogEvent[]): Promise<void> {
-  await navigator.clipboard.writeText(JSON.stringify(events, null, 2));
+/**
+ * The loaded events on the clipboard, as JSON: an array of what the API
+ * returned. `false` when the clipboard refused them.
+ */
+export function copyEvents(events: readonly LogEvent[]): Promise<boolean> {
+  return copyText(JSON.stringify(events, null, 2));
 }
 
 /**

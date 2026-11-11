@@ -696,7 +696,13 @@ no app: where it would scaffold one, it previews the project, and
 (`.zitadel/policies/auth.factor.password.set.json`), with a minimum length of
 15, NIST's minimum for password-only sign-in and the wizard's default. Pass
 `--password-min-length <n>` only when the user asks for another value (`0` sets
-none), and give test users passwords at least that long.
+none), and give test users passwords at least that long. It writes the
+sign-up policy (`.zitadel/policies/user.create.json`) too, which that deploy
+publishes: the default, the built-in proof of work every password sign-up
+solves with or without the file; passkey and sign-in provider sign-ups are not
+challenged. A server too old to take it gets a warning and no file; a file
+`--force` kept stays, and every `deploy` fails until the server is upgraded or
+the file moves out of `.zitadel/policies/`.
 When setup fails after scaffolding a new app, before its default schema and
 flow files are written, it removes the app again and puts back what the
 directory held, so rerunning the same `setup` starts over. Setup writes
@@ -752,7 +758,29 @@ When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, t
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 `auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
-provider or an older CLI version does not work.
+provider or an older CLI version does not work. `data.callback_uri` is the development URI only. The
+text output of `auth-method sso enable` also lists the URI for each deployed origin, and one pattern for
+each preview origin, since a preview URL is known only when its build runs. A preview pattern is not a
+URI to register: replace it with the concrete preview URL first. A JSON caller reads the project's origins
+with `origin list` and builds the same URIs itself.
+
+The same results carry the connection's `claim_mapping` (user attribute to
+claim), `verified_claims` (what makes an attribute verified: a claim's name, or
+`true` when the provider is trusted outright), `scopes`, `unmapped` (the
+attributes no claim fills, each with `required`) and `used_by` (the schemas that
+sign in through it) in `data.sso[]` from `setup` and `data.connection` from
+`sso enable`. To map another claim, edit `claim_mapping` in the connection file
+named there, then run `deploy`; the connection is not tested until a real
+sign-in. `deploy` refuses a mapping that cannot work and names the file, the
+problem and the fix: a target no schema defines (with a "Did you mean" when one
+is close), an empty `claim_mapping`, a `verified_claims` key with no mapping, and
+a claim name with a space at its start or end. Mistakes that almost certainly
+do not do what was meant warn but do not stop, so `deploy` carries on: a
+standard claim of a type the property
+cannot hold, a verification that reads a claim that is not a boolean, a
+`subject_claim` that is a profile claim (only until the connection is first
+deployed, after which it cannot change), and a connection that reads a
+standard claim without the scope that returns it. Fix the file named.
 
 In a terminal, `setup --sso custom` asks for the name the sign-in button shows
 first, then offers a connection name made from it (`Zitadel Cloud` offers
@@ -823,10 +851,12 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   In a terminal, a custom provider's settings you leave out are asked for, after
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
-  run must pass all three and gets an error naming the missing ones. After
-  writing a new custom connection that maps claims, the text output prints the
-  claim mappings and names the file to edit them in; `--json` carries the same
-  summary as an `info` entry in `data.notices`.
+  run must pass all three and gets an error naming the missing ones. The text
+  output, `--dry-run` included, prints a notice saying which claim fills each user
+  attribute, which attributes no claim fills (marked required or optional) and
+  which schemas sign in through the connection; `--json` carries the same in
+  `data.connection` as `claim_mapping`, `verified_claims`, `scopes`, `unmapped`
+  and `used_by`.
   An issuer on `http://localhost:<port>` (a test provider on this machine)
   works against a server `zitadel start` runs as a process: `start` sets
   `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless

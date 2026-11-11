@@ -1,5 +1,7 @@
 import {
   type CreatedProject,
+  InvalidError,
+  PolicyService,
   ProjectService,
   VariableService,
   VariableWrite,
@@ -113,7 +115,7 @@ import {
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import type { Asker } from "@/lib/input";
-import { Connection, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
+import { Connection, type PasswordMinLength, PasswordPolicy, SignupPolicy } from "@/lib/zitadel";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { normalizePublicCliProse } from "@/lib/public-cli";
@@ -445,6 +447,9 @@ export function customSettingsOf(flags: {
     scopes: flags.ssoScopes,
   };
 }
+
+/** Joins names as "a, b, and c" in the summary box. */
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
 
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL: Refusal = {
@@ -1469,7 +1474,7 @@ export default class Setup extends Destructive(BaseCommand) {
       try {
         scaffolded = this.dryRun
           ? { filesWritten: [], passwordMinLength: signInOf(answers).password_min_length }
-          : await this.writeConfiguration(answers);
+          : await this.writeConfiguration(answers, project);
       } catch (error) {
         // Setup is not atomic: the patcher already wrote `zitadel.json` (the
         // marker the already-initialized guard skips on) and `.zitadel/secret`.
@@ -1815,6 +1820,75 @@ export default class Setup extends Destructive(BaseCommand) {
         message: wrapForBox(
           [
             renderSummary(sections),
+            ...planned.connections.flatMap((entry) => {
+              const connection = entry.connection;
+              const text = (value: string) => {
+                return escapeControlCharacters(value, { keepLayout: false });
+              };
+              const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
+                planned.change.after.connections.summarize(connection);
+              const verifiedBy = new Map(
+                verifications.map(({ property, claim }) => {
+                  return [property, claim];
+                }),
+              );
+              const sections = [
+                mappings.length === 0
+                  ? []
+                  : [
+                      createsUsers
+                        ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+                        : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+                      ...mappings.map(({ property, claim }) => {
+                        const how = verifiedBy.get(property);
+                        const verified =
+                          how === true
+                            ? "always counts as verified"
+                            : typeof how === "string"
+                              ? `counts as verified when ${text(how)} is true`
+                              : "is not treated as verified";
+                        return [
+                          `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                          `  It ${verified}.`,
+                        ].join("\n");
+                      }),
+                    ],
+                scopes.length === 0
+                  ? []
+                  : [
+                      `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+                    ],
+                unmapped.length === 0
+                  ? []
+                  : [
+                      "These attributes have no claim yet:",
+                      ...unmapped.map(({ property, required }) => {
+                        if (!required) {
+                          return `- ${text(property)} is optional, so it can stay empty.`;
+                        }
+                        return createsUsers
+                          ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                          : `- ${text(property)} is required, but this connection does not create users.`;
+                      }),
+                    ],
+                usedBy.length === 0
+                  ? []
+                  : [
+                      `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+                    ],
+                [
+                  `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
+                ],
+              ].filter((section) => {
+                return section.length > 0;
+              });
+              return [
+                "",
+                ...sections.flatMap((section, at) => {
+                  return at === 0 ? section : ["", ...section];
+                }),
+              ];
+            }),
             "",
             renderBoxActions([
               ...deployStep.boxActions,
@@ -1874,11 +1948,25 @@ export default class Setup extends Destructive(BaseCommand) {
         sso: planned.connections.map((entry) => {
           const slug = providerOf(entry.chosen.selection).slug;
           const outcome = ssoOutcomes.get(slug);
+          const mapped = planned.change.after.connections.summarize(entry.connection);
           return {
             provider: selectionName(entry.chosen.selection),
             slug,
             client_id: entry.chosen.credentials.clientId ?? null,
             connection: entry.connection.path,
+            claim_mapping: Object.fromEntries(
+              mapped.mappings.map(({ property, claim }) => {
+                return [property, claim];
+              }),
+            ),
+            verified_claims: Object.fromEntries(
+              mapped.verifications.map(({ property, claim }) => {
+                return [property, claim];
+              }),
+            ),
+            scopes: mapped.scopes,
+            unmapped: mapped.unmapped,
+            used_by: mapped.usedBy,
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
@@ -1976,12 +2064,47 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     return (
       "The project was created but its default configuration (schema, login flow, " +
-      "password policy) was not all written. Re-run `zitadel setup` to start over; " +
+      "password and sign-up policies) was not all written. Re-run `zitadel setup` to start over; " +
       "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-      "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+      "existing password or sign-up policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
       "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
       "one, or keep it and enable the provider after setup to reuse it."
     );
+  }
+
+  /**
+   * Whether the server takes a sign-up policy.
+   *
+   * @remarks
+   * Asked by evaluating one with no settings, which stores nothing. The CLI's
+   * own client accepted the body, so a server refusing it as malformed does
+   * not know the operation yet. Any other failure says nothing about the
+   * policy and is left for the deploy to report.
+   *
+   * @param server - The server's base URL.
+   * @param project - The project just created, with the secret to ask as.
+   * @returns False when the server refuses the operation as unknown.
+   */
+  private async serverTakesSignupPolicy(server: string, project: CreatedProject): Promise<boolean> {
+    const service = new PolicyService(
+      createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token: project.project_secret,
+        signal: this.signal,
+      }),
+      project.id,
+    );
+    try {
+      await service.evaluate({
+        operation: SignupPolicy.OPERATION,
+        config: {},
+        input: { solved_challenge: "zitadel_pow" },
+      });
+      return true;
+    } catch (error) {
+      return !(error instanceof InvalidError && error.serverCode === "req.invalid");
+    }
   }
 
   /**
@@ -1992,17 +2115,33 @@ export default class Setup extends Destructive(BaseCommand) {
    * Only files: the first deploy publishes them. The configuration is planned
    * again against what is on disk now, so it refuses what the plan before the
    * project was created would. A README already there is the developer's, and
-   * is kept even under `--force`.
+   * is kept even under `--force`. The first deploy carries every policy file,
+   * so a server that does not take the sign-up policy yet gets none: setup
+   * goes on without it. A file `--force` keeps stays, and the server refuses
+   * every deploy that carries it.
    *
    * @param answers - What to scaffold.
+   * @param project - The project just created, whose server is asked whether
+   *   it takes a sign-up policy.
    * @returns The absolute paths written, and the minimum password length the
    *   policy holds.
    * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
    *   replace is there, or `E_VALIDATION` when a policy `--force` keeps is not
    *   valid.
    */
-  private async writeConfiguration(answers: SetupAnswers): Promise<ScaffoldedConfiguration> {
-    const scaffold = await scaffoldOf(this.cwd, this.force, answers);
+  private async writeConfiguration(
+    answers: SetupAnswers,
+    project: CreatedProject,
+  ): Promise<ScaffoldedConfiguration> {
+    const signupPolicy = await this.serverTakesSignupPolicy(answers.server, project);
+    const scaffold = await scaffoldOf(this.cwd, this.force, answers, signupPolicy);
+    if (!signupPolicy) {
+      reportWarning(
+        scaffold.signupPolicy === undefined
+          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run \`zitadel deploy\`.`
+          : `The server does not take a sign-up policy yet, so every \`zitadel deploy\` fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
+      );
+    }
     const store = new DiskStore(this.cwd);
     const saved = await scaffold.change
       .save(store, {
@@ -2361,17 +2500,20 @@ type ScaffoldedConfiguration = {
  *
  * @param cwd - The project root.
  * @param force - Whether the default schema and flow may be replaced, and an
- *   existing password policy kept.
+ *   existing password or sign-up policy kept.
  * @param answers - What to scaffold.
+ * @param signupPolicy - Whether a project without a sign-up policy gets the
+ *   default one; false for a server that does not take the policy yet.
  * @returns The configuration, and the change that writes it.
  * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
- *   would refuse to write, or `E_VALIDATION` for a kept password policy that
- *   is not valid.
+ *   would refuse to write, or `E_VALIDATION` for a kept password or sign-up
+ *   policy that is not valid.
  */
 async function scaffoldOf(
   cwd: string,
   force: boolean,
   answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
+  signupPolicy = true,
 ): Promise<Scaffold<SsoDraft>> {
   try {
     // Read without refusing a broken file: the scaffold knows which paths it
@@ -2390,6 +2532,7 @@ async function scaffoldOf(
       useCase: answers.useCase,
       sso: answers.sso,
       passwordMinLength: answers.passwordMinLength,
+      signupPolicy,
       force,
     });
   } catch (error) {
@@ -2428,6 +2571,12 @@ function setupRefusal(error: unknown, connections: readonly ScaffoldedConnection
   if (error.path === PasswordPolicy.PATH) {
     return new ZitadelError("E_CONFLICT", error.message, {
       hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+      details: error.details,
+    });
+  }
+  if (error.path === SignupPolicy.PATH) {
+    return new ZitadelError("E_CONFLICT", error.message, {
+      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
       details: error.details,
     });
   }
@@ -2776,6 +2925,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   [DEFAULT_SCHEMA_CONFIG_PATH]: { subject: "the editable default human user schema" },
   [`${CONFIG_DIRECTORIES.schemas}/${README}`]: { subject: "the schemas folder README" },
   [PasswordPolicy.PATH]: { subject: "the editable password policy" },
+  [SignupPolicy.PATH]: { subject: "the editable sign-up policy" },
   [`${CONFIG_DIRECTORIES.policies}/${README}`]: { subject: "the policies folder README" },
   [`${META_SCHEMA_DIR}/policy.json`]: { subject: "the policy dialect spec (editor $schema)" },
   [`${META_SCHEMA_DIR}/flow-definition.json`]: {

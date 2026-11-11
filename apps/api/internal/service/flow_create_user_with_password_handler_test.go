@@ -57,7 +57,7 @@ func newPasswordHandlerFixture(t *testing.T, gate ...service.PasswordGate) *pass
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
 	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, passwords, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
-	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, passwords, userService, schemaStore, v2Pool)
+	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, passwords, userService, schemaStore, v2Pool, stubSignupProtection{})
 
 	return &passwordHandlerFixture{
 		handler:     handler,
@@ -191,14 +191,6 @@ func TestFlowCreateUserWithPassword_PolicyViolationShowsStepError(t *testing.T) 
 	gate := newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil)
 	f := newPasswordHandlerFixture(t, gate)
 
-	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_premint01", nil)
-	f.schemaStore.EXPECT().
-		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
-		Return(&domain.JSONSchema{
-			ProjectID: "proj_1",
-			URL:       "https://example.test/schema.json",
-			Schema:    []byte(passwordHandlerTestSchema),
-		}, nil).AnyTimes()
 	// No hash, no transaction: the policy rejects the password first.
 
 	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
@@ -239,4 +231,27 @@ func TestFlowCreateUserWithPassword_MissingPasswordIsIntegrityError(t *testing.T
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+}
+
+func TestFlowCreateUserWithPassword_ProofBeforeUserOrPasswordWork(t *testing.T) {
+	for _, refusal := range []error{domain.ErrFlowProofInvalid(), domain.ErrFlowRateLimited()} {
+		// Nil mutation dependencies deliberately prove that a refused proof never
+		// reaches ID allocation, password hashing, schema lookup or user writes.
+		handler := service.NewFlowCreateUserHandler(nil, noPolicyGate(t), nil, nil, nil, stubSignupProtection{err: refusal})
+		state := &domain.FlowState{ProjectID: "proj_1", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "secret"}}}}
+		_, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: state.ProjectID, State: state})
+		require.ErrorIs(t, err, refusal)
+	}
+}
+
+func TestFlowCreateUserWithPassword_PolicyRefusalDoesNotSpendProof(t *testing.T) {
+	gate := newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil)
+	// Consume would fail if called; no ID, hasher or mutation dependencies exist.
+	handler := service.NewFlowCreateUserHandler(nil, gate, nil, nil, nil, stubSignupProtection{err: domain.ErrFlowProofInvalid()})
+	state := &domain.FlowState{ProjectID: "proj", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "short"}}}}
+	result, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: "proj", State: state})
+	require.NoError(t, err)
+	require.NotNil(t, result.StepError)
+	require.Equal(t, "error.x-auth-methods#password_min_length", result.StepError.Key)
+	require.ErrorIs(t, result.StepError.Cause, domain.ErrUserPasswordPolicyViolation(nil))
 }

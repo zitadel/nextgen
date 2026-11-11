@@ -1,0 +1,17 @@
+title: InvitationCreatedCommonPayload
+description: |
+  Fields every `invitation.created` payload carries, whatever its `type`.
+type: object
+required:
+  - journey_id
+  - expires_at
+properties:
+  journey_id:
+    type: string
+    description: Shared by an invitation and every invitation that replaces it.
+  replaces_invitation_id:
+    type: string
+    description: The invitation this one replaces, when it was created as a replacement.
+  expires_at:
+    type: string
+    format: date-time

@@ -2,9 +2,9 @@ type: object
 additionalProperties: false
 required: [kind, provider]
 description: |
-  A gate is a security check, such as a captcha, that must be satisfied
-  before this step's submission is accepted. The server may also inject gates
-  at runtime based on policy or risk evaluation.
+  A reserved gate declaration. Gates declared in a flow definition are not
+  currently enforced. Required signup gates are attached by the server based
+  on `on_success: create_user`, independently of this declaration.
 properties:
   kind:
     type: string
@@ -18,15 +18,9 @@ properties:
   provider:
     type: string
     description: |
-      The provider within the gate kind, for example `altcha`, `turnstile` or
-      `hcaptcha`. The server looks up an implementation in its provider
-      registry.
-    example: altcha
+      Reserved implementation identifier. Declaring a provider does not enable it.
   config:
     type: object
     description: |
-      Provider-specific configuration consumed by the implementation when
-      issuing the per-render challenge. Opaque to the server.
+      Reserved provider-specific configuration. It has no runtime effect.
     additionalProperties: true
-    example:
-      site_key: "0x4AAAAAAA-example-site-key"
