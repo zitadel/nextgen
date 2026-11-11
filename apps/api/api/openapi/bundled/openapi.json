@@ -26413,7 +26413,7 @@
           },
           {
             "title": "webhook.disabled",
-            "description": "The server disabled a webhook and stopped delivering to it. Its\ndeliveries failed for 3 days without one success, or its endpoint\nanswered `410`; the payload's `reason` says which. Enabling it with\n`updateWebhook` (`PATCH /webhooks/{id}`) starts delivery again from\nthat moment.\n",
+            "description": "The server disabled a webhook and stopped delivering to it. Its\ndeliveries failed for 3 days without one success, or its endpoint\nanswered `410`; `data`'s `reason` says which. Enabling it with\n`updateWebhook` (`PATCH /webhooks/{id}`) starts delivery again from\nthat moment.\n",
             "allOf": [
               {
                 "$ref": "#/components/schemas/webhook-event-base"

@@ -237,7 +237,7 @@ var webhookByEventType = map[string]webhookDoc{
 		"valid for 24 hours. The event carries neither secret."},
 	"webhook.disabled": {description: "The server disabled a webhook and stopped delivering to it. " +
 		"Its deliveries failed for 3 days without one success, or its endpoint answered `410`; " +
-		"the payload's `reason` says which. Enabling it with `updateWebhook` (`PATCH /webhooks/{id}`) " +
+		"`data`'s `reason` says which. Enabling it with `updateWebhook` (`PATCH /webhooks/{id}`) " +
 		"starts delivery again from that moment."},
 }
 
