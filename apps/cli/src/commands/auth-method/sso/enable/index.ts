@@ -584,14 +584,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     consola.info(`Callback URI   ${summary.callbackUri}`);
     for (const uri of summary.deployedCallbackUris) {
-      consola.info(`Callback URI   ${uri}`);
+      consola.info(`Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`);
     }
     if (summary.previewCallbackUris.length > 0) {
       consola.info(
         "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
       );
       for (const uri of summary.previewCallbackUris) {
-        consola.info(`  ${uri}`);
+        consola.info(`  ${escapeControlCharacters(uri, { keepLayout: false })}`);
       }
     }
     // A custom provider has no console to send the developer to: it is

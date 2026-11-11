@@ -903,6 +903,31 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  describe("when a primary origin holds an escape sequence", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "https://app.acme.com\u001b[2J", kind: "primary" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the escape sequence as text, not as a control character", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain("https://app.acme.com\\x1b[2J/__nextgen/idp/google/callback");
+    });
+  });
+
   describe("with --dry-run", () => {
     it("reports the run as skipped", async ({ dir }) => {
       const cwd = await aProject(dir);
