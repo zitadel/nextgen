@@ -48,6 +48,7 @@ type statements struct {
 	authzCatalogStatements
 	authzResolverStatements
 	eventStatements
+	webhookStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -92,6 +93,7 @@ func newStatements(client queryExecutor) statements {
 		authzCatalogStatements:        newAuthzCatalogStatements(client),
 		authzResolverStatements:       newAuthzResolverStatements(client),
 		eventStatements:               newEventStatements(client),
+		webhookStatements:             newWebhookStatements(client),
 	}
 }
 

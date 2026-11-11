@@ -23,6 +23,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/invitation"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/release"
+	"github.com/zitadel/nextgen/internal/storage/webhook"
 )
 
 func sampleFlowDefinition(projectID, id, name string) *domain.FlowDefinition {
@@ -103,6 +104,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("origins", func(t *testing.T) { battleOrigins(t, d) })
 		t.Run("policies", func(t *testing.T) { battlePolicies(t, d) })
 		t.Run("policy_revisions", func(t *testing.T) { battlePolicyRevisions(t, d) })
+		t.Run("webhooks", func(t *testing.T) { battleWebhooks(t, d) })
 	})
 }
 
@@ -1067,4 +1069,28 @@ func battlePolicyRevisions(t *testing.T, d dialect) {
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
 		return d.stmts.ListPolicyRevisions(unfilteredListCtx(t), projectID, entity.ID, page)
 	}, func(p *domain.Policy) string { return p.RevisionID }, 2)
+}
+
+func battleWebhooks(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	created := make([]*domain.Webhook, 0, 5)
+	for range 5 {
+		created = append(created, createWebhook(t, d.stmts, projectID, testWebhookURL))
+	}
+	// The order the query produces, not the order of the writes: two webhooks
+	// can share a created_at, and the id that breaks the tie is random.
+	slices.SortFunc(created, func(a, b *domain.Webhook) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
+	})
+	want := make([]string, len(created))
+	for i, entity := range created {
+		want[i] = entity.ID
+	}
+
+	orderAsc := webhook.NewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.WebhookField]) (*database.ListResult[*domain.Webhook], error) {
+		return d.stmts.ListWebhooks(t.Context(), projectID, page)
+	}, func(w *domain.Webhook) string { return w.ID }, 2)
 }

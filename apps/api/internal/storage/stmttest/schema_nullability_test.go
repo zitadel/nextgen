@@ -28,6 +28,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/userteam"
 	"github.com/zitadel/nextgen/internal/storage/usertotp"
 	"github.com/zitadel/nextgen/internal/storage/variable"
+	"github.com/zitadel/nextgen/internal/storage/webhook"
 )
 
 func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
@@ -50,6 +51,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("authz_assignments", authz.AuthzAssignmentSchema)...)
 	cols = append(cols, schematest.Columns("idp_identity_links", idpidentitylink.Schema)...)
 	cols = append(cols, schematest.Columns("events", events.Schema)...)
+	cols = append(cols, schematest.Columns("webhooks", webhook.Schema)...)
 	joined, err := schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)
 	require.NoError(t, err)
 	cols = append(cols, joined...)
