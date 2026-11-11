@@ -99,11 +99,11 @@ export default class ReleaseCreate extends EnvironmentCommand {
         content_hash: release.content_hash,
         resources: prepared.resourceCount,
       },
-      next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
       summary: {
         title: `Created ${escapeControlCharacters(release.id)}`,
         sections: [],
       },
+      next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
     });
   }
 }

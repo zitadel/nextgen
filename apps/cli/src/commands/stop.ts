@@ -50,7 +50,10 @@ export default class Stop extends BaseCommand {
           runtime: {
             backend: runtime?.backend ?? "missing",
             ...(runtime?.backend === "binary"
-              ? { pid: runtime.pid, log_path: runtime.log_path }
+              ? {
+                  pid: runtime.pid,
+                  log_path: runtime.log_path,
+                }
               : { container_name: containerName }),
             data_preserved: true,
             data_dir: runtime?.data_dir,

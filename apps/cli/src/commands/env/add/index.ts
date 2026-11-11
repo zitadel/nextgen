@@ -381,6 +381,42 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       });
     };
 
+    // The runnable `origin add` is in the next steps; the line here is
+    // for the one they cannot hold: a placeholder origin, or a file
+    // without the project secret it would authenticate with.
+    let originGuidance: string[] = [];
+    if (needsOrigin) {
+      if (writtenKeys.has("ZITADEL_PROJECT_SECRET")) {
+        if (issuer === undefined) {
+          originGuidance = [
+            `Allow this project's origin: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
+          ];
+        }
+      } else {
+        originGuidance = [
+          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${projectCommand(`origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary`, newEnvironment, this.cliVersion)}`,
+        ];
+      }
+    }
+    // Said even when nobody could be asked, because it is the one thing
+    // standing between this environment and a working app: until a
+    // release is deployed the project refuses sign-in, and the `.zitadel/`
+    // files in this directory are not served.
+    let deployGuidance: string[] = [];
+    if (createdProject && deployment === undefined) {
+      deployGuidance = [
+        `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
+      ];
+      // With an origin, the deploy is in the next steps.
+      if (!hasSomewhereToLand) {
+        deployGuidance = [
+          ...deployGuidance,
+          `Give it an origin first: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
+          `Then deploy to it: ${projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)}`,
+        ];
+      }
+    }
+
     return this.emit({
       status: "ok",
       data: {
@@ -411,38 +447,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         sections: [],
         lines: [
           `${environment.file} holds ${Object.keys(values).join(", ")}.`,
-          ...guidanceBlock([
-            // The runnable `origin add` is in the next steps; the line here is
-            // for the one they cannot hold: a placeholder origin, or a file
-            // without the project secret it would authenticate with.
-            ...(needsOrigin
-              ? writtenKeys.has("ZITADEL_PROJECT_SECRET")
-                ? issuer === undefined
-                  ? [
-                      `Allow this project's origin: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
-                    ]
-                  : []
-                : [
-                    `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${projectCommand(`origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary`, newEnvironment, this.cliVersion)}`,
-                  ]
-              : []),
-            // Said even when nobody could be asked, because it is the one thing
-            // standing between this environment and a working app: until a
-            // release is deployed the project refuses sign-in, and the `.zitadel/`
-            // files in this directory are not served.
-            ...(createdProject && deployment === undefined
-              ? [
-                  `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
-                  // With an origin, the deploy is in the next steps.
-                  ...(hasSomewhereToLand
-                    ? []
-                    : [
-                        `Give it an origin first: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
-                        `Then deploy to it: ${projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)}`,
-                      ]),
-                ]
-              : []),
-          ]),
+          ...guidanceBlock([...originGuidance, ...deployGuidance]),
           "",
           "The deployed app never reads that file. Set these where it is built and run.",
           "",

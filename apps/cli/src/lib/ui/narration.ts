@@ -73,17 +73,16 @@ export class Narration {
   }
 
   private draw(level: LogLevel, text: string): void {
-    const body = text;
     if (this.silent || (level === "debug" && !this.debug)) {
       return;
     }
     if (this.chain.chained) {
-      this.chain.narrate(MARKS[level], body);
+      this.chain.narrate(MARKS[level], text);
       return;
     }
     // A line written while a spinner draws would be glued to its frame.
     DrawnSpinner.around(() => {
-      return writePlain(level, body);
+      return writePlain(level, text);
     });
   }
 }

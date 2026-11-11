@@ -128,13 +128,13 @@ export default class Upgrade extends BaseCommand {
       ...(commands.length > 0 ? { commands } : {}),
     };
 
-    const said = `${
-      upToDate
-        ? `Zitadel is up to date at ${target}`
-        : dryRun
-          ? `Zitadel can be upgraded to ${target}`
-          : `Zitadel upgraded to ${target}`
-    }${dryRun ? " (dry run)" : ""}`;
+    let said = `Zitadel upgraded to ${target}`;
+    if (upToDate) {
+      said = `Zitadel is up to date at ${target}`;
+    } else if (dryRun) {
+      said = `Zitadel can be upgraded to ${target}`;
+    }
+    said = `${said}${dryRun ? " (dry run)" : ""}`;
     const done = dryRun ? arrow : mark.pass;
     const rows = [
       // A package's name and versions are what the registry answered, and this

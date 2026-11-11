@@ -1,62 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { Origins } from "@/lib/backend";
-import Deploy, { deployed, liveOn, missingPrimaryOrigin } from "@/commands/deploy/index";
+import Deploy, { missingPrimaryOrigin } from "@/commands/deploy/index";
 import { parseFlag } from "@tests/helpers/inputs";
-
-const HASH = `sha256:${"a".repeat(64)}`;
-
-describe("the line a deploy closes on", () => {
-  it("says what was deployed, not what it is called", () => {
-    expect(deployed(3)).toBe("Deployed 3 resources");
-  });
-
-  it("counts one resource as one", () => {
-    expect(deployed(1)).toBe("Deployed 1 resource");
-  });
-});
-
-describe("where a release went", () => {
-  it("names the one origin it landed on", () => {
-    expect(liveOn(HASH, ["http://localhost:3000"])).toBe(
-      "Release sha256:aaaaaaaaaaaa is now live on http://localhost:3000.",
-    );
-  });
-
-  // A bullet list of one line is not a list, so several origins are named in
-  // the sentence rather than under it.
-  it("joins several origins into the sentence", () => {
-    expect(liveOn(HASH, ["https://a.example.com", "https://b.example.com"])).toContain(
-      "live on https://a.example.com and https://b.example.com.",
-    );
-  });
-
-  it("lists three with commas and a final and", () => {
-    expect(liveOn(HASH, ["a", "b", "c"])).toContain("live on a, b, and c.");
-  });
-
-  it("spells out a hash the server filled with a terminal escape", () => {
-    const hostile = "sha256\u001b[2Jwiped:abcdef0123456789";
-
-    expect(liveOn(hostile, ["http://localhost:3000"])).toBe(
-      "Release sha256\\x1b[2Jwiped:abcdef012345 is now live on http://localhost:3000.",
-    );
-  });
-
-  it("says nothing about where when it landed nowhere", () => {
-    expect(liveOn(HASH, [])).toBe("Release sha256:aaaaaaaaaaaa is now live.");
-  });
-
-  // The full digest identifies the release to a machine, and the envelope is
-  // where a machine reads it.
-  it("never spells the whole digest at a person", () => {
-    expect(liveOn(HASH, ["http://localhost:3000"])).not.toContain("a".repeat(64));
-  });
-
-  it("stays inside the box it is drawn in", () => {
-    expect(liveOn(HASH, ["http://localhost:3000"]).length).toBeLessThanOrEqual(73);
-  });
-});
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = Origins.wrap([{ pattern: ISSUER, kind: "preview" }]);

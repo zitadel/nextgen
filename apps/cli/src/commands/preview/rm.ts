@@ -96,9 +96,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
                   `${escapeControlCharacters(args.url)} is not a live preview of the project`,
                 ],
               },
-              next: {
-                commands: [this.suggest("preview list")],
-              },
+              next: { commands: [this.suggest("preview list")] },
             });
           }
           return connection;
@@ -108,9 +106,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           await previewService.remove(args.url);
           return {
             status: "ok",
-            data: deletedData({
-              url: args.url,
-            }),
+            data: deletedData({ url: args.url }),
             summary: {
               title: `Stopped serving ${escapeControlCharacters(args.url)}`,
               sections: [],

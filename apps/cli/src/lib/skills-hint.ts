@@ -101,7 +101,6 @@ export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxActi
  * (`EEXIST`) just means another run is showing the note.
  */
 export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
-  const { cliVersion } = input;
   try {
     const shownPath = await pendingOffer(input);
     if (shownPath === undefined) {
@@ -121,7 +120,7 @@ export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
           "Using an AI coding agent?",
           "Add the Zitadel skills to your project to help your agent work with Zitadel's CLI and authentication integrations:",
           "",
-          `  ${command(publicCliCommand("skills add", cliVersion))}`,
+          `  ${command(publicCliCommand("skills add", input.cliVersion))}`,
           "",
           "Optional. You can continue without installing skills.",
         ].join("\n"),

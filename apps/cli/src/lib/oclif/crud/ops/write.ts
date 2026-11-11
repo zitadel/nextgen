@@ -27,6 +27,7 @@ import type {
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 import { json } from "@/lib/oclif/rendering";
+import type { Summary } from "@/lib/ui";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import {
   type OperationDefinition,
@@ -212,6 +213,17 @@ abstract class WriteOperation<
     // Some writes answer without a body (`grants create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
+    let summary: Summary = {
+      title: "Command completed",
+      sections: [],
+    };
+    if (result !== undefined) {
+      summary = {
+        title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)))}`,
+        sections: [],
+        lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+      };
+    }
     return {
       status: "ok",
       data: result ?? {},
@@ -219,17 +231,7 @@ abstract class WriteOperation<
       // generic rendering that says the command completed. Printing `{}` would
       // be the record the write did not make.
       ...(result === undefined ? {} : { pretty: json(result) }),
-      summary:
-        result === undefined
-          ? {
-              title: "Command completed",
-              sections: [],
-            }
-          : {
-              title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)))}`,
-              sections: [],
-              lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
-            },
+      summary,
       ...(result && resource.get
         ? {
             next: {

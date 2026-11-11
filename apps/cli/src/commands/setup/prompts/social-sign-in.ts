@@ -237,15 +237,19 @@ export class SocialSignInPrompt implements SetupPrompt {
    * matters because the vendor matches it literally.
    */
   private announce(ctx: PromptContext, entry: IdpProvider, devPort: number, issuer?: Issuer): void {
+    let registration: string[];
+    if (issuer === undefined) {
+      registration = [
+        entry.consoleUrl === undefined
+          ? `Register a client at ${entry.issuer}, as an OAuth application:`
+          : "Register an OAuth application at:",
+        ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
+      ];
+    } else {
+      registration = ["Register a client with the provider at:", issuer];
+    }
     ctx.note(`${entry.displayName} sign-in`, [
-      ...(issuer === undefined
-        ? [
-            entry.consoleUrl === undefined
-              ? `Register a client at ${entry.issuer}, as an OAuth application:`
-              : "Register an OAuth application at:",
-            ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
-          ]
-        : ["Register a client with the provider at:", issuer]),
+      ...registration,
       "",
       "Redirect URI:",
       callbackUriFor(issuerFromPort(devPort), entry.slug),

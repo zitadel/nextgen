@@ -1029,9 +1029,8 @@ function renderPretty(result: CommandResult, next: string): string {
   // made it knew which spelling its shape takes, so interpolating what the
   // server answered is safe wherever a command does it.
   const own = result.pretty?.text ?? "";
-  const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`;
   return [
-    body,
+    next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`,
     next,
     ...(result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : []).map(
       warningLine,
@@ -1058,7 +1057,12 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // The envelope keeps them as they came, so a reader parses the real text.
   // Only the label is coloured, so there is nothing for the spelling to undo.
   const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
-  const commands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
+  let commands: readonly string[] = [];
+  if (suggested.length > 0) {
+    commands = suggested;
+  } else if (misuse) {
+    commands = [helpFor(meta)];
+  }
   return {
     title: `Error: ${escapeControlCharacters(spellOutCommands(sentence, meta.cliVersion))} (${error.code})`,
     sections: [],

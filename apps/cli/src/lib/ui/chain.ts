@@ -107,8 +107,12 @@ export class Chain implements Drawing, Narratable {
   narrate(symbol: string, text: string): void {
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
+      let line = "\n";
+      if (body !== "") {
+        line = `${symbol === GUIDE ? " " : symbol}  ${body}\n`;
+      }
       (symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout).write(
-        body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`,
+        line,
       );
       return;
     }
@@ -201,8 +205,11 @@ export class Chain implements Drawing, Narratable {
    * leaving a run that failed showing nothing but its closing line.
    */
   abort(error: unknown): void {
-    const cancelled = error instanceof ZitadelError && error.code === "E_CANCELLED";
-    if (!cancelled || !this.audience.interactive || this.ended) {
+    if (
+      !(error instanceof ZitadelError && error.code === "E_CANCELLED") ||
+      !this.audience.interactive ||
+      this.ended
+    ) {
       return;
     }
     if (!this.chained) {

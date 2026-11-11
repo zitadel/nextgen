@@ -61,7 +61,10 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: {
-        environment: { name: name.value, source: name.source },
+        environment: {
+          name: name.value,
+          source: name.source,
+        },
         values: resolved,
         consulted: consulted.map(({ source, present, supplied }) => ({
           source,

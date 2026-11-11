@@ -13,13 +13,6 @@ import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { Cmd } from "@/lib/cmd";
 
-/**
- * The fields a deployment is shown by, in order. `get` reads the same ones,
- * so one deployment and a page of them name the same things in the same
- * words.
- */
-export const DEPLOYMENT_FIELDS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
-
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
 const LIMIT_MAX = 100;
@@ -35,26 +28,6 @@ const LIMIT: Refused<number> = {
     min: LIMIT_MIN,
     max: LIMIT_MAX,
   },
-};
-
-/** A deployment, narrowed to what the table reads. */
-export type DeploymentRecord = {
-  readonly id: string;
-  readonly release_id: string;
-  readonly reason?: string | undefined;
-  readonly origins: readonly string[];
-  readonly deployed_at: string;
-};
-
-/** One deployment flattened to the cells {@link DEPLOYMENT_FIELDS} names. */
-export const deploymentRow = (deployment: DeploymentRecord) => {
-  return {
-    id: deployment.id,
-    release_id: deployment.release_id,
-    reason: deployment.reason ?? "deploy",
-    origins: deployment.origins.join(", "),
-    deployed_at: deployment.deployed_at,
-  };
 };
 
 /**
@@ -114,9 +87,17 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     );
 
     const items = listed.items;
-    // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = items.map(deploymentRow);
-
+    const rows = items.map((deployment) => {
+      return {
+        id: deployment.id,
+        release_id: deployment.release_id,
+        reason: deployment.reason ?? "deploy",
+        origins: deployment.origins.join(", "),
+        deployed_at: deployment.deployed_at,
+      };
+    });
+    const columns = ["id", "release_id", "reason", "origins", "deployed_at"];
+    const empty = "No deployments found";
     const footer: string[] = [];
     const page = {
       token: listed.next,
@@ -130,11 +111,11 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const extra = {};
 
     return this.emitList(flags, {
-      columns: DEPLOYMENT_FIELDS,
+      columns,
       rows,
       items,
       singular: "deployment",
-      empty: "No deployments found",
+      empty,
       footer,
       page,
       extra,

@@ -291,11 +291,7 @@ export default class Pull extends EnvironmentCommand {
         release_id: release.id,
         pulled,
         skipped,
-        ...(this.dryRun
-          ? {
-              dry_run: true,
-            }
-          : {}),
+        ...(this.dryRun ? { dry_run: true } : {}),
       },
       summary: {
         title: escapeControlCharacters(
@@ -429,7 +425,9 @@ export function fileList(paths: readonly string[], dryRun: boolean): string[] {
     ? []
     : [
         dryRun ? "Files it would write:" : "Files written:",
-        ...paths.map((p) => escapeControlCharacters(`  ${p}`)),
+        ...paths.map((p) => {
+          return escapeControlCharacters(`  ${p}`);
+        }),
       ];
 }
 

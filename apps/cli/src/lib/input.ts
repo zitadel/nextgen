@@ -273,11 +273,12 @@ async function askOne(
   prompt: Prompter,
 ): Promise<unknown> {
   const stdin = session.stdin ?? process.stdin;
-  const refusal = (message: string, hint?: string): ZitadelError =>
-    new ZitadelError("E_VALIDATION", message, {
+  const refusal = (message: string, hint?: string): ZitadelError => {
+    return new ZitadelError("E_VALIDATION", message, {
       ...(hint === undefined ? {} : { hint }),
       ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
     });
+  };
   const unsupplied = (): ZitadelError => {
     const isText = kind === "text" || kind === "secret";
     // A secret is never a flag, whatever the question says, because that would

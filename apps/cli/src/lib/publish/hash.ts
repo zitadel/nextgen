@@ -6,6 +6,5 @@
  */
 export function abbreviate(hash: string): string {
   const separator = hash.indexOf(":");
-  const algorithm = separator < 0 ? "" : hash.slice(0, separator + 1);
-  return `${algorithm}${hash.slice(separator + 1, separator + 13)}`;
+  return `${separator < 0 ? "" : hash.slice(0, separator + 1)}${hash.slice(separator + 1, separator + 13)}`;
 }

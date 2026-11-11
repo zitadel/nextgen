@@ -220,17 +220,17 @@ export default class BrandingEject extends Promptable(BaseCommand) {
         design,
         files_written: filesWritten,
       },
+      summary: {
+        title: ejected,
+        sections: [],
+        lines: [`Files: ${filesWritten.length} written, 0 unchanged`],
+      },
       next: {
         actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Validate the template and see the diff with a dry run, then publish it.",
         ],
         commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],
-      },
-      summary: {
-        title: ejected,
-        sections: [],
-        lines: [`Files: ${filesWritten.length} written, 0 unchanged`],
       },
     });
   }

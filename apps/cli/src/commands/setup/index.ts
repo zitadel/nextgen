@@ -166,7 +166,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
-import { asStepsShown, type StepsShown } from "@/lib/oclif/next-steps";
+import { asStepsShown } from "@/lib/oclif/next-steps";
 import { Destructive } from "@/lib/oclif/destructive";
 import semver from "semver";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -442,8 +442,6 @@ export function customSettingsOf(flags: {
     scopes: flags.ssoScopes,
   };
 }
-
-/** Joins names as "a, b, and c" in the summary box. */
 
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL: Refusal = {
@@ -1308,21 +1306,20 @@ export default class Setup extends Destructive(BaseCommand) {
     // The interactive prompts can override the flag/default preset and use
     // case recorded at framework_resolved — re-record so
     // telemetry carries the values that actually scaffold.
+    // One slug, "none", or "multiple" -- never a joined set. A dimension's
+    // value space has to stay enumerable: comma-joining n providers makes it
+    // combinatorial, and the question telemetry answers here is whether a
+    // project enabled a provider at all, not which combination.
+    let ssoDimension = "multiple";
+    if (answers.sso.length === 0) {
+      ssoDimension = "none";
+    } else if (new Intl.PluralRules("en").select(answers.sso.length) === "one") {
+      ssoDimension = answers.sso[0] ? selectionName(answers.sso[0].selection) : "none";
+    }
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
-      // One slug, "none", or "multiple" -- never a joined set. A dimension's
-      // value space has to stay enumerable: comma-joining n providers makes it
-      // combinatorial, and the question telemetry answers here is whether a
-      // project enabled a provider at all, not which combination.
-      sso:
-        answers.sso.length === 0
-          ? "none"
-          : new Intl.PluralRules("en").select(answers.sso.length) === "one"
-            ? answers.sso[0]
-              ? selectionName(answers.sso[0].selection)
-              : "none"
-            : "multiple",
+      sso: ssoDimension,
       // Whether a minimum goes into the password policy, never the value. None
       // given is the recommended one (`PasswordPolicy.initial`), unless `--force`
       // keeps a policy file: `files_patched` records what was published.
@@ -1545,8 +1542,7 @@ export default class Setup extends Destructive(BaseCommand) {
     const allFilesWritten = [...result.filesWritten, ...scaffolded.filesWritten];
     if (framework !== undefined) {
       current?.done(
-        `Patched ${allFilesWritten.length} ${new Intl.PluralRules("en").select(allFilesWritten.length) === "one" ? "file" : "files"}` +
-          (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
+        `Patched ${allFilesWritten.length} ${new Intl.PluralRules("en").select(allFilesWritten.length) === "one" ? "file" : "files"}${result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""}`,
       );
     }
     this.recordTelemetry({
@@ -1865,27 +1861,29 @@ export default class Setup extends Destructive(BaseCommand) {
             return [property, claim];
           }),
         );
+        let mappingSection: string[] = [];
+        if (mappings.length > 0) {
+          mappingSection = [
+            createsUsers
+              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+            ...mappings.map(({ property, claim }) => {
+              const how = verifiedBy.get(property);
+              let verified = "is not treated as verified";
+              if (how === true) {
+                verified = "always counts as verified";
+              } else if (typeof how === "string") {
+                verified = `counts as verified when ${text(how)} is true`;
+              }
+              return [
+                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                `  It ${verified}.`,
+              ].join("\n");
+            }),
+          ];
+        }
         const sections = [
-          mappings.length === 0
-            ? []
-            : [
-                createsUsers
-                  ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-                  : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-                ...mappings.map(({ property, claim }) => {
-                  const how = verifiedBy.get(property);
-                  const verified =
-                    how === true
-                      ? "always counts as verified"
-                      : typeof how === "string"
-                        ? `counts as verified when ${text(how)} is true`
-                        : "is not treated as verified";
-                  return [
-                    `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-                    `  It ${verified}.`,
-                  ].join("\n");
-                }),
-              ],
+          mappingSection,
           scopes.length === 0
             ? []
             : [
@@ -1950,14 +1948,14 @@ export default class Setup extends Destructive(BaseCommand) {
       }
     }
 
-    // The box holds the next steps, so the base command does not repeat them.
-    const nextShown: StepsShown | undefined = this.isJson ? undefined : asStepsShown();
-
     return this.emit({
       status: "ok",
       data: {
         title: "Zitadel is ready",
-        project: { project_id: project.id, issuer },
+        project: {
+          project_id: project.id,
+          issuer,
+        },
         framework: app.framework,
         server: answers.server,
         files_written: allFilesWritten.map((file) => relativeDisplay(this.cwd, file)),
@@ -2066,7 +2064,8 @@ export default class Setup extends Destructive(BaseCommand) {
           ...claimNudge.commands,
         ],
       },
-      nextShown,
+      // The box holds the next steps, so the base command does not repeat them.
+      nextShown: this.isJson ? undefined : asStepsShown(),
     });
   }
 

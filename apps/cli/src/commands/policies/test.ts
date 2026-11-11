@@ -22,6 +22,7 @@ import {
   PolicyTest,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * Where a tested config came from: a policy file, a release's revision, or
@@ -148,7 +149,6 @@ type DescribedDecision = {
  * How many evaluate requests a run keeps in flight at once.
  */
 const EVALUATE_CONCURRENCY = 8;
-import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel policies test` — evaluate the cases in

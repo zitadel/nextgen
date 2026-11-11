@@ -204,7 +204,7 @@ export class Prose implements Renderable {
     return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length))
       .split("\n")
       .map((part, index) => {
-        return (index === 0 ? lead : lead + item) + part;
+        return `${index === 0 ? lead : `${lead}${item}`}${part}`;
       })
       .join("\n");
   }
@@ -233,11 +233,10 @@ export class Facts implements Renderable {
         return label.length;
       }),
     );
-    const gap = " ".repeat(COLUMN_GAP + 1);
     return [
       ...(section.heading === undefined ? [] : [pc.bold(section.heading)]),
       ...section.facts.map(([label, value]) => {
-        return columnRow(`${pc.dim(label.padEnd(width))}${gap}${value}`);
+        return columnRow(`${pc.dim(label.padEnd(width))}${" ".repeat(COLUMN_GAP + 1)}${value}`);
       }),
     ].join("\n");
   }
@@ -287,10 +286,9 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
   let rest = command;
   let indent = lead;
   while (indent.length + rest.length > width) {
-    const room = Math.max(1, width - indent.length - 2);
     const cut = argumentBreaks(rest)
       .filter((at) => {
-        return at > 0 && at <= room;
+        return at > 0 && at <= Math.max(1, width - indent.length - 2);
       })
       .at(-1);
     if (cut === undefined) {
@@ -300,7 +298,7 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
     rest = rest.slice(cut + 1);
     indent = lead;
   }
-  return [...lines, indent + rest];
+  return [...lines, `${indent}${rest}`];
 };
 
 /**
@@ -379,7 +377,7 @@ export class Frame implements Renderable {
     const lines = blocks.join("\n\n").split("\n");
     const last = lines.length - 1;
     const tail = lines[last] ?? "";
-    lines[last] = tail + " ".repeat(Math.max(0, Frame.INNER - visible(tail)));
+    lines[last] = `${tail}${" ".repeat(Math.max(0, Frame.INNER - visible(tail)))}`;
     return drawBox(lines.join("\n"), this.title);
   }
 

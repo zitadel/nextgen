@@ -128,10 +128,10 @@ export default class Status extends EnvironmentCommand {
       unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
       running: `The local server is running and healthy at ${serverUrl} (${how})`,
     }[server.lifecycle];
-    const dockerSaid =
-      backend === "docker" && !server.docker.available
-        ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
-        : "";
+    let dockerSaid = "";
+    if (backend === "docker" && !server.docker.available) {
+      dockerSaid = `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`;
+    }
     const projectSaid = [
       ...("project_id" in project && project.project_id !== undefined
         ? [`Project ${project.project_id}`]

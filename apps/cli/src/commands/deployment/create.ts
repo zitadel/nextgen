@@ -108,9 +108,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
         title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
         sections: [],
       },
-      next: {
-        commands: [this.suggest("deployment list")],
-      },
+      next: { commands: [this.suggest("deployment list")] },
     });
   }
 }

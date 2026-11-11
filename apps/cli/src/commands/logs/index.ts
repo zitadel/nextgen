@@ -110,9 +110,7 @@ export default class Logs extends BaseCommand {
 
       return this.emit({
         status: "ok",
-        data: {
-          title: "Stopped following local Zitadel logs",
-        },
+        data: { title: "Stopped following local Zitadel logs" },
         summary: {
           title: "Stopped following local Zitadel logs",
           sections: [],

@@ -160,9 +160,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
               actions,
               commands: followUps.commands,
             }
-          : {
-              commands: followUps.commands,
-            },
+          : { commands: followUps.commands },
     });
   }
 

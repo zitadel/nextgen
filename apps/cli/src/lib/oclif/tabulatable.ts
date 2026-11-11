@@ -6,7 +6,7 @@ import { isObject } from "@/lib/json";
 import { Cmd } from "@/lib/cmd";
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
-import { painted, rows } from "./rendering";
+import { painted, type Rendering, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
@@ -224,12 +224,16 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
               ].join(" "),
             );
       const nextCommand = token === null ? undefined : followUp;
+      let rendered: { pretty?: Rendering } = {};
+      if (plain) {
+        rendered = { pretty: rows(await this.renderList(plain, view)) };
+      } else if (this.jsonEnabled()) {
+        rendered = { pretty: painted(await this.renderList(plain, view)) };
+      }
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
-        ...(plain || this.jsonEnabled()
-          ? { pretty: (plain ? rows : painted)(await this.renderList(plain, view)) }
-          : {}),
+        ...rendered,
         summary: await this.listSummary(view, more),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       };
@@ -248,9 +252,8 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
           ...(more.length === 0 ? {} : { extras: [...more] }),
         };
       }
-      const plural = view.plural ?? `${view.singular}s`;
       return {
-        title: `Found ${view.rows.length} ${new Intl.PluralRules("en").select(view.rows.length) === "one" ? view.singular : plural}`,
+        title: `Found ${view.rows.length} ${new Intl.PluralRules("en").select(view.rows.length) === "one" ? view.singular : (view.plural ?? `${view.singular}s`)}`,
         sections: [],
         lines: (await this.tabulate(view.columns, view.rows)).split("\n"),
         extras: [

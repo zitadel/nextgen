@@ -49,28 +49,6 @@ const MESSAGE: Refused<string> = {
   },
 };
 
-/** What the run did, as the one sentence the chain closes on. */
-export function deployed(resources: number): string {
-  return `Deployed ${resources} ${new Intl.PluralRules("en").select(resources) === "one" ? "resource" : "resources"}`;
-}
-
-/**
- * Where the release went, as one sentence.
- *
- * The origins are named inside it rather than listed under it: a deploy
- * usually lands on one, and a bullet list of a single item is not a list. The
- * hash is the short one — the full digest identifies the release to a machine
- * and is in the envelope, where a machine reads it.
- */
-export function liveOn(hash: string, origins: readonly string[]): string {
-  const release = `Release ${escapeControlCharacters(abbreviate(hash))} is now live`;
-  if (origins.length === 0) {
-    return `${release}.`;
-  }
-  const named = origins.map((origin) => escapeControlCharacters(origin));
-  return `${release} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(named)}.`;
-}
-
 /**
  * What a deploy with no primary origin to land on tells the developer, naming
  * the step that gives the project one. A project `zitadel setup` 0.1.0 created
@@ -302,6 +280,19 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     // deployed in git (the warning above says to commit before the next deploy).
     const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
+    const resources = `Deployed ${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
+    let live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live.`;
+    if (servedOrigins.length > 0) {
+      live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live on ${new Intl.ListFormat(
+        "en",
+        { type: "conjunction" },
+      ).format(
+        servedOrigins.map((origin) => {
+          return escapeControlCharacters(origin);
+        }),
+      )}.`;
+    }
+
     return this.emit({
       status: "ok",
       data: {
@@ -312,13 +303,11 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins: servedOrigins,
         ...prepared.report,
       },
-      pretty: prose(
-        [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
-      ),
+      pretty: prose(`${resources}\n${live}`),
       summary: {
-        title: deployed(resourceCount),
+        title: resources,
         sections: [],
-        lines: [liveOn(release.content_hash, servedOrigins)],
+        lines: [live],
       },
       next: {
         commands: [

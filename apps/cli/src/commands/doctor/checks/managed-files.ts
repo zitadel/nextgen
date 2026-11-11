@@ -141,14 +141,14 @@ export class ManagedFilesCheck implements SanityCheck {
       return { name: this.name, status: "warn", message: warnings.join("; "), details };
     }
 
+    let verified = "";
+    if (wiring.length > 0) {
+      verified = `, ${wiring.length} ${new Intl.PluralRules("en").select(wiring.length) === "one" ? "wiring" : "wirings"} verified`;
+    }
     return {
       name: this.name,
       status: "pass",
-      message: `Scaffolded app files are present (${rows.length} tracked${
-        wiring.length > 0
-          ? `, ${wiring.length} ${new Intl.PluralRules("en").select(wiring.length) === "one" ? "wiring" : "wirings"} verified`
-          : ""
-      }${mode === "template" ? ", from templates" : ""})`,
+      message: `Scaffolded app files are present (${rows.length} tracked${verified}${mode === "template" ? ", from templates" : ""})`,
       details,
     };
   }

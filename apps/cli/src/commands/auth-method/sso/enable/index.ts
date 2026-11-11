@@ -308,10 +308,6 @@ type Payload = {
 };
 
 /**
- * Joins names as "a, b, and c" in the summary box.
- */
-
-/**
  * Nothing sent to the project, as a dry run reports it.
  */
 const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: undefined };
@@ -644,9 +640,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       this.drawMapping(change);
     }
     const toStore = this.wouldStore(summary.reused, names, givenClientId);
-    const writes = change.changedPaths.map((file) => {
-      return `Would write ${file}`;
-    });
     const stores =
       toStore.length > 0
         ? [
@@ -657,19 +650,30 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             )} on the project`,
           ]
         : [];
-    const said = [...writes, ...stores];
-    const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
+    const said = [
+      ...change.changedPaths.map((file) => {
+        return `Would write ${file}`;
+      }),
+      ...stores,
+    ];
     return this.emit({
       status: "ok",
       data: {
-        ...payload,
+        ...this.payload({
+          summary,
+          change,
+          published: NOTHING_PUBLISHED,
+          names,
+        }),
         would_store: toStore,
         dry_run: true,
       },
       summary: {
         title: escapeControlCharacters(said[0] === undefined ? "" : `${said[0]} (dry run)`),
         sections: [],
-        lines: said.slice(1).map((line) => escapeControlCharacters(line)),
+        lines: said.slice(1).map((line) => {
+          return escapeControlCharacters(line);
+        }),
       },
     });
   }
@@ -792,9 +796,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const stored = input.delivery.areStored(input.published);
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
     const leading = this.followUps(false, scopeArgs, recovery).commands;
-    const actions = [
-      `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
-    ];
     const payload = this.payload({
       summary,
       change: input.change,
@@ -838,12 +839,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       },
       next: unpublished
         ? {
-            actions,
+            actions: [
+              `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
+            ],
             commands: followUps.commands,
           }
-        : {
-            commands: followUps.commands,
-          },
+        : { commands: followUps.commands },
     });
   }
 

@@ -88,9 +88,15 @@ export function parseServer(value: string): Parsed<string> {
     };
   }
   try {
-    return { ok: true, value: serverOrigin(typed) };
+    return {
+      ok: true,
+      value: serverOrigin(typed),
+    };
   } catch (error) {
-    return { ok: false, problem: errorMessage(error) };
+    return {
+      ok: false,
+      problem: errorMessage(error),
+    };
   }
 }
 

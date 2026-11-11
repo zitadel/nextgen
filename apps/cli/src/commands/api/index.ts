@@ -306,11 +306,7 @@ export default class Api extends Destructive(BaseCommand) {
         title: "Done",
         sections: [],
       },
-      next: this.jsonEnabled()
-        ? {
-            commands: [this.suggestUnscoped("api ls")],
-          }
-        : undefined,
+      next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
     });
   }
 
@@ -416,11 +412,7 @@ export default class Api extends Destructive(BaseCommand) {
     return this.emit({
       status: "ok",
       data: response.body ?? null,
-      ...(answer.pretty === undefined
-        ? {}
-        : {
-            pretty: answer.pretty,
-          }),
+      ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
       summary: answer.summary,
     });
   }

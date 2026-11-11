@@ -130,26 +130,27 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     const dropped = changes?.dropped ?? [];
     const restored = changes?.restored ?? [];
 
+    const effects: string[] = [];
+    if (dropped.length > 0) {
+      effects.push(
+        `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(dropped))} refuse sign-in until the next deploy`,
+      );
+    }
+    if (restored.length > 0) {
+      effects.push(
+        `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(restored))} serve it again`,
+      );
+    }
+    let consequence = "";
+    if (effects.length > 0) {
+      consequence = `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format(effects)}`;
+    }
+
     return this.emit(
       await this.confirmed({
         verb: "rollback",
         name: `roll back to ${target.id}`,
-        message: `Roll back to ${escapeControlCharacters(target.id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${
-          dropped.length === 0 && restored.length === 0
-            ? ""
-            : `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format([
-                ...(dropped.length === 0
-                  ? []
-                  : [
-                      `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(dropped))} refuse sign-in until the next deploy`,
-                    ]),
-                ...(restored.length === 0
-                  ? []
-                  : [
-                      `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(restored))} serve it again`,
-                    ]),
-              ])}`
-        }?`,
+        message: `Roll back to ${escapeControlCharacters(target.id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${consequence}?`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.
         arguments: [target.id],

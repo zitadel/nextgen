@@ -33,6 +33,7 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     const items = origins.all;
     const rows = items;
     const columns = COLUMNS;
+    const empty = "No origins found";
     const footer: string[] = [];
     const page = null;
     const extra = {};
@@ -42,7 +43,7 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
       rows,
       items,
       singular: "origin",
-      empty: "No origins found",
+      empty,
       footer,
       page,
       extra,

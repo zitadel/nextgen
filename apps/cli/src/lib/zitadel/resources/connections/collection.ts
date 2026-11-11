@@ -22,8 +22,6 @@ import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ForceOptions } from "@/lib/zitadel/resources/schemas/types";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 
-const LIST = new Intl.ListFormat("en", { type: "conjunction" });
-
 /**
  * The identity-provider connections under `.zitadel/idps/`, in path order,
  * and offering one as a way to sign in.
@@ -258,7 +256,7 @@ export class Connections extends Collection<Connection> {
       .map((flow): Notice => {
         return {
           severity: "info",
-          message: `The steps ${LIST.format(flow.generatedSsoSteps)} stay in ${flow.path} for the next provider you enable.`,
+          message: `The steps ${new Intl.ListFormat("en", { type: "conjunction" }).format(flow.generatedSsoSteps)} stay in ${flow.path} for the next provider you enable.`,
         };
       });
     return new Change({
@@ -454,7 +452,7 @@ export class Connections extends Collection<Connection> {
     if (unapplied.length === 0) {
       return [];
     }
-    const settings = LIST.format(unapplied);
+    const settings = new Intl.ListFormat("en", { type: "conjunction" }).format(unapplied);
     if (unapplied.length === 1) {
       return [
         {
@@ -499,7 +497,7 @@ export class Connections extends Collection<Connection> {
     const variables = this.findUnsharedVariables(connection);
     const kept =
       variables.length > 0
-        ? `${connection.path} and the project variables ${LIST.format(variables)}`
+        ? `${connection.path} and the project variables ${new Intl.ListFormat("en", { type: "conjunction" }).format(variables)}`
         : connection.path;
     return [
       {

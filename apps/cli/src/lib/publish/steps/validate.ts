@@ -99,7 +99,6 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   if (errors.length === 0) {
     return;
   }
-  const noun = new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues";
   const literalSecret = errors.some((finding) => {
     return finding.rule === "connection/literal-secret";
   });
@@ -119,7 +118,7 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
     : fix;
   throw new ZitadelError(
     "E_VALIDATION",
-    `Configuration validation failed (${errors.length} ${noun}):\n${lines.join("\n")}`,
+    `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
     {
       hint,
       details: {

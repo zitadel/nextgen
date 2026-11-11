@@ -10,7 +10,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
 import { previewVerdict } from "@/commands/preview";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
-import { DEPLOY_ARGS, inShell } from "@/lib/suggestion";
+import { DEPLOY_ARGS, inShell, type SuggestedCommand } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -160,12 +160,15 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         return parseVariableValue(raw, flags.as);
       },
     };
-    const value = write.secret
-      ? await this.ask.secret(question)
-      : await this.ask.text({
-          ...question,
-          ...(args.value === undefined ? {} : { given: args.value }),
-        });
+    let value: string | number | boolean;
+    if (write.secret) {
+      value = await this.ask.secret(question);
+    } else {
+      value = await this.ask.text({
+        ...question,
+        ...(args.value === undefined ? {} : { given: args.value }),
+      });
+    }
 
     const written = await variableService.set(args.name, value, write);
     this.recordTelemetry({
@@ -213,6 +216,31 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           strict: false,
         });
         const previewable = verdict === "preview";
+        let next: { actions: string[]; commands: SuggestedCommand[] } = {
+          actions: [
+            "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
+          ],
+          commands: [this.suggest(DEPLOY_ARGS)],
+        };
+        if (write.preview) {
+          next = {
+            actions: [
+              "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
+            ],
+            commands: [],
+          };
+          if (previewable) {
+            next.commands = [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")];
+          } else if (verdict === "unnamed-ci-build") {
+            next.actions.push(
+              "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it.",
+            );
+          } else {
+            next.actions.push(
+              "Run it in the preview or development environment: preview skips any other.",
+            );
+          }
+        }
         return this.emit({
           status: "ok",
           data: {
@@ -230,28 +258,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }).split("\n"),
           },
-          next: write.preview
-            ? {
-                actions: [
-                  "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
-                  ...(previewable
-                    ? []
-                    : [
-                        verdict === "unnamed-ci-build"
-                          ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
-                          : "Run it in the preview or development environment: preview skips any other.",
-                      ]),
-                ],
-                commands: previewable
-                  ? [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")]
-                  : [],
-              }
-            : {
-                actions: [
-                  "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
-                ],
-                commands: [this.suggest(DEPLOY_ARGS)],
-              },
+          next,
         });
       }
     }

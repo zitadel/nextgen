@@ -489,13 +489,12 @@ async function lookupWarnings(
       const missingCount = count(missing.length, read.truncated);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const verb = new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have";
       const fix = ctx.suggest(
         `users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
       );
       return {
         warnings: [
-          `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${verb} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,
+          `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,
         ],
         partial: [],
         failed: false,
@@ -593,13 +592,11 @@ function strandedWarning(entry: Stranded, truncated: boolean, linksUnsure: boole
   const label =
     typeof entry.name === "string" ? quote(entry.name) : "schemas whose names could not be read";
   const users = `${count(entry.users, truncated)} existing ${plural(entry.users, "user")}`;
-  const verb = new Intl.PluralRules("en").select(entry.users) === "one" ? "is" : "are";
-  const linkedVerb = new Intl.PluralRules("en").select(entry.linked) === "one" ? "has" : "have";
   const sso =
     entry.linked > 0
-      ? ` (${count(entry.linked, linksUnsure)} of them ${linkedVerb} an SSO link)`
+      ? ` (${count(entry.linked, linksUnsure)} of them ${new Intl.PluralRules("en").select(entry.linked) === "one" ? "has" : "have"} an SSO link)`
       : "";
-  return `${users} of ${label} ${verb} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
+  return `${users} of ${label} ${new Intl.PluralRules("en").select(entry.users) === "one" ? "is" : "are"} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
 }
 
 /**
@@ -813,10 +810,9 @@ async function credentialWarnings(
       const strandedCount = count(stranded, partial || failed);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const keep = new Intl.PluralRules("en").select(disabled.length) === "one" ? methods : "them";
       return {
         warnings: [
-          `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${keep} enabled until they have another way in.`,
+          `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${new Intl.PluralRules("en").select(disabled.length) === "one" ? methods : "them"} enabled until they have another way in.`,
         ],
         partial: [],
         failed,

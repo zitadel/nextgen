@@ -9,7 +9,6 @@ import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { variableCell } from "@/lib/variables";
 import { json } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { DEPLOYMENT_FIELDS, deploymentRow } from "./list";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -54,26 +53,26 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
       shows ? deploymentService.variables(args.deploymentId) : undefined,
     ]);
 
-    const frozen =
-      variables === undefined
-        ? undefined
-        : variables.length === 0
-          ? ["variables  none"]
-          : [
-              "variables",
-              ...(
-                await this.tabulate(
-                  ["name", "value"],
-                  variables.map((variable) => {
-                    return variableCell(variable);
-                  }),
-                )
-              )
-                .split("\n")
-                .map((line) => {
-                  return `  ${line}`;
-                }),
-            ];
+    let frozen: string[] | undefined;
+    if (variables !== undefined && variables.length === 0) {
+      frozen = ["variables  none"];
+    } else if (variables !== undefined) {
+      frozen = [
+        "variables",
+        ...(
+          await this.tabulate(
+            ["name", "value"],
+            variables.map((variable) => {
+              return variableCell(variable);
+            }),
+          )
+        )
+          .split("\n")
+          .map((line) => {
+            return `  ${line}`;
+          }),
+      ];
+    }
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
     if (!shows) {
       return this.emit({
@@ -93,9 +92,17 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         title,
         sections: [],
         lines: [
-          ...this.tabulateDetail(undefined, DEPLOYMENT_FIELDS, deploymentRow(deployment)).split(
-            "\n",
-          ),
+          ...this.tabulateDetail(
+            undefined,
+            ["id", "release_id", "reason", "origins", "deployed_at"],
+            {
+              id: deployment.id,
+              release_id: deployment.release_id,
+              reason: deployment.reason ?? "deploy",
+              origins: deployment.origins.join(", "),
+              deployed_at: deployment.deployed_at,
+            },
+          ).split("\n"),
           ...(frozen === undefined ? [] : ["", ...frozen]),
         ],
       },

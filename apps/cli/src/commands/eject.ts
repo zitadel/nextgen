@@ -245,9 +245,7 @@ function ejected(
       title,
       sections: [],
     },
-    next: {
-      commands: assembleNextCommands(backedUp, actions.dependencies, dir),
-    },
+    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir) },
   };
 }
 
@@ -289,9 +287,12 @@ export default class Eject extends Destructive(BaseCommand) {
       verb: "eject",
       name: "remove the managed files and local state",
       message: "Remove the managed files and local Zitadel state?",
-      preview: async () => ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir, setItUp),
-      apply: async (consent) =>
-        ejected(this.cwd, await ejectProject(this.cwd, consent), dir, setItUp),
+      preview: async () => {
+        return ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir, setItUp);
+      },
+      apply: async (consent) => {
+        return ejected(this.cwd, await ejectProject(this.cwd, consent), dir, setItUp);
+      },
     });
     return this.emit(
       result.status === "skipped" && result.reason === "eject-cancelled"

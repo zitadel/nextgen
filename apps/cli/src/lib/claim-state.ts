@@ -145,10 +145,7 @@ function claimSentence(deadline?: Date): string {
     deadline === undefined
       ? `within ${CLAIM_WINDOW_DAYS} days of creation`
       : `before ${formatDeadline(deadline)}`;
-  return (
-    `Claim your project ${when} to make it permanent and start collaborating with your team. ` +
-    "Until then, your project is temporary and its data may be lost."
-  );
+  return `Claim your project ${when} to make it permanent and start collaborating with your team. Until then, your project is temporary and its data may be lost.`;
 }
 
 /**

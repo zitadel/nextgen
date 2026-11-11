@@ -322,12 +322,11 @@ export function selectionFromFlags(
     // A catalog provider knows its own name, issuer and scopes, so a setting
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
-      const pronoun = new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them";
       throw new ZitadelError(
         "E_VALIDATION",
         `${given.join(", ")} only applies to a custom connection`,
         {
-          hint: `Add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${pronoun}.`,
+          hint: `Add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them"}.`,
           details: { flags: given },
         },
       );
