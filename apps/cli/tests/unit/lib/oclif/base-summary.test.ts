@@ -9,12 +9,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 vi.mock("rosie-skills", () => rosie);
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import type { SuggestedCommand } from "../../../../src/lib/suggestion";
-import { COLUMN_MARK } from "../../../../src/lib/ui/layout";
-import { painted, rows } from "../../../../src/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { asTerminal } from "../../../helpers/terminal";
+import { BaseCommand } from "@/lib/oclif/base";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { COLUMN_MARK } from "@/lib/ui/layout";
+import { painted, rows } from "@/lib/oclif/rendering";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { asTerminal } from "@tests/helpers/terminal";
 
 /** A command that ends on a summary, so its box is what the assertions read. */
 class SummarisingCommand extends BaseCommand {

@@ -1,9 +1,9 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { log } from "../../../../src/lib/log";
-import { MARK } from "../../../../src/lib/ui/marks";
-import { Narration } from "../../../../src/lib/ui/narration";
+import { log } from "@/lib/log";
+import { MARK } from "@/lib/ui/marks";
+import { Narration } from "@/lib/ui/narration";
 
 /** A chain that collects what was narrated into it, as `mark text`. */
 class Collected {

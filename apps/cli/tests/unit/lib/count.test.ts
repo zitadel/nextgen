@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { renderCount } from "../../../src/lib/count";
+import { renderCount } from "@/lib/count";
 
 describe("renderCount", () => {
   it("uses the singular for one", () => {

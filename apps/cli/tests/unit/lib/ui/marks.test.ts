@@ -1,7 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { describe, expect, it } from "vitest";
 
-import { GUIDE, MARK } from "../../../../src/lib/ui/marks";
+import { GUIDE, MARK } from "@/lib/ui/marks";
 
 const plain = (text: string): string => stripAnsi(text);
 

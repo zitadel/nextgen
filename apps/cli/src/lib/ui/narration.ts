@@ -1,4 +1,4 @@
-import { installLogSink, type LogLevel } from "../log";
+import { installLogSink, type LogLevel } from "@/lib/log";
 import { GUIDE, MARK } from "./marks";
 
 /**

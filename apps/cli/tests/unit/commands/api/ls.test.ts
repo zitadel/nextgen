@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { asTerminal } from "@tests/helpers/terminal";
-import { runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 
 /** `api ls` reads the spec the CLI was built with, so it contacts nothing. */
 const listed = (...args: string[]) =>

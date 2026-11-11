@@ -2,10 +2,10 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 import pc from "picocolors";
 import { describe, expect, it } from "vitest";
 
-import { command, dim, strong } from "../../../../src/lib/style";
-import { Ending } from "../../../../src/lib/ui/ending";
-import { section, type Summary } from "../../../../src/lib/ui/summary";
-import { Where } from "../../../../src/lib/ui/where";
+import { command, dim, strong } from "@/lib/style";
+import { Ending } from "@/lib/ui/ending";
+import { section, type Summary } from "@/lib/ui/summary";
+import { Where } from "@/lib/ui/where";
 
 const plain = (text: string | undefined): string => stripAnsi(text ?? "");
 const nowhere = new Where();

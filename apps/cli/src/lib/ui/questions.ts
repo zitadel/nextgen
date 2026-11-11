@@ -1,6 +1,6 @@
 import type { Parsed } from "@zitadel/config/idp";
 
-import type { SuggestedCommand } from "../suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * The questions a command may ask, as types. {@link Questions} has one method

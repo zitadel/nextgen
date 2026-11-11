@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runCliForTest, stripAnsi } from "../../../helpers/run-cli";
-import { asTerminal } from "../../../helpers/terminal";
+import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.cloud";
 const dirs: string[] = [];

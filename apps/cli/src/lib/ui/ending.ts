@@ -1,7 +1,7 @@
 import pc from "picocolors";
 
-import { command, dim, strong } from "../style";
-import { escapeControlCharacters } from "../terminal-text";
+import { command, dim, strong } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Facts, Frame, stripColumnMarks } from "./layout";
 import type { Presentation } from "./presentation";
 import { NEXT_LABEL, type Summary } from "./summary";

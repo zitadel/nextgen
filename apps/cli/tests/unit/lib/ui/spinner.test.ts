@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { spinner } from "@clack/prompts";
 
-import { DrawnSpinner, QuietSpinner, type Spinner } from "../../../../src/lib/ui/spinner";
+import { DrawnSpinner, QuietSpinner, type Spinner } from "@/lib/ui/spinner";
 
 /** The handle clack handed back to the last spinner that was started. */
 const handle = () => vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;

@@ -47,7 +47,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { Cmd } from "../cmd";
+import { Cmd } from "@/lib/cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`

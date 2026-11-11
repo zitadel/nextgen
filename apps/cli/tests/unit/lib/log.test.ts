@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { installLogSink, log } from "@/lib/log";
 
-import { recordLog } from "../../helpers/log";
+import { recordLog } from "@tests/helpers/log";
 
 let stops: Array<() => void> = [];
 

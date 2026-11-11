@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { outcome, section } from "../../../../src/lib/ui/summary";
+import { outcome, section } from "@/lib/ui/summary";
 
 describe("section", () => {
   it("keeps its facts in the order they were given", () => {

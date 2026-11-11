@@ -1,4 +1,4 @@
-import type { BoxAction } from "../box";
+import type { BoxAction } from "@/lib/box";
 
 /**
  * How a command ends. Every command ends the same way: one line saying what

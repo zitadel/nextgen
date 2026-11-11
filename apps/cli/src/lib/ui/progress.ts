@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { log as narration } from "../log";
+import { log as narration } from "@/lib/log";
 
 import { stripColumnMarks } from "./layout";
 import { GUIDE, MARK } from "./marks";

@@ -1,4 +1,4 @@
-import { installLogSink, type LogLevel } from "../../src/lib/log";
+import { installLogSink, type LogLevel } from "@/lib/log";
 
 /** One line of narration, as the code under test said it. */
 export interface Said {

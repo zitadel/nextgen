@@ -1,7 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { describe, expect, it } from "vitest";
 
-import { Where } from "../../../../src/lib/ui/where";
+import { Where } from "@/lib/ui/where";
 
 const plain = (text: string): string => stripAnsi(text);
 

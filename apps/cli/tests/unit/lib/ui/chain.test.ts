@@ -1,16 +1,16 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import * as prompts from "@clack/prompts";
 import { confirm, intro, log, note, outro, select, spinner } from "@clack/prompts";
 
-import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
-import { Chain } from "../../../../src/lib/ui/chain";
-import { GUIDE } from "../../../../src/lib/ui/marks";
-import { answering, type clackDouble } from "../../../helpers/clack";
-import { asTerminal } from "../../../helpers/terminal";
+import { PromptCancelled, ZitadelError } from "@/lib/errors";
+import { Chain } from "@/lib/ui/chain";
+import { GUIDE } from "@/lib/ui/marks";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
 const normally = () => new Chain({ interactive: true, force: false }, "plain");

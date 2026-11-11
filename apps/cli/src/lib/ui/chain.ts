@@ -1,9 +1,9 @@
 import { intro, log, note, outro } from "@clack/prompts";
 import pc from "picocolors";
 
-import { CANCELLED, PromptCancelled, ZitadelError } from "../errors";
-import { asker } from "../input";
-import { log as narration } from "../log";
+import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
+import { asker } from "@/lib/input";
+import { log as narration } from "@/lib/log";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";

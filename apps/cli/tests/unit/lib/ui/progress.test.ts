@@ -1,12 +1,12 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { log, spinner } from "@clack/prompts";
 
-import { recordLog } from "../../../helpers/log";
-import { type Drawing, Progress } from "../../../../src/lib/ui/progress";
+import { recordLog } from "@tests/helpers/log";
+import { type Drawing, Progress } from "@/lib/ui/progress";
 
 /** A chain that remembers what progress asked of it, and draws nothing. */
 const chain = (

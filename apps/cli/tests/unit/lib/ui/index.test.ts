@@ -3,9 +3,9 @@ import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import * as ui from "../../../../src/lib/ui";
-import { drawsDirectly } from "../../../helpers/drawing-boundary";
-import { sourceFiles } from "../../../helpers/source-files";
+import * as ui from "@/lib/ui";
+import { drawsDirectly } from "@tests/helpers/drawing-boundary";
+import { sourceFiles } from "@tests/helpers/source-files";
 
 const SRC = join(import.meta.dirname, "../../../../src");
 const PACKAGE = join(SRC, "lib/ui");

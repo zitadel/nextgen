@@ -1,13 +1,13 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { confirm, intro, outro, spinner } from "@clack/prompts";
 
-import { log } from "../../../../src/lib/log";
-import { PromptCancelled, ZitadelError } from "../../../../src/lib/errors";
-import { Ui } from "../../../../src/lib/ui/ui";
+import { log } from "@/lib/log";
+import { PromptCancelled, ZitadelError } from "@/lib/errors";
+import { Ui } from "@/lib/ui/ui";
 
 const watched = () => new Ui({ interactive: true, force: false });
 const normally = () => new Ui({ interactive: true, force: false }, "plain");

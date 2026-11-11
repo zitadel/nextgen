@@ -1,7 +1,7 @@
 import { Args, type Config, Flags } from "@oclif/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { confirm } from "@clack/prompts";
 

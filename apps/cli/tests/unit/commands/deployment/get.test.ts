@@ -7,7 +7,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { asTerminal } from "@tests/helpers/terminal";
-import { runCliForTest } from "../../../helpers/run-cli";
+import { runCliForTest } from "@tests/helpers/run-cli";
 import DeploymentGet from "@/commands/deployment/get";
 import { parseArg } from "@tests/helpers/inputs";
 

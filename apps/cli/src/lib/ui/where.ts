@@ -1,6 +1,6 @@
 import pc from "picocolors";
 
-import { escapeControlCharacters } from "../terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * Where a command ran, as the sentence every command's summary opens with, so

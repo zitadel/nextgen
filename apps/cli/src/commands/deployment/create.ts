@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { renderCount } from "../../lib/count";
+import { renderCount } from "@/lib/count";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";

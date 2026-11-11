@@ -3,7 +3,7 @@ import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sourceFiles } from "../../helpers/source-files";
+import { sourceFiles } from "@tests/helpers/source-files";
 import {
   maskPublicCliVersion,
   normalizePublicCliCommand,
