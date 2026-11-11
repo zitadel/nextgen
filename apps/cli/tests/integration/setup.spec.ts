@@ -10,6 +10,7 @@ import {
   type CliResult,
   type Credentials,
   type CustomConnection,
+  DEFAULT_SIGNUP_POLICY,
   PASSWORD_POLICY,
   type ScaffoldedApp,
   SETUP_ORIGIN,
@@ -483,6 +484,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -493,6 +495,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -503,6 +506,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -742,6 +746,37 @@ describe("setup", () => {
 
           platform.recovers();
           expect(await app.deploy()).toSucceed();
+        });
+      });
+
+      describe("against a server that does not take a sign-up policy yet", () => {
+        it("writes none, and deploys the rest", async () => {
+          const app = await anApp();
+          platform.predatesTheSignupPolicy();
+
+          const result = await app.setup();
+
+          expect(result).toSucceed();
+          expect((await app.snapshot()).paths()).not.toContain(
+            app.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+          );
+          expect(await app.publishedPolicies()).toEqual([
+            expect.objectContaining({ operation: PASSWORD_POLICY }),
+          ]);
+        });
+
+        it("leaves a sign-up policy --force keeps, which no deploy gets past", async () => {
+          const app = await anApp();
+          await app.writeSignupPolicy({});
+          platform.predatesTheSignupPolicy();
+
+          const result = await app.setup(["--force"]);
+
+          expect(result).toSucceed();
+          expect((await app.snapshot()).paths()).toContain(
+            app.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+          );
+          expect(await app.liveDeploymentCount()).toBe(0);
         });
       });
 

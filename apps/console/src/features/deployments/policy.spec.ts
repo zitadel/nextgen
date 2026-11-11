@@ -5,6 +5,7 @@ import {
   policyDisplayName,
   policyDocument,
   policySettings,
+  userCreatePolicySettings,
 } from "./policy";
 
 const revision = {
@@ -20,6 +21,18 @@ const revision = {
 describe("policy display", () => {
   it("names the password policy by its operation", () => {
     expect(policyDisplayName("auth.factor.password.set")).toBe("Password policy");
+  });
+
+  it("names the sign-up policy and its challenge", () => {
+    expect(policyDisplayName("user.create")).toBe("Sign-up policy");
+    expect(
+      policySettings({
+        ...revision,
+        operation: "user.create",
+        config: { challenge: "zitadel_pow" },
+      }),
+    ).toEqual([{ label: "Challenge", value: "Built-in proof of work" }]);
+    expect(userCreatePolicySettings({})).toEqual([]);
   });
 
   it("names an operation it does not know by the operation as written, with no rows", () => {

@@ -34,6 +34,18 @@ import (
 func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	t.Helper()
 	var cols []schematest.ColumnNullability
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "project_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "flow_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "expires_at"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "payload"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "public"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "project_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "flow_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "window_start"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "issued"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "verified"})
+
 	cols = append(cols, schematest.Columns("users", user.NewSchema(user.SchemaSQL{}))...)
 	cols = append(cols, schematest.Columns("user_passkeys", userpasskey.Schema)...)
 	cols = append(cols, schematest.Columns("user_passwords", userpassword.Schema)...)

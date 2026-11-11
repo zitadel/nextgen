@@ -1,6 +1,9 @@
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
-import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+import {
+  passwordSetPolicyFileSchema,
+  RECOMMENDED_PASSWORD_MIN_LENGTH,
+} from "@zitadel/config/schemas";
 
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type {
@@ -43,7 +46,7 @@ export class PasswordPolicy extends Policy {
    * Here rather than in `types.ts`, which imports no value.
    */
   private static readonly MIN_LENGTH_BOUNDS =
-    policyConfigSchema.shape.config.shape.min_length.unwrap();
+    passwordSetPolicyFileSchema.shape.config.shape.min_length.unwrap();
 
   /**
    * Read a password policy file: the policy, or the broken file it is.
@@ -168,7 +171,13 @@ export class PasswordPolicy extends Policy {
    * @returns The length, or `undefined` when it enforces none.
    */
   get minLength(): number | undefined {
-    return this.config.min_length;
+    // The contract types a policy by its operation, so the password settings
+    // are read off the password branch.
+    const value = this.value;
+    if (value.operation !== PASSWORD_POLICY_OPERATION) {
+      return undefined;
+    }
+    return value.config.min_length;
   }
 
   /**

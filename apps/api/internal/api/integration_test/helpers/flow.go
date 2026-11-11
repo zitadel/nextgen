@@ -18,7 +18,7 @@ func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserW
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
 		h.EnsureServiceDB(t),
-	)
+		service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t)))
 }
 
 func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
@@ -31,7 +31,7 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
 			BuiltinSchemaBases(),
-		)
+			service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t)))
 	}
 	return h.flowService.value
 }

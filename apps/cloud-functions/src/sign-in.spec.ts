@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FLOW_WRITES, SIGN_IN_PREFIX } from "./contract";
 import { forwardSignIn, isApiPath, isFlowWrite } from "./sign-in";
 
 const human = async () => ({ isBot: false, isVerifiedBot: false });
@@ -23,6 +24,14 @@ describe("the sign-in widget's calls", () => {
       expect(isFlowWrite("POST", `${prefix}/sessions/exchange`)).toBe(false);
     },
   );
+
+  // BotID's client marks only these; a write the check reads that the client
+  // never marks is refused for every person.
+  it.each(FLOW_WRITES)("checks $method $path, which BotID's client marks", ({ method, path }) => {
+    expect(path.startsWith(`${SIGN_IN_PREFIX}/`)).toBe(true);
+    const sent = path.slice(SIGN_IN_PREFIX.length).replaceAll("*", "flw_1");
+    expect(isFlowWrite(method, sent)).toBe(true);
+  });
 
   // The server answers neither, so neither starts a flow there.
   it.each(["/api/v1/api/v1/flow", "/api/v2/flow", "/api/v1flow"])(

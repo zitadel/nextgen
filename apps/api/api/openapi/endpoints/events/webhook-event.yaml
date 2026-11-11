@@ -242,6 +242,36 @@ oneOf:
             const: deployment.created
           data:
             $ref: payloads/deployment-created-payload.yaml
+  - title: flow.signup_challenge.consumed
+    description: |
+      A signup proof was spent before attempting user creation.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: flow.signup_challenge.consumed
+          data:
+            $ref: payloads/empty-event-payload.yaml
+  - title: flow.signup_challenge.issued
+    description: |
+      A password signup proof-of-work challenge was issued.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: flow.signup_challenge.issued
+          data:
+            $ref: payloads/empty-event-payload.yaml
   - title: flowdef.created
     description: |
       A flow definition was created. A [flow
