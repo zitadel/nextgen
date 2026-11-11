@@ -5,7 +5,13 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp } from "@tests/helpers/project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import {
+  cliVersion,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "@tests/helpers/run-cli";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
 
@@ -192,17 +198,108 @@ describe("the cli", () => {
       });
     });
 
-    describe("handled by oclif rather than us", () => {
-      it("exits 127 for a command that does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+    describe("for a command that does not exist", () => {
+      describe("--json", () => {
+        it("prints one error envelope naming the command and the topic's help", async () => {
+          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
 
-        expect(result).toExitWith(127);
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "teams delete",
+            source: "",
+            code: "E_VALIDATION",
+            message: "teams delete is not a zitadel command.",
+            next_commands: [expectedPublicCliCommand("teams --help")],
+          });
+        });
+
+        it("prints one error envelope with the commands it was close to", async () => {
+          const result = await runCliForTest(["variable", "lst", "--json"]);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "variable lst",
+            source: "",
+            code: "E_VALIDATION",
+            message: "variable lst is not a zitadel command.",
+            next_commands: [
+              expectedPublicCliCommand("variable list"),
+              expectedPublicCliCommand("variable --help"),
+            ],
+          });
+        });
+
+        it("points at the CLI's help when nothing is close", async () => {
+          const result = await runCliForTest(["frobnicate", "--json"]);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "frobnicate",
+            source: "",
+            code: "E_VALIDATION",
+            message: "frobnicate is not a zitadel command.",
+            next_commands: [expectedPublicCliCommand("--help")],
+          });
+        });
+
+        it("exits 127, as a shell does for a command it cannot find", async () => {
+          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
+
+          expect(result).toExitWith(127);
+        });
+
+        it("writes nothing to stderr", async () => {
+          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
+
+          expect(result.stderr).toBe("");
+        });
       });
 
-      it("emits no envelope for a command that does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+      describe("piped", () => {
+        it("prints the error on stderr and nothing on stdout", async () => {
+          const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
 
-        expect(result.stdout.trim()).toBe("");
+          expect(result).toEqual({
+            exitCode: 127,
+            stdout: "",
+            stderr: [
+              "Error E_VALIDATION: teams delete is not a zitadel command.",
+              "Next:",
+              `  $ ${expectedPublicCliCommand("teams --help")}`,
+              "",
+            ].join("\n"),
+          });
+        });
+      });
+
+      describe("rendered for a terminal", () => {
+        it("prints the error and offers no prompt to run another command", async () => {
+          const result = await asTerminal(() =>
+            runCliForTest(["teams", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
+          );
+
+          expect(result).toEqual({
+            exitCode: 127,
+            stdout: "",
+            stderr: [
+              "Error E_VALIDATION: teams delete is not a zitadel command.",
+              "Next:",
+              `  $ ${expectedPublicCliCommand("teams --help")}`,
+              "",
+            ].join("\n"),
+          });
+        });
+
+        it("names the command it was close to as one to type", async () => {
+          const result = await asTerminal(() =>
+            runCliForTest(["variable", "lst"], { NO_COLOR: "1" }),
+          );
+
+          expect(result.stderr).toContain(`  $ ${expectedPublicCliCommand("variable list")}`);
+        });
       });
     });
   });

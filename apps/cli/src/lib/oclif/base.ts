@@ -795,7 +795,10 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
 }
 
 /** Builds the failure envelope from a {@link ZitadelError} and the invocation metadata. */
-function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelope {
+export function toErrorEnvelope(
+  error: ZitadelError,
+  meta: Pick<GlobalOptions, "cliVersion" | "command" | "source">,
+): ErrorEnvelope {
   return {
     status: "error",
     cli_version: meta.cliVersion,
@@ -848,7 +851,7 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
  * Renders a {@link ZitadelError} as a human-readable block for stderr: the
  * coded message, an optional hint, and any suggested next commands.
  */
-function renderError(error: ZitadelError, meta: GlobalOptions): string {
+export function renderError(error: ZitadelError, meta: Pick<GlobalOptions, "cliVersion">): string {
   // A failure names what it failed on — an origin, an id, a value — so the
   // message and the hint carry what the server answered as readily as a
   // success's rendering does, and are spelled out here for the same reason.

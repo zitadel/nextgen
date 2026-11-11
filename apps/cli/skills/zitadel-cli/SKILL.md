@@ -522,8 +522,11 @@ pause. `E_NOT_FOUND` also covers what the server says is gone (410), such as a
 claim window that has closed, which retrying never recovers. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
-without an envelope. In human mode a cancel prints no error block. An
-unknown command is handled by the CLI's help layer, not the envelope.
+without an envelope. In human mode a cancel prints no error block. A command
+that does not exist is an `E_VALIDATION` envelope like any other, with the
+commands it was close to and the topic's `--help` as `next_commands`, but it
+exits 127, as a shell does for a command it cannot find. It is never run as a
+different command, and no arguments typed after it are repeated.
 
 ## Clarify before you configure
 

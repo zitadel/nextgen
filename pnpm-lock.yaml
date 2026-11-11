@@ -224,9 +224,6 @@ catalogs:
     '@oclif/plugin-help':
       specifier: ^6.2.49
       version: 6.2.49
-    '@oclif/plugin-not-found':
-      specifier: ^3.2.86
-      version: 3.2.86
     '@oclif/plugin-search':
       specifier: ^1.2.50
       version: 1.2.50
@@ -406,7 +403,7 @@ catalogs:
       version: 1.16.0
     lucide-react:
       specifier: ^1.16.0
-      version: 1.20.0
+      version: 1.61.0
     marked:
       specifier: ^18.0.14
       version: 18.0.14
@@ -696,9 +693,6 @@ importers:
       '@oclif/plugin-help':
         specifier: 'catalog:'
         version: 6.2.49
-      '@oclif/plugin-not-found':
-        specifier: 'catalog:'
-        version: 3.2.86(@types/node@24.19.1)
       '@oclif/plugin-search':
         specifier: 'catalog:'
         version: 1.2.50
