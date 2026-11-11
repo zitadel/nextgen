@@ -15,9 +15,11 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// SignupProtection is deliberately limited to password signup. A proof buys
-// one create_user attempt in its flow, not an authentication factor. It is
-// the guard, and the project's user.create policy chooses its challenge.
+// SignupProtection is deliberately limited to sign-ups from a flow: a
+// password sign-up's create_user, and a passkey registration that creates its
+// user. A proof buys one such attempt in its flow, not an authentication
+// factor. It is the guard, and the project's user.create policy chooses its
+// challenge.
 type SignupProtection interface {
 	Challenge(context.Context, *domain.FlowState) (*pow.PublicChallenge, error)
 	Consume(context.Context, *domain.FlowState, string) error

@@ -8121,7 +8121,9 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 // The flow endpoints are the runtime calls the login component
 // (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
 // `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
-// For a password-signup step, prepares `step.gates.signup_pow.challenge`.
+// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
+// creates its user on submit, or one carrying a passkey registration that
+// creates its user.
 // Reuses challenges with more than a minute remaining; otherwise issues a
 // new one. If this render resolves parked SSO state, it first returns the
 // updated cookie; fetch the step again to obtain its puzzle.
@@ -21666,8 +21668,10 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 // The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
 // with the new flow state. The server is stateless: all orchestration
 // state is carried in this cookie between requests.
-// Password signup (`create_user`) additionally requires a single-use
-// `gate_proofs.signup_pow` solution for `step.gates.signup_pow`. Pending
+// Sign-up additionally requires a single-use `gate_proofs.signup_pow`
+// solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
+// sends it with the submit, and a passkey registration that creates its user
+// sends it with the attestation in `challenge_response`. Pending
 // challenges and rate counters are stored on the server. Invalid or spent
 // proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
 // `429 flow.rate_limited`. GET the current step to obtain or refresh its

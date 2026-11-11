@@ -1,6 +1,7 @@
 # Minimal signup proof of work
 
-> **Status:** Implemented for the Flow API's password `create_user` mutation.
+> **Status:** Implemented for the Flow API's password `create_user` mutation
+> and for a passkey registration that creates its user.
 > The protocol identifier remains provisional: `zitadel_pow_poc_v1`.
 
 The default signup announces `step.gates.signup_pow` on its password step.
@@ -77,10 +78,17 @@ worker bundle, and requires Web Crypto on a secure origin. Existing back and SSO
 actions do not solve signup puzzles. Headless clients must implement the same
 challenge/proof exchange; old clients without a solver receive a proof refusal.
 
+A step carrying a passkey registration that creates its user announces the
+gate too, and the attestation carries the proof. The widget fetches and solves
+the puzzle while the ceremony runs and takes the ceremony off the step if that
+fails, so a failed check leaves no passkey behind for an account that was
+never made. Only a refusal of the attestation itself can still follow a
+stored passkey, as a failed attestation always could.
+
 ## Scope and verification
 
 CEL, ten free attempts followed by increasing costs, external providers, Cloud
-BotID, algorithm configuration, and protection for SSO/passkey signup are deferred.
+BotID, algorithm configuration, and protection for SSO signup are deferred.
 Passwap remains the password-hashing library; it is not needed for these fixed
 protocol KDF parameters. There is no ALTCHA library or hosted service dependency.
 Mobile calibration and attacker economics remain unvalidated.

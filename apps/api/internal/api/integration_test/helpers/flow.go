@@ -18,7 +18,14 @@ func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserW
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
 		h.EnsureServiceDB(t),
-		service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t)))
+		h.newSignupProtection(t))
+}
+
+// newSignupProtection builds the sign-up guard the flow engine's parts share
+// in the server; it keeps no state of its own beyond the database.
+func (h *Harness) newSignupProtection(t testing.TB) service.SignupProtection {
+	t.Helper()
+	return service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t))
 }
 
 func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
@@ -31,7 +38,7 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
 			BuiltinSchemaBases(),
-			service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t)))
+			h.newSignupProtection(t))
 	}
 	return h.flowService.value
 }
@@ -43,7 +50,7 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineR
 
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t))
+		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
 		h.flowStateMachine.value = domain.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaStore(t),
