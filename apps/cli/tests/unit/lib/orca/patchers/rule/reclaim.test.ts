@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ScaffoldPlan } from "../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { reclaimableOps } from "../../../../../../src/lib/orca/patchers/rule/reclaim";
-import { MANAGED_MARKER } from "../../../../../../src/lib/paths";
+import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { reclaimableOps } from "@/lib/orca/patchers/rule/reclaim";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 const plan: ScaffoldPlan = {
   ops: [
@@ -22,6 +22,18 @@ describe("reclaimableOps", () => {
   it("keeps env, gitignore, add-dep, edit, and marker-bearing writes", () => {
     const kinds = reclaimableOps(plan).map((op) => op.kind);
     expect(kinds).toEqual(["write", "append-gitignore", "merge-env", "add-dep", "edit"]);
+  });
+
+  it("replays an overwriting env merge as additive only", () => {
+    const ops = reclaimableOps({
+      ops: [
+        { kind: "merge-env", path: ".env.development.local", entries: { A: "1" }, overwrite: true },
+      ],
+      summary: [],
+    });
+    expect(ops).toEqual([
+      { kind: "merge-env", path: ".env.development.local", entries: { A: "1" }, overwrite: false },
+    ]);
   });
 
   it("keeps config edits so doctor --fix can restore a removed proxy", () => {

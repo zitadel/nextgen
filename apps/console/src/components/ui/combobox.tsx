@@ -1,6 +1,6 @@
 import { Check, ChevronDown, X } from "lucide-react";
 import type * as React from "react";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -9,8 +9,11 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandItemText,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /**
@@ -46,12 +49,16 @@ const TRIGGER_DISABLED = "cursor-not-allowed bg-input/50 opacity-50 dark:bg-inpu
 const TRIGGER_INVALID =
   "border-destructive ring-destructive/20 dark:ring-destructive/40 aria-invalid:ring-[3px]";
 
-const LIST = "w-(--radix-popover-trigger-width) rounded-md border-foreground/10 p-0";
+/** The list's popover without its width, for a menu drawn like it (`ResourceFilter`). */
+export const COMBOBOX_SURFACE = "rounded-md border-foreground/10 p-0";
+const LIST = `w-(--radix-popover-trigger-width) ${COMBOBOX_SURFACE}`;
 
 // One-line is 32px; two-line stacks a 14px label over a 12px description and
 // measures 48px.
 const ITEM_SIMPLE = "h-8 gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
+/** A row of any height, for a menu drawn like this list. */
+export const COMBOBOX_ROW = ITEM_CUSTOM;
 // cmdk marks an item active as soon as the list mounts, but every state of
 // the design's menu item renders transparent — a resting list must not paint a
 // filled row, so the fill is suppressed until the operator points or arrows.
@@ -187,15 +194,43 @@ export interface ComboboxOption {
   description?: string;
   /** Optional leading glyph for the row. */
   icon?: ReactNode;
+  /**
+   * Draws the label as a tinted chip, with the description beside it on one
+   * line: for a row that is no value itself but stands for a set of the rows
+   * under it, so it is not read as one more of them.
+   */
+  chip?: "destructive" | "warning" | "secondary";
+}
+
+/** A run of rows under a caption, as the design's menu label draws it. */
+export interface ComboboxGroup {
+  heading?: string;
+  options: ComboboxOption[];
+  /** A hairline under the group, setting it apart from the groups that follow. */
+  ruled?: boolean;
 }
 
 /**
- * The popover list: search field, empty state, and rows. `selected` drives the
- * chosen affordance, which differs by usage — the project list fills the chosen
- * row (`Row · River`), while schema and role lists mark it with a Check.
+ * The caption: the design's menu label (`PROJECTS`), set in capitals rather
+ * than written in them, so the heading stays readable to assistive technology.
+ */
+const GROUP = "[&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:uppercase";
+
+/** What the list says when it has no rows: `CommandEmpty`'s own look. */
+const EMPTY = "py-6 text-center text-sm";
+
+/** The footer row's cmdk value, apart from the ids and names options carry. */
+const FOOTER_VALUE = "combobox:footer";
+
+/**
+ * The popover list: search field, empty state, and rows, in captioned groups
+ * when asked, over an optional footer action. `selected` drives the chosen
+ * affordance, which differs by usage — the project list fills the chosen row
+ * (`Row · River`), while schema and role lists mark it with a Check.
  */
 export function ComboboxContent({
   options,
+  groups,
   selected,
   searchPlaceholder,
   emptyLabel,
@@ -204,8 +239,15 @@ export function ComboboxContent({
   /** Keep the popover open on select — multiple selection accumulates. */
   closeOnSelect = true,
   onClose,
+  search,
+  footer,
+  label,
+  className,
 }: {
-  options: ComboboxOption[];
+  /** The rows, in one group without a caption. Pass `options` or `groups`. */
+  options?: ComboboxOption[];
+  /** The rows in captioned groups, in order. An empty group is left out. */
+  groups?: ComboboxGroup[];
   selected: string[];
   searchPlaceholder: string;
   emptyLabel: string;
@@ -213,57 +255,149 @@ export function ComboboxContent({
   onSelect: (value: string) => void;
   closeOnSelect?: boolean;
   onClose: () => void;
+  /**
+   * The caller searches: the field shows `query`, and the rows are the caller's
+   * answer to it, not cmdk's filtering of them. For a list whose rows come from
+   * a server search, which reaches past what the caller holds.
+   */
+  search?: { query: string; onQueryChange: (query: string) => void };
+  /** An action beneath the rows, reached by arrow like them; it closes the list. */
+  footer?: { label: string; icon?: ReactNode; onSelect: () => void };
+  /** The list's accessible name. */
+  label?: string;
+  /** For the popover: by default it is as wide as its trigger. */
+  className?: string;
 }) {
   const [navigating, setNavigating] = useState(false);
+  const sections = (groups ?? [{ options: options ?? [] }]).filter(
+    (group) => group.options.length > 0,
+  );
+
+  // The row cmdk highlights, which Enter picks — held here for a caller's
+  // search. Its rows land after the typing that asked for them, and cmdk
+  // highlights the first row the moment the query changes, which may be the
+  // footer, the only row there was; it keeps that when the matches arrive.
+  // So when the rows change and the highlight is not on one, it moves to the
+  // first match, as cmdk's own filtering would have put it.
+  const [highlight, setHighlight] = useState("");
+  const rowValues = sections.flatMap((group) => group.options.map((option) => option.value));
+  const rowsKey = rowValues.join("\n");
+  const lastRows = useRef(rowsKey);
+  useEffect(() => {
+    if (!search || lastRows.current === rowsKey) return;
+    lastRows.current = rowsKey;
+    const first = rowValues[0];
+    if (first !== undefined && !rowValues.includes(highlight)) setHighlight(first);
+  }, [search, rowsKey, rowValues, highlight]);
 
   return (
-    <PopoverContent align="start" className={LIST}>
+    <PopoverContent align="start" className={cn(LIST, className)}>
       <Command
+        // The field's name: cmdk labels its input with this (`aria-labelledby`),
+        // which an `aria-label` on the input would not outrank.
+        label={searchPlaceholder}
+        shouldFilter={!search}
+        {...(search && { value: highlight, onValueChange: setHighlight })}
         onPointerMove={() => setNavigating(true)}
         onKeyDown={(event: React.KeyboardEvent) => {
           if (event.key.startsWith("Arrow")) setNavigating(true);
         }}
       >
-        <CommandInput variant="boxed" placeholder={searchPlaceholder} />
-        <CommandList>
-          <CommandEmpty>{emptyLabel}</CommandEmpty>
-          <CommandGroup>
-            {options.map((option) => {
-              const isSelected = selected.includes(option.value);
-              return (
+        <CommandInput
+          variant="boxed"
+          placeholder={searchPlaceholder}
+          // Typing is interaction too: the first match is then what Enter
+          // picks, so its row may show it.
+          onValueChange={(query) => {
+            if (query) setNavigating(true);
+            search?.onQueryChange(query);
+          }}
+          {...(search && { value: search.query })}
+        />
+        <CommandList label={label}>
+          {/* cmdk's empty state counts the rows it shows, and it shows every
+              row of a caller's search, the footer among them, so it would
+              never say there are no matches. */}
+          {search ? (
+            sections.length === 0 && (
+              <div role="presentation" className={EMPTY}>
+                {emptyLabel}
+              </div>
+            )
+          ) : (
+            <CommandEmpty>{emptyLabel}</CommandEmpty>
+          )}
+          {sections.map((group, index) => (
+            <Fragment key={group.heading ?? index}>
+              <CommandGroup heading={group.heading} className={GROUP}>
+                {group.options.map((option) => {
+                  const isSelected = selected.includes(option.value);
+                  return (
+                    <CommandItem
+                      key={option.value}
+                      // The value is cmdk's name for the row, so it must be unique:
+                      // two schemas or projects may share a label. Search matches
+                      // the label and the description, so typing a property name
+                      // finds the schemas that collect it.
+                      value={option.value}
+                      keywords={
+                        option.description ? [option.label, option.description] : [option.label]
+                      }
+                      className={cn(
+                        option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
+                        !navigating && ITEM_RESTING,
+                        isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
+                      )}
+                      onSelect={() => {
+                        onSelect(option.value);
+                        if (closeOnSelect) onClose();
+                      }}
+                    >
+                      {option.icon}
+                      {option.chip ? (
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <Badge variant={option.chip}>{option.label}</Badge>
+                          {option.description && (
+                            <span className="truncate text-xs text-muted-foreground">
+                              {option.description}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <CommandItemText label={option.label} description={option.description} />
+                      )}
+                      {isSelected && indicator === "check" && (
+                        <Check className="absolute right-2 size-4" aria-hidden />
+                      )}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+              {group.ruled && <CommandSeparator className="bg-foreground/10" />}
+            </Fragment>
+          ))}
+          {footer && (
+            <>
+              {/* `foreground/10`, as the account menu's hairlines: `border` is
+                  the popover's own colour on the dark theme and would not show. */}
+              <CommandSeparator alwaysRender className="bg-foreground/10" />
+              <CommandGroup>
                 <CommandItem
-                  key={option.value}
-                  // Search matches the label and the description, so typing a
-                  // property name finds the schemas that collect it.
-                  value={`${option.label} ${option.description ?? ""}`}
-                  className={cn(
-                    option.description ? ITEM_CUSTOM : ITEM_SIMPLE,
-                    !navigating && ITEM_RESTING,
-                    isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
-                  )}
+                  // Shown whatever is typed: it is a way out, not a match.
+                  forceMount
+                  value={FOOTER_VALUE}
+                  className={cn(ITEM_SIMPLE, !navigating && ITEM_RESTING)}
                   onSelect={() => {
-                    onSelect(option.value);
-                    if (closeOnSelect) onClose();
+                    onClose();
+                    footer.onSelect();
                   }}
                 >
-                  {option.icon}
-                  {option.description ? (
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-medium">{option.label}</span>
-                      <span className="truncate text-xs leading-4 text-muted-foreground">
-                        {option.description}
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                  )}
-                  {isSelected && indicator === "check" && (
-                    <Check className="absolute right-2 size-4" aria-hidden />
-                  )}
+                  {footer.icon}
+                  <span className="min-w-0 flex-1 truncate">{footer.label}</span>
                 </CommandItem>
-              );
-            })}
-          </CommandGroup>
+              </CommandGroup>
+            </>
+          )}
         </CommandList>
       </Command>
     </PopoverContent>

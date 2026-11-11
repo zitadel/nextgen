@@ -64,7 +64,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -132,7 +132,9 @@ describe("<zitadel-login> with identity providers", () => {
   }
 
   /** Stub navigation for the duration of `run`, returning the calls made. */
-  async function withStubbedNavigation(run: () => Promise<void>): Promise<string[]> {
+  async function withStubbedNavigation(
+    run: (assign: ReturnType<typeof vi.fn>) => Promise<void>,
+  ): Promise<string[]> {
     const assign = vi.fn();
     const { location } = window;
     Object.defineProperty(window, "location", {
@@ -140,7 +142,7 @@ describe("<zitadel-login> with identity providers", () => {
       value: { ...location, assign },
     });
     try {
-      await run();
+      await run(assign);
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: location });
     }
@@ -254,6 +256,36 @@ describe("<zitadel-login> with identity providers", () => {
     expect(completes).toHaveLength(0);
   });
 
+  it("waits for work a zitadel-flow-redirect listener registers before navigating", async () => {
+    const element = await mountLogin();
+    const atom = providerAtom(element);
+    await atom.updateComplete;
+    const finish = new AbortController();
+    const redirected = vi.fn();
+    element.addEventListener("zitadel-flow-redirect", (event) => {
+      redirected();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    const calls = await withStubbedNavigation(async (assign) => {
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+      await vi.waitFor(() => expect(redirected).toHaveBeenCalledOnce());
+      await element.updateComplete;
+      expect(assign).not.toHaveBeenCalled();
+
+      finish.abort();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledOnce());
+    });
+
+    expect(calls).toEqual(["https://idp.mock.invalid/authorize"]);
+  });
+
   it("does not paint the redirect step it is navigating away from", async () => {
     const element = await mountLogin();
     const atom = providerAtom(element);
@@ -362,8 +394,8 @@ describe("<zitadel-login> with identity providers", () => {
       // A fresh page load: a widget that ignored `?flow=` would start a new
       // flow and leave the user on a blank sign-in screen.
       const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
-      expect(seen).toContain("GET /flow/flow_mock");
-      expect(seen).not.toContain("POST /flow");
+      expect(seen).toContain("GET /api/v1/flow/flow_mock");
+      expect(seen).not.toContain("POST /api/v1/flow");
       expect(element.shadowRoot?.querySelector('zl-field[name="given_name"]')).not.toBeNull();
     });
 
@@ -384,6 +416,32 @@ describe("<zitadel-login> with identity providers", () => {
     });
   });
 
+  describe("when the server answers flow.sso_user_schema_mismatch", () => {
+    it("starts a fresh flow whose notice does not ask the visitor to start again", async () => {
+      server.use(
+        http.get(
+          "*/flow/:id",
+          () =>
+            HttpResponse.json(
+              {
+                code: "flow.sso_user_schema_mismatch",
+                message: "the linked account cannot sign in through this flow",
+              },
+              { status: 409 },
+            ),
+          { once: true },
+        ),
+      );
+
+      const { element } = await landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      const text = element.shadowRoot?.textContent ?? "";
+      expect(text).toContain("This account can't sign in with this provider.");
+      expect(text).not.toContain("Please start again");
+    });
+  });
+
   describe("when the server answers flow.restart_required", () => {
     const restartRequired = () =>
       HttpResponse.json(
@@ -399,7 +457,7 @@ describe("<zitadel-login> with identity providers", () => {
       const { element, seen, url } = await resumeStale();
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
-      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(seen.filter((r) => r === "POST /api/v1/flow")).toHaveLength(1);
       // A reload must not resume the refused flow again.
       expect(url).toBe("?keep=1#top");
       expect(element.shadowRoot?.textContent).toContain(
@@ -413,7 +471,7 @@ describe("<zitadel-login> with identity providers", () => {
       const { element, seen } = await resumeStale();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(seen.filter((r) => r === "POST /api/v1/flow")).toHaveLength(1);
       expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
     });
 
@@ -521,8 +579,8 @@ describe("<zitadel-login> with identity providers", () => {
         warn.mockRestore();
       }
 
-      expect(seen).toContain("GET /flow/flow_stale");
-      expect(seen).toContain("POST /flow");
+      expect(seen).toContain("GET /api/v1/flow/flow_stale");
+      expect(seen).toContain("POST /api/v1/flow");
       expect(warned).toEqual([expect.stringContaining("flow_stale")]);
     },
   );

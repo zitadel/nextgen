@@ -1,0 +1,12 @@
+go 1.26.0
+
+toolchain go1.26.9
+
+use (
+	./apps/api
+	./packages/config/defaults
+	./packages/design-tokens
+	./packages/go
+	./tools/bench
+	./tools/oidc-mock
+)

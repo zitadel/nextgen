@@ -1,0 +1,17 @@
+---
+title: Policies
+description: Publish and read the settings an operation is checked against, such as the password policy.
+---
+
+A policy holds the settings a project's operation is checked against, for
+example the minimum length a new password must have. A project has one policy
+per operation, and each publish creates an immutable revision. An operation is
+checked against the revision the deployed [release](/docs/reference/api/releases)
+pins, from the next time it runs. Under a release that pins no policy, the
+operation is not checked. Settings left out are off: Zitadel applies no
+defaults.
+
+[Test a policy](/docs/guides/test-policies) checks what a policy decides before
+you publish it.
+
+<Operations />

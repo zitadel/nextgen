@@ -2,11 +2,16 @@ import { cancel, confirm, isCancel, multiselect, password, select, text } from "
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { ZitadelError } from "./errors";
+import { ZitadelError, confirmationHint } from "./errors";
 import { readStdin } from "./variables";
+import type { SuggestedCommand } from "./suggestion";
 
-/** One option of a `select` or `multiselect`. */
-type Choice<V> = { value: V; label: string; hint?: string };
+/**
+ * One option of a `select` or `multiselect`. A `disabled` one is shown, with
+ * its hint always visible, but cannot be chosen: for a choice that exists but
+ * is not available yet, such as a server that is not running.
+ */
+type Choice<V> = { value: V; label: string; hint?: string; disabled?: boolean };
 
 /** What every question says about itself, whatever it asks for. */
 type Common = {
@@ -33,7 +38,7 @@ type Common = {
    * run. It becomes the refusal's `nextCommands`, and for a value it is also
    * quoted in the hint as an example.
    */
-  retry?: string;
+  retry?: SuggestedCommand;
 };
 
 /** A question whose answer is text that must parse. */
@@ -75,15 +80,36 @@ type MultiselectQuestion = Common & {
   required?: boolean;
 };
 
+/**
+ * Agreement to a destructive action, which `--force` gives without asking.
+ * Only `Consent.request` asks it: an `Asker` cannot, so a command reaches it
+ * through `Destructive` and gets a `Consent` back rather than a boolean.
+ */
 type ConfirmQuestion = Common & {
   kind: "confirm";
+};
+
+/**
+ * A plain yes or no, about nothing destructive ("Deploy it now?"). `--force`
+ * never answers it, whatever the command's `--force` means.
+ */
+type YesNoQuestion = Common & {
+  kind: "yes-no";
   initialValue?: boolean;
 };
 
-type Question = TextQuestion | SelectQuestion | MultiselectQuestion | ConfirmQuestion;
+type Question =
+  | TextQuestion
+  | SelectQuestion
+  | MultiselectQuestion
+  | YesNoQuestion
+  | ConfirmQuestion;
+
+/** The questions a command may ask itself: every kind but `confirm`. */
+type Askable = Exclude<Question, ConfirmQuestion>;
 
 /** What `input` returns for a question: it follows the question's kind. */
-type Answer<Q extends Question> = Q extends { kind: "confirm" }
+type Answer<Q extends Question> = Q extends { kind: "confirm" | "yes-no" }
   ? boolean
   : Q extends { kind: "multiselect"; options: Choice<infer V>[] }
     ? V[]
@@ -99,7 +125,7 @@ type Answer<Q extends Question> = Q extends { kind: "confirm" }
 type Session = {
   /** Whether a person is at a terminal to be asked. */
   interactive: boolean;
-  /** The command's `--force`: it answers a `confirm` without asking. */
+  /** The command's `--force`: it answers a `confirm` without asking, never a `yes-no`. */
   force: boolean;
   /** The stream piped input is read from. Defaults to the process's stdin. */
   stdin?: NodeJS.ReadableStream & { isTTY?: boolean };
@@ -109,7 +135,7 @@ type Session = {
  * `input` with the session already filled in, which is what a command's
  * `this.input` and the setup wizard's prompt context hand out.
  */
-export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
+export type Asker = <Q extends Askable>(question: Q) => Promise<Answer<Q>>;
 
 /**
  * The one way the CLI takes input from a person or a script. Every command
@@ -140,15 +166,18 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  *   error. With `optional`, the answer may be `undefined` (see its docs).
  * - `select` returns the chosen option's `value`.
  * - `multiselect` returns the chosen options' `value`s.
+ * - `yes-no` returns a boolean. With no one to ask it throws "No <name>
+ *   supplied"; `force` never answers it.
  * - `confirm` returns a boolean. The session's `force` (the command's
  *   `--force`) answers it yes without asking. With no one to ask and no
- *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
- *   A command whose `--force` means something else must not hand out a
- *   session with `force` set.
+ *   `force`, it throws an `E_CONFIRMATION_REQUIRED` error carrying the
+ *   question in `details.question`, for an agent to put to a person.
+ *   Only `Consent.request` asks it.
  *
- * Cancelling a prompt (Ctrl-C) throws `E_VALIDATION` "Cancelled by user"
- * instead of returning a sentinel, so a command never carries on with a
- * missing answer.
+ * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
+ * sentinel, so a command never carries on with a missing answer, and exits
+ * 130 like Ctrl-C anywhere else. The prompt closes with "Cancelled.", which is
+ * all a person is shown: a cancel is their own decision, not an error.
  *
  * Commands call this through `this.input(...)` on `BaseCommand`, which fills in
  * `session` from the command's own flags. It takes the session as an argument
@@ -158,7 +187,7 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  * const clientId = await this.input({
  *   kind: "text",
  *   name: "client id",
- *   message: "Client ID",
+ *   message: "What is the client ID of your Google OAuth app?",
  *   flag: "--client-id",
  *   parse: parseClientId,
  *   given: flags["client-id"],
@@ -174,7 +203,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
     });
   const cancelled = (): ZitadelError => {
     cancel("Cancelled.");
-    return new ZitadelError("E_VALIDATION", "Cancelled by user");
+    return new ZitadelError("E_CANCELLED", "Cancelled by user");
   };
   const unsupplied = (): ZitadelError => {
     const isText = q.kind === "text" || q.kind === "secret";
@@ -203,19 +232,34 @@ export async function input<Q extends Question>(question: Q, session: Session): 
         return true;
       }
       if (!session.interactive) {
-        throw refusal(
+        // Its own code, so an agent tells it from a flag it can supply itself:
+        // the retry carries --force, which only a person may agree to.
+        throw new ZitadelError(
+          "E_CONFIRMATION_REQUIRED",
           `Cannot ${q.name} without --force in non-interactive mode`,
-          `Pass --force to ${q.name}.`,
+          {
+            hint: confirmationHint(q.message),
+            ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
+            details: { question: q.message },
+          },
         );
       }
-      const confirmed = await confirm({
-        message: q.message,
-        initialValue: q.initialValue ?? false,
-      });
+      const confirmed = await confirm({ message: q.message, initialValue: false });
       if (isCancel(confirmed)) {
         throw cancelled();
       }
       return confirmed;
+    }
+
+    if (q.kind === "yes-no") {
+      if (!session.interactive) {
+        throw unsupplied();
+      }
+      const answered = await confirm({ message: q.message, initialValue: q.initialValue ?? false });
+      if (isCancel(answered)) {
+        throw cancelled();
+      }
+      return answered;
     }
 
     if (q.kind === "select" || q.kind === "multiselect") {

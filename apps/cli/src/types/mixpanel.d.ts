@@ -23,6 +23,8 @@ declare module "mixpanel" {
      * residency. Defaults to `api.mixpanel.com` (US) when omitted.
      */
     host?: string;
+    /** What every request path starts with, for a proxy that serves the API under a prefix. */
+    path?: string;
     /** Disable IP-based geolocation lookups on ingestion. */
     geolocate?: boolean;
   }

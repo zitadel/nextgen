@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The `id` that `createFlowDefinition` (`POST /flow_definitions`) returns.
+schema:
+  type: string
+example: flowdef_01KWH8Q5NZT7F0N9WD3P2E4YM6

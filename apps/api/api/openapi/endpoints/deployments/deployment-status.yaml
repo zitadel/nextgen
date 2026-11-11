@@ -1,0 +1,13 @@
+title: DeploymentStatus
+type: string
+description: |
+  Whether the deployment serves its release now.
+
+  - `live`: the project's newest primary deployment, or a preview deployment
+    that one of its preview URLs still serves.
+  - `inactive`: a later deployment replaced it, or its previews expired or
+    were removed.
+enum:
+  - live
+  - inactive
+example: live

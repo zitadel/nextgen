@@ -7,7 +7,7 @@ the repo root.
 
 ## The journey
 
-- CI runs `npx @zitadel/cli@alpha doctor --runtime binary`,
+- CI runs `npx @zitadel/cli@latest doctor --runtime binary`,
   `start --runtime binary` and `setup --framework <id> --server local`, each
   with `--non-interactive --json`, for every id in `ciFrameworkIds`
   (`e2e/journey/scripts/frameworks.mjs`). The ids in `ciExcludedFrameworkIds`
@@ -52,6 +52,8 @@ the repo root.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.
+- `RELEASE_HOST_ONLY=1` (ci-turbo's journey) drops the other platforms'
+  server packages from that set, in the snapshot and in the check.
 - Keep Verdaccio's npmjs metadata cache (`maxage` in
   `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
   can ask for a nuxt released two hours earlier.
@@ -63,9 +65,9 @@ the repo root.
   lane, so one process shares one port allocator. A new variant joins the
   runner's `--ci` set, never a new workflow step. How the lane reaches CI:
   [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
-- `scripts/ci-mode.mjs` gates the tarball snapshot and collapses the
-  fresh-app matrix to one framework (`JOURNEY_MATRIX=single`) when no SDK, CLI
-  or journey surface changed.
+- `scripts/ci-mode.mjs` (in ci-turbo.yml, `turbo query affected`) gates the
+  tarball snapshot and collapses the fresh-app matrix to one framework
+  (`JOURNEY_MATRIX=single`) when no SDK, CLI or journey surface changed.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.

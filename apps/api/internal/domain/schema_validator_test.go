@@ -1,0 +1,785 @@
+package domain_test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+// todo (grvijayan): set to be the same as const defined for metaSchema in user-schema.json, will be updated once we have a decision on setting const
+const testBuiltinBase = "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas"
+
+func newTestValidator(t *testing.T) *domain.SchemaValidator {
+	t.Helper()
+	v, err := domain.NewSchemaValidator(testBuiltinBase)
+	require.NoError(t, err)
+	return v
+}
+
+func TestNewTenantSchemaValidator(t *testing.T) {
+	t.Run("succeeds with valid base", func(t *testing.T) {
+		v, err := domain.NewSchemaValidator(testBuiltinBase)
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
+
+	t.Run("fails with empty base", func(t *testing.T) {
+		_, err := domain.NewSchemaValidator("")
+		require.Error(t, err)
+	})
+	t.Run("fails with relative base", func(t *testing.T) {
+		_, err := domain.NewSchemaValidator("schemas/meta")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidBuiltinPublicBase)
+	})
+	t.Run("fails with no-host URL", func(t *testing.T) {
+		_, err := domain.NewSchemaValidator("file:///local/path")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidBuiltinPublicBase)
+	})
+	t.Run("trailing slash is normalized", func(t *testing.T) {
+		v, err := domain.NewSchemaValidator("https://example.test/schemas/")
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
+}
+
+func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
+	v := newTestValidator(t)
+
+	tests := []struct {
+		name                 string
+		input                []byte
+		wantErr              error
+		wantValidationErrors map[string]string
+	}{
+		{
+			name: "valid user schema",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"passkey": { "enabled": true }
+				}
+			}`),
+		},
+		{
+			name: "valid user schema with optional properties",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"description": "A user schema",
+				"x-auth-methods": {
+					"passkey": { "enabled": true }
+				},
+				"required": ["email"],
+				"properties": {
+					"email": { "type": "string", "title": "Email" }
+				}
+			}`),
+		},
+		{
+			name: "valid with nested property",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind":    "user-schema",
+				"objectType": "human-user",
+				"title":   "My User",
+				"x-auth-methods": {
+					"passkey": { "enabled": true }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"title": "Address",
+						"properties": {
+							"street": { "title": "Street", "type": "string" }
+						}
+					}
+				}
+			}`),
+		},
+		{
+			name: "dotted property name at the top level",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"address.street": { "type": "string" }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// Two levels down, so it only fails if user-property.json
+			// recurses into its own `properties` map.
+			name: "dotted property name inside a nested object",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"properties": {
+							"geo": {
+								"type": "object",
+								"properties": {
+									"zip.code": { "type": "string" }
+								}
+							}
+						}
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// A nested leaf carries x-unique the same way a top-level one
+			// does, so a typo there has to fail rather than silently leave
+			// the value non-unique.
+			name: "invalid x-unique on a nested property",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"properties": {
+							"zipCode": { "type": "string", "x-unique": "bogus" }
+						}
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// The audit emitter enables the value for any non-empty string
+			// other than "false", so `x-audit: "no"` would allowlist a field
+			// while reading as a refusal. The dialect is boolean-only, which
+			// turns that into a push-time failure.
+			name: "invalid x-audit string",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"email": { "type": "string", "x-audit": "no" }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// A property holds JSON Schema keywords and the annotations the
+			// dialect consumes; any other key would constrain nothing.
+			name: "undeclared annotation on a property is refused",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"passkey": { "enabled": true }
+				},
+				"properties": {
+					"email": {
+						"type": "string",
+						"writeOnly": true,
+						"x-audit": true,
+						"x-not-a-real-annotation": true
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name: "missing metaSchema",
+			input: []byte(`{
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				}
+			}`),
+			wantErr: domain.ErrMissingSchemaID,
+		},
+		{
+			name:    "missing metaSchema field",
+			input:   []byte(`{"kind": "user-schema", "title": "No Schema ID"}`),
+			wantErr: domain.ErrMissingSchemaID,
+		},
+		{
+			name:    "unknown metaSchema URI",
+			input:   []byte(`{"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/unknown.json", "title": "Unknown"}`),
+			wantErr: domain.ErrUnknownSchemaURI,
+		},
+		{
+			name: "missing required x-auth-methods",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User"
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/x-auth-methods": `missing required field "x-auth-methods"`,
+			},
+		},
+		{
+			// Flow definitions name a user schema by its objectType.
+			name: "missing required objectType",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/objectType": `missing required field "objectType"`,
+			},
+		},
+		{
+			name: "invalid auth method — missing enabled",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": {}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/properties/password/required/enabled": `missing required field "enabled"`,
+			},
+		},
+		{
+			name: "unknown auth method key rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"totp": { "enabled": true }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/additionalProperties/totp": `false schema never matches`,
+			},
+		},
+		{
+			name: "unknown auth method field rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/properties/password/additionalProperties/position": `false schema never matches`,
+			},
+		},
+		{
+			name: "sso enabled with providers",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": true, "providers": ["google"] }
+				}
+			}`),
+		},
+		{
+			name: "sso disabled without providers",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": false }
+				}
+			}`),
+		},
+		{
+			name: "sso enabled without providers rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": true }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name: "sso disabled with providers rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": false, "providers": ["google"] }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name: "sso providers must be slugs",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"objectType": "human-user",
+				"title": "My User",
+				"x-auth-methods": {
+					"sso": { "enabled": true, "providers": ["Google"] }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name:                 "invalid JSON",
+			input:                []byte(`{invalid`),
+			wantErr:              domain.ErrSchemaParseFailed,
+			wantValidationErrors: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.ValidateAgainstMetaSchema(tt.input)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				if tt.wantValidationErrors != nil {
+					assert.Equal(t, tt.wantValidationErrors, domain.FlattenValidationErrors(err))
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestTenantSchemaValidator_SchemaKeywords(t *testing.T) {
+	v := newTestValidator(t)
+	userSchema := func(root, properties string) []byte {
+		return []byte(`{
+			"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+			"kind": "user-schema",
+			"objectType": "human-user",
+			"x-auth-methods": { "passkey": { "enabled": true } },
+			` + root + `
+			"properties": {` + properties + `}
+		}`)
+	}
+
+	tests := []struct {
+		name  string
+		input []byte
+		// refused is the location the validator names; empty when the
+		// document is valid.
+		refused string
+	}{
+		{
+			name:    "a misspelt keyword on a property",
+			input:   userSchema(``, `"firstName": { "type": "string", "minimumLength": 3 }`),
+			refused: "additionalProperties/firstName/unevaluatedProperties/minimumLength",
+		},
+		{
+			name: "a misspelt keyword on a nested property",
+			input: userSchema(``, `"address": { "type": "object", "properties": {
+				"zip": { "type": "string", "maxLenght": 5 } } }`),
+			refused: "additionalProperties/zip/unevaluatedProperties/maxLenght",
+		},
+		{
+			name:    "an unknown keyword at the root",
+			input:   userSchema(`"requird": ["email"],`, ``),
+			refused: "unevaluatedProperties/requird",
+		},
+		{
+			name:    "a root-only key on a property",
+			input:   userSchema(``, `"email": { "type": "string", "kind": "user-property" }`),
+			refused: "additionalProperties/email/unevaluatedProperties/kind",
+		},
+		{
+			name:    "an undeclared x- key at the root",
+			input:   userSchema(`"x-team-note": "kept",`, ``),
+			refused: "unevaluatedProperties/x-team-note",
+		},
+		{
+			name:    "a root annotation on a property",
+			input:   userSchema(``, `"email": { "type": "string", "x-identifier": "email" }`),
+			refused: "additionalProperties/email/unevaluatedProperties/x-identifier",
+		},
+		{
+			name: "the declared annotations at the root and on a property",
+			input: userSchema(`"x-identifier": "email", "x-display": ["email"],`,
+				`"email": { "type": "string", "x-unique": "project", "x-claim": "email", "x-audit": true }`),
+		},
+		{
+			name:  "an attribute named like a keyword",
+			input: userSchema(``, `"minimumLength": { "type": "integer", "minimum": 0 }`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.ValidateAgainstMetaSchema(tt.input)
+			if tt.refused == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, domain.ErrSchemaValidationFailed)
+			assert.Contains(t, err.Error(), tt.refused)
+		})
+	}
+}
+
+func TestSchemaValidator_GetBuiltinSchema(t *testing.T) {
+	v := newTestValidator(t)
+
+	t.Run("returns schema for user-schema kind", func(t *testing.T) {
+		uri := testBuiltinBase + "/user-schema.json"
+		schema, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+
+	t.Run("returns schema for flow-definition kind", func(t *testing.T) {
+		uri := testBuiltinBase + "/flow-definition.json"
+		schema, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+
+	t.Run("returns independent clone — mutations do not affect validator", func(t *testing.T) {
+		uri := testBuiltinBase + "/user-schema.json"
+		s1, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		// Truncate s1's parts; s2 must remain intact
+		s1.Parts = s1.Parts[:0]
+		s2, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		assert.NotEmpty(t, s2.Parts, "second clone should be unaffected by mutation of first")
+	})
+
+	t.Run("returns error for unknown kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema("https://example.test/schemas/unknown.json")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+		assert.Nil(t, schema)
+	})
+
+	t.Run("returns error for empty kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema("")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+		assert.Nil(t, schema)
+	})
+}
+
+func TestSchemaValidator_LatestSchemaURI(t *testing.T) {
+	v := newTestValidator(t)
+
+	t.Run("returns URI for user-schema kind", func(t *testing.T) {
+		uri, err := v.LatestSchemaURI(domain.SchemaKindUser)
+		require.NoError(t, err)
+		assert.Equal(t, testBuiltinBase+"/user-schema.json", uri)
+	})
+
+	t.Run("returns URI for flow-definition kind", func(t *testing.T) {
+		uri, err := v.LatestSchemaURI(domain.SchemaKindFlowDefinition)
+		require.NoError(t, err)
+		assert.Equal(t, testBuiltinBase+"/flow-definition.json", uri)
+	})
+
+	t.Run("returned URI resolves to a valid schema", func(t *testing.T) {
+		uri, err := v.LatestSchemaURI(domain.SchemaKindFlowDefinition)
+		require.NoError(t, err)
+		schema, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		assert.NotNil(t, schema)
+	})
+
+	t.Run("returns error for unknown kind", func(t *testing.T) {
+		_, err := v.LatestSchemaURI("unknown-kind")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
+	})
+}
+
+func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
+	v := newTestValidator(t)
+
+	doc := func(body string) []byte {
+		return []byte(`{
+			"metaSchema": "` + testBuiltinBase + `/user-schema.json",
+			"$id": "https://example.test/schemas/my-user.json",
+			"kind": "user-schema",
+			"objectType": "human-user",
+			"title": "My User",
+			` + body + `}`)
+	}
+
+	tests := []struct {
+		name    string
+		input   []byte
+		wantErr error
+	}{
+		{
+			name: "identifier on a project-unique leaf",
+			input: doc(`"x-auth-methods": {"password": {"enabled": true}},
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+		},
+		{
+			name: "identifier on a nested leaf path",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account.handle",
+				"properties": {"account": {"type": "object", "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+		},
+		{
+			name: "password enabled without a designation",
+			input: doc(`"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name:  "passkey-only schema needs no designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}}`),
+		},
+		{
+			name: "identifier naming an unknown property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "username",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a non-unique property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a team-unique property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "username",
+				"properties": {"username": {"type": "string", "x-unique": "team"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier hiding an object behind a $ref is indeterminate",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "profile",
+				"$defs": {"profile": {"type": "object", "properties": {"handle": {"type": "string"}}}},
+				"properties": {"profile": {"$ref": "#/$defs/profile", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier composed via allOf is indeterminate",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"allOf": [{"type": "string"}], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a patternProperties object is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "labels",
+				"properties": {"labels": {"patternProperties": {"^x-": {"type": "string"}}, "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an untyped property is indeterminate",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "allOf constraining a declared scalar stays a valid designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "string", "allOf": [{"minLength": 3}], "x-unique": "project"}}`),
+		},
+		{
+			name: "inert object-only keywords on a declared scalar stay valid",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "string", "additionalProperties": false, "x-unique": "project"}}`),
+		},
+		{
+			name: "a nullable scalar union is a valid designation target",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["null", "string"], "x-unique": "project"}}`),
+		},
+		{
+			name: "an all-scalar type union is rejected like the flow resolver rejects it",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["string", "integer"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a null-only type cannot identify anyone",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": "null", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a null-only union cannot identify anyone",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "handle",
+				"properties": {"handle": {"type": ["null"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a scalar-typed schema root cannot carry a designation",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"type": "string",
+				"x-identifier": "email",
+				"properties": {"email": {"type": "string", "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "an intermediate segment on a scalar-typed parent is unreachable",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "a.b",
+				"properties": {"a": {"type": "string", "properties": {
+					"b": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "a nullable-object intermediate segment is reachable",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account.handle",
+				"properties": {"account": {"type": ["null", "object"], "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+		},
+		{
+			name: "identifier on an implicit object (properties without type)",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account",
+				"properties": {"account": {"properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an array is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "emails",
+				"properties": {"emails": {"items": {"type": "string"}, "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on a nullable-object type union is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "profile",
+				"properties": {"profile": {"type": ["null", "object"], "x-unique": "project"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "identifier on an object is not a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-identifier": "account",
+				"properties": {"account": {"type": "object", "properties": {
+					"handle": {"type": "string", "x-unique": "project"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "display on leaves without uniqueness",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["givenName", "name.family"],
+				"properties": {
+					"givenName": {"type": "string"},
+					"name": {"type": "object", "properties": {"family": {"type": "string"}}}}`),
+		},
+		{
+			name: "display naming an unknown property",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["nickname"],
+				"properties": {"email": {"type": "string"}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+		{
+			name: "display entry must be a leaf",
+			input: doc(`"x-auth-methods": {"passkey": {"enabled": true}},
+				"x-display": ["name"],
+				"properties": {"name": {"type": "object", "properties": {"family": {"type": "string"}}}}`),
+			wantErr: domain.ErrSchemaDesignationInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.ValidateAgainstMetaSchema(tt.input)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}

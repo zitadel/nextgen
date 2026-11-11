@@ -14,7 +14,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -22,6 +21,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
+import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
 import {
@@ -30,9 +30,10 @@ import {
   flowDisplayName,
   flowPurposeSummary,
   flowStepNames,
-} from "@/lib/flow-definition";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { schemaDisplayName } from "@/lib/schema";
+} from "@/features/flow-definitions/model";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { schemaDisplayName } from "@/features/schemas/model";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 5: Users sits at 3, Authentication at 4.
@@ -82,7 +83,7 @@ function LoginFlowsScreen() {
   const { flows } = Route.useLoaderData();
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Login flows</ResourceTitle>
 
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
@@ -109,8 +110,12 @@ function LoginFlowsScreen() {
             )}
           </TableBody>
         </Table>
+        <CliHint>
+          Edit the definitions locally, then deploy your changes with{" "}
+          <CliCommand>{CLI_DEPLOY}</CliCommand>.
+        </CliHint>
       </div>
-    </ResourcePage>
+    </Page>
   );
 }
 

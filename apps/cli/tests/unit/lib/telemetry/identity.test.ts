@@ -2,9 +2,18 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadOrCreateIdentity, telemetryConfigDir } from "../../../../src/lib/telemetry/identity";
+import { loadOrCreateIdentity, telemetryConfigDir } from "@/lib/telemetry/identity";
+
+const { homedir } = vi.hoisted(() => {
+  return { homedir: vi.fn<() => string>() };
+});
+
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return { ...actual, homedir };
+});
 
 const dirs: string[] = [];
 
@@ -24,6 +33,20 @@ afterEach(() => {
 describe("telemetryConfigDir", () => {
   it("nests under XDG_CONFIG_HOME when set", () => {
     expect(telemetryConfigDir({ XDG_CONFIG_HOME: "/cfg" })).toBe("/cfg/zitadel/cli");
+  });
+
+  it("falls back to ~/.config when XDG_CONFIG_HOME is not set", () => {
+    homedir.mockReturnValue("/home/dev");
+
+    expect(telemetryConfigDir({})).toBe("/home/dev/.config/zitadel/cli");
+  });
+
+  it("is undefined when the home directory cannot be determined", () => {
+    homedir.mockImplementation(() => {
+      throw new Error("no home directory");
+    });
+
+    expect(telemetryConfigDir({})).toBeUndefined();
   });
 });
 
@@ -53,6 +76,17 @@ describe("loadOrCreateIdentity", () => {
 
     const recovered = loadOrCreateIdentity(env);
     expect(recovered.distinctId).toMatch(/[0-9a-f-]{36}/);
+  });
+
+  it("fails open to an ephemeral id when the home directory cannot be determined", () => {
+    homedir.mockImplementation(() => {
+      throw new Error("no home directory");
+    });
+
+    const identity = loadOrCreateIdentity({});
+
+    expect(identity.isFirstRun).toBe(false);
+    expect(identity.distinctId).toMatch(/[0-9a-f-]{36}/);
   });
 
   it("fails open to an ephemeral id when the config dir is unwritable", () => {

@@ -1,8 +1,8 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import type { Telemetry, TelemetryDeps } from "../../../../src/lib/telemetry";
+import { BaseCommand } from "@/lib/oclif/base";
+import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 
 /** Minimal recording stand-in for the generic Telemetry client. */
 class RecordingTelemetry {
@@ -47,7 +47,7 @@ class TestCommand extends BaseCommand {
     /* swallow human output */
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 

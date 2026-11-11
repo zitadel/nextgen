@@ -1,0 +1,26 @@
+type: object
+additionalProperties: false
+required: [kind, provider]
+description: |
+  A reserved gate declaration. Gates declared in a flow definition are not
+  currently enforced. Required signup gates are attached by the server based
+  on `on_success: create_user`, independently of this declaration.
+properties:
+  kind:
+    type: string
+    enum: [captcha]
+    example: captcha
+    description: |
+      The gate category. Only `captcha` is defined today. Authenticator
+      ceremonies, such as passkey, are not gates: they are modeled as
+      credential authentication attempts (`auth_attempts`) with `x-credential`
+      on a field.
+  provider:
+    type: string
+    description: |
+      Reserved implementation identifier. Declaring a provider does not enable it.
+  config:
+    type: object
+    description: |
+      Reserved provider-specific configuration. It has no runtime effect.
+    additionalProperties: true

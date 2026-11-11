@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
-
-import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
+import { responseFailure } from "@/lib/backend";
+import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
+import {
+  EXIT_CODES,
+  ZitadelError,
+  errorMessage,
+  isCancellation,
+  isErrno,
+  toZitadelError,
+} from "@/lib/errors";
+import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
+import { unscopedCommand } from "@/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -17,6 +26,7 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
+      E_CONFIRMATION_REQUIRED: 3,
       E_CREDENTIAL_MISSING: 3,
       E_NOT_IMPLEMENTED: 2,
       E_CANCELLED: 130,
@@ -28,7 +38,7 @@ describe("ZitadelError", () => {
   it("carries the code, message, and optional extras", () => {
     const err = new ZitadelError("E_CONFLICT", "boom", {
       hint: "try again",
-      nextCommands: ["zitadel doctor", "zitadel init"],
+      nextCommands: [unscopedCommand("doctor"), unscopedCommand("init")],
       details: { field: "x" },
     });
     expect(err).toBeInstanceOf(Error);
@@ -93,29 +103,96 @@ describe("toZitadelError", () => {
     expect(result.hint).toBe("A required file or directory is missing.");
   });
 
+  it.each([
+    ["a ConflictError", new ConflictError("two with one slug"), "E_CONFLICT"],
+    ["a NotFoundError", new NotFoundError("no such connection"), "E_NOT_FOUND"],
+    ["any other ConfigError", new ConfigError("not valid"), "E_VALIDATION"],
+    [
+      "a ConfigError for a file the OS refused to read",
+      new ConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for a file the OS would not let it touch",
+      new ConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for any other errno",
+      new ConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
+      "E_VALIDATION",
+    ],
+  ])("maps %s to %s", (_name, err, code) => {
+    expect(toZitadelError(err).code).toBe(code);
+  });
+
+  it("passes a ConfigError's message, hint and details on", () => {
+    const err = new ConfigError("boom", { hint: "do this", details: { file: "a.json" } });
+    const result = toZitadelError(err);
+    expect([result.message, result.hint, result.details]).toEqual([
+      "boom",
+      "do this",
+      { file: "a.json" },
+    ]);
+  });
+
+  it("leaves out the hint and details a ConfigError has none of", () => {
+    const result = toZitadelError(new ConfigError("boom"));
+    expect([result.hint, result.details]).toEqual([undefined, undefined]);
+  });
+
+  it.each([
+    ["UnauthorizedError", new UnauthorizedError("the credential was not accepted")],
+    ["ForbiddenError", new ForbiddenError("the credential may not do this")],
+  ])("maps a %s the backend raised to E_AUTH", (_name, err) => {
+    const result = toZitadelError(err);
+
+    expect(result.code).toBe("E_AUTH");
+    expect(result.message).toBe(err.message);
+  });
+
   it("maps a request that got no response to E_NETWORK", () => {
-    const err = new NetworkError(
-      "http://localhost:8080/idps",
-      "unreachable",
+    const err = new UnavailableError(
       "GET http://localhost:8080/idps got no response (ECONNREFUSED)",
+      {
+        url: "http://localhost:8080/idps",
+        reason: "unreachable",
+      },
     );
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe(
-      "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
-    );
+    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 
   it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
-    const err = new NetworkError("http://localhost:8080/idps", "timeout", "GET … timed out");
+    const err = new UnavailableError("GET … timed out", {
+      url: "http://localhost:8080/idps",
+      reason: "timeout",
+    });
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
     expect(result.hint).toBe(
       "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
     );
+  });
+
+  it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
+    const err = new UnavailableError(
+      "GET http://localhost:8080/idps answered 200, but its body could not be read",
+      {
+        url: "http://localhost:8080/idps",
+        reason: "unreadable",
+      },
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NETWORK");
+    expect(result.hint).toBe(
+      "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+    );
+    expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreadable" });
   });
 
   it("does not guess a network failure from a TypeError's message", () => {
@@ -167,8 +244,19 @@ describe("toZitadelError", () => {
     expect(result.details).toBe("just a string");
   });
 
+  it("reports a 409 as a conflict with the state the platform holds", () => {
+    const err = responseFailure(
+      409,
+      "http://mock/releases/rel_1/revoke?project_id=proj_1",
+      { code: "rel.in_use", message: "release: still served by an origin" },
+      "POST http://mock/releases/rel_1/revoke returned 409",
+    );
+
+    expect(toZitadelError(err).code).toBe("E_CONFLICT");
+  });
+
   it("surfaces the server's message + nested details.details on ApiError 400", () => {
-    const err = new ApiError(
+    const err = responseFailure(
       400,
       "http://mock/flow_definitions/flow_1?project_id=proj_1",
       {
@@ -189,7 +277,7 @@ describe("toZitadelError", () => {
   });
 
   it("uses the server's message when details is a plain string", () => {
-    const err = new ApiError(
+    const err = responseFailure(
       404,
       "http://mock/schemas/sch_x?project_id=proj_1",
       { code: "schema.notfound", message: "schema not found", details: "sch_x" },
@@ -203,7 +291,7 @@ describe("toZitadelError", () => {
   });
 
   it("flags a non-enveloped 404 as a likely wrong server", () => {
-    const err = new ApiError(
+    const err = responseFailure(
       404,
       "https://api.zitadel.cloud/projects",
       { message: "not found" },
@@ -217,8 +305,23 @@ describe("toZitadelError", () => {
     );
   });
 
+  it("tells a server without the operation from a wrong server", () => {
+    const err = responseFailure(
+      404,
+      "http://localhost:8080/widgets",
+      { code: "req.not_found", message: "No API operation matches this path." },
+      "GET http://localhost:8080/widgets returned 404",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toBe(
+      "http://localhost:8080/widgets has no such endpoint on this Zitadel server",
+    );
+    expect(result.hint).toContain("different versions");
+  });
+
   it("falls back to the fetch-layer message when the body is not an envelope", () => {
-    const err = new ApiError(
+    const err = responseFailure(
       502,
       "http://mock/anything",
       { raw: "<html>Bad Gateway</html>" },
@@ -228,10 +331,39 @@ describe("toZitadelError", () => {
   });
 
   it("classifies 401/403 as E_AUTH and 5xx as E_NETWORK", () => {
-    const auth = new ApiError(401, "http://mock/x", { message: "bad token" }, "GET returned 401");
-    const server = new ApiError(500, "http://mock/x", { message: "boom" }, "GET returned 500");
+    const auth = responseFailure(
+      401,
+      "http://mock/x",
+      { message: "bad token" },
+      "GET returned 401",
+    );
+    const server = responseFailure(500, "http://mock/x", { message: "boom" }, "GET returned 500");
     expect(toZitadelError(auth).code).toBe("E_AUTH");
     expect(toZitadelError(server).code).toBe("E_NETWORK");
+  });
+
+  it.each([
+    ["too many requests", 429, "E_NETWORK"],
+    ["what the server says is gone", 410, "E_NOT_FOUND"],
+  ])("classifies %s as %s, which is not the caller's body to correct", (_what, status, code) => {
+    const refused = responseFailure(
+      status,
+      "http://mock/projects/p/claim/status",
+      { message: "come back later" },
+      `GET returned ${status}`,
+    );
+
+    expect(toZitadelError(refused).code).toBe(code);
+  });
+
+  it("classifies a 403 refusing a target origin as E_VALIDATION, not E_AUTH", () => {
+    const refused = responseFailure(
+      403,
+      "http://mock/deployments",
+      { code: "proj.origin_not_allowed", message: "project: https://x is not a primary origin" },
+      "POST returned 403",
+    );
+    expect(toZitadelError(refused).code).toBe("E_VALIDATION");
   });
 });
 
@@ -243,7 +375,7 @@ describe("toZitadelError", () => {
 describe("fields the platform blames", () => {
   const immutable = (body: unknown) =>
     toZitadelError(
-      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+      responseFailure(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
     );
 
   it("names them, as the server nests them", () => {
@@ -285,7 +417,7 @@ describe("fields the platform blames", () => {
 describe("endpoints the platform reports missing", () => {
   const partial = (body: unknown) =>
     toZitadelError(
-      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+      responseFailure(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
     );
 
   it("names them, in the server's order, as the server nests them", () => {
@@ -319,5 +451,147 @@ describe("endpoints the platform reports missing", () => {
     expect(error.hint).toBe(
       "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
     );
+  });
+});
+
+/**
+ * A rejected release names the schema or flow at fault, and why, only under
+ * `details.resources`; the hint carries them so the reason shows without
+ * `--json`.
+ */
+describe("resources the platform rejected", () => {
+  const rejected = (body: unknown) =>
+    toZitadelError(responseFailure(400, "http://localhost:8140/releases", body, "Bad Request"));
+
+  it("names each resource's kind, handle and reason", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "sch.invalid_request",
+            kind: "schema",
+            handle: "human-user",
+            message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+          },
+          { kind: "flow", handle: "default-login", message: "step is broken" },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      'schema human-user: schema designation invalid: "x-display" names unknown property "nickname"; flow default-login: step is broken.',
+    );
+  });
+
+  it("appends a flow's reason from the resource's own details", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "flowdef.invalid",
+            kind: "flow",
+            handle: "default-login",
+            message: "flow definition: invalid",
+            details: {
+              details:
+                'step "register-password": on_success create_user requires "identifier" to be collected upstream',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier" to be collected upstream.',
+    );
+  });
+
+  it("appends the fields a connection may not change", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.field_immutable",
+            kind: "idp",
+            handle: "zitadel-cloud",
+            message:
+              "identity provider connection: the field is fixed for the life of the connection",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp zitadel-cloud: identity provider connection: the field is fixed for the life of the connection: oidc.issuer.",
+    );
+  });
+
+  it("appends the endpoints a connection left out", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.endpoints_partial",
+            kind: "idp",
+            handle: "acme-sso",
+            message: "identity provider connection: the endpoints are partially set",
+            details: { details: { missing: ["jwks_uri", "token_endpoint"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp acme-sso: identity provider connection: the endpoints are partially set: jwks_uri, token_endpoint.",
+    );
+  });
+
+  it("adds no hint when a resource has no message", () => {
+    expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
+      undefined,
+    );
+  });
+});
+
+describe("isErrno", () => {
+  it("matches an error carrying the given code", () => {
+    expect(isErrno(Object.assign(new Error("gone"), { code: "ENOENT" }), "ENOENT")).toBe(true);
+  });
+
+  it("does not match another code, a missing code or a non-object", () => {
+    expect(isErrno(Object.assign(new Error("gone"), { code: "EACCES" }), "ENOENT")).toBe(false);
+    expect(isErrno(new Error("no code"), "ENOENT")).toBe(false);
+    expect(isErrno(undefined, "ENOENT")).toBe(false);
+    expect(isErrno("ENOENT", "ENOENT")).toBe(false);
+  });
+});
+
+describe("errorMessage", () => {
+  it("reads an Error's message, a string as it is, and anything else as text", () => {
+    expect(errorMessage(new Error("boom"))).toBe("boom");
+    expect(errorMessage("plain")).toBe("plain");
+    expect(errorMessage(42)).toBe("42");
+    expect(errorMessage(undefined)).toBe("undefined");
+  });
+});
+
+describe("isCancellation", () => {
+  it("knows the error Ctrl-C aborts the run with", () => {
+    expect(isCancellation(new ZitadelError("E_CANCELLED", "Cancelled."))).toBe(true);
+  });
+
+  it("is false for any other failure, so only a cancellation is let through", () => {
+    expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
+    expect(isCancellation(new Error("Cancelled."))).toBe(false);
+    expect(isCancellation(undefined)).toBe(false);
   });
 });

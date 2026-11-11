@@ -36,8 +36,9 @@ for password/secret hashing.
 The project's choice governs **hashing only**. Verification stays
 deployment-wide: the server keeps reading every hash it could read before, so
 choosing a method, or later changing it, never invalidates a stored password.
-Nothing is rehashed on a policy change either. A password moves to the new
-method the next time its owner sets one.
+A policy change rewrites no stored password by itself. A password moves to the
+new method on its owner's next successful sign-in, or when its owner sets a new
+one.
 
 The deployment restricts what a project may choose:
 

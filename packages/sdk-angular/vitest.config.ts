@@ -4,7 +4,7 @@ import { transformAsync } from "@babel/core";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
 
 /**
  * Finishes the partially compiled Angular code in the edge project, the step

@@ -10,11 +10,6 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
-    "./openid-configuration": {
-      "@zitadel/source": "./src/openid-configuration.ts",
-      "types": "./dist/openid-configuration.d.mts",
-      "import": "./dist/openid-configuration.mjs"
-    },
     "./platform": {
       "@zitadel/source": "./src/platform-handlers.ts",
       "types": "./dist/platform-handlers.d.mts",
@@ -74,6 +69,7 @@
     "@types/node": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsdown": "catalog:",

@@ -1,3 +1,4 @@
+import type { PasswordMinLength } from "@/lib/zitadel";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -6,8 +7,9 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "../../../lib/input";
-import type { FrameworkFacts } from "../../../lib/orca";
+import type { Asker } from "@/lib/input";
+import type { FrameworkChoice } from "@/lib/orca";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -88,26 +90,37 @@ export type SetupAnswers = {
    * provider, each with its own credentials.
    */
   sso: readonly SsoDraft[];
+  /**
+   * The minimum password length to put into the password policy setup
+   * writes: a number, `null` for an explicit "none", or `undefined` when none
+   * was given, which writes the recommended minimum (`PasswordPolicy.initial`).
+   * Chosen by {@link import("./password-policy").PasswordPolicyPrompt} or
+   * `--password-min-length`.
+   */
+  passwordMinLength?: PasswordMinLength;
 };
 
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
   /**
-   * How a prompt asks its question: `input`, so every question the wizard
-   * asks behaves like every other question the CLI asks.
-   *
-   * Deliberately not the command's `this.input`. That one answers a `confirm`
-   * when the command's `--force` is given, and setup's `--force` means "overwrite
-   * files", so with it a prompt such as "Detected next. Proceed?" would be
-   * answered yes without asking. This one never is.
+   * How a prompt asks its question: the command's `this.input`, so every
+   * question the wizard asks behaves like every other question the CLI asks.
+   * It cannot ask a `confirm`, so `--force` never answers one of its questions.
    */
   readonly input: Asker;
   /**
-   * The framework of the app setup integrates. Only its id: a new app does not
-   * exist while the wizard asks, because setup creates it once it has every
-   * answer.
+   * The framework of the app setup integrates: its id and the name a question
+   * shows ("Next.js"). Nothing more: a new app does not exist while the wizard
+   * asks, because setup creates it once it has every answer.
    */
-  readonly framework: Pick<FrameworkFacts, "id">;
+  readonly framework: FrameworkChoice;
+  /**
+   * A command for this app's project, for a question that names what to run
+   * once setup is done, such as adding a skipped provider. It carries the
+   * selector setup's own recovery commands carry, so it reaches the project
+   * setup creates and not one the shell's environment names.
+   */
+  readonly suggest: (args: string) => SuggestedCommand;
   /**
    * The app directory setup runs in. {@link import("./server").ServerPrompt}
    * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it
@@ -159,6 +172,12 @@ export type PromptContext = {
    * nobody to ask, and that one is refused rather than left incomplete.
    */
   readonly ssoFromFlag?: boolean;
+  /**
+   * Whether `--password-min-length` was passed explicitly. When set, the flag
+   * is authoritative and {@link import("./password-policy").PasswordPolicyPrompt}
+   * skips itself.
+   */
+  readonly passwordMinLengthFromFlag?: boolean;
   /**
    * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
    * development run asks where a provider's endpoints are — see

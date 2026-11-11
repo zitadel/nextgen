@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { country } from "../../../../../src/lib/telemetry/dimensions/country";
+import { country } from "@/lib/telemetry/dimensions/country";
 
 describe("country", () => {
   it("resolves a known IANA zone to its ISO country code", () => {

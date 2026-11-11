@@ -1,16 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { setTimeout as delay } from "node:timers/promises";
 
-import mixpanelLib, {
-  type Mixpanel as MixpanelClient,
-  type Modifiers,
-  type Properties,
-} from "mixpanel";
+import type { Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
 
-import { resolveTelemetryHost } from "./config";
+import { resolveTelemetryToken, type TelemetryEndpoint } from "./config";
 import { resolveConsent } from "./consent";
 import { type Identity, loadOrCreateIdentity } from "./identity";
+import { MixpanelSink } from "./mixpanel-sink";
+import { type TelemetrySink, trace } from "./sink";
 import { compact } from "./util";
+import { VercelSink } from "./vercel-sink";
 
 export type { Properties, Modifiers } from "mixpanel";
 export type { TelemetryRegion } from "./config";
@@ -34,16 +32,24 @@ export type TelemetryDeps = {
   readonly flag?: boolean;
   /** Emit each payload to stderr before sending — for `--debug`. */
   readonly debug?: boolean;
-  readonly initClient?: (token: string, host: string) => MixpanelClient;
+  /**
+   * The properties a copy of each event sends to Vercel Web Analytics, in
+   * priority order. Without them no copy is sent.
+   */
+  readonly vercelKeys?: readonly string[];
+  readonly initClient?: (token: string, endpoint: TelemetryEndpoint) => MixpanelClient;
   readonly loadIdentity?: (env: NodeJS.ProcessEnv) => Identity;
   readonly newId?: () => string;
+  /** Sends the Vercel copy; defaults to the global `fetch`. */
+  readonly fetch?: typeof fetch;
 };
 
 /**
- * A generic, application-agnostic Mixpanel client wrapper for a single short
- * process. It knows nothing about commands, CLIs, or event names — callers
- * supply fully-built property bags. Its only opinions are operational, because
- * telemetry must never degrade the host program:
+ * A generic, application-agnostic telemetry client for a single short process:
+ * Mixpanel, when a token names a project, and a copy of each event for Vercel
+ * Web Analytics. It knows nothing about commands, CLIs, or event names —
+ * callers supply fully-built property bags. Its only opinions are operational,
+ * because telemetry must never degrade the host program:
  *
  * - Never throws — a missing token, opt-out, or transport error all degrade to
  *   a silent no-op.
@@ -51,133 +57,123 @@ export type TelemetryDeps = {
  * - Never writes to stdout; the optional debug trace goes to stderr.
  *
  * Inputs are treated as immutable: {@link track}/{@link profile} build a new
- * payload via spread and never mutate the bag they are given.
+ * payload via spread and never mutate the bag they are given. The destinations
+ * are {@link TelemetrySink}s, and this class only decides whether there are any
+ * and hands each event to all of them.
  */
 export class Telemetry {
-  private readonly pending: Promise<void>[] = [];
-
-  private readonly client: MixpanelClient | undefined;
   readonly distinctId: string;
   readonly isFirstRun: boolean;
-  private readonly debug: boolean;
+  private readonly sinks: readonly TelemetrySink[];
   private readonly newId: () => string;
 
-  private constructor(
-    client: MixpanelClient | undefined,
-    distinctId: string,
-    isFirstRun: boolean,
-    debug: boolean,
-    newId: () => string,
-  ) {
-    this.client = client;
-    this.distinctId = distinctId;
-    this.isFirstRun = isFirstRun;
-    this.debug = debug;
-    this.newId = newId;
+  private constructor(settings: {
+    readonly distinctId: string;
+    readonly isFirstRun: boolean;
+    readonly sinks: readonly TelemetrySink[];
+    readonly newId: () => string;
+  }) {
+    this.distinctId = settings.distinctId;
+    this.isFirstRun = settings.isFirstRun;
+    this.sinks = settings.sinks;
+    this.newId = settings.newId;
   }
 
-  /** Whether events will actually be sent (consent granted and a token configured). */
+  /** Whether events will actually be sent: consent granted, and a destination to send to. */
   get enabled(): boolean {
-    return this.client !== undefined;
+    return this.sinks.length > 0;
   }
 
   /**
-   * Resolve consent, identity, token, and host, then build the Mixpanel client
-   * lazily — only when consent is granted *and* a token is configured. Any
-   * failure along the way yields an inert instance whose methods are no-ops.
+   * Resolve consent and where events go, then identity, and make the sinks. A
+   * sink exists only when it has somewhere to send: Mixpanel when a token names
+   * a project, the Vercel copy when there are properties to keep and an intake.
+   * Without a destination, or on any failure along the way, the instance is
+   * inert and its methods are no-ops; it then never writes an install id.
    */
   static create(deps: TelemetryDeps): Telemetry {
-    const newId = deps.newId ?? randomUUID;
     const debug = deps.debug ?? false;
-    const inert = (firstRun: boolean): Telemetry =>
-      new Telemetry(undefined, "", firstRun, debug, newId);
+    const newId = deps.newId ?? randomUUID;
+    const inert = (isFirstRun: boolean): Telemetry => {
+      return new Telemetry({ distinctId: "", isFirstRun, sinks: [], newId });
+    };
 
     const consent = resolveConsent({ env: deps.env, flag: deps.flag });
-    if (debug) {
-      process.stderr.write(`[telemetry] consent: ${consent.reason}\n`);
+    trace(debug, () => {
+      return `consent: ${consent.reason}`;
+    });
+    if (!consent.enabled) {
+      return inert(false);
     }
-    if (!consent.enabled || !consent.token) {
+
+    const token = resolveTelemetryToken(deps.env);
+    if (!token) {
+      trace(debug, () => {
+        return "mixpanel: no token";
+      });
+    }
+    const vercel = VercelSink.from({
+      env: deps.env,
+      keys: deps.vercelKeys,
+      debug,
+      fetch: deps.fetch ?? fetch,
+    });
+    if (!token && !vercel) {
       return inert(false);
     }
 
     const identity = (deps.loadIdentity ?? loadOrCreateIdentity)(deps.env);
-
-    let client: MixpanelClient | undefined;
-    try {
-      client = (deps.initClient ?? defaultInit)(consent.token, resolveTelemetryHost(deps.env));
-    } catch {
+    const mixpanel = MixpanelSink.connect({
+      env: deps.env,
+      token,
+      distinctId: identity.distinctId,
+      debug,
+      init: deps.initClient,
+    });
+    const sinks = [mixpanel, vercel].filter((sink) => {
+      return sink !== undefined;
+    });
+    if (sinks.length === 0) {
       return inert(identity.isFirstRun);
     }
-    return new Telemetry(client, identity.distinctId, identity.isFirstRun, debug, newId);
+    return new Telemetry({
+      distinctId: identity.distinctId,
+      isFirstRun: identity.isFirstRun,
+      sinks,
+      newId,
+    });
   }
 
   /** Send an event with the given properties; `distinct_id`/`$insert_id` are stamped here. */
   track(event: string, properties: TelemetryProperties): void {
-    if (!this.client) {
-      return;
-    }
     const payload = compact({
       ...properties,
       distinct_id: this.distinctId,
       $insert_id: this.newId(),
     });
-    if (this.debug) {
-      process.stderr.write(`[telemetry] ${event} ${JSON.stringify(payload)}\n`);
+    for (const sink of this.sinks) {
+      sink.track(event, payload);
     }
-    this.enqueue((client, done) => client.track(event, payload, done));
   }
 
-  /** Write a user profile via the People API. `modifiers` carries `$ip` etc. */
+  /** Write a user profile where the destination has one. `modifiers` carries `$ip` etc. */
   profile(properties: TelemetryProperties, modifiers: Modifiers = {}): void {
-    if (!this.client) {
-      return;
-    }
     const payload = compact(properties);
-    if (this.debug) {
-      process.stderr.write(`[telemetry] people.set ${JSON.stringify(payload)}\n`);
+    for (const sink of this.sinks) {
+      sink.profile(payload, modifiers);
     }
-    this.enqueue((client, done) => client.people.set(this.distinctId, payload, modifiers, done));
   }
 
   /**
    * Await in-flight sends so a short-lived process does not exit before the
-   * requests complete, bounded by `timeoutMs`. The timeout is unref'd so the
-   * losing race branch never holds the event loop open or needs a manual clear.
+   * requests complete, bounded by `timeoutMs` for every destination at once.
    * Safe to call on an inert instance.
    */
   async shutdown(timeoutMs = 2000): Promise<void> {
-    if (this.pending.length === 0) {
-      return;
-    }
-    await Promise.race([
-      Promise.allSettled(this.pending),
-      delay(timeoutMs, undefined, { ref: false }),
-    ]);
-  }
-
-  /**
-   * Enqueue one fire-and-forget send. Resolves (never rejects) on any failure —
-   * a synchronous throw or an error callback must not surface to the caller or
-   * leak as an unhandled rejection.
-   */
-  private enqueue(send: (client: MixpanelClient, done: () => void) => void): void {
-    const client = this.client;
-    if (!client) {
-      return;
-    }
-    this.pending.push(
-      new Promise<void>((resolve) => {
-        try {
-          send(client, () => resolve());
-        } catch {
-          resolve();
-        }
+    await Promise.all(
+      this.sinks.map((sink) => {
+        return sink.flush(timeoutMs);
       }),
     );
   }
-}
-
-/** Real Mixpanel client construction, isolated so {@link Telemetry.create} can swap it in tests. */
-function defaultInit(token: string, host: string): MixpanelClient {
-  return mixpanelLib.init(token, { host, geolocate: false });
 }

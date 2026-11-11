@@ -1,8 +1,11 @@
-import { ZitadelError, toZitadelError } from "../../errors";
-import { publicCliCommand } from "../../public-cli";
-import { listenersForPort, type TcpListener } from "../../prober/ports";
-import { dockerRuntimeGuidance, dockerUnavailableMessage } from "../docker-guidance";
-import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "../runtime";
+import { ZitadelError, toZitadelError } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
+import {
+  dockerRuntimeGuidance,
+  dockerUnavailableMessage,
+} from "@/lib/local-server/docker-guidance";
+import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "@/lib/local-server/runtime";
 import { DockerLauncher } from "./docker-launcher";
 import {
   NoFreePortError,
@@ -34,12 +37,14 @@ function startupCleanupFailedError(
     `${startupError.message}; cleanup did not stop the spawned local runtime`,
     {
       hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
-      nextCommands: unique([
-        ...(startupError.nextCommands ?? []),
-        publicCliCommand("stop --all", cliVersion),
-        publicCliCommand("logs", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
-      ]),
+      nextCommands: [
+        ...new Set([
+          ...(startupError.nextCommands ?? []),
+          unscopedCommand("stop --all", cliVersion),
+          unscopedCommand("logs", cliVersion),
+          unscopedCommand("reset --force", cliVersion),
+        ]),
+      ],
       details: {
         startup_error: {
           code: startupError.code,
@@ -57,12 +62,9 @@ function startupCleanupFailedError(
  * answer: better than a start that fails halfway with a raw `docker` error.
  */
 export async function assertDockerAvailable(cliVersion: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
-  try {
-    result = await DockerLauncher.available();
-  } catch (error) {
+  const result = await DockerLauncher.available().catch((error: unknown) => {
     throw dockerUnavailableError(error, cliVersion);
-  }
+  });
   if (result.status !== 0) {
     throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion);
   }
@@ -93,8 +95,8 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
         : new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
             hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
             nextCommands: [
-              publicCliCommand("logs", cliVersion),
-              publicCliCommand("reset --force", cliVersion),
+              unscopedCommand("logs", cliVersion),
+              unscopedCommand("reset --force", cliVersion),
             ],
             details: {
               ...details,
@@ -121,7 +123,7 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
   if (error instanceof NoFreePortError) {
     return new ZitadelError("E_PORT_IN_USE", error.message, {
       hint: "Free a port, or choose one with --port.",
-      nextCommands: [publicCliCommand("start --port 9080", cliVersion)],
+      nextCommands: [unscopedCommand("start --port 9080", cliVersion)],
       details: { first_port: error.firstPort },
     });
   }
@@ -144,8 +146,8 @@ function portInUseError(
   return new ZitadelError("E_PORT_IN_USE", `Port ${String(port)} is already in use`, {
     hint: `Stop the process using ${serverUrl}, run \`zitadel stop --all\` for managed local runtimes, or choose another port.`,
     nextCommands: [
-      publicCliCommand("stop --all", cliVersion),
-      publicCliCommand(`start --port ${String(fallbackPort)}`, cliVersion),
+      unscopedCommand("stop --all", cliVersion),
+      unscopedCommand(`start --port ${String(fallbackPort)}`, cliVersion),
     ],
     details: { port, server_url: serverUrl, listeners },
   });
@@ -168,8 +170,8 @@ function serverExitedError(
     {
       hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
       nextCommands: [
-        publicCliCommand("logs", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        unscopedCommand("logs", cliVersion),
+        unscopedCommand("reset --force", cliVersion),
       ],
       details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
     },
@@ -177,6 +179,3 @@ function serverExitedError(
 }
 
 /** Removes repeats while keeping order, for suggested commands. */
-function unique(values: string[]): string[] {
-  return [...new Set(values)];
-}

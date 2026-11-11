@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -55,13 +55,13 @@ let sessionAnswer: (() => Response) | undefined;
 // The status of the sign-out's CSRF token read (`GET /sessions/me/csrf`).
 let sessionStatus = 200;
 
-const meHandler = http.get(`${API_BASE}/sessions/me`, () =>
+const meHandler = http.get(`${API_BASE}/api/v1/sessions/me`, () =>
   sessionAnswer
     ? sessionAnswer()
     : HttpResponse.json(sessionBody(currentName, currentEmail, currentUserId)),
 );
 
-const csrfHandler = http.get(`${API_BASE}/sessions/me/csrf`, () => {
+const csrfHandler = http.get(`${API_BASE}/api/v1/sessions/me/csrf`, () => {
   if (sessionStatus !== 200) {
     return HttpResponse.json(
       { code: "auth.unauthorized", message: "Missing or invalid session token." },
@@ -71,7 +71,7 @@ const csrfHandler = http.get(`${API_BASE}/sessions/me/csrf`, () => {
   return HttpResponse.json({ csrf_token: CSRF_TOKEN });
 });
 
-const okHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
+const okHandler = http.delete(`${API_BASE}/api/v1/sessions/me`, ({ request }) => {
   requestLog.push({
     url: request.url,
     method: request.method,
@@ -512,11 +512,11 @@ describe("<zitadel-logout>", () => {
 
     expect(requestLog).toHaveLength(1);
     expect(requestLog[0]?.method).toBe("DELETE");
-    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
+    expect(requestLog[0]?.url).toBe(`${API_BASE}/api/v1/sessions/me?project_id=test`);
     expect(requestLog[0]?.credentials).toBe("include");
     expect(requestLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(signoutEvents).toHaveLength(1);
-    expect(signoutEvents[0]?.detail).toEqual({
+    expect(signoutEvents[0]?.detail).toMatchObject({
       display: "Alice Liddell",
       identifier: "alice@acme.com",
     });
@@ -543,6 +543,37 @@ describe("<zitadel-logout>", () => {
     expect(window.location.href).toBe("https://app.test/done");
   });
 
+  it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/done";
+    await flush(element);
+    const finish = new AbortController();
+    const signedOut = vi.fn();
+    element.addEventListener("zitadel-signout", (event) => {
+      signedOut();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await vi.waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
+    await element.updateComplete;
+    expect(window.location.href).toBe("");
+
+    finish.abort();
+    await vi.waitFor(() => expect(window.location.href).toBe("https://app.test/done"));
+  });
+
   it("signs out using project-id / proxy-path attributes with no global config", async () => {
     // Drop the global so only the declarative attributes can configure the
     // element; restore it afterwards so later tests keep their global config.
@@ -558,7 +589,7 @@ describe("<zitadel-logout>", () => {
       await new Promise((resolve) => setTimeout(resolve, 32));
 
       expect(requestLog).toHaveLength(1);
-      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
+      expect(requestLog[0]?.url).toBe(`${API_BASE}/api/v1/sessions/me?project_id=test`);
       expect(requestLog[0]?.credentials).toBe("include");
     } finally {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });
@@ -577,7 +608,7 @@ describe("<zitadel-logout>", () => {
     element.postSignOutUrl = "https://app.test/done";
     await flush(element);
     server.use(
-      http.delete(`${API_BASE}/sessions/me`, () =>
+      http.delete(`${API_BASE}/api/v1/sessions/me`, () =>
         HttpResponse.json(
           { code: "auth.unauthorized", message: "Missing or invalid session token." },
           { status: 401 },
@@ -621,7 +652,7 @@ describe("<zitadel-logout>", () => {
   it("surfaces a network error in the dropdown without redirecting", async () => {
     const element = mount();
     await flush(element);
-    server.use(http.delete(`${API_BASE}/sessions/me`, () => HttpResponse.error()));
+    server.use(http.delete(`${API_BASE}/api/v1/sessions/me`, () => HttpResponse.error()));
 
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
@@ -644,7 +675,7 @@ describe("<zitadel-logout>", () => {
       const element = mount();
       element.postSignOutUrl = "https://app.test/done";
       await flush(element);
-      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      server.use(http.delete(`${API_BASE}/api/v1/sessions/me`, answer));
       const events: Event[] = [];
       element.addEventListener("zitadel-signout", (event) => events.push(event));
 
@@ -669,7 +700,7 @@ describe("<zitadel-logout>", () => {
       const element = mount();
       element.postSignOutUrl = "https://app.test/done";
       await flush(element);
-      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      server.use(http.delete(`${API_BASE}/api/v1/sessions/me`, answer));
       const events: Event[] = [];
       element.addEventListener("zitadel-signout", (event) => events.push(event));
 

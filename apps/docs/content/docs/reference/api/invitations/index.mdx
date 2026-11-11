@@ -1,0 +1,18 @@
+---
+title: Invitations
+description: Create and manage 72-hour invitation links that grant a project role, and look up, accept or decline one by its token.
+---
+
+An invitation is a link, valid for 72 hours, that grants a project role to
+whoever redeems it while signed in. Create one for a project, share the
+one-shot `link` out of band, then list, read or cancel pending invitations.
+The redeem path looks up, accepts or declines an invitation by its token
+without the project ID in the URL.
+
+Creating a project-member invitation needs the same project `admin` check as
+creating a grant. Team-member invitations are declared in the contract and
+answer `501` until they ship. Refused for an unclaimed project, on a server
+without a platform project, and when the project's pending-invitation cap is
+reached.
+
+<Operations />

@@ -108,8 +108,8 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Tabs` |
-| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`), by the "List filters" recipe below |
+| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
@@ -119,11 +119,63 @@ Canonical examples:
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
+| Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
 
-Shared text styles (`PAGE_TITLE`, `OVERLINE`, `EYEBROW`, the panel table cells)
-live in `src/components/typography.ts`. A mutation's pending and error state
-comes from `useSubmit` (`src/hooks/use-submit.ts`), and cursor paging from
-`useLoadMore` (`src/hooks/use-load-more.ts`) with the `LoadMore` button.
+### Status tones
+
+A status pill's dot (`StatusBadge`, `StatusDot` in `src/components/status-badge.tsx`)
+is coloured by what the status means, never per status. Add a new status to
+`STATUS_TONE` there, under the tone whose meaning it has; an unlisted one reads
+neutral.
+
+| Tone | Token | Meaning | Statuses |
+| --- | --- | --- | --- |
+| `positive` | `success` | in force and working | `active`, `live` |
+| `caution` | `warning` | held for now; someone can lift it | `suspended` |
+| `critical` | `destructive` | on its way out, not coming back by itself | `pending_purge` |
+| `neutral` | `muted-foreground` | off, or not yet on | `deactivated`, `inactive`, `draft` |
+
+A hard stop that is not one state among several (a revoked release) is the
+tinted `destructive` `Badge` with no dot, not a tone.
+
+Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
+`OVERLINE`, `EYEBROW`, the panel table cells) live in
+`src/components/typography.ts`.
+
+- `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
+  and section title, the project page's Project Detail, Origins and Variables
+  and Secrets cards included. `DetailSection` renders it as an `h2`; so do
+  Field definitions, Steps, Release content and the settings sections.
+- `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
+  inside a card body, such as Sign-in methods on a schema.
+- The overline is for meta labels, table heads and drill-down breadcrumbs,
+  never a section title.
+
+The Figma style names are not the `heading-*` tokens in the exported
+`4. Custom` collection, which are the larger marketing headings.
+
+A mutation's pending and error state comes from `useSubmit`
+(`src/hooks/use-submit.ts`), and cursor paging from `useLoadMore`
+(`src/hooks/use-load-more.ts`) with the `LoadMore` button.
+
+## Page wrapper — one top for every screen
+
+Every console screen renders inside `Page` (`src/components/layout.tsx`): lists,
+resource details, configuration panels, settings and System. It owns the page
+gutter and, above all, the distance under the top bar, so no screen measures its
+own. Do not add a per-screen wrapper with its own padding.
+
+| Region | Value |
+| --- | --- |
+| Page top | 20px at `lg`, 16px below |
+| Page gutter | 16px; 24px from `sm` with `inset="panel"` |
+| Page bottom | 32px |
+| Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
+| Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
+
+`inset="panel"` is for the configuration-panel screens (Login flows, Identity
+providers, Releases), whose single card the design insets by 24px on the
+sides. It changes the sides only, never the top.
 
 ## Resource list layout — one shell for every list screen
 
@@ -133,30 +185,39 @@ compose it rather than restating the numbers per screen.
 
 Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
-composes `ResourcePage`, `ResourceTitle` (with the Add button as its `action`,
-beside the title at every width, D19), then `ResourceHeaderRow` +
+composes `Page`, `ResourceTitle` (with the Add button as its `action`,
+beside the title at every width, D19, labelled with what it adds as the sheet
+it opens is titled: `Add user`, `New project`, never a bare `Add`, the list's search as its `filter`,
+beside the action on one 36px row and on its own row under the title on a
+phone, where `filterBelow` keeps it at every width, as Logs' search is, and
+the list's `ResourceFilter` as its `below` row, by "List filters" below),
+then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
 its card below 576px rather than squeezing the cells.
 
 | Region | Value |
 | --- | --- |
-| Page gutter | 16px — the same inset as the table |
-| Page top | 20px at `lg`, 16px below — the page-header block |
+| Page | `Page` — 16px gutter, the same inset as the table; 20px top at `lg` |
 | Header gutter | 24px at `lg`, the page gutter plus 8px; 16px below it |
-| Title row | 24px, or 36px with the Add button beside the title |
+| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`) — every screen's title sits on this line |
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
+| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Logs). Never restate a height per cell |
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
 | Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
 
 Two things are deliberately **not** shared, because the designs genuinely differ:
 
-- **Column widths.** Teams sits on a fixed 248px grid, Projects on thirds, and
-  the Users table is schema-driven, so it has no fixed grid to share. It shows
-  each value once (D20): its ID column absorbs the slack and truncates, so the
-  default schema fits 1024px, and a schema with more columns scrolls.
+- **Column widths.** Teams sits on a fixed 248px grid. Users and Projects
+  clamp their name cell and let their ID column (`ResourceIdCell`) absorb the
+  slack and truncate (D20, D21). The Users table takes the properties a viewer
+  pins, so it has no fixed grid to share, and bounds its width (D23): the
+  unpinned attributes share one 280px Attributes column, so the default
+  columns fit 1024px. Pinning enough columns scrolls the table under its
+  sticky row-menu column, and from 640px its sticky User column
+  (`RESOURCE_STICKY_END` / `RESOURCE_STICKY_START` with `useScrollEdges`).
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 
@@ -170,33 +231,72 @@ glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
 the design even though its box measures correctly.
 
+### List filters
+
+A list is narrowed through `ResourceFilter` (`src/components/resource-filter.tsx`):
+**Add filter** lists the resource's properties, then the chosen property's
+values by its type, and each set filter is a chip. The Users list
+(`src/routes/_authed/users/index.tsx`) is the shipped example. To add it to a
+list:
+
+1. Describe the properties as `FilterDefinition`s (`src/lib/resource-filter.ts`)
+   in `src/features/<resource>/filters.tsx`. A fixed set of values is
+   `type: "options"`, a moment `type: "date"`; a status takes `statusOptions`
+   (`status-badge.tsx`). A property that depends on another names it in the
+   other's `clears` and says why it is `unavailable` until then.
+2. Keep each value in the URL under its definition's `key`: accept only what
+   the filter could have set in the route's `validateSearch`
+   (`parseDateFilter` for a date), and leave the keys in `loaderDeps`.
+3. Turn the values into the query's criteria in the feature, as `userFilter`
+   (`src/features/users/list.ts`) does. The server narrows; nothing filters or
+   counts the rows already loaded. A date's start is `dateFilterStart`.
+4. Render it in `ResourceTitle`'s `below` row, merging each `onChange` patch
+   into the search. The search field stays in `filter`.
+5. In the empty state, tell "no match" from "none yet" with `isFiltered`, and
+   clear with `clearedFilters`.
+
+A new kind of value (a number, free text) is a new `type` in
+`FilterDefinition` and its values list in the component, not a control beside
+it.
+
 ## Resource detail layout — one shell for every detail screen
 
 Detail screens come in three compositions, and each has one shell:
 
 - **Resource detail** (Users, Teams, Project settings): a title row over body
-  cards. Compose `DetailPage` + `DetailHeader` from
+  cards. Compose `Page` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
-  body card with a titled section is a `DetailSection`; a single name field with
-  its Save button is a `RenameCard` (`src/components/rename-card.tsx`).
-- **Configuration panel** (User schemas, Login flows): the whole screen is one
-  `DetailPanel` headed by a `PanelTitle` (both in
-  `src/components/detail-page.tsx`), inside `DETAIL_PANEL_PAGE`
+  body card with a titled section is a `DetailSection`, with an optional
+  `description` (a muted sentence about the whole section, between the title
+  and the rule); a single name field with
+  its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
+  card the design titles by name rather than a section title (Users: the profile,
+  under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
+  `h1`.
+- **Resource detail, identity-line header** (User schemas): the resource
+  detail body under `DetailTitle` (`src/components/detail-page.tsx`) instead of
+  `DetailHeader`: the title over one 12/16 line with the id, its copy button
+  and the created date, no icon tile and no header card. The line stacks under
+  `sm`. Each tab is a `DetailSection`.
+- **Configuration panel** (Login flows, Identity providers, Releases): the whole
+  screen is one `DetailPanel` headed by a `PanelTitle` (both in
+  `src/components/detail-page.tsx`), inside `<Page inset="panel">`
   (`src/components/layout.tsx`).
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
-  centred column `--zl-container-settings` wide. Compose `DetailPage` +
+  centred column `--zl-container-settings` wide. Compose `Page` +
   `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
   no header gutter, then `SettingsCard` (`src/components/settings-card.tsx`)
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
   and no header card: a settings screen is not a resource with an id.
 
-The first two share the icon tile (`ICON_PLATE`) and the header card
-(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
-copyable, and the created date.
+Resource detail and the configuration panel share the icon tile (`ICON_PLATE`)
+and the header card (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the
+resource id, copyable, and the created date. The identity-line header carries
+the same two values in one line instead.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
-| Page gutter   | 16px, 22px from the navbar — as the list shell        |
+| Page          | `Page` — 16px gutter, 20px top at `lg`, as every screen |
 | Header gutter | 24px — the page gutter plus 8px                        |
 | Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
 | Header card   | 20px inset, 14px block, values centred on the rule     |

@@ -19,7 +19,7 @@ If the image is not published yet, build locally — see [CONTRIBUTING.md](../..
 | Service | Role |
 | ------- | ---- |
 | `postgres` | PostgreSQL 18 with database `nextgen` |
-| `nextgen` | API + embedded `/ui/console/` and `/ui/login/` |
+| `nextgen` | API + embedded `/ui/console/` |
 
 ## Environment And Volumes
 

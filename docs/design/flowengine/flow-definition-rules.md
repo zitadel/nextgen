@@ -1,7 +1,7 @@
 # Flow Definition — Shape & Rules
 
 > **Status:** Current
-> **See also:** [Flow Engine](flow-engine.md) · [Architecture](architecture.md) · [OpenAPI schema](../../../api/openapi/endpoints/schemas/flow-definition.json)
+> **See also:** [Flow Engine](flow-engine.md) · [Architecture](architecture.md) · [OpenAPI schema](../../../apps/api/api/openapi/endpoints/schemas/flow-definition.json)
 
 A flow definition is a directed graph of steps stored as an API resource and
 executed by the [flow engine](architecture.md). This document describes the
@@ -9,17 +9,17 @@ shape and the rules the engine enforces on top of the JSON schema.
 
 Validation runs in two layers:
 
-1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, a transition never sets both `purpose` and `action`, and the `sso_authenticated` and `sso_user_not_found` transitions set neither. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
+1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, a transition sets a `target` or a `purpose` but never both `purpose` and `action`, and the `sso_authenticated` and `sso_user_not_found` transitions set neither. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
 2. **Engine**: the rules below, applied at write time and (where deferred) at runtime.
 
 ## Definition shape
 
 | Field | Required | Notes |
 |---|:-:|---|
-| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
-| `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
+| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. A release pins one revision of a name, and resolution by name returns it. |
+| `schema_version` | ✓ | Monotonic per `(project_id, name)`. The server hard-codes it today. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
-| `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The project's newest revision of it is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
+| `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The revision of it the release pins is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
 | `audience` | optional | `app_ids[]`, `team_ids[]`. Empty = project default. Specificity for resolution is app > team > default. |
 | `steps` | ✓ | Ordered list of `FlowDefinitionStep`. Order doesn't drive runtime; transitions do. |
@@ -40,7 +40,7 @@ present.
 | `sso_providers` | Definition-schema list of `{ id, name, template }`. Today's runtime does not emit providers and rejects SSO submissions. |
 | `on_success` | Server-side mutation that runs after fields validate, before the transition fires. `create_user` today. |
 | `complete` | Terminal classifier: `redirect` (frontend navigates to `redirect_uri`) or `show` (success screen). |
-| `transitions` | Map of action name **or** engine-emitted outcome → `{ target, action? }`. `action` distinguishes intra-flow targets (`null`) from cross-flow `switch` / `pivot`. |
+| `transitions` | Map of action name **or** engine-emitted outcome → `{ target?, purpose?, action? }`. `action` distinguishes intra-flow targets (`null`) from cross-flow `switch` / `pivot`. |
 
 ## Transitions
 
@@ -60,6 +60,7 @@ Transition values:
 | Value | Behavior |
 |---|---|
 | `{ target: "step_name" }` | Move within the current flow. `target` must be a step `name` in `steps`. |
+| `{ purpose: "register" }` | Switch to that purpose and go to its entry step, starting it fresh. `target` may be left out, or must name that entry step. |
 | `{ target: "other-flow", action: "pivot" }` | Push the current `FlowProgress` onto `PivotStack`, switch to another definition. Returns on completion. **Reserved — not implemented.** |
 | `{ target: "other-flow", action: "switch" }` | Replace the current flow entirely. No return. **Reserved — not implemented.** |
 
@@ -70,7 +71,8 @@ Transition values:
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
 - `user_schema` names a schema of the project.
-- **Flip-table coverage.** A definition that serves both `login` and `register` must wire `user_not_found` (login entry) and `user_already_exists` (register entry) on the entry step. Solo-purpose flows don't need the counter outcome. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- **The automatic switch is optional.** A definition that serves both `login` and `register` may leave `user_not_found` (login entry) or `user_already_exists` (register entry) unwired; the outcome then shows its step error. `zitadel deploy --dry-run` warns about it. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- **A purpose switch names a served purpose.** A transition with `purpose` targets that purpose's entry step: either `target` is that step or `target` is left out.
 - **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per `ManifestForOnSuccess`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
 
 ### Step

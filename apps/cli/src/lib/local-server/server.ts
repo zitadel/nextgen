@@ -2,8 +2,10 @@ import { join } from "node:path";
 
 import consola from "consola";
 
-import { ZitadelError } from "../errors";
-import { publicCliCommand } from "../public-cli";
+import { Consent } from "@/lib/consent";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { currentUser } from "@/lib/uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
@@ -31,6 +33,15 @@ import {
   removeLocalData,
   removeRuntimeMetadata,
 } from "./runtime";
+import {
+  type LogLevel,
+  type LogLine,
+  LogLineReader,
+  type LogSink,
+  atLeast,
+  lastLines,
+  logLines,
+} from "./server-log";
 
 /** What every backend needs to start: what the directory does not already say. */
 type CommonRunConfig = Readonly<{
@@ -195,6 +206,30 @@ export class LocalServer {
     }
   }
 
+  /**
+   * Whether nothing on this machine holds `port`, decided the way `start`
+   * decides it for a server (connect and bind, never `lsof`). For setup, which
+   * asks for an app port, or warns when it cannot ask, only when the detected
+   * one is taken.
+   */
+  static isPortFree(port: number): Promise<boolean> {
+    return new TcpPorts().isFree(port);
+  }
+
+  /**
+   * The first free port among the 20 after `port`, for setup to suggest in
+   * place of a taken one, or `undefined` when they are all taken too.
+   */
+  static async nextFreePort(port: number): Promise<number | undefined> {
+    const count = Math.max(0, Math.min(port + 20, 65535) - port);
+    for (const next of Array.from({ length: count }, (_, index) => port + 1 + index)) {
+      if (await LocalServer.isPortFree(next)) {
+        return next;
+      }
+    }
+    return undefined;
+  }
+
   /** Whether the server a record names is running (see the identity checks in the launchers) and answering. */
   private static async isServing(runtime: RuntimeMetadata): Promise<boolean> {
     const alive =
@@ -339,7 +374,7 @@ export class LocalServer {
           containerName: localContainerName(this.cwd),
           image,
           dataDir: paths.dataDir,
-          identity: await ensureContainerIdentity(this.cwd, DockerLauncher.currentUser()),
+          identity: await ensureContainerIdentity(this.cwd, currentUser()),
           env: config.env,
           userFile: config.userFile,
         }),
@@ -363,15 +398,13 @@ export class LocalServer {
    */
   async status(): Promise<ServerStatus> {
     const runtime = await readRuntimeMetadata(this.cwd);
-    let container: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
-    let dockerError: string | undefined;
-    if (runtime?.backend === "docker") {
-      try {
-        container = await DockerLauncher.inspect(runtime.container_name);
-      } catch (error) {
-        dockerError = error instanceof Error ? error.message : String(error);
-      }
-    }
+    const { container, dockerError } =
+      runtime?.backend === "docker"
+        ? await DockerLauncher.inspect(runtime.container_name).then(
+            (inspected) => ({ container: inspected, dockerError: undefined }),
+            (error: unknown) => ({ container: undefined, dockerError: errorMessage(error) }),
+          )
+        : { container: undefined, dockerError: undefined };
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
     const running =
       runtime?.backend === "binary" ? await BinaryLauncher.isRecordRunning(runtime) : false;
@@ -402,9 +435,11 @@ export class LocalServer {
    * Stops the directory's server and deletes its data and its record. The
    * server is stopped first so its database is not deleted from under it. The
    * local admin credential is kept: deleting it would leave a start that cannot
-   * sign in, because the server only imports the admin once.
+   * sign in, because the server only imports the admin once. The data cannot
+   * be recovered, so it takes the consent `reset` asked for.
    */
-  async reset(): Promise<StopReport> {
+  async reset(consent: Consent): Promise<StopReport> {
+    Consent.assert(consent);
     const report = await this.halt();
     await removeLocalData(this.cwd);
     await removeRuntimeMetadata(this.cwd);
@@ -412,35 +447,67 @@ export class LocalServer {
   }
 
   /**
-   * The end of the server's log, or, with `follow`, the log streamed until
-   * interrupted (then `logs` is empty: it was written to the terminal as it
-   * came). The log is read by the record, so it works for a server that has
-   * stopped, which is when the log is most wanted.
+   * The end of the server's log: its last `tail` lines, or with `level` the
+   * last `tail` lines at that level or above. The log is read by the record,
+   * so it works for a server that has stopped, which is when the log is most
+   * wanted.
    */
   async logs(options: {
     tail: number;
-    follow?: boolean;
-  }): Promise<{ runtime: RuntimeMetadata; logs: string }> {
+    level?: LogLevel;
+  }): Promise<{ runtime: RuntimeMetadata; lines: LogLine[] }> {
+    const runtime = await this.recordedRuntime();
+    // Docker picks the last lines itself, but by count only, so lines at a
+    // level are picked here from the whole log.
+    const text =
+      runtime.backend === "binary"
+        ? await BinaryLauncher.readLog(runtime.log_path)
+        : await DockerLauncher.readLogs(
+            runtime.container_name,
+            options.level ? "all" : options.tail,
+          );
+    return { runtime, lines: lastLines(logLines(text), options.tail, options.level) };
+  }
+
+  /**
+   * Prints the end of the server's log, the lines {@link logs} picks, and then
+   * each line the server writes, until interrupted. With `level`, the lines
+   * below it are left out of both.
+   */
+  async followLogs(options: {
+    tail: number;
+    level?: LogLevel;
+    print: (lines: readonly LogLine[]) => void;
+  }): Promise<RuntimeMetadata> {
+    const runtime = await this.recordedRuntime();
+    const reader = new LogLineReader();
+    const sink: LogSink = {
+      existing: (text) => options.print(lastLines(reader.read(text), options.tail, options.level)),
+      appended: (text) => options.print(atLeast(reader.read(text), options.level)),
+    };
+    if (runtime.backend === "binary") {
+      await BinaryLauncher.followLogs(runtime.log_path, sink);
+    } else {
+      await DockerLauncher.followLogs(
+        runtime.container_name,
+        options.level ? "all" : options.tail,
+        sink,
+      );
+    }
+    options.print(atLeast(reader.end(), options.level));
+    return runtime;
+  }
+
+  /** The directory's record, which reading the log needs: the log is found by it. */
+  private async recordedRuntime(): Promise<RuntimeMetadata> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [publicCliCommand("start", this.cliVersion)],
+        nextCommands: [unscopedCommand("start", this.cliVersion)],
       });
     }
-    if (options.follow) {
-      if (runtime.backend === "binary") {
-        await BinaryLauncher.followLogs(runtime.log_path, options.tail);
-      } else {
-        await DockerLauncher.followLogs(runtime.container_name, options.tail);
-      }
-      return { runtime, logs: "" };
-    }
-    const logs =
-      runtime.backend === "binary"
-        ? await BinaryLauncher.readLogs(runtime.log_path, options.tail)
-        : await DockerLauncher.readLogs(runtime.container_name, options.tail);
-    return { runtime, logs };
+    return runtime;
   }
 
   /**

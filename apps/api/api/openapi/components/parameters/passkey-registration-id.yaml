@@ -1,0 +1,8 @@
+name: registration_id
+in: path
+required: true
+description: |
+  The `registration_id` that `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`) returns.
+schema:
+  type: string
+example: att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C

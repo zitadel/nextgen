@@ -1,6 +1,6 @@
-import type { FrameworkFacts } from "../detectors/types";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
-import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
+import type { FrameworkFacts } from "@/lib/orca/detectors/types";
+import type { CreatedProject } from "@/lib/backend";
+import type { ScaffoldFileClass, ScaffoldPosture } from "@/lib/sync/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -29,7 +29,7 @@ export type PatchContext = PatchView &
      * `.zitadel/secret`, which records the project's ids and secrets but not
      * its name, and no patcher needs the name to fill a file.
      */
-    project: Omit<CreateProject201, "name">;
+    project: Omit<CreatedProject, "name">;
     issuer: string;
     server: string;
     cliVersion: string;
@@ -177,7 +177,7 @@ export type EjectActions = Readonly<{
 export type ConfigWiringStatus = Readonly<{
   path: string;
   wiring: "infrastructure" | "convenience";
-  state: "applied" | "detached" | "unknown";
+  state: "applied" | "detached" | "unknown" | "outdated";
   reason?: string;
 }>;
 

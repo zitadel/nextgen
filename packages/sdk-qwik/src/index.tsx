@@ -31,11 +31,11 @@ import {
 import { isServer } from "@qwik.dev/core/build";
 
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
-import type { ZitadelWidgetAttributes } from "./types";
+import type { ZitadelWidgetAttributes } from "./types.js";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from "./types";
+export * from "./types.js";
 
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
@@ -188,9 +188,22 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "suppressHeader", props.suppressHeader);
 }
 
-/** Hands the detail of a widget event to its handler; a plain event carries none and is not one. */
-function withDetail<Detail>(event: Event, handler: ((detail: Detail) => void) | undefined): void {
-  if (event instanceof CustomEvent) handler?.(event.detail);
+/**
+ * Forwards a widget event's detail to the app callback, and registers the
+ * callback's returned promise — from an async handler or a Qwik QRL — on the
+ * detail's `waitUntil`. The three navigating events (flow-complete,
+ * flow-redirect, signout) then wait for it before the widget navigates; other
+ * events carry no `waitUntil`, so the call is a no-op.
+ */
+function withDetail<Detail>(
+  event: Event,
+  handler: ((detail: Detail) => unknown) | undefined,
+): void {
+  if (!(event instanceof CustomEvent) || !handler) {
+    return;
+  }
+  const result = handler(event.detail);
+  event.detail.waitUntil?.(result);
 }
 
 const sessionForwarders = new WeakMap<Element, () => void>();

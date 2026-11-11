@@ -110,4 +110,17 @@ describe("brand marks and colour", () => {
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.every((path) => path.getAttribute("fill") !== null)).toBe(true);
   });
+
+  it("leaves a monochrome mark's paths unfilled, so GitHub follows the label colour", async () => {
+    brandHost.innerHTML = `<zl-icon name="brand-github" size="16" decorative></zl-icon>`;
+    const el = brandHost.querySelector("zl-icon") as ZlIcon;
+    await el.updateComplete;
+    const svg = el.shadowRoot?.querySelector("svg");
+
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(svg?.getAttribute("stroke")).toBeNull();
+    const paths = [...(svg?.querySelectorAll("path") ?? [])];
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((path) => path.getAttribute("fill") === null)).toBe(true);
+  });
 });

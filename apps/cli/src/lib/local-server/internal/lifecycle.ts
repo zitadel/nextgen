@@ -10,7 +10,7 @@
  * process is spawned or how a port is probed, the tests that make it cheap to
  * change stop being able to cover it.
  */
-import { DEFAULT_LOCAL_SERVER_PORT } from "../runtime";
+import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/local-server/runtime";
 import { type Clock, realClock } from "./clock";
 
 /**
@@ -273,7 +273,7 @@ export class Lifecycle<R extends ServerRecord> {
   /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
   private async answers(serverUrl: string): Promise<boolean> {
     const clock = this.options.clock ?? realClock;
-    for (let attempt = 1; attempt <= HEALTH_ATTEMPTS; attempt++) {
+    for (const attempt of Array.from({ length: HEALTH_ATTEMPTS }, (_, index) => index + 1)) {
       if (await this.deps.health.isHealthy(serverUrl)) {
         return true;
       }
@@ -317,6 +317,7 @@ export class Lifecycle<R extends ServerRecord> {
     if (previous) {
       await this.terminate(previous);
     }
+    // A port race retries on the next port, so both move with each attempt.
     let preferred = previous?.port ?? this.options.previousPort;
     for (let attempt = 0; ; attempt++) {
       const claim = await claimFreePort(
@@ -326,10 +327,7 @@ export class Lifecycle<R extends ServerRecord> {
         this.options.firstPort,
       );
       try {
-        let record: Launched<R>;
-        try {
-          record = await this.launchAndWait(claim.port);
-        } catch (error) {
+        const record = await this.launchAndWait(claim.port).catch(async (error: unknown) => {
           // Someone else took the port between claiming it and binding it (a
           // process outside our claims, or a Docker publish that failed). The
           // choice was automatic, so the next port is tried. A server that failed
@@ -341,10 +339,13 @@ export class Lifecycle<R extends ServerRecord> {
             (error instanceof ServerStartError ? error.reason === "exited" : true) &&
             !(await this.deps.ports.isFree(claim.port))
           ) {
-            preferred = claim.port + 1;
-            continue;
+            return undefined;
           }
           throw error;
+        });
+        if (record === undefined) {
+          preferred = claim.port + 1;
+          continue;
         }
         return { record, alreadyRunning: false };
       } finally {
@@ -510,7 +511,7 @@ export async function claimFreePort(
     return { port: requested, release };
   }
   const first = preferred ?? firstPort;
-  for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
+  for (const port of Array.from({ length: PORT_SEARCH_RANGE }, (_, index) => first + index)) {
     if (!(await ports.isFree(port))) {
       continue;
     }

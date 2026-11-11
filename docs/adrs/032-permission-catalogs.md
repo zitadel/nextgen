@@ -1,7 +1,14 @@
 # ADR 032: Permission Catalogs — A Portable Relational FGA Core
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-24 (originally Proposed 2026-07-09)
 > **Date:** 2026-07-09
+>
+> **Amendment (2026-10-24):** the core is built: the OpenFGA parser, profile
+> validator and compiler (#720), the relational storage (#677) and the
+> resolver's check and list oracle (#801), with cross-dialect statement tests.
+> Follow-up 4 is done. Follow-up 3 (Leopard flattening) stays deferred, as
+> `permission-storage.md` D11 records, and catalog customization is future
+> work.
 > **Context:** Shared permission model, catalog architecture, and storage/resolver core for internal and external authorization
 
 ## Introduction
@@ -98,7 +105,7 @@ The current design docs already lock several adjacent invariants:
   scope-bound repositories.
 - [`docs/design/api/authz.md`](../design/api/authz.md) frames authorization
   as `credential x resolved scope x required permission -> decision`.
-- [`internal/storage/AGENTS.md`](../../internal/storage/AGENTS.md) requires
+- [`internal/storage/AGENTS.md`](../../apps/api/internal/storage/AGENTS.md) requires
   SQL-first storage that works on both PostgreSQL and Spanner.
 
 Three related issue areas constrain the decision:

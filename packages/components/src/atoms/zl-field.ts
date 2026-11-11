@@ -24,6 +24,11 @@ import type { IconName } from "./zl-icon.js";
  */
 export type ZlFieldType = CreateFlow201StepFieldsItemType;
 
+/** The HTML input for a wire type: the same name, except for `date_time`. */
+function nativeInputType(type: ZlFieldType): string {
+  return type === "date_time" ? "datetime-local" : type;
+}
+
 /** Detail shape emitted by the `zl-input` event (input + clear). */
 export type ZlFieldInputDetail = { name: string; value: string };
 
@@ -42,13 +47,18 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                toggle takes the slot in every state, so the field never
  *                shows two icons. The clear button is a pointer-only affordance
  *                (`tabindex="-1"`) — keyboard users clear via the input
- *                itself. The toggle has no keyboard equivalent, so it sits in
- *                the tab order right after the input.
+ *                itself — drawn only while there is something to clear; an
+ *                empty field keeps its space, so text does not shift when
+ *                typing starts. The toggle has no keyboard equivalent, so it
+ *                sits in the tab order right after the input.
  *   description  14/20 in `--zl-muted-foreground`
  *   read-only    `--zl-muted` fill at full contrast, no hover edge and no
  *                clear button; still focusable and still submitted
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
+ *
+ * @fires {CustomEvent<ZlFieldInputDetail>} zl-input - The field value changed; carries the field name and value.
+ * @fires {CustomEvent<ZlSubmitDetail>} zl-submit - A field affordance (e.g. forgot-password) requests a flow action.
  */
 @customElement("zl-field")
 export class ZlField extends FormAtom {
@@ -148,7 +158,7 @@ export class ZlField extends FormAtom {
   private concealOnSubmit = (): void => {
     if (!this.revealed) return;
     this.revealed = false;
-    if (this.inputEl) this.inputEl.type = this.type;
+    if (this.inputEl) this.inputEl.type = nativeInputType(this.type);
   };
 
   override formResetCallback(): void {
@@ -193,10 +203,13 @@ export class ZlField extends FormAtom {
     const helpId = `${this.inputId}-help`;
     const showError = Boolean(this.error);
     const showSuccess = Boolean(this.success) && !showError && !this.invalid;
+    // The error takes the help text's place while it shows, so the field
+    // carries one message under it at a time.
+    const showHelp = this.hasHelp && !showError;
     const describedBy = [
       showError ? errorId : null,
       showSuccess ? successId : null,
-      this.hasHelp ? helpId : null,
+      showHelp ? helpId : null,
     ]
       .filter(Boolean)
       .join(" ");
@@ -242,7 +255,7 @@ export class ZlField extends FormAtom {
             id=${this.inputId}
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
-            type=${this.revealed ? "text" : this.type}
+            type=${this.revealed ? "text" : nativeInputType(this.type)}
             spellcheck=${ifDefined(toggleShown ? "false" : undefined)}
             autocapitalize=${ifDefined(toggleShown ? "off" : undefined)}
             autocorrect=${ifDefined(toggleShown ? "off" : undefined)}
@@ -263,7 +276,7 @@ export class ZlField extends FormAtom {
           <slot name="suffix" @slotchange=${this.handleSuffixSlotChange}></slot>
           ${trailing}
         </div>
-        <div class="zr-field__help" part="help" id=${helpId} ?hidden=${!this.hasHelp}>
+        <div class="zr-field__help" part="help" id=${helpId} ?hidden=${!showHelp}>
           <slot name="help" @slotchange=${this.handleHelpSlotChange}></slot>
         </div>
         <div
@@ -322,6 +335,12 @@ export class ZlField extends FormAtom {
       iconName = "check";
       tone = "success";
       clearable = false;
+    }
+
+    // A Clear button on an empty field does nothing, yet a pointer user still
+    // reads it as a control and a screen reader still lists it.
+    if (clearable && this.value === "") {
+      return null;
     }
 
     const icon = html`<zl-icon name=${iconName} size="16" tone=${tone} decorative></zl-icon>`;
@@ -475,7 +494,9 @@ export class ZlField extends FormAtom {
       const form = this.internals.form;
       if (form) {
         event.preventDefault();
-        form.requestSubmit();
+        // A listed element named requestSubmit or reset shadows the form's
+        // method through named access, so the prototype is called.
+        HTMLFormElement.prototype.requestSubmit.call(form);
       }
     }
   };

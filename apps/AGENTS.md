@@ -8,18 +8,19 @@ Conventions shared by the deployable apps.
   [`.gitignore`](../.gitignore) covers. Never introduce another output name
   (`storybook-static`, `build`, `out`).
 - The exceptions, each dictated by where something else reads the output:
-  - `console` builds into `internal/staticui/console/dist`, the tree the Go
-    server embeds ([`embed.go`](../internal/staticui/console/embed.go)). The
+  - `console` builds into `api/internal/staticui/console/dist`, the tree the
+    Go server embeds ([`embed.go`](api/internal/staticui/console/embed.go)). The
     cloud's `server` service compiles with `-tags noconsole`
-    ([`cloud/build.sh`](cloud/build.sh)) so it does not embed it as well.
+    ([`cloud/build-launcher.sh`](cloud/build-launcher.sh)) so it does not
+    embed it as well.
   - `docs` and `website` are Next.js: Vercel's Next.js preset reads `.next/`,
     so there is no output directory to set.
-  - The cloud's `schemas` service (`root: apps/cloud` in the repo-root
-    [`vercel.json`](../vercel.json)) renders the built-in schemas into the
-    repo-root `dist/cloud-schemas`.
-  - `mock-zitadel` is a Vercel Function with its own
-    [`vercel.json`](mock-zitadel/vercel.json): tsdown bundles the app into
-    `dist/app.mjs`, and the hand-written `api/index.mjs` re-exports it.
+  - `cloud` holds two services' builds: the launcher binary in
+    `dist/nextgen-launcher`, and the `schemas` service's built-in schemas in
+    `dist/cloud-schemas` ([`vercel.json`](../vercel.json)), so neither
+    serves the other.
+  - The `go-import` service serves `cloud/go-import/public`, a checked-in
+    page, not build output: it has no build, so there is no `dist`.
 
 ## What `next dev` writes
 

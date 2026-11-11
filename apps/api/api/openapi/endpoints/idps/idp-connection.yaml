@@ -1,0 +1,176 @@
+# Mirrors endpoints/schemas/idp-connection.json so generated clients get a
+# typed connection body. Two keywords differ from the JSON because ogen
+# cannot express them: the root `allOf` (the protocol requires its block)
+# would turn the object into an untyped field, and the `verified_claims`
+# `anyOf` of a const and a pattern aborts generation, so it is written as a
+# boolean-or-string `oneOf`.
+# `format: uri` is left off the endpoint fields on purpose: with it ogen
+# drops the URL patterns and parses the value into url.URL. The server
+# validates every body against the JSON before storing it. The mirror test in
+# endpoints/schemas/idp_connection_mirror_test.go keeps the two in step.
+title: IdentityProviderConnection
+"$schema": https://json-schema.org/draft/2020-12/schema
+type: object
+required:
+  - slug
+  - protocol
+  - display_name
+additionalProperties: false
+properties:
+  "$schema":
+    type: string
+    minLength: 1
+    description: "Editor affordance: path or URL of this schema so editors validate and autocomplete the file (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the platform."
+  slug:
+    type: string
+    pattern: '^[a-z0-9][a-z0-9_-]*$'
+    x-zitadel-pattern-message: "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -"
+    maxLength: 64
+    description: "Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers`) reference it. Unique within the project."
+    examples:
+      - google
+      - corp_idp
+  protocol:
+    $ref: idp-protocol.yaml
+  template:
+    type: string
+    examples:
+      - google
+      - okta
+    description: "A hint for rendering the provider (logo, colors). It carries no protocol behavior: behavior comes only from the protocol blocks."
+  display_name:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: Shown to the user on the sign-in button.
+  subject_claim:
+    type: string
+    minLength: 1
+    description: "The claim (a named piece of user data the provider returns) that carries the provider's stable subject identifier. Optional; the server uses `sub`, as the OIDC specification defines. Override it where `sub` is pairwise, for example Entra `oid`."
+  claim_mapping:
+    type: object
+    additionalProperties:
+      type: string
+      pattern: '^[^$]'
+      x-zitadel-pattern-message: "must not be empty or start with $"
+    description: "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
+  verified_claims:
+    type: object
+    additionalProperties:
+      oneOf:
+        - type: boolean
+        - type: string
+    description: "Maps a verifiable user schema property to its verification source: a claim name (read the claim) or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved for future sources. Distinct from `claim_mapping`, which carries values, not verification state."
+    examples:
+      - email: email_verified
+      - email: true
+  provisioning:
+    type: object
+    additionalProperties: false
+    # Deferred, as additive changes: gating on other properties once `x-verify`
+    # returns to the dialect; `auto_only`; the linking policy with the
+    # account-linking journey; `is_auto_update` with per-property verification state.
+    description: "How far this provider's data is trusted. `creation` defines what happens to a subject that has no account yet. With `disabled`, a user is not created. With `auto`, the user is created without a collection step (the step that asks the user for missing data) when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims. Gating on other properties is not available yet. These are not available yet either: the `auto_only` value, which creates the user from complete claims or fails without collecting; the linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey; and `is_auto_update`, together with per-property verification state."
+    properties:
+      creation:
+        type: string
+        enum:
+          - disabled
+          - auto
+        default: auto
+  oidc:
+    type: object
+    additionalProperties: false
+    description: "OIDC settings of the identity provider. Endpoints come from the issuer's discovery document (its `.well-known` document). A provider that exposes no `.well-known` document names them all instead: `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `userinfo_endpoint` unless `id_token_mapping` is set. Setting any endpoint without the others is rejected with `idp.endpoints_partial`; set all of them or none."
+    required:
+      - issuer
+      - client_id
+      - client_secret
+      - scopes
+    properties:
+      issuer:
+        type: string
+        pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
+        description: "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
+      jwks_uri:
+        type: string
+        pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
+        description: JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other endpoints.
+      id_token_mapping:
+        type: boolean
+        default: false
+        description: Read user claims from the id_token instead of the userinfo endpoint, for providers that populate only the former.
+      authorization_endpoint:
+        type: string
+        pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
+        description: For a provider that exposes no .well-known document. Set together with the other endpoints.
+      token_endpoint:
+        type: string
+        pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
+        description: For a provider that exposes no .well-known document. Set together with the other endpoints.
+      userinfo_endpoint:
+        type: string
+        pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$'
+        x-zitadel-pattern-message: "must be an https URL (http is allowed for localhost only)"
+        description: For a provider that exposes no .well-known document. Set together with the other endpoints; not needed when id_token_mapping is set.
+      client_id:
+        type: string
+        minLength: 1
+        maxLength: 512
+        description: "Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a variable, when each environment has its own client."
+      client_secret:
+        type: string
+        pattern: '^\$\{\{ *[A-Za-z0-9_]+ *\}\}$'
+        x-zitadel-pattern-message: "must be a variable reference such as ${{ CLIENT_SECRET }}, not the secret itself"
+        description: "A reference to the variable holding the client secret, never the secret itself. A secret may only be referenced as the entire value: text around the placeholder would be rendered into the resolved credential, so it is rejected. The server resolves it against the environment serving the request."
+      token_endpoint_auth_method:
+        type: string
+        enum:
+          - client_secret_basic
+          - client_secret_post
+        default: client_secret_basic
+        description: How the client authenticates at the token endpoint.
+      scopes:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        uniqueItems: true
+        minItems: 1
+        contains:
+          const: openid
+        default:
+          - openid
+          - profile
+          - email
+        description: "Must contain `openid`: without it the provider returns no id_token and the sign-in is not OIDC. An omitted `scopes` is rejected. The default (`openid`, `profile`, `email`) only pre-fills editors; validators never inject it."
+      pkce_enabled:
+        type: boolean
+        default: true
+        description: "Send PKCE (`code_challenge` and `code_verifier`), which binds the code exchange to the client that started it. Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them."
+      static_authorize_parameters:
+        type: object
+        propertyNames:
+          minLength: 1
+          not:
+            enum:
+              - client_id
+              - redirect_uri
+              - response_type
+              - scope
+              - state
+              - nonce
+              - code_challenge
+              - code_challenge_method
+              - response_mode
+              - request
+              - request_uri
+              - client_secret
+              - client_assertion
+        additionalProperties:
+          type: string
+        description: "Extra provider-specific authorize parameters (for example `prompt`). Protocol parameters the server sets are reserved and rejected by `propertyNames`: the server composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."

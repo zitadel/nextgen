@@ -1,15 +1,11 @@
 ---
 title: System
-description: OpenAPI operations for server health, liveness, and readiness probes.
+description: Check the server's liveness and readiness with the probes at /livez and /readyz.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
-
 System endpoints expose the service probes used by local development,
-automation, and deployment health checks.
+automation, and deployment health checks. Point a probe at the root path,
+`/livez` or `/readyz`: like every operation they also answer under `/api/v1`,
+but the root is where the probes stay.
 
-<Cards>
-  <Card title="Check server health" href="/docs/reference/api/system/getHealth" />
-  <Card title="Check server liveness" href="/docs/reference/api/system/getLive" />
-  <Card title="Check server readiness" href="/docs/reference/api/system/getReady" />
-</Cards>
+<Operations />

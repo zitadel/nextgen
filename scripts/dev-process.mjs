@@ -1,6 +1,42 @@
 import { spawn } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { accessSync, constants, realpathSync, statSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
+
+/**
+ * `env` with a PATH on which every process a contributor script starts finds
+ * the workspace's tools. The checkout needs only corepack, but package scripts
+ * (`pnpm run build`), the CLI's install in a generated app and moon's tasks
+ * call a bare `pnpm`: without one on PATH, scripts/shims/pnpm stands in and
+ * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so moon
+ * and turbo resolve when the script runs outside `pnpm run` and a global
+ * install still wins.
+ */
+export function withWorkspaceTools(env, options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const isExecutable = options.isExecutable ?? isExecutableFile;
+  const entries = (env.PATH ?? "").split(delimiter).filter(Boolean);
+  const shimDir = join(repoRoot, "scripts", "shims");
+  const binDir = join(repoRoot, "node_modules", ".bin");
+  const hasPnpm = entries.some((dir) => isExecutable(join(dir, "pnpm")));
+  const path = [
+    ...(hasPnpm || entries.includes(shimDir) ? [] : [shimDir]),
+    ...entries,
+    ...(entries.includes(binDir) ? [] : [binDir]),
+  ];
+  return { ...env, PATH: path.join(delimiter) };
+}
+
+function isExecutableFile(path) {
+  try {
+    accessSync(path, constants.X_OK);
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
 
 export function run(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
@@ -126,48 +162,6 @@ function writeAll(stream, text) {
 
 export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
-}
-
-// Maps items through an async worker with at most `limit` in flight,
-// preserving input order in the results. After a failure no new work starts,
-// but in-flight workers are awaited (their child processes cannot be
-// abandoned safely); the first error is rethrown once all lanes settle.
-export async function mapWithConcurrency(items, limit, worker) {
-  if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error(`mapWithConcurrency requires a positive integer limit, got ${limit}`);
-  }
-  const entries = [...items];
-  if (entries.length === 0) {
-    return [];
-  }
-  const results = new Array(entries.length);
-  const errors = [];
-  const width = Math.min(limit, entries.length);
-  let next = 0;
-  let failed = false;
-
-  await Promise.all(
-    Array.from({ length: width }, async () => {
-      while (!failed) {
-        const index = next;
-        next += 1;
-        if (index >= entries.length) {
-          return;
-        }
-        try {
-          results[index] = await worker(entries[index], index);
-        } catch (error) {
-          errors.push(error);
-          failed = true;
-        }
-      }
-    }),
-  );
-
-  if (errors.length > 0) {
-    throw errors[0];
-  }
-  return results;
 }
 
 export function forwardedArgs(args = process.argv.slice(2)) {

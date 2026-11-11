@@ -1,5 +1,75 @@
 # @zitadel/sdk-tanstack-start
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`bcd9413`](https://github.com/zitadel/nextgen/commit/bcd9413e7f1065cde76afb4149fddadd3e843cb6), [`c52126e`](https://github.com/zitadel/nextgen/commit/c52126ed0bad6656dc97d582628479075a476bb1), [`b665fe5`](https://github.com/zitadel/nextgen/commit/b665fe5229180cbc604b6e57085b73236160df94), [`81df24d`](https://github.com/zitadel/nextgen/commit/81df24d34accdf7a135d2930103a7812899b3401), [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b), [`d4e7203`](https://github.com/zitadel/nextgen/commit/d4e720361e3428eb0454aafff9c0d37e89ad2824)]:
+  - @zitadel/api@0.6.0
+  - @zitadel/components@0.6.0
+  - @zitadel/sdk-core@0.6.0
+  - @zitadel/sdk-react@0.6.0
+
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [[`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c), [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0), [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b), [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6), [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99), [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560), [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a), [`1420ccb`](https://github.com/zitadel/nextgen/commit/1420ccb257b7acae0d055c81c3886f1e8155a268), [`f76173b`](https://github.com/zitadel/nextgen/commit/f76173bf6a4de80a8eb0c49692df1e21c1497e61), [`48d8872`](https://github.com/zitadel/nextgen/commit/48d88726409a2e414c5b9d9999d2c5701493788a), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`e7799e9`](https://github.com/zitadel/nextgen/commit/e7799e933cd71dfea188724944d3f8369d952121), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede), [`503e27b`](https://github.com/zitadel/nextgen/commit/503e27b9017ac0bbf93e785f94b36c32ba361bfd)]:
+  - @zitadel/api@0.5.0
+  - @zitadel/components@0.5.0
+  - @zitadel/sdk-core@0.5.0
+  - @zitadel/sdk-react@0.5.0
+
+## 0.4.0
+
+### Minor Changes
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
+### Patch Changes
+
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924), [`79d8dd0`](https://github.com/zitadel/nextgen/commit/79d8dd01660b5bb7a2d936aa330c3d591a8d3954), [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`1ca73bd`](https://github.com/zitadel/nextgen/commit/1ca73bdeb158ad7b9f947e9c0b795cab33d93195), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da)]:
+  - @zitadel/api@0.4.0
+  - @zitadel/sdk-core@0.4.0
+  - @zitadel/components@0.4.0
+  - @zitadel/sdk-react@0.4.0
+
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [[`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3)]:
+  - @zitadel/api@0.3.0
+  - @zitadel/components@0.3.0
+  - @zitadel/sdk-core@0.3.0
+  - @zitadel/sdk-react@0.3.0
+
+## 0.2.0
+
+### Patch Changes
+
+- [#2328](https://github.com/zitadel/nextgen/pull/2328) [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1) - The packages no longer ship `.d.ts.map` files. They pointed at `src` files the packages do not publish, so an editor's go-to-definition already landed on the `.d.ts`; it still does.
+
+- [#2381](https://github.com/zitadel/nextgen/pull/2381) [`30ba040`](https://github.com/zitadel/nextgen/commit/30ba0407c389066d46200a5805ca56850d6b15b0) - `createNextgenRequestMiddleware` now type-checks inside `createMiddleware({ type: "request" }).server(...)`, so `tsc` no longer rejects the `src/start.ts` that `zitadel setup` writes with TS2345.
+- Updated dependencies [[`2d78353`](https://github.com/zitadel/nextgen/commit/2d78353e4191d576d8d163d312ae78be0e6c4341), [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`dcc1282`](https://github.com/zitadel/nextgen/commit/dcc1282fc30ae06735cdeb627eb013e3ec35df4f), [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5), [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19), [`727b716`](https://github.com/zitadel/nextgen/commit/727b71610839dfd9cc214c73689940f6d29681d6), [`4bcb7c3`](https://github.com/zitadel/nextgen/commit/4bcb7c3a56d988929099e5c5431f705841963f92), [`2ecde76`](https://github.com/zitadel/nextgen/commit/2ecde76e573c125fd86b7cf7b918619426b624bd), [`89a3471`](https://github.com/zitadel/nextgen/commit/89a34712236d2edc2deb6f482b56a636726956e3), [`33918fa`](https://github.com/zitadel/nextgen/commit/33918faa4ac9300e53d43bf99b55191ba2daa07f), [`5ea7fe4`](https://github.com/zitadel/nextgen/commit/5ea7fe4f9bcaa323c67d2cd347e53e9ba9048d02), [`c21caeb`](https://github.com/zitadel/nextgen/commit/c21caeb5e6c797d092a970129eb2238884d9c9f3), [`704911f`](https://github.com/zitadel/nextgen/commit/704911f26bd82497536579ff07f334da361ecc83), [`5092d59`](https://github.com/zitadel/nextgen/commit/5092d59756c22718e3bd2c1d376a46ae48d958c8), [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1)]:
+  - @zitadel/api@0.2.0
+  - @zitadel/components@0.2.0
+  - @zitadel/sdk-core@0.2.0
+  - @zitadel/sdk-react@0.2.0
+
+## 0.1.0
+
+### Patch Changes
+
+- [#2170](https://github.com/zitadel/nextgen/pull/2170) [`be439bc`](https://github.com/zitadel/nextgen/commit/be439bcf12a9d3a8d7a63194f8f8ae6fe6b26987) Thanks [@mridang](https://github.com/mridang)! - The `@tanstack/react-start` peer range is now `>=1.168.10`, the first release that exports `createCsrfMiddleware`, which the generated `src/start.ts` imports. Earlier releases fail to build with it.
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`5680eb7`](https://github.com/zitadel/nextgen/commit/5680eb76a273b722456d567f94554e828bcf55e9), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`e3cd8f8`](https://github.com/zitadel/nextgen/commit/e3cd8f81111f3298b5635e31ab3c63a2ce293707), [`be96308`](https://github.com/zitadel/nextgen/commit/be96308eec43f3ffe04a62fd414a18ea2b1ccb21), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030), [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa)]:
+  - @zitadel/api@0.1.0
+  - @zitadel/components@0.1.0
+  - @zitadel/sdk-core@0.1.0
+  - @zitadel/sdk-react@0.1.0
+
 ## 1.0.0-alpha.28
 
 ### Minor Changes

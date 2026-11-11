@@ -1,15 +1,21 @@
-import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { angularEntry, assertMountsRootComponent, type RootMount } from "../root-component";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import {
+  angularEntry,
+  assertMountsRootComponent,
+  type RootMount,
+} from "@/lib/orca/patchers/rule/root-component";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
 import {
   appComponentTemplate,
   appTemplateHtml,
+  proxyConfApiPrefixEdit,
+  proxyConfApiPrefixVerdict,
   proxyConfEdit,
   proxyConfSessionCookieEdit,
   proxyConfSessionCookieVerdict,
@@ -127,6 +133,16 @@ export class AngularPatcher extends AbstractRulePatcher {
         // so the doctor only warns while it is missing.
         wiring: "convenience",
         verify: proxyConfSessionCookieVerdict,
+      },
+      {
+        kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: proxyConfApiPrefixEdit(),
+        // The packages call the API under /api/v1 (ADR 077), and a v2 proxy
+        // attaches the project secret only to the exchange at the root, so
+        // sign-in fails: the doctor fails until `doctor --fix` moves it to v3.
+        wiring: "infrastructure",
+        verify: proxyConfApiPrefixVerdict,
       },
       {
         kind: "edit",

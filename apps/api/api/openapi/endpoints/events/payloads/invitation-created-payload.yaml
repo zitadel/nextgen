@@ -1,0 +1,14 @@
+title: InvitationCreatedPayload
+description: |
+  Payload for `invitation.created`. The invitation ID is the event's
+  `entity_id`. Discriminate on `type`; the object named after it says what
+  the invitation's link grants. The metadata entered at creation and the
+  link's token never appear.
+oneOf:
+  - $ref: invitation-created-project-member-payload.yaml
+  - $ref: invitation-created-team-member-payload.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: invitation-created-project-member-payload.yaml
+    team_member: invitation-created-team-member-payload.yaml

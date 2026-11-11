@@ -1,0 +1,85 @@
+---
+title: Test a policy
+description: Write test cases for a policy, such as the password policy, and check them against the server before you deploy.
+---
+
+A policy test checks what a policy decides for inputs you choose. You write the cases in a file beside the policy. `zitadel policies test` asks the server to evaluate each case exactly as the real operation would. Testing publishes nothing and leaves the live policies as they are.
+
+## Before you start
+
+- **A project from `zitadel setup`** ([Quickstart](/docs/get-started/quickstart)). The server evaluates every case, so the command needs the server, project and credentials setup wrote, the same connection `deploy` uses.
+- **A policy file.** Setup writes the password policy to `.zitadel/policies/auth.factor.password.set.json`, with a minimum length of 15 characters unless you chose another:
+
+```json
+{
+  "$schema": "../meta/policy.json",
+  "operation": "auth.factor.password.set",
+  "config": { "min_length": 15 }
+}
+```
+
+## Write the test cases
+
+The cases go in `<operation>.test.json` beside the policy, here `.zitadel/policies/auth.factor.password.set.test.json`. Each case has a `name`, the `input` the operation receives, and the decision you `expect`. One password is refused for being too short, one is allowed:
+
+```json
+{
+  "$schema": "../meta/policy-test.json",
+  "operation": "auth.factor.password.set",
+  "cases": [
+    {
+      "name": "too short",
+      "input": { "password": "short1" },
+      "expect": { "allowed": false, "violations": ["min_length"] }
+    },
+    {
+      "name": "long enough",
+      "input": { "password": "a-long-enough-one" },
+      "expect": { "allowed": true }
+    }
+  ]
+}
+```
+
+The password is in the file, not on the command line. Your editor validates the file against `.zitadel/meta/policy-test.json`. A case can also set:
+
+- `facts`: what a real password set would look up. `self_service` defaults to `true`, a user setting their own password. `history_matches` says whether the password matches each of the user's kept passwords, current first. With `history_depth` 2 or more, `"facts": { "history_matches": [false, true] }` checks that reusing the previous password is refused.
+- `code` in `expect`: the error code an API call answers with, such as `user.password_empty`.
+
+## Run the tests
+
+```sh
+npx @zitadel/cli@latest policies test
+```
+
+It prints each case under the policy file it ran against:
+
+```text
+auth.factor.password.set  (.zitadel/policies/auth.factor.password.set.json)
+  ✓ too short
+  ✓ long enough
+
+2 passed
+```
+
+A case that does not hold fails the command with `E_VALIDATION`. The output shows what you expected and what the server decided. Lower `min_length` to 6 and run it again:
+
+```text
+Error E_VALIDATION: 1 of 2 policy test cases failed
+auth.factor.password.set  (.zitadel/policies/auth.factor.password.set.json)
+  ✗ too short: expected refused (min_length), got allowed
+  ✓ long enough
+
+1 passed, 1 failed
+```
+
+- `policies test auth.factor.password.set` runs only that operation's cases.
+- `--json` returns the results as one envelope, for CI.
+
+## Test a release
+
+`policies test --release <id>` runs the same cases against the policies a release pins, instead of your local files. The ID comes from `zitadel release create` or `zitadel deployment list`.
+
+A policy applies once a deployed release pins it; `release create` alone changes nothing live. A pull request's `preview` applies its policy on that pull request's preview URLs. `deploy` applies it on your app's origins and to passwords your backend sets through the API. So run `policies test` on the local files before either: in CI, in the pull-request job before `preview`.
+
+Test files are never part of a release. [Deploy](/docs/guides/deploy) publishes the policy itself.

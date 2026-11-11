@@ -31,7 +31,7 @@ import type {
   ZitadelSessionProps,
   ZitadelSignoutDetail,
   ZitadelWidgetAttributes,
-} from "./types";
+} from "./types.js";
 
 declare module "solid-js" {
   namespace JSX {
@@ -109,6 +109,24 @@ function projectAttributes(props: {
   };
 }
 
+/**
+ * Forwards a widget event's detail to the app callback, and registers the
+ * callback's returned promise — from an async handler or a Qwik QRL — on the
+ * detail's `waitUntil`. The three navigating events (flow-complete,
+ * flow-redirect, signout) then wait for it before the widget navigates; other
+ * events carry no `waitUntil`, so the call is a no-op.
+ */
+function withDetail<Detail>(
+  event: Event,
+  handler: ((detail: Detail) => unknown) | undefined,
+): void {
+  if (!(event instanceof CustomEvent) || !handler) {
+    return;
+  }
+  const result = handler(event.detail);
+  event.detail.waitUntil?.(result);
+}
+
 /** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
 export type ZitadelLoginSolidProps = ZitadelLoginProps &
   ZitadelWidgetAttributes & {
@@ -129,7 +147,7 @@ export type ZitadelSessionSolidProps = ZitadelSessionProps &
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from "./types";
+export * from "./types.js";
 
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
@@ -166,11 +184,11 @@ export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
       prop:suppressPasswordToggle={props.suppressPasswordToggle}
-      on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
-      on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
-      on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
-      on:zitadel-flow-redirect={(event) => props.onFlowRedirect?.(event.detail)}
-      on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
+      on:zitadel-flow-step={(event) => withDetail(event, props.onFlowStep)}
+      on:zitadel-flow-input={(event) => withDetail(event, props.onFlowInput)}
+      on:zitadel-flow-complete={(event) => withDetail(event, props.onFlowComplete)}
+      on:zitadel-flow-redirect={(event) => withDetail(event, props.onFlowRedirect)}
+      on:zitadel-flow-error={(event) => withDetail(event, props.onFlowError)}
     />
   );
 }
@@ -197,7 +215,7 @@ export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
       {...projectAttributes(props)}
       post-sign-out-url={props.postSignOutUrl}
       theme={props.theme}
-      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
+      on:zitadel-signout={(event) => withDetail(event, props.onSignout)}
       on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
     />
   );
@@ -229,7 +247,7 @@ export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
       variant={props.variant}
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
-      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
+      on:zitadel-signout={(event) => withDetail(event, props.onSignout)}
       on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
     />
   );

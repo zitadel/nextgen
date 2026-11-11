@@ -5,6 +5,7 @@
 
   import type { ZitadelSessionSvelteProps } from './types';
   import { assignGiven } from './given';
+  import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
 
   let {
@@ -50,7 +51,7 @@
       return;
     }
     const onSignoutEvent = (event: Event): void => {
-      if (event instanceof CustomEvent) onSignout?.(event.detail);
+      withDetail(event, onSignout);
     };
     const sessionError = (event: Event): void => {
       if (event instanceof CustomEvent) onSessionError?.(event.detail);

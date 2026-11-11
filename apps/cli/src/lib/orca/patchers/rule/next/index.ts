@@ -1,13 +1,14 @@
-import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { ZitadelError } from "../../../../errors";
-import { MANAGED_MARKER } from "../../../../paths";
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
+import { ZitadelError } from "@/lib/errors";
+import { isFile } from "@/lib/fs";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
@@ -16,6 +17,9 @@ import type { RendererSpec } from "./renderers/types";
  * generated project config's `/__nextgen` proxy path is same-origin proxied
  * to `ZITADEL_URL` and `/profile` is gated. Next 16 renamed this convention to
  * `proxy.ts`; older projects keep `middleware.ts`.
+ * The matcher covers every route but Next's build files, so `protectedRoutes`
+ * alone decides what needs a sign-in: with a matcher listing routes, a
+ * protected route it misses never reaches the middleware and stays public.
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
 function requestBoundaryTemplate(functionName: "middleware" | "proxy"): string {
@@ -26,13 +30,18 @@ import type { NextRequest } from "next/server";
 export function ${functionName}(req: NextRequest) {
   return nextgenMiddleware(req, {
     url: process.env.ZITADEL_URL,
+    // The routes that need a sign-in. To protect another, add it here; a
+    // trailing * covers every path that starts with it, as in "/orders*".
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   });
 }
 
 export const config = {
-  matcher: ["/__nextgen/:path*", "/profile/:path*"],
+  // Every route but Next.js's build files and favicon.ico, so the list above
+  // alone decides what needs a sign-in, and auth() sees the session on every
+  // page. A protected route that a narrower matcher leaves out stays public.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
 `;
 }
@@ -97,8 +106,14 @@ export class NextPatcher extends AbstractRulePatcher {
 
   protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
     // Written only when setup created the app skeleton itself; on a
-    // pre-existing app the homepage stays user-owned (see nextCodeOps).
-    return [join(view.framework.appDir, "page.tsx")];
+    // pre-existing app the homepage and the route layouts stay user-owned
+    // (see nextCodeOps).
+    return [
+      join(view.framework.appDir, "page.tsx"),
+      ...routeTitles(getRenderer(view.rendererId)).map((route) =>
+        join(view.framework.appDir, `${route.segment}/layout.tsx`),
+      ),
+    ];
   }
 
   protected override retiredAlternateFiles(
@@ -151,13 +166,12 @@ function nextCodeFilePaths(
   renderer: RendererSpec,
 ): ReadonlyArray<string> {
   const appDir = framework.appDir;
-  const paths = [
-    join(appDir, "page.tsx"),
-    join(appDir, "login/page.tsx"),
-    join(appDir, "register/page.tsx"),
-  ];
-  if (renderer.templates.profilePage) {
-    paths.push(join(appDir, "profile/page.tsx"));
+  const paths = [join(appDir, "page.tsx")];
+  for (const route of routeTitles(renderer)) {
+    paths.push(
+      join(appDir, `${route.segment}/page.tsx`),
+      join(appDir, `${route.segment}/layout.tsx`),
+    );
   }
   paths.push(join(appDir, `../${requestBoundaryFile(framework).filename}`));
   if (renderer.templates.provider) {
@@ -223,6 +237,16 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
       : undefined,
+    // Fresh apps only: create-next-app's root layout titles every page
+    // "Create Next App", while an existing app has titles of its own and may
+    // have a layout beside a route already.
+    ...(ctx.scaffoldedFramework ? routeTitles(renderer) : []).map(
+      (route): FileOp => ({
+        kind: "write",
+        path: join(appDir, `${route.segment}/layout.tsx`),
+        contents: routeLayoutTemplate(route.title),
+      }),
+    ),
     {
       kind: "write",
       path: join(appDir, `../${boundary.filename}`),
@@ -235,11 +259,11 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       ? { kind: "write", path: join(appDir, "../custom-elements.d.ts"), contents: dts.contents }
       : undefined,
     // Next.js exposes NEXT_PUBLIC_-prefixed vars to client code.
-    { kind: "merge-env", path: ".env.example", entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
+    { kind: "merge-env", path: ".env.example", entries: { [PUBLIC_PROJECT_ID_VARIABLE.next]: "" } },
     {
       kind: "merge-env",
       path: ".env.local",
-      entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
+      entries: { [PUBLIC_PROJECT_ID_VARIABLE.next]: ctx.project.id },
     },
     {
       kind: "add-dep",
@@ -258,6 +282,31 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
  * validates every page for instant navigation and logs the redirect it throws
  * as an error on each request to `/`; `instant = false` exempts the page.
  */
+/**
+ * The routes setup writes, each with the browser tab title its layout sets on
+ * an app setup created. The pages are client components, which cannot export
+ * `metadata`, so a layout beside each one does.
+ */
+function routeTitles(renderer: RendererSpec): ReadonlyArray<{ segment: string; title: string }> {
+  return [
+    { segment: "login", title: "Sign in" },
+    { segment: "register", title: "Create account" },
+    ...(renderer.templates.profilePage ? [{ segment: "profile", title: "Profile" }] : []),
+  ];
+}
+
+function routeLayoutTemplate(title: string): string {
+  return `${MANAGED_MARKER}
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: ${JSON.stringify(title)} };
+
+export default function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return children;
+}
+`;
+}
+
 function homePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { redirect } from "next/navigation";
@@ -316,12 +365,4 @@ function boundaryConflict(existing: string, target: string, unknownVersion: bool
     `Next.js 16 won't start with both ${existing} and the ${target} setup writes`,
     { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
   );
-}
-
-async function isFile(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
 }

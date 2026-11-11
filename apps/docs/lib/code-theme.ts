@@ -6,5 +6,11 @@ import { createCssVariablesTheme } from "shiki/core";
 // syntax roles, so code switches with data-theme like everything else.
 const theme = createCssVariablesTheme({ name: "zitadel", variablePrefix: "--zl-shiki-" });
 
-// One theme for both modes: the variables carry the light and the dark values.
-export const codeThemes = { light: theme, dark: theme };
+export const codeOptions = {
+  // One theme for both modes: the variables carry the light and the dark values.
+  themes: { light: theme, dark: theme },
+  // No per-line time limit. A grammar's first line also compiles its patterns,
+  // and on a busy build machine that outlasts Shiki's 500 ms default, which
+  // then leaves the line unhighlighted in the first (light) pass only.
+  tokenizeTimeLimit: 0,
+};

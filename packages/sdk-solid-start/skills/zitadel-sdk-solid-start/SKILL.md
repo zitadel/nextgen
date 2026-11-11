@@ -30,9 +30,9 @@ adjusting a scaffolded wiring.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-solid-start@alpha
+pnpm add @zitadel/sdk-solid-start@latest
 # the login/logout/session widgets are a separate package:
-pnpm add @zitadel/sdk-solid@alpha
+pnpm add @zitadel/sdk-solid@latest
 ```
 
 Peer deps: `@solidjs/start ^2.0.0`, `solid-js ^1.8.0`.

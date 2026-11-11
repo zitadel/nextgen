@@ -145,7 +145,7 @@ zitadel app metadata web-frontend   # emits metadata for the counterparty (SAML)
 
 ## How they plug into flow definitions
 
-[Flow definitions](../flowengine/flow-engine.md) are `.zitadel/flows/<slug>.json` files shaped like `FlowDefinition` (canonical spec: [`api/openapi/components/flows/`](../../../api/openapi/components/flows/)). `fields` and `actions` are ordered arrays whose entries carry a `name` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); `gates` is keyed by gate type; every user-visible label is a `text_key` resolved client-side via LiquidJS's `| t` filter (see [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md)). Steps reference identity resources:
+[Flow definitions](../flowengine/flow-engine.md) are `.zitadel/flows/<slug>.json` files shaped like `FlowDefinition` (canonical spec: [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/)). `fields` and `actions` are ordered arrays whose entries carry a `name` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); `gates` is keyed by gate type; every user-visible label is a `text_key` resolved client-side via LiquidJS's `| t` filter (see [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md)). Steps reference identity resources:
 
 - An `identifier` step's `sso_providers` list resolves against `.zitadel/idps/`.
 - An `app`'s `audience` (via the flow's `audience.app_ids`) scopes which flow runs for which token consumer.

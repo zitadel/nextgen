@@ -1,6 +1,9 @@
 {
   "title": "API reference",
+  "root": true,
+  "pagesIndex": "index",
   "pages": [
+    "errors",
     "---Runtime auth---",
     "flows",
     "authentication-attempts",
@@ -10,6 +13,8 @@
     "schemas",
     "branding",
     "identity-providers",
+    "applications",
+    "policies",
     "variables",
     "releases",
     "deployments",
@@ -18,7 +23,9 @@
     "projects",
     "teams",
     "users",
+    "search",
     "grants",
+    "invitations",
     "events",
     "event-webhooks",
     "---System---",

@@ -94,6 +94,10 @@ const TIMEOUT_GRACE_MS = 1000;
  * straight from the server's challenge response.
  *
  * Spec: ADR 011 — Passkey Action Contract
+ *
+ * @fires {CustomEvent<ZlPasskeyStartedDetail>} zl-passkey-started - The WebAuthn ceremony began.
+ * @fires {CustomEvent<ZlPasskeyResultDetail>} zl-passkey-result - The ceremony produced a credential.
+ * @fires {CustomEvent<ZlPasskeyErrorDetail>} zl-passkey-error - The ceremony failed; carries the error.
  */
 @customElement("zl-passkey")
 export class ZlPasskey extends LitElement {

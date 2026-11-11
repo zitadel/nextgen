@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { ManualClock } from "../../../../helpers/clock";
+import { ManualClock } from "@tests/helpers/clock";
 
 import {
   claimFreePort,
@@ -16,7 +16,7 @@ import {
   type ServerRecord,
   type ServerStore,
   type StopOutcome,
-} from "../../../../../src/lib/local-server/internal/lifecycle";
+} from "@/lib/local-server/internal/lifecycle";
 
 type Fake = ServerRecord & { pid: number };
 
@@ -25,7 +25,7 @@ class World {
   record: Fake | undefined;
   takenPorts = new Set<number>();
   alive = new Set<number>();
-  /** Origins that answer /healthz, whoever answers them. */
+  /** Origins that answer /readyz, whoever answers them. */
   healthy = new Set<string>();
   launched: number[] = [];
   /** The recorded servers whose identity was asked about. */
@@ -163,15 +163,12 @@ describe("Lifecycle", () => {
     it("does not ask a process that is gone whether it answers", async () => {
       const world = new World();
       world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      let asked = 0;
-      world.health.isHealthy = async () => {
-        asked++;
-        return true;
-      };
+      const isHealthy = vi.fn(async () => true);
+      world.health.isHealthy = isHealthy;
 
       await world.server().state();
 
-      expect(asked).toBe(0);
+      expect(isHealthy.mock.calls.length).toBe(0);
     });
 
     it("is dead when the recorded process is alive but does not answer", async () => {
@@ -516,18 +513,18 @@ describe("Lifecycle", () => {
 
     it("records the server as soon as it is launched, so an interrupted start can still be stopped", async () => {
       const world = new World();
-      let recordedWhileBooting: unknown;
+      const recordedWhileBooting: unknown[] = [];
       world.onLaunch = (record, w) => {
         w.alive.add(record.pid);
         w.health.isHealthy = async () => {
-          recordedWhileBooting = w.record;
+          recordedWhileBooting.push(w.record);
           return true;
         };
       };
 
       await world.server().start();
 
-      expect(recordedWhileBooting).toMatchObject({ pid: 100, port: 8080 });
+      expect(recordedWhileBooting[0]).toMatchObject({ pid: 100, port: 8080 });
     });
 
     it("stops the server when checking on it throws", async () => {
@@ -684,19 +681,19 @@ describe("claimFreePort", () => {
 
     it("skips an automatic port and takes the next", async () => {
       const claimed: number[] = [];
-      let released = 0;
+      const released = vi.fn();
       const ports: PortProbe = {
         isFree: async (port) => port !== 8080 || claimed.length === 0,
         reserve: async (port) => {
           claimed.push(port);
           return async () => {
-            released++;
+            released();
           };
         },
       };
 
       await expect(claimFreePort(ports, undefined, 8080)).resolves.toMatchObject({ port: 8081 });
-      expect(released).toBe(1);
+      expect(released.mock.calls.length).toBe(1);
     });
 
     it("refuses a port that was asked for", async () => {
@@ -706,17 +703,17 @@ describe("claimFreePort", () => {
     });
 
     it("releases the claim on a port that was asked for and refused", async () => {
-      let released = 0;
+      const released = vi.fn();
       const ports: PortProbe = {
         isFree: async () => false,
         reserve: async () => async () => {
-          released++;
+          released();
         },
       };
 
       await claimFreePort(ports, 9200).catch(() => undefined);
 
-      expect(released).toBe(1);
+      expect(released.mock.calls.length).toBe(1);
     });
   });
 

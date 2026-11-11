@@ -1,0 +1,18 @@
+title: ProjectPayload
+type: object
+description: |
+  Payload for `project.created`, which holds every field, and
+  `project.updated`, which holds only the changed fields.
+properties:
+  name:
+    type: string
+  origins:
+    type: array
+    items:
+      $ref: ../../projects/project-origin.yaml
+  password_hash_algorithm:
+    type: string
+    description: |
+      The password hashing algorithm the project switched to. The empty string
+      means it was handed back to the server default. Absent when the update
+      did not touch hashing.

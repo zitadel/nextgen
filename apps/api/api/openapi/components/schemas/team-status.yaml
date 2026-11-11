@@ -1,0 +1,10 @@
+type: string
+description: |
+  The lifecycle state of a team.
+
+  - `active`: the team is available for use.
+  - `deactivated`: the team is no longer active but is retained for historical and audit purposes.
+enum:
+  - active
+  - deactivated
+example: active

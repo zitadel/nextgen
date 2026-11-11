@@ -1,0 +1,23 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package helpers
+
+import (
+	"testing"
+
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+func (h *Harness) EnsureEventService(t testing.TB) *service.EventService {
+	t.Helper()
+	h.eventService.mutex.Lock()
+	defer h.eventService.mutex.Unlock()
+
+	if h.eventService.value == nil {
+		h.eventService.value = service.NewEventService(
+			h.EnsureServiceDB(t),
+			h.EnsurePlatformProject(t).ID,
+		)
+	}
+	return h.eventService.value
+}

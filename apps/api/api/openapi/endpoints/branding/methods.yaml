@@ -1,0 +1,75 @@
+post:
+  operationId: createBranding
+  summary: Publish a branding revision
+  description: |
+    Publishes a new immutable branding revision for the project, and records a
+    `branding.created` event. Branding revisions cannot be updated or deleted.
+    Every edit publishes a new revision. Flow responses carry the branding
+    revision the request's release pins.
+
+    The `id` of the new revision is the revision ID a release pins for
+    `kind: branding`.
+
+    The `liquid_template` is validated lexically on save (size, encoding,
+    banned patterns such as `<script>` tags, inline event handlers, and the
+    `| raw` filter). Authoritative LiquidJS validation runs at authoring
+    time, in `zitadel deploy` and `zitadel deploy --dry-run`.
+  tags:
+    - Branding
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - branding.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../components/flows/branding.yaml
+  responses:
+    '201':
+      description: The created branding revision.
+      content:
+        application/json:
+          schema:
+            $ref: branding-revision-response.yaml
+    '400':
+      description: The branding configuration is not valid. Fix what the error reports and publish again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createBranding-error-response.yaml
+
+get:
+  operationId: listBranding
+  x-zitadel-cli: branding list
+  summary: List branding revisions
+  # Deliberately unpaginated in v1: list endpoints gain a real query
+  # mechanism together, and advertising pagination parameters the server
+  # ignores would be worse than none.
+  description: |
+    Lists a project's branding revisions, newest first, capped at the 100 most
+    recent and not paginated. The first entry is the newest revision.
+
+    The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
+    that a release pins for `kind: branding`.
+  tags:
+    - Branding
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - branding.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: The branding revisions, newest first.
+      content:
+        application/json:
+          schema:
+            $ref: list-branding-response.yaml
+    default:
+      $ref: listBranding-error-response.yaml

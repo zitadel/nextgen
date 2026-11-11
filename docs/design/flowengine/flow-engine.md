@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md)
 >
-> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
+> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../apps/api/api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
 
 The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but the `/flow/{id}` handle remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
@@ -76,9 +76,9 @@ POST   /flow_definitions/{id}/simulate    Dry-run with mock input
 
 A definition is an immutable revision: every `POST` assigns a new id, and a
 repeated `name` is a new revision of that flow, not a conflict. There is no
-update or delete. Resolution by `name` picks the newest active revision of
-that name. Audience resolution (steps 1-4 above) ranks every active
-definition regardless of name, so a new revision of an unscoped flow becomes
+update or delete. Resolution by `name` picks the revision of that name the
+release pins. Audience resolution (steps 1-4 above) ranks every definition the
+release pins regardless of name, so a new revision of an unscoped flow becomes
 the project default the same way a new flow does.
 
 ## Schema-Driven Steps

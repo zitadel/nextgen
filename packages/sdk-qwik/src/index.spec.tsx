@@ -18,7 +18,7 @@ import {
   type ZitadelSessionErrorDetail,
   type ZitadelSignoutDetail,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   LoginConfigHarness,
@@ -29,7 +29,8 @@ import {
   sessionConfig,
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
-import { resume, serverMarkup } from "./__tests__/resume-server-markup";
+import { closeServerMarkup, loadServerMarkup, resume } from "./__tests__/resume-server-markup";
+import type { ServerLoginProps } from "./__tests__/server-markup";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import {
@@ -78,12 +79,16 @@ async function renderWidget(jsx: Parameters<typeof render>[1]): Promise<HTMLElem
  * Qwik wires the widget's listeners in a `useVisibleTask$` that runs a turn
  * after `render` (eager `document-ready` strategy), so a single fixed delay
  * races the attachment. Instead, re-dispatch the event each turn until the
- * forwarded callback receives this exact `detail`, polling up to a generous
- * deadline. CustomEvents do not replay, so dispatching only after the listener
- * exists is essential — re-dispatching makes that deterministic without guessing
- * the timing. Matching by identity (not "something arrived") keeps the check
- * robust when the live widget emits its own event of the same name — e.g. the
- * `zitadel-flow-step` it fires when the mock API answers — alongside our probe.
+ * forwarded callback receives this exact `detail`. CustomEvents do not replay,
+ * so dispatching only after the listener exists is essential — re-dispatching
+ * makes that deterministic without guessing the timing. Matching by identity
+ * (not "something arrived") keeps the check robust when the live widget emits
+ * its own event of the same name — e.g. the `zitadel-flow-step` it fires when
+ * the mock API answers — alongside our probe.
+ *
+ * The deadline only bounds a hang: on a loaded CI runner that turn came more
+ * than a second after `render`. It stays under the 15 s test timeout, so a
+ * listener that never attaches fails with this error instead of a timeout.
  */
 async function dispatchUntilForwarded(
   el: Element,
@@ -91,14 +96,15 @@ async function dispatchUntilForwarded(
   detail: Record<string, unknown>,
   received: readonly Record<string, unknown>[],
 ): Promise<void> {
-  const deadline = Date.now() + 1000;
+  const budgetMs = 10_000;
+  const deadline = Date.now() + budgetMs;
   while (!received.includes(detail)) {
     el.dispatchEvent(new CustomEvent(eventName, { detail }));
     if (received.includes(detail)) {
       return;
     }
     if (Date.now() > deadline) {
-      throw new Error(`listener for "${eventName}" never forwarded within 1000ms`);
+      throw new Error(`listener for "${eventName}" never forwarded within ${budgetMs}ms`);
     }
     await macrotask();
   }
@@ -397,6 +403,25 @@ describe("ZitadelLogout", () => {
     expect(received).toEqual([detail]);
   });
 
+  it("passes an async callback's promise to the event's waitUntil", async () => {
+    const ran = vi.fn();
+    const registered: Array<Promise<unknown>> = [];
+    const host = await renderWidget(
+      <ZitadelLogout project={project} onSignout$={$(() => Promise.resolve().then(() => ran()))} />,
+    );
+    const el = widgetIn(host, widgetTags.logout);
+    await vi.waitFor(() => {
+      el.dispatchEvent(
+        new CustomEvent("zitadel-signout", {
+          detail: { waitUntil: (work: Promise<unknown>) => registered.push(work) },
+        }),
+      );
+      expect(registered).not.toHaveLength(0);
+    });
+    await registered[0];
+    expect(ran).toHaveBeenCalled();
+  });
+
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelLogoutElement | undefined>;
     const host = await renderWidget(<ZitadelLogout project={project} ref={consumerRef} />);
@@ -598,6 +623,17 @@ describe("resumed server markup", () => {
 });
 
 describe("resuming a server-rendered login", () => {
+  let serverMarkup: (props: ServerLoginProps) => Promise<string>;
+
+  // The server build loads once, here, so each test's 15 s budget covers only
+  // its render and the resume. On a loaded CI runner the load takes about 15 s;
+  // this hook's budget only bounds a hang.
+  beforeAll(async () => {
+    serverMarkup = await loadServerMarkup();
+  }, 60_000);
+
+  afterAll(() => closeServerMarkup());
+
   it("starts its first flow with the purpose the server rendered", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
@@ -663,7 +699,7 @@ describe("a resumed flow that is already terminal", () => {
   it("still reaches onFlowComplete$, which attaches after the widget has fetched", async () => {
     const original = globalThis.fetch;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      if (!String(input).includes("/__nextgen/flow/flow_done")) {
+      if (!String(input).includes("/__nextgen/api/v1/flow/flow_done")) {
         return original(input, init);
       }
       return Response.json({

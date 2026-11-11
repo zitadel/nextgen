@@ -1,0 +1,18 @@
+title: ReleasePointerKind
+type: string
+description: |
+  The kind of resource a release pointer pins.
+
+  The kind is explicit, not inferred from `revision_id`, because a revision ID
+  does not always identify its kind: a schema's is its `$id`, which may be any
+  URL.
+
+  `flow_definition` rather than `flow`: a release pins the definitions served
+  at `/flow_definitions`, not the runtime flows at `/flow`.
+enum:
+  - schema
+  - flow_definition
+  - branding
+  - idp
+  - policy
+example: schema

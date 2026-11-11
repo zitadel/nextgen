@@ -95,6 +95,8 @@ export interface SessionControllerOptions {
  * network error, a gateway's page, a 200 that is not a session) keeps the
  * host's surface, sets `errorMessage` and fires `zitadel-session-error`, so the
  * app can tell an outage from a visitor without a session.
+ *
+ * @fires {CustomEvent<ZitadelSignoutDetail>} zitadel-signout - The session was revoked; carries the display and identifier.
  */
 export class SessionController implements ReactiveController {
   display = "";
@@ -229,7 +231,7 @@ export class SessionController implements ReactiveController {
     // Removed while the request was in flight: the session is gone all the same,
     // and the page hears of it when the host is put back.
     if (this.host.isConnected) {
-      emit(this.host, "zitadel-signout", detail);
+      await emit(this.host, "zitadel-signout", detail, { waitForListeners: true });
       return true;
     }
     // Resolves `false` so the caller does not navigate yet: `hostConnected`

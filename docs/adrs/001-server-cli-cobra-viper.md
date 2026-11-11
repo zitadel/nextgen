@@ -1,8 +1,17 @@
 # ADR 001: Standardize Server Command Surface on Cobra and Viper
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-24 (originally Proposed 2026-04-24)
 > **Date:** 2026-04-24
 > **Context:** nextgen server command and configuration handling
+>
+> **Amendment (2026-10-24):** the server command is built on Cobra and Viper
+> (`cmd/server/`). The code answers the open question below: `database` holds
+> exactly one dialect key (`postgres`, `spanner` or `sqlite`), the key present
+> selects the backend, and there is no `database.type` discriminator; more than
+> one key fails with `ErrMultipleDialectsConfigured`
+> (`internal/storage/database/dialect.go`, #315). `OTEL_*` variables are
+> honoured (`internal/instrumentation/zotel/`) and a Postgres DSN goes through
+> `pgxpool.ParseConfig`, but neither is documented for operators yet.
 
 ## Decision
 
