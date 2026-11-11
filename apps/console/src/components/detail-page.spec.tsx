@@ -48,11 +48,6 @@ describe("detail header", () => {
     expect(screen.queryByRole("paragraph")).not.toBeInTheDocument();
   });
 
-  it("draws no icon tile for a screen without one", () => {
-    const { container } = render(<DetailHeader title="Default login" meta={[]} />);
-    expect(container.querySelector("svg")).toBeNull();
-  });
-
   it("keeps the icon out of the accessibility tree", () => {
     const { container } = render(<DetailHeader icon={Box} title="Engineering" meta={[]} />);
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
@@ -69,7 +64,7 @@ describe("detail header", () => {
   });
 
   it("draws no identity line when there are no values", () => {
-    const { container } = render(<DetailHeader title="Engineering" meta={[]} />);
+    const { container } = render(<DetailHeader icon={Box} title="Engineering" meta={[]} />);
     expect(container.querySelector("dl")).toBeNull();
   });
 

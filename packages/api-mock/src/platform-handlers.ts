@@ -598,8 +598,12 @@ function matchesIdpFilters(
   return true;
 }
 
+const IDP_FIELD_IMMUTABLE_MESSAGE =
+  "identity provider connection: the field is fixed for the life of the connection";
+
 /**
- * Which identity field a revision would change, or `undefined` when none would.
+ * The identity fields a revision would change, in the server's order, or empty
+ * when none would.
  *
  * `protocol`, `subject_claim` and the field naming the authority decide which
  * provider account a stored subject belongs to, so changing one repoints
@@ -607,22 +611,25 @@ function matchesIdpFilters(
  * for the life of the connection, and a mock that accepted it would let the CLI
  * pass a test the real service fails.
  */
-function immutableFieldClash(
+function immutableFieldsChanged(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
-): string | undefined {
-  for (const field of ["protocol", "subject_claim"] as const) {
-    if (before[field] !== undefined && before[field] !== after[field]) {
-      return field;
-    }
+): string[] {
+  const changed: string[] = [];
+  if (before.protocol !== undefined && before.protocol !== after.protocol) {
+    changed.push("protocol");
   }
-  // The authority is the issuer.
+  // An absent subject_claim reads as `sub`, as the server resolves it.
+  if ((before.subject_claim ?? "sub") !== (after.subject_claim ?? "sub")) {
+    changed.push("subject_claim");
+  }
+  // The authority is the issuer, compared as the server does: exactly.
   const was = before.oidc;
   const now = after.oidc;
   if (isObject(was) && isObject(now) && was.issuer !== undefined && was.issuer !== now.issuer) {
-    return "oidc.issuer";
+    changed.push("oidc.issuer");
   }
-  return undefined;
+  return changed;
 }
 
 type VariableKind = "primary" | "preview";
@@ -1248,25 +1255,34 @@ function materializeBundle(
 }
 
 /**
- * The first connection in the bundle that would change a field fixed for the
- * life of the connection, with the field it changes.
+ * Every connection in the bundle that would change a field fixed for the life
+ * of the connection, as the server reports it under `rel.invalid`: the fields
+ * sit in the resource's own `details`, where the CLI's hint reads them.
  */
-function bundleIdpClash(
+function bundleIdpFailures(
   projectId: string,
   bundle: Record<string, unknown>,
-): { slug: string; field: string } | undefined {
-  for (const item of asArray(bundle.idps)) {
+): Record<string, unknown>[] {
+  const failures: Record<string, unknown>[] = [];
+  asArray(bundle.idps).forEach((item, index) => {
     const resource = isObject(item) ? item : {};
     const slug = bundleResourceHandle("idp", resource);
     const existing = [...store.idps.values()].find(
       (record) => record.projectId === projectId && record.slug === slug,
     );
-    const field = existing === undefined ? undefined : immutableFieldClash(existing.body, resource);
-    if (field !== undefined) {
-      return { slug, field };
+    const fields = existing === undefined ? [] : immutableFieldsChanged(existing.body, resource);
+    if (fields.length > 0) {
+      failures.push({
+        kind: "idp",
+        index,
+        handle: slug,
+        code: "idp.field_immutable",
+        message: IDP_FIELD_IMMUTABLE_MESSAGE,
+        details: { details: { fields } },
+      });
     }
-  }
-  return undefined;
+  });
+  return failures;
 }
 
 /**
@@ -1811,21 +1827,11 @@ export function setupPlatformHandlers() {
       const bundle = data.bundle;
       // A connection's fixed fields are checked before anything is written, as
       // the service checks them inside the build's transaction: a bundle that
-      // would change one is refused whole rather than revising it.
-      const clash = bundleIdpClash(project.id, bundle);
-      if (clash) {
-        return HttpResponse.json(
-          errorBody(
-            "idp.field_immutable",
-            `release: ${clash.slug}: the field ${clash.field} is fixed for the life of the connection`,
-          ),
-          { status: 400 },
-        );
-      }
-      // The service validates each policy against its template and refuses two
-      // for one operation, reporting every refused resource under
+      // would change one is refused whole rather than revising it. The service
+      // also validates each policy against its template and refuses two for
+      // one operation. Every refused resource is reported at once under
       // `rel.invalid`.
-      const refused = bundlePolicyFailures(bundle);
+      const refused = [...bundleIdpFailures(project.id, bundle), ...bundlePolicyFailures(bundle)];
       if (refused.length > 0) {
         return HttpResponse.json(
           errorBody("rel.invalid", "release: the bundle has invalid resources", {
@@ -2940,13 +2946,10 @@ export function setupPlatformHandlers() {
         (record) => record.projectId === query.data.project_id && record.slug === slug,
       );
       if (existing) {
-        const clash = immutableFieldClash(existing.body, definition);
-        if (clash) {
+        const fields = immutableFieldsChanged(existing.body, definition);
+        if (fields.length > 0) {
           return HttpResponse.json(
-            errorBody(
-              "idp.field_immutable",
-              "identity provider connection: the field is fixed for the life of the connection",
-            ),
+            errorBody("idp.field_immutable", IDP_FIELD_IMMUTABLE_MESSAGE, { details: { fields } }),
             { status: 400 },
           );
         }

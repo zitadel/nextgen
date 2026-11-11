@@ -1,9 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Braces } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import {
   DETAIL_BODY,
   DETAIL_STACK,
+  DETAIL_VALUE_EMPTY,
+  DetailRow,
   DetailRows,
   DetailSection,
   DetailHeader,
@@ -90,6 +93,7 @@ function SchemaDetail() {
       {/* The design draws `Expires at` beside the id; nothing on the schema
           resource backs it, so the created date stands in. */}
       <DetailHeader
+        icon={Braces}
         title={name}
         meta={[
           { label: "Schema ID", value: schemaId, copyable: true },
@@ -121,17 +125,12 @@ function SchemaDetail() {
           {/* No picker here: the design draws it on the Fields card only. */}
           <DetailSection title="Sign-in methods">
             {methods.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                This schema declares no sign-in methods.
-              </p>
+              <p className={DETAIL_VALUE_EMPTY}>This schema declares no sign-in methods.</p>
             ) : (
               <DetailRows>
                 {methods.map((method) => (
-                  <div key={method.key} className="flex items-center justify-between gap-4 py-1">
-                    <span className="text-sm leading-5 font-medium text-foreground">
-                      {method.label}
-                    </span>
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <DetailRow key={method.key} align="center" label={method.label}>
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       {/* Raw slugs: resolving them to connection names needs
                             `idp.read`, which this screen does not assume. A
                             slug with no connection reads the same — the
@@ -143,7 +142,7 @@ function SchemaDetail() {
                         {method.enabled ? "Enabled" : "Disabled"}
                       </Badge>
                     </div>
-                  </div>
+                  </DetailRow>
                 ))}
               </DetailRows>
             )}

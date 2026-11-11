@@ -153,21 +153,23 @@ stateDiagram-v2
   [*] --> pending: create, or replace
   pending --> accepted: accept
   pending --> rejected: decline
-  pending --> cancelled: cancel, or replace
   pending --> expired: 72 hours pass
+  pending --> [*]: cancel, or replace deletes the row
 ```
 
-- All states but `pending` are final. Revoking the resulting grant doesn't
-  change the invitation, and its link can't restore access.
-- `expired` is derived on read from `expires_at`; no sweeper runs.
+- All statuses but `pending` are final. Revoking the resulting grant doesn't
+  change the invitation, and its link can't restore access. There is no
+  `cancelled` status: cancel and replace of a pending invitation delete the
+  row.
+- `expired` is derived on read from `expires_at`; no sweeper runs yet.
 - **Replace** is a create with `replaces_invitation_id`, a request parameter
   that isn't stored. The new invitation keeps the original's `journey_id`. A
-  pending original becomes `cancelled` in the same transaction; an expired or
+  pending original is deleted in the same transaction; an expired or
   rejected one keeps its status.
-- **Erasure:** accepting, declining and cancelling null `metadata` in the same
-  transaction; replacing moves it to the new invitation. An expired
-  invitation that is never replaced keeps it until a cleanup job removes it
-  (follow-up).
+- **Erasure:** accepting and declining null `metadata` in the same
+  transaction; replacing moves it to the new invitation; cancelling deletes
+  the row. An expired invitation that is never replaced keeps its metadata
+  until a cleanup job removes the row (follow-up with subscriptions / GC).
 - **Accept** runs in one transaction: find by token hash, check it is pending
   and unexpired, hand off to the type's adapter, mark it accepted, emit
   events. The inviter can't accept their own invitation.
@@ -203,7 +205,7 @@ stateDiagram-v2
 | `invitation.created` | create, and the new row of a replace | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` |
 | `invitation.accepted` | accept; with the grant service's events when it writes | `type` and its object, `journey_id`, `user_id` |
 | `invitation.rejected` | decline | `journey_id`, `user_id` |
-| `invitation.cancelled` | cancel, and the old row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
+| `invitation.cancelled` | cancel, and the deleted row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
 Payloads never carry the metadata or the token. `invitation.expired` waits for
 a sweeper.
@@ -237,9 +239,11 @@ browser-plane preview secret carries.
 | `POST /invitations/lookup`, `/accept`, `/reject` with `{token}` | platform-project session; CSRF on writes |
 | `GET /projects/{project_id}/members` | `project.write`, or a session that can read the project |
 
-Cancel is `DELETE`, which keeps the row as `cancelled`; replace is a create,
-like signing-key rotation. `lookup`, `accept` and `reject` are verbs because
-their caller holds a token, not an id.
+Cancel is `DELETE`, which removes the pending row; replace is a create that
+deletes a pending original in the same transaction, like signing-key
+rotation. `lookup`, `accept` and `reject` are verbs because their caller
+holds a token, not an id. Lookup is a read (CSRF origin check only);
+accept and reject are writes (CSRF token required).
 
 ### 8. CLI
 
@@ -324,7 +328,7 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   refused if `created_by` no longer holds `admin` on the project, or if the
   project is no longer active. When `created_by` is `null` (the CLI), only
   the project check applies. Rotating the secret doesn't cancel them; an administrator does.
-- Pending invitations are cancelled when their project is deleted or changes
+- Pending invitations are deleted when their project is deleted or changes
   owner.
 - The platform project can be invited into, so its administrators can add
   colleagues until team membership exists (#2436). It's always claimed, as
@@ -341,11 +345,12 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   are rate-limited.
 
 **State changes**
-- Accept, decline, cancel and the cancel inside a replace change an
-  invitation's status only while it's `pending`, each in one transaction.
-  When two race, one wins and the other gets the same answer as for a
-  finished invitation. Two replacements of an expired or rejected invitation
-  can both succeed, like any two invitations for the same person.
+- Accept and decline change an invitation's status only while it's
+  `pending`; cancel and the delete inside a replace remove a pending row.
+  Each runs in one transaction. When two race, one wins and the other gets
+  the same answer as for a finished invitation. Two replacements of an
+  expired or rejected invitation can both succeed, like any two invitations
+  for the same person.
 
 **Logs**
 - Request logs and wide events redact `token`, `link` and `metadata`, and
@@ -354,7 +359,8 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 **Accepted risks**
 - A leaked link grants its role to whoever redeems it first within 72 hours.
   The expiry, cancel and the visible accepter limit the damage.
-- Expired invitations keep their metadata until the cleanup job exists.
+- Expired invitations keep their metadata until the cleanup / GC job exists
+  (follow-up with subscriptions).
 - An `admin` link to the platform project is the most powerful link there is.
   The same rules apply to it as to any other project's links.
 

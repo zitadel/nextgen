@@ -35,7 +35,7 @@ test("is reached from the sidebar, beside the flows it brands", async ({ page, z
   await signIn(page, zitadel, await seed.user());
 
   // The sidebar lists a project's screens once one is selected; `/` selects
-  // this lane's pinned project and lands on its first screen.
+  // this lane's pinned project and lands on its Overview.
   await page.goto("/");
 
   // Branding is a row of its own in the single-level sidebar, right after

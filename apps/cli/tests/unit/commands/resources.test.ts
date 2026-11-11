@@ -2164,11 +2164,26 @@ describe("the query resources' filters", () => {
     ["idps", QueryIdpsBodyFilterItemOperation],
     ["projects", QueryProjectsBodyFilterItemOperation],
   ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
-    const offered = new Set(
+    const offered = new Set<string>(
       (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
     );
+    // Every query's enum holds `starts_with`, but only a field an index answers
+    // it for takes it, so a resource without such a field offers it nowhere.
+    const expected = Object.values(operations).filter(
+      (operation) => operation !== "starts_with" || offered.has(operation),
+    );
 
-    expect([...offered].sort()).toEqual(Object.values(operations).sort());
+    expect([...offered].sort()).toEqual(expected.sort());
+  });
+
+  it("offer starts_with on the fields an index answers it for, and no other", () => {
+    const fields = Object.entries(RESOURCES).flatMap(([topic, resource]) =>
+      (resource.list?.filters ?? [])
+        .filter((filter) => (filter.operations as readonly string[]).includes("starts_with"))
+        .map((filter) => `${topic}.${filter.field}`),
+    );
+
+    expect(fields).toEqual(["users.identifier"]);
   });
 });
 
@@ -2388,8 +2403,8 @@ describe("the registry builders", () => {
   it("refuses an operation the query body does not take", () => {
     list({
       body: QueryUsersBody,
-      // @ts-expect-error a user query takes no `starts_with` operation
-      filters: [{ field: "status", operations: ["starts_with"] }],
+      // @ts-expect-error a user query takes no `ends_with` operation
+      filters: [{ field: "status", operations: ["ends_with"] }],
       call: ({ client }, body) => client.queryUsers(body),
       items: (page: QueryUsers200) => page.users,
       next: (page: QueryUsers200) => page.next_page_token,

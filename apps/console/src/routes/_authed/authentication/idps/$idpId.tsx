@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Shield } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
@@ -13,7 +14,7 @@ import {
 } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { SECTION_HEADING } from "@/components/typography";
+import { SUBSECTION_HEADING } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { formatDate } from "@/lib/date";
 import { fetchAllFlows } from "@/features/flow-definitions/api";
@@ -61,7 +62,9 @@ function IdpDetail() {
 
   return (
     <Page>
+      {/* `Shield`, the sidebar's glyph for Authentication, where connections live. */}
       <DetailHeader
+        icon={Shield}
         title={idp.definition.display_name}
         meta={[
           { label: "Connection ID", value: idp.id, copyable: true },
@@ -93,7 +96,7 @@ function IdpDetail() {
             </DetailRows>
 
             <section aria-labelledby="idp-used-by" className="flex flex-col gap-2">
-              <h3 id="idp-used-by" className={SECTION_HEADING}>
+              <h3 id="idp-used-by" className={SUBSECTION_HEADING}>
                 Used by
               </h3>
               <DetailRows>

@@ -119,6 +119,7 @@ Canonical examples:
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
+| Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
 
 Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in
@@ -130,8 +131,7 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
   Field definitions, a login flow's User schema, Release content and the
   settings sections.
 - `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
-  inside a card body. The design draws an identity provider's Used by in the
-  section face instead, so that `h3` takes `SECTION_HEADING`.
+  inside a card body, such as an identity provider's Used by.
 - The overline is for meta labels, table heads and drill-down breadcrumbs,
   never a section title.
 
@@ -216,18 +216,15 @@ cards of labelled rows. Compose `Page` + `DetailHeader` from
 row and cards 16px apart (`DETAIL_STACK`).
 
 - A body card with a titled section is a `DetailSection`: the title, with an
-  optional `aside` beside it (a login flow's schema and its `RevisionLink`)
-  and `action` at the row's end, a rule, then the content. `asideOnRail`
-  starts the aside on the rail instead, as the user detail's schema card draws
-  it over its form. A single name field with its Save button is a
+  optional `aside` on the label rail (a login flow's or a user's schema and
+  its `RevisionLink`) and `action` at the row's end, a rule, then the
+  content. A single name field with its Save button is a
   `RenameCard` (`src/components/rename-card.tsx`).
 - A labelled value is a `DetailRow`, its value in `DETAIL_VALUE`, and a card's
   rows sit in `DetailRows`. Do not lay out a label and value by hand: every
-  card puts its values on the same 218px rail (`DETAIL_LABEL_RAIL`), and a
-  label beside a form control takes `FIELD_LABEL_RAIL` (or
-  `FIELD_GROUP_LABEL_RAIL` in a responsive `FieldGroup`) so the control starts
-  there too. A status list the design right-aligns (a schema's sign-in
-  methods) keeps its own row inside `DetailRows`.
+  card puts its values on the same 218px rail, and a label beside a form
+  control takes `FIELD_LABEL_RAIL` (or `FIELD_GROUP_LABEL_RAIL` in a
+  responsive `FieldGroup`) so the control starts there too.
 
 Settings (Profile) is a different composition: a bare title over one card of
 labelled rows, in a centred column `--zl-container-settings` wide. Compose
@@ -237,8 +234,8 @@ heading with no header gutter, then `SettingsCard`
 block, 16px between rows. No icon tile and no identity line: a settings screen
 is not a resource with an id.
 
-`DetailHeader` is the title row (an icon tile on resource and release
-screens, the title, a status beside it) over one identity line: the `meta`
+`DetailHeader` is the title row (the icon tile, carrying the glyph of the
+screen's sidebar entry, the title, a status beside it) over one identity line: the `meta`
 items, each value after its muted label, the id `copyable` and cut in the
 middle, a rule between items. The line stacks under `sm`. An `action` (a
 release's menu) sits at the right, beside the title and the line together.

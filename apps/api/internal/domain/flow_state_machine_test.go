@@ -6327,9 +6327,9 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 	}
 }
 
-// An array can carry x-unique and is stored in the uniqueness registry, so a
+// An array can carry x-unique and is stored as a unique claim, so a
 // required unique array must arrive verified like any other unique property.
-// It is probed as one value, as the registry stores it.
+// It is probed as one value, as the unique index stores it.
 func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToCollection(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorldWithSchema(t, `{
