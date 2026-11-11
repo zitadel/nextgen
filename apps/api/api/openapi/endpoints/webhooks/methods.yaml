@@ -1,0 +1,226 @@
+get:
+  operationId: listWebhooks
+  summary: List webhooks
+  description: |
+    Lists the webhooks of the project in `project_id`, newest first by
+    `created_at`, paginated with `limit` and `page_token`.
+
+    Each webhook carries the time of its last delivery and of its last
+    failed attempt. None carries its signing secret: only `createWebhook`
+    (`POST /webhooks`) and `rotateWebhookSecret`
+    (`POST /webhooks/{id}/rotate_secret`) return it.
+
+    Authenticate with a project secret (`oauth2`), or with the session cookie
+    (`sessionCookie`) of a signed-in person who can read the project.
+  tags:
+    - Webhooks
+  security:
+    - oauth2:
+        - webhook.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  responses:
+    '200':
+      description: A page of the project's webhooks.
+      content:
+        application/json:
+          schema:
+            $ref: list-webhooks-response.yaml
+          examples:
+            webhooks:
+              summary: One delivering webhook and one failing webhook
+              description: |
+                The second webhook's last attempt got no response, so its
+                `last_error_at` is later than its `last_delivered_at` and its
+                `last_error_status` is `null`.
+              value:
+                data:
+                  - id: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    url: https://api.acme.com/hooks/zitadel
+                    description: User sync
+                    event_types:
+                      - user.created
+                      - user.updated
+                      - user.deleted
+                    enabled: true
+                    last_delivered_at: '2026-11-11T10:00:12Z'
+                    last_error_status: null
+                    last_error_at: null
+                    previous_secret_expires_at: null
+                    created_at: '2026-11-11T10:00:00Z'
+                  - id: hook_01KWF8Q2N5T7V9X1Z3B5D7F9H1
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    url: https://siem.acme.com/zitadel
+                    description: 'Audit log'
+                    event_types:
+                      - '*'
+                    enabled: true
+                    last_delivered_at: '2026-11-09T17:42:03Z'
+                    last_error_status: null
+                    last_error_at: '2026-11-11T09:58:44Z'
+                    previous_secret_expires_at: null
+                    created_at: '2026-11-02T13:20:00Z'
+                next_page_token: null
+    '400':
+      description: The page token is not valid. Send the `next_page_token` from the previous response unchanged.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: The caller cannot read the project's webhooks.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: listWebhooks-error-response.yaml
+
+post:
+  operationId: createWebhook
+  summary: Create a webhook
+  description: |
+    Creates a webhook for the project in `project_id` and returns it with its
+    signing secret.
+
+    The server then POSTs each of the project's events whose type is in
+    `event_types` to `url`, one event per request, signed with the secret.
+    Delivery starts with the events stored after this call: a new webhook
+    gets no history. A project that is not claimed yet delivers nothing until
+    the [claim](/docs/concepts/project-team-user#claim) succeeds.
+
+    The server refuses a body that breaks one of these rules:
+
+    - `url` is `https`, at most 2048 characters, and carries no user info.
+    - `event_types` holds at least one entry and no entry twice. Each entry
+      is an event type the server writes, or `*`, and `*` stands alone.
+    - A project holds at most 10 webhooks. One more answers `409`
+      `webhook.limit_reached`: delete one with `deleteWebhook`
+      (`DELETE /webhooks/{id}`) first. Two webhooks may name the
+      same `url`.
+
+    The `secret` appears only in this response. Store it where the endpoint
+    can read it, and verify each request with it.
+
+    To recover from a lost response, send `Idempotency-Key` and repeat the
+    request with the same key: it returns the first response, `secret`
+    included, and creates nothing. Without the key, a repeated request
+    creates a second webhook. Then find both with `listWebhooks`
+    (`GET /webhooks`), delete one, and issue a secret for the other with
+    `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+
+    Authenticate with a project secret (`oauth2`), or with the session cookie
+    (`sessionCookie`) of a signed-in person who can change the project.
+    Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Webhooks
+  security:
+    - oauth2:
+        - webhook.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key. A retry carrying the same key within the retry
+        window returns the first response, `secret` included, instead of
+        creating another webhook. Without it, a retry after a lost response
+        creates a second webhook, and the first one's secret is lost.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-webhook-request.yaml
+        examples:
+          some_types:
+            summary: Receive the user events
+            value:
+              url: https://api.acme.com/hooks/zitadel
+              description: User sync
+              event_types:
+                - user.created
+                - user.updated
+                - user.deleted
+          all_types:
+            summary: Receive every event type except request.api
+            value:
+              url: https://siem.acme.com/zitadel
+              event_types:
+                - '*'
+  responses:
+    '201':
+      description: The webhook was created. The response carries its signing secret, this once.
+      content:
+        application/json:
+          schema:
+            $ref: webhook-with-secret.yaml
+          examples:
+            created:
+              summary: A new webhook, with its secret
+              description: |
+                Nothing was delivered yet, so `last_delivered_at` is `null`.
+              value:
+                id: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                url: https://api.acme.com/hooks/zitadel
+                description: User sync
+                event_types:
+                  - user.created
+                  - user.updated
+                  - user.deleted
+                enabled: true
+                last_delivered_at: null
+                last_error_status: null
+                last_error_at: null
+                previous_secret_expires_at: null
+                created_at: '2026-11-11T10:00:00Z'
+                secret: whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oDZJQk1o3DdH8=
+    '400':
+      description: The `url` or an entry of `event_types` is not valid, or `*` is listed beside another entry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: The caller cannot change the project's webhooks.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: The project already holds 10 webhooks. Delete one with `deleteWebhook` first.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createWebhook-error-response.yaml

@@ -1,0 +1,15 @@
+title: CreateWebhookRequest
+type: object
+description: The webhook to create.
+required:
+  - url
+  - event_types
+properties:
+  url:
+    $ref: webhook-url.yaml
+  event_types:
+    $ref: webhook-event-types.yaml
+  description:
+    type: string
+    description: A note on what the webhook is for.
+    example: User sync

@@ -290,6 +290,20 @@ func encodeCreateUserRequest(
 	return nil
 }
 
+func encodeCreateWebhookRequest(
+	req *CreateWebhookRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeEvaluatePolicyRequest(
 	req EvaluatePolicyRequest,
 	r *http.Request,
@@ -620,6 +634,20 @@ func encodeUpdateTeamRequest(
 
 func encodeUpdateVariablesRequest(
 	req UpdateVariablesRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateWebhookRequest(
+	req *UpdateWebhookRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

@@ -160,6 +160,18 @@ type CreateUserParams struct {
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
+// CreateWebhookParams is parameters of createWebhook operation.
+type CreateWebhookParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
+}
+
 // DeleteGrantParams is parameters of deleteGrant operation.
 type DeleteGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
@@ -195,6 +207,17 @@ type DeleteVariableParams struct {
 	VariableName VariableName
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
+}
+
+// DeleteWebhookParams is parameters of deleteWebhook operation.
+type DeleteWebhookParams struct {
+	// The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`
+	// (`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.
+	ID WebhookID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 }
 
 // EvaluatePolicyParams is parameters of evaluatePolicy operation.
@@ -562,6 +585,17 @@ type GetVariablesParams struct {
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
+}
+
+// GetWebhookParams is parameters of getWebhook operation.
+type GetWebhookParams struct {
+	// The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`
+	// (`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.
+	ID WebhookID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 }
 
 // InitClaimParams is parameters of initClaim operation.
@@ -1000,6 +1034,21 @@ type ListUserTeamsParams struct {
 	UserID UserID
 }
 
+// ListWebhooksParams is parameters of listWebhooks operation.
+type ListWebhooksParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+}
+
 // PatchMyUserParams is parameters of patchMyUser operation.
 type PatchMyUserParams struct {
 	// The project the caller signs its users in to. The cookie's session is used
@@ -1134,6 +1183,21 @@ type RollbackDeploymentParams struct {
 	DeploymentID DeploymentID
 }
 
+// RotateWebhookSecretParams is parameters of rotateWebhookSecret operation.
+type RotateWebhookSecretParams struct {
+	// The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`
+	// (`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.
+	ID WebhookID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
+}
+
 // SearchParams is parameters of search operation.
 type SearchParams struct {
 	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
@@ -1190,6 +1254,17 @@ type UpdateVariablesParams struct {
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
+}
+
+// UpdateWebhookParams is parameters of updateWebhook operation.
+type UpdateWebhookParams struct {
+	// The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`
+	// (`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.
+	ID WebhookID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 }
 
 // VerifyChallengeProofParams is parameters of verifyChallengeProof operation.

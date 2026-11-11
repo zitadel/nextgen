@@ -147,6 +147,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return grantErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixInvitation.ErrorCodePrefix("")):
 		return invitationErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.WebhookErrorCodePrefix):
+		return webhookErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
 		return projectErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),

@@ -1,0 +1,9 @@
+name: id
+in: path
+required: true
+description: |
+  The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`
+  (`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.
+schema:
+  $ref: '../schemas/webhook-id.yaml'
+example: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6

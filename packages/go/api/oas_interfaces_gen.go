@@ -145,6 +145,10 @@ type CreateUserRes interface {
 	createUserRes()
 }
 
+type CreateWebhookRes interface {
+	createWebhookRes()
+}
+
 type DeleteGrantRes interface {
 	deleteGrantRes()
 }
@@ -159,6 +163,10 @@ type DeleteUserByIDRes interface {
 
 type DeleteVariableRes interface {
 	deleteVariableRes()
+}
+
+type DeleteWebhookRes interface {
+	deleteWebhookRes()
 }
 
 type DeploymentCreatedRes interface {
@@ -317,6 +325,10 @@ type GetVariablesRes interface {
 	getVariablesRes()
 }
 
+type GetWebhookRes interface {
+	getWebhookRes()
+}
+
 type IdpCreatedRes interface {
 	idpCreatedRes()
 }
@@ -427,6 +439,10 @@ type ListUserPasskeysRes interface {
 
 type ListUserTeamsRes interface {
 	listUserTeamsRes()
+}
+
+type ListWebhooksRes interface {
+	listWebhooksRes()
 }
 
 type LookupInvitationRes interface {
@@ -545,6 +561,10 @@ type RollbackDeploymentRes interface {
 	rollbackDeploymentRes()
 }
 
+type RotateWebhookSecretRes interface {
+	rotateWebhookSecretRes()
+}
+
 type SchemaCreatedRes interface {
 	schemaCreatedRes()
 }
@@ -587,6 +607,10 @@ type UpdateTeamRes interface {
 
 type UpdateVariablesRes interface {
 	updateVariablesRes()
+}
+
+type UpdateWebhookRes interface {
+	updateWebhookRes()
 }
 
 type UserCreateFailedRes interface {

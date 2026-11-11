@@ -141,6 +141,40 @@ tags:
       Events are the project's audit trail: identity, session, admin and entity
       events. These operations list and read them; filter the list by `category`
       or `event_type`. An event's `event_type` selects its typed payload.
+  - name: Webhooks
+    description: |
+      Webhooks are the URLs a project's events are sent to. These operations
+      create, list, read, update and delete a project's webhooks and rotate a
+      webhook's signing secret. They are not available yet: each answers
+      `501` `not_implemented`.
+
+      A webhook names the event types it receives, or `*` for all of them
+      except `request.api`. The server POSTs each matching event to the
+      webhook's `url` as it stores it, one event per request and in the order
+      they were stored. The body is the event as `GET /events` returns it; the
+      Event Webhooks pages describe it per event type. Any `2xx` status
+      acknowledges the event. Delivery is at least once.
+
+      Every request to a project's webhook is signed, following
+      [Standard Webhooks](https://www.standardwebhooks.com/). It carries three
+      headers:
+
+      - `webhook-id`: the event's `id`. It is the same on every retry, so drop
+        duplicates by it.
+      - `webhook-timestamp`: when this attempt was sent, in seconds since the
+        Unix epoch. Refuse a request whose timestamp is more than five minutes
+        from your clock.
+      - `webhook-signature`: `v1,` followed by the base64 of the HMAC-SHA256
+        of `{webhook-id}.{webhook-timestamp}.{body}`, where `{body}` is the
+        request body byte for byte. The key is the webhook's secret: the
+        base64 after `whsec_`, decoded. For 24 hours after
+        `rotateWebhookSecret` the header holds two signatures separated by a
+        space, one per secret; accept the request when either matches.
+
+      Verify the signature over the raw body before parsing it, and compare
+      in constant time. Only a project's webhooks are signed: the sinks an
+      operator sets in the server's configuration, under `events.export`, get
+      the same requests without these headers.
   - name: Event Webhooks
     description: |
       Event webhooks are the requests the server POSTs to a webhook sink as it
@@ -321,6 +355,12 @@ paths:
     $ref: endpoints/events/methods.yaml
   /events/{id}:
     $ref: endpoints/events/by_id/methods.yaml
+  /webhooks:
+    $ref: endpoints/webhooks/methods.yaml
+  /webhooks/{id}:
+    $ref: endpoints/webhooks/by_id/methods.yaml
+  /webhooks/{id}/rotate_secret:
+    $ref: endpoints/webhooks/by_id/rotate_secret/methods.yaml
   /variables:
     $ref: endpoints/variables/methods.yaml
   /variables/{variable_name}:

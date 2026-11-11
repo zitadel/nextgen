@@ -21913,6 +21913,385 @@ type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
 
+type CreateWebhookBadRequest ErrorDetails
+
+func (*CreateWebhookBadRequest) createWebhookRes() {}
+
+type CreateWebhookConflict ErrorDetails
+
+func (*CreateWebhookConflict) createWebhookRes() {}
+
+// CreateWebhookErrorResponse represents sum type.
+type CreateWebhookErrorResponse struct {
+	Type                    CreateWebhookErrorResponseType // switch on this field
+	AuthCsrfInvalid         AuthCsrfInvalid
+	AuthUnauthorized        AuthUnauthorized
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
+	WebhookInvalid          WebhookInvalid
+	WebhookLimitReached     WebhookLimitReached
+	WebhookNotFound         WebhookNotFound
+	WebhookPermissionDenied WebhookPermissionDenied
+}
+
+// CreateWebhookErrorResponseType is oneOf type of CreateWebhookErrorResponse.
+type CreateWebhookErrorResponseType string
+
+// Possible values for CreateWebhookErrorResponseType.
+const (
+	AuthCsrfInvalidCreateWebhookErrorResponse         CreateWebhookErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCreateWebhookErrorResponse        CreateWebhookErrorResponseType = "auth.unauthorized"
+	InternalCreateWebhookErrorResponse                CreateWebhookErrorResponseType = "internal"
+	NotImplementedCreateWebhookErrorResponse          CreateWebhookErrorResponseType = "not_implemented"
+	ReqInvalidCreateWebhookErrorResponse              CreateWebhookErrorResponseType = "req.invalid"
+	UnavailableCreateWebhookErrorResponse             CreateWebhookErrorResponseType = "unavailable"
+	WebhookInvalidCreateWebhookErrorResponse          CreateWebhookErrorResponseType = "webhook.invalid"
+	WebhookLimitReachedCreateWebhookErrorResponse     CreateWebhookErrorResponseType = "webhook.limit_reached"
+	WebhookNotFoundCreateWebhookErrorResponse         CreateWebhookErrorResponseType = "webhook.not_found"
+	WebhookPermissionDeniedCreateWebhookErrorResponse CreateWebhookErrorResponseType = "webhook.permission_denied"
+)
+
+// IsAuthCsrfInvalid reports whether CreateWebhookErrorResponse is AuthCsrfInvalid.
+func (s CreateWebhookErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateWebhookErrorResponse
+}
+
+// IsAuthUnauthorized reports whether CreateWebhookErrorResponse is AuthUnauthorized.
+func (s CreateWebhookErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateWebhookErrorResponse
+}
+
+// IsInternal reports whether CreateWebhookErrorResponse is Internal.
+func (s CreateWebhookErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateWebhookErrorResponse
+}
+
+// IsNotImplemented reports whether CreateWebhookErrorResponse is NotImplemented.
+func (s CreateWebhookErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateWebhookErrorResponse
+}
+
+// IsReqInvalid reports whether CreateWebhookErrorResponse is ReqInvalid.
+func (s CreateWebhookErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateWebhookErrorResponse
+}
+
+// IsUnavailable reports whether CreateWebhookErrorResponse is Unavailable.
+func (s CreateWebhookErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateWebhookErrorResponse
+}
+
+// IsWebhookInvalid reports whether CreateWebhookErrorResponse is WebhookInvalid.
+func (s CreateWebhookErrorResponse) IsWebhookInvalid() bool {
+	return s.Type == WebhookInvalidCreateWebhookErrorResponse
+}
+
+// IsWebhookLimitReached reports whether CreateWebhookErrorResponse is WebhookLimitReached.
+func (s CreateWebhookErrorResponse) IsWebhookLimitReached() bool {
+	return s.Type == WebhookLimitReachedCreateWebhookErrorResponse
+}
+
+// IsWebhookNotFound reports whether CreateWebhookErrorResponse is WebhookNotFound.
+func (s CreateWebhookErrorResponse) IsWebhookNotFound() bool {
+	return s.Type == WebhookNotFoundCreateWebhookErrorResponse
+}
+
+// IsWebhookPermissionDenied reports whether CreateWebhookErrorResponse is WebhookPermissionDenied.
+func (s CreateWebhookErrorResponse) IsWebhookPermissionDenied() bool {
+	return s.Type == WebhookPermissionDeniedCreateWebhookErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateWebhookErrorResponse to AuthCsrfInvalid.
+func (s *CreateWebhookErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateWebhookErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateWebhookErrorResponse is AuthCsrfInvalid.
+func (s CreateWebhookErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateWebhookErrorResponse(v AuthCsrfInvalid) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets CreateWebhookErrorResponse to AuthUnauthorized.
+func (s *CreateWebhookErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateWebhookErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateWebhookErrorResponse is AuthUnauthorized.
+func (s CreateWebhookErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateWebhookErrorResponse(v AuthUnauthorized) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets CreateWebhookErrorResponse to Internal.
+func (s *CreateWebhookErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateWebhookErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateWebhookErrorResponse is Internal.
+func (s CreateWebhookErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from Internal.
+func NewInternalCreateWebhookErrorResponse(v Internal) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CreateWebhookErrorResponse to NotImplemented.
+func (s *CreateWebhookErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateWebhookErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateWebhookErrorResponse is NotImplemented.
+func (s CreateWebhookErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from NotImplemented.
+func NewNotImplementedCreateWebhookErrorResponse(v NotImplemented) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets CreateWebhookErrorResponse to ReqInvalid.
+func (s *CreateWebhookErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateWebhookErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateWebhookErrorResponse is ReqInvalid.
+func (s CreateWebhookErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from ReqInvalid.
+func NewReqInvalidCreateWebhookErrorResponse(v ReqInvalid) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateWebhookErrorResponse to Unavailable.
+func (s *CreateWebhookErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateWebhookErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateWebhookErrorResponse is Unavailable.
+func (s CreateWebhookErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from Unavailable.
+func NewUnavailableCreateWebhookErrorResponse(v Unavailable) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetWebhookInvalid sets CreateWebhookErrorResponse to WebhookInvalid.
+func (s *CreateWebhookErrorResponse) SetWebhookInvalid(v WebhookInvalid) {
+	s.Type = WebhookInvalidCreateWebhookErrorResponse
+	s.WebhookInvalid = v
+}
+
+// GetWebhookInvalid returns WebhookInvalid and true boolean if CreateWebhookErrorResponse is WebhookInvalid.
+func (s CreateWebhookErrorResponse) GetWebhookInvalid() (v WebhookInvalid, ok bool) {
+	if !s.IsWebhookInvalid() {
+		return v, false
+	}
+	return s.WebhookInvalid, true
+}
+
+// NewWebhookInvalidCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from WebhookInvalid.
+func NewWebhookInvalidCreateWebhookErrorResponse(v WebhookInvalid) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetWebhookInvalid(v)
+	return s
+}
+
+// SetWebhookLimitReached sets CreateWebhookErrorResponse to WebhookLimitReached.
+func (s *CreateWebhookErrorResponse) SetWebhookLimitReached(v WebhookLimitReached) {
+	s.Type = WebhookLimitReachedCreateWebhookErrorResponse
+	s.WebhookLimitReached = v
+}
+
+// GetWebhookLimitReached returns WebhookLimitReached and true boolean if CreateWebhookErrorResponse is WebhookLimitReached.
+func (s CreateWebhookErrorResponse) GetWebhookLimitReached() (v WebhookLimitReached, ok bool) {
+	if !s.IsWebhookLimitReached() {
+		return v, false
+	}
+	return s.WebhookLimitReached, true
+}
+
+// NewWebhookLimitReachedCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from WebhookLimitReached.
+func NewWebhookLimitReachedCreateWebhookErrorResponse(v WebhookLimitReached) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetWebhookLimitReached(v)
+	return s
+}
+
+// SetWebhookNotFound sets CreateWebhookErrorResponse to WebhookNotFound.
+func (s *CreateWebhookErrorResponse) SetWebhookNotFound(v WebhookNotFound) {
+	s.Type = WebhookNotFoundCreateWebhookErrorResponse
+	s.WebhookNotFound = v
+}
+
+// GetWebhookNotFound returns WebhookNotFound and true boolean if CreateWebhookErrorResponse is WebhookNotFound.
+func (s CreateWebhookErrorResponse) GetWebhookNotFound() (v WebhookNotFound, ok bool) {
+	if !s.IsWebhookNotFound() {
+		return v, false
+	}
+	return s.WebhookNotFound, true
+}
+
+// NewWebhookNotFoundCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from WebhookNotFound.
+func NewWebhookNotFoundCreateWebhookErrorResponse(v WebhookNotFound) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetWebhookNotFound(v)
+	return s
+}
+
+// SetWebhookPermissionDenied sets CreateWebhookErrorResponse to WebhookPermissionDenied.
+func (s *CreateWebhookErrorResponse) SetWebhookPermissionDenied(v WebhookPermissionDenied) {
+	s.Type = WebhookPermissionDeniedCreateWebhookErrorResponse
+	s.WebhookPermissionDenied = v
+}
+
+// GetWebhookPermissionDenied returns WebhookPermissionDenied and true boolean if CreateWebhookErrorResponse is WebhookPermissionDenied.
+func (s CreateWebhookErrorResponse) GetWebhookPermissionDenied() (v WebhookPermissionDenied, ok bool) {
+	if !s.IsWebhookPermissionDenied() {
+		return v, false
+	}
+	return s.WebhookPermissionDenied, true
+}
+
+// NewWebhookPermissionDeniedCreateWebhookErrorResponse returns new CreateWebhookErrorResponse from WebhookPermissionDenied.
+func NewWebhookPermissionDeniedCreateWebhookErrorResponse(v WebhookPermissionDenied) CreateWebhookErrorResponse {
+	var s CreateWebhookErrorResponse
+	s.SetWebhookPermissionDenied(v)
+	return s
+}
+
+// CreateWebhookErrorResponseStatusCode wraps CreateWebhookErrorResponse with StatusCode.
+type CreateWebhookErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateWebhookErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateWebhookErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateWebhookErrorResponseStatusCode) GetResponse() CreateWebhookErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateWebhookErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateWebhookErrorResponseStatusCode) SetResponse(val CreateWebhookErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateWebhookErrorResponseStatusCode) createWebhookRes() {}
+
+type CreateWebhookForbidden ErrorDetails
+
+func (*CreateWebhookForbidden) createWebhookRes() {}
+
+type CreateWebhookNotFound ErrorDetails
+
+func (*CreateWebhookNotFound) createWebhookRes() {}
+
+// The webhook to create.
+// Ref: #
+type CreateWebhookRequest struct {
+	URL        WebhookURL        `json:"url"`
+	EventTypes WebhookEventTypes `json:"event_types"`
+	// A note on what the webhook is for.
+	Description OptString `json:"description"`
+}
+
+// GetURL returns the value of URL.
+func (s *CreateWebhookRequest) GetURL() WebhookURL {
+	return s.URL
+}
+
+// GetEventTypes returns the value of EventTypes.
+func (s *CreateWebhookRequest) GetEventTypes() WebhookEventTypes {
+	return s.EventTypes
+}
+
+// GetDescription returns the value of Description.
+func (s *CreateWebhookRequest) GetDescription() OptString {
+	return s.Description
+}
+
+// SetURL sets the value of URL.
+func (s *CreateWebhookRequest) SetURL(val WebhookURL) {
+	s.URL = val
+}
+
+// SetEventTypes sets the value of EventTypes.
+func (s *CreateWebhookRequest) SetEventTypes(val WebhookEventTypes) {
+	s.EventTypes = val
+}
+
+// SetDescription sets the value of Description.
+func (s *CreateWebhookRequest) SetDescription(val OptString) {
+	s.Description = val
+}
+
+type CreateWebhookUnauthorized ErrorDetails
+
+func (*CreateWebhookUnauthorized) createWebhookRes() {}
+
 // The session-bound CSRF token.
 // Ref: #
 type CsrfTokenResponse struct {
@@ -23184,6 +23563,287 @@ func (*DeleteVariableErrorResponseStatusCode) deleteVariableRes() {}
 type DeleteVariableNoContent struct{}
 
 func (*DeleteVariableNoContent) deleteVariableRes() {}
+
+// DeleteWebhookErrorResponse represents sum type.
+type DeleteWebhookErrorResponse struct {
+	Type                    DeleteWebhookErrorResponseType // switch on this field
+	AuthCsrfInvalid         AuthCsrfInvalid
+	AuthUnauthorized        AuthUnauthorized
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
+	WebhookNotFound         WebhookNotFound
+	WebhookPermissionDenied WebhookPermissionDenied
+}
+
+// DeleteWebhookErrorResponseType is oneOf type of DeleteWebhookErrorResponse.
+type DeleteWebhookErrorResponseType string
+
+// Possible values for DeleteWebhookErrorResponseType.
+const (
+	AuthCsrfInvalidDeleteWebhookErrorResponse         DeleteWebhookErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedDeleteWebhookErrorResponse        DeleteWebhookErrorResponseType = "auth.unauthorized"
+	InternalDeleteWebhookErrorResponse                DeleteWebhookErrorResponseType = "internal"
+	NotImplementedDeleteWebhookErrorResponse          DeleteWebhookErrorResponseType = "not_implemented"
+	ReqInvalidDeleteWebhookErrorResponse              DeleteWebhookErrorResponseType = "req.invalid"
+	UnavailableDeleteWebhookErrorResponse             DeleteWebhookErrorResponseType = "unavailable"
+	WebhookNotFoundDeleteWebhookErrorResponse         DeleteWebhookErrorResponseType = "webhook.not_found"
+	WebhookPermissionDeniedDeleteWebhookErrorResponse DeleteWebhookErrorResponseType = "webhook.permission_denied"
+)
+
+// IsAuthCsrfInvalid reports whether DeleteWebhookErrorResponse is AuthCsrfInvalid.
+func (s DeleteWebhookErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidDeleteWebhookErrorResponse
+}
+
+// IsAuthUnauthorized reports whether DeleteWebhookErrorResponse is AuthUnauthorized.
+func (s DeleteWebhookErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedDeleteWebhookErrorResponse
+}
+
+// IsInternal reports whether DeleteWebhookErrorResponse is Internal.
+func (s DeleteWebhookErrorResponse) IsInternal() bool {
+	return s.Type == InternalDeleteWebhookErrorResponse
+}
+
+// IsNotImplemented reports whether DeleteWebhookErrorResponse is NotImplemented.
+func (s DeleteWebhookErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteWebhookErrorResponse
+}
+
+// IsReqInvalid reports whether DeleteWebhookErrorResponse is ReqInvalid.
+func (s DeleteWebhookErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidDeleteWebhookErrorResponse
+}
+
+// IsUnavailable reports whether DeleteWebhookErrorResponse is Unavailable.
+func (s DeleteWebhookErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableDeleteWebhookErrorResponse
+}
+
+// IsWebhookNotFound reports whether DeleteWebhookErrorResponse is WebhookNotFound.
+func (s DeleteWebhookErrorResponse) IsWebhookNotFound() bool {
+	return s.Type == WebhookNotFoundDeleteWebhookErrorResponse
+}
+
+// IsWebhookPermissionDenied reports whether DeleteWebhookErrorResponse is WebhookPermissionDenied.
+func (s DeleteWebhookErrorResponse) IsWebhookPermissionDenied() bool {
+	return s.Type == WebhookPermissionDeniedDeleteWebhookErrorResponse
+}
+
+// SetAuthCsrfInvalid sets DeleteWebhookErrorResponse to AuthCsrfInvalid.
+func (s *DeleteWebhookErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidDeleteWebhookErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if DeleteWebhookErrorResponse is AuthCsrfInvalid.
+func (s DeleteWebhookErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidDeleteWebhookErrorResponse(v AuthCsrfInvalid) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets DeleteWebhookErrorResponse to AuthUnauthorized.
+func (s *DeleteWebhookErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedDeleteWebhookErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if DeleteWebhookErrorResponse is AuthUnauthorized.
+func (s DeleteWebhookErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedDeleteWebhookErrorResponse(v AuthUnauthorized) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets DeleteWebhookErrorResponse to Internal.
+func (s *DeleteWebhookErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalDeleteWebhookErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if DeleteWebhookErrorResponse is Internal.
+func (s DeleteWebhookErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from Internal.
+func NewInternalDeleteWebhookErrorResponse(v Internal) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets DeleteWebhookErrorResponse to NotImplemented.
+func (s *DeleteWebhookErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteWebhookErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteWebhookErrorResponse is NotImplemented.
+func (s DeleteWebhookErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from NotImplemented.
+func NewNotImplementedDeleteWebhookErrorResponse(v NotImplemented) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets DeleteWebhookErrorResponse to ReqInvalid.
+func (s *DeleteWebhookErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidDeleteWebhookErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if DeleteWebhookErrorResponse is ReqInvalid.
+func (s DeleteWebhookErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from ReqInvalid.
+func NewReqInvalidDeleteWebhookErrorResponse(v ReqInvalid) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets DeleteWebhookErrorResponse to Unavailable.
+func (s *DeleteWebhookErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableDeleteWebhookErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if DeleteWebhookErrorResponse is Unavailable.
+func (s DeleteWebhookErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from Unavailable.
+func NewUnavailableDeleteWebhookErrorResponse(v Unavailable) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetWebhookNotFound sets DeleteWebhookErrorResponse to WebhookNotFound.
+func (s *DeleteWebhookErrorResponse) SetWebhookNotFound(v WebhookNotFound) {
+	s.Type = WebhookNotFoundDeleteWebhookErrorResponse
+	s.WebhookNotFound = v
+}
+
+// GetWebhookNotFound returns WebhookNotFound and true boolean if DeleteWebhookErrorResponse is WebhookNotFound.
+func (s DeleteWebhookErrorResponse) GetWebhookNotFound() (v WebhookNotFound, ok bool) {
+	if !s.IsWebhookNotFound() {
+		return v, false
+	}
+	return s.WebhookNotFound, true
+}
+
+// NewWebhookNotFoundDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from WebhookNotFound.
+func NewWebhookNotFoundDeleteWebhookErrorResponse(v WebhookNotFound) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetWebhookNotFound(v)
+	return s
+}
+
+// SetWebhookPermissionDenied sets DeleteWebhookErrorResponse to WebhookPermissionDenied.
+func (s *DeleteWebhookErrorResponse) SetWebhookPermissionDenied(v WebhookPermissionDenied) {
+	s.Type = WebhookPermissionDeniedDeleteWebhookErrorResponse
+	s.WebhookPermissionDenied = v
+}
+
+// GetWebhookPermissionDenied returns WebhookPermissionDenied and true boolean if DeleteWebhookErrorResponse is WebhookPermissionDenied.
+func (s DeleteWebhookErrorResponse) GetWebhookPermissionDenied() (v WebhookPermissionDenied, ok bool) {
+	if !s.IsWebhookPermissionDenied() {
+		return v, false
+	}
+	return s.WebhookPermissionDenied, true
+}
+
+// NewWebhookPermissionDeniedDeleteWebhookErrorResponse returns new DeleteWebhookErrorResponse from WebhookPermissionDenied.
+func NewWebhookPermissionDeniedDeleteWebhookErrorResponse(v WebhookPermissionDenied) DeleteWebhookErrorResponse {
+	var s DeleteWebhookErrorResponse
+	s.SetWebhookPermissionDenied(v)
+	return s
+}
+
+// DeleteWebhookErrorResponseStatusCode wraps DeleteWebhookErrorResponse with StatusCode.
+type DeleteWebhookErrorResponseStatusCode struct {
+	StatusCode int
+	Response   DeleteWebhookErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *DeleteWebhookErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *DeleteWebhookErrorResponseStatusCode) GetResponse() DeleteWebhookErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *DeleteWebhookErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *DeleteWebhookErrorResponseStatusCode) SetResponse(val DeleteWebhookErrorResponse) {
+	s.Response = val
+}
+
+func (*DeleteWebhookErrorResponseStatusCode) deleteWebhookRes() {}
+
+type DeleteWebhookForbidden ErrorDetails
+
+func (*DeleteWebhookForbidden) deleteWebhookRes() {}
+
+// DeleteWebhookNoContent is response for DeleteWebhook operation.
+type DeleteWebhookNoContent struct{}
+
+func (*DeleteWebhookNoContent) deleteWebhookRes() {}
+
+type DeleteWebhookNotFound ErrorDetails
+
+func (*DeleteWebhookNotFound) deleteWebhookRes() {}
+
+type DeleteWebhookUnauthorized ErrorDetails
+
+func (*DeleteWebhookUnauthorized) deleteWebhookRes() {}
 
 // Merged schema.
 // Ref: #
@@ -41940,6 +42600,252 @@ func (s *GetVariablesErrorResponseStatusCode) SetResponse(val GetVariablesErrorR
 
 func (*GetVariablesErrorResponseStatusCode) getVariablesRes() {}
 
+// GetWebhookErrorResponse represents sum type.
+type GetWebhookErrorResponse struct {
+	Type                    GetWebhookErrorResponseType // switch on this field
+	AuthUnauthorized        AuthUnauthorized
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
+	WebhookNotFound         WebhookNotFound
+	WebhookPermissionDenied WebhookPermissionDenied
+}
+
+// GetWebhookErrorResponseType is oneOf type of GetWebhookErrorResponse.
+type GetWebhookErrorResponseType string
+
+// Possible values for GetWebhookErrorResponseType.
+const (
+	AuthUnauthorizedGetWebhookErrorResponse        GetWebhookErrorResponseType = "auth.unauthorized"
+	InternalGetWebhookErrorResponse                GetWebhookErrorResponseType = "internal"
+	NotImplementedGetWebhookErrorResponse          GetWebhookErrorResponseType = "not_implemented"
+	ReqInvalidGetWebhookErrorResponse              GetWebhookErrorResponseType = "req.invalid"
+	UnavailableGetWebhookErrorResponse             GetWebhookErrorResponseType = "unavailable"
+	WebhookNotFoundGetWebhookErrorResponse         GetWebhookErrorResponseType = "webhook.not_found"
+	WebhookPermissionDeniedGetWebhookErrorResponse GetWebhookErrorResponseType = "webhook.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetWebhookErrorResponse is AuthUnauthorized.
+func (s GetWebhookErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetWebhookErrorResponse
+}
+
+// IsInternal reports whether GetWebhookErrorResponse is Internal.
+func (s GetWebhookErrorResponse) IsInternal() bool { return s.Type == InternalGetWebhookErrorResponse }
+
+// IsNotImplemented reports whether GetWebhookErrorResponse is NotImplemented.
+func (s GetWebhookErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetWebhookErrorResponse
+}
+
+// IsReqInvalid reports whether GetWebhookErrorResponse is ReqInvalid.
+func (s GetWebhookErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetWebhookErrorResponse
+}
+
+// IsUnavailable reports whether GetWebhookErrorResponse is Unavailable.
+func (s GetWebhookErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetWebhookErrorResponse
+}
+
+// IsWebhookNotFound reports whether GetWebhookErrorResponse is WebhookNotFound.
+func (s GetWebhookErrorResponse) IsWebhookNotFound() bool {
+	return s.Type == WebhookNotFoundGetWebhookErrorResponse
+}
+
+// IsWebhookPermissionDenied reports whether GetWebhookErrorResponse is WebhookPermissionDenied.
+func (s GetWebhookErrorResponse) IsWebhookPermissionDenied() bool {
+	return s.Type == WebhookPermissionDeniedGetWebhookErrorResponse
+}
+
+// SetAuthUnauthorized sets GetWebhookErrorResponse to AuthUnauthorized.
+func (s *GetWebhookErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetWebhookErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetWebhookErrorResponse is AuthUnauthorized.
+func (s GetWebhookErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetWebhookErrorResponse returns new GetWebhookErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetWebhookErrorResponse(v AuthUnauthorized) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetWebhookErrorResponse to Internal.
+func (s *GetWebhookErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetWebhookErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetWebhookErrorResponse is Internal.
+func (s GetWebhookErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetWebhookErrorResponse returns new GetWebhookErrorResponse from Internal.
+func NewInternalGetWebhookErrorResponse(v Internal) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetWebhookErrorResponse to NotImplemented.
+func (s *GetWebhookErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetWebhookErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetWebhookErrorResponse is NotImplemented.
+func (s GetWebhookErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetWebhookErrorResponse returns new GetWebhookErrorResponse from NotImplemented.
+func NewNotImplementedGetWebhookErrorResponse(v NotImplemented) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetWebhookErrorResponse to ReqInvalid.
+func (s *GetWebhookErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetWebhookErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetWebhookErrorResponse is ReqInvalid.
+func (s GetWebhookErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetWebhookErrorResponse returns new GetWebhookErrorResponse from ReqInvalid.
+func NewReqInvalidGetWebhookErrorResponse(v ReqInvalid) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetWebhookErrorResponse to Unavailable.
+func (s *GetWebhookErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetWebhookErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetWebhookErrorResponse is Unavailable.
+func (s GetWebhookErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetWebhookErrorResponse returns new GetWebhookErrorResponse from Unavailable.
+func NewUnavailableGetWebhookErrorResponse(v Unavailable) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetWebhookNotFound sets GetWebhookErrorResponse to WebhookNotFound.
+func (s *GetWebhookErrorResponse) SetWebhookNotFound(v WebhookNotFound) {
+	s.Type = WebhookNotFoundGetWebhookErrorResponse
+	s.WebhookNotFound = v
+}
+
+// GetWebhookNotFound returns WebhookNotFound and true boolean if GetWebhookErrorResponse is WebhookNotFound.
+func (s GetWebhookErrorResponse) GetWebhookNotFound() (v WebhookNotFound, ok bool) {
+	if !s.IsWebhookNotFound() {
+		return v, false
+	}
+	return s.WebhookNotFound, true
+}
+
+// NewWebhookNotFoundGetWebhookErrorResponse returns new GetWebhookErrorResponse from WebhookNotFound.
+func NewWebhookNotFoundGetWebhookErrorResponse(v WebhookNotFound) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetWebhookNotFound(v)
+	return s
+}
+
+// SetWebhookPermissionDenied sets GetWebhookErrorResponse to WebhookPermissionDenied.
+func (s *GetWebhookErrorResponse) SetWebhookPermissionDenied(v WebhookPermissionDenied) {
+	s.Type = WebhookPermissionDeniedGetWebhookErrorResponse
+	s.WebhookPermissionDenied = v
+}
+
+// GetWebhookPermissionDenied returns WebhookPermissionDenied and true boolean if GetWebhookErrorResponse is WebhookPermissionDenied.
+func (s GetWebhookErrorResponse) GetWebhookPermissionDenied() (v WebhookPermissionDenied, ok bool) {
+	if !s.IsWebhookPermissionDenied() {
+		return v, false
+	}
+	return s.WebhookPermissionDenied, true
+}
+
+// NewWebhookPermissionDeniedGetWebhookErrorResponse returns new GetWebhookErrorResponse from WebhookPermissionDenied.
+func NewWebhookPermissionDeniedGetWebhookErrorResponse(v WebhookPermissionDenied) GetWebhookErrorResponse {
+	var s GetWebhookErrorResponse
+	s.SetWebhookPermissionDenied(v)
+	return s
+}
+
+// GetWebhookErrorResponseStatusCode wraps GetWebhookErrorResponse with StatusCode.
+type GetWebhookErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetWebhookErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetWebhookErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetWebhookErrorResponseStatusCode) GetResponse() GetWebhookErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetWebhookErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetWebhookErrorResponseStatusCode) SetResponse(val GetWebhookErrorResponse) {
+	s.Response = val
+}
+
+func (*GetWebhookErrorResponseStatusCode) getWebhookRes() {}
+
+type GetWebhookForbidden ErrorDetails
+
+func (*GetWebhookForbidden) getWebhookRes() {}
+
+type GetWebhookNotFound ErrorDetails
+
+func (*GetWebhookNotFound) getWebhookRes() {}
+
+type GetWebhookUnauthorized ErrorDetails
+
+func (*GetWebhookUnauthorized) getWebhookRes() {}
+
 // A collaboration grant: it gives a user or a team a role on a project.
 // Check which of `user` or `team` is present. Those objects are always refs
 // (`user_id` / `team_id`); expand adds extra fields on the same object rather
@@ -56223,6 +57129,290 @@ type ListUserTeamsUnauthorized ErrorDetails
 
 func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 
+type ListWebhooksBadRequest ErrorDetails
+
+func (*ListWebhooksBadRequest) listWebhooksRes() {}
+
+// ListWebhooksErrorResponse represents sum type.
+type ListWebhooksErrorResponse struct {
+	Type                    ListWebhooksErrorResponseType // switch on this field
+	AuthUnauthorized        AuthUnauthorized
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
+	WebhookNotFound         WebhookNotFound
+	WebhookPermissionDenied WebhookPermissionDenied
+}
+
+// ListWebhooksErrorResponseType is oneOf type of ListWebhooksErrorResponse.
+type ListWebhooksErrorResponseType string
+
+// Possible values for ListWebhooksErrorResponseType.
+const (
+	AuthUnauthorizedListWebhooksErrorResponse        ListWebhooksErrorResponseType = "auth.unauthorized"
+	InternalListWebhooksErrorResponse                ListWebhooksErrorResponseType = "internal"
+	NotImplementedListWebhooksErrorResponse          ListWebhooksErrorResponseType = "not_implemented"
+	ReqInvalidListWebhooksErrorResponse              ListWebhooksErrorResponseType = "req.invalid"
+	UnavailableListWebhooksErrorResponse             ListWebhooksErrorResponseType = "unavailable"
+	WebhookNotFoundListWebhooksErrorResponse         ListWebhooksErrorResponseType = "webhook.not_found"
+	WebhookPermissionDeniedListWebhooksErrorResponse ListWebhooksErrorResponseType = "webhook.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether ListWebhooksErrorResponse is AuthUnauthorized.
+func (s ListWebhooksErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListWebhooksErrorResponse
+}
+
+// IsInternal reports whether ListWebhooksErrorResponse is Internal.
+func (s ListWebhooksErrorResponse) IsInternal() bool {
+	return s.Type == InternalListWebhooksErrorResponse
+}
+
+// IsNotImplemented reports whether ListWebhooksErrorResponse is NotImplemented.
+func (s ListWebhooksErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListWebhooksErrorResponse
+}
+
+// IsReqInvalid reports whether ListWebhooksErrorResponse is ReqInvalid.
+func (s ListWebhooksErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListWebhooksErrorResponse
+}
+
+// IsUnavailable reports whether ListWebhooksErrorResponse is Unavailable.
+func (s ListWebhooksErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListWebhooksErrorResponse
+}
+
+// IsWebhookNotFound reports whether ListWebhooksErrorResponse is WebhookNotFound.
+func (s ListWebhooksErrorResponse) IsWebhookNotFound() bool {
+	return s.Type == WebhookNotFoundListWebhooksErrorResponse
+}
+
+// IsWebhookPermissionDenied reports whether ListWebhooksErrorResponse is WebhookPermissionDenied.
+func (s ListWebhooksErrorResponse) IsWebhookPermissionDenied() bool {
+	return s.Type == WebhookPermissionDeniedListWebhooksErrorResponse
+}
+
+// SetAuthUnauthorized sets ListWebhooksErrorResponse to AuthUnauthorized.
+func (s *ListWebhooksErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListWebhooksErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListWebhooksErrorResponse is AuthUnauthorized.
+func (s ListWebhooksErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListWebhooksErrorResponse returns new ListWebhooksErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListWebhooksErrorResponse(v AuthUnauthorized) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListWebhooksErrorResponse to Internal.
+func (s *ListWebhooksErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListWebhooksErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListWebhooksErrorResponse is Internal.
+func (s ListWebhooksErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListWebhooksErrorResponse returns new ListWebhooksErrorResponse from Internal.
+func NewInternalListWebhooksErrorResponse(v Internal) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListWebhooksErrorResponse to NotImplemented.
+func (s *ListWebhooksErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListWebhooksErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListWebhooksErrorResponse is NotImplemented.
+func (s ListWebhooksErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListWebhooksErrorResponse returns new ListWebhooksErrorResponse from NotImplemented.
+func NewNotImplementedListWebhooksErrorResponse(v NotImplemented) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListWebhooksErrorResponse to ReqInvalid.
+func (s *ListWebhooksErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListWebhooksErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListWebhooksErrorResponse is ReqInvalid.
+func (s ListWebhooksErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListWebhooksErrorResponse returns new ListWebhooksErrorResponse from ReqInvalid.
+func NewReqInvalidListWebhooksErrorResponse(v ReqInvalid) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListWebhooksErrorResponse to Unavailable.
+func (s *ListWebhooksErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListWebhooksErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListWebhooksErrorResponse is Unavailable.
+func (s ListWebhooksErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListWebhooksErrorResponse returns new ListWebhooksErrorResponse from Unavailable.
+func NewUnavailableListWebhooksErrorResponse(v Unavailable) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetWebhookNotFound sets ListWebhooksErrorResponse to WebhookNotFound.
+func (s *ListWebhooksErrorResponse) SetWebhookNotFound(v WebhookNotFound) {
+	s.Type = WebhookNotFoundListWebhooksErrorResponse
+	s.WebhookNotFound = v
+}
+
+// GetWebhookNotFound returns WebhookNotFound and true boolean if ListWebhooksErrorResponse is WebhookNotFound.
+func (s ListWebhooksErrorResponse) GetWebhookNotFound() (v WebhookNotFound, ok bool) {
+	if !s.IsWebhookNotFound() {
+		return v, false
+	}
+	return s.WebhookNotFound, true
+}
+
+// NewWebhookNotFoundListWebhooksErrorResponse returns new ListWebhooksErrorResponse from WebhookNotFound.
+func NewWebhookNotFoundListWebhooksErrorResponse(v WebhookNotFound) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetWebhookNotFound(v)
+	return s
+}
+
+// SetWebhookPermissionDenied sets ListWebhooksErrorResponse to WebhookPermissionDenied.
+func (s *ListWebhooksErrorResponse) SetWebhookPermissionDenied(v WebhookPermissionDenied) {
+	s.Type = WebhookPermissionDeniedListWebhooksErrorResponse
+	s.WebhookPermissionDenied = v
+}
+
+// GetWebhookPermissionDenied returns WebhookPermissionDenied and true boolean if ListWebhooksErrorResponse is WebhookPermissionDenied.
+func (s ListWebhooksErrorResponse) GetWebhookPermissionDenied() (v WebhookPermissionDenied, ok bool) {
+	if !s.IsWebhookPermissionDenied() {
+		return v, false
+	}
+	return s.WebhookPermissionDenied, true
+}
+
+// NewWebhookPermissionDeniedListWebhooksErrorResponse returns new ListWebhooksErrorResponse from WebhookPermissionDenied.
+func NewWebhookPermissionDeniedListWebhooksErrorResponse(v WebhookPermissionDenied) ListWebhooksErrorResponse {
+	var s ListWebhooksErrorResponse
+	s.SetWebhookPermissionDenied(v)
+	return s
+}
+
+// ListWebhooksErrorResponseStatusCode wraps ListWebhooksErrorResponse with StatusCode.
+type ListWebhooksErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListWebhooksErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListWebhooksErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListWebhooksErrorResponseStatusCode) GetResponse() ListWebhooksErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListWebhooksErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListWebhooksErrorResponseStatusCode) SetResponse(val ListWebhooksErrorResponse) {
+	s.Response = val
+}
+
+func (*ListWebhooksErrorResponseStatusCode) listWebhooksRes() {}
+
+type ListWebhooksForbidden ErrorDetails
+
+func (*ListWebhooksForbidden) listWebhooksRes() {}
+
+type ListWebhooksNotFound ErrorDetails
+
+func (*ListWebhooksNotFound) listWebhooksRes() {}
+
+// A page of a project's webhooks, newest first.
+// Ref: #
+type ListWebhooksResponse struct {
+	// The webhooks of this page.
+	Data []Webhook `json:"data"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetData returns the value of Data.
+func (s *ListWebhooksResponse) GetData() []Webhook {
+	return s.Data
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListWebhooksResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetData sets the value of Data.
+func (s *ListWebhooksResponse) SetData(val []Webhook) {
+	s.Data = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListWebhooksResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListWebhooksResponse) listWebhooksRes() {}
+
+type ListWebhooksUnauthorized ErrorDetails
+
+func (*ListWebhooksUnauthorized) listWebhooksRes() {}
+
 type LookupInvitationBadRequest ErrorDetails
 
 func (*LookupInvitationBadRequest) lookupInvitationRes() {}
@@ -56559,6 +57749,51 @@ func (o NilDeployment) Get() (v Deployment, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o NilDeployment) Or(d Deployment) Deployment {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilInt32 returns new NilInt32 with value set to v.
+func NewNilInt32(v int32) NilInt32 {
+	return NilInt32{
+		Value: v,
+	}
+}
+
+// NilInt32 is nullable int32.
+type NilInt32 struct {
+	Value int32
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilInt32) SetTo(v int32) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilInt32) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilInt32) SetToNull() {
+	o.Null = true
+	var v int32
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilInt32) Get() (v int32, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilInt32) Or(d int32) int32 {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -75469,6 +76704,236 @@ func (o OptVariableSetPayloadKind) Or(d VariableSetPayloadKind) VariableSetPaylo
 	return d
 }
 
+// NewOptWebhookInvalidDetails returns new OptWebhookInvalidDetails with value set to v.
+func NewOptWebhookInvalidDetails(v WebhookInvalidDetails) OptWebhookInvalidDetails {
+	return OptWebhookInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptWebhookInvalidDetails is optional WebhookInvalidDetails.
+type OptWebhookInvalidDetails struct {
+	Value WebhookInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptWebhookInvalidDetails was set.
+func (o OptWebhookInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptWebhookInvalidDetails) Reset() {
+	var v WebhookInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptWebhookInvalidDetails) SetTo(v WebhookInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptWebhookInvalidDetails) Get() (v WebhookInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptWebhookInvalidDetails) Or(d WebhookInvalidDetails) WebhookInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptWebhookLimitReachedDetails returns new OptWebhookLimitReachedDetails with value set to v.
+func NewOptWebhookLimitReachedDetails(v WebhookLimitReachedDetails) OptWebhookLimitReachedDetails {
+	return OptWebhookLimitReachedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptWebhookLimitReachedDetails is optional WebhookLimitReachedDetails.
+type OptWebhookLimitReachedDetails struct {
+	Value WebhookLimitReachedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptWebhookLimitReachedDetails was set.
+func (o OptWebhookLimitReachedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptWebhookLimitReachedDetails) Reset() {
+	var v WebhookLimitReachedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptWebhookLimitReachedDetails) SetTo(v WebhookLimitReachedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptWebhookLimitReachedDetails) Get() (v WebhookLimitReachedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptWebhookLimitReachedDetails) Or(d WebhookLimitReachedDetails) WebhookLimitReachedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptWebhookNotFoundDetails returns new OptWebhookNotFoundDetails with value set to v.
+func NewOptWebhookNotFoundDetails(v WebhookNotFoundDetails) OptWebhookNotFoundDetails {
+	return OptWebhookNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptWebhookNotFoundDetails is optional WebhookNotFoundDetails.
+type OptWebhookNotFoundDetails struct {
+	Value WebhookNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptWebhookNotFoundDetails was set.
+func (o OptWebhookNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptWebhookNotFoundDetails) Reset() {
+	var v WebhookNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptWebhookNotFoundDetails) SetTo(v WebhookNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptWebhookNotFoundDetails) Get() (v WebhookNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptWebhookNotFoundDetails) Or(d WebhookNotFoundDetails) WebhookNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptWebhookPermissionDeniedDetails returns new OptWebhookPermissionDeniedDetails with value set to v.
+func NewOptWebhookPermissionDeniedDetails(v WebhookPermissionDeniedDetails) OptWebhookPermissionDeniedDetails {
+	return OptWebhookPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptWebhookPermissionDeniedDetails is optional WebhookPermissionDeniedDetails.
+type OptWebhookPermissionDeniedDetails struct {
+	Value WebhookPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptWebhookPermissionDeniedDetails was set.
+func (o OptWebhookPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptWebhookPermissionDeniedDetails) Reset() {
+	var v WebhookPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptWebhookPermissionDeniedDetails) SetTo(v WebhookPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptWebhookPermissionDeniedDetails) Get() (v WebhookPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptWebhookPermissionDeniedDetails) Or(d WebhookPermissionDeniedDetails) WebhookPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptWebhookURL returns new OptWebhookURL with value set to v.
+func NewOptWebhookURL(v WebhookURL) OptWebhookURL {
+	return OptWebhookURL{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptWebhookURL is optional WebhookURL.
+type OptWebhookURL struct {
+	Value WebhookURL
+	Set   bool
+}
+
+// IsSet returns true if OptWebhookURL was set.
+func (o OptWebhookURL) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptWebhookURL) Reset() {
+	var v WebhookURL
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptWebhookURL) SetTo(v WebhookURL) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptWebhookURL) Get() (v WebhookURL, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptWebhookURL) Or(d WebhookURL) WebhookURL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 type Origin string
 
 // Merged schema.
@@ -91663,6 +93128,282 @@ func (s *RollbackDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID)
 	s.ExpectedDeploymentID = val
 }
 
+// RotateWebhookSecretErrorResponse represents sum type.
+type RotateWebhookSecretErrorResponse struct {
+	Type                    RotateWebhookSecretErrorResponseType // switch on this field
+	AuthCsrfInvalid         AuthCsrfInvalid
+	AuthUnauthorized        AuthUnauthorized
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
+	WebhookNotFound         WebhookNotFound
+	WebhookPermissionDenied WebhookPermissionDenied
+}
+
+// RotateWebhookSecretErrorResponseType is oneOf type of RotateWebhookSecretErrorResponse.
+type RotateWebhookSecretErrorResponseType string
+
+// Possible values for RotateWebhookSecretErrorResponseType.
+const (
+	AuthCsrfInvalidRotateWebhookSecretErrorResponse         RotateWebhookSecretErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRotateWebhookSecretErrorResponse        RotateWebhookSecretErrorResponseType = "auth.unauthorized"
+	InternalRotateWebhookSecretErrorResponse                RotateWebhookSecretErrorResponseType = "internal"
+	NotImplementedRotateWebhookSecretErrorResponse          RotateWebhookSecretErrorResponseType = "not_implemented"
+	ReqInvalidRotateWebhookSecretErrorResponse              RotateWebhookSecretErrorResponseType = "req.invalid"
+	UnavailableRotateWebhookSecretErrorResponse             RotateWebhookSecretErrorResponseType = "unavailable"
+	WebhookNotFoundRotateWebhookSecretErrorResponse         RotateWebhookSecretErrorResponseType = "webhook.not_found"
+	WebhookPermissionDeniedRotateWebhookSecretErrorResponse RotateWebhookSecretErrorResponseType = "webhook.permission_denied"
+)
+
+// IsAuthCsrfInvalid reports whether RotateWebhookSecretErrorResponse is AuthCsrfInvalid.
+func (s RotateWebhookSecretErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRotateWebhookSecretErrorResponse
+}
+
+// IsAuthUnauthorized reports whether RotateWebhookSecretErrorResponse is AuthUnauthorized.
+func (s RotateWebhookSecretErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRotateWebhookSecretErrorResponse
+}
+
+// IsInternal reports whether RotateWebhookSecretErrorResponse is Internal.
+func (s RotateWebhookSecretErrorResponse) IsInternal() bool {
+	return s.Type == InternalRotateWebhookSecretErrorResponse
+}
+
+// IsNotImplemented reports whether RotateWebhookSecretErrorResponse is NotImplemented.
+func (s RotateWebhookSecretErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRotateWebhookSecretErrorResponse
+}
+
+// IsReqInvalid reports whether RotateWebhookSecretErrorResponse is ReqInvalid.
+func (s RotateWebhookSecretErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRotateWebhookSecretErrorResponse
+}
+
+// IsUnavailable reports whether RotateWebhookSecretErrorResponse is Unavailable.
+func (s RotateWebhookSecretErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRotateWebhookSecretErrorResponse
+}
+
+// IsWebhookNotFound reports whether RotateWebhookSecretErrorResponse is WebhookNotFound.
+func (s RotateWebhookSecretErrorResponse) IsWebhookNotFound() bool {
+	return s.Type == WebhookNotFoundRotateWebhookSecretErrorResponse
+}
+
+// IsWebhookPermissionDenied reports whether RotateWebhookSecretErrorResponse is WebhookPermissionDenied.
+func (s RotateWebhookSecretErrorResponse) IsWebhookPermissionDenied() bool {
+	return s.Type == WebhookPermissionDeniedRotateWebhookSecretErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RotateWebhookSecretErrorResponse to AuthCsrfInvalid.
+func (s *RotateWebhookSecretErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRotateWebhookSecretErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RotateWebhookSecretErrorResponse is AuthCsrfInvalid.
+func (s RotateWebhookSecretErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRotateWebhookSecretErrorResponse(v AuthCsrfInvalid) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets RotateWebhookSecretErrorResponse to AuthUnauthorized.
+func (s *RotateWebhookSecretErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRotateWebhookSecretErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RotateWebhookSecretErrorResponse is AuthUnauthorized.
+func (s RotateWebhookSecretErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRotateWebhookSecretErrorResponse(v AuthUnauthorized) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets RotateWebhookSecretErrorResponse to Internal.
+func (s *RotateWebhookSecretErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRotateWebhookSecretErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RotateWebhookSecretErrorResponse is Internal.
+func (s RotateWebhookSecretErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from Internal.
+func NewInternalRotateWebhookSecretErrorResponse(v Internal) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RotateWebhookSecretErrorResponse to NotImplemented.
+func (s *RotateWebhookSecretErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRotateWebhookSecretErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RotateWebhookSecretErrorResponse is NotImplemented.
+func (s RotateWebhookSecretErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from NotImplemented.
+func NewNotImplementedRotateWebhookSecretErrorResponse(v NotImplemented) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RotateWebhookSecretErrorResponse to ReqInvalid.
+func (s *RotateWebhookSecretErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRotateWebhookSecretErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RotateWebhookSecretErrorResponse is ReqInvalid.
+func (s RotateWebhookSecretErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from ReqInvalid.
+func NewReqInvalidRotateWebhookSecretErrorResponse(v ReqInvalid) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets RotateWebhookSecretErrorResponse to Unavailable.
+func (s *RotateWebhookSecretErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRotateWebhookSecretErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RotateWebhookSecretErrorResponse is Unavailable.
+func (s RotateWebhookSecretErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from Unavailable.
+func NewUnavailableRotateWebhookSecretErrorResponse(v Unavailable) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetWebhookNotFound sets RotateWebhookSecretErrorResponse to WebhookNotFound.
+func (s *RotateWebhookSecretErrorResponse) SetWebhookNotFound(v WebhookNotFound) {
+	s.Type = WebhookNotFoundRotateWebhookSecretErrorResponse
+	s.WebhookNotFound = v
+}
+
+// GetWebhookNotFound returns WebhookNotFound and true boolean if RotateWebhookSecretErrorResponse is WebhookNotFound.
+func (s RotateWebhookSecretErrorResponse) GetWebhookNotFound() (v WebhookNotFound, ok bool) {
+	if !s.IsWebhookNotFound() {
+		return v, false
+	}
+	return s.WebhookNotFound, true
+}
+
+// NewWebhookNotFoundRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from WebhookNotFound.
+func NewWebhookNotFoundRotateWebhookSecretErrorResponse(v WebhookNotFound) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetWebhookNotFound(v)
+	return s
+}
+
+// SetWebhookPermissionDenied sets RotateWebhookSecretErrorResponse to WebhookPermissionDenied.
+func (s *RotateWebhookSecretErrorResponse) SetWebhookPermissionDenied(v WebhookPermissionDenied) {
+	s.Type = WebhookPermissionDeniedRotateWebhookSecretErrorResponse
+	s.WebhookPermissionDenied = v
+}
+
+// GetWebhookPermissionDenied returns WebhookPermissionDenied and true boolean if RotateWebhookSecretErrorResponse is WebhookPermissionDenied.
+func (s RotateWebhookSecretErrorResponse) GetWebhookPermissionDenied() (v WebhookPermissionDenied, ok bool) {
+	if !s.IsWebhookPermissionDenied() {
+		return v, false
+	}
+	return s.WebhookPermissionDenied, true
+}
+
+// NewWebhookPermissionDeniedRotateWebhookSecretErrorResponse returns new RotateWebhookSecretErrorResponse from WebhookPermissionDenied.
+func NewWebhookPermissionDeniedRotateWebhookSecretErrorResponse(v WebhookPermissionDenied) RotateWebhookSecretErrorResponse {
+	var s RotateWebhookSecretErrorResponse
+	s.SetWebhookPermissionDenied(v)
+	return s
+}
+
+// RotateWebhookSecretErrorResponseStatusCode wraps RotateWebhookSecretErrorResponse with StatusCode.
+type RotateWebhookSecretErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RotateWebhookSecretErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RotateWebhookSecretErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RotateWebhookSecretErrorResponseStatusCode) GetResponse() RotateWebhookSecretErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RotateWebhookSecretErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RotateWebhookSecretErrorResponseStatusCode) SetResponse(val RotateWebhookSecretErrorResponse) {
+	s.Response = val
+}
+
+func (*RotateWebhookSecretErrorResponseStatusCode) rotateWebhookSecretRes() {}
+
+type RotateWebhookSecretForbidden ErrorDetails
+
+func (*RotateWebhookSecretForbidden) rotateWebhookSecretRes() {}
+
+type RotateWebhookSecretNotFound ErrorDetails
+
+func (*RotateWebhookSecretNotFound) rotateWebhookSecretRes() {}
+
+type RotateWebhookSecretUnauthorized ErrorDetails
+
+func (*RotateWebhookSecretUnauthorized) rotateWebhookSecretRes() {}
+
 // Ref: #
 type SSOAuthMethod struct {
 	// Whether the authentication method is enabled.
@@ -100837,6 +102578,368 @@ func (s *UpdateVariablesRequest) init() UpdateVariablesRequest {
 	return m
 }
 
+type UpdateWebhookBadRequest ErrorDetails
+
+func (*UpdateWebhookBadRequest) updateWebhookRes() {}
+
+// UpdateWebhookErrorResponse represents sum type.
+type UpdateWebhookErrorResponse struct {
+	Type                    UpdateWebhookErrorResponseType // switch on this field
+	AuthCsrfInvalid         AuthCsrfInvalid
+	AuthUnauthorized        AuthUnauthorized
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
+	WebhookInvalid          WebhookInvalid
+	WebhookNotFound         WebhookNotFound
+	WebhookPermissionDenied WebhookPermissionDenied
+}
+
+// UpdateWebhookErrorResponseType is oneOf type of UpdateWebhookErrorResponse.
+type UpdateWebhookErrorResponseType string
+
+// Possible values for UpdateWebhookErrorResponseType.
+const (
+	AuthCsrfInvalidUpdateWebhookErrorResponse         UpdateWebhookErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedUpdateWebhookErrorResponse        UpdateWebhookErrorResponseType = "auth.unauthorized"
+	InternalUpdateWebhookErrorResponse                UpdateWebhookErrorResponseType = "internal"
+	NotImplementedUpdateWebhookErrorResponse          UpdateWebhookErrorResponseType = "not_implemented"
+	ReqInvalidUpdateWebhookErrorResponse              UpdateWebhookErrorResponseType = "req.invalid"
+	UnavailableUpdateWebhookErrorResponse             UpdateWebhookErrorResponseType = "unavailable"
+	WebhookInvalidUpdateWebhookErrorResponse          UpdateWebhookErrorResponseType = "webhook.invalid"
+	WebhookNotFoundUpdateWebhookErrorResponse         UpdateWebhookErrorResponseType = "webhook.not_found"
+	WebhookPermissionDeniedUpdateWebhookErrorResponse UpdateWebhookErrorResponseType = "webhook.permission_denied"
+)
+
+// IsAuthCsrfInvalid reports whether UpdateWebhookErrorResponse is AuthCsrfInvalid.
+func (s UpdateWebhookErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidUpdateWebhookErrorResponse
+}
+
+// IsAuthUnauthorized reports whether UpdateWebhookErrorResponse is AuthUnauthorized.
+func (s UpdateWebhookErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedUpdateWebhookErrorResponse
+}
+
+// IsInternal reports whether UpdateWebhookErrorResponse is Internal.
+func (s UpdateWebhookErrorResponse) IsInternal() bool {
+	return s.Type == InternalUpdateWebhookErrorResponse
+}
+
+// IsNotImplemented reports whether UpdateWebhookErrorResponse is NotImplemented.
+func (s UpdateWebhookErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedUpdateWebhookErrorResponse
+}
+
+// IsReqInvalid reports whether UpdateWebhookErrorResponse is ReqInvalid.
+func (s UpdateWebhookErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidUpdateWebhookErrorResponse
+}
+
+// IsUnavailable reports whether UpdateWebhookErrorResponse is Unavailable.
+func (s UpdateWebhookErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableUpdateWebhookErrorResponse
+}
+
+// IsWebhookInvalid reports whether UpdateWebhookErrorResponse is WebhookInvalid.
+func (s UpdateWebhookErrorResponse) IsWebhookInvalid() bool {
+	return s.Type == WebhookInvalidUpdateWebhookErrorResponse
+}
+
+// IsWebhookNotFound reports whether UpdateWebhookErrorResponse is WebhookNotFound.
+func (s UpdateWebhookErrorResponse) IsWebhookNotFound() bool {
+	return s.Type == WebhookNotFoundUpdateWebhookErrorResponse
+}
+
+// IsWebhookPermissionDenied reports whether UpdateWebhookErrorResponse is WebhookPermissionDenied.
+func (s UpdateWebhookErrorResponse) IsWebhookPermissionDenied() bool {
+	return s.Type == WebhookPermissionDeniedUpdateWebhookErrorResponse
+}
+
+// SetAuthCsrfInvalid sets UpdateWebhookErrorResponse to AuthCsrfInvalid.
+func (s *UpdateWebhookErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidUpdateWebhookErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if UpdateWebhookErrorResponse is AuthCsrfInvalid.
+func (s UpdateWebhookErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidUpdateWebhookErrorResponse(v AuthCsrfInvalid) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets UpdateWebhookErrorResponse to AuthUnauthorized.
+func (s *UpdateWebhookErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedUpdateWebhookErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if UpdateWebhookErrorResponse is AuthUnauthorized.
+func (s UpdateWebhookErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedUpdateWebhookErrorResponse(v AuthUnauthorized) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets UpdateWebhookErrorResponse to Internal.
+func (s *UpdateWebhookErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalUpdateWebhookErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if UpdateWebhookErrorResponse is Internal.
+func (s UpdateWebhookErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from Internal.
+func NewInternalUpdateWebhookErrorResponse(v Internal) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets UpdateWebhookErrorResponse to NotImplemented.
+func (s *UpdateWebhookErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedUpdateWebhookErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if UpdateWebhookErrorResponse is NotImplemented.
+func (s UpdateWebhookErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from NotImplemented.
+func NewNotImplementedUpdateWebhookErrorResponse(v NotImplemented) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets UpdateWebhookErrorResponse to ReqInvalid.
+func (s *UpdateWebhookErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidUpdateWebhookErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if UpdateWebhookErrorResponse is ReqInvalid.
+func (s UpdateWebhookErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from ReqInvalid.
+func NewReqInvalidUpdateWebhookErrorResponse(v ReqInvalid) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets UpdateWebhookErrorResponse to Unavailable.
+func (s *UpdateWebhookErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableUpdateWebhookErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if UpdateWebhookErrorResponse is Unavailable.
+func (s UpdateWebhookErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from Unavailable.
+func NewUnavailableUpdateWebhookErrorResponse(v Unavailable) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetWebhookInvalid sets UpdateWebhookErrorResponse to WebhookInvalid.
+func (s *UpdateWebhookErrorResponse) SetWebhookInvalid(v WebhookInvalid) {
+	s.Type = WebhookInvalidUpdateWebhookErrorResponse
+	s.WebhookInvalid = v
+}
+
+// GetWebhookInvalid returns WebhookInvalid and true boolean if UpdateWebhookErrorResponse is WebhookInvalid.
+func (s UpdateWebhookErrorResponse) GetWebhookInvalid() (v WebhookInvalid, ok bool) {
+	if !s.IsWebhookInvalid() {
+		return v, false
+	}
+	return s.WebhookInvalid, true
+}
+
+// NewWebhookInvalidUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from WebhookInvalid.
+func NewWebhookInvalidUpdateWebhookErrorResponse(v WebhookInvalid) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetWebhookInvalid(v)
+	return s
+}
+
+// SetWebhookNotFound sets UpdateWebhookErrorResponse to WebhookNotFound.
+func (s *UpdateWebhookErrorResponse) SetWebhookNotFound(v WebhookNotFound) {
+	s.Type = WebhookNotFoundUpdateWebhookErrorResponse
+	s.WebhookNotFound = v
+}
+
+// GetWebhookNotFound returns WebhookNotFound and true boolean if UpdateWebhookErrorResponse is WebhookNotFound.
+func (s UpdateWebhookErrorResponse) GetWebhookNotFound() (v WebhookNotFound, ok bool) {
+	if !s.IsWebhookNotFound() {
+		return v, false
+	}
+	return s.WebhookNotFound, true
+}
+
+// NewWebhookNotFoundUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from WebhookNotFound.
+func NewWebhookNotFoundUpdateWebhookErrorResponse(v WebhookNotFound) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetWebhookNotFound(v)
+	return s
+}
+
+// SetWebhookPermissionDenied sets UpdateWebhookErrorResponse to WebhookPermissionDenied.
+func (s *UpdateWebhookErrorResponse) SetWebhookPermissionDenied(v WebhookPermissionDenied) {
+	s.Type = WebhookPermissionDeniedUpdateWebhookErrorResponse
+	s.WebhookPermissionDenied = v
+}
+
+// GetWebhookPermissionDenied returns WebhookPermissionDenied and true boolean if UpdateWebhookErrorResponse is WebhookPermissionDenied.
+func (s UpdateWebhookErrorResponse) GetWebhookPermissionDenied() (v WebhookPermissionDenied, ok bool) {
+	if !s.IsWebhookPermissionDenied() {
+		return v, false
+	}
+	return s.WebhookPermissionDenied, true
+}
+
+// NewWebhookPermissionDeniedUpdateWebhookErrorResponse returns new UpdateWebhookErrorResponse from WebhookPermissionDenied.
+func NewWebhookPermissionDeniedUpdateWebhookErrorResponse(v WebhookPermissionDenied) UpdateWebhookErrorResponse {
+	var s UpdateWebhookErrorResponse
+	s.SetWebhookPermissionDenied(v)
+	return s
+}
+
+// UpdateWebhookErrorResponseStatusCode wraps UpdateWebhookErrorResponse with StatusCode.
+type UpdateWebhookErrorResponseStatusCode struct {
+	StatusCode int
+	Response   UpdateWebhookErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *UpdateWebhookErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *UpdateWebhookErrorResponseStatusCode) GetResponse() UpdateWebhookErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *UpdateWebhookErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UpdateWebhookErrorResponseStatusCode) SetResponse(val UpdateWebhookErrorResponse) {
+	s.Response = val
+}
+
+func (*UpdateWebhookErrorResponseStatusCode) updateWebhookRes() {}
+
+type UpdateWebhookForbidden ErrorDetails
+
+func (*UpdateWebhookForbidden) updateWebhookRes() {}
+
+type UpdateWebhookNotFound ErrorDetails
+
+func (*UpdateWebhookNotFound) updateWebhookRes() {}
+
+// The fields of the webhook to change. A field you leave out keeps its
+// value. The body names at least one field.
+// Ref: #
+type UpdateWebhookRequest struct {
+	URL OptWebhookURL `json:"url"`
+	// A note on what the webhook is for. Send `""` to remove it.
+	Description OptString         `json:"description"`
+	EventTypes  WebhookEventTypes `json:"event_types"`
+	// Whether the server sends events to the webhook. `false` stops
+	// delivery. `true` starts it again from now: events stored while the
+	// webhook was disabled are not sent.
+	Enabled OptBool `json:"enabled"`
+}
+
+// GetURL returns the value of URL.
+func (s *UpdateWebhookRequest) GetURL() OptWebhookURL {
+	return s.URL
+}
+
+// GetDescription returns the value of Description.
+func (s *UpdateWebhookRequest) GetDescription() OptString {
+	return s.Description
+}
+
+// GetEventTypes returns the value of EventTypes.
+func (s *UpdateWebhookRequest) GetEventTypes() WebhookEventTypes {
+	return s.EventTypes
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *UpdateWebhookRequest) GetEnabled() OptBool {
+	return s.Enabled
+}
+
+// SetURL sets the value of URL.
+func (s *UpdateWebhookRequest) SetURL(val OptWebhookURL) {
+	s.URL = val
+}
+
+// SetDescription sets the value of Description.
+func (s *UpdateWebhookRequest) SetDescription(val OptString) {
+	s.Description = val
+}
+
+// SetEventTypes sets the value of EventTypes.
+func (s *UpdateWebhookRequest) SetEventTypes(val WebhookEventTypes) {
+	s.EventTypes = val
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *UpdateWebhookRequest) SetEnabled(val OptBool) {
+	s.Enabled = val
+}
+
+type UpdateWebhookUnauthorized ErrorDetails
+
+func (*UpdateWebhookUnauthorized) updateWebhookRes() {}
+
 // A user is an individual identity in the system. It can represent a person, a
 // service account or any other type of identity.
 // `attributes` is the document that satisfies the user schema named by
@@ -106784,6 +108887,161 @@ func NewPasskeyProofVerifyChallengeRequestSum(v PasskeyProof) VerifyChallengeReq
 	return s
 }
 
+// A webhook of a project: a URL the server POSTs the project's events to,
+// and the event types it gets. It never carries the signing secret, which
+// only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
+// (`POST /webhooks/{id}/rotate_secret`) return.
+// A webhook is failing when `last_error_at` is later than
+// `last_delivered_at`, or is set while `last_delivered_at` is `null`: its
+// last attempt failed. The server retries, and holds back the webhook's
+// later events until an attempt succeeds. When the endpoint has failed for
+// 3 days without a success, or answers `410`, the server sets `enabled` to
+// `false` and stops sending.
+// Ref: #
+type Webhook struct {
+	ID        WebhookID  `json:"id"`
+	ProjectID ProjectID  `json:"project_id"`
+	URL       WebhookURL `json:"url"`
+	// A note on what the webhook is for. Empty when none was given.
+	Description string            `json:"description"`
+	EventTypes  WebhookEventTypes `json:"event_types"`
+	// Whether the server sends events to the webhook. The server sets it to
+	// `false` itself when the endpoint has failed for 3 days without a
+	// success, or answers `410`. Set it back to `true` with `updateWebhook`
+	// (`PATCH /webhooks/{id}`).
+	Enabled bool `json:"enabled"`
+	// When the endpoint last acknowledged an event. `null` until the first
+	// delivery.
+	LastDeliveredAt NilDateTime `json:"last_delivered_at"`
+	// The HTTP status the endpoint answered the last failed attempt with.
+	// `null` when no attempt has failed, and also when the attempt at
+	// `last_error_at` got no response: the connection failed, or the
+	// endpoint did not answer within 10 seconds. It is never `0`.
+	LastErrorStatus NilInt32 `json:"last_error_status"`
+	// When a delivery attempt last failed. `null` when none has. A later
+	// success does not clear it: compare it with `last_delivered_at`.
+	LastErrorAt NilDateTime `json:"last_error_at"`
+	// Until when deliveries are also signed with the secret that
+	// `rotateWebhookSecret` replaced: 24 hours from the rotation. `null`
+	// when no rotation is in progress.
+	PreviousSecretExpiresAt NilDateTime `json:"previous_secret_expires_at"`
+	// When the webhook was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *Webhook) GetID() WebhookID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Webhook) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetURL returns the value of URL.
+func (s *Webhook) GetURL() WebhookURL {
+	return s.URL
+}
+
+// GetDescription returns the value of Description.
+func (s *Webhook) GetDescription() string {
+	return s.Description
+}
+
+// GetEventTypes returns the value of EventTypes.
+func (s *Webhook) GetEventTypes() WebhookEventTypes {
+	return s.EventTypes
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *Webhook) GetEnabled() bool {
+	return s.Enabled
+}
+
+// GetLastDeliveredAt returns the value of LastDeliveredAt.
+func (s *Webhook) GetLastDeliveredAt() NilDateTime {
+	return s.LastDeliveredAt
+}
+
+// GetLastErrorStatus returns the value of LastErrorStatus.
+func (s *Webhook) GetLastErrorStatus() NilInt32 {
+	return s.LastErrorStatus
+}
+
+// GetLastErrorAt returns the value of LastErrorAt.
+func (s *Webhook) GetLastErrorAt() NilDateTime {
+	return s.LastErrorAt
+}
+
+// GetPreviousSecretExpiresAt returns the value of PreviousSecretExpiresAt.
+func (s *Webhook) GetPreviousSecretExpiresAt() NilDateTime {
+	return s.PreviousSecretExpiresAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Webhook) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *Webhook) SetID(val WebhookID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Webhook) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetURL sets the value of URL.
+func (s *Webhook) SetURL(val WebhookURL) {
+	s.URL = val
+}
+
+// SetDescription sets the value of Description.
+func (s *Webhook) SetDescription(val string) {
+	s.Description = val
+}
+
+// SetEventTypes sets the value of EventTypes.
+func (s *Webhook) SetEventTypes(val WebhookEventTypes) {
+	s.EventTypes = val
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *Webhook) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// SetLastDeliveredAt sets the value of LastDeliveredAt.
+func (s *Webhook) SetLastDeliveredAt(val NilDateTime) {
+	s.LastDeliveredAt = val
+}
+
+// SetLastErrorStatus sets the value of LastErrorStatus.
+func (s *Webhook) SetLastErrorStatus(val NilInt32) {
+	s.LastErrorStatus = val
+}
+
+// SetLastErrorAt sets the value of LastErrorAt.
+func (s *Webhook) SetLastErrorAt(val NilDateTime) {
+	s.LastErrorAt = val
+}
+
+// SetPreviousSecretExpiresAt sets the value of PreviousSecretExpiresAt.
+func (s *Webhook) SetPreviousSecretExpiresAt(val NilDateTime) {
+	s.PreviousSecretExpiresAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Webhook) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*Webhook) getWebhookRes()    {}
+func (*Webhook) updateWebhookRes() {}
+
 // Ref: #
 type WebhookDelivered struct {
 	StatusCode int
@@ -106848,6 +109106,118 @@ func (*WebhookDelivered) userUpdatedRes()                {}
 func (*WebhookDelivered) variableRemovedRes()            {}
 func (*WebhookDelivered) variableSetRes()                {}
 
+type WebhookEventType string
+
+type WebhookEventTypes []WebhookEventType
+
+type WebhookID string
+
+// Merged schema.
+// Ref: #
+type WebhookInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptWebhookInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *WebhookInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *WebhookInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *WebhookInvalid) GetDetails() OptWebhookInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *WebhookInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *WebhookInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *WebhookInvalid) SetDetails(val OptWebhookInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type WebhookInvalidDetails map[string]jx.Raw
+
+func (s *WebhookInvalidDetails) init() WebhookInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type WebhookLimitReached struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptWebhookLimitReachedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *WebhookLimitReached) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *WebhookLimitReached) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *WebhookLimitReached) GetDetails() OptWebhookLimitReachedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *WebhookLimitReached) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *WebhookLimitReached) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *WebhookLimitReached) SetDetails(val OptWebhookLimitReachedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type WebhookLimitReachedDetails map[string]jx.Raw
+
+func (s *WebhookLimitReachedDetails) init() WebhookLimitReachedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type WebhookNotDelivered struct {
 	StatusCode int
@@ -106911,3 +109281,271 @@ func (*WebhookNotDelivered) userDeletedRes()                {}
 func (*WebhookNotDelivered) userUpdatedRes()                {}
 func (*WebhookNotDelivered) variableRemovedRes()            {}
 func (*WebhookNotDelivered) variableSetRes()                {}
+
+// Merged schema.
+// Ref: #
+type WebhookNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptWebhookNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *WebhookNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *WebhookNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *WebhookNotFound) GetDetails() OptWebhookNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *WebhookNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *WebhookNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *WebhookNotFound) SetDetails(val OptWebhookNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type WebhookNotFoundDetails map[string]jx.Raw
+
+func (s *WebhookNotFoundDetails) init() WebhookNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type WebhookPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptWebhookPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *WebhookPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *WebhookPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *WebhookPermissionDenied) GetDetails() OptWebhookPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *WebhookPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *WebhookPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *WebhookPermissionDenied) SetDetails(val OptWebhookPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type WebhookPermissionDeniedDetails map[string]jx.Raw
+
+func (s *WebhookPermissionDeniedDetails) init() WebhookPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type WebhookURL string
+
+// Merged schema.
+// Ref: #
+type WebhookWithSecret struct {
+	ID        WebhookID  `json:"id"`
+	ProjectID ProjectID  `json:"project_id"`
+	URL       WebhookURL `json:"url"`
+	// A note on what the webhook is for. Empty when none was given.
+	Description string            `json:"description"`
+	EventTypes  WebhookEventTypes `json:"event_types"`
+	// Whether the server sends events to the webhook. The server sets it to
+	// `false` itself when the endpoint has failed for 3 days without a
+	// success, or answers `410`. Set it back to `true` with `updateWebhook`
+	// (`PATCH /webhooks/{id}`).
+	Enabled bool `json:"enabled"`
+	// When the endpoint last acknowledged an event. `null` until the first
+	// delivery.
+	LastDeliveredAt NilDateTime `json:"last_delivered_at"`
+	// The HTTP status the endpoint answered the last failed attempt with.
+	// `null` when no attempt has failed, and also when the attempt at
+	// `last_error_at` got no response: the connection failed, or the
+	// endpoint did not answer within 10 seconds. It is never `0`.
+	LastErrorStatus NilInt32 `json:"last_error_status"`
+	// When a delivery attempt last failed. `null` when none has. A later
+	// success does not clear it: compare it with `last_delivered_at`.
+	LastErrorAt NilDateTime `json:"last_error_at"`
+	// Until when deliveries are also signed with the secret that
+	// `rotateWebhookSecret` replaced: 24 hours from the rotation. `null`
+	// when no rotation is in progress.
+	PreviousSecretExpiresAt NilDateTime `json:"previous_secret_expires_at"`
+	// When the webhook was created.
+	CreatedAt time.Time `json:"created_at"`
+	// The secret the server signs the webhook's deliveries with: `whsec_`
+	// followed by 32 random bytes in base64. The server generates it; a
+	// caller cannot choose it.
+	Secret string `json:"secret"`
+}
+
+// GetID returns the value of ID.
+func (s *WebhookWithSecret) GetID() WebhookID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *WebhookWithSecret) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetURL returns the value of URL.
+func (s *WebhookWithSecret) GetURL() WebhookURL {
+	return s.URL
+}
+
+// GetDescription returns the value of Description.
+func (s *WebhookWithSecret) GetDescription() string {
+	return s.Description
+}
+
+// GetEventTypes returns the value of EventTypes.
+func (s *WebhookWithSecret) GetEventTypes() WebhookEventTypes {
+	return s.EventTypes
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *WebhookWithSecret) GetEnabled() bool {
+	return s.Enabled
+}
+
+// GetLastDeliveredAt returns the value of LastDeliveredAt.
+func (s *WebhookWithSecret) GetLastDeliveredAt() NilDateTime {
+	return s.LastDeliveredAt
+}
+
+// GetLastErrorStatus returns the value of LastErrorStatus.
+func (s *WebhookWithSecret) GetLastErrorStatus() NilInt32 {
+	return s.LastErrorStatus
+}
+
+// GetLastErrorAt returns the value of LastErrorAt.
+func (s *WebhookWithSecret) GetLastErrorAt() NilDateTime {
+	return s.LastErrorAt
+}
+
+// GetPreviousSecretExpiresAt returns the value of PreviousSecretExpiresAt.
+func (s *WebhookWithSecret) GetPreviousSecretExpiresAt() NilDateTime {
+	return s.PreviousSecretExpiresAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *WebhookWithSecret) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetSecret returns the value of Secret.
+func (s *WebhookWithSecret) GetSecret() string {
+	return s.Secret
+}
+
+// SetID sets the value of ID.
+func (s *WebhookWithSecret) SetID(val WebhookID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *WebhookWithSecret) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetURL sets the value of URL.
+func (s *WebhookWithSecret) SetURL(val WebhookURL) {
+	s.URL = val
+}
+
+// SetDescription sets the value of Description.
+func (s *WebhookWithSecret) SetDescription(val string) {
+	s.Description = val
+}
+
+// SetEventTypes sets the value of EventTypes.
+func (s *WebhookWithSecret) SetEventTypes(val WebhookEventTypes) {
+	s.EventTypes = val
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *WebhookWithSecret) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// SetLastDeliveredAt sets the value of LastDeliveredAt.
+func (s *WebhookWithSecret) SetLastDeliveredAt(val NilDateTime) {
+	s.LastDeliveredAt = val
+}
+
+// SetLastErrorStatus sets the value of LastErrorStatus.
+func (s *WebhookWithSecret) SetLastErrorStatus(val NilInt32) {
+	s.LastErrorStatus = val
+}
+
+// SetLastErrorAt sets the value of LastErrorAt.
+func (s *WebhookWithSecret) SetLastErrorAt(val NilDateTime) {
+	s.LastErrorAt = val
+}
+
+// SetPreviousSecretExpiresAt sets the value of PreviousSecretExpiresAt.
+func (s *WebhookWithSecret) SetPreviousSecretExpiresAt(val NilDateTime) {
+	s.PreviousSecretExpiresAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *WebhookWithSecret) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *WebhookWithSecret) SetSecret(val string) {
+	s.Secret = val
+}
+
+func (*WebhookWithSecret) createWebhookRes()       {}
+func (*WebhookWithSecret) rotateWebhookSecretRes() {}
