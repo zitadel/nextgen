@@ -31,7 +31,7 @@ Much of what that needs exists:
 - the spec documents one webhook per event type, whose body is the event as
   `GET /events` returns it;
 - `webhook.read`, `webhook.write` and `webhook.delete` are reserved scopes,
-  and the resource map names `/projects/{id}/webhooks`.
+  and the resource map sketches the resource.
 
 **In scope:** a webhook resource a project's administrators manage; a filter
 by event type; a signature on every delivery and the secret behind it;
@@ -39,6 +39,7 @@ delivery to customer-chosen URLs; a version pin; API, console and CLI.
 
 **Not in scope:** a log of every delivery attempt; retrying each event on its
 own schedule; filters other than the event type; team-scoped webhooks;
+sending a test event;
 versions of the payload (§6).
 
 ## Decision
@@ -57,10 +58,9 @@ or a rollback never changes where events go.
   "description": "User sync",
   "event_types": ["user.created", "user.updated", "user.deleted"],
   "enabled": true,
-  "status": "active",                    // active | failing | disabled
   "last_delivered_at": "2026-11-11T10:00:12Z",
-  "last_error": null,                    // { "status": 503, "at": "…" }
-  "consecutive_failures": 0,
+  "last_error_at": null,
+  "last_error_status": null,             // the HTTP status; null with no response
   "previous_secret_expires_at": null,
   "created_at": "2026-11-11T10:00:00Z",
   // Only in the responses to create and rotate_secret:
@@ -75,17 +75,19 @@ or a rollback never changes where events go.
   `webhook.*`, as an application's are `application.*` beside its `app`
   prefix.
 - **`url`** is `https`, at most 2048 characters, with no userinfo.
-- **`event_types`** holds values of the enum `GET /events` filters by, or the
-  single entry `*`.
+- **`event_types`** holds event types as `GET /events` names them, each
+  once, or the single entry `*`. It is never empty.
   - `*` is every type the server writes, those added later included, except
     `request.api`. That type is every API call, and a receiver that calls the
     API for each event it gets would feed itself. It is delivered only when
     named.
-  - The list is checked against the enum on write only. A stored type the
+  - The list is checked against the types the server writes, on write only.
+    A stored type the
     running server does not know matches nothing and is not an error, so a
     retired type and a rolled-back server both keep the webhook working.
-- **`status`** is derived: `disabled` when `enabled` is false, `failing` when
-  the last attempt failed, otherwise `active`.
+- There is no `status` field. A webhook is failing when `last_error_at` is
+  later than `last_delivered_at`, and a reader works that out: a field that
+  only restates two others is one more thing to keep true.
 - A project holds at most 10 webhooks. Two projects, or two webhooks of one
   project, may name the same URL: the unique key `(type, scope, url)` is
   dropped for project sinks.
@@ -121,9 +123,12 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
   base64. A caller cannot choose it.
 - It is returned once, in the response to create and to `rotate_secret`. No
   other response, event or log carries it.
+- Both operations take an `Idempotency-Key`, as creating an application
+  does: a caller whose response was lost repeats the request and gets the
+  same secret, where otherwise nobody would hold it.
 - It is stored encrypted with the project's secret encryption key
-  ([ADR 029](029-cryptography-secrets-and-key-lifecycle.md)), the way a secret
-  variable is. It is not a variable: a variable is frozen per deployment and
+  ([ADR 029](029-cryptography-secrets-and-key-lifecycle.md)), through the
+  `KeyService` the variable service encrypts a secret variable with. It is not a variable: a variable is frozen per deployment and
   split by target kind ([ADR 069](069-variables-per-kind-frozen-per-deployment.md)),
   and one name holds one value.
 - `rotate_secret` issues a new secret and keeps the previous one valid for 24
@@ -159,9 +164,6 @@ ADR 049. What changes for a project's webhook:
 - **Isolation.** Webhooks ship concurrently, each within its own time budget,
   so a slow endpoint delays only itself.
 
-`POST …/test` sends one `webhook.test` event to that webhook alone, signed as
-any other, and answers with the endpoint's status. The event is not stored.
-
 ### 5. Events
 
 `webhook.created`, `webhook.updated`, `webhook.deleted`,
@@ -184,16 +186,21 @@ may be added, and a receiver ignores what it does not know.
 
 | Operation | Request | Permission |
 |---|---|---|
-| List | `GET /projects/{project_id}/webhooks` | `webhook.read` |
-| Get | `GET /projects/{project_id}/webhooks/{id}` | `webhook.read` |
-| Create | `POST /projects/{project_id}/webhooks` | `webhook.write` |
-| Update | `PATCH /projects/{project_id}/webhooks/{id}` | `webhook.write` |
-| Delete | `DELETE /projects/{project_id}/webhooks/{id}` | `webhook.delete` |
-| Rotate the secret | `POST …/webhooks/{id}/rotate_secret` | `webhook.write` |
-| Send a test event | `POST …/webhooks/{id}/test` | `webhook.write` |
+| List | `GET /webhooks` | `webhook.read` |
+| Get | `GET /webhooks/{id}` | `webhook.read` |
+| Create | `POST /webhooks` | `webhook.write` |
+| Update | `PATCH /webhooks/{id}` | `webhook.write` |
+| Delete | `DELETE /webhooks/{id}` | `webhook.delete` |
+| Rotate the secret | `POST /webhooks/{id}/rotate_secret` | `webhook.write` |
 
+- The paths are flat and name the project as `/invitations`, `/idps`,
+  `/policies` and `/variables` do. `/projects/{project_id}/…` holds only a
+  project's own properties.
+- Every operation takes an API credential with the scope, or the console's
+  session cookie.
 - Create takes `url`, `event_types` and optionally `description`. `PATCH`
-  takes those and `enabled`.
+  takes those and `enabled`, and at least one of them.
+- Delete removes the row. There is no deleted state.
 - The three permissions are the reserved scopes, added to the system catalog.
   A team-scoped credential holds none of them.
 
@@ -201,7 +208,7 @@ may be added, and a receiver ignores what it does not know.
 
 A project gets a Webhooks page: the list with each webhook's status and last
 delivery, a form to add one, and a page per webhook to edit it, enable or
-disable it, rotate its secret and send a test event.
+disable it and rotate its secret.
 
 - The form chooses event types from the list Logs filters by, grouped the
   same way, or "All events".
@@ -247,6 +254,10 @@ disable it, rotate its secret and send a test event.
 - **Stripe's `t=…,v1=…` header.** It carries the same HMAC. Standard Webhooks
   has verification libraries in most languages, so the SDKs need not ship one
   each.
+- **Paths under `/projects/{project_id}/webhooks`**, as the resource map
+  sketched. Every project-scoped resource added since is flat.
+- **A `status` field, a failure counter and a nested `last_error`.** Each
+  restates what `enabled` and two timestamps already say.
 - **`sink_` ids for webhooks.** One prefix per table, but "sink" is the
   export's internal word and a customer manages a webhook.
 - **An envelope around the event.** The event already carries its id, type
